@@ -1,0 +1,322 @@
+================================================================================
+ LT MARKETPLACE SUITE — MANUAL DEL VENDEDOR
+ Versión 1.5.0 | Español
+================================================================================
+
+ÍNDICE
+------
+1. Primeros Pasos
+2. Panel de Control (Dashboard)
+3. Gestión de Pedidos
+4. Billetera y Retiros
+5. Catálogo de Productos
+6. Red de Afiliados (MLM)
+7. Verificación de Identidad (KYC)
+8. Configuración de la Tienda
+9. Notificaciones
+10. Preguntas Frecuentes
+
+================================================================================
+1. PRIMEROS PASOS
+================================================================================
+
+Registro
+--------
+1. Ir a /ltms-registro/ en el sitio web
+2. Completar los 3 pasos del formulario:
+   - Paso 1: Datos personales (nombre, email, documento)
+   - Paso 2: Datos de tu tienda (nombre, descripción, código de referido)
+   - Paso 3: Contraseña y aceptación de términos
+3. Recibirás un email de bienvenida con instrucciones
+
+Inicio de Sesión
+----------------
+1. Ir a /ltms-login/
+2. Ingresar usuario o email y contraseña
+3. Marcar "Recordarme" para sesiones persistentes
+
+IMPORTANTE: Si intentas ingresar más de 5 veces incorrectamente,
+tu acceso quedará bloqueado por 15 minutos.
+
+================================================================================
+2. PANEL DE CONTROL (DASHBOARD)
+================================================================================
+
+La pantalla de inicio muestra:
+
+  📊 VENTAS DEL MES      Suma de todos tus pedidos del mes actual
+  📦 PEDIDOS             Cantidad de pedidos recibidos este mes
+  💰 COMISIONES          Dinero acreditado a tu billetera este mes
+  💳 SALDO DISPONIBLE    Saldo actual en tu billetera
+
+Gráfico de Ventas
+-----------------
+Muestra tus ventas y comisiones de los últimos 12 meses.
+
+Navegación
+----------
+El menú lateral izquierdo te permite acceder a:
+  🏠 Inicio      - Métricas y gráficos
+  📦 Pedidos     - Lista de pedidos
+  💰 Billetera   - Saldo y movimientos
+  🛍️ Productos   - Tu catálogo
+  ⚙️ Configuración - Datos de tu tienda
+
+================================================================================
+3. GESTIÓN DE PEDIDOS
+================================================================================
+
+Ver Pedidos
+-----------
+1. Click en "Pedidos" en el menú lateral
+2. Filtra por estado: Todos / Procesando / Completado / Cancelado
+
+Cada pedido muestra:
+  - Número de pedido (#XXXX)
+  - Nombre del comprador
+  - Productos comprados
+  - Total del pedido
+  - Estado actual
+  - Fecha
+
+Estados de Pedido
+-----------------
+  🔵 Procesando    Pago recibido, pedido en preparación
+  🟢 Completado    Pedido entregado exitosamente
+  🔴 Cancelado     Pedido cancelado
+  🟡 En espera     Requiere revisión manual
+
+Actualizar Estado
+-----------------
+Los estados se actualizan automáticamente según el flujo de pago y envío.
+Si necesitas actualizar manualmente, contacta al administrador.
+
+================================================================================
+4. BILLETERA Y RETIROS
+================================================================================
+
+Tu Billetera
+------------
+  💰 Saldo total         Todo el dinero que has ganado
+  🔒 Saldo retenido      Dinero reservado para retiros en proceso
+  ✅ Saldo disponible    Dinero que puedes retirar ahora
+
+Cómo Funcionan las Comisiones
+------------------------------
+Cuando un comprador paga un pedido:
+1. El sistema calcula la comisión de la plataforma (aprox. 10%)
+2. Se descuentan impuestos aplicables (ReteFuente, ReteICA, etc.)
+3. El saldo neto se acredita automáticamente a tu billetera
+4. Recibes un email de confirmación
+
+Solicitar un Retiro
+-------------------
+1. Ve a "Billetera" en el menú
+2. Click en "Solicitar Retiro"
+3. Ingresa el monto (mínimo: $50,000 COP / $500 MXN)
+4. Selecciona el método de pago:
+   - Transferencia bancaria
+   - Nequi (Colombia)
+   - Daviplata (Colombia)
+   - SPEI (México)
+5. Confirma los datos bancarios
+6. El retiro se procesa en 1-3 días hábiles
+
+⚠️ REQUISITOS PARA RETIRAR:
+  - Tener verificación KYC aprobada
+  - No tener la billetera congelada
+  - Máximo 3 solicitudes pendientes simultáneas
+
+Historial de Movimientos
+-------------------------
+La tabla de movimientos muestra:
+  - Tipo (comisión, retiro, referido, ajuste)
+  - Descripción
+  - Monto (positivo=ingreso, negativo=egreso)
+  - Saldo después del movimiento
+  - Fecha
+
+================================================================================
+5. CATÁLOGO DE PRODUCTOS
+================================================================================
+
+Ver tus Productos
+-----------------
+Ve a "Productos" para ver tu catálogo actual con:
+  - Imagen del producto
+  - Nombre y precio
+  - Estado (publicado / borrador / sin stock)
+  - Accesos rápidos a editar / ver en tienda
+
+Agregar Productos
+-----------------
+Los productos se gestionan desde WooCommerce admin:
+1. Login en wp-admin
+2. Ve a Productos > Agregar nuevo
+3. Asegúrate de que el producto esté asignado a tu tienda
+
+================================================================================
+6. RED DE AFILIADOS (MLM)
+================================================================================
+
+Cómo Funciona
+-------------
+Tienes un código de referido único (ej: CARLR4X2).
+Cuando otro vendedor se registra usando tu código:
+  - Se convierte en tu referido de Nivel 1
+  - Cuando ellos venden, ganas una comisión de sus ventas
+  - Hasta 3 niveles de profundidad
+
+Comisiones por Referido
+-----------------------
+  Nivel 1 (referidos directos):   40% del fee de plataforma generado
+  Nivel 2 (referidos de tus referidos): 20%
+  Nivel 3:                         10%
+
+Ejemplo:
+  - Tu referido vende $100,000
+  - Fee plataforma (10%) = $10,000
+  - Tu comisión nivel 1 = $4,000 (40% de $10,000)
+
+Ver tu Red
+----------
+La sección de referidos en Configuración muestra:
+  - Tu código de referido
+  - Total de referidos activos
+  - Comisiones ganadas por referidos
+  - Árbol visual de tu red (hasta 3 niveles)
+
+Cómo Invitar
+------------
+  1. Copia tu código desde la sección "Afiliados"
+  2. Comparte el enlace: tusitio.com/ltms-registro/?ref=TUCODIGO
+  3. O comparte el código directamente
+
+================================================================================
+7. VERIFICACIÓN DE IDENTIDAD (KYC)
+================================================================================
+
+¿Por qué es necesaria?
+-----------------------
+La verificación KYC (Know Your Customer) es obligatoria para:
+  - Solicitar retiros de tu billetera
+  - Cumplir con regulaciones antilavado (SAGRILAFT en Colombia)
+  - Construir confianza con los compradores
+
+Documentos Requeridos
+---------------------
+Colombia:
+  - Cédula de ciudadanía o cédula de extranjería
+  - RUT actualizado
+  - Certificación bancaria
+
+México:
+  - INE/IFE o pasaporte
+  - RFC
+  - Estado de cuenta bancaria reciente
+
+Proceso
+-------
+1. Ve a Configuración > Documentos KYC
+2. Sube los documentos requeridos (JPG, PNG o PDF)
+3. Espera la revisión del equipo (1-2 días hábiles)
+4. Recibirás email con el resultado
+
+Estados KYC
+-----------
+  ⏳ Pendiente    Documentos enviados, en cola de revisión
+  🔍 En revisión  El equipo está revisando tus documentos
+  ✅ Aprobado     Verificación exitosa, retiros habilitados
+  ❌ Rechazado    Documentos no válidos (ver motivo en email)
+
+================================================================================
+8. CONFIGURACIÓN DE LA TIENDA
+================================================================================
+
+Ve a "Configuración" para actualizar:
+
+Datos de la Tienda
+------------------
+  - Nombre de la tienda
+  - Teléfono de contacto
+  - Descripción de la tienda
+
+Cuenta Bancaria
+---------------
+Tu número de cuenta se cifra con AES-256. Solo se muestra
+los últimos 4 dígitos por seguridad.
+
+Cambiar Contraseña
+------------------
+Usa la opción de WordPress "Olvidé mi contraseña" en /ltms-login/.
+
+================================================================================
+9. NOTIFICACIONES
+================================================================================
+
+Notificaciones en el Panel
+---------------------------
+El icono 🔔 en la barra superior muestra notificaciones no leídas.
+Click para abrir el panel de notificaciones.
+
+Las notificaciones se actualizan automáticamente cada 30 segundos.
+
+Tipos de Notificaciones
+-----------------------
+  📦 Nuevo pedido recibido
+  💰 Comisión acreditada
+  ✅ Retiro procesado
+  ❌ Retiro rechazado
+  📋 KYC aprobado/rechazado
+  👥 Nuevo referido registrado
+
+Notificaciones Push (PWA)
+--------------------------
+Si instalas el panel como app en tu móvil, puedes recibir
+notificaciones push en tiempo real.
+
+Para instalar como PWA:
+  1. Abre el panel en Chrome/Safari
+  2. "Agregar a pantalla de inicio"
+  3. Acepta los permisos de notificación
+
+================================================================================
+10. PREGUNTAS FRECUENTES
+================================================================================
+
+¿Por qué no puedo retirar dinero?
+-----------------------------------
+Revisa estos requisitos:
+  1. Verificación KYC aprobada
+  2. Saldo disponible mayor al mínimo ($50,000 COP / $500 MXN)
+  3. Billetera no congelada
+  4. Máximo 3 retiros pendientes
+
+¿Cuánto tiempo tarda el retiro?
+---------------------------------
+Los retiros se procesan en 1-3 días hábiles.
+Transferencias bancarias pueden tomar hasta 2 días adicionales.
+
+¿Cómo calculo mi comisión neta?
+---------------------------------
+Comisión neta = Valor del pedido × (1 - % fee plataforma) - impuestos
+
+Ejemplo Colombia (pedido $100,000):
+  - Fee plataforma (10%) = $10,000
+  - ReteFuente (3.5%) = $3,500
+  - ReteICA (aprox 0.4%) = $400
+  - Neto recibido ≈ $86,100
+
+¿Puedo tener múltiples tiendas?
+---------------------------------
+Actualmente, cada cuenta solo puede tener una tienda.
+Para múltiples tiendas necesitas diferentes cuentas de email.
+
+¿Cómo contacto al soporte?
+-----------------------------
+Desde tu panel ve a Configuración > Soporte, o escribe a:
+soporte@ltmarketplace.co
+
+================================================================================
+ FIN DEL MANUAL DEL VENDEDOR — LT Marketplace Suite v1.5.0
+================================================================================

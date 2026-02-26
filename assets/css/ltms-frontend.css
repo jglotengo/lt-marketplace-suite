@@ -1,0 +1,452 @@
+/**
+ * LT Marketplace Suite - Frontend CSS
+ * Estilos complementarios para el panel SPA del vendedor
+ * Version: 1.5.0
+ */
+
+/* ── Productos del Vendedor ─────────────────────────────────── */
+.ltms-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.ltms-product-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--ltms-radius);
+    overflow: hidden;
+    transition: box-shadow 0.15s;
+}
+
+.ltms-product-card:hover {
+    box-shadow: var(--ltms-shadow);
+}
+
+.ltms-product-card .ltms-product-img {
+    aspect-ratio: 4 / 3;
+    background: #f4f7f9;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ltms-product-card .ltms-product-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ltms-product-card .ltms-product-body {
+    padding: 14px;
+}
+
+.ltms-product-card .ltms-product-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--ltms-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ltms-product-card .ltms-product-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ltms-primary);
+}
+
+.ltms-product-card .ltms-product-actions {
+    display: flex;
+    gap: 6px;
+    padding: 12px 14px;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* ── Formulario de Producto ─────────────────────────────────── */
+.ltms-product-form .ltms-form-field {
+    margin-bottom: 18px;
+}
+
+.ltms-product-form label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: var(--ltms-dark);
+}
+
+.ltms-product-form input[type="text"],
+.ltms-product-form input[type="number"],
+.ltms-product-form input[type="email"],
+.ltms-product-form select,
+.ltms-product-form textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    background: #fff;
+}
+
+.ltms-product-form input:focus,
+.ltms-product-form select:focus,
+.ltms-product-form textarea:focus {
+    outline: none;
+    border-color: var(--ltms-secondary);
+    box-shadow: 0 0 0 3px rgba(41,128,185,0.12);
+}
+
+/* ── Upload de Imágenes ─────────────────────────────────────── */
+.ltms-image-upload-area {
+    border: 2px dashed #d1d5db;
+    border-radius: var(--ltms-radius);
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.ltms-image-upload-area:hover,
+.ltms-image-upload-area.drag-over {
+    border-color: var(--ltms-secondary);
+    background: #f0f7ff;
+}
+
+.ltms-image-upload-area .ltms-upload-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: #9ca3af;
+}
+
+.ltms-image-upload-area p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.ltms-image-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ltms-image-preview-item {
+    aspect-ratio: 1;
+    background: #f4f7f9;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.ltms-image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ltms-image-preview-item .ltms-remove-img {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    line-height: 1;
+}
+
+/* ── KPI Metrics Row ────────────────────────────────────────── */
+.ltms-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.ltms-kpi-mini {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--ltms-radius);
+    padding: 16px;
+    text-align: center;
+}
+
+.ltms-kpi-mini .ltms-kpi-num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ltms-primary);
+    display: block;
+}
+
+.ltms-kpi-mini .ltms-kpi-lbl {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+}
+
+/* ── Modal de Retiro ────────────────────────────────────────── */
+.ltms-payout-modal .ltms-modal-body {
+    max-width: 440px;
+}
+
+.ltms-balance-display {
+    background: linear-gradient(135deg, var(--ltms-primary), var(--ltms-secondary));
+    color: #fff;
+    border-radius: var(--ltms-radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.ltms-balance-display .ltms-balance-num {
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.ltms-balance-display .ltms-balance-lbl {
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+/* ── Steps / Wizard ─────────────────────────────────────────── */
+.ltms-steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    counter-reset: step;
+}
+
+.ltms-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    text-align: center;
+}
+
+.ltms-step::before {
+    counter-increment: step;
+    content: counter(step);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    z-index: 1;
+}
+
+.ltms-step.active::before {
+    background: var(--ltms-primary);
+    color: #fff;
+}
+
+.ltms-step.completed::before {
+    background: var(--ltms-success);
+    color: #fff;
+    content: '✓';
+}
+
+.ltms-step + .ltms-step::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: -50%;
+    width: 100%;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 0;
+}
+
+.ltms-step.completed + .ltms-step::after {
+    background: var(--ltms-success);
+}
+
+.ltms-step-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.ltms-step.active .ltms-step-label {
+    color: var(--ltms-primary);
+    font-weight: 500;
+}
+
+/* ── Notificaciones In-App ──────────────────────────────────── */
+.ltms-notifications-panel {
+    position: fixed;
+    top: var(--ltms-header-h);
+    right: 0;
+    width: 340px;
+    height: calc(100vh - var(--ltms-header-h));
+    background: #fff;
+    border-left: 1px solid #e5e7eb;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.08);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.ltms-notifications-panel.open {
+    transform: translateX(0);
+}
+
+.ltms-notifications-panel .ltms-notif-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: #fff;
+}
+
+.ltms-notif-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.ltms-notif-item:hover {
+    background: #f9fafb;
+}
+
+.ltms-notif-item.unread {
+    border-left: 3px solid var(--ltms-primary);
+    background: #f0f7ff;
+}
+
+.ltms-notif-item .ltms-notif-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 2px;
+}
+
+.ltms-notif-item .ltms-notif-msg {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.ltms-notif-item .ltms-notif-time {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-top: 4px;
+}
+
+/* ── Empty States ───────────────────────────────────────────── */
+.ltms-empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #9ca3af;
+}
+
+.ltms-empty-state .ltms-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.ltms-empty-state h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0 0 8px;
+}
+
+.ltms-empty-state p {
+    font-size: 0.875rem;
+    margin: 0 0 16px;
+}
+
+/* ── Loading Skeleton ───────────────────────────────────────── */
+.ltms-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: ltms-skeleton 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes ltms-skeleton {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Pagination ─────────────────────────────────────────────── */
+.ltms-pagination {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.ltms-pagination .ltms-page-btn {
+    min-width: 36px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ltms-pagination .ltms-page-btn:hover,
+.ltms-pagination .ltms-page-btn.active {
+    background: var(--ltms-primary);
+    color: #fff;
+    border-color: var(--ltms-primary);
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ltms-products-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .ltms-notifications-panel {
+        width: 100%;
+    }
+    .ltms-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .ltms-products-grid {
+        grid-template-columns: 1fr;
+    }
+    .ltms-kpi-row {
+        grid-template-columns: 1fr;
+    }
+    .ltms-steps {
+        display: none; /* Ocultar wizard steps en móvil muy pequeño */
+    }
+}

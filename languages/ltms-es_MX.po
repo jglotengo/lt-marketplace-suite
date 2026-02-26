@@ -1,0 +1,211 @@
+# LT Marketplace Suite - Spanish (Mexico)
+# Copyright (C) 2025 LT Marketplace Suite
+# This file is distributed under the GNU GPL v2 or later.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: LT Marketplace Suite 1.5.0\n"
+"Report-Msgid-Bugs-To: https://github.com/ltms/lt-marketplace-suite/issues\n"
+"POT-Creation-Date: 2025-01-01T00:00:00+00:00\n"
+"PO-Revision-Date: 2025-01-01T00:00:00+00:00\n"
+"Last-Translator: LTMS Team <soporte@ltmarketplace.mx>\n"
+"Language-Team: Spanish (Mexico)\n"
+"Language: es_MX\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.4\n"
+"X-Domain: ltms\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. Plugin Name of the plugin
+msgid "LT Marketplace Suite"
+msgstr "LT Marketplace Suite"
+
+#. Description of the plugin
+msgid "Enterprise multi-vendor marketplace for WooCommerce. Colombia & Mexico."
+msgstr "Marketplace multi-vendedor empresarial para WooCommerce. Colombia y México."
+
+msgid "LT Marketplace"
+msgstr "LT Marketplace"
+
+msgid "Dashboard"
+msgstr "Tablero"
+
+msgid "Vendedores"
+msgstr "Vendedores"
+
+msgid "Pedidos"
+msgstr "Pedidos"
+
+msgid "Billeteras"
+msgstr "Monederos"
+
+msgid "Retiros"
+msgstr "Retiros"
+
+msgid "KYC / Documentos"
+msgstr "KYC / Documentos"
+
+msgid "KYC"
+msgstr "KYC"
+
+msgid "Reportes Fiscales"
+msgstr "Reportes Fiscales"
+
+msgid "Marketing"
+msgstr "Marketing"
+
+msgid "Seguridad / Logs"
+msgstr "Seguridad / Registros"
+
+msgid "Seguridad"
+msgstr "Seguridad"
+
+msgid "Configuración"
+msgstr "Configuración"
+
+msgid "Panel Auditor LTMS"
+msgstr "Panel Auditor LTMS"
+
+msgid "Auditoría LTMS"
+msgstr "Auditoría LTMS"
+
+msgid "Configurar"
+msgstr "Configurar"
+
+msgid "¿Confirmas que deseas eliminar este elemento?"
+msgstr "¿Confirmas que deseas eliminar este elemento?"
+
+msgid "Procesando..."
+msgstr "Procesando..."
+
+msgid "Ocurrió un error. Por favor intenta de nuevo."
+msgstr "Ocurrió un error. Por favor inténtalo de nuevo."
+
+msgid "¡Operación exitosa!"
+msgstr "¡Operación exitosa!"
+
+msgid "El monto mínimo de retiro es %s"
+msgstr "El monto mínimo de retiro es %s"
+
+msgid "Saldo insuficiente para realizar este retiro."
+msgstr "Saldo insuficiente para realizar este retiro."
+
+msgid "Tienes el máximo de solicitudes de retiro pendientes. Espera a que sean procesadas."
+msgstr "Tienes el máximo de solicitudes de retiro pendientes. Espera a que sean procesadas."
+
+msgid "Debes completar la verificación KYC para solicitar retiros."
+msgstr "Debes completar la verificación KYC para solicitar retiros."
+
+msgid "Error al reservar el saldo. Por favor intenta de nuevo."
+msgstr "Error al reservar el saldo. Por favor inténtalo de nuevo."
+
+msgid "Solicitud de retiro enviada. Será procesada en 1-3 días hábiles."
+msgstr "Solicitud de retiro enviada. Se procesará en 1-3 días hábiles."
+
+msgid "Retiro procesado #%d"
+msgstr "Retiro procesado #%d"
+
+msgid "Nuevo Pedido"
+msgstr "Nuevo Pedido"
+
+msgid "Tienes un nuevo pedido #%1$s por %2$s"
+msgstr "Tienes un nuevo pedido #%1$s por %2$s"
+
+msgid "Debes iniciar sesión para acceder al panel."
+msgstr "Debes iniciar sesión para acceder al tablero."
+
+msgid "Iniciar sesión"
+msgstr "Iniciar sesión"
+
+msgid "Esta página es exclusiva para vendedores registrados."
+msgstr "Esta página es exclusiva para vendedores registrados."
+
+msgid "Regístrate como vendedor"
+msgstr "Regístrate como vendedor"
+
+msgid "Demasiados intentos. Espera 15 minutos."
+msgstr "Demasiados intentos. Espera 15 minutos."
+
+msgid "Usuario y contraseña son requeridos."
+msgstr "Usuario y contraseña son requeridos."
+
+msgid "Bienvenido de vuelta."
+msgstr "Bienvenido de vuelta."
+
+msgid "¡Registro exitoso! Bienvenido a la plataforma."
+msgstr "¡Registro exitoso! Bienvenido a la plataforma."
+
+msgid "El nombre es requerido."
+msgstr "El nombre es requerido."
+
+msgid "El apellido es requerido."
+msgstr "El apellido es requerido."
+
+msgid "Email inválido."
+msgstr "Correo electrónico inválido."
+
+msgid "La contraseña debe tener al menos 8 caracteres."
+msgstr "La contraseña debe tener al menos 8 caracteres."
+
+msgid "Las contraseñas no coinciden."
+msgstr "Las contraseñas no coinciden."
+
+msgid "El nombre de tu tienda es requerido."
+msgstr "El nombre de tu tienda es requerido."
+
+msgid "El número de documento es requerido."
+msgstr "El número de documento es requerido."
+
+msgid "Debes aceptar los términos y condiciones."
+msgstr "Debes aceptar los términos y condiciones."
+
+msgid "Ya tienes sesión iniciada."
+msgstr "Ya tienes sesión iniciada."
+
+msgid "Ir al panel"
+msgstr "Ir al tablero"
+
+# Mexico-specific strings
+msgid "RFC"
+msgstr "RFC"
+
+msgid "CURP"
+msgstr "CURP"
+
+msgid "ISR art. 113-A LISR"
+msgstr "ISR art. 113-A LISR"
+
+msgid "IEPS"
+msgstr "IEPS"
+
+msgid "IVA"
+msgstr "IVA"
+
+msgid "CFDI 4.0"
+msgstr "CFDI 4.0"
+
+msgid "RESICO"
+msgstr "RESICO"
+
+msgid "Pesos mexicanos (MXN)"
+msgstr "Pesos mexicanos (MXN)"
+
+msgid "OXXO Pay"
+msgstr "OXXO Pay"
+
+msgid "SPEI - Transferencia Electrónica"
+msgstr "SPEI - Transferencia Electrónica"
+
+msgid "Meses Sin Intereses"
+msgstr "Meses Sin Intereses"
+
+msgid "Pagar antes del"
+msgstr "Pagar antes del"
+
+msgid "CLABE Interbancaria"
+msgstr "CLABE Interbancaria"
+
+msgid "Beneficiario"
+msgstr "Beneficiario"

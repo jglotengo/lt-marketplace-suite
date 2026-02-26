@@ -1,0 +1,394 @@
+/**
+ * LTMS POS (Point of Sale) CSS
+ * Interfaz de punto de venta para vendedores presenciales
+ * Version: 1.5.0
+ */
+
+/* ── Layout ────────────────────────────────────────────────────── */
+.ltms-pos-layout {
+    display: flex;
+    height: calc(100vh - 64px);
+    background: #f3f4f6;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.ltms-pos-catalog {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    border-right: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.ltms-pos-cart {
+    width: 360px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+/* ── Catalog Header & Search ───────────────────────────────────── */
+.ltms-pos-catalog-header {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 1rem;
+}
+
+.ltms-pos-search {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: .5rem .75rem;
+}
+
+.ltms-pos-search input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: .9375rem;
+    color: #111827;
+}
+
+.ltms-pos-search-icon {
+    color: #9ca3af;
+    font-size: 1rem;
+}
+
+.ltms-pos-categories {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: .75rem 0 0;
+}
+
+.ltms-pos-categories::-webkit-scrollbar { display: none; }
+
+.ltms-pos-cat-btn {
+    background: #f3f4f6;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    padding: .3rem .875rem;
+    font-size: .8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+    color: #374151;
+}
+
+.ltms-pos-cat-btn.active,
+.ltms-pos-cat-btn:hover {
+    background: #1a5276;
+    color: #fff;
+    border-color: #1a5276;
+}
+
+/* ── Product Grid ──────────────────────────────────────────────── */
+.ltms-pos-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: .75rem;
+}
+
+.ltms-pos-product {
+    background: #fff;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+}
+
+.ltms-pos-product:hover {
+    border-color: #1a5276;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(26,82,118,.15);
+}
+
+.ltms-pos-product:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.ltms-pos-product.out-of-stock {
+    opacity: .5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.ltms-pos-product-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: #f9fafb;
+}
+
+.ltms-pos-product-body {
+    padding: .5rem;
+}
+
+.ltms-pos-product-name {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #111827;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+    min-height: 2.6em;
+}
+
+.ltms-pos-product-price {
+    font-size: .9375rem;
+    font-weight: 700;
+    color: #1a5276;
+    margin-top: .25rem;
+}
+
+.ltms-pos-product-stock {
+    font-size: .6875rem;
+    color: #6b7280;
+}
+
+/* ── Cart ──────────────────────────────────────────────────────── */
+.ltms-pos-cart-header {
+    padding: .875rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ltms-pos-cart-count {
+    background: #1a5276;
+    color: #fff;
+    border-radius: 12px;
+    padding: .15rem .5rem;
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.ltms-pos-cart-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: .5rem 0;
+}
+
+.ltms-pos-cart-empty {
+    text-align: center;
+    color: #9ca3af;
+    padding: 3rem 1rem;
+    font-size: .875rem;
+}
+
+.ltms-pos-cart-item {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .625rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.ltms-pos-cart-item-img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #f3f4f6;
+    flex-shrink: 0;
+}
+
+.ltms-pos-cart-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ltms-pos-cart-item-name {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ltms-pos-cart-item-price {
+    font-size: .875rem;
+    color: #6b7280;
+    margin-top: .125rem;
+}
+
+.ltms-pos-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    flex-shrink: 0;
+}
+
+.ltms-pos-qty-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #374151;
+    transition: all .15s;
+}
+
+.ltms-pos-qty-btn:hover { background: #f3f4f6; }
+.ltms-pos-qty-btn.remove { border-color: #fca5a5; color: #dc2626; }
+.ltms-pos-qty-btn.remove:hover { background: #fef2f2; }
+
+.ltms-pos-qty-value {
+    min-width: 24px;
+    text-align: center;
+    font-size: .875rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ── Cart Footer / Totals ──────────────────────────────────────── */
+.ltms-pos-cart-footer {
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.ltms-pos-totals {
+    margin-bottom: 1rem;
+}
+
+.ltms-pos-total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: .875rem;
+    color: #6b7280;
+    margin-bottom: .375rem;
+}
+
+.ltms-pos-total-row.grand-total {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #111827;
+    padding-top: .5rem;
+    border-top: 1px solid #e5e7eb;
+    margin-top: .5rem;
+}
+
+.ltms-pos-payment-methods {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: .75rem;
+}
+
+.ltms-pos-pay-btn {
+    flex: 1;
+    padding: .5rem;
+    font-size: .75rem;
+    font-weight: 600;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: all .15s;
+    color: #374151;
+}
+
+.ltms-pos-pay-btn.active,
+.ltms-pos-pay-btn:hover {
+    border-color: #1a5276;
+    background: #eff6ff;
+    color: #1a5276;
+}
+
+.ltms-pos-checkout-btn {
+    width: 100%;
+    padding: .875rem;
+    background: #1a5276;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s;
+}
+
+.ltms-pos-checkout-btn:hover { background: #154360; }
+.ltms-pos-checkout-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+/* ── Receipt Modal ─────────────────────────────────────────────── */
+.ltms-pos-receipt {
+    max-width: 320px;
+    margin: 0 auto;
+    font-family: 'Courier New', monospace;
+    font-size: .875rem;
+    color: #111827;
+}
+
+.ltms-pos-receipt-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: .75rem;
+    border-bottom: 1px dashed #9ca3af;
+}
+
+.ltms-pos-receipt-store {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: .25rem;
+}
+
+.ltms-pos-receipt-items {
+    margin-bottom: 1rem;
+}
+
+.ltms-pos-receipt-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: .25rem;
+}
+
+.ltms-pos-receipt-footer {
+    border-top: 1px dashed #9ca3af;
+    padding-top: .75rem;
+    text-align: center;
+    font-size: .75rem;
+    color: #6b7280;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .ltms-pos-layout {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .ltms-pos-cart {
+        width: 100%;
+        max-height: 50vh;
+    }
+}

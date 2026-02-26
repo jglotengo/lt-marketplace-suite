@@ -1,0 +1,548 @@
+<?php
+/**
+ * LTMS DB Migrations - Instalación y Actualización del Esquema de BD
+ *
+ * Ejecuta las migraciones de base de datos de forma idempotente.
+ * Usa la versión almacenada en ltms_db_version para determinar
+ * qué migraciones aplicar.
+ *
+ * @package    LTMS
+ * @subpackage LTMS/includes/core/migrations
+ * @version    1.6.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Class LTMS_DB_Migrations
+ */
+final class LTMS_DB_Migrations {
+
+    /**
+     * Versión actual del esquema de BD.
+     */
+    private const CURRENT_VERSION = '1.6.0';
+
+    /**
+     * Ejecuta las migraciones pendientes.
+     *
+     * @return void
+     */
+    public static function run(): void {
+        $installed_version = get_option( 'ltms_db_version', '0.0.0' );
+
+        if ( version_compare( $installed_version, self::CURRENT_VERSION, '>=' ) ) {
+            return; // Todo actualizado
+        }
+
+        // Ejecutar migraciones en orden
+        self::create_tables();
+        self::create_indexes();
+
+        update_option( 'ltms_db_version', self::CURRENT_VERSION );
+
+        LTMS_Core_Logger::info(
+            'DB_MIGRATION_COMPLETE',
+            sprintf( 'BD actualizada de v%s a v%s', $installed_version, self::CURRENT_VERSION )
+        );
+    }
+
+    /**
+     * Crea o actualiza todas las tablas del plugin usando dbDelta.
+     *
+     * @return void
+     */
+    private static function create_tables(): void {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+
+        $sqls = [];
+
+        // lt_vendor_wallets
+        $sqls[] = "CREATE TABLE `{$p}lt_vendor_wallets` (
+            `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`         BIGINT UNSIGNED NOT NULL,
+            `balance`           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `balance_pending`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `balance_reserved`  DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `currency`          CHAR(3) NOT NULL DEFAULT 'COP',
+            `is_frozen`         TINYINT(1) NOT NULL DEFAULT 0,
+            `freeze_reason`     VARCHAR(500) DEFAULT NULL,
+            `total_earned`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `total_withdrawn`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `last_transaction`  DATETIME DEFAULT NULL,
+            `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `checksum`          CHAR(64) DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_vendor_id` (`vendor_id`)
+        ) {$charset}";
+
+        // lt_wallet_transactions
+        $sqls[] = "CREATE TABLE `{$p}lt_wallet_transactions` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `wallet_id`       BIGINT UNSIGNED NOT NULL,
+            `vendor_id`       BIGINT UNSIGNED NOT NULL,
+            `order_id`        BIGINT UNSIGNED DEFAULT NULL,
+            `type`            ENUM('credit','debit','hold','release','reversal','adjustment','payout','fee','tax_withholding') NOT NULL,
+            `amount`          DECIMAL(15,2) NOT NULL,
+            `balance_before`  DECIMAL(15,2) NOT NULL,
+            `balance_after`   DECIMAL(15,2) NOT NULL,
+            `currency`        CHAR(3) NOT NULL DEFAULT 'COP',
+            `description`     VARCHAR(500) NOT NULL,
+            `reference`       VARCHAR(255) DEFAULT NULL,
+            `status`          ENUM('pending','completed','failed','reversed') NOT NULL DEFAULT 'completed',
+            `metadata`        LONGTEXT DEFAULT NULL,
+            `ip_address`      VARCHAR(45) DEFAULT NULL,
+            `created_by`      BIGINT UNSIGNED DEFAULT NULL,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `checksum`        CHAR(64) DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_wallet_id` (`wallet_id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_order_id` (`order_id`)
+        ) {$charset}";
+
+        // lt_commissions
+        $sqls[] = "CREATE TABLE `{$p}lt_commissions` (
+            `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`          BIGINT UNSIGNED NOT NULL,
+            `order_item_id`     BIGINT UNSIGNED DEFAULT NULL,
+            `vendor_id`         BIGINT UNSIGNED NOT NULL,
+            `product_id`        BIGINT UNSIGNED NOT NULL,
+            `gross_amount`      DECIMAL(15,2) NOT NULL,
+            `commission_rate`   DECIMAL(5,4) NOT NULL,
+            `commission_amount` DECIMAL(15,2) NOT NULL,
+            `vendor_amount`     DECIMAL(15,2) NOT NULL,
+            `tax_withholding`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `iva_amount`        DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `currency`          CHAR(3) NOT NULL DEFAULT 'COP',
+            `country_code`      CHAR(2) NOT NULL DEFAULT 'CO',
+            `status`            ENUM('pending','approved','paid','reversed','disputed') NOT NULL DEFAULT 'pending',
+            `paid_at`           DATETIME DEFAULT NULL,
+            `strategy_applied`  VARCHAR(100) DEFAULT NULL,
+            `metadata`          LONGTEXT DEFAULT NULL,
+            `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_order_id` (`order_id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        // lt_payout_requests
+        $sqls[] = "CREATE TABLE `{$p}lt_payout_requests` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `wallet_id`        BIGINT UNSIGNED NOT NULL,
+            `amount`           DECIMAL(15,2) NOT NULL,
+            `currency`         CHAR(3) NOT NULL DEFAULT 'COP',
+            `method`           ENUM('bank_transfer','paypal','nequi','daviplata','spei','clabe') NOT NULL DEFAULT 'bank_transfer',
+            `bank_account`     LONGTEXT NOT NULL,
+            `status`           ENUM('pending','approved','processing','completed','rejected','cancelled') NOT NULL DEFAULT 'pending',
+            `admin_notes`      TEXT DEFAULT NULL,
+            `rejection_reason` VARCHAR(500) DEFAULT NULL,
+            `transaction_id`   BIGINT UNSIGNED DEFAULT NULL,
+            `external_ref`     VARCHAR(255) DEFAULT NULL,
+            `processed_by`     BIGINT UNSIGNED DEFAULT NULL,
+            `requested_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `processed_at`     DATETIME DEFAULT NULL,
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        // lt_audit_logs
+        $sqls[] = "CREATE TABLE `{$p}lt_audit_logs` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `event_code`  VARCHAR(100) NOT NULL,
+            `message`     TEXT NOT NULL,
+            `context`     LONGTEXT DEFAULT NULL,
+            `level`       ENUM('DEBUG','INFO','WARNING','ERROR','CRITICAL','SECURITY') NOT NULL DEFAULT 'INFO',
+            `user_id`     BIGINT UNSIGNED DEFAULT NULL,
+            `ip_address`  VARCHAR(45) DEFAULT NULL,
+            `user_agent`  VARCHAR(500) DEFAULT NULL,
+            `url`         VARCHAR(2048) DEFAULT NULL,
+            `source`      VARCHAR(100) DEFAULT NULL,
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_event_code` (`event_code`),
+            KEY `idx_level` (`level`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_security_events
+        $sqls[] = "CREATE TABLE `{$p}lt_security_events` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `event_type`      VARCHAR(100) NOT NULL,
+            `severity`        ENUM('low','medium','high','critical') NOT NULL DEFAULT 'medium',
+            `ip_address`      VARCHAR(45) NOT NULL,
+            `user_id`         BIGINT UNSIGNED DEFAULT NULL,
+            `request_uri`     VARCHAR(2048) DEFAULT NULL,
+            `request_method`  VARCHAR(10) DEFAULT NULL,
+            `payload`         TEXT DEFAULT NULL,
+            `rule_matched`    VARCHAR(255) DEFAULT NULL,
+            `blocked`         TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_ip_address` (`ip_address`),
+            KEY `idx_event_type` (`event_type`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_waf_blocked_ips
+        $sqls[] = "CREATE TABLE `{$p}lt_waf_blocked_ips` (
+            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `ip_address`   VARCHAR(45) NOT NULL,
+            `reason`       VARCHAR(255) NOT NULL,
+            `block_count`  INT UNSIGNED NOT NULL DEFAULT 1,
+            `expires_at`   DATETIME DEFAULT NULL,
+            `is_permanent` TINYINT(1) NOT NULL DEFAULT 0,
+            `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_ip` (`ip_address`)
+        ) {$charset}";
+
+        // lt_vendor_kyc
+        $sqls[] = "CREATE TABLE `{$p}lt_vendor_kyc` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `document_type`    VARCHAR(20) NOT NULL,
+            `document_number`  VARCHAR(255) NOT NULL,
+            `full_name`        VARCHAR(255) NOT NULL,
+            `file_path`        VARCHAR(500) DEFAULT NULL,
+            `file_hash`        CHAR(64) DEFAULT NULL,
+            `status`           ENUM('pending','approved','rejected','expired') NOT NULL DEFAULT 'pending',
+            `verified_by`      BIGINT UNSIGNED DEFAULT NULL,
+            `verified_at`      DATETIME DEFAULT NULL,
+            `rejection_reason` VARCHAR(500) DEFAULT NULL,
+            `expires_at`       DATE DEFAULT NULL,
+            `country_code`     CHAR(2) NOT NULL DEFAULT 'CO',
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        // lt_referral_network
+        $sqls[] = "CREATE TABLE `{$p}lt_referral_network` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `referrer_id`      BIGINT UNSIGNED NOT NULL,
+            `level`            TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            `referral_code`    VARCHAR(50) NOT NULL,
+            `source`           VARCHAR(100) DEFAULT NULL,
+            `total_sales`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `total_commission` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `status`           ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_vendor_referrer` (`vendor_id`, `referrer_id`),
+            KEY `idx_referral_code` (`referral_code`)
+        ) {$charset}";
+
+        // lt_notifications
+        $sqls[] = "CREATE TABLE `{$p}lt_notifications` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`    BIGINT UNSIGNED NOT NULL,
+            `type`       VARCHAR(100) NOT NULL,
+            `channel`    ENUM('inapp','email','whatsapp','sms','push') NOT NULL DEFAULT 'inapp',
+            `title`      VARCHAR(255) NOT NULL,
+            `message`    TEXT NOT NULL,
+            `data`       LONGTEXT DEFAULT NULL,
+            `is_read`    TINYINT(1) NOT NULL DEFAULT 0,
+            `read_at`    DATETIME DEFAULT NULL,
+            `sent_at`    DATETIME DEFAULT NULL,
+            `expires_at` DATETIME DEFAULT NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_is_read` (`is_read`)
+        ) {$charset}";
+
+        // lt_api_logs
+        $sqls[] = "CREATE TABLE `{$p}lt_api_logs` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `provider`      VARCHAR(50) NOT NULL,
+            `endpoint`      VARCHAR(500) NOT NULL,
+            `method`        VARCHAR(10) NOT NULL,
+            `request_body`  MEDIUMTEXT DEFAULT NULL,
+            `response_code` SMALLINT DEFAULT NULL,
+            `response_body` MEDIUMTEXT DEFAULT NULL,
+            `duration_ms`   INT UNSIGNED DEFAULT NULL,
+            `status`        ENUM('success','error','timeout','retry') NOT NULL DEFAULT 'success',
+            `order_id`      BIGINT UNSIGNED DEFAULT NULL,
+            `error_message` TEXT DEFAULT NULL,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_provider` (`provider`),
+            KEY `idx_status` (`status`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_webhook_logs
+        $sqls[] = "CREATE TABLE `{$p}lt_webhook_logs` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `provider`      VARCHAR(50) NOT NULL,
+            `event_type`    VARCHAR(100) NOT NULL,
+            `payload`       MEDIUMTEXT NOT NULL,
+            `signature`     VARCHAR(500) DEFAULT NULL,
+            `is_valid`      TINYINT(1) DEFAULT NULL,
+            `status`        ENUM('received','processing','processed','failed','ignored') NOT NULL DEFAULT 'received',
+            `order_id`      BIGINT UNSIGNED DEFAULT NULL,
+            `error_message` TEXT DEFAULT NULL,
+            `ip_address`    VARCHAR(45) DEFAULT NULL,
+            `attempts`      TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `processed_at`  DATETIME DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_provider` (`provider`),
+            KEY `idx_status` (`status`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_job_queue
+        $sqls[] = "CREATE TABLE `{$p}lt_job_queue` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `hook`          VARCHAR(200) NOT NULL,
+            `args`          LONGTEXT DEFAULT NULL,
+            `priority`      TINYINT UNSIGNED NOT NULL DEFAULT 10,
+            `status`        ENUM('pending','processing','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
+            `attempts`      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            `max_attempts`  TINYINT UNSIGNED NOT NULL DEFAULT 3,
+            `scheduled_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `started_at`    DATETIME DEFAULT NULL,
+            `completed_at`  DATETIME DEFAULT NULL,
+            `error_message` TEXT DEFAULT NULL,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_hook` (`hook`),
+            KEY `idx_status` (`status`),
+            KEY `idx_scheduled_at` (`scheduled_at`)
+        ) {$charset}";
+
+        // lt_marketing_banners
+        $sqls[] = "CREATE TABLE `{$p}lt_marketing_banners` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `title`           VARCHAR(255) NOT NULL,
+            `type`            ENUM('banner','flyer','social_post','email_template','video') NOT NULL DEFAULT 'banner',
+            `file_url`        VARCHAR(500) NOT NULL,
+            `thumbnail_url`   VARCHAR(500) DEFAULT NULL,
+            `dimensions`      VARCHAR(50) DEFAULT NULL,
+            `category`        VARCHAR(100) DEFAULT NULL,
+            `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+            `download_count`  INT UNSIGNED NOT NULL DEFAULT 0,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_type` (`type`),
+            KEY `idx_is_active` (`is_active`)
+        ) {$charset}";
+
+        // lt_deposits
+        $sqls[] = "CREATE TABLE `{$p}lt_deposits` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `amount`           DECIMAL(15,2) NOT NULL,
+            `currency`         CHAR(3) NOT NULL DEFAULT 'COP',
+            `type`             ENUM('security','tournament','promotional') NOT NULL DEFAULT 'security',
+            `status`           ENUM('held','released','forfeited','partial_release') NOT NULL DEFAULT 'held',
+            `reason`           VARCHAR(500) DEFAULT NULL,
+            `released_amount`  DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `release_date`     DATE DEFAULT NULL,
+            `order_id`         BIGINT UNSIGNED DEFAULT NULL,
+            `admin_notes`      TEXT DEFAULT NULL,
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        // lt_tax_reports
+        $sqls[] = "CREATE TABLE `{$p}lt_tax_reports` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `period_start`    DATE NOT NULL,
+            `period_end`      DATE NOT NULL,
+            `country_code`    CHAR(2) NOT NULL,
+            `report_type`     VARCHAR(50) NOT NULL,
+            `total_sales`     DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `total_tax`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `total_withheld`  DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `vendor_count`    INT UNSIGNED NOT NULL DEFAULT 0,
+            `order_count`     INT UNSIGNED NOT NULL DEFAULT 0,
+            `report_data`     LONGTEXT DEFAULT NULL,
+            `pdf_path`        VARCHAR(500) DEFAULT NULL,
+            `xml_path`        VARCHAR(500) DEFAULT NULL,
+            `status`          ENUM('draft','generated','submitted','accepted','rejected') NOT NULL DEFAULT 'draft',
+            `generated_by`    BIGINT UNSIGNED NOT NULL,
+            `generated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_period` (`period_start`, `period_end`),
+            KEY `idx_country` (`country_code`)
+        ) {$charset}";
+
+        // lt_rate_limits
+        $sqls[] = "CREATE TABLE `{$p}lt_rate_limits` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `identifier`     VARCHAR(255) NOT NULL,
+            `action`         VARCHAR(100) NOT NULL,
+            `attempts`       INT UNSIGNED NOT NULL DEFAULT 1,
+            `window_start`   DATETIME NOT NULL,
+            `blocked_until`  DATETIME DEFAULT NULL,
+            `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_identifier_action` (`identifier`(191), `action`)
+        ) {$charset}";
+
+        // ── v1.6.0 Tables ────────────────────────────────────────────
+
+        // lt_media_files — Backblaze B2 file tracking
+        $sqls[] = "CREATE TABLE `{$p}lt_media_files` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `file_key`      VARCHAR(500) NOT NULL,
+            `bucket`        VARCHAR(255) NOT NULL,
+            `original_name` VARCHAR(500) DEFAULT NULL,
+            `mime_type`     VARCHAR(100) DEFAULT NULL,
+            `file_size`     BIGINT UNSIGNED DEFAULT NULL,
+            `file_hash`     CHAR(64) DEFAULT NULL,
+            `entity_type`   ENUM('kyc','product','invoice','marketing','other') NOT NULL,
+            `entity_id`     BIGINT UNSIGNED NOT NULL,
+            `is_private`    TINYINT(1) NOT NULL DEFAULT 1,
+            `uploader_id`   BIGINT UNSIGNED NOT NULL,
+            `b2_file_id`    VARCHAR(255) DEFAULT NULL,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_file_key` (`file_key`(191)),
+            KEY `idx_entity_type_id` (`entity_type`, `entity_id`)
+        ) {$charset}";
+
+        // lt_shipping_quotes_cache — Caches shipping quotes per provider
+        $sqls[] = "CREATE TABLE `{$p}lt_shipping_quotes_cache` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `cache_key`   CHAR(64) NOT NULL,
+            `provider`    VARCHAR(50) NOT NULL,
+            `quote_data`  LONGTEXT NOT NULL,
+            `expires_at`  DATETIME NOT NULL,
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_cache_key_provider` (`cache_key`, `provider`),
+            KEY `idx_expires_at` (`expires_at`)
+        ) {$charset}";
+
+        // lt_insurance_policies — XCover insurance policy records
+        $sqls[] = "CREATE TABLE `{$p}lt_insurance_policies` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`         BIGINT UNSIGNED NOT NULL,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `quote_id`         VARCHAR(255) NOT NULL,
+            `policy_id`        VARCHAR(255) NOT NULL,
+            `policy_number`    VARCHAR(255) DEFAULT NULL,
+            `certificate_url`  VARCHAR(1000) DEFAULT NULL,
+            `insurance_type`   ENUM('parcel_protection','purchase_protection','other') NOT NULL DEFAULT 'parcel_protection',
+            `premium_amount`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `currency`         CHAR(3) NOT NULL DEFAULT 'COP',
+            `status`           ENUM('active','cancelled','claimed','expired') NOT NULL DEFAULT 'active',
+            `cancellation_ref` VARCHAR(255) DEFAULT NULL,
+            `cancelled_at`     DATETIME DEFAULT NULL,
+            `cancel_reason`    VARCHAR(500) DEFAULT NULL,
+            `refund_amount`    DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `metadata`         LONGTEXT DEFAULT NULL,
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_policy_id` (`policy_id`(191)),
+            KEY `idx_order_id` (`order_id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_status` (`status`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_redi_agreements — ReDi reseller-origin product agreements
+        $sqls[] = "CREATE TABLE `{$p}lt_redi_agreements` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `origin_vendor_id`    BIGINT UNSIGNED NOT NULL,
+            `reseller_vendor_id`  BIGINT UNSIGNED NOT NULL,
+            `origin_product_id`   BIGINT UNSIGNED NOT NULL,
+            `reseller_product_id` BIGINT UNSIGNED DEFAULT NULL,
+            `redi_rate`           DECIMAL(5,4) NOT NULL,
+            `status`              ENUM('active','paused','revoked') NOT NULL DEFAULT 'active',
+            `revoked_at`          DATETIME DEFAULT NULL,
+            `revocation_reason`   VARCHAR(500) DEFAULT NULL,
+            `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_reseller_origin_product` (`reseller_vendor_id`, `origin_product_id`),
+            KEY `idx_origin_vendor_id` (`origin_vendor_id`),
+            KEY `idx_reseller_vendor_id` (`reseller_vendor_id`),
+            KEY `idx_origin_product_id` (`origin_product_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        // lt_redi_commissions — Per-item ReDi commission ledger
+        $sqls[] = "CREATE TABLE `{$p}lt_redi_commissions` (
+            `id`                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `agreement_id`         BIGINT UNSIGNED NOT NULL,
+            `order_id`             BIGINT UNSIGNED NOT NULL,
+            `order_item_id`        BIGINT UNSIGNED DEFAULT NULL,
+            `origin_vendor_id`     BIGINT UNSIGNED NOT NULL,
+            `reseller_vendor_id`   BIGINT UNSIGNED NOT NULL,
+            `gross_amount`         DECIMAL(15,2) NOT NULL,
+            `platform_fee`         DECIMAL(15,2) NOT NULL,
+            `reseller_commission`  DECIMAL(15,2) NOT NULL,
+            `origin_vendor_gross`  DECIMAL(15,2) NOT NULL,
+            `tax_withholding`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `origin_vendor_net`    DECIMAL(15,2) NOT NULL,
+            `redi_rate`            DECIMAL(5,4) NOT NULL,
+            `currency`             CHAR(3) NOT NULL DEFAULT 'COP',
+            `status`               ENUM('paid','reversed','disputed') NOT NULL DEFAULT 'paid',
+            `origin_tx_id`         BIGINT UNSIGNED DEFAULT NULL,
+            `reseller_tx_id`       BIGINT UNSIGNED DEFAULT NULL,
+            `metadata`             LONGTEXT DEFAULT NULL,
+            `created_at`           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_order_id` (`order_id`),
+            KEY `idx_origin_vendor_id` (`origin_vendor_id`),
+            KEY `idx_reseller_vendor_id` (`reseller_vendor_id`),
+            KEY `idx_agreement_id` (`agreement_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
+        foreach ( $sqls as $sql ) {
+            dbDelta( $sql );
+        }
+    }
+
+    /**
+     * Crea índices adicionales para optimización de consultas frecuentes.
+     *
+     * @return void
+     */
+    private static function create_indexes(): void {
+        global $wpdb;
+
+        $indexes = [
+            "ALTER TABLE `{$wpdb->prefix}lt_wallet_transactions`
+             ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
+            "ALTER TABLE `{$wpdb->prefix}lt_commissions`
+             ADD INDEX IF NOT EXISTS `idx_paid_at` (`paid_at`)",
+        ];
+
+        foreach ( $indexes as $sql ) {
+            // Ignorar errores de índices ya existentes
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->query( $sql );
+        }
+    }
+}

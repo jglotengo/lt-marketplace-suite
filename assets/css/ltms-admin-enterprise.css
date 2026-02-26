@@ -1,0 +1,295 @@
+/**
+ * LT Marketplace Suite - Admin Enterprise CSS
+ * Estilos extendidos para el backend de administración
+ * Version: 1.5.0
+ */
+
+/* ── Enterprise Dashboard Widgets ──────────────────────────── */
+.ltms-enterprise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.ltms-kpi-card {
+    background: linear-gradient(135deg, var(--ltms-primary) 0%, var(--ltms-secondary) 100%);
+    color: #fff;
+    border-radius: var(--ltms-radius);
+    padding: 20px 24px;
+    box-shadow: var(--ltms-shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+.ltms-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    width: 80px;
+    height: 80px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+}
+
+.ltms-kpi-card .ltms-kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    margin: 8px 0 4px;
+}
+
+.ltms-kpi-card .ltms-kpi-label {
+    font-size: 0.8rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ltms-kpi-card .ltms-kpi-trend {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-top: 8px;
+}
+
+.ltms-kpi-card.ltms-kpi-success { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+.ltms-kpi-card.ltms-kpi-warning { background: linear-gradient(135deg, #e67e22, #f39c12); }
+.ltms-kpi-card.ltms-kpi-danger  { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+
+/* ── Vendor Detail Card ─────────────────────────────────────── */
+.ltms-vendor-card {
+    background: #fff;
+    border: 1px solid var(--ltms-border);
+    border-radius: var(--ltms-radius);
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    box-shadow: var(--ltms-shadow);
+}
+
+.ltms-vendor-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--ltms-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.ltms-vendor-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ltms-vendor-info {
+    flex: 1;
+}
+
+.ltms-vendor-info h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    color: var(--ltms-dark);
+}
+
+.ltms-vendor-meta {
+    font-size: 0.8rem;
+    color: #888;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ── Timeline de Eventos ────────────────────────────────────── */
+.ltms-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+}
+
+.ltms-timeline::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--ltms-border);
+}
+
+.ltms-timeline-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    position: relative;
+}
+
+.ltms-timeline-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--ltms-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    z-index: 1;
+    position: relative;
+}
+
+.ltms-timeline-dot.success { background: var(--ltms-success); }
+.ltms-timeline-dot.warning { background: var(--ltms-warning); }
+.ltms-timeline-dot.danger  { background: var(--ltms-danger); }
+
+.ltms-timeline-content {
+    flex: 1;
+    padding-top: 4px;
+}
+
+.ltms-timeline-content p {
+    margin: 0 0 4px;
+    font-size: 0.875rem;
+}
+
+.ltms-timeline-content time {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+/* ── Ledger / Wallet Transaction List ───────────────────────── */
+.ltms-ledger-table td.debit  { color: var(--ltms-danger);  font-weight: 600; }
+.ltms-ledger-table td.credit { color: var(--ltms-success); font-weight: 600; }
+
+/* ── Security Log ───────────────────────────────────────────── */
+.ltms-security-event {
+    padding: 10px 16px;
+    border-left: 3px solid var(--ltms-border);
+    margin-bottom: 8px;
+    background: #fff;
+    font-size: 0.875rem;
+}
+
+.ltms-security-event.critical { border-color: var(--ltms-danger); background: #fdf2f2; }
+.ltms-security-event.warning  { border-color: var(--ltms-warning); background: #fffdf2; }
+.ltms-security-event.info     { border-color: var(--ltms-secondary); background: #f2f7fd; }
+
+/* ── Compliance Panel ───────────────────────────────────────── */
+.ltms-compliance-meter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ltms-compliance-bar {
+    flex: 1;
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ltms-compliance-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--ltms-success);
+    transition: width 0.3s ease;
+}
+
+.ltms-compliance-fill.medium { background: var(--ltms-warning); }
+.ltms-compliance-fill.low    { background: var(--ltms-danger); }
+
+/* ── Country Flag Indicators ────────────────────────────────── */
+.ltms-country-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* ── API Status Indicators ──────────────────────────────────── */
+.ltms-api-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.ltms-api-status-dot.ok      { background: var(--ltms-success); animation: ltms-pulse 2s infinite; }
+.ltms-api-status-dot.error   { background: var(--ltms-danger); }
+.ltms-api-status-dot.unknown { background: #ccc; }
+
+@keyframes ltms-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ── Tabs Personalizados ────────────────────────────────────── */
+.ltms-tab-panel {
+    display: none;
+}
+
+.ltms-tab-panel.active {
+    display: block;
+}
+
+/* ── Data Export Buttons ────────────────────────────────────── */
+.ltms-export-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--ltms-border);
+    margin-bottom: 16px;
+}
+
+/* ── Fullscreen Chart Modal ─────────────────────────────────── */
+.ltms-chart-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0,0,0,0.8);
+    align-items: center;
+    justify-content: center;
+}
+
+.ltms-chart-modal.open {
+    display: flex;
+}
+
+.ltms-chart-modal-inner {
+    background: #fff;
+    border-radius: var(--ltms-radius);
+    padding: 24px;
+    width: 90vw;
+    max-width: 900px;
+    max-height: 90vh;
+}
+
+/* ── Responsive Enterprise ──────────────────────────────────── */
+@media (max-width: 1200px) {
+    .ltms-enterprise-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .ltms-enterprise-grid {
+        grid-template-columns: 1fr;
+    }
+    .ltms-kpi-card .ltms-kpi-value {
+        font-size: 1.6rem;
+    }
+}

@@ -1,0 +1,76 @@
+# ============================================================
+# LT Marketplace Suite - .gitignore
+# ============================================================
+
+# Dependencias de Composer (se instalan via CI/CD)
+/vendor/
+
+# Variables de entorno y secretos (NUNCA en git)
+.env
+.env.local
+.env.staging
+.env.production
+secrets/
+*.key
+*.pem
+*.p12
+wp-config-local.php
+
+# Logs de aplicación
+/logs/
+*.log
+*.log.php
+
+# Vault de archivos seguros (datos de producción)
+/ltms-secure-vault/
+
+# Artefactos de construcción
+/dist/
+/build/
+*.zip
+
+# Dependencias Node.js (si se usan herramientas de build)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Cache de herramientas de análisis
+.phpstan-cache/
+.phpcs-cache/
+.psalm/
+/var/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDEs
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# Archivos de prueba temporales
+tests/coverage/
+.phpunit.result.cache
+phpunit.xml.local
+
+# Certificados temporales (solo para dev local)
+*.crt
+*.csr
+
+# Archivos de backup de BD
+*.sql.gz
+*.sql.bak
+dump-*.sql
+
+# Fuentes para PDF (se instalan por deploy-server.sh)
+assets/fonts/
+
+# Uploads generados en runtime
+assets/img/generated/

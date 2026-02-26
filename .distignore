@@ -1,0 +1,51 @@
+# ============================================================
+# LT Marketplace Suite - .distignore (WP-CLI Build Exclusions)
+# ============================================================
+# Este archivo le dice a `wp dist-archive` qué excluir del ZIP.
+
+.git
+.github
+.gitignore
+.gitattributes
+.editorconfig
+.dockerignore
+.vscode
+.distignore
+.phpstan-cache
+.env
+.env.*
+
+# Testing
+tests/
+phpunit.xml
+.phpunit.result.cache
+
+# DevOps / Build tools
+bin/
+docker-compose.yml
+docker-compose.prod.yml
+Makefile
+nginx.conf
+php.ini
+
+# QA Tools
+phpcs.xml
+phpstan.neon
+.phpcs-cache
+
+# Docs de desarrollo (no necesarios en producción)
+docs/
+ARCHITECTURE.md
+SECURITY.md
+
+# Node
+node_modules/
+package.json
+package-lock.json
+
+# Composer dev
+vendor/bin/
+
+# Logs y vault (generados en runtime)
+logs/
+ltms-secure-vault/

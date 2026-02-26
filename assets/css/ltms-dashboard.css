@@ -1,0 +1,336 @@
+/**
+ * LT Marketplace Suite - Vendor Dashboard CSS
+ * Frontend SPA del Panel de Vendedor
+ * Version: 1.5.0
+ */
+
+/* ── Variables ──────────────────────────────────────────────── */
+:root {
+    --ltms-primary:     #1a5276;
+    --ltms-secondary:   #2980b9;
+    --ltms-accent:      #f39c12;
+    --ltms-success:     #27ae60;
+    --ltms-warning:     #e67e22;
+    --ltms-danger:      #e74c3c;
+    --ltms-dark:        #2c3e50;
+    --ltms-light-bg:    #f4f7f9;
+    --ltms-sidebar-w:   260px;
+    --ltms-header-h:    64px;
+    --ltms-radius:      8px;
+    --ltms-shadow-sm:   0 1px 4px rgba(0,0,0,0.08);
+    --ltms-shadow:      0 2px 12px rgba(0,0,0,0.1);
+}
+
+/* ── Reset / Base ────────────────────────────────────────────── */
+.ltms-dashboard-container *,
+.ltms-dashboard-container *::before,
+.ltms-dashboard-container *::after {
+    box-sizing: border-box;
+}
+
+/* ── Layout Principal SPA ───────────────────────────────────── */
+.ltms-dashboard-container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--ltms-light-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    color: var(--ltms-dark);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.ltms-sidebar {
+    width: var(--ltms-sidebar-w);
+    background: var(--ltms-primary);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100;
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+}
+
+.ltms-sidebar-logo {
+    padding: 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.ltms-sidebar-nav {
+    padding: 12px 0;
+    flex: 1;
+}
+
+.ltms-sidebar-nav .ltms-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 20px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+}
+
+.ltms-sidebar-nav .ltms-nav-item:hover,
+.ltms-sidebar-nav .ltms-nav-item.active {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+}
+
+.ltms-sidebar-nav .ltms-nav-item .ltms-nav-icon {
+    width: 20px;
+    text-align: center;
+    font-size: 1rem;
+}
+
+/* ── Main Content ───────────────────────────────────────────── */
+.ltms-main-content {
+    margin-left: var(--ltms-sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── Header del Dashboard ───────────────────────────────────── */
+.ltms-topbar {
+    height: var(--ltms-header-h);
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: var(--ltms-shadow-sm);
+}
+
+.ltms-topbar-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ltms-dark);
+}
+
+.ltms-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.ltms-topbar-notif {
+    position: relative;
+    cursor: pointer;
+}
+
+.ltms-topbar-notif .ltms-badge-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--ltms-danger);
+    color: #fff;
+    font-size: 10px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+/* ── Sección de Vista ───────────────────────────────────────── */
+.ltms-view-section {
+    padding: 24px;
+    flex: 1;
+}
+
+.ltms-view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.ltms-view-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--ltms-dark);
+}
+
+/* ── Cards ──────────────────────────────────────────────────── */
+.ltms-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--ltms-radius);
+    box-shadow: var(--ltms-shadow-sm);
+    overflow: hidden;
+}
+
+.ltms-card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--ltms-dark);
+}
+
+.ltms-card-body {
+    padding: 20px;
+}
+
+/* ── Métricas del Dashboard Home ────────────────────────────── */
+.ltms-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.ltms-metric {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--ltms-radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ltms-metric-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+.ltms-metric-icon.blue   { background: #dbeafe; color: #1d4ed8; }
+.ltms-metric-icon.green  { background: #dcfce7; color: #16a34a; }
+.ltms-metric-icon.orange { background: #fed7aa; color: #c2410c; }
+.ltms-metric-icon.purple { background: #ede9fe; color: #7c3aed; }
+
+.ltms-metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--ltms-dark);
+}
+
+.ltms-metric-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* ── Tablas del Dashboard ───────────────────────────────────── */
+.ltms-dtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.ltms-dtable thead th {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.ltms-dtable tbody tr:hover {
+    background: #f9fafb;
+}
+
+.ltms-dtable tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+/* ── Wallet / Balance Widget ────────────────────────────────── */
+.ltms-wallet-widget {
+    background: linear-gradient(135deg, var(--ltms-primary) 0%, var(--ltms-secondary) 100%);
+    color: #fff;
+    border-radius: var(--ltms-radius);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.ltms-wallet-balance {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+    margin: 12px 0 4px;
+}
+
+.ltms-wallet-label {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+/* ── Botones del Dashboard ──────────────────────────────────── */
+.ltms-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    text-decoration: none;
+}
+
+.ltms-btn-primary  { background: var(--ltms-primary);   color: #fff; }
+.ltms-btn-success  { background: var(--ltms-success);   color: #fff; }
+.ltms-btn-danger   { background: var(--ltms-danger);    color: #fff; }
+.ltms-btn-outline  { background: transparent; border: 1px solid var(--ltms-primary); color: var(--ltms-primary); }
+.ltms-btn-sm       { padding: 5px 12px; font-size: 0.8rem; }
+
+/* ── Responsive Mobile ──────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ltms-sidebar {
+        transform: translateX(-100%);
+    }
+    .ltms-sidebar.open {
+        transform: translateX(0);
+    }
+    .ltms-main-content {
+        margin-left: 0;
+    }
+    .ltms-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .ltms-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    .ltms-wallet-balance {
+        font-size: 1.8rem;
+    }
+}

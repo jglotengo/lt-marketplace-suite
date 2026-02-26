@@ -1,0 +1,303 @@
+/**
+ * LT Marketplace Suite - Admin CSS
+ * Backend WordPress Dashboard Styles
+ * Version: 1.5.0
+ */
+
+/* ── Variables ──────────────────────────────────────────────── */
+:root {
+    --ltms-primary:     #1a5276;
+    --ltms-secondary:   #2980b9;
+    --ltms-accent:      #f39c12;
+    --ltms-success:     #27ae60;
+    --ltms-warning:     #f39c12;
+    --ltms-danger:      #e74c3c;
+    --ltms-dark:        #2c3e50;
+    --ltms-light:       #ecf0f1;
+    --ltms-border:      #d5d9dd;
+    --ltms-radius:      6px;
+    --ltms-shadow:      0 2px 8px rgba(0,0,0,0.1);
+    --ltms-font:        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ── Layout Base ────────────────────────────────────────────── */
+.ltms-admin-wrap {
+    max-width: 1400px;
+    margin: 20px 20px 20px 0;
+    font-family: var(--ltms-font);
+}
+
+.ltms-admin-wrap .ltms-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 0 16px;
+    border-bottom: 2px solid var(--ltms-primary);
+    margin-bottom: 24px;
+}
+
+.ltms-admin-wrap .ltms-header .ltms-logo {
+    width: 40px;
+    height: 40px;
+}
+
+.ltms-admin-wrap .ltms-header h1 {
+    font-size: 1.6rem;
+    color: var(--ltms-primary);
+    margin: 0;
+}
+
+/* ── Stats Cards ────────────────────────────────────────────── */
+.ltms-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.ltms-stat-card {
+    background: #fff;
+    border: 1px solid var(--ltms-border);
+    border-radius: var(--ltms-radius);
+    padding: 20px;
+    box-shadow: var(--ltms-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.15s ease;
+}
+
+.ltms-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.ltms-stat-card .ltms-stat-label {
+    font-size: 0.8rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ltms-stat-card .ltms-stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--ltms-primary);
+    line-height: 1;
+}
+
+.ltms-stat-card .ltms-stat-sub {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+.ltms-stat-card.ltms-stat-success .ltms-stat-value { color: var(--ltms-success); }
+.ltms-stat-card.ltms-stat-warning .ltms-stat-value { color: var(--ltms-warning); }
+.ltms-stat-card.ltms-stat-danger  .ltms-stat-value { color: var(--ltms-danger); }
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.ltms-table-wrap {
+    background: #fff;
+    border: 1px solid var(--ltms-border);
+    border-radius: var(--ltms-radius);
+    overflow: hidden;
+    box-shadow: var(--ltms-shadow);
+    margin-bottom: 24px;
+}
+
+.ltms-table-title {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--ltms-border);
+    font-weight: 600;
+    color: var(--ltms-dark);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ltms-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.ltms-table thead th {
+    background: var(--ltms-primary);
+    color: #fff;
+    padding: 10px 16px;
+    text-align: left;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ltms-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.ltms-table tbody tr:hover {
+    background: #eef4fb;
+}
+
+.ltms-table tbody td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+/* ── Status Badges ──────────────────────────────────────────── */
+.ltms-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ltms-badge-success  { background: #d4edda; color: #155724; }
+.ltms-badge-warning  { background: #fff3cd; color: #856404; }
+.ltms-badge-danger   { background: #f8d7da; color: #721c24; }
+.ltms-badge-info     { background: #d1ecf1; color: #0c5460; }
+.ltms-badge-pending  { background: #e2e3e5; color: #383d41; }
+.ltms-badge-primary  { background: #cce5ff; color: #004085; }
+
+/* ── Forms ──────────────────────────────────────────────────── */
+.ltms-form-section {
+    background: #fff;
+    border: 1px solid var(--ltms-border);
+    border-radius: var(--ltms-radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--ltms-shadow);
+}
+
+.ltms-form-section h2 {
+    margin: 0 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ltms-border);
+    font-size: 1.1rem;
+    color: var(--ltms-dark);
+}
+
+.ltms-form-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    align-items: start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.ltms-form-row label {
+    padding-top: 8px;
+    font-weight: 500;
+    color: var(--ltms-dark);
+}
+
+.ltms-form-row input[type="text"],
+.ltms-form-row input[type="email"],
+.ltms-form-row input[type="number"],
+.ltms-form-row input[type="password"],
+.ltms-form-row select,
+.ltms-form-row textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--ltms-border);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: border-color 0.15s;
+}
+
+.ltms-form-row input:focus,
+.ltms-form-row select:focus,
+.ltms-form-row textarea:focus {
+    outline: none;
+    border-color: var(--ltms-secondary);
+    box-shadow: 0 0 0 2px rgba(41,128,185,0.15);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.ltms-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+    border: none;
+}
+
+.ltms-btn-primary {
+    background: var(--ltms-primary);
+    color: #fff;
+}
+
+.ltms-btn-primary:hover {
+    background: var(--ltms-secondary);
+    color: #fff;
+}
+
+.ltms-btn-success  { background: var(--ltms-success); color: #fff; }
+.ltms-btn-warning  { background: var(--ltms-warning); color: #fff; }
+.ltms-btn-danger   { background: var(--ltms-danger);  color: #fff; }
+.ltms-btn-outline  { background: transparent; border: 1px solid var(--ltms-border); color: var(--ltms-dark); }
+
+.ltms-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── Alerts ─────────────────────────────────────────────────── */
+.ltms-alert {
+    padding: 12px 16px;
+    border-radius: var(--ltms-radius);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.875rem;
+}
+
+.ltms-alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+.ltms-alert-warning { background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
+.ltms-alert-danger  { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+.ltms-alert-info    { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+
+/* ── Loading Spinner ────────────────────────────────────────── */
+.ltms-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--ltms-border);
+    border-top-color: var(--ltms-primary);
+    border-radius: 50%;
+    animation: ltms-spin 0.7s linear infinite;
+    display: inline-block;
+}
+
+@keyframes ltms-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .ltms-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .ltms-form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .ltms-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .ltms-table {
+        font-size: 0.8rem;
+    }
+}

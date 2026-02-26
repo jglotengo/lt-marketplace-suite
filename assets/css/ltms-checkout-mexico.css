@@ -1,0 +1,388 @@
+/**
+ * LTMS Checkout Mexico CSS
+ * Estilos específicos para flujos de pago en México:
+ * OXXO Pay, SPEI, Openpay MX, Conekta, MSI (Meses Sin Intereses)
+ * Version: 1.5.0
+ */
+
+/* ── OXXO Pay ──────────────────────────────────────────────────── */
+.ltms-oxxo-section {
+    background: #fffbeb;
+    border: 1.5px solid #fde68a;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-oxxo-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.ltms-oxxo-logo {
+    width: 72px;
+    height: auto;
+}
+
+.ltms-oxxo-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #92400e;
+    margin: 0;
+}
+
+.ltms-oxxo-subtitle {
+    font-size: .875rem;
+    color: #d97706;
+    margin: .25rem 0 0;
+}
+
+.ltms-oxxo-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    counter-reset: oxxo-step;
+}
+
+.ltms-oxxo-steps li {
+    counter-increment: oxxo-step;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .5rem 0;
+    font-size: .875rem;
+    color: #374151;
+    border-bottom: 1px solid #fde68a;
+}
+
+.ltms-oxxo-steps li:last-child { border-bottom: none; }
+
+.ltms-oxxo-steps li::before {
+    content: counter(oxxo-step);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #d97706;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── OXXO Voucher / Reference ──────────────────────────────────── */
+.ltms-oxxo-voucher {
+    background: #fff;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.ltms-oxxo-ref-label {
+    font-size: .75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .5rem;
+}
+
+.ltms-oxxo-ref-number {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #92400e;
+    letter-spacing: .15em;
+    word-break: break-all;
+    margin-bottom: 1rem;
+}
+
+.ltms-oxxo-barcode {
+    max-width: 260px;
+    height: 70px;
+    margin: 0 auto .75rem;
+    display: block;
+}
+
+.ltms-oxxo-amount {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.ltms-oxxo-expiry {
+    font-size: .75rem;
+    color: #9ca3af;
+    margin-top: .375rem;
+}
+
+.ltms-oxxo-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: .5rem 1.25rem;
+    font-size: .875rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: .75rem;
+    transition: background .2s;
+}
+
+.ltms-oxxo-download-btn:hover { background: #b45309; }
+
+/* ── SPEI / Transferencia Electrónica ─────────────────────────── */
+.ltms-spei-section {
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-spei-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.ltms-spei-icon {
+    font-size: 2rem;
+}
+
+.ltms-spei-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1e40af;
+    margin: 0;
+}
+
+.ltms-spei-clabe-box {
+    background: #fff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.ltms-spei-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .375rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: .875rem;
+}
+
+.ltms-spei-field:last-child { border-bottom: none; }
+
+.ltms-spei-field-label {
+    color: #6b7280;
+    flex-shrink: 0;
+    margin-right: 1rem;
+}
+
+.ltms-spei-field-value {
+    font-weight: 600;
+    color: #111827;
+    text-align: right;
+}
+
+.ltms-spei-clabe-value {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1d4ed8;
+    letter-spacing: .08em;
+}
+
+.ltms-spei-copy-btn {
+    background: none;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: .25rem .5rem;
+    font-size: .75rem;
+    color: #2563eb;
+    cursor: pointer;
+    margin-left: .5rem;
+    transition: all .15s;
+}
+
+.ltms-spei-copy-btn:hover {
+    background: #dbeafe;
+}
+
+.ltms-spei-note {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+    border-radius: 6px;
+    padding: .625rem .75rem;
+    font-size: .8125rem;
+    color: #713f12;
+    display: flex;
+    gap: .5rem;
+    align-items: flex-start;
+}
+
+/* ── MSI — Meses Sin Intereses ─────────────────────────────────── */
+.ltms-msi-section {
+    margin-bottom: 1.5rem;
+}
+
+.ltms-msi-title {
+    font-size: .9375rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: .75rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.ltms-msi-title::after {
+    content: 'MSI';
+    background: #15803d;
+    color: #fff;
+    font-size: .625rem;
+    font-weight: 700;
+    padding: .125rem .375rem;
+    border-radius: 4px;
+    letter-spacing: .05em;
+}
+
+.ltms-msi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: .5rem;
+}
+
+.ltms-msi-option {
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    padding: .625rem .375rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    background: #fff;
+}
+
+.ltms-msi-option:hover,
+.ltms-msi-option.selected {
+    border-color: #15803d;
+    background: #f0fdf4;
+}
+
+.ltms-msi-months {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: #15803d;
+    line-height: 1;
+}
+
+.ltms-msi-label {
+    font-size: .625rem;
+    color: #6b7280;
+    margin-top: .25rem;
+}
+
+.ltms-msi-monthly {
+    font-size: .75rem;
+    font-weight: 600;
+    color: #374151;
+    margin-top: .375rem;
+}
+
+.ltms-msi-banks {
+    display: flex;
+    gap: .375rem;
+    flex-wrap: wrap;
+    margin-top: .625rem;
+    justify-content: center;
+}
+
+.ltms-msi-bank-logo {
+    height: 16px;
+    width: auto;
+    opacity: .7;
+}
+
+/* ── IEPS & ISR Tax Display (MX) ───────────────────────────────── */
+.ltms-mx-tax-breakdown {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: .875rem 1rem;
+    margin-bottom: 1rem;
+    font-size: .875rem;
+}
+
+.ltms-mx-tax-title {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: .5rem;
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+}
+
+.ltms-mx-tax-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .25rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    color: #6b7280;
+}
+
+.ltms-mx-tax-row:last-child { border-bottom: none; }
+
+.ltms-mx-tax-row.isr-113a { color: #7c3aed; }
+.ltms-mx-tax-row.ieps     { color: #c2410c; }
+.ltms-mx-tax-row.iva      { color: #1d4ed8; }
+
+.ltms-mx-tax-legal {
+    font-size: .6875rem;
+    color: #9ca3af;
+    margin-top: .5rem;
+    font-style: italic;
+}
+
+/* ── RESICO Indicator ──────────────────────────────────────────── */
+.ltms-resico-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    background: #faf5ff;
+    border: 1px solid #e9d5ff;
+    border-radius: 8px;
+    padding: .375rem .75rem;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #7c3aed;
+    margin-bottom: .75rem;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .ltms-oxxo-ref-number {
+        font-size: 1.125rem;
+        letter-spacing: .08em;
+    }
+
+    .ltms-msi-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .ltms-spei-field {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .25rem;
+    }
+}

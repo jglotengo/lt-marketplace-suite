@@ -1,0 +1,418 @@
+================================================================================
+ LT MARKETPLACE SUITE — GUÍA DEL ADMINISTRADOR
+ Versión 1.5.0 | Español
+================================================================================
+
+ÍNDICE
+------
+1. Instalación y Configuración Inicial
+2. Panel de Administración
+3. Gestión de Vendedores
+4. Gestión de Billeteras
+5. Gestión de Retiros
+6. KYC — Verificación de Identidad
+7. Reportes Fiscales
+8. Seguridad y Logs
+9. Marketing y Red MLM
+10. Configuración Avanzada
+11. Cron Jobs
+12. Solución de Problemas
+
+================================================================================
+1. INSTALACIÓN Y CONFIGURACIÓN INICIAL
+================================================================================
+
+Paso 1: Requisitos del Servidor
+--------------------------------
+  - PHP 8.1+ con extensiones: openssl, bcmath, intl, mbstring
+  - MySQL 8.0+ (no MariaDB < 10.5 por funciones JSON)
+  - WordPress 6.3+
+  - WooCommerce 8.0+
+  - SSL/HTTPS activo (requerido para pagos)
+
+Paso 2: wp-config.php
+----------------------
+Agregar ANTES de "That's all, stop editing!":
+
+  define( 'WP_LTMS_MASTER_KEY', 'clave-generada-con-openssl-rand-base64-32' );
+  define( 'WP_LTMS_OPENPAY_MERCHANT_ID_CO', 'tu-merchant-id' );
+  // Ver wp-config-sample-snippet.php para todas las constantes
+
+⚠️ La clave maestra NUNCA puede cambiar después de crear datos.
+   Si cambia, todos los campos cifrados (cuentas bancarias, documentos) quedan ilegibles.
+
+Paso 3: Activación
+-------------------
+  1. Subir ZIP en wp-admin > Plugins > Agregar nuevo
+  2. Activar el plugin
+  3. El activador ejecuta automáticamente:
+     - Creación de tablas en la DB
+     - Registro de roles y capacidades
+     - Configuración de cron jobs
+     - Flush de reglas de reescritura
+
+Paso 4: Configuración mínima
+-----------------------------
+  LT Marketplace > Configuración:
+  1. General: país (CO/MX), moneda, nombre del sitio
+  2. Comisiones: tasa global (recomendado: 10%)
+  3. Pagos: credenciales de Openpay
+  4. KYC: documentos requeridos
+  5. Emails: email de soporte
+
+Paso 5: Páginas
+----------------
+Crear páginas con los shortcodes:
+  - Nombre: "Panel Vendedor" | Shortcode: [ltms_vendor_dashboard]
+  - Nombre: "Login Vendedores" | Shortcode: [ltms_vendor_login]
+  - Nombre: "Registro Vendedores" | Shortcode: [ltms_vendor_register]
+
+================================================================================
+2. PANEL DE ADMINISTRACIÓN
+================================================================================
+
+Acceso: LT Marketplace en el menú de WordPress admin
+
+Menú Principal
+--------------
+  📊 Dashboard        Métricas globales, gráficos, estado de APIs
+  👥 Vendedores       Lista y gestión de vendedores
+  📦 Pedidos          Todos los pedidos del marketplace
+  💰 Billeteras       Saldos y movimientos de todos los vendedores
+  💸 Retiros          Cola de retiros pendientes, procesados, rechazados
+  📋 KYC / Docs       Documentos de verificación de identidad
+  📊 Reportes Fiscales Declaraciones DIAN (CO) / SAT (MX)
+  📢 Marketing        Banners, red MLM, leaderboard
+  🔒 Seguridad        Eventos WAF, IPs bloqueadas, logs
+  ⚙️ Configuración    Todos los ajustes del plugin
+
+Dashboard de Métricas
+----------------------
+Muestra:
+  - Ventas del mes (suma de todos los vendedores)
+  - Total de vendedores activos
+  - Retiros pendientes de aprobar
+  - Documentos KYC pendientes de revisar
+  - Estado de conexión con cada API integrada
+
+================================================================================
+3. GESTIÓN DE VENDEDORES
+================================================================================
+
+Ver Lista de Vendedores
+-----------------------
+LT Marketplace > Vendedores muestra:
+  - Nombre y tienda
+  - Plan (básico / premium)
+  - Estado KYC
+  - Saldo de billetera
+  - Botón congelar/descongelar billetera
+
+Buscar Vendedores
+------------------
+Usa el formulario de búsqueda por nombre, email o tienda.
+
+Congelar/Descongelar Billetera
+--------------------------------
+La billetera congelada impide:
+  - Acreditar nuevas comisiones
+  - Solicitar retiros
+
+Uso típico: Investigación de fraude, incumplimiento de políticas.
+
+Acciones disponibles:
+  1. Click en "Congelar" e ingresar el motivo
+  2. Todos los intentos de transacción quedan bloqueados y registrados
+
+Para descongelar: Click en "Descongelar"
+
+Asignar Plan Premium
+---------------------
+Cambiar el rol del usuario a 'ltms_vendor_premium' desde wp-admin > Usuarios.
+
+================================================================================
+4. GESTIÓN DE BILLETERAS
+================================================================================
+
+LT Marketplace > Billeteras muestra:
+  - Total de saldo acumulado en toda la plataforma
+  - Total de saldos retenidos (en proceso de retiro)
+  - Lista de vendedores con sus saldos individuales
+
+Acciones por Billetera
+-----------------------
+  - Ver historial completo de movimientos
+  - Congelar/descongelar
+  - Ajuste manual de saldo (requiere motivo)
+
+Ajuste Manual
+--------------
+⚠️ USAR CON PRECAUCIÓN. Cada ajuste queda registrado en el log inmutable.
+  1. Click en vendedor
+  2. "Ajuste manual de saldo"
+  3. Ingresar monto (positivo=crédito, negativo=débito) y motivo
+
+================================================================================
+5. GESTIÓN DE RETIROS
+================================================================================
+
+LT Marketplace > Retiros muestra 3 pestañas:
+  - Pendientes
+  - Procesados
+  - Rechazados
+
+Aprobar un Retiro
+------------------
+1. Click en "Aprobar" en la fila del retiro
+2. El sistema:
+   a. Ejecuta el pago vía la pasarela configurada
+   b. Debita el saldo de la billetera
+   c. Registra el movimiento en el ledger
+   d. Envía email de confirmación al vendedor
+
+⚠️ Verificar los datos bancarios antes de aprobar.
+
+Rechazar un Retiro
+-------------------
+1. Click en "Rechazar"
+2. Ingresar el motivo del rechazo
+3. El sistema:
+   a. Libera el saldo retenido (lo devuelve como disponible)
+   b. Envía email con el motivo al vendedor
+
+Exportar CSV
+------------
+Click en "Exportar CSV" para descargar todos los retiros filtrados.
+Útil para conciliación bancaria.
+
+Auto-aprobación
+---------------
+Configurable en Ajustes > Retiros:
+  - Monto máximo para auto-aprobación
+  - Días de antigüedad del vendedor requeridos
+
+================================================================================
+6. KYC — VERIFICACIÓN DE IDENTIDAD
+================================================================================
+
+LT Marketplace > KYC / Documentos
+
+Flujo de Verificación
+----------------------
+1. Vendedor sube documentos desde su panel
+2. Aparece en la cola "Pendientes" del admin
+3. Admin revisa y aprueba/rechaza
+
+Revisar Documentos
+-------------------
+1. Click en el nombre del vendedor
+2. Ver documentos adjuntos (ID, RUT, certificado bancario)
+3. Verificar legibilidad, vigencia y coherencia de datos
+
+Aprobar KYC
+-----------
+1. Click "Aprobar"
+2. El sistema:
+   - Actualiza estado a 'approved' en la tabla lt_vendor_kyc
+   - Actualiza meta_key 'ltms_kyc_status' del usuario
+   - Envía email de aprobación
+   - Desbloquea función de retiros
+
+Rechazar KYC
+------------
+1. Click "Rechazar"
+2. Ingresar motivo específico (ej: "Documento ilegible - cédula")
+3. El vendedor puede volver a subir documentos
+
+Estados KYC
+-----------
+  pending       → Recién enviado
+  under_review  → En revisión activa
+  approved      → Verificado
+  rejected      → Rechazado (puede reintentar)
+
+================================================================================
+7. REPORTES FISCALES
+================================================================================
+
+LT Marketplace > Reportes Fiscales
+
+Filtros Disponibles
+-------------------
+  - Período (año/mes)
+  - País (Colombia / México / Todos)
+
+Colombia — Información mostrada
+--------------------------------
+  Total bruto, fee plataforma, neto vendedores,
+  ReteFuente total, ReteIVA total, ReteICA total, Impoconsumo
+
+México — Información mostrada
+------------------------------
+  Total bruto, fee plataforma, neto vendedores,
+  ISR art. 113-A retenido, IVA cobrado, IEPS aplicado
+
+Exportación
+-----------
+Los reportes pueden exportarse en formato CSV para declaración ante
+DIAN (Colombia) o SAT (México).
+
+Panel del Auditor Externo
+--------------------------
+LT Marketplace > Auditoría LTMS (solo usuarios con rol ltms_external_auditor)
+
+El auditor tiene acceso de solo lectura a:
+  - Resumen fiscal del período
+  - Alertas SAGRILAFT (retiros > umbral)
+  - KYC pendiente
+  - Eventos de seguridad
+
+Todos los accesos del auditor quedan registrados en el log forense.
+
+================================================================================
+8. SEGURIDAD Y LOGS
+================================================================================
+
+LT Marketplace > Seguridad / Logs
+
+Eventos de Seguridad
+---------------------
+Tabla con: nivel, tipo, usuario, IP, resumen, fecha
+
+Niveles:
+  🔴 CRITICAL   Posible intrusión, SQLi detectado, etc.
+  🟠 ERROR       Fallo de autenticación repetido, WAF block
+  🟡 WARNING     Intentos de acceso inusuales
+  🔵 INFO        Acciones administrativas normales
+
+IPs Bloqueadas
+--------------
+Tabla con las IPs bloqueadas por el WAF.
+Puedes desbloquear manualmente desde aquí.
+
+El WAF se activa en:
+  - Inyección SQL detectada
+  - XSS en parámetros
+  - Traversal de directorios
+  - Bots maliciosos
+  - 10+ intentos de login fallidos
+
+⚠️ El log de seguridad es INMUTABLE. Triggers de MySQL previenen
+   la modificación o eliminación de registros históricos.
+
+Rotación de Logs
+-----------------
+Los logs de más de 90 días se archivan automáticamente (cron semanal).
+
+================================================================================
+9. MARKETING Y RED MLM
+================================================================================
+
+LT Marketplace > Marketing
+
+Red de Afiliados (MLM)
+-----------------------
+  - Estadísticas globales de la red (nodos totales, profundidad promedio)
+  - Comisiones distribuidas en el período
+  - Leaderboard de mejores afiliados
+
+Banners
+--------
+La tabla de banners registra los materiales de marketing activos.
+Los vendedores con plan premium pueden acceder a banners personalizados.
+
+================================================================================
+10. CONFIGURACIÓN AVANZADA
+================================================================================
+
+LT Marketplace > Configuración
+
+Pestañas Disponibles
+---------------------
+  General       País, moneda, páginas del plugin, soporte
+  Comisiones    Tasa global, comisiones por categoría, contratos
+  Pagos         Openpay CO/MX, OXXO, SPEI, MSI, Addi BNPL
+  Siigo         Facturación electrónica DIAN (Colombia)
+  KYC           Documentos requeridos, auto-aprobación
+  MLM           Tasas de comisión por nivel (Niv1/Niv2/Niv3)
+  Seguridad     Umbral WAF, rotación de logs, 2FA
+  Emails        Remitente, plantillas, notificaciones
+
+Campos de API (Contraseñas)
+----------------------------
+Los campos de API key se cifran con AES-256 antes de guardarse.
+Verás el indicador "🔐 AES-256" junto a los campos cifrados.
+
+Test de Conexión
+-----------------
+El botón "Probar conexión" en cada API llama a health_check()
+para verificar que las credenciales son válidas.
+
+================================================================================
+11. CRON JOBS
+================================================================================
+
+El plugin registra los siguientes cron jobs en WordPress:
+
+  ltms_daily_payout_processor   Diario 02:00   Procesa retiros en cola
+  ltms_weekly_tax_report        Lunes           Genera reporte fiscal semanal
+  ltms_hourly_waf_cleanup       Cada hora       Limpia IPs expiradas del WAF
+  ltms_sync_commission_rates    Diario 06:00    Sincroniza tasas desde config
+
+Verificar estado de crons:
+  wp cron event list
+
+Ejecutar manualmente:
+  wp eval 'do_action("ltms_daily_payout_processor");' --allow-root
+
+================================================================================
+12. SOLUCIÓN DE PROBLEMAS
+================================================================================
+
+Error: "Tabla lt_wallets no existe"
+-------------------------------------
+Solución: Desactivar y reactivar el plugin. Esto ejecuta el activador que
+crea las tablas.
+Si persiste: Ejecutar manualmente el script SQL en database_schema_full.sql
+
+Error: "Función de cifrado no disponible"
+------------------------------------------
+Solución: Verificar que la constante WP_LTMS_MASTER_KEY esté definida en
+wp-config.php y que PHP tenga la extensión openssl habilitada.
+
+Los emails no se envían
+------------------------
+1. Verificar configuración SMTP en Settings > Email
+2. Revisar logs de error de WordPress
+3. Probar con plugin SMTP como WP Mail SMTP
+
+Retiro no se procesa
+---------------------
+1. Verificar credenciales de la pasarela (Ajustes > Pagos)
+2. Probar conexión con "Test de conexión"
+3. Revisar logs en Seguridad > Eventos
+
+Vendedor no puede acceder al dashboard
+---------------------------------------
+1. Verificar que el usuario tenga rol ltms_vendor
+2. Verificar que la página del dashboard tenga el shortcode [ltms_vendor_dashboard]
+3. Verificar que la URL de la página esté configurada en Ajustes > General
+
+WAF bloqueando IPs legítimas
+-----------------------------
+1. LT Marketplace > Seguridad > IPs Bloqueadas
+2. Localizar la IP y desbloquearla
+3. Si es frecuente, aumentar el umbral en Ajustes > Seguridad
+
+Log de errores de WordPress
+-----------------------------
+Agregar a wp-config.php para debugging:
+  define('WP_DEBUG', true);
+  define('WP_DEBUG_LOG', true);
+  define('WP_DEBUG_DISPLAY', false);
+
+Los errores se escriben en wp-content/debug.log
+
+================================================================================
+ FIN DE LA GUÍA DEL ADMINISTRADOR — LT Marketplace Suite v1.5.0
+================================================================================

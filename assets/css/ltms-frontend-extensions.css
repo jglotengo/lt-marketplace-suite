@@ -1,0 +1,454 @@
+/**
+ * LTMS Frontend Extensions CSS
+ * Componentes extendidos del panel de vendedor: analytics, referidos, KDS, POS
+ * Version: 1.5.0
+ */
+
+/* ── Analytics & Charts ────────────────────────────────────────── */
+.ltms-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.ltms-chart-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.ltms-chart-card h3 {
+    font-size: .875rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: 0 0 1rem;
+}
+
+.ltms-chart-canvas-wrap {
+    position: relative;
+    height: 200px;
+}
+
+.ltms-chart-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: .75rem;
+    font-size: .75rem;
+    color: #6b7280;
+}
+
+.ltms-chart-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+/* ── Referral Network Tree ─────────────────────────────────────── */
+.ltms-referral-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-referral-code-display {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-referral-code-value {
+    font-family: 'Courier New', monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #16a34a;
+    letter-spacing: .1em;
+    flex: 1;
+}
+
+.ltms-copy-code-btn {
+    background: #16a34a;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: .4rem .8rem;
+    font-size: .8rem;
+    cursor: pointer;
+    transition: background .2s;
+}
+
+.ltms-copy-code-btn:hover { background: #15803d; }
+
+.ltms-referral-stats-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-referral-stat {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: .75rem;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.ltms-referral-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a5276;
+}
+
+.ltms-referral-stat-label {
+    font-size: .75rem;
+    color: #6b7280;
+    margin-top: .25rem;
+}
+
+/* ── Leaderboard ───────────────────────────────────────────────── */
+.ltms-leaderboard {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+}
+
+.ltms-leaderboard th {
+    background: #f9fafb;
+    padding: .625rem .75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.ltms-leaderboard td {
+    padding: .625rem .75rem;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+}
+
+.ltms-leaderboard tr:hover td { background: #fafafa; }
+
+.ltms-rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: .75rem;
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.ltms-rank-badge.rank-1 { background: #fef08a; color: #854d0e; }
+.ltms-rank-badge.rank-2 { background: #e5e7eb; color: #374151; }
+.ltms-rank-badge.rank-3 { background: #fed7aa; color: #9a3412; }
+
+/* ── Insurance (XCover) Section ────────────────────────────────── */
+.ltms-insurance-section {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-insurance-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.ltms-insurance-icon {
+    font-size: 2rem;
+}
+
+.ltms-insurance-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e40af;
+    margin: 0;
+}
+
+.ltms-insurance-sub {
+    font-size: .8125rem;
+    color: #3b82f6;
+    margin: .25rem 0 0;
+}
+
+.ltms-insurance-quote {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: .75rem;
+}
+
+.ltms-quote-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+
+.ltms-quote-period {
+    font-size: .75rem;
+    color: #6b7280;
+}
+
+/* ── Logistics Tracking ────────────────────────────────────────── */
+.ltms-tracking-timeline {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    position: relative;
+}
+
+.ltms-tracking-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e5e7eb;
+}
+
+.ltms-tracking-event {
+    display: flex;
+    gap: 1rem;
+    padding: .75rem 0;
+    position: relative;
+}
+
+.ltms-tracking-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #9ca3af;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #9ca3af;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.ltms-tracking-event.completed .ltms-tracking-dot {
+    background: #16a34a;
+    box-shadow: 0 0 0 2px #16a34a;
+}
+
+.ltms-tracking-event.current .ltms-tracking-dot {
+    background: #2563eb;
+    box-shadow: 0 0 0 2px #2563eb;
+    animation: ltms-pulse-dot 1.5s infinite;
+}
+
+@keyframes ltms-pulse-dot {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.2); }
+}
+
+.ltms-tracking-content {
+    flex: 1;
+    padding-bottom: .5rem;
+}
+
+.ltms-tracking-status {
+    font-size: .875rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.ltms-tracking-date {
+    font-size: .75rem;
+    color: #6b7280;
+    margin-top: .125rem;
+}
+
+.ltms-tracking-location {
+    font-size: .8125rem;
+    color: #4b5563;
+    margin-top: .25rem;
+}
+
+/* ── BNPL / Addi Section ───────────────────────────────────────── */
+.ltms-bnpl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 20px;
+    padding: .25rem .75rem;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #c2410c;
+}
+
+.ltms-bnpl-installments {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+}
+
+.ltms-bnpl-option {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: .75rem;
+    cursor: pointer;
+    transition: all .15s;
+    background: #fff;
+}
+
+.ltms-bnpl-option:hover,
+.ltms-bnpl-option.selected {
+    border-color: #f97316;
+    background: #fff7ed;
+}
+
+.ltms-bnpl-option .ltms-bnpl-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #c2410c;
+}
+
+.ltms-bnpl-option .ltms-bnpl-amount {
+    font-size: .8125rem;
+    color: #6b7280;
+    margin-top: .25rem;
+}
+
+/* ── Digital Signature Status ──────────────────────────────────── */
+.ltms-contract-status {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    border-radius: 8px;
+    font-size: .875rem;
+    margin-bottom: 1rem;
+}
+
+.ltms-contract-status.pending {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+    color: #713f12;
+}
+
+.ltms-contract-status.signed {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #14532d;
+}
+
+.ltms-contract-status.rejected {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #7f1d1d;
+}
+
+.ltms-contract-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+/* ── Performance Score ─────────────────────────────────────────── */
+.ltms-score-ring {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+}
+
+.ltms-score-ring svg {
+    transform: rotate(-90deg);
+}
+
+.ltms-score-value {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+/* ── Quick Product Grid (compact) ──────────────────────────────── */
+.ltms-product-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: .75rem;
+}
+
+.ltms-product-mini-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    text-align: center;
+    transition: box-shadow .2s;
+    background: #fff;
+}
+
+.ltms-product-mini-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+
+.ltms-product-mini-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: #f3f4f6;
+}
+
+.ltms-product-mini-name {
+    font-size: .75rem;
+    font-weight: 500;
+    color: #374151;
+    padding: .375rem .5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ltms-product-mini-price {
+    font-size: .8125rem;
+    font-weight: 700;
+    color: #1a5276;
+    padding: 0 .5rem .5rem;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ltms-analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ltms-referral-stats-row {
+        gap: .75rem;
+    }
+
+    .ltms-bnpl-installments {
+        flex-direction: column;
+    }
+}

@@ -1,0 +1,332 @@
+<?php
+/**
+ * LTMS Core Firewall - Web Application Firewall (WAF)
+ *
+ * Protección multicapa contra: SQL Injection, XSS, LFI/RFI,
+ * CSRF, Brute Force, Bad Bots y escaneo de vulnerabilidades.
+ *
+ * @package    LTMS
+ * @subpackage LTMS/includes/core
+ * @version    1.5.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Class LTMS_Core_Firewall
+ */
+final class LTMS_Core_Firewall {
+
+    /**
+     * Patrones de ataque conocidos (SQL Injection, XSS, LFI).
+     *
+     * @var array<string, string>
+     */
+    private static array $attack_patterns = [
+        'sql_injection_union'    => '/(\bunion\b.*\bselect\b|\bselect\b.*\bfrom\b.*\bwhere\b)/i',
+        'sql_injection_drop'     => '/(\bdrop\b.*\btable\b|\btruncate\b.*\btable\b)/i',
+        'sql_injection_insert'   => '/(\binsert\b.*\binto\b|\bupdate\b.*\bset\b.*\bwhere\b)/i',
+        'sql_injection_comment'  => '/(--|#|\/\*.*\*\/)/i',
+        'xss_script'             => '/<\s*script[^>]*>.*?<\s*\/\s*script\s*>/is',
+        'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit)\s*=/i',
+        'xss_javascript'         => '/javascript\s*:/i',
+        'lfi_path_traversal'     => '/(\.\.\/|\.\.\\\\|%2e%2e%2f|%2e%2e\/|\.\.%2f)/i',
+        'rfi_http'               => '/(https?|ftp):\/\/.*\.(php|asp|aspx|jsp)/i',
+        'php_injection'          => '/(<\?php|<\?=|eval\s*\(|base64_decode\s*\()/i',
+        'null_byte'              => '/\0/',
+    ];
+
+    /**
+     * Umbral de eventos antes de bloquear una IP.
+     */
+    private const BLOCK_THRESHOLD = 10;
+
+    /**
+     * Duración del bloqueo en segundos (1 hora).
+     */
+    private const BLOCK_DURATION = 3600;
+
+    /**
+     * Inicializa el WAF (debe ejecutarse lo antes posible).
+     *
+     * @return void
+     */
+    public static function init(): void {
+        // Solo activar en requests HTTP/HTTPS (no CLI)
+        if ( php_sapi_name() === 'cli' ) {
+            return;
+        }
+
+        add_action( 'init', [ __CLASS__, 'run' ], 1 );
+    }
+
+    /**
+     * Ejecuta todas las verificaciones del WAF.
+     *
+     * @return void
+     */
+    public static function run(): void {
+        $ip = self::get_client_ip();
+
+        // 1. Verificar blacklist de IPs
+        if ( self::is_ip_blocked( $ip ) ) {
+            self::block_request( 'IP_BLACKLISTED', $ip );
+        }
+
+        // 2. Análisis de parámetros GET y POST
+        $params_to_check = array_merge(
+            $_GET,
+            $_POST,
+            [ 'URI' => $_SERVER['REQUEST_URI'] ?? '' ]
+        );
+
+        foreach ( $params_to_check as $key => $value ) {
+            if ( is_array( $value ) ) {
+                $value = implode( ' ', array_map( 'strval', $value ) );
+            }
+            $matched_rule = self::check_patterns( (string) $value );
+            if ( $matched_rule ) {
+                self::handle_attack( $matched_rule, $ip, $key, $value );
+            }
+        }
+
+        // 3. Verificar User-Agent sospechoso
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        if ( self::is_bad_bot( $ua ) ) {
+            self::handle_attack( 'bad_bot', $ip, 'user_agent', $ua );
+        }
+    }
+
+    /**
+     * Verifica si un valor coincide con algún patrón de ataque.
+     *
+     * @param string $value Valor a analizar.
+     * @return string|null Nombre de la regla disparada o null.
+     */
+    private static function check_patterns( string $value ): ?string {
+        // Decodificar URL encoding para detectar ataques ofuscados
+        $decoded = urldecode( $value );
+
+        foreach ( self::$attack_patterns as $rule => $pattern ) {
+            if ( preg_match( $pattern, $decoded ) ) {
+                return $rule;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Maneja un ataque detectado: loguea, incrementa contador y bloquea si supera umbral.
+     *
+     * @param string $rule       Regla disparada.
+     * @param string $ip         IP del atacante.
+     * @param string $param_name Parámetro donde se detectó.
+     * @param string $payload    Payload sospechoso (se trunca para el log).
+     * @return void
+     */
+    private static function handle_attack( string $rule, string $ip, string $param_name, string $payload ): void {
+        // Registrar evento de seguridad
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_security_events';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $wpdb->insert(
+            $table,
+            [
+                'event_type'     => strtoupper( $rule ),
+                'severity'       => self::get_severity( $rule ),
+                'ip_address'     => $ip,
+                'user_id'        => get_current_user_id() ?: null,
+                'request_uri'    => substr( sanitize_text_field( $_SERVER['REQUEST_URI'] ?? '' ), 0, 500 ),
+                'request_method' => sanitize_text_field( $_SERVER['REQUEST_METHOD'] ?? 'GET' ),
+                'payload'        => substr( sanitize_textarea_field( $payload ), 0, 500 ),
+                'rule_matched'   => $param_name . ':' . $rule,
+                'blocked'        => 1,
+                'created_at'     => current_time( 'mysql', true ),
+            ],
+            [ '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%s' ]
+        );
+
+        // Log en tabla de auditoría
+        LTMS_Core_Logger::security(
+            'WAF_ATTACK_DETECTED',
+            "WAF bloqueó ataque [{$rule}] desde IP {$ip}",
+            [
+                'rule'    => $rule,
+                'param'   => $param_name,
+                'payload' => substr( $payload, 0, 200 ),
+            ]
+        );
+
+        // Incrementar contador para esta IP
+        $count_key = 'ltms_waf_' . md5( $ip );
+        $count     = (int) get_transient( $count_key );
+        $count++;
+        set_transient( $count_key, $count, self::BLOCK_DURATION );
+
+        // Bloquear IP si supera el umbral
+        if ( $count >= self::BLOCK_THRESHOLD ) {
+            self::block_ip( $ip, "Auto-blocked after {$count} WAF violations. Last rule: {$rule}" );
+        }
+
+        self::block_request( $rule, $ip );
+    }
+
+    /**
+     * Verifica si una IP está en la blacklist.
+     *
+     * @param string $ip Dirección IP.
+     * @return bool
+     */
+    private static function is_ip_blocked( string $ip ): bool {
+        // Cache rápido con transient
+        $cache_key = 'ltms_blocked_' . md5( $ip );
+        $cached    = get_transient( $cache_key );
+
+        if ( $cached !== false ) {
+            return (bool) $cached;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_waf_blocked_ips';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $result = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM `{$table}` WHERE ip_address = %s AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1",
+                $ip
+            )
+        );
+
+        $is_blocked = ! empty( $result );
+        set_transient( $cache_key, $is_blocked ? 1 : 0, 300 ); // Cache 5 minutos
+
+        return $is_blocked;
+    }
+
+    /**
+     * Agrega una IP a la blacklist.
+     *
+     * @param string $ip     Dirección IP.
+     * @param string $reason Motivo del bloqueo.
+     * @return void
+     */
+    public static function block_ip( string $ip, string $reason ): void {
+        global $wpdb;
+        $table    = $wpdb->prefix . 'lt_waf_blocked_ips';
+        $expires  = gmdate( 'Y-m-d H:i:s', time() + self::BLOCK_DURATION );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $wpdb->query(
+            $wpdb->prepare(
+                "INSERT INTO `{$table}` (ip_address, reason, block_count, expires_at)
+                 VALUES (%s, %s, 1, %s)
+                 ON DUPLICATE KEY UPDATE
+                     block_count = block_count + 1,
+                     reason = VALUES(reason),
+                     expires_at = VALUES(expires_at),
+                     updated_at = NOW()",
+                $ip,
+                substr( $reason, 0, 255 ),
+                $expires
+            )
+        );
+
+        // Invalidar cache
+        delete_transient( 'ltms_blocked_' . md5( $ip ) );
+
+        LTMS_Core_Logger::security(
+            'WAF_IP_BLOCKED',
+            "IP {$ip} bloqueada por el WAF",
+            [ 'reason' => $reason, 'expires' => $expires ]
+        );
+    }
+
+    /**
+     * Termina la request con HTTP 403.
+     *
+     * @param string $rule Regla que disparó el bloqueo.
+     * @param string $ip   IP del atacante.
+     * @return never
+     */
+    private static function block_request( string $rule, string $ip ): never {
+        status_header( 403 );
+        nocache_headers();
+        wp_die(
+            esc_html__( 'Tu solicitud fue bloqueada por el sistema de seguridad.', 'ltms' ),
+            esc_html__( 'Acceso Denegado', 'ltms' ),
+            [
+                'response'  => 403,
+                'exit'      => true,
+            ]
+        );
+    }
+
+    /**
+     * Detecta user-agents de bots maliciosos conocidos.
+     *
+     * @param string $ua User-Agent a verificar.
+     * @return bool
+     */
+    private static function is_bad_bot( string $ua ): bool {
+        $bad_bots = [
+            'sqlmap', 'nikto', 'nmap', 'masscan', 'zgrab',
+            'python-requests', 'go-http-client', 'curl/7', 'libwww-perl',
+            'dirbuster', 'gobuster', 'wfuzz', 'w3af', 'burpsuite',
+            'hydra', 'medusa', 'nessus', 'openvas',
+        ];
+
+        $ua_lower = strtolower( $ua );
+        foreach ( $bad_bots as $bot ) {
+            if ( str_contains( $ua_lower, $bot ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Determina la severidad de un ataque según el tipo de regla.
+     *
+     * @param string $rule Regla de ataque.
+     * @return string low|medium|high|critical
+     */
+    private static function get_severity( string $rule ): string {
+        $critical_rules = [ 'sql_injection_drop', 'php_injection', 'rfi_http' ];
+        $high_rules     = [ 'sql_injection_union', 'sql_injection_insert', 'lfi_path_traversal' ];
+        $medium_rules   = [ 'xss_script', 'xss_event_handler', 'null_byte' ];
+
+        if ( in_array( $rule, $critical_rules, true ) ) {
+            return 'critical';
+        }
+        if ( in_array( $rule, $high_rules, true ) ) {
+            return 'high';
+        }
+        if ( in_array( $rule, $medium_rules, true ) ) {
+            return 'medium';
+        }
+        return 'low';
+    }
+
+    /**
+     * Obtiene la IP real del cliente.
+     *
+     * @return string
+     */
+    private static function get_client_ip(): string {
+        $headers = [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR' ];
+        foreach ( $headers as $h ) {
+            if ( ! empty( $_SERVER[ $h ] ) ) {
+                $ip = trim( explode( ',', $_SERVER[ $h ] )[0] );
+                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                    return $ip;
+                }
+            }
+        }
+        return '0.0.0.0';
+    }
+}

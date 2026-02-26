@@ -1,0 +1,341 @@
+================================================================================
+ LT MARKETPLACE SUITE — GUÍA DE SOLUCIÓN DE PROBLEMAS (TROUBLESHOOTING)
+ Versión 1.5.0
+================================================================================
+
+ÍNDICE RÁPIDO
+-------------
+Use Ctrl+F para buscar el código de error o síntoma exacto.
+
+1.  Problemas de Activación
+2.  Problemas de Base de Datos
+3.  Errores de Cifrado
+4.  Problemas de Billetera y Pagos
+5.  Errores de API (Openpay, Siigo, etc.)
+6.  Problemas del Dashboard del Vendedor
+7.  Problemas de Email
+8.  Errores de KYC
+9.  Problemas de WAF / Seguridad
+10. Errores de Cron Jobs
+11. Problemas de Rendimiento
+12. Errores PHP y Logs
+
+================================================================================
+1. PROBLEMAS DE ACTIVACIÓN
+================================================================================
+
+SÍNTOMA: "Error al activar el plugin"
+CÓDIGO:   LTMS_ACT_001
+SOLUCIÓN:
+  1. Verificar PHP >= 8.1: php --version
+  2. Verificar que WooCommerce esté activado primero
+  3. Revisar wp-content/debug.log para el error específico
+  4. Verificar permisos de directorio: chmod 755 wp-content/plugins/
+
+SÍNTOMA: "La versión de PHP no es compatible"
+CÓDIGO:   LTMS_ACT_002
+SOLUCIÓN:
+  Actualizar PHP a 8.1 o superior. LTMS requiere:
+  - PHP 8.1+ para tipos de retorno nativos y enums
+  - Extensiones: openssl, bcmath, intl, mbstring, json, curl
+
+SÍNTOMA: "Tablas no creadas después de activación"
+CÓDIGO:   LTMS_ACT_003
+SOLUCIÓN:
+  1. Desactivar y reactivar el plugin
+  2. Si persiste, ejecutar manualmente:
+     wp eval 'LTMS_DB_Migrations::run();' --allow-root
+  3. O importar manualmente: database_schema_full.sql
+
+================================================================================
+2. PROBLEMAS DE BASE DE DATOS
+================================================================================
+
+SÍNTOMA: "Table 'lt_wallets' doesn't exist"
+CÓDIGO:   LTMS_DB_001
+SOLUCIÓN:
+  Ejecutar migraciones:
+  wp eval 'LTMS_DB_Migrations::run();' --allow-root
+  O verificar si el prefijo de tabla es correcto (lt_ es el prefijo propio de LTMS,
+  no el prefijo de WordPress $table_prefix).
+
+SÍNTOMA: "Deadlock encontrado en transacción"
+CÓDIGO:   LTMS_DB_002
+SOLUCIÓN:
+  - Incrementar innodb_lock_wait_timeout en MySQL (recomendado: 60)
+  - Verificar que MySQL 8.0+ tenga innodb_deadlock_detect = ON
+  - Si ocurre frecuentemente, revisar volumen de transacciones concurrentes
+
+SÍNTOMA: "Row size too large"
+CÓDIGO:   LTMS_DB_003
+SOLUCIÓN:
+  Agregar a my.cnf:
+  [mysqld]
+  innodb_file_per_table = 1
+  innodb_file_format = Barracuda
+  innodb_large_prefix = 1
+  row_format = DYNAMIC
+
+SÍNTOMA: Datos cifrados muestran texto ilegible / Base64
+CÓDIGO:   LTMS_DB_004
+CAUSA:    La clave WP_LTMS_MASTER_KEY cambió o no está definida
+SOLUCIÓN:
+  1. Restaurar la clave original en wp-config.php
+  2. Si la clave se perdió permanentemente, los datos cifrados NO son recuperables
+  3. Para datos nuevos, los vendedores deben reingresar información bancaria
+
+================================================================================
+3. ERRORES DE CIFRADO
+================================================================================
+
+SÍNTOMA: "openssl_encrypt(): No key supplied"
+CÓDIGO:   LTMS_SEC_001
+SOLUCIÓN:
+  define( 'WP_LTMS_MASTER_KEY', 'tu-clave' ); en wp-config.php
+  La clave debe ser al menos 32 caracteres.
+  Generar: openssl rand -base64 32
+
+SÍNTOMA: "Decryption failed: bad payload"
+CÓDIGO:   LTMS_SEC_002
+CAUSA:    Datos cifrados con una clave diferente a la actual
+SOLUCIÓN:
+  1. Restaurar la clave original
+  2. O resetear los datos cifrados (los vendedores deben reingresar)
+
+================================================================================
+4. PROBLEMAS DE BILLETERA Y PAGOS
+================================================================================
+
+SÍNTOMA: Comisión no se acredita después de un pedido pagado
+CÓDIGO:   LTMS_WAL_001
+DIAGNÓSTICO:
+  1. Verificar que el hook 'woocommerce_payment_complete' esté activo:
+     wp eval 'echo has_action("woocommerce_payment_complete", ["LTMS_Order_Paid_Listener", "handle"]);'
+  2. Verificar log de seguridad en LT Marketplace > Seguridad
+  3. Revisar lt_commissions para el order_id específico:
+     SELECT * FROM lt_commissions WHERE order_id = XXXXX;
+SOLUCIÓN:
+  Si el hook no está registrado: desactivar y reactivar el plugin.
+  Si la comisión falló: reactivar manualmente:
+  wp eval 'LTMS_Order_Split::process(wc_get_order(XXXXX));' --allow-root
+
+SÍNTOMA: "Saldo insuficiente" al intentar retirar con saldo visible
+CÓDIGO:   LTMS_WAL_002
+CAUSA:    El saldo está parcialmente retenido (held_balance)
+SOLUCIÓN:
+  Verificar saldo disponible:
+  SELECT balance, held_balance, (balance - held_balance) AS available
+  FROM lt_wallets WHERE user_id = XXX;
+  Si held_balance > 0 sin retiro activo, crear ajuste manual.
+
+SÍNTOMA: Retiro en estado "pending" por más de 3 días hábiles
+CÓDIGO:   LTMS_PAY_001
+SOLUCIÓN:
+  1. Verificar si el cron ltms_daily_payout_processor está ejecutándose
+  2. Ejecutar manualmente:
+     wp eval 'LTMS_Payout_Scheduler::process_pending_payouts();' --allow-root
+  3. Si sigue fallando, verificar credenciales de la pasarela de pago
+
+================================================================================
+5. ERRORES DE API
+================================================================================
+
+SÍNTOMA: "Openpay: 401 Unauthorized"
+CÓDIGO:   LTMS_API_OPY_001
+SOLUCIÓN:
+  1. Verificar merchant_id y api_key en wp-config.php
+  2. Verificar que la clave corresponde al ambiente (sandbox vs live)
+  3. Probar en el dashboard de Openpay directamente
+
+SÍNTOMA: "Siigo: Token expired"
+CÓDIGO:   LTMS_API_SIG_001
+SOLUCIÓN:
+  El token de Siigo se renueva automáticamente vía transients.
+  Si falla, limpiar el transient:
+  wp transient delete ltms_siigo_token
+  Luego reintentar la operación.
+
+SÍNTOMA: "Addi: 422 Unprocessable Entity"
+CÓDIGO:   LTMS_API_ADI_001
+CAUSA:    Datos del cliente o pedido no cumplen con los requisitos de Addi
+SOLUCIÓN:
+  - Verificar que el monto del pedido sea >= monto mínimo Addi
+  - Verificar que el email y nombre del cliente estén completos
+  - Revisar el cuerpo de la respuesta en el log
+
+SÍNTOMA: "API: cURL error 28: Connection timed out"
+CÓDIGO:   LTMS_API_TIMEOUT
+SOLUCIÓN:
+  - Verificar que el servidor puede hacer llamadas salientes (outbound HTTP)
+  - En hosting compartido, puede estar bloqueado por firewall del proveedor
+  - Incrementar timeout en la API: revisar LTMS_Abstract_Api_Client::$timeout
+
+================================================================================
+6. PROBLEMAS DEL DASHBOARD DEL VENDEDOR
+================================================================================
+
+SÍNTOMA: Dashboard carga en blanco / muestra "Acceso denegado"
+CÓDIGO:   LTMS_FE_001
+SOLUCIÓN:
+  1. Verificar que el usuario tenga rol ltms_vendor
+  2. Verificar que la página tenga el shortcode [ltms_vendor_dashboard]
+  3. Verificar URL en Ajustes > General > Página del panel
+  4. Limpiar caché (Flush Rewrite Rules):
+     wp rewrite flush --allow-root
+
+SÍNTOMA: AJAX calls fallan con "403 Forbidden"
+CÓDIGO:   LTMS_FE_002
+CAUSA:    Nonce inválido o sesión expirada
+SOLUCIÓN:
+  Recargar la página para obtener un nuevo nonce.
+  Si persiste con usuarios específicos: verificar que no haya plugin de seguridad
+  (Wordfence, iThemes) bloqueando los AJAX de LTMS.
+
+SÍNTOMA: Gráfico de ventas no carga
+CÓDIGO:   LTMS_FE_003
+SOLUCIÓN:
+  1. Verificar en la consola del navegador (F12) si hay errores de Chart.js
+  2. Verificar que Chart.js esté cargándose:
+     wp eval 'wp_print_scripts("chart-js");' --allow-root
+  3. Si hay conflicto de versiones, desactivar temporalmente otros plugins
+
+SÍNTOMA: PWA no se instala / manifest no encontrado
+CÓDIGO:   LTMS_PWA_001
+SOLUCIÓN:
+  1. Verificar URL: tudominio.com/wp-content/plugins/lt-marketplace-suite/assets/json/manifest.json
+  2. Verificar que la etiqueta <link rel="manifest"> esté en el <head>
+  3. Verificar desde DevTools > Application > Manifest
+
+================================================================================
+7. PROBLEMAS DE EMAIL
+================================================================================
+
+SÍNTOMA: Emails de notificación no se envían
+CÓDIGO:   LTMS_EMAIL_001
+DIAGNÓSTICO:
+  1. Verificar en LT Marketplace > Seguridad si hay errores de email en el log
+  2. Probar el envío de email con:
+     wp eval 'wp_mail("test@tudominio.com", "Test", "Funcionando");' --allow-root
+SOLUCIÓN:
+  - Configurar SMTP con WP Mail SMTP o Similar Plugins
+  - Usar servicio transaccional: SendGrid, SES, Mailgun
+  - Agregar SPF/DKIM al dominio para evitar spam
+
+SÍNTOMA: Emails van a la carpeta de spam
+CÓDIGO:   LTMS_EMAIL_002
+SOLUCIÓN:
+  1. Configurar registros SPF y DKIM en DNS
+  2. Usar IP dedicada para envío de emails
+  3. Verificar con: https://mail-tester.com
+
+================================================================================
+8. ERRORES DE KYC
+================================================================================
+
+SÍNTOMA: Documentos no se suben correctamente
+CÓDIGO:   LTMS_KYC_001
+SOLUCIÓN:
+  1. Verificar upload_max_filesize >= 10M en php.ini
+  2. Verificar post_max_size >= 10M en php.ini
+  3. Verificar permisos de wp-content/uploads/
+
+SÍNTOMA: Documentos KYC visibles para usuarios no autorizados
+CÓDIGO:   LTMS_KYC_SEC_001
+SOLUCIÓN:
+  Este es un problema de seguridad crítico.
+  1. Verificar que los archivos KYC se almacenen en Backblaze B2 (no local)
+  2. Si se almacenan localmente, agregar .htaccess en el directorio:
+     deny from all
+
+================================================================================
+9. PROBLEMAS DE WAF / SEGURIDAD
+================================================================================
+
+SÍNTOMA: Usuarios legítimos bloqueados por el WAF
+CÓDIGO:   LTMS_WAF_001
+SOLUCIÓN:
+  1. LT Marketplace > Seguridad > IPs Bloqueadas
+  2. Desbloquear la IP específica
+  3. Si ocurre frecuentemente con la misma IP, agregar a whitelist:
+     wp eval 'LTMS_Firewall::whitelist_ip("X.X.X.X");' --allow-root
+
+SÍNTOMA: "Posible SQL injection detectado" en usuario legítimo
+CÓDIGO:   LTMS_WAF_002
+CAUSA:    El WAF puede hacer falsos positivos con nombres de productos o búsquedas
+SOLUCIÓN:
+  1. Revisar el patrón que activó el WAF en el log de seguridad
+  2. Si es un falso positivo, ajustar los patrones en LTMS_Firewall
+  3. Agregar el parámetro específico a la lista de exclusiones
+
+================================================================================
+10. ERRORES DE CRON JOBS
+================================================================================
+
+SÍNTOMA: Los cron jobs no se ejecutan
+CÓDIGO:   LTMS_CRON_001
+DIAGNÓSTICO:
+  wp cron event list | grep ltms
+SOLUCIÓN:
+  1. Verificar que DISABLE_WP_CRON no esté en true en wp-config.php
+  2. Configurar cron real en crontab:
+     */5 * * * * wget -q -O /dev/null http://tudominio.com/wp-cron.php?doing_wp_cron
+  3. Reinstalar hooks de cron:
+     wp eval 'LTMS_Kernel::get_instance()->register_cron();' --allow-root
+
+================================================================================
+11. PROBLEMAS DE RENDIMIENTO
+================================================================================
+
+SÍNTOMA: Dashboard del vendedor carga lento (> 3 segundos)
+CÓDIGO:   LTMS_PERF_001
+SOLUCIÓN:
+  1. Activar Redis para WP Object Cache
+  2. Agregar índices faltantes en tablas de LTMS:
+     EXPLAIN SELECT * FROM lt_commissions WHERE vendor_id = X ORDER BY created_at DESC;
+  3. Limitar el historial de la billetera (paginar en lugar de cargar todo)
+
+SÍNTOMA: Alto uso de CPU durante el procesamiento de pedidos
+CÓDIGO:   LTMS_PERF_002
+SOLUCIÓN:
+  1. Mover el procesamiento al cron (Action Scheduler)
+  2. Aumentar innodb_buffer_pool_size en MySQL
+  3. Considerar separar la lógica de tax engine en proceso asíncrono
+
+================================================================================
+12. ERRORES PHP Y LOGS
+================================================================================
+
+Activar Debug Mode
+-------------------
+En wp-config.php:
+  define('WP_DEBUG', true);
+  define('WP_DEBUG_LOG', true);
+  define('WP_DEBUG_DISPLAY', false);
+
+Ver logs en tiempo real (servidor):
+  tail -f /var/www/html/wp-content/debug.log
+
+Errores Comunes
+---------------
+  Error: "Cannot redeclare LTMS_Wallet::..."
+  Causa:  Conflicto con otro plugin que carga la misma clase
+  Fix:    Verificar si otro plugin tiene clases con mismo nombre; desactivar conflictivo
+
+  Error: "Maximum execution time of 30 seconds exceeded"
+  Causa:  Operaciones complejas (ej: distribución MLM masiva)
+  Fix:    Aumentar max_execution_time a 120 en php.ini
+
+  Error: "Allowed memory size exhausted"
+  Causa:  Procesamiento de muchos pedidos simultáneos
+  Fix:    Aumentar memory_limit a 512M en php.ini
+
+Contacto de Soporte
+--------------------
+Si el problema persiste después de revisar esta guía:
+  1. Recopilar: error exacto, versión de PHP, versión de WP, versión de LTMS
+  2. Adjuntar extracto del debug.log
+  3. Enviar a: soporte@ltmarketplace.co
+
+================================================================================
+ FIN DE LA GUÍA DE TROUBLESHOOTING — LT Marketplace Suite v1.5.0
+================================================================================

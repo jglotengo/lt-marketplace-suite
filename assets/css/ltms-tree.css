@@ -1,0 +1,332 @@
+/**
+ * LTMS Referral Tree CSS
+ * Visualización del árbol de red MLM de afiliados
+ * Version: 1.5.0
+ */
+
+/* ── Tree Container ────────────────────────────────────────────── */
+.ltms-tree-container {
+    overflow: auto;
+    padding: 2rem 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    min-height: 300px;
+    position: relative;
+    user-select: none;
+}
+
+.ltms-tree-root {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+/* ── Levels ────────────────────────────────────────────────────── */
+.ltms-tree-level {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: nowrap;
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+.ltms-tree-level::before {
+    content: '';
+    position: absolute;
+    top: -1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 1rem;
+    background: #9ca3af;
+}
+
+.ltms-tree-level:first-child::before { display: none; }
+
+/* ── Node ──────────────────────────────────────────────────────── */
+.ltms-tree-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    min-width: 80px;
+}
+
+.ltms-tree-node-card {
+    background: #fff;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: .625rem .75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    min-width: 80px;
+    max-width: 110px;
+    position: relative;
+    z-index: 1;
+}
+
+.ltms-tree-node-card:hover {
+    border-color: #1a5276;
+    box-shadow: 0 4px 12px rgba(26,82,118,.15);
+    transform: translateY(-2px);
+}
+
+.ltms-tree-node-card.ltms-tree-self {
+    border-color: #1a5276;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.ltms-tree-node-card.ltms-tree-premium {
+    border-color: #f59e0b;
+}
+
+.ltms-tree-node-card.ltms-tree-inactive {
+    opacity: .6;
+    filter: grayscale(.4);
+}
+
+.ltms-tree-node-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 auto .375rem;
+    object-fit: cover;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #6b7280;
+    overflow: hidden;
+}
+
+.ltms-tree-node-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ltms-tree-node-name {
+    font-size: .6875rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+}
+
+.ltms-tree-node-level {
+    font-size: .625rem;
+    color: #6b7280;
+    margin-top: .125rem;
+}
+
+.ltms-tree-node-stats {
+    display: flex;
+    gap: .375rem;
+    justify-content: center;
+    margin-top: .375rem;
+}
+
+.ltms-tree-node-stat-pill {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: .125rem .375rem;
+    font-size: .5625rem;
+    color: #374151;
+    font-weight: 500;
+}
+
+/* ── Crown for top earner ──────────────────────────────────────── */
+.ltms-tree-node-card.ltms-tree-top::before {
+    content: '👑';
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1rem;
+}
+
+/* ── Connector Lines (SVG approach) ───────────────────────────── */
+.ltms-tree-connectors {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.ltms-tree-connector-line {
+    stroke: #d1d5db;
+    stroke-width: 1.5;
+    fill: none;
+    stroke-dasharray: 4 2;
+}
+
+/* ── Tooltip ───────────────────────────────────────────────────── */
+.ltms-tree-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    border-radius: 8px;
+    padding: .5rem .75rem;
+    font-size: .75rem;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.ltms-tree-node:hover .ltms-tree-tooltip {
+    opacity: 1;
+}
+
+.ltms-tree-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1f2937;
+}
+
+/* ── Legend ────────────────────────────────────────────────────── */
+.ltms-tree-legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding: .75rem 1rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: .8125rem;
+}
+
+.ltms-tree-legend-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    color: #374151;
+}
+
+.ltms-tree-legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 2px solid;
+    flex-shrink: 0;
+}
+
+.ltms-tree-legend-dot.self    { border-color: #1a5276; background: #dbeafe; }
+.ltms-tree-legend-dot.premium { border-color: #f59e0b; background: #fef9c3; }
+.ltms-tree-legend-dot.active  { border-color: #e5e7eb; background: #fff; }
+.ltms-tree-legend-dot.inactive { border-color: #e5e7eb; background: #f3f4f6; opacity: .6; }
+
+/* ── Stats Summary Bar ─────────────────────────────────────────── */
+.ltms-tree-stats-bar {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.ltms-tree-stat-card {
+    flex: 1;
+    min-width: 130px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: .875rem 1rem;
+    text-align: center;
+}
+
+.ltms-tree-stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1a5276;
+    display: block;
+}
+
+.ltms-tree-stat-label {
+    font-size: .75rem;
+    color: #6b7280;
+    margin-top: .25rem;
+    display: block;
+}
+
+/* ── Depth Indicator ───────────────────────────────────────────── */
+.ltms-tree-depth-labels {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 2rem 0;
+    pointer-events: none;
+}
+
+.ltms-tree-depth-label {
+    font-size: .625rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    background: #f3f4f6;
+    padding: .125rem .375rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* ── Animations ────────────────────────────────────────────────── */
+@keyframes ltms-tree-node-appear {
+    from { opacity: 0; transform: scale(.8) translateY(-10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.ltms-tree-node-card {
+    animation: ltms-tree-node-appear .3s ease both;
+}
+
+.ltms-tree-level:nth-child(1) .ltms-tree-node-card { animation-delay: .05s; }
+.ltms-tree-level:nth-child(2) .ltms-tree-node-card { animation-delay: .15s; }
+.ltms-tree-level:nth-child(3) .ltms-tree-node-card { animation-delay: .25s; }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .ltms-tree-level {
+        gap: .75rem;
+    }
+
+    .ltms-tree-node-card {
+        min-width: 64px;
+        max-width: 80px;
+        padding: .5rem;
+    }
+
+    .ltms-tree-node-avatar {
+        width: 32px;
+        height: 32px;
+    }
+
+    .ltms-tree-node-name {
+        font-size: .5625rem;
+        max-width: 70px;
+    }
+}

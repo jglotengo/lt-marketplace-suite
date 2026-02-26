@@ -1,0 +1,40 @@
+# ============================================================
+# LT Marketplace Suite - .dockerignore
+# ============================================================
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Dependencias (se instalan dentro del contenedor)
+node_modules/
+
+# Archivos de desarrollo local
+.env.local
+.env.development
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# Logs y temporales
+logs/
+*.log
+
+# Artefactos de testing
+tests/coverage/
+.phpunit.result.cache
+
+# Documentación (no necesaria en imagen)
+docs/
+*.md
+README.*
+
+# Archivos de configuración de desarrollo
+.editorconfig
+phpunit.xml
+phpcs.xml
+phpstan.neon
+Makefile

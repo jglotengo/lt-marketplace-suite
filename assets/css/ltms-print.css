@@ -1,0 +1,295 @@
+/**
+ * LTMS Print CSS
+ * Estilos para impresión de facturas, recibos, reportes fiscales y comprobantes de pago
+ * Version: 1.5.0
+ */
+
+@media print {
+
+    /* ── Reset para impresión ──────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    html,
+    body {
+        width: 210mm;
+        font-size: 11pt;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #000 !important;
+        background: #fff !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* ── Ocultar elementos no imprimibles ──────────────────────── */
+    .ltms-sidebar,
+    .ltms-topbar,
+    .ltms-notifications-panel,
+    .ltms-modal-overlay,
+    .ltms-btn:not(.ltms-print-visible),
+    .ltms-no-print,
+    .ltms-pagination,
+    nav,
+    header:not(.ltms-print-header),
+    footer:not(.ltms-print-footer),
+    .wp-admin-bar,
+    #wpadminbar {
+        display: none !important;
+    }
+
+    /* ── Área de impresión ─────────────────────────────────────── */
+    .ltms-print-area {
+        display: block !important;
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    /* ── Cabecera del documento ────────────────────────────────── */
+    .ltms-doc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2pt solid #1a5276;
+        padding-bottom: 12pt;
+        margin-bottom: 12pt;
+    }
+
+    .ltms-doc-logo {
+        max-width: 160pt;
+        max-height: 60pt;
+    }
+
+    .ltms-doc-info {
+        text-align: right;
+    }
+
+    .ltms-doc-title {
+        font-size: 16pt;
+        font-weight: bold;
+        color: #1a5276;
+        margin: 0 0 4pt;
+    }
+
+    .ltms-doc-number {
+        font-size: 10pt;
+        color: #555;
+    }
+
+    .ltms-doc-date {
+        font-size: 9pt;
+        color: #777;
+    }
+
+    /* ── Datos del emisor / receptor ───────────────────────────── */
+    .ltms-doc-parties {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16pt;
+        margin-bottom: 16pt;
+        font-size: 9pt;
+    }
+
+    .ltms-doc-party-box {
+        border: 1pt solid #ddd;
+        border-radius: 4pt;
+        padding: 8pt;
+    }
+
+    .ltms-doc-party-title {
+        font-size: 7.5pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        color: #1a5276;
+        border-bottom: 1pt solid #eee;
+        padding-bottom: 4pt;
+        margin-bottom: 6pt;
+        letter-spacing: .03em;
+    }
+
+    .ltms-doc-party-name {
+        font-weight: bold;
+        font-size: 10pt;
+        margin-bottom: 2pt;
+    }
+
+    /* ── Tabla de items ────────────────────────────────────────── */
+    .ltms-doc-items {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9pt;
+        margin-bottom: 16pt;
+    }
+
+    .ltms-doc-items th {
+        background: #1a5276 !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 5pt 6pt;
+        text-align: left;
+        font-size: 8.5pt;
+    }
+
+    .ltms-doc-items td {
+        padding: 4pt 6pt;
+        border-bottom: 0.5pt solid #e5e7eb;
+        vertical-align: top;
+    }
+
+    .ltms-doc-items tr:nth-child(even) td {
+        background: #f9fafb !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ltms-doc-items .col-qty,
+    .ltms-doc-items .col-price,
+    .ltms-doc-items .col-total {
+        text-align: right;
+    }
+
+    /* ── Totales ───────────────────────────────────────────────── */
+    .ltms-doc-totals {
+        margin-left: auto;
+        width: 260pt;
+        font-size: 9pt;
+        margin-bottom: 16pt;
+    }
+
+    .ltms-doc-total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 3pt 0;
+        border-bottom: 0.5pt solid #eee;
+    }
+
+    .ltms-doc-total-row.grand {
+        font-size: 11pt;
+        font-weight: bold;
+        color: #1a5276;
+        padding: 6pt 0 0;
+        border-bottom: none;
+        border-top: 1.5pt solid #1a5276;
+        margin-top: 4pt;
+    }
+
+    .ltms-doc-total-label { color: #555; }
+
+    /* ── Retenciones (Colombia) ────────────────────────────────── */
+    .ltms-doc-retenciones {
+        border: 0.5pt solid #f97316;
+        border-radius: 4pt;
+        padding: 8pt;
+        margin-bottom: 16pt;
+        font-size: 8.5pt;
+    }
+
+    .ltms-doc-retenciones-title {
+        font-weight: bold;
+        color: #c2410c;
+        font-size: 8pt;
+        text-transform: uppercase;
+        margin-bottom: 6pt;
+    }
+
+    .ltms-doc-retenciones table {
+        width: 100%;
+        font-size: 8.5pt;
+        border-collapse: collapse;
+    }
+
+    .ltms-doc-retenciones td {
+        padding: 2pt 4pt;
+    }
+
+    /* ── CFDI (México) ─────────────────────────────────────────── */
+    .ltms-doc-cfdi-box {
+        border: 0.5pt solid #16a34a;
+        border-radius: 4pt;
+        padding: 8pt;
+        margin-bottom: 16pt;
+        font-size: 8pt;
+    }
+
+    .ltms-doc-cfdi-title {
+        font-weight: bold;
+        color: #15803d;
+        font-size: 8pt;
+        text-transform: uppercase;
+        margin-bottom: 4pt;
+    }
+
+    .ltms-doc-cfdi-uuid {
+        font-family: 'Courier New', monospace;
+        font-size: 7pt;
+        word-break: break-all;
+        color: #374151;
+    }
+
+    .ltms-doc-cfdi-qr {
+        float: right;
+        width: 60pt;
+        height: 60pt;
+    }
+
+    /* ── Pie del documento ─────────────────────────────────────── */
+    .ltms-doc-footer {
+        border-top: 1pt solid #e5e7eb;
+        padding-top: 8pt;
+        font-size: 7.5pt;
+        color: #9ca3af;
+        text-align: center;
+    }
+
+    .ltms-doc-footer-legal {
+        font-size: 7pt;
+        margin-top: 4pt;
+        line-height: 1.4;
+    }
+
+    /* ── Saltos de página ──────────────────────────────────────── */
+    .ltms-page-break-before { page-break-before: always; }
+    .ltms-page-break-after  { page-break-after: always; }
+    .ltms-no-page-break     { page-break-inside: avoid; }
+
+    /* ── Configuración de página ───────────────────────────────── */
+    @page {
+        size: A4 portrait;
+        margin: 15mm 15mm 20mm;
+
+        @bottom-center {
+            content: "Página " counter(page) " de " counter(pages);
+            font-size: 8pt;
+            color: #9ca3af;
+        }
+    }
+
+    /* ── Recibo térmico (80mm) ─────────────────────────────────── */
+    @page thermal {
+        size: 80mm auto;
+        margin: 3mm;
+    }
+
+    .ltms-thermal-receipt {
+        page: thermal;
+        font-family: 'Courier New', monospace;
+        font-size: 9pt;
+        width: 72mm;
+        color: #000 !important;
+    }
+
+    .ltms-thermal-receipt .ltms-doc-items th {
+        background: #000 !important;
+        color: #fff !important;
+    }
+
+    .ltms-thermal-receipt .ltms-doc-parties {
+        grid-template-columns: 1fr;
+    }
+}

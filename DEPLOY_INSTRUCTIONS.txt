@@ -1,0 +1,238 @@
+================================================================================
+ LT MARKETPLACE SUITE — INSTRUCCIONES DE DESPLIEGUE
+ Versión 1.5.0
+================================================================================
+
+TABLA DE CONTENIDOS
+-------------------
+1. Entorno Recomendado
+2. Checklist Pre-Deploy
+3. Deploy en Servidor Compartido (cPanel)
+4. Deploy en VPS/Dedicado (Ubuntu/Debian)
+5. Deploy con Docker
+6. Deploy vía CI/CD (GitHub Actions)
+7. Post-Deploy Verification
+8. Rollback
+
+================================================================================
+1. ENTORNO RECOMENDADO
+================================================================================
+
+Hardware Mínimo (VPS)
+----------------------
+  CPU:    2 vCPUs
+  RAM:    4 GB
+  Disco:  40 GB SSD
+  Banda:  100 Mbps
+
+Stack Recomendado
+------------------
+  OS:    Ubuntu 22.04 LTS
+  Web:   Nginx 1.24+
+  PHP:   8.2 + PHP-FPM (con opcache, APCu)
+  DB:    MySQL 8.0 (NO MariaDB < 10.5)
+  Cache: Redis 7 (para WP object cache)
+  CDN:   Cloudflare (free tier suficiente)
+  SSL:   Let's Encrypt (auto-renovación)
+
+PHP Extensions Requeridas
+--------------------------
+  openssl bcmath intl mbstring json curl zip gd pdo_mysql
+
+================================================================================
+2. CHECKLIST PRE-DEPLOY
+================================================================================
+
+[ ] Backup completo de la base de datos actual
+[ ] Backup completo de wp-content/
+[ ] WP_LTMS_MASTER_KEY generada (bin/generate-secrets.sh)
+[ ] Todas las credenciales de API configuradas en wp-config.php
+[ ] SSL activo y verificado (https://www.ssllabs.com/ssltest/)
+[ ] WooCommerce activo y configurado
+[ ] Modo sandbox de APIs activado para pruebas
+[ ] Email SMTP configurado
+[ ] Capacidad de mantenimiento verificada (wp maintenance-mode)
+[ ] Revisado php.ini: upload_max_filesize >= 10M, memory_limit >= 256M
+
+================================================================================
+3. DEPLOY EN SERVIDOR COMPARTIDO (cPanel)
+================================================================================
+
+1. Construir el paquete:
+   make dist
+
+2. Subir el ZIP:
+   Administrador de archivos cPanel > wp-content/plugins/
+   Subir lt-marketplace-suite-1.5.0.zip
+   Extraer el ZIP
+
+3. Configurar wp-config.php:
+   Editar el archivo y agregar las constantes de wp-config-sample-snippet.php
+
+4. Activar en WordPress admin:
+   wp-admin > Plugins > Activar "LT Marketplace Suite"
+
+5. Verificar tablas:
+   phpMyAdmin > tu_base_de_datos
+   Confirmar existencia de lt_wallets, lt_commissions, etc.
+
+⚠️ LIMITACIONES DE HOSTING COMPARTIDO:
+   - Puede no admitir cron jobs reales (usar plugin WP Crontrol)
+   - Memory limit puede ser insuficiente (contactar al proveedor)
+   - MySQL puede ser MariaDB; verificar compatibilidad
+
+================================================================================
+4. DEPLOY EN VPS/DEDICADO
+================================================================================
+
+Configuración Nginx
+-------------------
+Ver: nginx.conf (incluido en el repositorio)
+
+Copiar a: /etc/nginx/sites-available/tu-sitio.conf
+Enlazar: ln -s /etc/nginx/sites-available/tu-sitio.conf /etc/nginx/sites-enabled/
+Verificar: nginx -t
+Recargar: systemctl reload nginx
+
+PHP-FPM
+-------
+Crear pool en /etc/php/8.2/fpm/pool.d/wordpress.conf:
+  [wordpress]
+  user = www-data
+  group = www-data
+  listen = /run/php/php8.2-fpm-wp.sock
+  pm = dynamic
+  pm.max_children = 20
+  pm.start_servers = 5
+  pm.min_spare_servers = 3
+  pm.max_spare_servers = 8
+  php_admin_value[memory_limit] = 512M
+  php_admin_value[upload_max_filesize] = 64M
+  php_admin_value[max_execution_time] = 120
+
+Deploy via Makefile
+-------------------
+  make dist                        # Construir paquete
+  make install-wp-tests            # (opcional) Configurar tests
+  bash bin/deploy-server.sh \
+    --host mi-servidor.com \
+    --user deploy \
+    --key ~/.ssh/id_rsa
+
+================================================================================
+5. DEPLOY CON DOCKER
+================================================================================
+
+Desarrollo Local
+-----------------
+  make dev-up          # Inicia WordPress + MySQL + phpMyAdmin
+
+Acceder a:
+  WordPress:  http://localhost:8080
+  phpMyAdmin: http://localhost:8081 (root/root)
+
+Producción Docker
+------------------
+  docker-compose -f docker-compose.prod.yml up -d
+
+Variables de entorno para producción (.env):
+  MYSQL_ROOT_PASSWORD=clave_segura
+  MYSQL_DATABASE=wordpress
+  WP_DOMAIN=tu-dominio.com
+  LTMS_MASTER_KEY=clave-generada-con-openssl
+
+================================================================================
+6. DEPLOY VÍA CI/CD (GITHUB ACTIONS)
+================================================================================
+
+Crear .github/workflows/deploy.yml:
+
+  name: Deploy LTMS
+  on:
+    push:
+      branches: [main]
+  jobs:
+    deploy:
+      runs-on: ubuntu-22.04
+      steps:
+        - uses: actions/checkout@v4
+        - name: Setup PHP
+          uses: shivammathur/setup-php@v2
+          with:
+            php-version: '8.2'
+            extensions: openssl,bcmath,intl,mbstring
+        - name: Install & Build
+          run: make install && make dist --skip-lint --skip-tests
+        - name: Deploy
+          run: |
+            bash bin/deploy-server.sh \
+              --host ${{ secrets.DEPLOY_HOST }} \
+              --user ${{ secrets.DEPLOY_USER }} \
+              --key "${{ secrets.DEPLOY_KEY }}"
+
+Secrets a configurar en GitHub:
+  DEPLOY_HOST      tu.servidor.com
+  DEPLOY_USER      deploy-user
+  DEPLOY_KEY       Contenido de ~/.ssh/id_rsa
+
+================================================================================
+7. POST-DEPLOY VERIFICATION
+================================================================================
+
+Checklist Post-Deploy
+----------------------
+[ ] WordPress admin accesible
+[ ] Plugin activo en Plugins > Plugins instalados
+[ ] Tablas creadas (usar phpMyAdmin o WP CLI)
+[ ] Shortcodes funcionando en páginas
+[ ] Registro de vendedor funcional
+[ ] Login de vendedor funcional
+[ ] Dashboard SPA carga correctamente
+[ ] Notificaciones de email llegando
+[ ] APIs en sandbox respondiendo (probar desde Ajustes > Configuración)
+[ ] PWA: manifest.json accesible
+[ ] Service Worker registrado (DevTools > Application)
+
+Comandos WP-CLI para verificación
+-----------------------------------
+  wp plugin status lt-marketplace-suite
+  wp option get ltms_db_version
+  wp eval 'echo LTMS_Core_Config::get_country();'
+  wp cron event list | grep ltms
+
+Prueba de integridad
+---------------------
+  php bin/master-integrity-check.php --generate  # Generar hashes iniciales
+  php bin/master-integrity-check.php              # Verificar en el futuro
+
+================================================================================
+8. ROLLBACK
+================================================================================
+
+Rollback de Plugin
+-------------------
+1. Activar modo mantenimiento:
+   wp maintenance-mode activate --allow-root
+
+2. Restaurar archivos del plugin desde backup:
+   rsync -av backup/lt-marketplace-suite/ /path/to/wp-content/plugins/lt-marketplace-suite/
+
+3. Restaurar base de datos si es necesario:
+   wp db import backup-pre-deploy.sql --allow-root
+
+4. Desactivar modo mantenimiento:
+   wp maintenance-mode deactivate --allow-root
+
+5. Limpiar caches:
+   wp cache flush --allow-root
+   wp transient delete --all --allow-root
+
+Rollback Rápido (si bin/deploy-server.sh falló)
+------------------------------------------------
+El script crea un backup antes de deploy en /tmp/ltms-backup-TIMESTAMP/.
+En el servidor:
+  cp -r /tmp/ltms-backup-TIMESTAMP/ /path/to/plugins/lt-marketplace-suite/
+
+================================================================================
+ FIN DE LAS INSTRUCCIONES DE DESPLIEGUE — LT Marketplace Suite v1.5.0
+================================================================================
