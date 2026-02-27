@@ -2,7 +2,7 @@
     "name": "lt-marketplace/lt-marketplace-suite",
     "description": "Enterprise Multi-Vendor WooCommerce Plugin for Colombia & Mexico",
     "type": "wordpress-plugin",
-    "version": "1.5.0",
+    "version": "1.7.0",
     "license": "proprietary",
     "authors": [
         {
@@ -19,7 +19,8 @@
         "ext-bcmath": "*",
         "dompdf/dompdf": "^2.0",
         "firebase/php-jwt": "^6.10",
-        "ramsey/uuid": "^4.7"
+        "ramsey/uuid": "^4.7",
+        "stripe/stripe-php": "^13.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.5",

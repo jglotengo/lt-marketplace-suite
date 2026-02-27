@@ -28,6 +28,7 @@ final class LTMS_Core_Activator {
         self::run_migrations();
         self::install_roles();
         self::install_pages();
+        self::create_required_pages();
         self::set_default_options();
         self::schedule_cron_jobs();
         self::create_secure_directories();
@@ -182,6 +183,123 @@ final class LTMS_Core_Activator {
                 wp_schedule_event( $timestamp, $config['recurrence'], $hook );
             }
         }
+    }
+
+    /**
+     * Registra los hooks de WordPress necesarios para el activador
+     * (p.ej., el handler de admin-post para recrear páginas).
+     * Llamar desde el bootstrap del plugin (ltms_run).
+     *
+     * @return void
+     */
+    public static function register_hooks(): void {
+        add_action( 'admin_post_ltms_recreate_pages', [ __CLASS__, 'handle_recreate_pages' ] );
+    }
+
+    /**
+     * Handler de admin-post: recrea las páginas faltantes del plugin.
+     * Requiere nonce válido y capacidad manage_options.
+     *
+     * @return void
+     */
+    public static function handle_recreate_pages(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'No tienes permiso para realizar esta acción.', 'ltms' ), 403 );
+        }
+
+        check_admin_referer( 'ltms_recreate_pages' );
+
+        self::create_required_pages();
+
+        wp_safe_redirect(
+            add_query_arg(
+                [ 'page' => 'ltms-pages', 'ltms_pages_recreated' => '1' ],
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    /**
+     * Crea (o recrea) las páginas requeridas del plugin si no existen o fueron eliminadas.
+     * Almacena un mapa associativo page_key => page_id en la opción ltms_installed_pages.
+     *
+     * @return void
+     */
+    public static function create_required_pages(): void {
+        $pages = [
+            'ltms-vendor-register' => [
+                'title'   => 'Registro de Vendedor',
+                'content' => '[ltms_vendor_register]',
+                'slug'    => 'registro-vendedor',
+            ],
+            'ltms-dashboard'       => [
+                'title'   => 'Panel del Vendedor',
+                'content' => '[ltms_vendor_dashboard]',
+                'slug'    => 'panel-vendedor',
+            ],
+            'ltms-login'           => [
+                'title'   => 'Iniciar Sesión',
+                'content' => '[ltms_vendor_login]',
+                'slug'    => 'login-vendedor',
+            ],
+            'ltms-store'           => [
+                'title'   => 'Tienda del Vendedor',
+                'content' => '[ltms_vendor_store]',
+                'slug'    => 'tienda',
+            ],
+            'ltms-orders'          => [
+                'title'   => 'Mis Pedidos',
+                'content' => '[ltms_vendor_orders]',
+                'slug'    => 'mis-pedidos',
+            ],
+            'ltms-wallet'          => [
+                'title'   => 'Mi Billetera',
+                'content' => '[ltms_vendor_wallet]',
+                'slug'    => 'mi-billetera',
+            ],
+            'ltms-kyc'             => [
+                'title'   => 'Verificación de Identidad',
+                'content' => '[ltms_vendor_kyc]',
+                'slug'    => 'verificacion-identidad',
+            ],
+            'ltms-insurance'       => [
+                'title'   => 'Mis Seguros',
+                'content' => '[ltms_vendor_insurance]',
+                'slug'    => 'mis-seguros',
+            ],
+        ];
+
+        // ltms_installed_pages puede ser un array indexado (legado) o asociativo (nuevo).
+        // Normalizar a asociativo por clave de página.
+        $installed = get_option( 'ltms_installed_pages', [] );
+        if ( ! is_array( $installed ) ) {
+            $installed = [];
+        }
+
+        foreach ( $pages as $key => $page_data ) {
+            // Si ya existe una entrada válida para esta clave, omitir.
+            if ( ! empty( $installed[ $key ] ) && get_post( $installed[ $key ] ) ) {
+                continue;
+            }
+
+            $page_id = wp_insert_post(
+                [
+                    'post_title'     => $page_data['title'],
+                    'post_content'   => $page_data['content'],
+                    'post_status'    => 'publish',
+                    'post_type'      => 'page',
+                    'post_name'      => $page_data['slug'],
+                    'comment_status' => 'closed',
+                ]
+            );
+
+            if ( ! is_wp_error( $page_id ) ) {
+                $installed[ $key ] = $page_id;
+            }
+        }
+
+        update_option( 'ltms_installed_pages', $installed );
     }
 
     /**

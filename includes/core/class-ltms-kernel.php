@@ -358,6 +358,15 @@ final class LTMS_Core_Kernel {
             return;
         }
 
+        // GOB-002: Aviso si WP_CRON no está desactivado (recomendación para pagos y reportes DIAN/SAT)
+        add_action( 'admin_notices', function() {
+            if ( ! defined( 'DISABLE_WP_CRON' ) || ! DISABLE_WP_CRON ) {
+                echo '<div class="notice notice-warning"><p>';
+                esc_html_e( 'LT Marketplace Suite: Para garantizar pagos puntuales, configure un cron real del servidor. Ver documentación de instalación.', 'ltms' );
+                echo '</p></div>';
+            }
+        } );
+
         if ( class_exists( 'LTMS_Admin' ) ) {
             LTMS_Admin::init();
         }

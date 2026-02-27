@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           1.6.0
+ * Version:           1.7.0
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -17,7 +17,7 @@
  * Requires Plugins:     woocommerce
  *
  * @package LTMS
- * @version 1.6.0
+ * @version 1.7.0
  */
 
 // ============================================================
@@ -30,8 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '1.6.0' );
-define( 'LTMS_DB_VERSION',       '1.6.0' );
+define( 'LTMS_VERSION',          '1.7.0' );
+define( 'LTMS_DB_VERSION',       '1.7.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
 define( 'LTMS_MIN_WC',           '7.0' );
@@ -147,6 +147,7 @@ function ltms_load_autoloader(): void {
                 'frontend' => [ 'data', 'views', 'views/vendor-parts' ],
                 'admin'    => [ 'views' ],
                 'shipping' => [],
+                'gateway'  => [],
             ];
 
             if ( isset( $subdirs_map[ $subdir ] ) ) {
@@ -210,11 +211,31 @@ function ltms_on_deactivation(): void {
  * WooCommerce y WordPress estén completamente inicializados.
  */
 function ltms_run(): void {
+    // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
+    ltms_load_autoloader();
+
     if ( ! ltms_check_requirements() ) {
+        // Sin WooCommerce: registrar menú mínimo para que el plugin sea visible.
+        if ( is_admin() ) {
+            add_action( 'admin_menu', function() {
+                add_menu_page(
+                    'LT Marketplace Suite',
+                    'LT Marketplace',
+                    'manage_options',
+                    'ltms-dashboard',
+                    function() {
+                        echo '<div class="wrap"><h1>LT Marketplace Suite v' . esc_html( LTMS_VERSION ) . '</h1>';
+                        echo '<div class="notice notice-error inline"><p>' .
+                             esc_html__( 'LT Marketplace Suite requiere WooCommerce activo para funcionar correctamente. Por favor instala y activa WooCommerce.', 'ltms' ) .
+                             '</p></div></div>';
+                    },
+                    'dashicons-store',
+                    30
+                );
+            }, 5 );
+        }
         return;
     }
-
-    ltms_load_autoloader();
 
     // Cargar traducciones antes de cualquier otra cosa
     load_plugin_textdomain(

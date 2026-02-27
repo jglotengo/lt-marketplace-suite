@@ -32,6 +32,7 @@ final class LTMS_Core_Deactivator {
         self::clear_transients();
         self::flush_rewrite_rules();
         self::log_deactivation();
+        self::set_deactivation_notice();
     }
 
     /**
@@ -91,7 +92,11 @@ final class LTMS_Core_Deactivator {
         // Transients por prefijo (WAF IP blocks)
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->query(
-            "DELETE FROM `{$wpdb->options}` WHERE option_name LIKE '_transient_ltms_%' OR option_name LIKE '_transient_timeout_ltms_%'"
+            $wpdb->prepare(
+                "DELETE FROM `{$wpdb->options}` WHERE option_name LIKE %s OR option_name LIKE %s",
+                $wpdb->esc_like( '_transient_ltms_' ) . '%',
+                $wpdb->esc_like( '_transient_timeout_ltms_' ) . '%'
+            )
         );
     }
 
@@ -123,5 +128,20 @@ final class LTMS_Core_Deactivator {
                 [ 'user_id' => $user_id ]
             );
         }
+    }
+
+    /**
+     * Almacena una bandera para mostrar un aviso informativo al administrador
+     * en la próxima carga de página tras la desactivación.
+     * El aviso se consume en admin_notices (en el bootstrap del plugin si sigue activo,
+     * o en el plugin que gestione esa lógica). Dado que al desactivarse este plugin
+     * no hay admin_notices hook disponible de forma inmediata, se usa update_option
+     * para que otro hook (o la próxima instancia de admin) lo muestre y lo elimine.
+     *
+     * @return void
+     */
+    private static function set_deactivation_notice(): void {
+        // Nivel 1: Los datos permanecen intactos. Se notifica al admin.
+        update_option( 'ltms_show_deactivation_notice', '1' );
     }
 }
