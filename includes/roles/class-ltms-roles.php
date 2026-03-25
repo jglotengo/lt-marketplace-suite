@@ -141,6 +141,7 @@ final class LTMS_Roles {
                 'ltms_manage_roles',
                 'ltms_freeze_wallets',
                 'ltms_generate_legal_evidence',
+                'ltms_view_audit_log',            // required by Historial Fiscal submenu
             ];
 
             foreach ( $admin_caps as $cap ) {

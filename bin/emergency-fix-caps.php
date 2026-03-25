@@ -2,11 +2,11 @@
 /**
  * LTMS Emergency Capabilities Fix
  *
- * Run via WP-CLI when LTMS_Roles class is unavailable (e.g., autoloader broken):
- *   wp eval-file wp-content/plugins/lt-marketplace-suite/bin/emergency-fix-caps.php --allow-root
+ * Adds ALL capabilities required by LTMS admin submenus directly to the
+ * administrator role, bypassing the LTMS autoloader entirely.
  *
- * This script directly writes capabilities to the administrator role in the database,
- * bypassing the LTMS class autoloader entirely.
+ * Run via WP-CLI:
+ *   wp eval-file wp-content/plugins/lt-marketplace-suite/bin/emergency-fix-caps.php --allow-root
  *
  * @package LTMS
  */
@@ -18,126 +18,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 echo "LTMS Emergency Capabilities Fix\n";
 echo str_repeat( '-', 50 ) . "\n";
 
-// All capabilities the administrator needs for LTMS
+/**
+ * EXACT capability names as checked by class-ltms-admin.php submenus.
+ * These names are authoritative — changing them breaks the menu checks.
+ */
 $admin_caps = [
-    'ltms_access_dashboard'     => true,
-    'ltms_manage_all_vendors'   => true,
-    'ltms_view_wallet_ledger'   => true,
-    'ltms_manage_payouts'       => true,
-    'ltms_manage_commissions'   => true,
-    'ltms_view_audit_logs'      => true,
-    'ltms_manage_settings'      => true,
-    'ltms_export_reports'       => true,
-    'ltms_manage_api_keys'      => true,
-    'ltms_manage_kyc'           => true,
-    'ltms_approve_kyc'          => true,
-    'ltms_manage_waf'           => true,
-    'ltms_view_waf_logs'        => true,
-    'ltms_impersonate_vendor'   => true,
-    'ltms_manage_referrals'     => true,
-    'ltms_manage_insurance'     => true,
-    'ltms_manage_redi'          => true,
-    'ltms_view_tax_reports'     => true,
-    'ltms_manage_coupons'       => true,
-    'ltms_manage_marketing'     => true,
+    // ── Required by admin submenus (exact names from class-ltms-admin.php) ──
+    'ltms_access_dashboard',          // main menu + Dashboard submenu
+    'ltms_manage_all_vendors',        // Vendedores, ReDi
+    'ltms_approve_payouts',           // Retiros  (NOT ltms_manage_payouts)
+    'ltms_manage_platform_settings',  // Config, Marketing, Fiscal, Salud APIs, Comisiones  (NOT ltms_manage_settings)
+    'ltms_view_tax_reports',          // Reportes Fiscales
+    'ltms_view_wallet_ledger',        // Billeteras
+    'ltms_view_all_orders',           // Pedidos, Para Recogida, Seguros  (NOT ltms_manage_orders)
+    'ltms_manage_kyc',                // KYC / Documentos
+    'ltms_view_security_logs',        // Seguridad
+    'ltms_view_audit_log',            // Historial Fiscal  (singular, NOT ltms_view_audit_logs)
+
+    // ── Additional caps from LTMS_Roles::install() ──
+    'ltms_view_compliance_logs',
+    'ltms_export_reports',
+    'ltms_compliance',
+    'ltms_manage_roles',
+    'ltms_freeze_wallets',
+    'ltms_generate_legal_evidence',
 ];
 
-// Vendor caps
-$vendor_caps = [
-    'ltms_vendor_access'         => true,
-    'ltms_view_own_wallet'       => true,
-    'ltms_request_payout'        => true,
-    'ltms_manage_own_products'   => true,
-    'ltms_view_own_orders'       => true,
-    'ltms_manage_own_store'      => true,
-    'ltms_upload_kyc_docs'       => true,
-    'ltms_view_own_commissions'  => true,
-    'ltms_view_own_referrals'    => true,
-    'ltms_manage_own_settings'   => true,
-];
+$role  = get_role( 'administrator' );
+$added = 0;
+$had   = 0;
 
-// 1. Administrator role
-$admin_role = get_role( 'administrator' );
-if ( $admin_role ) {
-    $added = 0;
-    $already = 0;
-    foreach ( $admin_caps as $cap => $grant ) {
-        if ( ! $admin_role->has_cap( $cap ) ) {
-            $admin_role->add_cap( $cap, $grant );
-            $added++;
-            echo "+ Added: {$cap}\n";
-        } else {
-            $already++;
-        }
+if ( ! $role ) {
+    echo "ERROR: 'administrator' role not found.\n";
+    exit( 1 );
+}
+
+foreach ( $admin_caps as $cap ) {
+    if ( $role->has_cap( $cap ) ) {
+        echo "  already  $cap\n";
+        $had++;
+    } else {
+        $role->add_cap( $cap, true );
+        echo "  + added  $cap\n";
+        $added++;
     }
-    // Admin also gets vendor caps
-    foreach ( $vendor_caps as $cap => $grant ) {
-        if ( ! $admin_role->has_cap( $cap ) ) {
-            $admin_role->add_cap( $cap, $grant );
-        }
-    }
-    echo "\nAdministrator: {$added} caps added, {$already} already present.\n";
-} else {
-    echo "ERROR: 'administrator' role not found!\n";
 }
 
-// 2. Create ltms_vendor role if missing
-$vendor_role = get_role( 'ltms_vendor' );
-if ( ! $vendor_role ) {
-    add_role( 'ltms_vendor', 'Vendor LTMS', array_merge( $vendor_caps, [
-        'read' => true,
-    ] ) );
-    echo "Created role: ltms_vendor\n";
-} else {
-    foreach ( $vendor_caps as $cap => $grant ) {
-        $vendor_role->add_cap( $cap, $grant );
-    }
-    echo "Updated role: ltms_vendor\n";
-}
+echo str_repeat( '-', 50 ) . "\n";
+echo "Added: $added | Already present: $had\n\n";
 
-// 3. Create ltms_vendor_premium role if missing
-$premium_role = get_role( 'ltms_vendor_premium' );
-if ( ! $premium_role ) {
-    $premium_caps = array_merge( $vendor_caps, [
-        'read'                      => true,
-        'ltms_vendor_premium_access'=> true,
-        'ltms_access_advanced_stats'=> true,
-        'ltms_create_coupons'       => true,
-    ] );
-    add_role( 'ltms_vendor_premium', 'Vendor Premium LTMS', $premium_caps );
-    echo "Created role: ltms_vendor_premium\n";
-} else {
-    echo "Role ltms_vendor_premium: already exists\n";
-}
-
-// 4. Create ltms_compliance_officer role if missing
-if ( ! get_role('ltms_compliance_officer') ) {
-    add_role( 'ltms_compliance_officer', 'Compliance Officer LTMS', [
-        'read'                   => true,
-        'ltms_view_audit_logs'   => true,
-        'ltms_manage_kyc'        => true,
-        'ltms_approve_kyc'       => true,
-        'ltms_view_tax_reports'  => true,
-        'ltms_export_reports'    => true,
-        'ltms_view_waf_logs'     => true,
-    ] );
-    echo "Created role: ltms_compliance_officer\n";
-}
-
-// 5. Create ltms_external_auditor role if missing
-if ( ! get_role('ltms_external_auditor') ) {
-    add_role( 'ltms_external_auditor', 'External Auditor LTMS', [
-        'read'                   => true,
-        'ltms_view_audit_logs'   => true,
-        'ltms_view_tax_reports'  => true,
-        'ltms_export_reports'    => true,
-    ] );
-    echo "Created role: ltms_external_auditor\n";
-}
-
-// 6. Verify the critical capability
-$admin_role_check = get_role( 'administrator' );
-$has_key_cap = $admin_role_check && $admin_role_check->has_cap( 'ltms_access_dashboard' );
-echo "\n" . str_repeat( '-', 50 ) . "\n";
-echo "ltms_access_dashboard on administrator: " . ( $has_key_cap ? "YES ✓ — Admin menu should now appear" : "NO ✗ — Something went wrong" ) . "\n";
-echo "\nDone. Clear any object cache and reload wp-admin.\n";
+// Verify the critical gate cap
+$ok = get_role( 'administrator' ) && get_role( 'administrator' )->has_cap( 'ltms_access_dashboard' );
+echo 'ltms_access_dashboard: ' . ( $ok ? 'OK — admin menu visible' : 'STILL MISSING' ) . "\n";
+echo "Done.\n";
