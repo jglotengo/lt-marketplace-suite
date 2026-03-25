@@ -114,6 +114,23 @@ function ltms_load_autoloader(): void {
         return;
     }
 
+    // Fallback: cargar traits e interfaces de forma eager antes del autoloader.
+    // El autoloader SPL solo maneja clases; los traits/interfaces tienen prefijo
+    // 'trait-' o 'interface-' y no se encuentran con la convención 'class-*'.
+    // Sin estas cargas tempranas, cualquier clase que use LTMS_Logger_Aware
+    // provoca un fatal en boot() que queda silenciado en producción.
+    $eager_files = [
+        LTMS_INCLUDES_DIR . 'core/traits/trait-ltms-logger-aware.php',
+        LTMS_INCLUDES_DIR . 'core/traits/trait-ltms-singleton.php',
+        LTMS_INCLUDES_DIR . 'core/interfaces/interface-ltms-api-client.php',
+        LTMS_INCLUDES_DIR . 'core/interfaces/interface-ltms-tax-strategy.php',
+    ];
+    foreach ( $eager_files as $file ) {
+        if ( file_exists( $file ) ) {
+            require_once $file;
+        }
+    }
+
     // Fallback: Autoloader manual basado en convención de nombres LTMS_*
     spl_autoload_register( function( string $class_name ): void {
         // Solo procesar clases LTMS_*
