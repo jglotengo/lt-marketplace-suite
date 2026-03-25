@@ -215,6 +215,33 @@ function ltms_load_autoloader(): void {
                     }
                 }
             }
+
+            // ── Excepciones 3+ partes ────────────────────────────────────────
+            // Clases cuyo archivo OMITE el subpaquete en el nombre:
+            // LTMS_Core_Kernel → class-ltms-kernel.php (no class-ltms-core-kernel.php)
+            // Sin este mapa el Kernel nunca se carga → cero menús en wp-admin.
+            $exceptions_npart = [
+                // Core — archivo no incluye 'core-' en el nombre
+                'ltms-core-kernel'      => 'core/class-ltms-kernel.php',
+                'ltms-core-config'      => 'core/class-ltms-config.php',
+                'ltms-core-logger'      => 'core/class-ltms-logger.php',
+                'ltms-core-security'    => 'core/class-ltms-security.php',
+                'ltms-core-firewall'    => 'core/class-ltms-firewall.php',
+                'ltms-core-activator'   => 'core/services/class-ltms-activator.php',
+                'ltms-core-deactivator' => 'core/services/class-ltms-deactivator.php',
+                // Business — archivo no incluye 'business-'
+                'ltms-business-wallet'  => 'business/class-ltms-wallet.php',
+                // Data/DB — subdir incorrecto en nombre de clase
+                'ltms-data-masking'     => 'core/class-ltms-data-masking.php',
+                'ltms-db-migrations'    => 'core/migrations/class-ltms-db-migrations.php',
+            ];
+
+            if ( isset( $exceptions_npart[ $class_file ] ) ) {
+                $filepath = LTMS_INCLUDES_DIR . $exceptions_npart[ $class_file ];
+                if ( file_exists( $filepath ) ) {
+                    require_once $filepath;
+                }
+            }
         }
     });
 }
