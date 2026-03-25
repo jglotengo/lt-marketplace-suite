@@ -628,7 +628,8 @@ final class LTMS_DB_Migrations {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_commission_tiers';
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}`", [] ) );
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a trusted constant string
+        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
         if ( $count > 0 ) {
             return;
         }
@@ -666,9 +667,25 @@ final class LTMS_DB_Migrations {
         // DDL statements (ALTER TABLE) cannot use parameterized placeholders.
         // Table names are derived exclusively from $wpdb->prefix (trusted, server-set value).
         // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $p = $wpdb->prefix;
         $indexes = [
-            "ALTER TABLE `{$wpdb->prefix}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
-            "ALTER TABLE `{$wpdb->prefix}lt_commissions`         ADD INDEX IF NOT EXISTS `idx_paid_at`    (`paid_at`)",
+            // Existing single-column indexes
+            "ALTER TABLE `{$p}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
+            "ALTER TABLE `{$p}lt_commissions`         ADD INDEX IF NOT EXISTS `idx_paid_at`    (`paid_at`)",
+
+            // PERF: composite indexes for common query patterns
+            // notifications: user_id + is_read + created_at (dashboard unread count + list)
+            "ALTER TABLE `{$p}lt_notifications` ADD INDEX IF NOT EXISTS `idx_user_unread` (`user_id`, `is_read`, `created_at`)",
+            // wallet_transactions: vendor_id + type + created_at (commission reports, payout history)
+            "ALTER TABLE `{$p}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_vendor_type_date` (`vendor_id`, `type`, `created_at`)",
+            // waf_blocked_ips: expires_at (cleanup cron queries)
+            "ALTER TABLE `{$p}lt_waf_blocked_ips` ADD INDEX IF NOT EXISTS `idx_expires_at` (`expires_at`)",
+            // commissions: vendor_id + status + created_at (vendor commission reports)
+            "ALTER TABLE `{$p}lt_commissions` ADD INDEX IF NOT EXISTS `idx_vendor_status_date` (`vendor_id`, `status`, `created_at`)",
+            // audit_logs: user_id + created_at (per-user audit trail)
+            "ALTER TABLE `{$p}lt_audit_logs` ADD INDEX IF NOT EXISTS `idx_user_date` (`user_id`, `created_at`)",
+            // api_logs: provider + created_at (provider health dashboard)
+            "ALTER TABLE `{$p}lt_api_logs` ADD INDEX IF NOT EXISTS `idx_provider_date` (`provider`, `created_at`)",
         ];
 
         foreach ( $indexes as $sql ) {

@@ -164,6 +164,24 @@ final class LTMS_Core_Activator {
      * @return void
      */
     private static function schedule_cron_jobs(): void {
+        // Register custom intervals inline so wp_schedule_event() accepts them
+        // even when this runs before the kernel's cron_schedules filter is hooked.
+        add_filter( 'cron_schedules', static function ( array $schedules ): array {
+            if ( ! isset( $schedules['every_5_minutes'] ) ) {
+                $schedules['every_5_minutes'] = [
+                    'interval' => 5 * MINUTE_IN_SECONDS,
+                    'display'  => __( 'Every 5 Minutes', 'ltms' ),
+                ];
+            }
+            if ( ! isset( $schedules['every_30_minutes'] ) ) {
+                $schedules['every_30_minutes'] = [
+                    'interval' => 30 * MINUTE_IN_SECONDS,
+                    'display'  => __( 'Every 30 Minutes', 'ltms' ),
+                ];
+            }
+            return $schedules;
+        } );
+
         $jobs = [
             'ltms_process_payouts'    => [ 'recurrence' => 'daily',   'time' => '02:00:00' ],
             'ltms_sync_siigo'         => [ 'recurrence' => 'hourly',  'time' => null ],

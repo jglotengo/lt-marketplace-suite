@@ -308,10 +308,14 @@ final class LTMS_Core_Firewall {
      */
     private static function is_bad_bot( string $ua ): bool {
         $bad_bots = [
+            // Actual attack tools — never legitimate API clients
             'sqlmap', 'nikto', 'nmap', 'masscan', 'zgrab',
-            'python-requests', 'go-http-client', 'curl/7', 'libwww-perl',
             'dirbuster', 'gobuster', 'wfuzz', 'w3af', 'burpsuite',
             'hydra', 'medusa', 'nessus', 'openvas',
+            // NOTE: curl, python-requests, go-http-client, libwww-perl intentionally
+            // removed — they are used by legitimate API consumers, monitoring systems,
+            // and payment gateway webhooks. Block by behavior (rate-limit, patterns),
+            // not by UA string.
         ];
 
         $ua_lower = strtolower( $ua );

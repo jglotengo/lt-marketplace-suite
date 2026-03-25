@@ -171,11 +171,6 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Commission_Strategy::init();
         }
 
-        // Split de pagos
-        if ( class_exists( 'LTMS_Business_Order_Split' ) ) {
-            LTMS_Business_Order_Split::init();
-        }
-
         // Motor fiscal
         if ( class_exists( 'LTMS_Business_Tax_Engine' ) ) {
             LTMS_Business_Tax_Engine::init();
@@ -407,6 +402,23 @@ final class LTMS_Core_Kernel {
      * @return void
      */
     private function boot_cron(): void {
+        // Register custom recurrence intervals so that WP accepts them.
+        add_filter( 'cron_schedules', static function ( array $schedules ): array {
+            if ( ! isset( $schedules['every_5_minutes'] ) ) {
+                $schedules['every_5_minutes'] = [
+                    'interval' => 5 * MINUTE_IN_SECONDS,
+                    'display'  => __( 'Every 5 Minutes', 'ltms' ),
+                ];
+            }
+            if ( ! isset( $schedules['every_30_minutes'] ) ) {
+                $schedules['every_30_minutes'] = [
+                    'interval' => 30 * MINUTE_IN_SECONDS,
+                    'display'  => __( 'Every 30 Minutes', 'ltms' ),
+                ];
+            }
+            return $schedules;
+        } );
+
         if ( class_exists( 'LTMS_Core_Cron_Manager' ) ) {
             LTMS_Core_Cron_Manager::init();
         }
