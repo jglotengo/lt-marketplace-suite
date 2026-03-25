@@ -14,9 +14,13 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LTMS: CLAVE MAESTRA DE CIFRADO AES-256
+// NOMBRE CORRECTO DE LA CONSTANTE: LTMS_ENCRYPTION_KEY
+// El plugin verifica define('LTMS_ENCRYPTION_KEY', ...) en class-ltms-config.php.
 // Genera una clave segura con: openssl rand -base64 32
+// ⚠️  NUNCA cambiar este valor después de haber cifrado datos — los registros
+//     existentes (KYC, cuentas bancarias, NIT/RFC) se volverán ilegibles.
 // ─────────────────────────────────────────────────────────────────────────────
-define( 'WP_LTMS_MASTER_KEY', 'REPLACE_WITH_64_CHAR_RANDOM_KEY_HERE_DO_NOT_USE_DEFAULT' );
+define( 'LTMS_ENCRYPTION_KEY', 'REPLACE_WITH_64_CHAR_RANDOM_KEY_HERE_DO_NOT_USE_DEFAULT' );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LTMS: OPENPAY COLOMBIA
@@ -100,6 +104,39 @@ define( 'WP_LTMS_B2_BUCKET_ID',   'backblaze_bucket_id' );
 define( 'WP_LTMS_VAPID_PUBLIC_KEY',  'VAPID_PUBLIC_KEY_BASE64URL' );
 define( 'WP_LTMS_VAPID_PRIVATE_KEY', 'VAPID_PRIVATE_KEY_BASE64URL' );
 define( 'WP_LTMS_VAPID_SUBJECT',     'mailto:admin@yoursite.com' );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LTMS: PROXY / CDN DE CONFIANZA (WAF IP Resolution)
+//
+// Si el sitio está detrás de Cloudflare, AWS ALB u otro proxy inverso,
+// declara aquí las IPs o rangos CIDR del proxy para que el WAF de LTMS
+// lea la IP real del cliente desde X-Forwarded-For / CF-Connecting-IP.
+//
+// Formato: lista separada por comas de IPs o rangos CIDR.
+// Ejemplos:
+//   Cloudflare IPv4: '173.245.48.0/20,103.21.244.0/22,...'
+//   AWS ALB:         '10.0.0.0/8,172.16.0.0/12'
+//   Sin proxy:       '' (cadena vacía — valor por defecto)
+// ─────────────────────────────────────────────────────────────────────────────
+define( 'LTMS_TRUSTED_PROXY_IPS', '' ); // Ejemplo: '173.245.48.0/20,103.21.244.0/22'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LTMS: CHART.JS SRI HASH (Subresource Integrity)
+//
+// Hash de integridad para Chart.js cargado desde CDN.
+// Verificar / regenerar en: https://www.srihash.org/
+// Actualizar cuando se cambie la versión de Chart.js ($chartjs_version en
+// class-ltms-admin.php). El valor por defecto corresponde a chart.js@4.4.4.
+// ─────────────────────────────────────────────────────────────────────────────
+// define( 'LTMS_CHARTJS_SRI', 'sha256-zyIBaW7VExhKvGqMlPU9TH0Tve6BGFPXM1STFM/ycE=' );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LTMS: DESHABILITAR VERIFICACIÓN SSL (solo desarrollo local)
+//
+// NUNCA usar en producción. Solo para entornos locales con certificados
+// autofirmados. Las llamadas a APIs externas siempre verifican SSL por defecto.
+// ─────────────────────────────────────────────────────────────────────────────
+// define( 'LTMS_DISABLE_SSL_VERIFY', true ); // ¡SOLO DESARROLLO LOCAL!
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WORDPRESS: Recomendaciones adicionales de seguridad

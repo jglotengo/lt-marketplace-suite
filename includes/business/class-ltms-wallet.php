@@ -262,8 +262,11 @@ final class LTMS_Business_Wallet {
                 );
             }
 
-            // 2. Verificar si la billetera está congelada
-            if ( (int) $wallet['is_frozen'] === 1 && in_array( $type, [ 'debit', 'payout' ], true ) ) {
+            // 2. Verificar si la billetera está congelada.
+            // Frozen wallets block all outbound/mutating operations:
+            // debit, payout, hold (new retentions), and adjustment.
+            // credit and release are still allowed to avoid trapping funds indefinitely.
+            if ( (int) $wallet['is_frozen'] === 1 && in_array( $type, [ 'debit', 'payout', 'hold', 'adjustment' ], true ) ) {
                 throw new \RuntimeException(
                     sprintf( 'LTMS Wallet: La billetera del vendedor #%d está congelada por compliance.', $vendor_id )
                 );
@@ -305,7 +308,13 @@ final class LTMS_Business_Wallet {
 
                 case 'release':
                     if ( (float) $new_balance_pending < $amount ) {
-                        $amount = (float) $new_balance_pending; // Liberar lo que hay
+                        throw new \InvalidArgumentException(
+                            sprintf(
+                                'LTMS Wallet: No se puede liberar %s — saldo pendiente disponible: %s.',
+                                $amount,
+                                $new_balance_pending
+                            )
+                        );
                     }
                     $new_balance_pending = bcsub( (string) $pending_before, (string) $amount, 2 );
                     $new_balance         = bcadd( (string) $balance_before, (string) $amount, 2 );

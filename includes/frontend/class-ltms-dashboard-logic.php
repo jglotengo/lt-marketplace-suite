@@ -181,14 +181,22 @@ final class LTMS_Dashboard_Logic {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_notifications';
 
-        $where = $wpdb->prepare( 'WHERE user_id = %d AND is_read = 0', $user_id );
+        $where_sql = 'WHERE user_id = %d AND is_read = 0';
+        $args      = [ $user_id ];
+
         if ( $since ) {
-            $where .= $wpdb->prepare( ' AND created_at > %s', $since );
+            $where_sql .= ' AND created_at > %s';
+            $args[]     = $since;
         }
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+        $args[] = 20; // LIMIT placeholder
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $notifications = $wpdb->get_results(
-            "SELECT id, type, title, message, data, created_at FROM `{$table}` {$where} ORDER BY created_at DESC LIMIT 20",
+            $wpdb->prepare(
+                "SELECT id, type, title, message, data, created_at FROM `{$table}` {$where_sql} ORDER BY created_at DESC LIMIT %d",
+                ...$args
+            ),
             ARRAY_A
         );
 

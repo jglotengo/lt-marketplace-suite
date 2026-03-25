@@ -273,28 +273,48 @@ final class LTMS_Admin_Payouts {
         $table  = $wpdb->prefix . 'lt_payout_requests';
         $status = sanitize_key( $_POST['status'] ?? '' ); // phpcs:ignore
 
-        $where = $status ? $wpdb->prepare( 'WHERE status = %s', $status ) : '';
+        $where_sql = '';
+        $args      = [];
+
+        if ( $status ) {
+            $where_sql = 'WHERE p.status = %s';
+            $args[]    = $status;
+        }
+
+        $args[] = 1000; // LIMIT placeholder
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $payouts = $wpdb->get_results(
-            "SELECT p.*, u.user_email, u.display_name FROM `{$table}` p LEFT JOIN `{$wpdb->users}` u ON u.ID = p.vendor_id {$where} ORDER BY p.created_at DESC LIMIT 1000",
+            $wpdb->prepare(
+                "SELECT p.*, u.user_email, u.display_name FROM `{$table}` p LEFT JOIN `{$wpdb->users}` u ON u.ID = p.vendor_id {$where_sql} ORDER BY p.created_at DESC LIMIT %d",
+                ...$args
+            ),
             ARRAY_A
         );
+
+        // Sanitize a CSV field: escape formula injection chars (=, +, -, @, TAB, CR).
+        $csv_field = static function ( $v ): string {
+            $v = (string) $v;
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
 
         $csv  = "ID,Vendedor,Email,Monto,Fee,Neto,Método,Estado,Referencia,Fecha\n";
         foreach ( $payouts as $row ) {
             $csv .= sprintf(
                 '"%s","%s","%s","%s","%s","%s","%s","%s","%s","%s"' . "\n",
-                $row['id'],
-                $row['display_name'],
-                $row['user_email'],
-                $row['amount'],
-                $row['fee'],
-                $row['net_amount'],
-                $row['method'],
-                $row['status'],
-                $row['reference'],
-                $row['created_at']
+                $csv_field( $row['id'] ),
+                $csv_field( $row['display_name'] ),
+                $csv_field( $row['user_email'] ),
+                $csv_field( $row['amount'] ),
+                $csv_field( $row['fee'] ),
+                $csv_field( $row['net_amount'] ),
+                $csv_field( $row['method'] ),
+                $csv_field( $row['status'] ),
+                $csv_field( $row['reference'] ),
+                $csv_field( $row['created_at'] )
             );
         }
 

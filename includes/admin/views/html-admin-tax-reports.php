@@ -17,20 +17,39 @@ $month    = (int) ( $_GET['month'] ?? 0 ); // phpcs:ignore
 global $wpdb;
 $commissions_table = $wpdb->prefix . 'lt_commissions';
 
-$date_filter = $month
-    ? sprintf( "AND DATE_FORMAT(c.created_at, '%%Y-%%m') = '%d-%02d'", $year, $month )
-    : sprintf( "AND YEAR(c.created_at) = %d", $year );
-
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$tax_summary = $wpdb->get_row(
-    "SELECT
-        SUM(gross_amount) as total_gross,
-        SUM(platform_fee) as total_platform_fee,
-        SUM(vendor_net) as total_vendor_net,
-        COUNT(*) as total_transactions
-    FROM `{$commissions_table}` c WHERE status = 'paid' {$date_filter}",
-    ARRAY_A
-);
+// phpcs:disable WordPress.DB.DirectDatabaseQuery
+if ( $month ) {
+    $tax_summary = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT
+                SUM(gross_amount)    as total_gross,
+                SUM(platform_fee)    as total_platform_fee,
+                SUM(vendor_net)      as total_vendor_net,
+                COUNT(*)             as total_transactions
+            FROM `{$commissions_table}` c
+            WHERE status = 'paid'
+              AND DATE_FORMAT(c.created_at, '%%Y-%%m') = %s",
+            sprintf( '%04d-%02d', $year, $month )
+        ),
+        ARRAY_A
+    );
+} else {
+    $tax_summary = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT
+                SUM(gross_amount)    as total_gross,
+                SUM(platform_fee)    as total_platform_fee,
+                SUM(vendor_net)      as total_vendor_net,
+                COUNT(*)             as total_transactions
+            FROM `{$commissions_table}` c
+            WHERE status = 'paid'
+              AND YEAR(c.created_at) = %d",
+            $year
+        ),
+        ARRAY_A
+    );
+}
+// phpcs:enable
 ?>
 <div class="wrap ltms-admin-wrap">
 

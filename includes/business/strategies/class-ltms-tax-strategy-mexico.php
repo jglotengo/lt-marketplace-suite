@@ -25,32 +25,76 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
 
-    // ── Tasas IVA México (LIVA 2025) ─────────────────────────────
-    private const IVA_GENERAL      = 0.16;  // 16% - Tasa general
-    private const IVA_REDUCIDO     = 0.08;  // 8% - Zona frontera norte (D.O.F. 31-XII-2018)
-    private const IVA_EXENTO       = 0.00;  // 0% - Alimentos básicos, medicinas
+    // ── Tasas México — ahora configurables (v1.7.0) ──────────────
+    // Valores por defecto como fallback
 
-    // ── Tasas ISR (Retención a prestadores de servicios) ────────
-    private const ISR_SERVICIOS_PROFESIONALES = 0.10; // 10% honorarios RIF/PF
-    private const ISR_ARRENDAMIENTO           = 0.10; // 10% arrendamiento
-    private const ISR_PM_PLATAFORMAS          = 0.04; // 4% ingresos por plataformas digitales (art. 113-A LISR)
+    private function get_iva_general_mx(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_mx_iva_general', 0.16 );
+    }
 
-    // ── Retención IVA a proveedores (art. 1-A LIVA) ─────────────
-    private const RETENCION_IVA_PM            = 0.1067; // 10.67% personas morales → personas físicas
+    private function get_iva_frontera(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_mx_iva_frontera', 0.08 );
+    }
 
-    // ── IEPS (por categoría de producto) ─────────────────────────
-    private const IEPS_BEBIDAS_AZUCARADAS     = 0.01;   // $1 MXN por litro
-    private const IEPS_TABACO                 = 1.60;   // 160%
-    private const IEPS_CERVEZAS               = 0.26;   // 26%
-    private const IEPS_VINOS                  = 0.26;   // 26%
-    private const IEPS_BEBIDAS_ENERGETICAS    = 0.25;   // 25%
-    private const IEPS_COMIDA_CHATARRA        = 0.08;   // 8%
+    private function get_isr_honorarios_mx(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_mx_isr_honorarios', 0.10 );
+    }
 
-    // ── Umbrales ISR (Plataformas digitales 2025) ─────────────────
-    private const ISR_PLAT_UMBRAL_1    = 25000;  // Hasta $25K/mes: 2%
-    private const ISR_PLAT_UMBRAL_2    = 100000; // $25K-$100K/mes: 6%
-    private const ISR_PLAT_UMBRAL_3    = 300000; // $100K-$300K/mes: 10%
-    // Más de $300K: 17% (art. 113-A LISR)
+    private function get_isr_plataformas(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_mx_isr_plataformas', 0.04 );
+    }
+
+    private function get_retencion_iva_pm(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_mx_retencion_iva_pm', 0.1067 );
+    }
+
+    /** Returns IEPS rate for a given product category. */
+    private function get_ieps_rate( string $product_type ): float {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $rate = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT rate FROM `{$wpdb->prefix}lt_mx_ieps_rates` WHERE category = %s ORDER BY valid_from DESC LIMIT 1",
+                $product_type
+            )
+        );
+        if ( $rate !== null ) {
+            return (float) $rate;
+        }
+        // Fallback defaults
+        $defaults = [
+            'sugary_drinks'     => 0.08,
+            'tobacco'           => 1.60,
+            'beer'              => 0.26,
+            'wine'              => 0.26,
+            'energy_drinks'     => 0.25,
+            'junk_food'         => 0.08,
+        ];
+        return $defaults[ $product_type ] ?? 0.0;
+    }
+
+    /** Returns ISR rate for platform digital income from lt_mx_isr_tramos. */
+    private function get_isr_platform_rate( float $monthly_income ): float {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $rate = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT rate FROM `{$wpdb->prefix}lt_mx_isr_tramos`
+                 WHERE min_amount <= %f AND max_amount >= %f
+                 ORDER BY valid_from DESC LIMIT 1",
+                $monthly_income,
+                $monthly_income
+            )
+        );
+        if ( $rate !== null ) {
+            return (float) $rate;
+        }
+        // Fallback: Art. 113-A tiers
+        if ( $monthly_income <= 25000 )  return 0.02;
+        if ( $monthly_income <= 100000 ) return 0.06;
+        if ( $monthly_income <= 300000 ) return 0.10;
+        return 0.17;
+    }
 
     /**
      * Calcula todos los impuestos mexicanos para una transacción.
@@ -75,7 +119,7 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
 
         $platform_is_pm = $order_data['platform_is_persona_moral'] ?? true;
         if ( $platform_is_pm && $iva_amount > 0 ) {
-            $retencion_iva_rate   = self::RETENCION_IVA_PM;
+            $retencion_iva_rate   = $this->get_retencion_iva_pm();
             $retencion_iva_amount = round( $gross_amount * $retencion_iva_rate, 2 );
         }
 
@@ -152,15 +196,15 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
     private function get_iva_rate( string $product_type, bool $is_border_zone ): float {
         $exempt_types = [ 'basic_food', 'medicine', 'baby_food', 'tortillas', 'masa', 'tamales' ];
         if ( in_array( $product_type, $exempt_types, true ) ) {
-            return self::IVA_EXENTO;
+            return 0.0; // IVA exento
         }
 
-        // Frontera Norte: 8% en lugar de 16% (D.O.F. 31-XII-2018)
+        // Frontera Norte: tasa reducida
         if ( $is_border_zone ) {
-            return self::IVA_REDUCIDO;
+            return $this->get_iva_frontera();
         }
 
-        return self::IVA_GENERAL;
+        return $this->get_iva_general_mx();
     }
 
     /**
@@ -174,62 +218,27 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
     private function get_isr_rate( string $vendor_regime, float $gross_amount, float $monthly_income ): float {
         switch ( $vendor_regime ) {
             case 'resico':
-                // RESICO: tasas escalonadas mensuales (art. 113-E LISR)
-                if ( $monthly_income <= 25000 ) {
-                    return 0.0125; // 1.25%
-                } elseif ( $monthly_income <= 50000 ) {
-                    return 0.015;  // 1.5%
-                } elseif ( $monthly_income <= 83333 ) {
-                    return 0.02;   // 2%
-                } elseif ( $monthly_income <= 166666 ) {
-                    return 0.025;  // 2.5%
-                } else {
-                    return 0.03;   // 3% - Máximo RESICO
-                }
+                if ( $monthly_income <= 25000 )       return 0.0125;
+                elseif ( $monthly_income <= 50000 )   return 0.015;
+                elseif ( $monthly_income <= 83333 )   return 0.02;
+                elseif ( $monthly_income <= 166666 )  return 0.025;
+                else                                  return 0.03;
 
             case 'pf_actividad':
-                // Plataformas digitales (art. 113-A): tasas por monto mensual
-                if ( $monthly_income <= self::ISR_PLAT_UMBRAL_1 ) {
-                    return 0.02; // 2%
-                } elseif ( $monthly_income <= self::ISR_PLAT_UMBRAL_2 ) {
-                    return 0.06; // 6%
-                } elseif ( $monthly_income <= self::ISR_PLAT_UMBRAL_3 ) {
-                    return 0.10; // 10%
-                } else {
-                    return 0.17; // 17%
-                }
+                // Lee de lt_mx_isr_tramos o usa defaults art. 113-A
+                return $this->get_isr_platform_rate( $monthly_income );
 
             case 'pf_honorarios':
-                return self::ISR_SERVICIOS_PROFESIONALES; // 10%
+                return $this->get_isr_honorarios_mx();
 
             case 'arrendamiento':
-                return self::ISR_ARRENDAMIENTO; // 10%
+                return $this->get_isr_honorarios_mx();
 
             case 'pm':
-                return 0.0; // PM declara directamente, no hay retención en ventas normales
+                return 0.0;
 
             default:
                 return 0.0;
         }
-    }
-
-    /**
-     * Obtiene la tasa de IEPS según tipo de producto.
-     *
-     * @param string $product_type Tipo de producto.
-     * @return float
-     */
-    private function get_ieps_rate( string $product_type ): float {
-        $ieps_map = [
-            'tobacco'              => self::IEPS_TABACO,
-            'beer'                 => self::IEPS_CERVEZAS,
-            'wine'                 => self::IEPS_VINOS,
-            'spirits'              => self::IEPS_CERVEZAS, // Misma tasa
-            'energy_drink'         => self::IEPS_BEBIDAS_ENERGETICAS,
-            'junk_food'            => self::IEPS_COMIDA_CHATARRA,
-            'sugary_beverage'      => 0.01, // $1 MXN/litro (cuota fija, no porcentaje)
-        ];
-
-        return $ieps_map[ $product_type ] ?? 0.0;
     }
 }

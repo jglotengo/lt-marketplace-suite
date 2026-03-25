@@ -76,14 +76,19 @@ $kyc_flagged = $wpdb->get_results( $wpdb->prepare(
     $date_to . ' 23:59:59'
 ), ARRAY_A );
 
-// Retiros grandes (> umbral SAGRILAFT: 10.000 UVT = ~497.990.000 COP en 2025)
+// Retiros grandes (> umbral SAGRILAFT configurable: ltms_sagrilaft_uvt_threshold UVT × UVT)
+$sagrilaft_uvt   = (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 49799.0 );
+$sagrilaft_uvts  = (float) LTMS_Core_Config::get( 'ltms_sagrilaft_uvt_threshold', 10000.0 );
+$sagrilaft_floor = $sagrilaft_uvt * $sagrilaft_uvts;
+
 $large_payouts = $wpdb->get_results( $wpdb->prepare(
     "SELECT p.*, u.display_name, u.user_email
      FROM {$wpdb->prefix}lt_payout_requests p
      LEFT JOIN {$wpdb->users} u ON u.ID = p.vendor_id
-     WHERE p.amount >= 100000000
+     WHERE p.amount >= %f
        AND p.created_at BETWEEN %s AND %s
      ORDER BY p.amount DESC",
+    $sagrilaft_floor,
     $date_from . ' 00:00:00',
     $date_to . ' 23:59:59'
 ), ARRAY_A );

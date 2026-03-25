@@ -155,7 +155,22 @@ final class LTMS_Core_Security {
      * @return string Hash hexadecimal de 64 caracteres.
      */
     public static function hash( string $value, string $pepper = '' ): string {
-        $salt = defined( 'SECURE_AUTH_SALT' ) ? SECURE_AUTH_SALT : 'ltms-fallback-salt-2025';
+        // Prefer WordPress salts (unique per installation). All three are set by
+        // wp-config.php; the explicit fallback only triggers during unit tests or
+        // incomplete installations and is deliberately not a static string.
+        if ( defined( 'SECURE_AUTH_SALT' ) && '' !== SECURE_AUTH_SALT ) {
+            $salt = SECURE_AUTH_SALT;
+        } elseif ( defined( 'AUTH_SALT' ) && '' !== AUTH_SALT ) {
+            $salt = AUTH_SALT;
+        } elseif ( defined( 'AUTH_KEY' ) && '' !== AUTH_KEY ) {
+            $salt = AUTH_KEY;
+        } else {
+            // Last-resort: derive something installation-specific rather than a
+            // hard-coded constant.  Still weaker — operators MUST set WP salts.
+            $salt = hash( 'sha256', ( defined( 'DB_NAME' ) ? DB_NAME : '' )
+                        . ( defined( 'DB_USER' ) ? DB_USER : '' )
+                        . get_option( 'siteurl', 'ltms' ) );
+        }
         return hash_hmac( 'sha256', $value . $pepper, $salt );
     }
 
@@ -271,7 +286,9 @@ final class LTMS_Core_Security {
      */
     private static function derive_key( string $master_key ): string {
         // Usar site_url como salt adicional para que la clave sea única por instalación
+        // Use site_url as salt so the derived key is unique per installation.
+        // 600,000 iterations aligns with NIST SP 800-132 (2024) recommendation for SHA-256.
         $site_salt = defined( 'AUTH_SALT' ) ? AUTH_SALT : site_url();
-        return hash_pbkdf2( 'sha256', $master_key, $site_salt, 10000, 32, true );
+        return hash_pbkdf2( 'sha256', $master_key, $site_salt, 600000, 32, true );
     }
 }

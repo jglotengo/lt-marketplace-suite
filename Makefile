@@ -1,7 +1,7 @@
 # LT Marketplace Suite — Makefile
 # Automatización de tareas de desarrollo, build y deploy
 # Uso: make <target>
-# Version: 1.5.0
+# Version: 1.7.0
 
 PLUGIN_SLUG   = lt-marketplace-suite
 PLUGIN_VERSION = $(shell grep "Version:" lt-marketplace-suite.php | awk '{print $$2}' | tr -d '\r')

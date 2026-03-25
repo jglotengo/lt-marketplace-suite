@@ -44,9 +44,28 @@ final class LTMS_Core_Firewall {
     private const BLOCK_THRESHOLD = 10;
 
     /**
-     * Duración del bloqueo en segundos (1 hora).
+     * Duración por defecto del bloqueo en segundos (1 hora).
+     * Configurable mediante ltms_waf_block_duration_seconds.
      */
-    private const BLOCK_DURATION = 3600;
+    private const BLOCK_DURATION_DEFAULT = 3600;
+
+    /**
+     * Obtiene la duración del bloqueo configurable.
+     *
+     * @return int Segundos.
+     */
+    private static function get_block_duration(): int {
+        return (int) LTMS_Core_Config::get( 'ltms_waf_block_duration_seconds', self::BLOCK_DURATION_DEFAULT );
+    }
+
+    /**
+     * Obtiene el TTL del caché de IPs bloqueadas.
+     *
+     * @return int Segundos.
+     */
+    private static function get_ip_cache_ttl(): int {
+        return (int) LTMS_Core_Config::get( 'ltms_waf_ip_cache_ttl_seconds', 300 );
+    }
 
     /**
      * Inicializa el WAF (debe ejecutarse lo antes posible).
@@ -96,6 +115,22 @@ final class LTMS_Core_Firewall {
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         if ( self::is_bad_bot( $ua ) ) {
             self::handle_attack( 'bad_bot', $ip, 'user_agent', $ua );
+        }
+
+        // 4. FIX C-03: Inspect raw JSON request body.
+        // REST API requests send payloads as application/json via php://input,
+        // which never populates $_POST. Without this check, the WAF is completely
+        // blind to injection attacks targeting /wp-json/ltms/v1/* endpoints.
+        $content_type = strtolower( $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '' );
+        if ( str_contains( $content_type, 'application/json' ) ) {
+            // Limit read to 512 KB to prevent DoS via giant payloads.
+            $raw_body = file_get_contents( 'php://input', false, null, 0, 524288 );
+            if ( ! empty( $raw_body ) ) {
+                $matched_rule = self::check_patterns( $raw_body );
+                if ( $matched_rule ) {
+                    self::handle_attack( $matched_rule, $ip, 'json_body', $raw_body );
+                }
+            }
         }
     }
 
@@ -165,7 +200,7 @@ final class LTMS_Core_Firewall {
         $count_key = 'ltms_waf_' . md5( $ip );
         $count     = (int) get_transient( $count_key );
         $count++;
-        set_transient( $count_key, $count, self::BLOCK_DURATION );
+        set_transient( $count_key, $count, self::get_block_duration() );
 
         // Bloquear IP si supera el umbral
         if ( $count >= self::BLOCK_THRESHOLD ) {
@@ -202,7 +237,7 @@ final class LTMS_Core_Firewall {
         );
 
         $is_blocked = ! empty( $result );
-        set_transient( $cache_key, $is_blocked ? 1 : 0, 300 ); // Cache 5 minutos
+        set_transient( $cache_key, $is_blocked ? 1 : 0, self::get_ip_cache_ttl() );
 
         return $is_blocked;
     }
@@ -217,7 +252,7 @@ final class LTMS_Core_Firewall {
     public static function block_ip( string $ip, string $reason ): void {
         global $wpdb;
         $table    = $wpdb->prefix . 'lt_waf_blocked_ips';
-        $expires  = gmdate( 'Y-m-d H:i:s', time() + self::BLOCK_DURATION );
+        $expires  = gmdate( 'Y-m-d H:i:s', time() + self::get_block_duration() );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->query(
@@ -315,18 +350,92 @@ final class LTMS_Core_Firewall {
     /**
      * Obtiene la IP real del cliente.
      *
+     * FIX C-01: Proxy headers (X-Forwarded-For, CF-Connecting-IP, X-Real-IP) are
+     * only trusted when the request originates from a known trusted proxy IP/CIDR.
+     * Configure trusted proxies via the LTMS_TRUSTED_PROXY_IPS constant in wp-config.php
+     * (comma-separated IPs or CIDR ranges, e.g. "10.0.0.1,173.245.48.0/20").
+     * Loopback (127.0.0.1, ::1) is always trusted to support local Docker/nginx setups.
+     *
      * @return string
      */
     private static function get_client_ip(): string {
-        $headers = [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR' ];
-        foreach ( $headers as $h ) {
-            if ( ! empty( $_SERVER[ $h ] ) ) {
-                $ip = trim( explode( ',', $_SERVER[ $h ] )[0] );
-                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-                    return $ip;
+        $remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        if ( ! filter_var( $remote_addr, FILTER_VALIDATE_IP ) ) {
+            return '0.0.0.0';
+        }
+
+        // Only honour forwarded-for headers when the direct connection comes from a trusted proxy.
+        if ( self::is_trusted_proxy( $remote_addr ) ) {
+            $proxy_headers = [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP' ];
+            foreach ( $proxy_headers as $h ) {
+                if ( ! empty( $_SERVER[ $h ] ) ) {
+                    // X-Forwarded-For may be a comma-separated list; take the leftmost (client) IP.
+                    $ip = trim( explode( ',', $_SERVER[ $h ] )[0] );
+                    if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                        return $ip;
+                    }
                 }
             }
         }
-        return '0.0.0.0';
+
+        return $remote_addr;
+    }
+
+    /**
+     * Determines whether a given IP is a trusted proxy.
+     *
+     * @param string $ip The REMOTE_ADDR to check.
+     * @return bool
+     */
+    private static function is_trusted_proxy( string $ip ): bool {
+        // Loopback is always trusted (local reverse proxies, Docker internal networking).
+        if ( in_array( $ip, [ '127.0.0.1', '::1' ], true ) ) {
+            return true;
+        }
+
+        if ( ! defined( 'LTMS_TRUSTED_PROXY_IPS' ) || '' === LTMS_TRUSTED_PROXY_IPS ) {
+            return false;
+        }
+
+        $trusted = array_filter( array_map( 'trim', explode( ',', LTMS_TRUSTED_PROXY_IPS ) ) );
+
+        foreach ( $trusted as $entry ) {
+            if ( str_contains( $entry, '/' ) ) {
+                if ( self::ip_in_cidr( $ip, $entry ) ) {
+                    return true;
+                }
+            } elseif ( $ip === $entry ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks whether an IPv4 address falls within a CIDR range.
+     *
+     * @param string $ip   IPv4 address to test.
+     * @param string $cidr CIDR notation (e.g. "10.0.0.0/8").
+     * @return bool
+     */
+    private static function ip_in_cidr( string $ip, string $cidr ): bool {
+        $parts = explode( '/', $cidr, 2 );
+        if ( count( $parts ) !== 2 ) {
+            return false;
+        }
+
+        [ $subnet, $prefix ] = $parts;
+        $prefix      = (int) $prefix;
+        $ip_long     = ip2long( $ip );
+        $subnet_long = ip2long( $subnet );
+
+        if ( false === $ip_long || false === $subnet_long || $prefix < 0 || $prefix > 32 ) {
+            return false;
+        }
+
+        $mask = $prefix === 0 ? 0 : ( ~0 << ( 32 - $prefix ) );
+        return ( $ip_long & $mask ) === ( $subnet_long & $mask );
     }
 }

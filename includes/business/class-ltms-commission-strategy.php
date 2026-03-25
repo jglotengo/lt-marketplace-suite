@@ -91,23 +91,32 @@ final class LTMS_Commission_Strategy {
         $monthly_sales = self::get_vendor_monthly_sales( $vendor_id );
         $country       = LTMS_Core_Config::get_country();
 
-        if ( $country === 'CO' ) {
-            // Tiers en COP
-            if ( $monthly_sales >= 50_000_000 ) return 0.06;
-            if ( $monthly_sales >= 20_000_000 ) return 0.08;
-            if ( $monthly_sales >=  5_000_000 ) return 0.10;
-            return 0.12;
-        }
+        // v1.7.0 — Lee tiers desde BD (configurable desde admin)
+        return self::get_db_tier_rate( $monthly_sales, $country );
+    }
 
-        if ( $country === 'MX' ) {
-            // Tiers en MXN
-            if ( $monthly_sales >= 300_000 ) return 0.06;
-            if ( $monthly_sales >= 100_000 ) return 0.08;
-            if ( $monthly_sales >=  25_000 ) return 0.10;
-            return 0.12;
-        }
-
-        return null;
+    /**
+     * Lee el tier de comisión desde la tabla lt_commission_tiers (v1.7.0).
+     *
+     * @param float  $monthly_sales Ventas mensuales del vendedor.
+     * @param string $country       País ('CO' | 'MX').
+     * @return float|null Tasa del tier activo más apropiado, o null.
+     */
+    private static function get_db_tier_rate( float $monthly_sales, string $country ): ?float {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $rate = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT rate FROM `{$wpdb->prefix}lt_commission_tiers`
+                 WHERE country = %s AND is_active = 1
+                   AND min_amount <= %f AND max_amount >= %f
+                 ORDER BY sort_order ASC LIMIT 1",
+                $country,
+                $monthly_sales,
+                $monthly_sales
+            )
+        );
+        return $rate !== null ? (float) $rate : null;
     }
 
     /**

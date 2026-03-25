@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '1.6.0';
+    private const CURRENT_VERSION = '1.7.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -519,8 +519,139 @@ final class LTMS_DB_Migrations {
             KEY `idx_status` (`status`)
         ) {$charset}";
 
+        // ── v1.7.0 Tables ────────────────────────────────────────────
+
+        // lt_provider_health — Circuit breaker & uptime monitoring
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_provider_health` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `provider`    VARCHAR(50)  NOT NULL,
+            `status`      ENUM('success','error','timeout') NOT NULL,
+            `latency_ms`  INT UNSIGNED NOT NULL DEFAULT 0,
+            `error_code`  VARCHAR(100) NOT NULL DEFAULT '',
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_provider_created` (`provider`, `created_at`)
+        ) {$charset}";
+
+        // lt_vendor_drivers — Domiciliarios propios del vendedor
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vendor_drivers` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`        BIGINT UNSIGNED NOT NULL,
+            `name`             VARCHAR(100) NOT NULL,
+            `phone`            VARCHAR(20)  NOT NULL,
+            `document_number`  VARCHAR(500) DEFAULT NULL COMMENT 'Cifrado AES-256',
+            `vehicle_type`     ENUM('moto','bici','carro','pie') NOT NULL DEFAULT 'moto',
+            `vehicle_plate`    VARCHAR(500) DEFAULT NULL COMMENT 'Cifrado AES-256',
+            `is_active`        TINYINT(1)   NOT NULL DEFAULT 1,
+            `is_available`     TINYINT(1)   NOT NULL DEFAULT 1,
+            `current_order_id` BIGINT UNSIGNED DEFAULT NULL,
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_active` (`vendor_id`, `is_active`, `is_available`)
+        ) {$charset}";
+
+        // lt_commission_tiers — Tiers de volumen configurables desde admin
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_commission_tiers` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `country`    CHAR(2)          NOT NULL,
+            `min_amount` DECIMAL(20,2)    NOT NULL DEFAULT 0,
+            `max_amount` DECIMAL(20,2)    NOT NULL DEFAULT 999999999.99,
+            `rate`       DECIMAL(5,4)     NOT NULL,
+            `label`      VARCHAR(100)     NOT NULL,
+            `currency`   CHAR(3)          NOT NULL,
+            `is_active`  TINYINT(1)       NOT NULL DEFAULT 1,
+            `sort_order` INT UNSIGNED     NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            KEY `idx_country_active` (`country`, `is_active`, `sort_order`)
+        ) {$charset}";
+
+        // lt_tax_rates_history — Auditoría de cambios de tasas tributarias
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_tax_rates_history` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `country`          CHAR(2)       NOT NULL,
+            `rate_key`         VARCHAR(100)  NOT NULL,
+            `old_value`        DECIMAL(15,6) NOT NULL DEFAULT 0,
+            `new_value`        DECIMAL(15,6) NOT NULL,
+            `decree_reference` VARCHAR(200)  DEFAULT NULL,
+            `notes`            TEXT          DEFAULT NULL,
+            `changed_by`       BIGINT UNSIGNED DEFAULT NULL,
+            `valid_from`       DATE          NOT NULL,
+            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_country_key` (`country`, `rate_key`, `valid_from`)
+        ) {$charset}";
+
+        // lt_mx_ieps_rates — Tasas IEPS México por categoría (editables)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_mx_ieps_rates` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `category`   VARCHAR(100) NOT NULL,
+            `rate`       DECIMAL(8,4) NOT NULL,
+            `unit`       VARCHAR(20)  NOT NULL DEFAULT 'percent',
+            `valid_from` DATE         NOT NULL,
+            `notes`      VARCHAR(200) DEFAULT NULL,
+            PRIMARY KEY (`id`)
+        ) {$charset}";
+
+        // lt_mx_isr_tramos — Tramos ISR México Art. 113-A (editables)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_mx_isr_tramos` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `min_amount` DECIMAL(15,2) NOT NULL,
+            `max_amount` DECIMAL(15,2) NOT NULL,
+            `rate`       DECIMAL(5,4)  NOT NULL,
+            `valid_from` DATE          NOT NULL,
+            PRIMARY KEY (`id`)
+        ) {$charset}";
+
+        // lt_co_reteica_rates — ReteICA Colombia por CIIU (editable)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_co_reteica_rates` (
+            `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `ciiu_prefix`       CHAR(1)      NOT NULL,
+            `description`       VARCHAR(200) NOT NULL,
+            `rate_per_thousand` DECIMAL(8,4) NOT NULL,
+            `valid_from`        DATE         NOT NULL,
+            PRIMARY KEY (`id`)
+        ) {$charset}";
+
         foreach ( $sqls as $sql ) {
             dbDelta( $sql );
+        }
+
+        // Insert default commission tiers if table is empty
+        self::seed_commission_tiers();
+    }
+
+    /**
+     * Seeds default commission tiers after table creation.
+     */
+    private static function seed_commission_tiers(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_commission_tiers';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}`", [] ) );
+        if ( $count > 0 ) {
+            return;
+        }
+        $defaults = [
+            [ 'CO', 0,          4999999.99,  0.12, 'Tier 1 — Inicio',     'COP', 1 ],
+            [ 'CO', 5000000,   19999999.99,  0.10, 'Tier 2 — Creciente',  'COP', 2 ],
+            [ 'CO', 20000000,  49999999.99,  0.08, 'Tier 3 — Establecido','COP', 3 ],
+            [ 'CO', 50000000, 999999999.99,  0.06, 'Tier 4 — Platinum',   'COP', 4 ],
+            [ 'MX', 0,            24999.99,  0.12, 'Tier 1 — Inicio',     'MXN', 1 ],
+            [ 'MX', 25000,        99999.99,  0.08, 'Tier 2 — Creciente',  'MXN', 2 ],
+            [ 'MX', 100000,      299999.99,  0.06, 'Tier 3 — Establecido','MXN', 3 ],
+            [ 'MX', 300000,   999999999.99,  0.04, 'Tier 4 — Platinum',   'MXN', 4 ],
+        ];
+        foreach ( $defaults as $row ) {
+            $wpdb->insert( $table, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                'country'    => $row[0],
+                'min_amount' => $row[1],
+                'max_amount' => $row[2],
+                'rate'       => $row[3],
+                'label'      => $row[4],
+                'currency'   => $row[5],
+                'sort_order' => $row[6],
+            ], [ '%s', '%f', '%f', '%f', '%s', '%s', '%d' ] );
         }
     }
 
@@ -532,17 +663,17 @@ final class LTMS_DB_Migrations {
     private static function create_indexes(): void {
         global $wpdb;
 
+        // DDL statements (ALTER TABLE) cannot use parameterized placeholders.
+        // Table names are derived exclusively from $wpdb->prefix (trusted, server-set value).
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
         $indexes = [
-            "ALTER TABLE `{$wpdb->prefix}lt_wallet_transactions`
-             ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
-            "ALTER TABLE `{$wpdb->prefix}lt_commissions`
-             ADD INDEX IF NOT EXISTS `idx_paid_at` (`paid_at`)",
+            "ALTER TABLE `{$wpdb->prefix}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
+            "ALTER TABLE `{$wpdb->prefix}lt_commissions`         ADD INDEX IF NOT EXISTS `idx_paid_at`    (`paid_at`)",
         ];
 
         foreach ( $indexes as $sql ) {
-            // Ignorar errores de índices ya existentes
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->query( $sql );
+            $wpdb->query( $sql ); // Ignore duplicate-index errors (idempotent).
         }
+        // phpcs:enable
     }
 }

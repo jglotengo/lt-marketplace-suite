@@ -74,6 +74,7 @@ final class LTMS_Frontend_Assets {
         if ( is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 ) ) {
             $this->enqueue_checkout_assets( $url, $ver );
             $this->enqueue_shipping_selector( $url, $ver );
+            $this->enqueue_stripe_assets( $url, $ver );
         }
 
         // Login y Registro de vendedores
@@ -183,6 +184,47 @@ final class LTMS_Frontend_Assets {
         );
 
         $this->localize_checkout_script( $country );
+    }
+
+    /**
+     * Carga Stripe Elements en el checkout cuando Stripe está habilitado (v1.7.0).
+     *
+     * @param string $url URL base.
+     * @param string $ver Versión.
+     * @return void
+     */
+    private function enqueue_stripe_assets( string $url, string $ver ): void {
+        $pub_key = LTMS_Core_Config::get( 'ltms_stripe_test_mode' )
+            ? LTMS_Core_Config::get( 'ltms_stripe_test_publishable_key' )
+            : LTMS_Core_Config::get( 'ltms_stripe_live_publishable_key' );
+
+        if ( empty( $pub_key ) ) {
+            return; // Stripe not configured — skip
+        }
+
+        wp_enqueue_script(
+            'stripe-js',
+            'https://js.stripe.com/v3/',
+            [],
+            null, // Stripe requires no version query string
+            true
+        );
+
+        wp_enqueue_script(
+            'ltms-stripe',
+            $url . 'js/ltms-stripe.js',
+            [ 'jquery', 'stripe-js' ],
+            $ver,
+            true
+        );
+
+        wp_localize_script( 'ltms-stripe', 'ltmsStripe', [
+            'publishable_key' => $pub_key,
+            'i18n'            => [
+                'card_error' => __( 'Error en los datos de la tarjeta.', 'ltms' ),
+                'processing' => __( 'Procesando pago...', 'ltms' ),
+            ],
+        ] );
     }
 
     /**

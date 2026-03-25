@@ -17,17 +17,34 @@ $page_num      = max( 1, (int) ( $_GET['paged'] ?? 1 ) ); // phpcs:ignore
 $per_page      = 20;
 $offset        = ( $page_num - 1 ) * $per_page;
 
-$table  = $wpdb->prefix . 'lt_payout_requests';
-$where  = $status_filter ? $wpdb->prepare( 'WHERE p.status = %s', $status_filter ) : '';
+$table = $wpdb->prefix . 'lt_payout_requests';
 
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$payouts = $wpdb->get_results(
-    "SELECT p.*, u.display_name, u.user_email FROM `{$table}` p LEFT JOIN `{$wpdb->users}` u ON u.ID = p.vendor_id {$where} ORDER BY p.created_at DESC LIMIT {$per_page} OFFSET {$offset}",
-    ARRAY_A
-);
-
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}` p {$where}" );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery
+if ( $status_filter ) {
+    $payouts = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT p.*, u.display_name, u.user_email FROM `{$table}` p LEFT JOIN `{$wpdb->users}` u ON u.ID = p.vendor_id WHERE p.status = %s ORDER BY p.created_at DESC LIMIT %d OFFSET %d",
+            $status_filter,
+            $per_page,
+            $offset
+        ),
+        ARRAY_A
+    );
+    $total = (int) $wpdb->get_var(
+        $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}` p WHERE p.status = %s", $status_filter )
+    );
+} else {
+    $payouts = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT p.*, u.display_name, u.user_email FROM `{$table}` p LEFT JOIN `{$wpdb->users}` u ON u.ID = p.vendor_id ORDER BY p.created_at DESC LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        ),
+        ARRAY_A
+    );
+    $total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}` p" );
+}
+// phpcs:enable
 
 $status_labels = [
     'pending'   => [ 'label' => __( 'Pendiente', 'ltms' ),  'class' => 'ltms-badge-warning' ],

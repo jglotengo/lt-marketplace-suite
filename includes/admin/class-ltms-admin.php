@@ -159,6 +159,55 @@ final class LTMS_Admin {
                 'slug'       => 'ltms-redi',
                 'callback'   => [ $this, 'render_redi' ],
             ],
+            // v1.7.0 submenus
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Salud Proveedores', 'ltms' ),
+                'menu_title' => __( 'Salud APIs', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-provider-health',
+                'callback'   => [ $this, 'render_provider_health' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Tiers de Comisión', 'ltms' ),
+                'menu_title' => __( 'Comisiones', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-commission-tiers',
+                'callback'   => [ $this, 'render_commission_tiers' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Fiscal Colombia', 'ltms' ),
+                'menu_title' => __( 'Fiscal CO', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-fiscal-co',
+                'callback'   => [ $this, 'render_fiscal_co' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Fiscal México', 'ltms' ),
+                'menu_title' => __( 'Fiscal MX', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-fiscal-mx',
+                'callback'   => [ $this, 'render_fiscal_mx' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Historial Fiscal', 'ltms' ),
+                'menu_title' => __( 'Historial Fiscal', 'ltms' ),
+                'capability' => 'ltms_view_audit_log',
+                'slug'       => 'ltms-tax-history',
+                'callback'   => [ $this, 'render_tax_history' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Páginas del Plugin', 'ltms' ),
+                'menu_title' => __( 'Páginas', 'ltms' ),
+                'capability' => 'manage_options',
+                'slug'       => 'ltms-pages',
+                'callback'   => [ $this, 'render_pages' ],
+            ],
         ];
 
         foreach ( $submenus as $submenu ) {
@@ -204,7 +253,39 @@ final class LTMS_Admin {
         wp_enqueue_style( 'ltms-admin', $url . 'css/ltms-admin.css', [], $ver );
         wp_enqueue_style( 'ltms-admin-enterprise', $url . 'css/ltms-admin-enterprise.css', [], $ver );
 
-        wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4/dist/chart.umd.min.js', [], '4.4.0', true );
+        // Pin to an exact semver to enable a stable SRI hash.
+        // Regenerate the hash when upgrading: https://www.srihash.org/
+        // Override the hash via LTMS_CHARTJS_SRI constant in wp-config.php.
+        $chartjs_version = '4.4.4';
+        $chartjs_sri     = defined( 'LTMS_CHARTJS_SRI' )
+            ? LTMS_CHARTJS_SRI
+            : 'sha256-zyIBaW7VExhKvGqMlPU9TH0Tve6BGFPXM1STFM/ycE='; // chart.js@4.4.4 umd.min
+
+        wp_enqueue_script(
+            'chart-js',
+            'https://cdn.jsdelivr.net/npm/chart.js@' . $chartjs_version . '/dist/chart.umd.min.js',
+            [],
+            $chartjs_version,
+            true
+        );
+
+        // Attach SRI integrity + CORS attributes.
+        add_filter(
+            'script_loader_tag',
+            static function ( string $tag, string $handle ) use ( $chartjs_sri ): string {
+                if ( 'chart-js' !== $handle ) {
+                    return $tag;
+                }
+                return str_replace(
+                    ' src=',
+                    ' crossorigin="anonymous" integrity="' . esc_attr( $chartjs_sri ) . '" src=',
+                    $tag
+                );
+            },
+            10,
+            2
+        );
+
         wp_enqueue_script( 'ltms-admin', $url . 'js/ltms-admin.js', [ 'jquery', 'wp-util', 'chart-js' ], $ver, true );
 
         wp_localize_script( 'ltms-admin', 'ltmsAdmin', [
@@ -333,6 +414,31 @@ final class LTMS_Admin {
 
     public function render_redi(): void {
         $this->render_view( 'html-admin-redi' );
+    }
+
+    // v1.7.0 render methods
+    public function render_provider_health(): void {
+        $this->render_view( 'html-admin-provider-health' );
+    }
+
+    public function render_commission_tiers(): void {
+        $this->render_view( 'html-admin-commission-tiers' );
+    }
+
+    public function render_fiscal_co(): void {
+        $this->render_view( 'html-admin-fiscal-colombia' );
+    }
+
+    public function render_fiscal_mx(): void {
+        $this->render_view( 'html-admin-fiscal-mexico' );
+    }
+
+    public function render_tax_history(): void {
+        $this->render_view( 'html-admin-tax-history' );
+    }
+
+    public function render_pages(): void {
+        $this->render_view( 'html-admin-pages' );
     }
 
     /**

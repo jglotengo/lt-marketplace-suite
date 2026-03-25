@@ -42,6 +42,7 @@ final class LTMS_Api_Factory {
         'xcover'    => 'LTMS_Api_XCover',
         'backblaze' => 'LTMS_Api_Backblaze',
         'uber'      => 'LTMS_Api_Uber',
+        'stripe'    => 'LTMS_Api_Stripe',
     ];
 
     /**

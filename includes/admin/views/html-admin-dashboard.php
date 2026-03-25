@@ -19,11 +19,20 @@ $payouts_table     = $wpdb->prefix . 'lt_payout_requests';
 
 $month_start = gmdate( 'Y-m-01' );
 
-// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$total_sales_month = (float) $wpdb->get_var( "SELECT SUM(gross_amount) FROM `{$commissions_table}` WHERE DATE(created_at) >= '{$month_start}'" );
-$total_vendors     = (int) count_users()['avail_roles']['ltms_vendor'] ?? 0;
-$pending_payouts   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$payouts_table}` WHERE status = 'pending'" );
-$pending_kyc       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$wpdb->prefix}lt_vendor_kyc` WHERE status = 'pending'" );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery
+$total_sales_month = (float) $wpdb->get_var(
+    $wpdb->prepare(
+        "SELECT SUM(gross_amount) FROM `{$commissions_table}` WHERE DATE(created_at) >= %s",
+        $month_start
+    )
+);
+$total_vendors   = (int) ( count_users()['avail_roles']['ltms_vendor'] ?? 0 );
+$pending_payouts = (int) $wpdb->get_var(
+    $wpdb->prepare( "SELECT COUNT(*) FROM `{$payouts_table}` WHERE status = %s", 'pending' )
+);
+$pending_kyc = (int) $wpdb->get_var(
+    $wpdb->prepare( "SELECT COUNT(*) FROM `{$wpdb->prefix}lt_vendor_kyc` WHERE status = %s", 'pending' )
+);
 // phpcs:enable
 ?>
 <div class="wrap ltms-admin-wrap">

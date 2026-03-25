@@ -14,7 +14,7 @@ global $wpdb;
 $security_table = $wpdb->prefix . 'lt_security_events';
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $security_events = $wpdb->get_results(
-    "SELECT * FROM `{$security_table}` ORDER BY created_at DESC LIMIT 50",
+    $wpdb->prepare( "SELECT * FROM `{$security_table}` ORDER BY created_at DESC LIMIT %d", 50 ),
     ARRAY_A
 );
 
@@ -22,7 +22,7 @@ $security_events = $wpdb->get_results(
 $blocked_ips_table = $wpdb->prefix . 'lt_waf_blocked_ips';
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $blocked_ips = $wpdb->get_results(
-    "SELECT * FROM `{$blocked_ips_table}` WHERE blocked_until > NOW() ORDER BY blocked_at DESC LIMIT 20",
+    $wpdb->prepare( "SELECT * FROM `{$blocked_ips_table}` WHERE blocked_until > NOW() ORDER BY blocked_at DESC LIMIT %d", 20 ),
     ARRAY_A
 );
 ?>

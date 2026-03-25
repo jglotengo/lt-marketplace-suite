@@ -25,24 +25,53 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
 
-    // ── Tasas IVA Colombia (2025) ─────────────────────────────────
-    private const IVA_GENERAL     = 0.19;   // 19% - bienes y servicios estándar
-    private const IVA_REDUCIDO    = 0.05;   // 5% - algunos alimentos, medicamentos
-    private const IVA_EXENTO      = 0.00;   // 0% - canasta familiar básica
+    // ── Tasas IVA Colombia — ahora configurables (v1.7.0) ────────
+    // Valores por defecto mantenidos como fallback
 
-    // ── Retención en la Fuente (Honorarios/Servicios) ────────────
-    private const RETEFUENTE_HONORARIOS      = 0.11;  // 11% honorarios > 1 UVT
-    private const RETEFUENTE_SERVICIOS       = 0.04;  // 4% servicios generales
-    private const RETEFUENTE_COMPRAS         = 0.025; // 2.5% compras bienes
-    private const RETEFUENTE_SERVICIOS_TECH  = 0.06;  // 6% servicios tecnológicos
+    /** Lee el valor UVT desde configuración. */
+    private function get_uvt(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 49799.0 );
+    }
 
-    // ── ReteIVA ──────────────────────────────────────────────────
-    private const RETEIVA_RATE = 0.15; // 15% del IVA (para grandes contribuyentes)
+    private function get_iva_general(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_iva_general', 0.19 );
+    }
 
-    // ── Umbrales 2025 (en pesos colombianos) ─────────────────────
-    private const RETEFUENTE_MIN_COMPRAS  = 533000;  // ~14 UVT = $533.000 COP (2025)
-    private const RETEFUENTE_MIN_SERVICIOS = 133000; // ~3.5 UVT = $133.000 COP (2025)
-    private const UVT_2025                = 49799;   // Valor UVT 2025 (Decreto 2229/2024)
+    private function get_iva_reducido(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_iva_reducido', 0.05 );
+    }
+
+    private function get_retefuente_honorarios(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_retefuente_honorarios', 0.11 );
+    }
+
+    private function get_retefuente_servicios(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_retefuente_servicios', 0.04 );
+    }
+
+    private function get_retefuente_compras(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_retefuente_compras', 0.025 );
+    }
+
+    private function get_retefuente_servicios_tech(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_retefuente_tech', 0.06 );
+    }
+
+    private function get_reteiva_rate(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_reteiva_rate', 0.15 );
+    }
+
+    private function get_impoconsumo_rate(): float {
+        return (float) LTMS_Core_Config::get( 'ltms_impoconsumo_rate', 0.08 );
+    }
+
+    private function get_retefuente_min_compras(): float {
+        return $this->get_uvt() * (float) LTMS_Core_Config::get( 'ltms_retefuente_min_compras_uvt', 10.666 );
+    }
+
+    private function get_retefuente_min_servicios(): float {
+        return $this->get_uvt() * (float) LTMS_Core_Config::get( 'ltms_retefuente_min_servicios_uvt', 2.666 );
+    }
 
     /**
      * Calcula todos los impuestos aplicables para una transacción en Colombia.
@@ -75,7 +104,7 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
 
         $buyer_is_grande = $order_data['buyer_is_gran_contribuyente'] ?? false;
         if ( $buyer_is_grande && $iva_amount > 0 ) {
-            $reteiva_rate   = self::RETEIVA_RATE;
+            $reteiva_rate   = $this->get_reteiva_rate();
             $reteiva_amount = round( $iva_amount * $reteiva_rate, 2 );
         }
 
@@ -88,7 +117,7 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
         $inc_amount = 0.0;
 
         if ( in_array( $product_type, [ 'food_service', 'restaurant', 'bar' ], true ) ) {
-            $inc_rate   = 0.08;
+            $inc_rate   = $this->get_impoconsumo_rate();
             $inc_amount = round( $gross_amount * $inc_rate, 2 );
         }
 
@@ -118,7 +147,7 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             'strategy'           => self::class,
             'country'            => 'CO',
             'currency'           => 'COP',
-            'uvt_value'          => self::UVT_2025,
+            'uvt_value'          => $this->get_uvt(),
         ];
     }
 
@@ -157,17 +186,17 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
         // Categorías exentas de IVA (canasta básica)
         $exempt_types = [ 'basic_food', 'medicine', 'health_service', 'education', 'agricultural_basic' ];
         if ( in_array( $product_type, $exempt_types, true ) ) {
-            return self::IVA_EXENTO;
+            return 0.0; // IVA_EXENTO
         }
 
         // Tasa reducida 5%
         $reduced_types = [ 'coffee', 'cacao', 'eggs_retail', 'sanitary_supplies', 'agricultural_machinery' ];
         if ( in_array( $product_type, $reduced_types, true ) ) {
-            return self::IVA_REDUCIDO;
+            return $this->get_iva_reducido();
         }
 
-        // Tasa general 19%
-        return self::IVA_GENERAL;
+        // Tasa general
+        return $this->get_iva_general();
     }
 
     /**
@@ -181,29 +210,29 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
     private function get_retefuente_rate( string $product_type, float $gross_amount, string $vendor_regime ): float {
         // Servicios tecnológicos / Software
         if ( in_array( $product_type, [ 'software', 'digital_service', 'saas', 'tech_service' ], true ) ) {
-            return $gross_amount >= self::RETEFUENTE_MIN_SERVICIOS
-                ? self::RETEFUENTE_SERVICIOS_TECH
+            return $gross_amount >= $this->get_retefuente_min_servicios()
+                ? $this->get_retefuente_servicios_tech()
                 : 0.0;
         }
 
         // Honorarios (consultoría, servicios profesionales)
         if ( in_array( $product_type, [ 'consulting', 'professional_service', 'freelance' ], true ) ) {
-            $base_honorarios = 1 * self::UVT_2025; // 1 UVT
+            $base_honorarios = 1 * $this->get_uvt(); // 1 UVT
             return $gross_amount >= $base_honorarios
-                ? self::RETEFUENTE_HONORARIOS
+                ? $this->get_retefuente_honorarios()
                 : 0.0;
         }
 
         // Compras de bienes
         if ( in_array( $product_type, [ 'physical', 'product' ], true ) ) {
-            return $gross_amount >= self::RETEFUENTE_MIN_COMPRAS
-                ? self::RETEFUENTE_COMPRAS
+            return $gross_amount >= $this->get_retefuente_min_compras()
+                ? $this->get_retefuente_compras()
                 : 0.0;
         }
 
         // Servicios generales
-        return $gross_amount >= self::RETEFUENTE_MIN_SERVICIOS
-            ? self::RETEFUENTE_SERVICIOS
+        return $gross_amount >= $this->get_retefuente_min_servicios()
+            ? $this->get_retefuente_servicios()
             : 0.0;
     }
 

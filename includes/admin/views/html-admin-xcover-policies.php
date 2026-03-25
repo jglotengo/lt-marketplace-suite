@@ -81,13 +81,15 @@
 			$where_sql = 'WHERE ' . implode( ' AND ', $where_clauses );
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
-		$sql = "SELECT * FROM `{$table_name}` {$where_sql} ORDER BY created_at DESC LIMIT 50";
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$sql = "SELECT * FROM `{$table_name}` {$where_sql} ORDER BY created_at DESC LIMIT %d";
 
 		if ( ! empty( $where_values ) ) {
-			$policies = $wpdb->get_results( $wpdb->prepare( $sql, $where_values ) ); // phpcs:ignore
+			$policies = $wpdb->get_results(
+				$wpdb->prepare( $sql, array_merge( $where_values, [ 50 ] ) )
+			);
 		} else {
-			$policies = $wpdb->get_results( $sql ); // phpcs:ignore
+			$policies = $wpdb->get_results( $wpdb->prepare( $sql, 50 ) );
 		}
 		// phpcs:enable
 
@@ -136,15 +138,15 @@
 							<td><?php echo esc_html( $policy->id ); ?></td>
 							<td>
 								<?php if ( $edit_url ) : ?>
-									<a href="<?php echo $edit_url; ?>">#<?php echo esc_html( $order_id ); ?></a>
+									<a href="<?php echo esc_url( $edit_url ); ?>">#<?php echo esc_html( $order_id ); ?></a>
 								<?php else : ?>
 									<?php esc_html_e( 'N/D', 'ltms' ); ?>
 								<?php endif; ?>
 							</td>
 							<td><?php echo esc_html( $vendor_name ); ?></td>
-							<td><?php echo $policy_num; ?></td>
+							<td><?php echo esc_html( $policy_num ); ?></td>
 							<td><?php echo esc_html( $prima ); ?></td>
-							<td><?php echo $policy_type; ?></td>
+							<td><?php echo esc_html( $policy_type ); ?></td>
 							<td>
 								<span style="
 									display:inline-block;
@@ -167,7 +169,7 @@
 									<?php esc_html_e( 'N/D', 'ltms' ); ?>
 								<?php endif; ?>
 							</td>
-							<td><?php echo $created_at; ?></td>
+							<td><?php echo esc_html( $created_at ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

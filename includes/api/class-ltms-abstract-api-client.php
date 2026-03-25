@@ -37,25 +37,37 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
     protected string $provider_slug = '';
 
     /**
-     * Timeout en segundos para las peticiones HTTP.
+     * Timeout en segundos para las peticiones HTTP (v1.7.0: configurable).
      *
      * @var int
      */
     protected int $timeout = 30;
 
     /**
-     * Número máximo de reintentos en caso de error de red.
+     * Número máximo de reintentos en caso de error de red (v1.7.0: configurable).
      *
      * @var int
      */
     protected int $max_retries = 3;
 
     /**
-     * Delay en segundos entre reintentos (exponencial).
+     * Delay en segundos entre reintentos (v1.7.0: configurable).
      *
      * @var int
      */
     protected int $retry_delay = 1;
+
+    /**
+     * Inicializa valores configurables desde LTMS_Core_Config.
+     * Llamar en el constructor de subclases (o usar __construct).
+     */
+    protected function init_configurable_settings(): void {
+        if ( class_exists( 'LTMS_Core_Config' ) ) {
+            $this->timeout     = (int) LTMS_Core_Config::get( 'ltms_api_timeout_seconds', 30 );
+            $this->max_retries = (int) LTMS_Core_Config::get( 'ltms_api_max_retries', 3 );
+            $this->retry_delay = (int) LTMS_Core_Config::get( 'ltms_api_retry_delay_seconds', 1 );
+        }
+    }
 
     /**
      * Headers por defecto para todas las peticiones.
@@ -90,10 +102,12 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
         $headers = array_merge( $this->default_headers, $headers );
 
         $args = [
-            'method'  => $method,
-            'headers' => $headers,
-            'timeout' => $this->timeout,
-            'sslverify' => LTMS_Core_Config::is_production(),
+            'method'    => $method,
+            'headers'   => $headers,
+            'timeout'   => $this->timeout,
+            // SSL is always verified. Set LTMS_DISABLE_SSL_VERIFY=true in wp-config.php
+            // ONLY for local development with self-signed certificates.
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ];
 
         if ( ! empty( $data ) && in_array( $method, [ 'POST', 'PUT', 'PATCH' ], true ) ) {
@@ -238,7 +252,10 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
      * @return array Datos con campos sensibles redactados.
      */
     protected function redact_sensitive_data( array $data ): array {
-        $sensitive = [ 'card_number', 'cvv', 'cvv2', 'expiry', 'pin', 'password', 'secret', 'private_key', 'api_key' ];
+        $sensitive = [
+            'card_number', 'cvv', 'cvv2', 'expiry', 'pin', 'password', 'secret', 'private_key', 'api_key',
+            'document', 'document_number', 'nit', 'rfc', 'curp', 'cedula', 'nuip',
+        ];
         $redacted  = [];
 
         foreach ( $data as $key => $value ) {

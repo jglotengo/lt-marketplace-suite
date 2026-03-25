@@ -10,8 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 global $wpdb;
 $banners_table = $wpdb->prefix . 'lt_marketing_banners';
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$banners = $wpdb->get_results( "SELECT * FROM `{$banners_table}` ORDER BY created_at DESC LIMIT 20", ARRAY_A );
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$banners = $wpdb->get_results(
+    $wpdb->prepare( "SELECT * FROM `{$banners_table}` ORDER BY created_at DESC LIMIT %d", 20 ),
+    ARRAY_A
+);
 
 $mlm_enabled = LTMS_Core_Config::get( 'ltms_mlm_enabled', 'no' ) === 'yes';
 ?>
@@ -32,10 +35,10 @@ $mlm_enabled = LTMS_Core_Config::get( 'ltms_mlm_enabled', 'no' ) === 'yes';
         <?php
         global $wpdb;
         $ref_table = $wpdb->prefix . 'lt_referral_network';
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery
         $total_nodes = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$ref_table}`" );
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $avg_depth   = (int) $wpdb->get_var( "SELECT AVG(level) FROM `{$ref_table}`" );
+        // phpcs:enable
         ?>
         <div class="ltms-stats-grid">
             <div class="ltms-stat-card">

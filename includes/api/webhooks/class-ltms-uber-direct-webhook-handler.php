@@ -21,8 +21,18 @@ class LTMS_Uber_Direct_Webhook_Handler {
         $signature = $request->get_header( 'x-postmates-signature' ) ?: $request->get_header( 'x-uber-signature' ) ?: '';
         $secret    = LTMS_Core_Config::get( 'ltms_uber_direct_webhook_secret', '' );
 
-        // Validate HMAC-SHA256 signature
-        if ( $secret && ! self::validate_signature( $payload, $signature, $secret ) ) {
+        // FIX C-02: Reject immediately when no webhook secret is configured.
+        // An empty secret would skip signature validation entirely, allowing
+        // unauthenticated callers to forge delivery events and complete orders.
+        if ( empty( $secret ) ) {
+            LTMS_Core_Logger::warning(
+                'UBER_WEBHOOK_NO_SECRET',
+                'Uber Direct webhook secret is not configured. Request rejected to prevent unsigned webhook acceptance.'
+            );
+            return new \WP_REST_Response( [ 'error' => 'Webhook endpoint not configured' ], 401 );
+        }
+
+        if ( ! self::validate_signature( $payload, $signature, $secret ) ) {
             LTMS_Core_Logger::warning( 'UBER_WEBHOOK_INVALID_SIG', 'Invalid signature received', [ 'sig' => $signature ] );
             return new \WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
         }

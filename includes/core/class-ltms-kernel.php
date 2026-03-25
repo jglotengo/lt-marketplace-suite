@@ -268,6 +268,7 @@ final class LTMS_Core_Kernel {
             'LTMS_Aveonline_Webhook_Handler',
             'LTMS_Zapsign_Webhook_Handler',
             'LTMS_Uber_Direct_Webhook_Handler', // v1.6.0
+            'LTMS_Stripe_Webhook_Handler',       // v1.7.0
         ];
 
         foreach ( $webhook_handlers as $handler ) {
@@ -289,6 +290,7 @@ final class LTMS_Core_Kernel {
             'LTMS_Shipping_Method_Aveonline',
             'LTMS_Shipping_Method_Heka',
             'LTMS_Shipping_Method_Pickup',
+            'LTMS_Shipping_Method_Own_Delivery', // v1.7.0
         ];
 
         foreach ( $shipping_classes as $class ) {
@@ -312,6 +314,10 @@ final class LTMS_Core_Kernel {
         }
         if ( class_exists( 'LTMS_Api_Gateway_Addi' ) ) {
             $gateways[] = 'LTMS_Api_Gateway_Addi';
+        }
+        // v1.7.0 — Stripe gateway
+        if ( class_exists( 'LTMS_Gateway_Stripe' ) ) {
+            $gateways[] = 'LTMS_Gateway_Stripe';
         }
         return $gateways;
     }

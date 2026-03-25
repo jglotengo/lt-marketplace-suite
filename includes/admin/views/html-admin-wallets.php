@@ -14,14 +14,18 @@ $page_num = max( 1, (int) ( $_GET['paged'] ?? 1 ) ); // phpcs:ignore
 $per_page = 25;
 $offset   = ( $page_num - 1 ) * $per_page;
 
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+// phpcs:disable WordPress.DB.DirectDatabaseQuery
 $wallets = $wpdb->get_results(
-    "SELECT w.*, u.display_name, u.user_email FROM `{$table}` w LEFT JOIN `{$wpdb->users}` u ON u.ID = w.user_id ORDER BY w.balance DESC LIMIT {$per_page} OFFSET {$offset}",
+    $wpdb->prepare(
+        "SELECT w.*, u.display_name, u.user_email FROM `{$table}` w LEFT JOIN `{$wpdb->users}` u ON u.ID = w.user_id ORDER BY w.balance DESC LIMIT %d OFFSET %d",
+        $per_page,
+        $offset
+    ),
     ARRAY_A
 );
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $total_balance = (float) $wpdb->get_var( "SELECT SUM(balance) FROM `{$table}`" );
-$total_held    = (float) $wpdb->get_var( "SELECT SUM(held_balance) FROM `{$table}`" ); // phpcs:ignore
+$total_held    = (float) $wpdb->get_var( "SELECT SUM(balance_pending) FROM `{$table}`" );
+// phpcs:enable
 ?>
 <div class="wrap ltms-admin-wrap">
 

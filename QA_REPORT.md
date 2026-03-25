@@ -1,7 +1,7 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 1.6.0
-**Report Date:** 2026-02-25
+**Version:** 1.7.0
+**Report Date:** 2026-03-24
 **Environment:** Ubuntu 22.04 · PHP 8.2.15 · MySQL 8.0.36 · WordPress 6.4.3 · WooCommerce 8.5.2
 **Tester:** Automated CI + Manual Review
 

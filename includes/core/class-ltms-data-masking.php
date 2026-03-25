@@ -194,13 +194,19 @@ final class LTMS_Data_Masking {
             return;
         }
 
+        // Use the firewall's IP resolution so the audit log records the actual
+        // client IP even when the site sits behind a trusted proxy / CDN.
+        $ip = class_exists( 'LTMS_Firewall' ) && method_exists( 'LTMS_Firewall', 'get_client_ip' )
+            ? LTMS_Firewall::get_client_ip()
+            : sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+
         LTMS_Core_Logger::security(
             'AUDITOR_EXTERNAL_ACCESS',
             sprintf( 'Auditor externo (ID: %d) accedió a: %s', get_current_user_id(), $section ),
             [
                 'user_id'  => get_current_user_id(),
                 'section'  => $section,
-                'ip'       => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ),
+                'ip'       => $ip,
                 'time'     => current_time( 'mysql', true ),
             ]
         );

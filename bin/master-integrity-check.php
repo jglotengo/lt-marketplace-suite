@@ -14,7 +14,7 @@
  *   --path=...  Ruta al directorio del plugin (por defecto: directorio padre).
  *
  * @package LTMS
- * @version 1.5.0
+ * @version 1.7.0
  */
 
 declare(strict_types=1);
@@ -35,20 +35,35 @@ foreach ($argv as $arg) {
 
 // ── Critical files to verify ───────────────────────────────────────
 const CRITICAL_FILES = [
+    // Bootloader & kernel
     'lt-marketplace-suite.php',
     'uninstall.php',
     'includes/core/class-ltms-kernel.php',
+    // Security infrastructure
     'includes/core/class-ltms-security.php',
     'includes/core/class-ltms-firewall.php',
     'includes/core/class-ltms-logger.php',
     'includes/core/class-ltms-data-masking.php',
+    // Database
     'includes/core/migrations/class-ltms-db-migrations.php',
     'includes/core/services/class-ltms-activator.php',
+    // Financial ledger
     'includes/business/class-ltms-wallet.php',
     'includes/business/class-ltms-tax-engine.php',
     'includes/business/class-ltms-payout-scheduler.php',
+    // v1.7.0 — new high-value targets
+    'includes/business/class-ltms-commission-strategy.php',
+    'includes/business/class-ltms-payment-orchestrator.php',
+    'includes/business/strategies/class-ltms-tax-strategy-colombia.php',
+    'includes/business/strategies/class-ltms-tax-strategy-mexico.php',
+    // API layer
     'includes/api/factories/class-ltms-api-factory.php',
+    'includes/api/class-ltms-abstract-api-client.php',
+    'includes/api/webhooks/class-ltms-stripe-webhook-handler.php',
+    'includes/api/webhooks/class-ltms-uber-direct-webhook-handler.php',
+    // Admin & roles
     'includes/admin/class-ltms-admin.php',
+    'includes/admin/class-ltms-admin-payouts.php',
     'includes/roles/class-ltms-roles.php',
 ];
 

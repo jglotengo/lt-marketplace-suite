@@ -63,6 +63,17 @@ class LTMS_Stripe_Webhook_Handler {
         // Recuperar el webhook secret desde la configuración de la pasarela.
         $webhook_secret = self::get_webhook_secret();
 
+        // Guard: reject immediately when the secret is not yet configured.
+        // Without a secret the SDK would throw and silently drop every event,
+        // leaving orders stuck in 'pending'.
+        if ( empty( $webhook_secret ) ) {
+            LTMS_Core_Logger::warning(
+                'STRIPE_WEBHOOK_NO_SECRET',
+                'Stripe webhook secret is not configured. Request rejected. Set webhook_secret in the ltms_stripe gateway settings.'
+            );
+            return new WP_REST_Response( [ 'error' => 'Webhook endpoint not configured' ], 401 );
+        }
+
         // 1. Verificar firma con el SDK de Stripe.
         try {
             $event = \Stripe\Webhook::constructEvent( $body, $sig_header, $webhook_secret );

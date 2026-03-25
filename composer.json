@@ -12,13 +12,14 @@
     ],
     "require": {
         "php": ">=8.1",
-        "ext-openssl": "*",
+        "ext-bcmath": "*",
+        "ext-curl": "*",
+        "ext-intl": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-curl": "*",
-        "ext-bcmath": "*",
+        "ext-openssl": "*",
         "dompdf/dompdf": "^2.0",
-        "firebase/php-jwt": "^6.10",
+        "firebase/php-jwt": "^7.0",
         "ramsey/uuid": "^4.7",
         "stripe/stripe-php": "^13.0"
     },
@@ -50,7 +51,7 @@
         "phpstan": "phpstan analyse includes/ --level=6",
         "build": "bin/build.sh",
         "post-install-cmd": [
-            "@php -r \"copy('vendor/autoload.php', 'vendor/autoload.php');\""
+            "@php -r \"echo 'LTMS autoloader ready.\\n';\""
         ]
     },
     "config": {

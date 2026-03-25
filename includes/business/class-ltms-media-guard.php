@@ -53,7 +53,8 @@ class LTMS_Media_Guard {
         try {
             $b2     = LTMS_Api_Factory::get( 'backblaze' );
             $bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' );
-            $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $key ), 300 ); // 5 min TTL
+            $signed_url_ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
+            $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $key ), $signed_url_ttl );
             wp_redirect( esc_url_raw( $url ) );
             exit;
         } catch ( \Throwable $e ) {
@@ -91,8 +92,10 @@ class LTMS_Media_Guard {
             return new \WP_Error( 'not_logged_in', __( 'Debes iniciar sesión.', 'ltms' ) );
         }
 
-        $allowed_types = [ 'image/jpeg', 'image/png', 'application/pdf' ];
-        $max_size      = 10 * 1024 * 1024; // 10 MB
+        $allowed_types_cfg = LTMS_Core_Config::get( 'ltms_kyc_allowed_mime_types', 'image/jpeg,image/png,application/pdf' );
+        $allowed_types     = array_map( 'trim', explode( ',', (string) $allowed_types_cfg ) );
+        $max_size_mb       = (float) LTMS_Core_Config::get( 'ltms_kyc_max_file_size_mb', 10 );
+        $max_size          = (int) ( $max_size_mb * 1024 * 1024 );
 
         $file = $upload_data;
 
