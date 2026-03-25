@@ -30,7 +30,6 @@ final class LTMS_Roles {
         'upload_files'                     => true,
 
         // Capacidades de negocio LTMS
-        'ltms_access_dashboard'            => true,
         'ltms_manage_own_products'         => true,
         'ltms_view_own_orders'             => true,
         'ltms_view_own_wallet'             => true,
@@ -44,6 +43,11 @@ final class LTMS_Roles {
         'ltms_use_pos'                     => true,
 
         // Restricciones explícitas
+        // ltms_access_dashboard se omite: los vendedores usan el SPA frontend
+        // (class-ltms-dashboard-logic.php usa LTMS_Utils::is_ltms_vendor(),
+        // no esta cap). Tenerla en true causaba que los vendedores vieran
+        // el menú de administración de LTMS en /wp-admin.
+        'ltms_access_dashboard'            => false,
         'ltms_view_other_vendor_data'      => false,
         'ltms_approve_payouts'             => false,
         'ltms_manage_platform_settings'    => false,
@@ -60,7 +64,7 @@ final class LTMS_Roles {
     public const VENDOR_PREMIUM_CAPABILITIES = [
         'read'                             => true,
         'upload_files'                     => true,
-        'ltms_access_dashboard'            => true,
+        'ltms_access_dashboard'            => false,  // same as VENDOR: frontend SPA, no admin menu
         'ltms_manage_own_products'         => true,
         'ltms_view_own_orders'             => true,
         'ltms_view_own_wallet'             => true,
