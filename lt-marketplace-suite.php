@@ -125,13 +125,52 @@ function ltms_load_autoloader(): void {
         // LTMS_Core_Security => includes/core/class-ltms-core-security.php
         $class_file = strtolower( str_replace( '_', '-', $class_name ) );
         $parts      = explode( '-', $class_file );
+        $filename   = 'class-' . $class_file . '.php';
 
+        // ── Clases de 2 partes (ej: LTMS_Admin, LTMS_Roles, LTMS_Utils) ──
+        // El guard original `count >= 3` las excluía silenciosamente, causando
+        // que add_menu_page nunca se registrara sin Composer instalado.
+        if ( count( $parts ) === 2 ) {
+            $subdir   = $parts[1];
+
+            // Ruta estándar: includes/{subdir}/class-ltms-{subdir}.php
+            // Cubre: LTMS_Admin → admin/, LTMS_Roles → roles/
+            $filepath = LTMS_INCLUDES_DIR . $subdir . '/' . $filename;
+            if ( file_exists( $filepath ) ) {
+                require_once $filepath;
+                return;
+            }
+
+            // Rutas no estándar: clases cuyo directorio no coincide con su nombre
+            $two_part_exceptions = [
+                'ltms-wallet'     => 'business/class-ltms-wallet.php',
+                'ltms-utils'      => 'core/utils/class-ltms-utils.php',
+                'ltms-activator'  => 'core/services/class-ltms-activator.php',
+                'ltms-deactivator'=> 'core/services/class-ltms-deactivator.php',
+                'ltms-config'     => 'core/class-ltms-config.php',
+                'ltms-kernel'     => 'core/class-ltms-kernel.php',
+                'ltms-logger'     => 'core/class-ltms-logger.php',
+                'ltms-security'   => 'core/class-ltms-security.php',
+                'ltms-firewall'   => 'core/class-ltms-firewall.php',
+                'ltms-affiliates' => 'business/class-ltms-affiliates.php',
+            ];
+
+            if ( isset( $two_part_exceptions[ $class_file ] ) ) {
+                $filepath = LTMS_INCLUDES_DIR . $two_part_exceptions[ $class_file ];
+                if ( file_exists( $filepath ) ) {
+                    require_once $filepath;
+                }
+            }
+
+            return; // Clase de 2 partes procesada (encontrada o no)
+        }
+
+        // ── Clases de 3+ partes (ej: LTMS_Core_Security, LTMS_Admin_Settings) ──
         // Detectar subdirectorio (segundo segmento después de "ltms")
         // Ej: ltms-core-security => includes/core/class-ltms-core-security.php
         // Ej: ltms-api-siigo     => includes/api/class-ltms-api-siigo.php
         if ( count( $parts ) >= 3 ) {
             $subdir   = $parts[1]; // core, api, business, admin, frontend, roles
-            $filename = 'class-' . $class_file . '.php';
             $filepath = LTMS_INCLUDES_DIR . $subdir . '/' . $filename;
 
             if ( file_exists( $filepath ) ) {
