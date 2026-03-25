@@ -297,6 +297,23 @@ function ltms_run(): void {
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
 
+    // ── Garantías de arranque ─────────────────────────────────────────────────
+    // Registradas aquí, fuera del Kernel, para que funcionen aunque el boot
+    // falle por cualquier causa (WooCommerce ausente, excepción silenciada,
+    // clases no encontradas, etc.)
+    //
+    // 1. Caps: asegurar que el rol administrator tenga todas las caps LTMS.
+    //    Se ejecuta en init@1 (antes de admin_menu) en cada request hasta que
+    //    las caps estén todas guardadas en la BD.
+    add_action( 'init', 'ltms_direct_ensure_caps', 1 );
+    //
+    // 2. Menú de emergencia: si el Kernel falló y LTMS_Admin no registró el
+    //    menú principal, este fallback lo registra en admin_menu@99 con
+    //    manage_options para que siempre sea visible al administrador.
+    if ( is_admin() ) {
+        add_action( 'admin_menu', 'ltms_emergency_menu_fallback', 99 );
+    }
+
     if ( ! ltms_check_requirements() ) {
         // Sin WooCommerce: registrar menú mínimo para que el plugin sea visible.
         if ( is_admin() ) {
@@ -351,3 +368,85 @@ function ltms_run(): void {
 
 // Arrancar en 'plugins_loaded' con prioridad 15 (después de WooCommerce @ 10)
 add_action( 'plugins_loaded', 'ltms_run', 15 );
+
+// ============================================================
+// GARANTÍAS DIRECTAS — sin depender del Kernel ni de clases
+// ============================================================
+
+/**
+ * Asegura que el rol administrator tenga todas las caps LTMS.
+ * Corre en init@1 en cada request; la escritura en BD ocurre solo cuando
+ * falta alguna cap (después de eso los has_cap() devuelven true y no escribe).
+ */
+function ltms_direct_ensure_caps(): void {
+    $role = get_role( 'administrator' );
+    if ( ! $role ) {
+        return;
+    }
+
+    $required = [
+        'ltms_access_dashboard',
+        'ltms_manage_all_vendors',
+        'ltms_approve_payouts',
+        'ltms_manage_platform_settings',
+        'ltms_view_tax_reports',
+        'ltms_view_wallet_ledger',
+        'ltms_view_all_orders',
+        'ltms_manage_kyc',
+        'ltms_view_security_logs',
+        'ltms_view_audit_log',
+        'ltms_view_compliance_logs',
+        'ltms_export_reports',
+        'ltms_compliance',
+        'ltms_manage_roles',
+        'ltms_freeze_wallets',
+        'ltms_generate_legal_evidence',
+    ];
+
+    foreach ( $required as $cap ) {
+        if ( ! $role->has_cap( $cap ) ) {
+            $role->add_cap( $cap, true );
+        }
+    }
+}
+
+/**
+ * Red de seguridad: registra el menú LT Marketplace con manage_options si
+ * LTMS_Admin::register_menus() no lo hizo (el Kernel falló).
+ * Corre en admin_menu@99 — después de que LTMS_Admin habría corrido en @10.
+ */
+function ltms_emergency_menu_fallback(): void {
+    global $menu;
+    foreach ( (array) $menu as $item ) {
+        if ( isset( $item[2] ) && 'ltms-dashboard' === $item[2] ) {
+            return; // LTMS_Admin ya registró el menú — nada que hacer
+        }
+    }
+
+    // El Kernel no cargó. Registrar menú de emergencia con manage_options.
+    add_menu_page(
+        'LT Marketplace Suite',
+        'LT Marketplace',
+        'manage_options',
+        'ltms-dashboard',
+        'ltms_emergency_dashboard_page',
+        'dashicons-store',
+        30
+    );
+}
+
+/**
+ * Página de emergencia — solo visible si el Kernel no pudo cargar.
+ */
+function ltms_emergency_dashboard_page(): void {
+    echo '<div class="wrap">';
+    echo '<h1>LT Marketplace Suite v' . esc_html( LTMS_VERSION ) . '</h1>';
+    echo '<div class="notice notice-warning inline"><p>';
+    echo '<strong>El Kernel no pudo inicializar.</strong> ';
+    echo 'El menú está visible gracias a la red de seguridad. ';
+    echo 'Verifica: WooCommerce activo, PHP &ge; 8.1, logs en <code>wp-content/debug.log</code>.';
+    echo '</p></div>';
+    echo '<p>Para diagnosticar, ejecuta via WP-CLI:</p>';
+    echo '<pre>wp eval-file wp-content/plugins/lt-marketplace-suite/bin/ltms-diagnose.php --allow-root</pre>';
+    echo '</div>';
+}
