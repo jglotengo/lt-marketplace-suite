@@ -38,6 +38,7 @@ final class LTMS_Admin_Settings {
         add_action( 'wp_ajax_ltms_save_settings_section', [ $instance, 'ajax_save_section' ] );
         add_action( 'wp_ajax_ltms_test_api_connection', [ $instance, 'ajax_test_api_connection' ] );
         add_action( 'wp_ajax_ltms_get_chart_data', [ $instance, 'ajax_get_chart_data' ] );
+        add_action( 'wp_ajax_ltms_fix_admin_caps', [ $instance, 'ajax_fix_admin_caps' ] );
     }
 
     /**
@@ -271,5 +272,67 @@ final class LTMS_Admin_Settings {
                 ]],
             ],
         ];
+    }
+
+    /**
+     * AJAX: Fuerza la re-asignación de todas las caps LTMS al rol administrator.
+     *
+     * Requiere: manage_options + nonce ltms_admin_nonce.
+     * Acción JS: wp.ajax.post('ltms_fix_admin_caps', { nonce: ltmsAdmin.nonce })
+     *
+     * @return void
+     */
+    public function ajax_fix_admin_caps(): void {
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
+        }
+
+        $role = get_role( 'administrator' );
+        if ( ! $role ) {
+            wp_send_json_error( __( 'Rol administrator no encontrado.', 'ltms' ) );
+        }
+
+        if ( ! class_exists( 'LTMS_Roles' ) ) {
+            wp_send_json_error( __( 'Clase LTMS_Roles no disponible — verifica que Composer esté instalado.', 'ltms' ) );
+        }
+
+        $caps    = LTMS_Roles::ADMIN_CAPABILITIES;
+        $added   = [];
+        $already = [];
+
+        foreach ( $caps as $cap ) {
+            if ( $role->has_cap( $cap ) ) {
+                $already[] = $cap;
+            } else {
+                $role->add_cap( $cap, true );
+                $added[] = $cap;
+            }
+        }
+
+        // Invalidar el transient de auto-healing para que se re-verifique.
+        delete_transient( 'ltms_admin_caps_ok_' . md5( LTMS_VERSION ) );
+
+        LTMS_Core_Logger::info(
+            'CAPS_FIXED',
+            sprintf(
+                'Caps fix ejecutado por usuario #%d: %d añadidas, %d ya existían.',
+                get_current_user_id(),
+                count( $added ),
+                count( $already )
+            )
+        );
+
+        wp_send_json_success( [
+            'added'   => $added,
+            'already' => $already,
+            'message' => sprintf(
+                /* translators: 1: caps añadidas, 2: caps ya existentes */
+                __( '%1$d capacidades añadidas, %2$d ya existían. Recarga la página.', 'ltms' ),
+                count( $added ),
+                count( $already )
+            ),
+        ] );
     }
 }

@@ -93,14 +93,48 @@ final class LTMS_Roles {
     ];
 
     /**
-     * Inicializa el sistema de roles (en cada request).
+     * Capacidades exactas que el rol administrator debe tener para que todos
+     * los submenús LTMS sean visibles. Los nombres son autoritativos: deben
+     * coincidir con los valores 'capability' en class-ltms-admin.php.
+     *
+     * @var string[]
+     */
+    public const ADMIN_CAPABILITIES = [
+        'ltms_access_dashboard',          // menú principal + submenu Dashboard
+        'ltms_manage_all_vendors',        // Vendedores, ReDi
+        'ltms_approve_payouts',           // Retiros
+        'ltms_manage_platform_settings',  // Configuración, Marketing, Fiscal CO/MX, Salud APIs, Comisiones
+        'ltms_view_tax_reports',          // Reportes Fiscales
+        'ltms_view_wallet_ledger',        // Billeteras
+        'ltms_view_all_orders',           // Pedidos, Para Recogida, Seguros XCover
+        'ltms_manage_kyc',                // KYC / Documentos
+        'ltms_view_security_logs',        // Seguridad
+        'ltms_view_audit_log',            // Historial Fiscal (singular, no plural)
+        'ltms_view_compliance_logs',
+        'ltms_export_reports',
+        'ltms_compliance',
+        'ltms_manage_roles',
+        'ltms_freeze_wallets',
+        'ltms_generate_legal_evidence',
+    ];
+
+    /**
+     * Inicializa el sistema de roles en cada request.
+     *
+     * Registra el filtro de capacidades dinámicas y encola el auto-healing
+     * de caps del administrador.
      *
      * @return void
      */
     public static function init(): void {
-        // Los roles se instalan solo una vez (en activación).
-        // Aquí solo registramos filtros de capacidades dinámicos.
+        // Registrar filtro de capacidades dinámicas.
         add_filter( 'user_has_cap', [ __CLASS__, 'dynamic_capabilities' ], 10, 4 );
+
+        // Auto-healing: si el administrador perdió caps LTMS (migración de BD,
+        // activación fallida, restauración de backup), las re-añade una vez por
+        // versión del plugin. Se ejecuta en cada request pero la escritura real
+        // solo ocurre cuando faltan caps, y el transient la previene en subsiguientes.
+        add_action( 'init', [ __CLASS__, 'ensure_admin_caps' ], 1 );
     }
 
     /**
@@ -122,32 +156,67 @@ final class LTMS_Roles {
         remove_role( 'ltms_support_agent' );
         add_role( 'ltms_support_agent', __( 'Soporte LTMS', 'ltms' ), self::SUPPORT_AGENT_CAPABILITIES );
 
-        // Agregar capacidades de gestión al rol Administrator de WordPress
+        // Agregar capacidades de gestión al rol Administrator de WordPress.
+        // ADMIN_CAPABILITIES es la fuente de verdad única — editarla ahí afecta
+        // tanto a la activación como al auto-healing en ensure_admin_caps().
         $admin_role = get_role( 'administrator' );
         if ( $admin_role ) {
-            $admin_caps = [
-                'ltms_access_dashboard',
-                'ltms_manage_all_vendors',
-                'ltms_approve_payouts',
-                'ltms_manage_platform_settings',
-                'ltms_view_tax_reports',
-                'ltms_view_compliance_logs',
-                'ltms_view_wallet_ledger',
-                'ltms_view_all_orders',
-                'ltms_manage_kyc',
-                'ltms_export_reports',
-                'ltms_compliance',
-                'ltms_view_security_logs',
-                'ltms_manage_roles',
-                'ltms_freeze_wallets',
-                'ltms_generate_legal_evidence',
-                'ltms_view_audit_log',            // required by Historial Fiscal submenu
-            ];
-
-            foreach ( $admin_caps as $cap ) {
+            foreach ( self::ADMIN_CAPABILITIES as $cap ) {
                 $admin_role->add_cap( $cap, true );
             }
         }
+
+        // Invalidar el transient de verificación para que ensure_admin_caps()
+        // no omita la próxima comprobación tras la instalación/actualización.
+        delete_transient( 'ltms_admin_caps_ok_' . md5( LTMS_VERSION ) );
+    }
+
+    /**
+     * Garantiza que el rol administrator tenga todas las caps LTMS requeridas.
+     *
+     * Se ejecuta en el hook 'init' con prioridad 1. Usa un transient para
+     * evitar escribir en la BD en cada request: solo actúa cuando detecta que
+     * falta al menos una cap, o cuando el plugin acaba de actualizarse.
+     *
+     * @return void
+     */
+    public static function ensure_admin_caps(): void {
+        // El transient se invalida cuando cambia la versión del plugin.
+        $transient_key = 'ltms_admin_caps_ok_' . md5( LTMS_VERSION );
+
+        if ( get_transient( $transient_key ) ) {
+            return; // Ya verificado en este ciclo de versión.
+        }
+
+        $role = get_role( 'administrator' );
+        if ( ! $role ) {
+            return;
+        }
+
+        $missing = array_filter(
+            self::ADMIN_CAPABILITIES,
+            fn( string $cap ) => ! $role->has_cap( $cap )
+        );
+
+        if ( ! empty( $missing ) ) {
+            foreach ( $missing as $cap ) {
+                $role->add_cap( $cap, true );
+            }
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'CAPS_AUTOHEALED',
+                    sprintf(
+                        'Auto-heal: %d caps añadidas al rol administrator: %s',
+                        count( $missing ),
+                        implode( ', ', $missing )
+                    )
+                );
+            }
+        }
+
+        // Marcar como verificado para esta versión (24 horas).
+        set_transient( $transient_key, true, DAY_IN_SECONDS );
     }
 
     /**

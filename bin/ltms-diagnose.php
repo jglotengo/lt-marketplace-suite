@@ -214,14 +214,21 @@ if ( ! $admin_role ) {
     $errors[] = 'administrator role not found in database';
     echo "   administrator role: NOT FOUND !!!\n";
 } else {
+    // Names are authoritative — must match capability values in class-ltms-admin.php.
     $ltms_caps = [
-        'ltms_access_dashboard',     // gates the ENTIRE admin menu
-        'ltms_manage_all_vendors',
-        'ltms_view_wallet_ledger',
-        'ltms_manage_payouts',
-        'ltms_manage_commissions',
-        'ltms_view_audit_logs',
-        'ltms_manage_settings',
+        'ltms_access_dashboard',          // gates the ENTIRE admin menu
+        'ltms_manage_all_vendors',        // Vendedores, ReDi
+        'ltms_approve_payouts',           // Retiros  (was wrongly ltms_manage_payouts)
+        'ltms_manage_platform_settings',  // Config, Marketing, Fiscal (was ltms_manage_settings)
+        'ltms_view_tax_reports',          // Reportes Fiscales
+        'ltms_view_wallet_ledger',        // Billeteras
+        'ltms_view_all_orders',           // Pedidos, Para Recogida, Seguros
+        'ltms_manage_kyc',                // KYC / Documentos
+        'ltms_view_security_logs',        // Seguridad (NOT ltms_security_logs)
+        'ltms_view_audit_log',            // Historial Fiscal (SINGULAR, not ltms_view_audit_logs)
+        'ltms_generate_legal_evidence',
+        'ltms_freeze_wallets',
+        'ltms_manage_roles',
     ];
 
     $missing_caps = [];
