@@ -189,7 +189,7 @@ final class LTMS_Admin_Payouts {
     public function ajax_freeze_wallet(): void {
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'ltms_manage_compliance' ) ) {
+        if ( ! current_user_can( 'ltms_compliance' ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
         }
 
@@ -222,7 +222,7 @@ final class LTMS_Admin_Payouts {
     public function ajax_unfreeze_wallet(): void {
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'ltms_manage_compliance' ) ) {
+        if ( ! current_user_can( 'ltms_compliance' ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
         }
 

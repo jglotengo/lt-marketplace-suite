@@ -9,7 +9,7 @@
 defined( 'ABSPATH' ) || exit;
 
 // Verificar permisos de auditor
-if ( ! current_user_can( 'ltms_view_audit_logs' ) ) {
+if ( ! current_user_can( 'ltms_access_auditor_dashboard' ) ) {
     wp_die( esc_html__( 'No tienes permiso para acceder a esta página.', 'ltms' ) );
 }
 
