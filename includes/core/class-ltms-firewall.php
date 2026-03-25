@@ -28,7 +28,7 @@ final class LTMS_Core_Firewall {
         'sql_injection_union'    => '/(\bunion\b.*\bselect\b|\bselect\b.*\bfrom\b.*\bwhere\b)/i',
         'sql_injection_drop'     => '/(\bdrop\b.*\btable\b|\btruncate\b.*\btable\b)/i',
         'sql_injection_insert'   => '/(\binsert\b.*\binto\b|\bupdate\b.*\bset\b.*\bwhere\b)/i',
-        'sql_injection_comment'  => '/(--|#|\/\*.*\*\/)/i',
+        'sql_injection_comment'  => '/(--|#|\/\*[\s\S]*?\*\/)/i', // SEC-L1: [\s\S] catches multi-line comment bypass
         'xss_script'             => '/<\s*script[^>]*>.*?<\s*\/\s*script\s*>/is',
         'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit)\s*=/i',
         'xss_javascript'         => '/javascript\s*:/i',

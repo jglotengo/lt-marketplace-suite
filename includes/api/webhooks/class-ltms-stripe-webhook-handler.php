@@ -45,7 +45,11 @@ class LTMS_Stripe_Webhook_Handler {
             [
                 'methods'             => 'POST',
                 'callback'            => [ __CLASS__, 'handle' ],
-                'permission_callback' => '__return_true', // La verificación se hace dentro del handler.
+                // SEC-H2: '__return_true' is intentional — Stripe webhooks must be publicly reachable.
+                // Authentication is enforced inside handle() via HMAC-SHA256 signature verification
+                // using \Stripe\WebhookSignature::verifyHeader() with ltms_stripe_webhook_secret.
+                // Requests with an invalid or missing Stripe-Signature header are rejected with HTTP 400.
+                'permission_callback' => '__return_true',
             ]
         );
     }

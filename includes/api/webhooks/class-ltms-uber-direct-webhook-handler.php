@@ -12,7 +12,11 @@ class LTMS_Uber_Direct_Webhook_Handler {
         register_rest_route( 'ltms/v1', '/webhooks/uber-direct', [
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'handle' ],
-            'permission_callback' => '__return_true', // Validation done inside handle()
+            // SEC-H2: '__return_true' is intentional — Uber Direct webhooks must be publicly reachable.
+            // Authentication is enforced inside handle() via HMAC-SHA256 signature verification
+            // using the x-postmates-signature / x-uber-signature header and ltms_uber_direct_webhook_secret.
+            // Requests with a missing secret or invalid signature are rejected with HTTP 401/400.
+            'permission_callback' => '__return_true',
         ] );
     }
 

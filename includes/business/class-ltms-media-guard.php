@@ -103,9 +103,25 @@ class LTMS_Media_Guard {
             return new \WP_Error( 'invalid_upload', __( 'Archivo inválido.', 'ltms' ) );
         }
 
-        $mime = mime_content_type( $file['tmp_name'] );
-        if ( ! in_array( $mime, $allowed_types, true ) ) {
+        // SEC-H1: Use finfo (available PHP 5.3+) rather than deprecated mime_content_type().
+        // finfo reads actual file magic bytes; we also cross-check the browser-supplied
+        // extension via wp_check_filetype() to catch polyglot files (e.g. PHP+PDF magic).
+        $finfo = new \finfo( FILEINFO_MIME_TYPE );
+        $mime  = $finfo->file( $file['tmp_name'] );
+
+        if ( false === $mime || ! in_array( $mime, $allowed_types, true ) ) {
             return new \WP_Error( 'invalid_type', __( 'Solo se permiten imágenes JPEG, PNG y PDF.', 'ltms' ) );
+        }
+
+        // Cross-check declared extension vs detected MIME to catch polyglot uploads.
+        $ext_check    = wp_check_filetype( $file['name'] );
+        $allowed_exts = [ 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'pdf' => 'application/pdf' ];
+        if (
+            ! empty( $ext_check['ext'] ) &&
+            isset( $allowed_exts[ $ext_check['ext'] ] ) &&
+            $allowed_exts[ $ext_check['ext'] ] !== $mime
+        ) {
+            return new \WP_Error( 'mime_mismatch', __( 'El tipo de archivo no coincide con su extensión.', 'ltms' ) );
         }
 
         if ( $file['size'] > $max_size ) {
