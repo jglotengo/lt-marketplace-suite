@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           1.7.0
+ * Version:           1.7.2
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -17,7 +17,7 @@
  * Requires Plugins:     woocommerce
  *
  * @package LTMS
- * @version 1.7.0
+ * @version 1.7.2
  */
 
 // ============================================================
@@ -30,7 +30,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '1.7.0' );
+define( 'LTMS_VERSION',          '1.7.2' );
 define( 'LTMS_DB_VERSION',       '1.7.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
@@ -356,6 +356,9 @@ function ltms_on_deactivation(): void {
  * WooCommerce y WordPress estén completamente inicializados.
  */
 function ltms_run(): void {
+    // DIAGNÓSTICO — confirma que este archivo (v1.7.2) es el que corre en producción.
+    error_log( '[LTMS v1.7.2] ltms_run() iniciado desde: ' . __FILE__ );
+
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
 
@@ -397,6 +400,10 @@ function ltms_run(): void {
                     $allcaps[ $cap ] = true;
                 }
             }
+        }
+        // DIAGNÓSTICO — loguear solo cuando se verifica ltms_access_dashboard
+        if ( in_array( 'ltms_access_dashboard', $caps, true ) ) {
+            error_log( '[LTMS v1.7.2] user_has_cap(ltms_access_dashboard): manage_options=' . ( ! empty( $allcaps['manage_options'] ) ? 'SI' : 'NO' ) . ' resultado=' . ( ! empty( $allcaps['ltms_access_dashboard'] ) ? 'CONCEDIDO' : 'DENEGADO' ) );
         }
         return $allcaps;
     }, 1, 3 );
