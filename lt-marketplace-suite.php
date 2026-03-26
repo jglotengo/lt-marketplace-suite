@@ -65,6 +65,31 @@ if ( ! defined( 'LTMS_CIPHER_ALGO' ) ) {
 }
 
 // ============================================================
+// CAPTURA DE ERRORES FATALES — Diagnóstico sin email
+// ============================================================
+// Registrado lo antes posible para capturar cualquier fatal PHP.
+// El resultado se muestra en la siguiente carga de wp-admin.
+register_shutdown_function( static function() {
+    $error = error_get_last();
+    if ( ! $error ) {
+        return;
+    }
+    $fatal_types = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ];
+    if ( ! in_array( $error['type'], $fatal_types, true ) ) {
+        return;
+    }
+    $content = sprintf(
+        "[%s] %s\nArchivo: %s línea %d\n",
+        gmdate( 'Y-m-d H:i:s' ),
+        $error['message'],
+        $error['file'],
+        (int) $error['line']
+    );
+    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+    file_put_contents( __DIR__ . '/ltms-fatal-debug.txt', $content, LOCK_EX );
+} );
+
+// ============================================================
 // VERIFICACIÓN DE COMPATIBILIDAD PRE-ARRANQUE
 // ============================================================
 /**
@@ -333,6 +358,22 @@ function ltms_on_deactivation(): void {
 function ltms_run(): void {
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
+
+    // Mostrar en admin cualquier fatal PHP capturado del request anterior.
+    $ltms_fatal_file = LTMS_PLUGIN_DIR . 'ltms-fatal-debug.txt';
+    if ( is_admin() && file_exists( $ltms_fatal_file ) ) {
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        $ltms_fatal_msg = (string) file_get_contents( $ltms_fatal_file );
+        @unlink( $ltms_fatal_file ); // borrar para no repetir el aviso
+        add_action( 'admin_notices', static function() use ( $ltms_fatal_msg ) {
+            echo '<div class="notice notice-error"><p>';
+            echo '<strong>⚠ LTMS — Error PHP fatal capturado (request anterior):</strong><br>';
+            echo '<code style="display:block;white-space:pre-wrap;background:#f1f1f1;padding:8px;margin-top:6px">'
+                . esc_html( $ltms_fatal_msg )
+                . '</code>';
+            echo '</p></div>';
+        } );
+    }
 
     // ── Garantías de arranque ─────────────────────────────────────────────────
     // Registradas aquí, fuera del Kernel, para que funcionen aunque el boot
