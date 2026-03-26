@@ -385,6 +385,22 @@ function ltms_run(): void {
     //    las caps estén todas guardadas en la BD.
     add_action( 'init', 'ltms_direct_ensure_caps', 1 );
     //
+    // 1b. Filtro dinámico de caps: WordPress cachea $allcaps del usuario ANTES
+    //     de que init@1 agregue las caps al rol en la BD. Si el cache aún no
+    //     tiene 'ltms_access_dashboard', add_menu_page() retorna false y el
+    //     menú real nunca se registra. Este filtro concede todas las caps ltms_*
+    //     a administrators en tiempo real, sin depender del cache de roles.
+    add_filter( 'user_has_cap', static function ( array $allcaps, array $caps, array $args ): array {
+        if ( ! empty( $allcaps['manage_options'] ) ) {
+            foreach ( $caps as $cap ) {
+                if ( str_starts_with( (string) $cap, 'ltms_' ) ) {
+                    $allcaps[ $cap ] = true;
+                }
+            }
+        }
+        return $allcaps;
+    }, 1, 3 );
+    //
     // 2. Menú de emergencia: si el Kernel falló y LTMS_Admin no registró el
     //    menú principal, este fallback lo registra en admin_menu@99 con
     //    manage_options para que siempre sea visible al administrador.
