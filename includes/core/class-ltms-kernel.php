@@ -167,28 +167,28 @@ final class LTMS_Core_Kernel {
         }
 
         // Motor de comisiones
-        if ( class_exists( 'LTMS_Business_Commission_Strategy' ) ) {
-            LTMS_Business_Commission_Strategy::init();
+        if ( class_exists( 'LTMS_Commission_Strategy' ) ) {
+            LTMS_Commission_Strategy::init();
         }
 
         // Motor fiscal
-        if ( class_exists( 'LTMS_Business_Tax_Engine' ) ) {
-            LTMS_Business_Tax_Engine::init();
+        if ( class_exists( 'LTMS_Tax_Engine' ) ) {
+            LTMS_Tax_Engine::init();
         }
 
         // Árbol de referidos MLM
-        if ( class_exists( 'LTMS_Business_Referral_Tree' ) ) {
-            LTMS_Business_Referral_Tree::init();
+        if ( class_exists( 'LTMS_Referral_Tree' ) ) {
+            LTMS_Referral_Tree::init();
         }
 
         // Afiliados / Cookies
-        if ( class_exists( 'LTMS_Business_Affiliates' ) ) {
-            LTMS_Business_Affiliates::init();
+        if ( class_exists( 'LTMS_Affiliates' ) ) {
+            LTMS_Affiliates::init();
         }
 
         // Scheduler de pagos
-        if ( class_exists( 'LTMS_Business_Payout_Scheduler' ) ) {
-            LTMS_Business_Payout_Scheduler::init();
+        if ( class_exists( 'LTMS_Payout_Scheduler' ) ) {
+            LTMS_Payout_Scheduler::init();
         }
 
         // Protección al consumidor / vesting

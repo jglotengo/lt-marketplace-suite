@@ -36,11 +36,13 @@ final class LTMS_Core_Activator {
         update_option( 'ltms_version', LTMS_VERSION );
         update_option( 'ltms_activation_redirect', true );
 
-        LTMS_Core_Logger::info(
-            'PLUGIN_ACTIVATED',
-            sprintf( 'LTMS v%s activado exitosamente', LTMS_VERSION ),
-            [ 'user_id' => get_current_user_id(), 'site_url' => site_url() ]
-        );
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'PLUGIN_ACTIVATED',
+                sprintf( 'LTMS v%s activado exitosamente', LTMS_VERSION ),
+                [ 'user_id' => get_current_user_id(), 'site_url' => site_url() ]
+            );
+        }
     }
 
     /**

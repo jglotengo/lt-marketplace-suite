@@ -43,10 +43,12 @@ final class LTMS_DB_Migrations {
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
 
-        LTMS_Core_Logger::info(
-            'DB_MIGRATION_COMPLETE',
-            sprintf( 'BD actualizada de v%s a v%s', $installed_version, self::CURRENT_VERSION )
-        );
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION_COMPLETE',
+                sprintf( 'BD actualizada de v%s a v%s', $installed_version, self::CURRENT_VERSION )
+            );
+        }
     }
 
     /**

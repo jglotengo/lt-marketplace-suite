@@ -222,18 +222,44 @@ function ltms_load_autoloader(): void {
             // Sin este mapa el Kernel nunca se carga → cero menús en wp-admin.
             $exceptions_npart = [
                 // Core — archivo no incluye 'core-' en el nombre
-                'ltms-core-kernel'      => 'core/class-ltms-kernel.php',
-                'ltms-core-config'      => 'core/class-ltms-config.php',
-                'ltms-core-logger'      => 'core/class-ltms-logger.php',
-                'ltms-core-security'    => 'core/class-ltms-security.php',
-                'ltms-core-firewall'    => 'core/class-ltms-firewall.php',
-                'ltms-core-activator'   => 'core/services/class-ltms-activator.php',
-                'ltms-core-deactivator' => 'core/services/class-ltms-deactivator.php',
+                'ltms-core-kernel'              => 'core/class-ltms-kernel.php',
+                'ltms-core-config'              => 'core/class-ltms-config.php',
+                'ltms-core-logger'              => 'core/class-ltms-logger.php',
+                'ltms-core-security'            => 'core/class-ltms-security.php',
+                'ltms-core-firewall'            => 'core/class-ltms-firewall.php',
+                'ltms-core-activator'           => 'core/services/class-ltms-activator.php',
+                'ltms-core-deactivator'         => 'core/services/class-ltms-deactivator.php',
                 // Business — archivo no incluye 'business-'
-                'ltms-business-wallet'  => 'business/class-ltms-wallet.php',
+                'ltms-business-wallet'          => 'business/class-ltms-wallet.php',
+                'ltms-business-order-split'     => 'business/class-ltms-order-split.php',
+                // Business — subdir derivado de la clase no existe; archivo en business/
+                'ltms-commission-strategy'      => 'business/class-ltms-commission-strategy.php',
+                'ltms-tax-engine'               => 'business/class-ltms-tax-engine.php',
+                'ltms-referral-tree'            => 'business/class-ltms-referral-tree.php',
+                'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
+                'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
+                'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
+                'ltms-xcover-checkout-handler'  => 'business/class-ltms-xcover-checkout-handler.php',
+                // Business listeners
+                'ltms-order-paid-listener'      => 'business/listeners/class-ltms-order-paid-listener.php',
+                'ltms-redi-order-listener'      => 'business/listeners/class-ltms-redi-order-listener.php',
+                'ltms-xcover-policy-listener'   => 'business/listeners/class-ltms-xcover-policy-listener.php',
+                // Business strategies
+                'ltms-tax-strategy-colombia'    => 'business/strategies/class-ltms-tax-strategy-colombia.php',
+                'ltms-tax-strategy-mexico'      => 'business/strategies/class-ltms-tax-strategy-mexico.php',
+                // API — clase base abstracta (subdir 'abstract' no existe)
+                'ltms-abstract-api-client'      => 'api/class-ltms-abstract-api-client.php',
+                // API webhooks — subdir 'stripe'/'uber' no existe; archivo en api/webhooks/
+                'ltms-stripe-webhook-handler'       => 'api/webhooks/class-ltms-stripe-webhook-handler.php',
+                'ltms-uber-direct-webhook-handler'  => 'api/webhooks/class-ltms-uber-direct-webhook-handler.php',
+                // Frontend — subdir derivado ('dashboard', 'public') no coincide con 'frontend/'
+                'ltms-dashboard-logic'          => 'frontend/class-ltms-dashboard-logic.php',
+                'ltms-public-auth-handler'      => 'frontend/class-ltms-public-auth-handler.php',
+                // Roles — subdir derivado ('external') no existe; archivo en roles/
+                'ltms-external-auditor-role'    => 'roles/class-ltms-external-auditor-role.php',
                 // Data/DB — subdir incorrecto en nombre de clase
-                'ltms-data-masking'     => 'core/class-ltms-data-masking.php',
-                'ltms-db-migrations'    => 'core/migrations/class-ltms-db-migrations.php',
+                'ltms-data-masking'             => 'core/class-ltms-data-masking.php',
+                'ltms-db-migrations'            => 'core/migrations/class-ltms-db-migrations.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
