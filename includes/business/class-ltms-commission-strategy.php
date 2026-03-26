@@ -29,6 +29,13 @@ final class LTMS_Commission_Strategy {
     const DEFAULT_RATE = 0.10; // 10%
 
     /**
+     * Punto de entrada del Kernel. Sin hooks que registrar para esta clase.
+     *
+     * @return void
+     */
+    public static function init(): void {}
+
+    /**
      * Calcula la tasa de comisión efectiva para un vendedor y pedido.
      *
      * @param int       $vendor_id ID del vendedor.

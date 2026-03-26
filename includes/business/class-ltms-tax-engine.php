@@ -22,6 +22,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class LTMS_Tax_Engine {
 
     /**
+     * Punto de entrada del Kernel. Sin hooks que registrar para esta clase.
+     *
+     * @return void
+     */
+    public static function init(): void {}
+
+    /**
      * Instancias cacheadas de estrategias fiscales.
      *
      * @var array<string, LTMS_Tax_Strategy_Interface>

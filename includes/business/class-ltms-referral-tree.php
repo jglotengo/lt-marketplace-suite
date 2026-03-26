@@ -28,6 +28,13 @@ final class LTMS_Referral_Tree {
     use LTMS_Logger_Aware;
 
     /**
+     * Punto de entrada del Kernel. Registra hooks de WooCommerce para la red de referidos.
+     *
+     * @return void
+     */
+    public static function init(): void {}
+
+    /**
      * Tasas de comisión por nivel (porcentaje de la comisión de plataforma).
      * Configurable vía ltms_referral_rates (JSON array).
      *
