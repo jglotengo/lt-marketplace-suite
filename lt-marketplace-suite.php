@@ -292,8 +292,19 @@ function ltms_on_activation(): void {
 
     ltms_load_autoloader();
 
-    if ( class_exists( 'LTMS_Core_Activator' ) ) {
-        LTMS_Core_Activator::activate();
+    try {
+        if ( class_exists( 'LTMS_Core_Activator' ) ) {
+            LTMS_Core_Activator::activate();
+        }
+    } catch ( \Throwable $e ) {
+        wp_die(
+            '<p><strong>LT Marketplace Suite — Error de Activación</strong></p>' .
+            '<p>' . esc_html( $e->getMessage() ) . '</p>' .
+            '<p>Archivo: <code>' . esc_html( $e->getFile() ) . ':' . (int) $e->getLine() . '</code></p>' .
+            '<p><a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">&larr; Volver a Plugins</a></p>',
+            'Error de Activación LTMS',
+            [ 'response' => 500 ]
+        );
     }
 
     // Flush rewrite rules para nuevos endpoints

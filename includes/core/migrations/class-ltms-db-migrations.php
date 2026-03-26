@@ -668,30 +668,45 @@ final class LTMS_DB_Migrations {
 
         // DDL statements (ALTER TABLE) cannot use parameterized placeholders.
         // Table names are derived exclusively from $wpdb->prefix (trusted, server-set value).
+        // ADD INDEX IF NOT EXISTS is MariaDB-only — we use a SELECT-based guard for MySQL compat.
         // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-        $p = $wpdb->prefix;
-        $indexes = [
-            // Existing single-column indexes
-            "ALTER TABLE `{$p}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_created_at` (`created_at`)",
-            "ALTER TABLE `{$p}lt_commissions`         ADD INDEX IF NOT EXISTS `idx_paid_at`    (`paid_at`)",
+        $p  = $wpdb->prefix;
+        $db = DB_NAME;
 
-            // PERF: composite indexes for common query patterns
-            // notifications: user_id + is_read + created_at (dashboard unread count + list)
-            "ALTER TABLE `{$p}lt_notifications` ADD INDEX IF NOT EXISTS `idx_user_unread` (`user_id`, `is_read`, `created_at`)",
-            // wallet_transactions: vendor_id + type + created_at (commission reports, payout history)
-            "ALTER TABLE `{$p}lt_wallet_transactions` ADD INDEX IF NOT EXISTS `idx_vendor_type_date` (`vendor_id`, `type`, `created_at`)",
-            // waf_blocked_ips: expires_at (cleanup cron queries)
-            "ALTER TABLE `{$p}lt_waf_blocked_ips` ADD INDEX IF NOT EXISTS `idx_expires_at` (`expires_at`)",
-            // commissions: vendor_id + status + created_at (vendor commission reports)
-            "ALTER TABLE `{$p}lt_commissions` ADD INDEX IF NOT EXISTS `idx_vendor_status_date` (`vendor_id`, `status`, `created_at`)",
-            // audit_logs: user_id + created_at (per-user audit trail)
-            "ALTER TABLE `{$p}lt_audit_logs` ADD INDEX IF NOT EXISTS `idx_user_date` (`user_id`, `created_at`)",
-            // api_logs: provider + created_at (provider health dashboard)
-            "ALTER TABLE `{$p}lt_api_logs` ADD INDEX IF NOT EXISTS `idx_provider_date` (`provider`, `created_at`)",
+        /**
+         * Each entry: [ table_without_prefix, index_name, column_list ]
+         * We check information_schema before altering to stay idempotent on MySQL.
+         */
+        $indexes = [
+            [ 'lt_wallet_transactions', 'idx_created_at',       '(`created_at`)' ],
+            [ 'lt_commissions',         'idx_paid_at',           '(`paid_at`)' ],
+            [ 'lt_notifications',       'idx_user_unread',       '(`user_id`, `is_read`, `created_at`)' ],
+            [ 'lt_wallet_transactions', 'idx_vendor_type_date',  '(`vendor_id`, `type`, `created_at`)' ],
+            [ 'lt_waf_blocked_ips',     'idx_expires_at',        '(`expires_at`)' ],
+            [ 'lt_commissions',         'idx_vendor_status_date','(`vendor_id`, `status`, `created_at`)' ],
+            [ 'lt_audit_logs',          'idx_user_date',         '(`user_id`, `created_at`)' ],
+            [ 'lt_api_logs',            'idx_provider_date',     '(`provider`, `created_at`)' ],
         ];
 
-        foreach ( $indexes as $sql ) {
-            $wpdb->query( $sql ); // Ignore duplicate-index errors (idempotent).
+        foreach ( $indexes as [ $tbl_suffix, $idx_name, $cols ] ) {
+            $table = $p . $tbl_suffix;
+
+            // Skip if the index already exists (MySQL + MariaDB compatible).
+            $exists = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM information_schema.STATISTICS
+                     WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s",
+                    $db,
+                    $table,
+                    $idx_name
+                )
+            );
+
+            if ( $exists ) {
+                continue;
+            }
+
+            $wpdb->query( "ALTER TABLE `{$table}` ADD INDEX `{$idx_name}` {$cols}" );
         }
         // phpcs:enable
     }
