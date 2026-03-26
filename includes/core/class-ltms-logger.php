@@ -80,7 +80,10 @@ final class LTMS_Core_Logger {
         }
 
         // En producción, ignorar DEBUG
-        if ( LTMS_Core_Config::is_production() && $level === 'DEBUG' ) {
+        $is_production = class_exists( 'LTMS_Core_Config' )
+            ? LTMS_Core_Config::is_production()
+            : ( defined( 'LTMS_ENVIRONMENT' ) && 'production' === LTMS_ENVIRONMENT );
+        if ( $is_production && $level === 'DEBUG' ) {
             return;
         }
 
