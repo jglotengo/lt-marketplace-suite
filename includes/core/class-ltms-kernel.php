@@ -89,6 +89,16 @@ final class LTMS_Core_Kernel {
             do_action( 'ltms_kernel_booted' );
 
         } catch ( \Throwable $e ) {
+            // DIAGNÓSTICO TEMPORAL — siempre loguear al debug.log para diagnóstico
+            error_log( sprintf(
+                '[LTMS KERNEL ERROR] %s: %s in %s line %d',
+                get_class( $e ),
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            ) );
+            error_log( '[LTMS KERNEL TRACE] ' . $e->getTraceAsString() );
+
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::log(
                     'KERNEL_BOOT_ERROR',
