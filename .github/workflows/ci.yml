@@ -49,6 +49,8 @@ jobs:
           php-version: '8.2'
           extensions: mbstring, json, mysqli
           tools: composer:v2, phpunit
+      - name: Install SVN
+        run: sudo apt-get install -y subversion
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
       - name: Install WP Test Suite
