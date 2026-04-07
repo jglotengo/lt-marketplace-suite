@@ -47,6 +47,8 @@
     },
     "scripts": {
         "test": "phpunit",
+        "lint": "phpcs --standard=WordPress includes/",
+        "analyse": "phpstan analyse includes/ --level=6 --no-progress",
         "phpcs": "phpcs --standard=WordPress includes/",
         "phpstan": "phpstan analyse includes/ --level=6",
         "build": "bin/build.sh",
