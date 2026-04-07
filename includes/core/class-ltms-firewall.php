@@ -82,12 +82,82 @@ final class LTMS_Core_Firewall {
     }
 
     /**
+     * Rutas del área de administración de WordPress que están permitidas
+     * sin inspección de patrones de ataque.
+     *
+     * Estas rutas son exclusivas del panel admin y están protegidas por el
+     * sistema de autenticación y nonces de WordPress. Inspeccionarlas con el WAF
+     * genera falsos positivos (p. ej. el File Manager envía rutas con "../" que
+     * disparan lfi_path_traversal) sin ningún beneficio de seguridad real,
+     * ya que WordPress ya verifica capacidades antes de procesar estas requests.
+     *
+     * ⚠️  Esta lista SOLO excluye la inspección de patrones. La verificación de
+     *     IP en blacklist (paso 1) sigue aplicándose para todas las rutas.
+     *
+     * @var string[]
+     */
+    private static array $admin_path_whitelist = [
+        '/wp-admin/',          // Panel de administración general
+        '/wp-login.php',       // Página de login (manejo propio de WP)
+        '/wp-json/',           // REST API (autenticación via nonce/JWT)
+        '/wp-admin/admin-ajax.php', // AJAX de plugins admin
+    ];
+
+    /**
+     * Comprueba si la request actual proviene del área admin de WordPress
+     * Y el usuario tiene la capacidad 'manage_options' (administrador).
+     *
+     * Se usa is_user_logged_in() + current_user_can() en lugar de is_admin()
+     * porque is_admin() solo verifica la URL, no la sesión del usuario.
+     *
+     * @return bool True si es un administrador autenticado en área admin.
+     */
+    private static function is_authenticated_admin(): bool {
+        // is_user_logged_in() requiere que las cookies ya hayan sido procesadas.
+        // En el hook 'init' con priority 1, la sesión WP ya está disponible.
+        return is_user_logged_in() && current_user_can( 'manage_options' );
+    }
+
+    /**
+     * Comprueba si la REQUEST_URI actual está en la whitelist de rutas admin.
+     *
+     * @return bool
+     */
+    private static function is_whitelisted_admin_path(): bool {
+        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        foreach ( self::$admin_path_whitelist as $path ) {
+            if ( str_contains( $request_uri, $path ) ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Ejecuta todas las verificaciones del WAF.
      *
      * @return void
      */
     public static function run(): void {
         $ip = self::get_client_ip();
+
+        // ── EXCLUSIÓN PARA ADMINISTRADORES AUTENTICADOS EN RUTAS ADMIN ──────────
+        // Si la request viene de un administrador autenticado accediendo a una
+        // ruta del área admin (wp-admin/, wp-json/, admin-ajax.php), omitimos
+        // la inspección de patrones de ataque para evitar falsos positivos con
+        // plugins legítimos como WP File Manager, ACF, etc.
+        //
+        // La verificación de blacklist de IP (paso 1 más abajo) sigue corriendo
+        // para todos los usuarios, incluyendo admins, para bloquear IPs comprometidas.
+        // ────────────────────────────────────────────────────────────────────────
+        if ( self::is_authenticated_admin() && self::is_whitelisted_admin_path() ) {
+            // Solo ejecutar verificación de blacklist de IP, no inspección de patrones.
+            if ( self::is_ip_blocked( $ip ) ) {
+                self::block_request( 'IP_BLACKLISTED', $ip );
+            }
+            return;
+        }
+        // ── FIN EXCLUSIÓN ADMIN ──────────────────────────────────────────────────
 
         // 1. Verificar blacklist de IPs
         if ( self::is_ip_blocked( $ip ) ) {
