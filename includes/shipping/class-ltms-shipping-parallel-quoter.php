@@ -95,6 +95,23 @@ class LTMS_Shipping_Parallel_Quoter {
 		return $rates;
 	}
 
+	/**
+	 * Devuelve la cotización más barata para un paquete (usado por envío absorbido).
+	 *
+	 * @param array $package WooCommerce package.
+	 * @return array|null  ['provider', 'cost', 'label'] o null si no hay cotizaciones.
+	 */
+	public static function get_cheapest_quote( array $package ): ?array {
+		$rates = self::quote_all( $package );
+		if ( empty( $rates ) ) return null;
+		$cheapest = $rates[0]; // ya ordenado por cost ASC.
+		return [
+			'provider' => $cheapest['provider'] ?? 'unknown',
+			'cost'     => (float) ( $cheapest['cost'] ?? 0 ),
+			'label'    => $cheapest['label'] ?? '',
+		];
+	}
+
 	// ── Private helpers ──────────────────────────────────────────────
 
 	private static function build_requests( float $weight, array $dest, string $country ): array {

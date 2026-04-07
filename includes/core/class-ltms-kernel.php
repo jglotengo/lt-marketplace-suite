@@ -89,15 +89,10 @@ final class LTMS_Core_Kernel {
             do_action( 'ltms_kernel_booted' );
 
         } catch ( \Throwable $e ) {
-            // DIAGNÓSTICO TEMPORAL — siempre loguear al debug.log para diagnóstico
-            error_log( sprintf(
-                '[LTMS KERNEL ERROR] %s: %s in %s line %d',
-                get_class( $e ),
-                $e->getMessage(),
-                $e->getFile(),
-                $e->getLine()
-            ) );
-            error_log( '[LTMS KERNEL TRACE] ' . $e->getTraceAsString() );
+            // Siempre escribir en error_log de PHP (visible en cPanel/hosting).
+            // Esto permite diagnosticar el error sin re-lanzar la excepción.
+            error_log( 'LTMS KERNEL BOOT ERROR: ' . $e->getMessage()
+                . ' in ' . $e->getFile() . ':' . $e->getLine() );
 
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::log(
@@ -107,10 +102,10 @@ final class LTMS_Core_Kernel {
                     'CRITICAL'
                 );
             }
-            // En producción, no mostrar el error. En debug, re-lanzar.
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                throw $e;
-            }
+
+            // NUNCA re-lanzar: si la excepción escapa de plugins_loaded,
+            // WordPress entra en recovery mode y tumba el sitio.
+            // El error ya queda en error_log y la página de emergencia lo mostrará.
         }
     }
 
@@ -211,6 +206,11 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Tourism_Compliance::init();
         }
 
+        // v2.0.0 — Motor de reservas ACID
+        if ( class_exists( 'LTMS_Booking_Manager' ) ) {
+            LTMS_Booking_Manager::init();
+        }
+
         // Listeners de eventos de dominio
         if ( class_exists( 'LTMS_Order_Paid_Listener' ) ) {
             LTMS_Order_Paid_Listener::init();
@@ -249,6 +249,21 @@ final class LTMS_Core_Kernel {
      * @return void
      */
     private function boot_api_integrations(): void {
+        // v2.0.0 — Tipo de producto ltms_bookable
+        add_filter( 'product_type_selector', static function( array $types ): array {
+            return array_merge( $types, [ 'ltms_bookable' => __( 'Producto Reservable (LTMS)', 'ltms' ) ] );
+        } );
+        add_filter( 'woocommerce_product_class', static function( string $classname, string $type ): string {
+            return 'ltms_bookable' === $type ? 'LTMS_Product_Bookable' : $classname;
+        }, 10, 2 );
+
+        // v2.0.0 — Setup políticas por defecto para vendedores nuevos
+        add_action( 'ltms_vendor_approved', static function( int $vendor_id ): void {
+            if ( class_exists( 'LTMS_Booking_Policy_Handler' ) ) {
+                LTMS_Booking_Policy_Handler::setup_default_policies( $vendor_id );
+            }
+        } );
+
         // Registrar pasarelas de pago en WooCommerce
         add_filter( 'woocommerce_payment_gateways', [ $this, 'register_payment_gateways' ] );
 
@@ -295,7 +310,8 @@ final class LTMS_Core_Kernel {
             'LTMS_Shipping_Method_Aveonline',
             'LTMS_Shipping_Method_Heka',
             'LTMS_Shipping_Method_Pickup',
-            'LTMS_Shipping_Method_Own_Delivery', // v1.7.0
+            'LTMS_Shipping_Method_Own_Delivery',  // v1.7.0
+            'LTMS_Shipping_Method_Free_Absorbed', // v2.0.0
         ];
 
         foreach ( $shipping_classes as $class ) {
@@ -357,6 +373,29 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }
+
+        // v2.0.0 — Calendario de reservas
+        if ( class_exists( 'LTMS_Booking_Calendar' ) ) {
+            LTMS_Booking_Calendar::init();
+        }
+
+        // v2.0.0 — SEO técnico (Schema.org, Open Graph, Sitemap)
+        if ( class_exists( 'LTMS_SEO_Manager' ) ) {
+            LTMS_SEO_Manager::init();
+        }
+        if ( class_exists( 'LTMS_Sitemap' ) ) {
+            LTMS_Sitemap::init();
+        }
+
+        // v2.0.0 — Analytics (GTM, GA4, Meta Pixel)
+        if ( class_exists( 'LTMS_Analytics_Manager' ) ) {
+            LTMS_Analytics_Manager::init();
+        }
+
+        // v2.0.0 — Geolocalización
+        if ( class_exists( 'LTMS_Geo_Detector' ) ) {
+            LTMS_Geo_Detector::init();
+        }
     }
 
     /**
@@ -404,6 +443,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Admin_Redi' ) ) {
             LTMS_Admin_Redi::init();
         }
+
+        // v2.0.0 — Admin de reservas y compliance turístico
+        if ( class_exists( 'LTMS_Admin_Bookings' ) ) {
+            LTMS_Admin_Bookings::init();
+        }
     }
 
     /**
@@ -433,6 +477,7 @@ final class LTMS_Core_Kernel {
             LTMS_Core_Cron_Manager::init();
         }
     }
+
 
     /**
      * Registra los endpoints de la API REST.

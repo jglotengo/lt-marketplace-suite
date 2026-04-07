@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           1.7.2
+ * Version:           2.0.0
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -17,7 +17,7 @@
  * Requires Plugins:     woocommerce
  *
  * @package LTMS
- * @version 1.7.2
+ * @version 2.0.0
  */
 
 // ============================================================
@@ -27,11 +27,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Guard: prevenir carga doble si hay dos copias del plugin activas simultáneamente.
+// Sin este guard, PHP lanza "Cannot redeclare function ltms_run()" — error crítico.
+if ( defined( 'LTMS_LOADED' ) ) {
+    return;
+}
+define( 'LTMS_LOADED', true );
+
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '1.7.2' );
-define( 'LTMS_DB_VERSION',       '1.7.0' );
+define( 'LTMS_VERSION',          '2.0.0' );
+define( 'LTMS_DB_VERSION',       '2.0.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
 define( 'LTMS_MIN_WC',           '7.0' );
@@ -136,7 +143,9 @@ function ltms_load_autoloader(): void {
 
     if ( file_exists( $composer_autoload ) ) {
         require_once $composer_autoload;
-        return;
+        // No retornar — Composer maneja vendor packages pero su classmap NO incluye
+        // las clases LTMS_* (nombres con guion-bajo, sin namespace PSR-4).
+        // El fallback SPL a continuación cubre todas las clases LTMS_*.
     }
 
     // Fallback: cargar traits e interfaces de forma eager antes del autoloader.
@@ -356,9 +365,6 @@ function ltms_on_deactivation(): void {
  * WooCommerce y WordPress estén completamente inicializados.
  */
 function ltms_run(): void {
-    // DIAGNÓSTICO — confirma que este archivo (v1.7.2) es el que corre en producción.
-    error_log( '[LTMS v1.7.2] ltms_run() iniciado desde: ' . __FILE__ );
-
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
 
@@ -400,10 +406,6 @@ function ltms_run(): void {
                     $allcaps[ $cap ] = true;
                 }
             }
-        }
-        // DIAGNÓSTICO — loguear solo cuando se verifica ltms_access_dashboard
-        if ( in_array( 'ltms_access_dashboard', $caps, true ) ) {
-            error_log( '[LTMS v1.7.2] user_has_cap(ltms_access_dashboard): manage_options=' . ( ! empty( $allcaps['manage_options'] ) ? 'SI' : 'NO' ) . ' resultado=' . ( ! empty( $allcaps['ltms_access_dashboard'] ) ? 'CONCEDIDO' : 'DENEGADO' ) );
         }
         return $allcaps;
     }, 1, 3 );
@@ -463,7 +465,15 @@ function ltms_run(): void {
 
     // Inicializar el Kernel principal
     if ( class_exists( 'LTMS_Core_Kernel' ) ) {
-        LTMS_Core_Kernel::get_instance()->boot();
+        try {
+            LTMS_Core_Kernel::get_instance()->boot();
+        } catch ( \Throwable $e ) {
+            // Capa de seguridad externa: si el catch del Kernel falla por cualquier
+            // razón, este catch previene que la excepción escape a plugins_loaded
+            // (lo que causaría WordPress recovery mode y tumbaría el sitio).
+            error_log( 'LTMS UNCAUGHT KERNEL ERROR: ' . $e->getMessage()
+                . ' in ' . $e->getFile() . ':' . $e->getLine() );
+        }
     }
 }
 
@@ -538,16 +548,81 @@ function ltms_emergency_menu_fallback(): void {
 
 /**
  * Página de emergencia — solo visible si el Kernel no pudo cargar.
+ * Intenta arrancar el Kernel de nuevo para capturar y mostrar el error exacto.
  */
 function ltms_emergency_dashboard_page(): void {
     echo '<div class="wrap">';
     echo '<h1>LT Marketplace Suite v' . esc_html( LTMS_VERSION ) . '</h1>';
-    echo '<div class="notice notice-warning inline"><p>';
-    echo '<strong>El Kernel no pudo inicializar.</strong> ';
-    echo 'El menú está visible gracias a la red de seguridad. ';
-    echo 'Verifica: WooCommerce activo, PHP &ge; 8.1, logs en <code>wp-content/debug.log</code>.';
-    echo '</p></div>';
-    echo '<p>Para diagnosticar, ejecuta via WP-CLI:</p>';
-    echo '<pre>wp eval-file wp-content/plugins/lt-marketplace-suite/bin/ltms-diagnose.php --allow-root</pre>';
+
+    // ── Diagnóstico inline: intentar boot y capturar excepción ───────────────
+    $boot_error   = null;
+    $boot_success = false;
+
+    // Verificaciones previas al boot
+    $checks = [];
+    $checks['PHP ' . PHP_VERSION . ' >= 8.1']  = version_compare( PHP_VERSION, '8.1', '>=' );
+    $checks['WooCommerce activo']               = function_exists( 'WC' );
+    $checks['LTMS_Core_Kernel cargada']         = class_exists( 'LTMS_Core_Kernel' );
+    $checks['vendor/autoload.php existe']       = file_exists( LTMS_PLUGIN_DIR . 'vendor/autoload.php' );
+
+    // Rutas clave
+    echo '<h3>Rutas del plugin</h3>';
+    echo '<pre style="background:#f0f0f0;padding:8px;font-size:12px">';
+    echo 'LTMS_PLUGIN_DIR  = ' . esc_html( LTMS_PLUGIN_DIR ) . "\n";
+    echo 'LTMS_INCLUDES_DIR= ' . esc_html( LTMS_INCLUDES_DIR ) . "\n";
+    echo 'kernel file      = ' . esc_html( LTMS_INCLUDES_DIR . 'core/class-ltms-kernel.php' ) . "\n";
+    echo 'kernel exists    = ' . ( file_exists( LTMS_INCLUDES_DIR . 'core/class-ltms-kernel.php' ) ? 'SI' : 'NO' ) . "\n";
+    echo 'includes/ exists = ' . ( is_dir( LTMS_INCLUDES_DIR ) ? 'SI' : 'NO' ) . "\n";
+    echo 'vendor/ exists   = ' . ( is_dir( LTMS_PLUGIN_DIR . 'vendor' ) ? 'SI' : 'NO' ) . "\n";
+    // Listar archivos en la carpeta raíz del plugin
+    $root_files = @scandir( LTMS_PLUGIN_DIR );
+    echo 'Archivos en raíz = ' . ( $root_files ? esc_html( implode( ', ', array_diff( $root_files, ['.', '..'] ) ) ) : '(error leyendo directorio)' ) . "\n";
+    echo '</pre>';
+
+    echo '<table class="widefat" style="margin:12px 0;max-width:600px"><tbody>';
+    foreach ( $checks as $label => $ok ) {
+        $icon = $ok ? '✅' : '❌';
+        echo '<tr><td>' . esc_html( $icon . ' ' . $label ) . '</td></tr>';
+    }
+    echo '</tbody></table>';
+
+    if ( $checks['LTMS_Core_Kernel cargada'] ) {
+        try {
+            // Forzar un boot fresh (el singleton ya está marcado como no-booted
+            // porque falló antes — si no, usamos reflexión para resetear)
+            $kernel = LTMS_Core_Kernel::get_instance();
+            $ref    = new ReflectionClass( $kernel );
+            $prop   = $ref->getProperty( 'booted' );
+            $prop->setAccessible( true );
+            $prop->setValue( $kernel, false ); // reset para poder re-intentar
+
+            $kernel->boot();
+            $boot_success = true;
+        } catch ( \Throwable $e ) {
+            $boot_error = $e;
+        }
+    }
+
+    if ( $boot_success ) {
+        echo '<div class="notice notice-success inline"><p>';
+        echo '<strong>✅ Boot exitoso en el segundo intento.</strong> Recarga la página.';
+        echo '</p></div>';
+    } elseif ( $boot_error ) {
+        echo '<div class="notice notice-error inline" style="padding:12px">';
+        echo '<p><strong>❌ Excepción durante Kernel::boot():</strong></p>';
+        echo '<pre style="background:#1d2327;color:#f0f0f1;padding:12px;overflow:auto;border-radius:4px">';
+        echo esc_html( get_class( $boot_error ) . ': ' . $boot_error->getMessage() );
+        echo "\n\n" . esc_html( $boot_error->getFile() . ':' . $boot_error->getLine() );
+        echo "\n\nTrace:\n" . esc_html( $boot_error->getTraceAsString() );
+        echo '</pre>';
+        echo '</div>';
+    } else {
+        echo '<div class="notice notice-warning inline"><p>';
+        echo '<strong>El Kernel no pudo inicializar</strong> — la clase LTMS_Core_Kernel no se cargó. ';
+        echo 'El autoloader no puede encontrar el archivo. ';
+        echo 'Verifica que el ZIP se descomprimió completo en el servidor.';
+        echo '</p></div>';
+    }
+
     echo '</div>';
 }

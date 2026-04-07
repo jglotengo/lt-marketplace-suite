@@ -36,12 +36,13 @@ class LTMS_Affiliates {
     /**
      * Init hooks.
      */
-    public function init(): void {
-        add_action( 'ltms_vendor_registered', [ $this, 'on_vendor_registered' ], 10, 2 );
-        add_action( 'ltms_payout_completed',  [ $this, 'on_payout_completed' ],  10, 2 );
+    public static function init(): void {
+        $instance = self::get_instance();
+        add_action( 'ltms_vendor_registered', [ $instance, 'on_vendor_registered' ], 10, 2 );
+        add_action( 'ltms_payout_completed',  [ $instance, 'on_payout_completed' ],  10, 2 );
 
         // REST endpoint para estadísticas de afiliados
-        add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+        add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
     }
 
     // ── Lifecycle Hooks ────────────────────────────────────────────

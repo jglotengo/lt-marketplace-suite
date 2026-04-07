@@ -1,0 +1,29 @@
+parameters:
+    level: 5
+    paths:
+        - includes
+    excludePaths:
+        - includes/core/migrations
+        - vendor
+    bootstrapFiles:
+        - tests/bootstrap-phpstan.php
+    checkMissingIterableValueType: false
+    ignoreErrors:
+        # WP global functions are stubs via szepeviktor/phpstan-wordpress
+        - '#Function get_option not found#'
+        - '#Function update_option not found#'
+        - '#Function add_action not found#'
+        - '#Function add_filter not found#'
+        - '#Function do_action not found#'
+        - '#Function apply_filters not found#'
+        - '#Function esc_html not found#'
+        - '#Function sanitize_text_field not found#'
+        - '#Function wp_create_nonce not found#'
+        - '#Function wc_get_order not found#'
+        - '#Class WC_Order not found#'
+        - '#Class WC_Product not found#'
+        - '#Function current_time not found#'
+        - '#Function error_log not found#'
+
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon

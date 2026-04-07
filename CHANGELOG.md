@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-04-07
+
+### Added
+- **Módulo de Reservas ACID**: `LTMS_Booking_Manager` con `START TRANSACTION` + `SELECT…FOR UPDATE` para eliminar doble-booking
+- **Producto Bookable**: Tipo WooCommerce personalizado `ltms_bookable` (alojamiento, experiencia, renta, restaurante…)
+- **Calendario Frontend**: Flatpickr range picker con precios dinámicos por temporada vía REST API
+- **Temporadas de precio**: `LTMS_Booking_Season_Manager` — reglas globales y por producto; semillas CO/MX
+- **Políticas de cancelación**: `LTMS_Booking_Policy_Handler` — flexible, moderate, strict, non_refundable
+- **Compliance Turístico**: RNT (FONTUR Colombia, Ley 2068/2020) + SECTUR México con panel admin y formulario My Account
+- **Panel admin Reservas**: Tabla filtrable, calendario FullCalendar 6.x, export CSV, cancelación con reembolso automático
+- **6 Cron Jobs**: cleanup pending, check-in reminders, balance reminders, auto-checkout, RNT expiry, deposit release
+- **Módulo Envíos v2**: Modo `absorbed` con `LTMS_Shipping_Method_Free_Absorbed` + `get_cheapest_quote()`; debit de billetera en orden pagada
+- **SEO Técnico**: Schema.org Product/Organization, Open Graph, Twitter Card, Google Search Console verification
+- **Sitemap XML**: `/ltms-sitemap.xml` con productos, tiendas y páginas del plugin
+- **Analytics Unificado**: GTM o GA4+Meta Pixel (plataforma + nivel vendedor); GA4 ecommerce events
+- **Geolocalización**: ip-api.com sin API key, caché 24h, URLs SEO `/productos/{ciudad}/`
+- **CI/CD GitHub Actions**: lint + PHPStan + PHPUnit + release ZIP automático en tag
+- **10 plantillas de email**: booking confirmed/cancelled/pending/checkin-reminder/balance-reminder, vendor-new, rnt-approved/rejected/expiry, deposit-released
+- **9 tests unitarios** con Brain\Monkey
+- **5 tablas de BD**: `lt_bookings`, `lt_booking_slots`, `lt_booking_policies`, `lt_tourism_compliance`, `lt_booking_season_rules`
+- `bin/version-bump.php`, `bin/install-wp-tests.sh`, `phpunit.xml`, `phpstan.neon`
+
+### Changed
+- `LTMS_VERSION` y `LTMS_DB_VERSION` de 1.7.3 → **2.0.0**
+- Kernel carga condicional de todos los módulos nuevos
+- `LTMS_Core_Activator` incluye todos los defaults de configuración v2.0.0
+
+### Fixed
+- `LTMS_Shipping_Parallel_Quoter::get_cheapest_quote()` ahora es público
+- `LTMS_Order_Paid_Listener` debita el costo de envío absorbido de la billetera del vendedor tras el pago
+
 ---
 
 ## [1.7.0] — 2026-03-24

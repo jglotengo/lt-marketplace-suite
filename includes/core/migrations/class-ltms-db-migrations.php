@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '1.7.0';
+    private const CURRENT_VERSION = '2.0.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -615,12 +615,151 @@ final class LTMS_DB_Migrations {
             PRIMARY KEY (`id`)
         ) {$charset}";
 
+        // ── v2.0.0 Tables — Módulo Booking ──────────────────────────
+
+        // lt_bookings — Reservas principales
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_bookings` (
+            `id`                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `wc_order_id`          BIGINT UNSIGNED NOT NULL,
+            `deposit_wc_order_id`  BIGINT UNSIGNED DEFAULT NULL,
+            `product_id`           BIGINT UNSIGNED NOT NULL,
+            `vendor_id`            BIGINT UNSIGNED NOT NULL,
+            `customer_id`          BIGINT UNSIGNED NOT NULL,
+            `booking_type`         VARCHAR(30)   NOT NULL DEFAULT 'accommodation',
+            `checkin_date`         DATE          NOT NULL,
+            `checkout_date`        DATE          NOT NULL,
+            `checkin_time`         TIME          DEFAULT NULL,
+            `checkout_time`        TIME          DEFAULT NULL,
+            `guests`               TINYINT UNSIGNED DEFAULT 1,
+            `total_price`          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `deposit_amount`       DECIMAL(15,2) DEFAULT 0.00,
+            `balance_amount`       DECIMAL(15,2) DEFAULT 0.00,
+            `currency`             VARCHAR(3)    NOT NULL DEFAULT 'COP',
+            `payment_mode`         VARCHAR(20)   NOT NULL DEFAULT 'full',
+            `status`               VARCHAR(20)   NOT NULL DEFAULT 'pending',
+            `cancellation_reason`  TEXT          DEFAULT NULL,
+            `zapsign_doc_token`    VARCHAR(255)  DEFAULT NULL,
+            `xcover_policy_id`     VARCHAR(255)  DEFAULT NULL,
+            `rnt_number`           VARCHAR(50)   DEFAULT NULL,
+            `sectur_folio`         VARCHAR(100)  DEFAULT NULL,
+            `notes`                TEXT          DEFAULT NULL,
+            `vendor_notes`         TEXT          DEFAULT NULL,
+            `ip_address`           VARCHAR(45)   DEFAULT NULL,
+            `created_at`           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_wc_order` (`wc_order_id`),
+            KEY `idx_product`  (`product_id`),
+            KEY `idx_vendor`   (`vendor_id`),
+            KEY `idx_customer` (`customer_id`),
+            KEY `idx_status`   (`status`),
+            KEY `idx_checkin`  (`checkin_date`),
+            KEY `idx_checkout` (`checkout_date`),
+            KEY `idx_type`     (`booking_type`)
+        ) {$charset}";
+
+        // lt_booking_slots — Disponibilidad por fecha/slot
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_booking_slots` (
+            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `product_id`   BIGINT UNSIGNED NOT NULL,
+            `slot_date`    DATE            NOT NULL,
+            `slot_time`    TIME            DEFAULT NULL,
+            `capacity`     SMALLINT UNSIGNED DEFAULT 1,
+            `booked`       SMALLINT UNSIGNED DEFAULT 0,
+            `is_blocked`   TINYINT(1)      DEFAULT 0,
+            `block_reason` VARCHAR(255)    DEFAULT NULL,
+            `base_price`   DECIMAL(15,2)   DEFAULT NULL,
+            `created_at`   DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `idx_product_date_time` (`product_id`, `slot_date`, `slot_time`),
+            KEY `idx_date`  (`slot_date`),
+            KEY `idx_avail` (`product_id`, `slot_date`, `is_blocked`, `booked`, `capacity`)
+        ) {$charset}";
+
+        // lt_booking_policies — Políticas de cancelación por vendedor
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_booking_policies` (
+            `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`             BIGINT UNSIGNED NOT NULL,
+            `name`                  VARCHAR(100)    NOT NULL,
+            `policy_type`           VARCHAR(20)     NOT NULL DEFAULT 'flexible',
+            `free_cancel_hours`     SMALLINT UNSIGNED DEFAULT 24,
+            `partial_refund_pct`    TINYINT UNSIGNED  DEFAULT 50,
+            `partial_refund_hours`  SMALLINT UNSIGNED DEFAULT 0,
+            `no_refund_hours`       SMALLINT UNSIGNED DEFAULT 0,
+            `deposit_pct`           TINYINT UNSIGNED  DEFAULT 0,
+            `deposit_deadline_days` TINYINT UNSIGNED  DEFAULT 0,
+            `force_majeure_enabled` TINYINT(1)        DEFAULT 1,
+            `force_majeure_docs`    TEXT              DEFAULT NULL,
+            `is_default`            TINYINT(1)        DEFAULT 0,
+            `created_at`            DATETIME          DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor`  (`vendor_id`),
+            KEY `idx_type`    (`policy_type`),
+            KEY `idx_default` (`vendor_id`, `is_default`)
+        ) {$charset}";
+
+        // lt_tourism_compliance — RNT Colombia + SECTUR México por vendedor
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_tourism_compliance` (
+            `id`                          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`                   BIGINT UNSIGNED NOT NULL,
+            `country_code`                VARCHAR(3)   NOT NULL DEFAULT 'CO',
+            `rnt_number`                  VARCHAR(50)  DEFAULT NULL,
+            `rnt_category`                VARCHAR(100) DEFAULT NULL,
+            `rnt_expiry_date`             DATE         DEFAULT NULL,
+            `rnt_doc_b2_key`              VARCHAR(500) DEFAULT NULL,
+            `rnt_verified`                TINYINT(1)   DEFAULT 0,
+            `rnt_verified_at`             DATETIME     DEFAULT NULL,
+            `rnt_verified_by`             BIGINT UNSIGNED DEFAULT NULL,
+            `rnt_rejection_reason`        TEXT         DEFAULT NULL,
+            `sworn_declaration_signed`    TINYINT(1)   DEFAULT 0,
+            `sworn_declaration_signed_at` DATETIME     DEFAULT NULL,
+            `sworn_declaration_ip`        VARCHAR(45)  DEFAULT NULL,
+            `rfc`                         VARCHAR(13)  DEFAULT NULL,
+            `sectur_folio`                VARCHAR(100) DEFAULT NULL,
+            `sectur_category`             VARCHAR(100) DEFAULT NULL,
+            `sectur_expiry_date`          DATE         DEFAULT NULL,
+            `sectur_doc_b2_key`           VARCHAR(500) DEFAULT NULL,
+            `sectur_verified`             TINYINT(1)   DEFAULT 0,
+            `status`                      VARCHAR(20)  NOT NULL DEFAULT 'pending',
+            `admin_notes`                 TEXT         DEFAULT NULL,
+            `created_at`                  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`                  DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `udx_vendor_id` (`vendor_id`),
+            PRIMARY KEY (`id`),
+            KEY `idx_country` (`country_code`),
+            KEY `idx_status`  (`status`),
+            KEY `idx_rnt`     (`rnt_number`),
+            KEY `idx_rnt_exp` (`rnt_expiry_date`)
+        ) {$charset}";
+
+        // lt_booking_season_rules — Modificadores de precio por temporada
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_booking_season_rules` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `product_id`     BIGINT UNSIGNED NOT NULL,
+            `name`           VARCHAR(100)    NOT NULL,
+            `season_type`    VARCHAR(20)     NOT NULL DEFAULT 'custom',
+            `country_code`   VARCHAR(3)      DEFAULT NULL,
+            `date_from`      DATE            NOT NULL,
+            `date_to`        DATE            NOT NULL,
+            `price_modifier` DECIMAL(8,4)    NOT NULL DEFAULT 1.0000,
+            `min_nights`     TINYINT UNSIGNED DEFAULT 1,
+            `is_active`      TINYINT(1)      DEFAULT 1,
+            `created_at`     DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_product` (`product_id`),
+            KEY `idx_dates`   (`date_from`, `date_to`),
+            KEY `idx_country` (`country_code`)
+        ) {$charset}";
+
         foreach ( $sqls as $sql ) {
             dbDelta( $sql );
         }
 
         // Insert default commission tiers if table is empty
         self::seed_commission_tiers();
+
+        // v2.0.0: Insert booking season seed data
+        self::seed_booking_seasons();
     }
 
     /**
@@ -655,6 +794,56 @@ final class LTMS_DB_Migrations {
                 'currency'   => $row[5],
                 'sort_order' => $row[6],
             ], [ '%s', '%f', '%f', '%f', '%s', '%s', '%d' ] );
+        }
+    }
+
+    /**
+     * Inserta datos semilla de temporadas CO y MX (product_id=0 = regla global).
+     * Solo inserta si la tabla está vacía.
+     *
+     * @return void
+     */
+    private static function seed_booking_seasons(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_booking_season_rules';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+        if ( $count > 0 ) {
+            return;
+        }
+
+        $year      = (int) gmdate( 'Y' );
+        $next_year = $year + 1;
+
+        $seeds = [
+            // Colombia
+            [ 0, 'Mitad de año CO',   'high',   'CO', "{$year}-06-25", "{$year}-07-15", 1.3000, 3 ],
+            [ 0, 'Fin de año CO',     'high',   'CO', "{$year}-12-15", "{$next_year}-01-15", 1.5000, 2 ],
+            [ 0, 'Feria de Cali',     'high',   'CO', "{$year}-12-25", "{$year}-12-31", 1.4000, 2 ],
+            // México
+            [ 0, 'Verano MX',         'high',   'MX', "{$year}-07-01", "{$year}-08-31", 1.2500, 2 ],
+            [ 0, 'Día de Muertos MX', 'high',   'MX', "{$year}-10-28", "{$year}-11-03", 1.3000, 2 ],
+            [ 0, 'Navidad/AñoNuevo MX','high',  'MX', "{$year}-12-20", "{$next_year}-01-06", 1.5000, 2 ],
+            [ 0, 'Temporada baja MX', 'low',    'MX', "{$year}-02-01", "{$year}-03-31", 0.8500, 1 ],
+        ];
+
+        foreach ( $seeds as $seed ) {
+            $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $table,
+                [
+                    'product_id'     => $seed[0],
+                    'name'           => $seed[1],
+                    'season_type'    => $seed[2],
+                    'country_code'   => $seed[3],
+                    'date_from'      => $seed[4],
+                    'date_to'        => $seed[5],
+                    'price_modifier' => $seed[6],
+                    'min_nights'     => $seed[7],
+                    'is_active'      => 1,
+                ],
+                [ '%d', '%s', '%s', '%s', '%s', '%s', '%f', '%d', '%d' ]
+            );
         }
     }
 

@@ -32,6 +32,7 @@ final class LTMS_Order_Paid_Listener {
     public static function init(): void {
         add_action( 'woocommerce_payment_complete', [ __CLASS__, 'on_order_paid' ], 10, 1 );
         add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'on_order_paid' ], 10, 1 );
+        add_action( 'woocommerce_checkout_order_created', [ __CLASS__, 'save_absorbed_shipping_quote' ] );
     }
 
     /**
@@ -60,6 +61,7 @@ final class LTMS_Order_Paid_Listener {
         self::process_commissions( $order );
         self::schedule_invoice_sync( $order );
         self::notify_vendor( $order );
+        self::debit_absorbed_shipping( $order );
 
         LTMS_Core_Logger::info(
             'ORDER_PAID_PROCESSED',
@@ -123,6 +125,56 @@ final class LTMS_Order_Paid_Listener {
                 'scheduled_at' => gmdate( 'Y-m-d H:i:s', time() + 30 ),
                 'created_at'   => LTMS_Utils::now_utc(),
             ], [ '%s', '%s', '%d', '%s', '%s', '%s' ]);
+        }
+    }
+
+    /**
+     * Guarda la cotización de envío absorbido en la meta del pedido.
+     *
+     * @param \WC_Order $order
+     */
+    public static function save_absorbed_shipping_quote( \WC_Order $order ): void {
+        try {
+            $quote = WC()->session ? WC()->session->get( 'ltms_absorbed_shipping_quote' ) : null;
+            if ( ! $quote ) return;
+            $order->update_meta_data( '_ltms_absorbed_shipping_cost',     (float) ( $quote['cost']     ?? 0 ) );
+            $order->update_meta_data( '_ltms_absorbed_shipping_provider', sanitize_text_field( $quote['provider'] ?? '' ) );
+            $order->save();
+            WC()->session->__unset( 'ltms_absorbed_shipping_quote' );
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS save_absorbed_shipping_quote: ' . $e->getMessage() );
+        }
+    }
+
+    /**
+     * Debita el costo de envío absorbido de la billetera del vendedor.
+     *
+     * @param \WC_Order $order
+     */
+    private static function debit_absorbed_shipping( \WC_Order $order ): void {
+        try {
+            $cost = (float) $order->get_meta( '_ltms_absorbed_shipping_cost' );
+            if ( $cost <= 0 ) return;
+
+            $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+            if ( ! $vendor_id ) return;
+
+            $already = $order->get_meta( '_ltms_shipping_debited' );
+            if ( $already ) return;
+
+            if ( class_exists( 'LTMS_Business_Wallet' ) ) {
+                LTMS_Business_Wallet::debit(
+                    $vendor_id,
+                    $cost,
+                    'shipping_absorbed',
+                    sprintf( __( 'Envío absorbido — Pedido #%d', 'ltms' ), $order->get_id() )
+                );
+            }
+
+            $order->update_meta_data( '_ltms_shipping_debited', 1 );
+            $order->save();
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS debit_absorbed_shipping order #' . $order->get_id() . ': ' . $e->getMessage() );
         }
     }
 

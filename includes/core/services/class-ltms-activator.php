@@ -152,6 +152,50 @@ final class LTMS_Core_Activator {
             'ltms_invoice_provider'        => 'siigo',
             'ltms_notifications_email'     => 'yes',
             'ltms_notifications_whatsapp'  => 'no',
+
+            // v2.0.0 — Módulo de Envíos
+            'ltms_shipping_mode'                   => 'quoted',
+            'ltms_shipping_free_min_amount'        => 0,
+            'ltms_shipping_free_categories'        => '',
+            'ltms_shipping_commission_on_shipping' => false,
+            'ltms_shipping_vendor_absorbs'         => true,
+            'ltms_shipping_cache_ttl'              => 300,
+            'ltms_shipping_timeout_seconds'        => 3,
+            'ltms_default_product_weight_kg'       => 0.5,
+
+            // v2.0.0 — SEO
+            'ltms_google_search_console_verify' => '',
+            'ltms_sitemap_exclude_outofstock'   => true,
+            'ltms_og_site_name'                 => '',
+            'ltms_og_locale'                    => 'es_CO',
+
+            // v2.0.0 — Analytics
+            'ltms_google_tag_manager_id'        => '',
+            'ltms_ga4_measurement_id'           => '',
+            'ltms_meta_pixel_id'                => '',
+
+            // v2.0.0 — Geo
+            'ltms_geo_detection_enabled'        => true,
+            'ltms_geo_default_city'             => 'Bogotá',
+            'ltms_geo_default_country'          => 'CO',
+
+            // v2.0.0 — Módulo Booking
+            'ltms_booking_enabled'                    => false,
+            'ltms_booking_default_country'            => 'CO',
+            'ltms_booking_dispute_window_days'        => 3,
+            'ltms_booking_auto_cancel_unpaid_balance' => false,
+            'ltms_booking_default_payment_mode'       => 'full',
+            'ltms_booking_default_deposit_pct'        => 30,
+            'ltms_booking_require_rnt_co'             => true,
+            'ltms_booking_require_sectur_mx'          => true,
+            'ltms_booking_zapsign_enabled'            => true,
+            'ltms_booking_xcover_enabled'             => false,
+            'ltms_booking_commission_on_deposit'      => true,
+            'ltms_booking_commission_on_balance'      => true,
+            'ltms_booking_pending_slot_lock_minutes'  => 30,
+            'ltms_booking_checkin_reminder_hours'     => 48,
+            'ltms_booking_max_advance_booking_days'   => 365,
+            'ltms_zapsign_booking_template_id'        => '',
         ];
 
         $current_settings = get_option( 'ltms_settings', [] );
