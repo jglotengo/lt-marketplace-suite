@@ -300,7 +300,7 @@ class AutoloaderTest extends LTMS_Unit_Test_Case {
             'includes/roles'    => [ 'includes/roles' ],
             'includes/shipping' => [ 'includes/shipping' ],
             'tests'             => [ 'tests' ],
-            'tests/Unit'        => [ 'tests/Unit' ],
+            'tests/unit'        => [ 'tests/unit' ],
         ];
     }
 
@@ -394,4 +394,5 @@ class AutoloaderTest extends LTMS_Unit_Test_Case {
         ];
     }
 }
+
 
