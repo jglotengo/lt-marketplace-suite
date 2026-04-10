@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace LTMS\Tests\Unit;
+namespace LTMS\Tests\unit;
 
 use Brain\Monkey;
 use Brain\Monkey\Functions;

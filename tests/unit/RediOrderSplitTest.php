@@ -17,7 +17,7 @@
 
 declare(strict_types=1);
 
-namespace LTMS\Tests\Unit;
+namespace LTMS\Tests\unit;
 
 /**
  * @covers LTMS_Business_Redi_Order_Split
