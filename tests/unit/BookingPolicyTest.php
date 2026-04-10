@@ -1064,3 +1064,4 @@ class BookingPolicyTest extends TestCase
         ];
     }
 }
+

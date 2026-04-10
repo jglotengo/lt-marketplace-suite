@@ -387,3 +387,4 @@ class BackblazeApiTest extends TestCase
         $this->assertTrue($ref->isPrivate());
     }
 }
+

@@ -781,3 +781,4 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
         }
     }
 }
+

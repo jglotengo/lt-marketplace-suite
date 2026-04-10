@@ -430,3 +430,4 @@ class GatewayStripeTest extends TestCase
         $this->assertTrue($ref->isPrivate());
     }
 }
+

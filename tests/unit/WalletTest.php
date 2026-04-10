@@ -1165,3 +1165,4 @@ class WalletTest extends LTMS_Unit_Test_Case {
         };
     }
 }
+

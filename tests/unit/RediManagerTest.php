@@ -686,3 +686,4 @@ class RediManagerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $this->assertStringContainsString( 'array', (string) $rt );
     }
 }
+

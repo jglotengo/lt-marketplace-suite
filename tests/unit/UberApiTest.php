@@ -428,3 +428,4 @@ class UberApiTest extends TestCase
         $this->assertStringContainsString('uber.com', $ref->getConstant('AUTH_URL'));
     }
 }
+

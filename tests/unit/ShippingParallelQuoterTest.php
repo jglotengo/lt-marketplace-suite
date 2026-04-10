@@ -783,3 +783,4 @@ class ShippingParallelQuoterTest extends TestCase
     }
 
 }
+

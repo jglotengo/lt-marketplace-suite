@@ -275,3 +275,4 @@ class XcoverApiTest extends TestCase
         $this->assertFalse((new ReflectionClass(\LTMS_Api_Xcover::class))->isFinal());
     }
 }
+

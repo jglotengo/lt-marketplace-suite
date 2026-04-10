@@ -447,3 +447,4 @@ class AveonlineApiTest extends TestCase
         $this->assertStringContainsString('LTMS_Abstract_API_Client', $ref->getParentClass()->getName());
     }
 }
+

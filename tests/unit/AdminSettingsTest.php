@@ -460,3 +460,4 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertSame(9999, $result['rate_limit']);
     }
 }
+

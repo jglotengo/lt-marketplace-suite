@@ -581,3 +581,4 @@ class AdminTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertContains('LTMS_Logger_Aware', $traits);
     }
 }
+

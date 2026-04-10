@@ -717,3 +717,4 @@ class UtilsTest extends TestCase
         $this->assertFalse(\LTMS_Utils::is_ltms_vendor(1));
     }
 }
+

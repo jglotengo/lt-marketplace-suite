@@ -422,3 +422,4 @@ class TourismComplianceTest extends TestCase
         $this->assertTrue(method_exists('LTMS_Business_Tourism_Compliance', 'add_endpoint'));
     }
 }
+

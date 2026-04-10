@@ -334,3 +334,4 @@ class StripeApiTest extends LTMS_Unit_Test_Case {
         $this->assertNotEmpty( $this->stripe->get_provider_slug() );
     }
 }
+

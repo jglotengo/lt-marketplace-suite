@@ -565,3 +565,4 @@ class AnalyticsManagerTest extends LTMS_Unit_Test_Case {
         $this->assertCount( 6, $ref->getParameters() );
     }
 }
+

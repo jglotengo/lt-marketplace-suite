@@ -479,3 +479,4 @@ class DataMaskingTest extends TestCase
         $this->assertSame( $r1, $r2 );
     }
 }
+

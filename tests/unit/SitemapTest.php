@@ -373,3 +373,4 @@ class SitemapTest extends TestCase
         $this->assertStringContainsString( '<priority>0.5</priority>', $xml );
     }
 }
+

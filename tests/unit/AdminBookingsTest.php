@@ -200,7 +200,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('current_user_can')->justReturn(false);
         Functions\when('check_ajax_referer')->justReturn(true);
         Functions\when('wp_send_json_error')->alias(
-            static fn(): never => throw new \RuntimeException('json_error')
+            static function(): never { throw new \RuntimeException('json_error'); }
         );
         $_POST = ['booking_action' => 'cancel', 'booking_id' => '5'];
 
@@ -219,7 +219,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('current_user_can')->justReturn(true);
         Functions\when('check_ajax_referer')->justReturn(true);
         Functions\when('wp_send_json_error')->alias(
-            static fn(): never => throw new \RuntimeException('json_error')
+            static function(): never { throw new \RuntimeException('json_error'); }
         );
         $_POST = ['booking_action' => 'unknown_action', 'booking_id' => '5'];
 
@@ -238,7 +238,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('current_user_can')->justReturn(true);
         Functions\when('check_ajax_referer')->justReturn(true);
         Functions\when('wp_send_json_error')->alias(
-            static fn(): never => throw new \RuntimeException('json_error')
+            static function(): never { throw new \RuntimeException('json_error'); }
         );
         $_POST = ['booking_action' => 'cancel', 'booking_id' => '0'];
 
@@ -259,7 +259,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('current_user_can')->justReturn(false);
         Functions\when('check_ajax_referer')->justReturn(true);
         Functions\when('wp_send_json_error')->alias(
-            static fn(): never => throw new \RuntimeException('json_error')
+            static function(): never { throw new \RuntimeException('json_error'); }
         );
         $_POST = ['vendor_id' => '5', 'approved' => '1', 'notes' => ''];
 
@@ -280,7 +280,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('current_user_can')->justReturn(false);
         Functions\when('check_admin_referer')->justReturn(true);
         Functions\when('wp_die')->alias(
-            static fn(): never => throw new \RuntimeException('wp_die')
+            static function(): never { throw new \RuntimeException('wp_die'); }
         );
 
         $threw = false;
@@ -398,3 +398,4 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertTrue($rm->isStatic());
     }
 }
+

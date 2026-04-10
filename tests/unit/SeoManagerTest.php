@@ -699,3 +699,4 @@ class SeoManagerTest extends LTMS_Unit_Test_Case
         $this->assertStringContainsString('Marketplace Colombia', $output);
     }
 }
+

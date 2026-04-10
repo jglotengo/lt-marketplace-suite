@@ -376,3 +376,4 @@ class MediaGuardTest extends LTMS_Unit_Test_Case {
         $this->assertTrue( $result );
     }
 }
+

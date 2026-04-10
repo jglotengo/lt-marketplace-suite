@@ -317,3 +317,4 @@ class SeasonManagerTest extends LTMS_Unit_Test_Case
         $this->assertCount(4, $params);
     }
 }
+

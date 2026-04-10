@@ -481,3 +481,4 @@ class SiigoApiTest extends TestCase
         $this->assertTrue($ref->isPublic());
     }
 }
+

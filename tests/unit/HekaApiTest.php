@@ -376,3 +376,4 @@ class HekaApiTest extends TestCase
         $this->assertFalse((new ReflectionClass(\LTMS_Api_Heka::class))->isFinal());
     }
 }
+

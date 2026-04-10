@@ -495,3 +495,4 @@ class ConfigTest extends TestCase
         $this->assertSame('***REDACTED***', $safe['ltms_db_password']);
     }
 }
+

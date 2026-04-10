@@ -548,3 +548,4 @@ class SecurityTest extends TestCase
         $this->assertMatchesRegularExpression('/^[0-9\+\-\s\(\)]+$/', $result);
     }
 }
+

@@ -349,3 +349,4 @@ class ApiFactoryTest extends TestCase
         \LTMS_Api_Factory::reset_all();
     }
 }
+

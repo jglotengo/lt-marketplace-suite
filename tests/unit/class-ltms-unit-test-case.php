@@ -154,3 +154,4 @@ abstract class LTMS_Unit_Test_Case extends TestCase {
 		}
 	}
 }
+

@@ -330,3 +330,4 @@ class ShippingModeTest extends TestCase
     }
 
 }
+

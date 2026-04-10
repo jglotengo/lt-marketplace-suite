@@ -739,3 +739,4 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
         return $order;
     }
 }
+

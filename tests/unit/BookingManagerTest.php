@@ -487,3 +487,4 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
         $this->assertFalse( $result );
     }
 }
+

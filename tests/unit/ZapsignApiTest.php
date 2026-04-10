@@ -453,3 +453,4 @@ class ZapsignApiTest extends TestCase
         $this->assertStringContainsString('zapsign.com.br', $ref->getConstant('API_BASE'));
     }
 }
+

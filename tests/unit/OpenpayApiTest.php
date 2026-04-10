@@ -387,3 +387,4 @@ class OpenpayApiTest extends TestCase
         $this->assertTrue($ref->isPrivate());
     }
 }
+

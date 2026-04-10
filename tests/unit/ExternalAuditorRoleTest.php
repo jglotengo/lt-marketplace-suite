@@ -381,3 +381,4 @@ class ExternalAuditorRoleTest extends TestCase
             "Deben haber más caps LTMS bloqueadas ({$ltms_blocked}) que permitidas ({$ltms_allowed})" );
     }
 }
+

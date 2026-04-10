@@ -364,3 +364,4 @@ class AbstractApiClientTest extends TestCase
         $this->assertSame('Primary error message', $result);
     }
 }
+

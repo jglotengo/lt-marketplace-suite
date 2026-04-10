@@ -439,3 +439,4 @@ class LoggerTest extends TestCase
         $this->assertSame([], $buf[0]['context']);
     }
 }
+

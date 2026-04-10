@@ -394,3 +394,4 @@ class AutoloaderTest extends LTMS_Unit_Test_Case {
         ];
     }
 }
+

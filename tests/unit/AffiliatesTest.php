@@ -581,3 +581,4 @@ class AffiliatesTest extends TestCase
         ];
     }
 }
+

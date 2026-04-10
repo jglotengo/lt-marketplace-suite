@@ -440,3 +440,4 @@ class GeoDetectorTest extends LTMS_Unit_Test_Case {
         $this->assertTrue( true );
     }
 }
+

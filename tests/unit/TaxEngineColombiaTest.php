@@ -577,3 +577,4 @@ class TaxEngineColombiaTest extends LTMS_Unit_Test_Case {
         };
     }
 }
+
