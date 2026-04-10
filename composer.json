@@ -42,12 +42,9 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "LTMS\\Tests\\": "tests/"
-        },
-        "classmap": [
-            "tests/unit/",
-            "tests/integration/"
-        ]
+            "LTMS\\Tests\\Unit\\": "tests/unit/",
+            "LTMS\\Tests\\Integration\\": "tests/integration/"
+        }
     },
     "scripts": {
         "test": "phpunit",
