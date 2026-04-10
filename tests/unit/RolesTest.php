@@ -21,7 +21,7 @@ namespace {
     }
 }
 
-namespace LTMS\Tests\unit {
+namespace LTMS\Tests\Unit {
 
 use Brain\Monkey;
 use Brain\Monkey\Functions;

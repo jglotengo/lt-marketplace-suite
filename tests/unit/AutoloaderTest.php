@@ -13,7 +13,7 @@
 
 declare( strict_types=1 );
 
-namespace LTMS\Tests\unit;
+namespace LTMS\Tests\Unit;
 
 /**
  * Class AutoloaderTest
