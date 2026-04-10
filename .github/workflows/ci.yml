@@ -40,8 +40,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-${{ matrix.php }}-
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
@@ -88,8 +88,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-${{ matrix.php }}-
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
@@ -173,8 +173,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-${{ matrix.php }}-
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
