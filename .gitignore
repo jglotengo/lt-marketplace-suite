@@ -74,3 +74,8 @@ assets/fonts/
 
 # Uploads generados en runtime
 assets/img/generated/
+
+# PHPUnit generated
+.phpunit.cache/
+coverage/
+test-results.xml
