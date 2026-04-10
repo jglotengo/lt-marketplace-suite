@@ -64,7 +64,7 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
             include $section_file;
         } else {
             // Renderizar sección genérica
-            self::render_generic_section( $active_tab );
+            ltms_render_generic_settings_section( $active_tab );
         }
         ?>
 
@@ -203,6 +203,7 @@ function ltms_render_generic_settings_section( string $tab ): void {
         return;
     }
 
+    global $tabs;
     echo '<div class="ltms-form-section">';
     echo '<h2>' . esc_html( $tabs[ $tab ] ?? $tab ) . '</h2>';
 
@@ -248,6 +249,8 @@ function ltms_render_generic_settings_section( string $tab ): void {
     echo '</div>';
 }
 
-// Llamar a la función de renderizado
-ltms_render_generic_settings_section( $active_tab );
+// Llamar a la función de renderizado — solo si la función no fue llamada ya desde el bloque include
+if ( ! file_exists( LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . $active_tab . '.php' ) ) {
+    ltms_render_generic_settings_section( $active_tab );
+}
 ?>
