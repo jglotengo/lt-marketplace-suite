@@ -92,6 +92,9 @@ jobs:
       - name: Install dependencies
         run: composer update --no-interaction --prefer-dist --ignore-platform-reqs
 
+      - name: Create log directory for tests
+        run: mkdir -p /tmp/ltms-logs
+
       - name: Run Unit Tests
         env:
           LTMS_UNIT_ONLY: "true"
