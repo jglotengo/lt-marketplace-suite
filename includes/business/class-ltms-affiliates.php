@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * LTMS Affiliates - Gestión de Red de Afiliados y Comisiones MLM
  *
@@ -70,7 +70,7 @@ class LTMS_Affiliates {
             $tptc = LTMS_Api_Factory::get( 'tptc' );
             $tptc->register_affiliate( $vendor_id, $code, $referral_code );
         } catch ( \Exception $e ) {
-            $this->log_warning( 'TPTC affiliate sync failed: ' . $e->getMessage(), [ 'vendor_id' => $vendor_id ] );
+            $this->log_warning( 'tptc_sync_failed', 'TPTC affiliate sync failed: ' . $e->getMessage(), [ 'vendor_id' => $vendor_id ] );
         }
     }
 
@@ -82,7 +82,7 @@ class LTMS_Affiliates {
      */
     public function on_payout_completed( int $vendor_id, float $net_amount ): void {
         // Solo registrar el evento; las comisiones MLM se distribuyen en order_split.
-        $this->log_info( 'Payout completed for affiliate chain', [
+        $this->log_info( 'payout_completed', 'Payout completed for affiliate chain', [
             'vendor_id'  => $vendor_id,
             'net_amount' => $net_amount,
         ] );
@@ -155,7 +155,7 @@ class LTMS_Affiliates {
         $sponsor_id = $this->get_vendor_by_code( $referral_code );
 
         if ( ! $sponsor_id ) {
-            $this->log_warning( 'Invalid referral code during registration', [
+            $this->log_warning( 'invalid_referral_code', 'Invalid referral code during registration', [
                 'vendor_id' => $vendor_id,
                 'code'      => $referral_code,
             ] );
@@ -166,7 +166,7 @@ class LTMS_Affiliates {
         update_user_meta( $vendor_id, 'ltms_sponsor_id', $sponsor_id );
         LTMS_Referral_Tree::register_node( $vendor_id, $referral_code );
 
-        $this->log_info( 'Vendor linked to sponsor', [
+        $this->log_info( 'vendor_linked', 'Vendor linked to sponsor', [
             'vendor_id'  => $vendor_id,
             'sponsor_id' => $sponsor_id,
         ] );

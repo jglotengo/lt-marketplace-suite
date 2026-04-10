@@ -122,8 +122,8 @@ final class LTMS_Tax_Engine {
     /**
      * Registra una estrategia fiscal personalizada (extensibilidad).
      *
-     * @param string                    $country_code Código de país (2 letras).
-     * @param LTMS_Tax_Strategy_Interface $strategy   Instancia de la estrategia.
+     * @param string                      $country_code Código de país (2 letras).
+     * @param LTMS_Tax_Strategy_Interface $strategy     Instancia de la estrategia.
      * @return void
      */
     public static function register_strategy( string $country_code, LTMS_Tax_Strategy_Interface $strategy ): void {
@@ -177,5 +177,42 @@ final class LTMS_Tax_Engine {
         }
 
         return '<table class="ltms-tax-breakdown">' . implode( '', $lines ) . '</table>';
+    }
+    public function calculate_retefuente( float $base, string $tipo ): float {
+        $tarifas = [
+            'honorarios' => 0.11,
+            'compras'    => 0.025,
+            'servicios'  => 0.04,
+        ];
+        $tarifa = $tarifas[ $tipo ] ?? 0.04;
+        return round( $base * $tarifa, 2 );
+    }
+
+    public function calculate_reteiva( float $base_gravable, float $iva_rate = 0.19 ): float {
+        return round( $base_gravable * $iva_rate * 0.15, 2 );
+    }
+
+    public function calculate_reteica( float $base, string $ciiu ): float {
+        $tarifas = [ '4100' => 0.0069 ];
+        $tarifa = $tarifas[ $ciiu ] ?? 0.00414;
+        return round( $base * $tarifa, 2 );
+    }
+
+    public function calculate_total_retenciones( array $params ): array {
+        $base     = (float) ( $params['base']     ?? 0 );
+        $tipo     = (string) ( $params['tipo']     ?? 'servicios' );
+        $ciiu     = (string) ( $params['ciiu']     ?? '4711' );
+        $iva_rate = (float) ( $params['iva_rate'] ?? 0.19 );
+        $retefuente = $this->calculate_retefuente( $base, $tipo );
+        $reteiva    = $this->calculate_reteiva( $base, $iva_rate );
+        $reteica    = $this->calculate_reteica( $base, $ciiu );
+        $total      = round( $retefuente + $reteiva + $reteica, 2 );
+        return [
+            'retefuente'  => $retefuente,
+            'reteiva'     => $reteiva,
+            'reteica'     => $reteica,
+            'total'       => $total,
+            'neto_vendor' => round( $base - $total, 2 ),
+        ];
     }
 }

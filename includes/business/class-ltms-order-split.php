@@ -75,7 +75,6 @@ final class LTMS_Business_Order_Split {
         LTMS_Wallet::credit(
             $vendor_id,
             $vendor_net,
-            'commission',
             sprintf(
                 /* translators: %1$s: número de pedido, %2$s: total del pedido */
                 __( 'Comisión pedido #%1$s - Total bruto: %2$s', 'ltms' ),
@@ -83,12 +82,13 @@ final class LTMS_Business_Order_Split {
                 LTMS_Utils::format_money( $gross_amount )
             ),
             [
-                'order_id'         => $order->get_id(),
+                'type'             => 'commission',
                 'gross_amount'     => $gross_amount,
                 'platform_fee'     => $platform_fee,
                 'withholding'      => $withholding_total,
                 'tax_breakdown'    => $tax_breakdown,
-            ]
+            ],
+            $order->get_id()
         );
 
         // Registrar comisión en la tabla de comisiones

@@ -395,15 +395,17 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
     /**
      * Verifica la conectividad con Stripe recuperando el balance de la cuenta principal.
      *
-     * @return bool true si la conexión es exitosa, false en caso contrario.
+     * @return array{status: string, message: string, latency_ms?: int}
      */
-    public function health_check(): bool {
+    public function health_check(): array {
+        $start = microtime( true );
         try {
             \Stripe\Balance::retrieve();
-            return true;
+            $latency = (int) round( ( microtime( true ) - $start ) * 1000 );
+            return [ 'status' => 'ok', 'message' => 'Conectado', 'latency_ms' => $latency ];
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_HEALTH_CHECK_FAILED', $e->getMessage() );
-            return false;
+            return [ 'status' => 'error', 'message' => $e->getMessage() ];
         }
     }
 

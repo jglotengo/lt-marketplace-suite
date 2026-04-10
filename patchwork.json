@@ -1,0 +1,9 @@
+{
+    "redefinable-internals": [
+        "error_log",
+        "time",
+        "header",
+        "headers_sent",
+        "gmdate"
+    ]
+}

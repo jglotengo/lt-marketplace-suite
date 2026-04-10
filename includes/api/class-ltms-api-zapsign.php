@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class LTMS_Api_Zapsign
  */
-class LTMS_Api_Zapsign extends LTMS_Abstract_Api_Client {
+final class LTMS_Api_Zapsign extends LTMS_Abstract_Api_Client {
 
     const API_BASE = 'https://api.zapsign.com.br/api/v1';
 

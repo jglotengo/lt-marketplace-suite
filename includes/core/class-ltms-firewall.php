@@ -26,15 +26,15 @@ final class LTMS_Core_Firewall {
      */
     private static array $attack_patterns = [
         'sql_injection_union'    => '/(\bunion\b.*\bselect\b|\bselect\b.*\bfrom\b.*\bwhere\b)/i',
-        'sql_injection_drop'     => '/(\bdrop\b.*\btable\b|\btruncate\b.*\btable\b)/i',
+        'sql_injection_drop'     => '/(\bdrop\b.*\b(table|database)\b|\btruncate\b.*\btable\b)/i',
         'sql_injection_insert'   => '/(\binsert\b.*\binto\b|\bupdate\b.*\bset\b.*\bwhere\b)/i',
         'sql_injection_comment'  => '/(--|#|\/\*[\s\S]*?\*\/)/i', // SEC-L1: [\s\S] catches multi-line comment bypass
-        'xss_script'             => '/<\s*script[^>]*>.*?<\s*\/\s*script\s*>/is',
+        'xss_script'             => '/<\s*script(\s[^>]*)?>/is',
         'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit)\s*=/i',
         'xss_javascript'         => '/javascript\s*:/i',
         'lfi_path_traversal'     => '/(\.\.\/|\.\.\\\\|%2e%2e%2f|%2e%2e\/|\.\.%2f)/i',
         'rfi_http'               => '/(https?|ftp):\/\/.*\.(php|asp|aspx|jsp)/i',
-        'php_injection'          => '/(<\?php|<\?=|eval\s*\(|base64_decode\s*\()/i',
+        'php_injection'          => '/(<\?php|<\?=|eval\s*\(|base64_decode\s*\(|passthru\s*\(|system\s*\(|exec\s*\(|shell_exec\s*\()/i',
         'null_byte'              => '/\0/',
     ];
 
@@ -101,6 +101,7 @@ final class LTMS_Core_Firewall {
         '/wp-login.php',       // Página de login (manejo propio de WP)
         '/wp-json/',           // REST API (autenticación via nonce/JWT)
         '/wp-admin/admin-ajax.php', // AJAX de plugins admin
+        '/wp-cron.php',        // Cron de WordPress (tareas programadas internas)
     ];
 
     /**

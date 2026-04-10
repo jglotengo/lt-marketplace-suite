@@ -1,14 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
-         bootstrap="tests/bootstrap.php"
-         colors="true"
-         testdox="true"
-         stopOnFailure="false">
-
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+    bootstrap="tests/bootstrap.php"
+    cacheDirectory=".phpunit.cache"
+    colors="true"
+    displayDetailsOnTestsThatTriggerWarnings="true"
+    displayDetailsOnTestsThatTriggerDeprecations="true"
+    failOnWarning="false"
+    failOnDeprecation="false"
+    stopOnFailure="false"
+    executionOrder="default"
+    beStrictAboutOutputDuringTests="false"
+>
     <testsuites>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
+        <testsuite name="unit">
+            <directory suffix="Test.php">tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory suffix="Test.php">tests/integration</directory>
+        </testsuite>
+        <testsuite name="all">
+            <directory suffix="Test.php">tests/Unit</directory>
+            <directory suffix="Test.php">tests/integration</directory>
         </testsuite>
     </testsuites>
 
@@ -17,16 +31,23 @@
             <directory suffix=".php">includes</directory>
         </include>
         <exclude>
-            <directory>includes/core/migrations</directory>
+            <directory>vendor</directory>
+            <directory>tests</directory>
+            <file>includes/core/migrations/class-ltms-db-migrations.php</file>
         </exclude>
     </source>
 
-    <php>
-        <env name="WP_TESTS_DIR" value="/tmp/wordpress-tests-lib"/>
-        <env name="WP_CORE_DIR"  value="/tmp/wordpress"/>
+    <php>        <ini name="error_reporting" value="32767"/>
+        <env name="WP_TESTS_DB_NAME"      value="wordpress_test"           force="true"/>
+        <env name="WP_TESTS_DB_USER"      value="root"                     force="true"/>
+        <env name="WP_TESTS_DB_PASS"      value="root"                     force="true"/>
+        <env name="WP_TESTS_DB_HOST"      value="127.0.0.1"                force="true"/>
+        <env name="WP_TESTS_TABLE_PREFIX" value="wptests_"                 force="true"/>
+        <env name="WP_TESTS_DIR"          value="/tmp/wordpress-tests-lib" force="false"/>
+        <env name="WP_CORE_DIR"           value="/tmp/wordpress"           force="false"/>
+        <env name="WP_CACHE"              value="false"                    force="true"/>
+        <env name="LTMS_ENVIRONMENT"      value="test"                     force="true"/>
+        <env name="LTMS_COUNTRY"          value="CO"                       force="true"/>
     </php>
-
-    <logging>
-        <junit outputFile="tests/results/junit.xml"/>
-    </logging>
 </phpunit>
+

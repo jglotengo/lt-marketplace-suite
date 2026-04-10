@@ -141,6 +141,10 @@ class LTMS_SEO_Manager {
         return [];
     }
 
+    public static function inject_search_console_tag(): void {
+        self::inject_search_console();
+    }
+
     public static function inject_search_console(): void {
         try {
             $verify = LTMS_Core_Config::get( 'ltms_google_search_console_verify', '' );

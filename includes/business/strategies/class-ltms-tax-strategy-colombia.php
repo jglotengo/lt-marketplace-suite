@@ -13,7 +13,7 @@
  *
  * @package    LTMS
  * @subpackage LTMS/includes/business/strategies
- * @version    1.5.0
+ * @version    1.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -25,10 +25,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
 
-    // ── Tasas IVA Colombia — ahora configurables (v1.7.0) ────────
-    // Valores por defecto mantenidos como fallback
+    // ── Tasas Colombia — configurables (v1.7.0) ───────────────────────────────
 
-    /** Lee el valor UVT desde configuración. */
     private function get_uvt(): float {
         return (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 49799.0 );
     }
@@ -82,14 +80,14 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
      * @return array
      */
     public function calculate( float $gross_amount, array $order_data, array $vendor_data ): array {
-        $product_type = $order_data['product_type'] ?? 'physical';
-        $vendor_regime = $vendor_data['tax_regime'] ?? 'simplified'; // simplified | common | special
+        $product_type  = $order_data['product_type'] ?? 'physical';
+        $vendor_regime = $vendor_data['tax_regime']  ?? 'simplified';
 
-        // 1. Calcular IVA según tipo de producto/servicio
+        // 1. IVA según tipo de producto/servicio
         $iva_rate   = $this->get_iva_rate( $product_type, $order_data );
         $iva_amount = round( $gross_amount * $iva_rate, 2 );
 
-        // 2. Calcular Retención en la Fuente
+        // 2. Retención en la Fuente
         $retefuente_rate   = 0.0;
         $retefuente_amount = 0.0;
 
@@ -98,7 +96,7 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             $retefuente_amount = round( $gross_amount * $retefuente_rate, 2 );
         }
 
-        // 3. Calcular ReteIVA (solo si hay IVA y el comprador es gran contribuyente)
+        // 3. ReteIVA (solo si hay IVA y el comprador es gran contribuyente)
         $reteiva_rate   = 0.0;
         $reteiva_amount = 0.0;
 
@@ -108,8 +106,11 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             $reteiva_amount = round( $iva_amount * $reteiva_rate, 2 );
         }
 
-        // 4. ReteICA (retención de industria y comercio)
-        $reteica_rate   = $this->get_reteica_rate( $vendor_data['municipality_code'] ?? '', $vendor_data['ciiu_code'] ?? '' );
+        // 4. ReteICA
+        $reteica_rate   = $this->get_reteica_rate(
+            $vendor_data['municipality_code'] ?? '',
+            $vendor_data['ciiu_code']         ?? ''
+        );
         $reteica_amount = round( $gross_amount * $reteica_rate, 2 );
 
         // 5. Impoconsumo (restaurantes, bares, discotecas - Ley 2010/2019)
@@ -121,12 +122,13 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             $inc_amount = round( $gross_amount * $inc_rate, 2 );
         }
 
-        // 6. Calcular totales
-        $total_taxes       = $iva_amount + $inc_amount; // Impuestos que paga el consumidor
-        $total_withholding = $retefuente_amount + $reteiva_amount + $reteica_amount; // Retenciones al vendedor
+        // 6. Totales
+        $total_taxes       = $iva_amount + $inc_amount;
+        $total_withholding = $retefuente_amount + $reteiva_amount + $reteica_amount;
         $net_to_vendor     = round( $gross_amount - $total_withholding, 2 );
 
         return [
+            'gross'              => $gross_amount,
             'iva'                => $iva_amount,
             'iva_rate'           => $iva_rate,
             'retefuente'         => $retefuente_amount,
@@ -144,6 +146,7 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             'total_taxes'        => $total_taxes,
             'total_withholding'  => $total_withholding,
             'net_to_vendor'      => $net_to_vendor,
+            'platform_fee'       => 0.0,
             'strategy'           => self::class,
             'country'            => 'CO',
             'currency'           => 'COP',
@@ -153,109 +156,83 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
 
     /**
      * Determina si aplica retención al vendedor.
-     * No aplica a: régimen simplificado, personas naturales sin actividad económica.
+     * Régimen simplificado NO está sujeto a ReteFuente como agente retenido.
      *
      * @param array $vendor_data Datos del vendedor.
      * @return bool
      */
     public function should_apply_withholding( array $vendor_data ): bool {
-        // Régimen simplificado NO está sujeto a ReteFuente como agente retenido
-        // (a partir de 2023, con la Ley 2277, algunas reglas cambiaron)
         $regime = $vendor_data['tax_regime'] ?? 'simplified';
-
         return in_array( $regime, [ 'common', 'special', 'gran_contribuyente' ], true );
     }
 
     /**
-     * Obtiene el código del país.
-     *
-     * @return string
+     * Código de país.
      */
     public function get_country_code(): string {
         return 'CO';
     }
 
     /**
-     * Determina la tasa de IVA según el tipo de producto.
-     *
-     * @param string $product_type Tipo de producto.
-     * @param array  $order_data   Datos del pedido.
-     * @return float Tasa de IVA.
+     * Tasa de IVA según tipo de producto.
      */
     private function get_iva_rate( string $product_type, array $order_data ): float {
-        // Categorías exentas de IVA (canasta básica)
         $exempt_types = [ 'basic_food', 'medicine', 'health_service', 'education', 'agricultural_basic' ];
         if ( in_array( $product_type, $exempt_types, true ) ) {
-            return 0.0; // IVA_EXENTO
+            return 0.0;
         }
 
-        // Tasa reducida 5%
         $reduced_types = [ 'coffee', 'cacao', 'eggs_retail', 'sanitary_supplies', 'agricultural_machinery' ];
         if ( in_array( $product_type, $reduced_types, true ) ) {
             return $this->get_iva_reducido();
         }
 
-        // Tasa general
         return $this->get_iva_general();
     }
 
     /**
-     * Determina la tasa de ReteFuente según tipo de actividad y monto.
-     *
-     * @param string $product_type  Tipo de producto/servicio.
-     * @param float  $gross_amount  Monto bruto.
-     * @param string $vendor_regime Régimen tributario del vendedor.
-     * @return float Tasa de retención.
+     * Tasa de ReteFuente según tipo de actividad y monto.
      */
     private function get_retefuente_rate( string $product_type, float $gross_amount, string $vendor_regime ): float {
-        // Servicios tecnológicos / Software
         if ( in_array( $product_type, [ 'software', 'digital_service', 'saas', 'tech_service' ], true ) ) {
             return $gross_amount >= $this->get_retefuente_min_servicios()
                 ? $this->get_retefuente_servicios_tech()
                 : 0.0;
         }
 
-        // Honorarios (consultoría, servicios profesionales)
         if ( in_array( $product_type, [ 'consulting', 'professional_service', 'freelance' ], true ) ) {
-            $base_honorarios = 1 * $this->get_uvt(); // 1 UVT
+            $base_honorarios = 1 * $this->get_uvt();
             return $gross_amount >= $base_honorarios
                 ? $this->get_retefuente_honorarios()
                 : 0.0;
         }
 
-        // Compras de bienes
         if ( in_array( $product_type, [ 'physical', 'product' ], true ) ) {
             return $gross_amount >= $this->get_retefuente_min_compras()
                 ? $this->get_retefuente_compras()
                 : 0.0;
         }
 
-        // Servicios generales
+        // Servicios generales (incluye 'general', 'food_service', etc.)
         return $gross_amount >= $this->get_retefuente_min_servicios()
             ? $this->get_retefuente_servicios()
             : 0.0;
     }
 
     /**
-     * Obtiene la tasa de ReteICA según municipio y actividad CIIU.
-     *
-     * @param string $municipality_code Código del municipio DANE.
-     * @param string $ciiu_code         Código CIIU de la actividad.
-     * @return float Tasa de ReteICA.
+     * Tasa de ReteICA según municipio y actividad CIIU.
      */
     private function get_reteica_rate( string $municipality_code, string $ciiu_code ): float {
-        // Tabla simplificada de tasas ICA por tipo de actividad
-        // (En producción, esto vendría de la tabla de municipios DANE)
         $rates_by_ciiu_prefix = [
-            '4'  => 0.00414, // Comercio al por menor: 4.14 por mil
-            '5'  => 0.00966, // Servicios de transporte: 9.66 por mil
-            '6'  => 0.00966, // Actividades financieras: 9.66 por mil
-            '7'  => 0.00966, // Actividades profesionales: 9.66 por mil
-            '8'  => 0.00966, // Administración pública: 9.66 por mil
-            '9'  => 0.00690, // Entretenimiento/Cultura: 6.90 por mil
+            '4' => 0.00414,
+            '5' => 0.00966,
+            '6' => 0.00966,
+            '7' => 0.00966,
+            '8' => 0.00966,
+            '9' => 0.00690,
         ];
 
         $prefix = substr( $ciiu_code, 0, 1 );
-        return $rates_by_ciiu_prefix[ $prefix ] ?? 0.00414; // Por defecto: comercio
+        return $rates_by_ciiu_prefix[ $prefix ] ?? 0.00414;
     }
 }

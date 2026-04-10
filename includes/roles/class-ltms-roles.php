@@ -120,6 +120,7 @@ final class LTMS_Roles {
         'ltms_manage_roles',
         'ltms_freeze_wallets',
         'ltms_generate_legal_evidence',
+        'ltms_export_customer_db',        // Exportar base de datos de clientes
     ];
 
     /**
@@ -256,10 +257,11 @@ final class LTMS_Roles {
         $capability = $args[0] ?? '';
         $object_id  = (int) $args[2];
 
-        // Restricción: Vendedor solo puede editar sus propios productos
+        // Restricción: Vendedor (estándar y premium) solo puede editar sus propios productos
         if (
             $capability === 'edit_post' &&
-            in_array( 'ltms_vendor', (array) $user->roles, true ) &&
+            ( in_array( 'ltms_vendor', (array) $user->roles, true ) ||
+              in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) &&
             $object_id > 0
         ) {
             $post = get_post( $object_id );
