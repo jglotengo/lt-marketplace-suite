@@ -132,6 +132,8 @@ if ( ! class_exists( 'LTMS_Core_Security', false ) ) {
         private const IV_LENGTH          = 16;
         private const ENCRYPTION_VERSION = 'v1';
 
+        public static function init(): void {}
+
         public static function encrypt( string $plaintext ): string {
             if ( empty( $plaintext ) ) return '';
             $key       = self::derive_key( LTMS_Core_Config::get_encryption_key() );
@@ -715,6 +717,9 @@ tests_add_filter( 'muplugins_loaded', 'ltms_bootstrap_load_plugin' );
 require $ltms_wp_tests_dir . '/includes/bootstrap.php';
 
 echo "[LTMS Test Bootstrap] WordPress cargado. Iniciando tests...\n\n";
+
+// ── Cargar clase base de tests de integración ──────────────────────────────────
+require_once __DIR__ . '/integration/class-ltms-integration-test-case.php';
 
 function ltms_bootstrap_load_plugin(): void {
     $wc_plugin = ltms_bootstrap_find_woocommerce();
