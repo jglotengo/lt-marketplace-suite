@@ -35,16 +35,15 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      # Cache de dependencias Composer para acelerar el CI
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.json') }}
           restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
+        run: composer update --no-interaction --prefer-dist --ignore-platform-reqs
 
       - name: PHP Syntax check (parallel)
         run: |
@@ -55,10 +54,10 @@ jobs:
             | xargs -P4 php -l
 
       - name: PHPCS — WordPress Coding Standards
-        run: composer lint || true   # Non-blocking hasta llegar a 0 errores
+        run: composer lint || true
 
       - name: PHPStan — Static Analysis (level 6)
-        run: composer analyse || true  # Non-blocking hasta llegar a 0 errores
+        run: composer analyse || true
 
   # ============================================================
   # JOB 2: Unit Tests (sin WordPress, rápidos)
@@ -82,17 +81,17 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: mbstring, json, mysqli, bcmath, intl, openssl
           tools: composer:v2
-          coverage: xdebug   # Solo en unit tests para cobertura rápida
+          coverage: xdebug
 
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.json') }}
           restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
+        run: composer update --no-interaction --prefer-dist --ignore-platform-reqs
 
       - name: Run Unit Tests
         env:
@@ -105,7 +104,7 @@ jobs:
             --display-deprecations
 
       - name: Run Unit Tests with Coverage
-        if: matrix.php == '8.2'   # Solo en 8.2 para no duplicar
+        if: matrix.php == '8.2'
         env:
           LTMS_UNIT_ONLY: "true"
         run: |
@@ -113,7 +112,7 @@ jobs:
             --testsuite=unit \
             --coverage-clover=coverage/clover.xml \
             --coverage-html=coverage/html \
-            || true   # Non-blocking mientras añadimos más tests
+            || true
         continue-on-error: true
 
       - name: Upload Coverage Report
@@ -138,7 +137,6 @@ jobs:
         php: [ '8.2' ]
         wp:  [ 'latest' ]
         include:
-          # Testear también con WP más antiguo soportado
           - php: '8.1'
             wp: '6.3'
 
@@ -173,16 +171,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          key: composer-v2-${{ matrix.php }}-${{ hashFiles('composer.json') }}
           restore-keys: composer-v2-${{ matrix.php }}-
 
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
+        run: composer update --no-interaction --prefer-dist --ignore-platform-reqs
 
       - name: Install SVN (requerido por install-wp-tests.sh)
         run: sudo apt-get update -qq && sudo apt-get install -y subversion
 
-      # Cache de WordPress core para acelerar siguientes runs
       - name: Cache WordPress test suite
         uses: actions/cache@v4
         with:
@@ -210,7 +207,6 @@ jobs:
 
       - name: Install WooCommerce for tests
         run: |
-          # Instalar WooCommerce en el WP de test para que el bootstrap lo encuentre
           WP_CORE=/tmp/wordpress
           WC_DIR="$WP_CORE/wp-content/plugins/woocommerce"
 
