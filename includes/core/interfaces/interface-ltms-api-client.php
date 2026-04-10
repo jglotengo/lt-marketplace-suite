@@ -7,27 +7,27 @@
  * @package    LTMS
  * @subpackage LTMS/includes/core/interfaces
  */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-/**
- * Interface LTMS_API_Client_Interface
- */
-interface LTMS_API_Client_Interface {
-
+if ( ! interface_exists( 'LTMS_API_Client_Interface', false ) ) {
     /**
-     * Obtiene el estado de salud de la conexión con la API.
-     *
-     * @return array{status: string, message: string, latency_ms?: int}
+     * Interface LTMS_API_Client_Interface
      */
-    public function health_check(): array;
+    interface LTMS_API_Client_Interface {
+        /**
+         * Obtiene el estado de salud de la conexión con la API.
+         *
+         * @return array{status: string, message: string, latency_ms?: int}
+         */
+        public function health_check(): array;
 
-    /**
-     * Obtiene el slug identificador del proveedor.
-     *
-     * @return string Ej: 'siigo', 'openpay', 'addi'
-     */
-    public function get_provider_slug(): string;
+        /**
+         * Obtiene el slug identificador del proveedor.
+         *
+         * @return string Ej: 'siigo', 'openpay', 'addi'
+         */
+        public function get_provider_slug(): string;
+    }
 }
