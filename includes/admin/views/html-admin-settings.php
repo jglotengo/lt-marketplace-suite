@@ -63,7 +63,6 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
         if ( file_exists( $section_file ) ) {
             include $section_file;
         } else {
-            // Renderizar sección genérica
             ltms_render_generic_settings_section( $active_tab );
         }
         ?>
@@ -235,7 +234,7 @@ function ltms_render_generic_settings_section( string $tab ): void {
                 echo '<textarea id="' . esc_attr( $field['key'] ) . '" name="' . esc_attr( $field['key'] ) . '" rows="3">' . esc_textarea( $value ) . '</textarea>';
                 break;
             default:
-                $attrs = $field['attrs'] ?? '';
+                $attrs       = $field['attrs'] ?? '';
                 $placeholder = isset( $field['placeholder'] ) ? 'placeholder="' . esc_attr( $field['placeholder'] ) . '"' : '';
                 echo '<input type="' . esc_attr( $field['type'] ) . '" id="' . esc_attr( $field['key'] ) . '" name="' . esc_attr( $field['key'] ) . '" value="' . esc_attr( $value ) . '" ' . $placeholder . ' ' . $attrs . '>'; // phpcs:ignore
         }
@@ -248,9 +247,3 @@ function ltms_render_generic_settings_section( string $tab ): void {
 
     echo '</div>';
 }
-
-// Llamar a la función de renderizado — solo si la función no fue llamada ya desde el bloque include
-if ( ! file_exists( LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . $active_tab . '.php' ) ) {
-    ltms_render_generic_settings_section( $active_tab );
-}
-?>
