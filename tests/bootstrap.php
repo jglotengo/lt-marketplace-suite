@@ -232,9 +232,6 @@ if ( ! class_exists( 'LTMS_Core_Security', false ) ) {
 }
 
 // ── Stub LTMS_API_Client_Interface ─────────────────────────────────────────────
-// Declarada aquí (pre-Composer) para que LTMS_Abstract_API_Client pueda
-// implementarla. La clase real de producción se carga después (PASO 3), pero
-// como ya existe esta declaración, PHP no la redeclarará.
 if ( ! interface_exists( 'LTMS_API_Client_Interface', false ) ) {
     interface LTMS_API_Client_Interface {
         public function health_check(): array;
@@ -243,28 +240,14 @@ if ( ! interface_exists( 'LTMS_API_Client_Interface', false ) ) {
 }
 
 // ── Stub LTMS_Abstract_API_Client con __construct() ────────────────────────────
-// DECLARADO AQUÍ (pre-Composer) para dos razones:
-// 1. Las clases concretas llaman parent::__construct() — sin constructor PHP 8 lanza Error.
-// 2. Las clases concretas necesitan parent::__construct() — PHP 8 lanza Error sin él.
-//    Brain\Monkey puede redefinirla limpiamente en setUp() de cada test.
-// LIMITACIÓN: Al declararse antes de que LTMS_API_Client_Interface exista, el stub
-// no puede implementarla. El test ApiFactoryTest::test_get_instance_implements_api_client_interface
-// funciona porque las clases concretas de producción sí la implementan directamente.
 if ( ! class_exists( 'LTMS_Abstract_API_Client', false ) ) {
     abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
-
-        // NOTA: No usamos "use LTMS_Logger_Aware" aquí porque el trait se carga
-        // en PASO 3 (después de Composer). El stub replica los métodos mínimos
-        // necesarios para que los tests pasen sin el trait real.
 
         protected string $api_url         = '';
         protected string $provider_slug   = '';
         protected int    $timeout         = 30;
         protected int    $max_retries     = 3;
         protected int    $retry_delay     = 1;
-        // PHP 8.2: declarar base_url como propiedad tipada evita el
-        // "Creation of dynamic property" deprecation en LTMS_Api_Zapsign,
-        // que asigna $this->base_url en su constructor.
         protected string $base_url        = '';
         protected array  $default_headers = [
             'Content-Type' => 'application/json',
@@ -272,18 +255,11 @@ if ( ! class_exists( 'LTMS_Abstract_API_Client', false ) ) {
         ];
 
         public function __construct() {
-            // Sincroniza base_url → api_url para LTMS_Api_Zapsign que usa
-            // $this->base_url en lugar de $this->api_url (herencia histórica).
-            // Permite que test_constructor_sets_fixed_api_url encuentre el valor.
             if ( $this->base_url !== '' && $this->api_url === '' ) {
                 $this->api_url = $this->base_url;
             }
         }
 
-        /**
-         * Devuelve los headers por defecto. Subclases pueden sobreescribirlo.
-         * Requerido por ZapsignApiTest::test_default_headers_include_bearer_authorization.
-         */
         protected function get_default_headers(): array {
             return $this->default_headers;
         }
@@ -494,18 +470,9 @@ if ( $ltms_unit_only ) {
     }
 
     // ── API Factory ────────────────────────────────────────────────────────────
-    // La interfaz LTMS_API_Client_Interface ya está declarada en PASO 1b (stub pre-Composer).
-    // Si el archivo de producción NO tiene guard interface_exists(), este require_once
-    // causaría "Cannot redeclare interface". Lo cargamos solo si aún no existe.
     if ( ! interface_exists( 'LTMS_API_Client_Interface', false ) ) {
         require_once $ltms_base . '/core/interfaces/interface-ltms-api-client.php';
     }
-    // NOTA: class-ltms-abstract-api-client.php NO se require_once aquí porque ya
-    // está declarada como stub arriba (antes de Composer). Si se incluye de nuevo,
-    // PHP lanza "Cannot redeclare class". El autoloader de Composer tampoco la
-    // cargará porque class_exists('LTMS_Abstract_API_Client') devuelve true.
-    // El stub implementa LTMS_API_Client_Interface directamente, por lo que
-    // ApiFactoryTest::test_get_instance_implements_api_client_interface pasa.
     require_once $ltms_base . '/api/factories/class-ltms-api-factory.php';
 
     // ── Payment Orchestrator ───────────────────────────────────────────────────
@@ -547,10 +514,6 @@ if ( $ltms_unit_only ) {
     if ( ! function_exists( 'home_url' ) ) {
         function home_url( string $path = '' ): string { return 'http://localhost' . $path; }
     }
-    // wp_json_encode: NO se define aquí.
-    // Se registra via Brain\Monkey en class-ltms-unit-test-case::stub_common_wp_functions()
-    // DESPUÉS de que Patchwork arranca (via autoloader), así ZapsignApiTest puede
-    // sobreescribirla con Functions\when() sin que Patchwork lance DefinedTooEarly.
     if ( ! function_exists( 'get_current_user_id' ) ) {
         function get_current_user_id(): int { return 0; }
     }
@@ -678,9 +641,6 @@ if ( $ltms_unit_only ) {
     }
 
     // ── Stub LTMS_Utils ───────────────────────────────────────────────────────
-    // Brain\Monkey no puede stubear métodos estáticos con Functions\when().
-    // LTMS_Utils::format_phone_e164() y ::now_utc() se usan en varios tests.
-    // Si la clase real aún no fue cargada por el autoloader, se define este stub.
     if ( ! class_exists( 'LTMS_Utils', false ) ) {
         class LTMS_Utils {
             public static function format_phone_e164( string $phone, string $country = 'CO' ): string {
@@ -734,6 +694,17 @@ echo "\n[LTMS Test Bootstrap] WP Tests Dir: {$ltms_wp_tests_dir}\n";
 $ltms_wp_tests_config = $ltms_wp_tests_dir . '/wp-tests-config.php';
 if ( ! file_exists( $ltms_wp_tests_config ) ) {
     ltms_bootstrap_generate_wp_config( $ltms_wp_tests_dir );
+}
+
+// ── FIX: PHPUnit Polyfills — requerido por WP test suite ──────────────────────
+// Debe cargarse ANTES de require bootstrap.php de WordPress.
+$ltms_polyfills_autoload = dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php';
+if ( file_exists( $ltms_polyfills_autoload ) ) {
+    require_once $ltms_polyfills_autoload;
+} else {
+    // Fallback: indicar la ruta via constante para que WP bootstrap lo encuentre
+    defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' )
+        || define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills' );
 }
 
 require_once $ltms_wp_tests_dir . '/includes/functions.php';
