@@ -1,10 +1,10 @@
 <?php
 /**
- * Bootstrap para PHPUnit — LT Marketplace Suite
+ * Bootstrap para PHPUnit – LT Marketplace Suite
  *
  * Orden de carga CRÍTICO:
  * 1. Constantes mínimas (ANTES de Composer/Patchwork)
- * 2. Composer autoloader (vendor/autoload.php) — incluye Patchwork
+ * 2. Composer autoloader (vendor/autoload.php) – incluye Patchwork
  * 3. WordPress test suite (modo integración) o return (modo unit)
  *
  * Para tests UNITARIOS puros:
@@ -15,18 +15,23 @@
 
 declare( strict_types=1 );
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PASO 1: Solo constantes PHP puras — NUNCA funciones WP aquí.
+// ══════════════════════════════════════════════════════════════════════════════════
+// PASO 1: Solo constantes PHP puras – NUNCA funciones WP aquí.
 // Brain\Monkey registrará __(), apply_filters(), etc. en setUp() de cada test.
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 
 if ( ! defined( 'ABSPATH' ) ) {
-    define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+    $ltms_is_integration = getenv( 'LTMS_UNIT_ONLY' ) !== 'true';
+    if ( $ltms_is_integration ) {
+        define( 'ABSPATH', rtrim( getenv( 'WP_CORE_DIR' ) ?: '/tmp/wordpress', '/' ) . '/' );
+    } else {
+        define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+    }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PASO 1b: Clases LTMS reales inline — ANTES del autoloader de Composer.
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
+// PASO 1b: Clases LTMS reales inline – ANTES del autoloader de Composer.
+// ══════════════════════════════════════════════════════════════════════════════════
 
 defined( 'AUTH_SALT' )        || define( 'AUTH_SALT',        str_repeat( 'ltms_test_salt_', 4 ) );
 defined( 'SECURE_AUTH_SALT' ) || define( 'SECURE_AUTH_SALT', str_repeat( 'ltms_sec_salt__', 4 ) );
@@ -360,9 +365,9 @@ if ( ! class_exists( 'LTMS_Abstract_API_Client', false ) ) {
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 // PASO 2: Composer autoloader (incluye Patchwork + Brain\Monkey)
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 $ltms_composer_autoload = dirname( __DIR__ ) . '/vendor/autoload.php';
 
 if ( ! file_exists( $ltms_composer_autoload ) ) {
@@ -373,14 +378,14 @@ if ( ! file_exists( $ltms_composer_autoload ) ) {
 
 require_once $ltms_composer_autoload;
 
-// ── FIX: flush cache estático de LTMS_Core_Config después de Composer ──────
+// ── FIX: flush cache estático de LTMS_Core_Config después de Composer ──────────
 if ( class_exists( 'LTMS_Core_Config' ) ) {
     LTMS_Core_Config::flush_cache();
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 // PASO 3: Modo Unit Only vs Integración
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 $ltms_unit_only = getenv( 'LTMS_UNIT_ONLY' ) === 'true'
     || ( defined( 'LTMS_TESTS_UNIT_ONLY' ) && LTMS_TESTS_UNIT_ONLY );
 
@@ -501,7 +506,7 @@ if ( $ltms_unit_only ) {
     defined( 'LTMS_COUNTRY' )         || define( 'LTMS_COUNTRY',         'CO' );
     defined( 'LTMS_ENCRYPTION_KEY' )  || define( 'LTMS_ENCRYPTION_KEY',  str_repeat( 'x', 32 ) );
 
-    // ── Stubs de funciones WordPress usadas por Logger/Config ─────────────────
+    // ── Stubs de funciones WordPress usadas por Logger/Config ──────────────────
     if ( ! function_exists( 'is_email' ) ) {
         function is_email( string $email ): bool { return (bool) filter_var( $email, FILTER_VALIDATE_EMAIL ); }
     }
@@ -640,7 +645,7 @@ if ( $ltms_unit_only ) {
         }
     }
 
-    // ── Stub LTMS_Utils ───────────────────────────────────────────────────────
+    // ── Stub LTMS_Utils ────────────────────────────────────────────────────────
     if ( ! class_exists( 'LTMS_Utils', false ) ) {
         class LTMS_Utils {
             public static function format_phone_e164( string $phone, string $country = 'CO' ): string {
@@ -662,9 +667,9 @@ if ( $ltms_unit_only ) {
     return;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 // MODO INTEGRACIÓN (con WordPress real)
-// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════════
 $ltms_wp_tests_dir = getenv( 'WP_TESTS_DIR' );
 
 if ( ! $ltms_wp_tests_dir ) {
@@ -696,13 +701,11 @@ if ( ! file_exists( $ltms_wp_tests_config ) ) {
     ltms_bootstrap_generate_wp_config( $ltms_wp_tests_dir );
 }
 
-// ── FIX: PHPUnit Polyfills — requerido por WP test suite ──────────────────────
-// Debe cargarse ANTES de require bootstrap.php de WordPress.
+// ── FIX: PHPUnit Polyfills – requerido por WP test suite ──────────────────────
 $ltms_polyfills_autoload = dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php';
 if ( file_exists( $ltms_polyfills_autoload ) ) {
     require_once $ltms_polyfills_autoload;
 } else {
-    // Fallback: indicar la ruta via constante para que WP bootstrap lo encuentre
     defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' )
         || define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills' );
 }
@@ -719,7 +722,7 @@ function ltms_bootstrap_load_plugin(): void {
         echo "[LTMS Bootstrap] Cargando WooCommerce desde: {$wc_plugin}\n";
         require_once $wc_plugin;
     } else {
-        echo "[LTMS Bootstrap] ⚠    WooCommerce no encontrado.\n";
+        echo "[LTMS Bootstrap] ⚠     WooCommerce no encontrado.\n";
         ltms_bootstrap_stub_woocommerce();
     }
     $ltms_plugin_file = dirname( __DIR__ ) . '/lt-marketplace-suite.php';
