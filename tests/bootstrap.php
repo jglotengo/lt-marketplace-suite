@@ -696,7 +696,7 @@ if ( $ltms_unit_only ) {
     }
 
     // ── Clase base de tests unitarios ──────────────────────────────────────────
-    require_once __DIR__ . '/Unit/class-ltms-unit-test-case.php';
+    require_once __DIR__ . '/unit/class-ltms-unit-test-case.php';
 
     // Brain\Monkey se inicializa en cada test via setUp()/tearDown()
     return;
