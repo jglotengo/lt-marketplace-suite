@@ -98,9 +98,7 @@ jobs:
         run: |
           vendor/bin/phpunit \
             --testsuite=unit \
-            --no-coverage \
-            --display-warnings \
-            --display-deprecations
+            --no-coverage
 
       - name: Run Unit Tests with Coverage
         if: matrix.php == '8.2'
@@ -235,8 +233,7 @@ jobs:
         run: |
           vendor/bin/phpunit \
             --testsuite=integration \
-            --no-coverage \
-            --display-warnings
+            --no-coverage
 
   # ============================================================
   # JOB 4: Build Release ZIP (solo en tags v*)
