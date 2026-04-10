@@ -208,6 +208,23 @@ final class LTMS_Admin {
                 'slug'       => 'ltms-pages',
                 'callback'   => [ $this, 'render_pages' ],
             ],
+            // v1.7.0 Booking & Tourism submenus
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Alojamiento / Reservas', 'ltms' ),
+                'menu_title' => __( 'Reservas', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-bookings',
+                'callback'   => [ $this, 'render_bookings' ],
+            ],
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Compliance Turismo', 'ltms' ),
+                'menu_title' => __( 'Turismo', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-tourism',
+                'callback'   => [ $this, 'render_tourism' ],
+            ],
         ];
 
         foreach ( $submenus as $submenu ) {
@@ -242,7 +259,6 @@ final class LTMS_Admin {
      * @return void
      */
     public function enqueue_assets( string $hook_suffix ): void {
-        // Solo cargar en páginas del plugin
         if ( strpos( $hook_suffix, 'ltms' ) === false && strpos( $hook_suffix, 'toplevel_page_ltms' ) === false ) {
             return;
         }
@@ -253,13 +269,10 @@ final class LTMS_Admin {
         wp_enqueue_style( 'ltms-admin', $url . 'css/ltms-admin.css', [], $ver );
         wp_enqueue_style( 'ltms-admin-enterprise', $url . 'css/ltms-admin-enterprise.css', [], $ver );
 
-        // Pin to an exact semver to enable a stable SRI hash.
-        // Regenerate the hash when upgrading: https://www.srihash.org/
-        // Override the hash via LTMS_CHARTJS_SRI constant in wp-config.php.
         $chartjs_version = '4.4.4';
         $chartjs_sri     = defined( 'LTMS_CHARTJS_SRI' )
             ? LTMS_CHARTJS_SRI
-            : 'sha256-zyIBaW7VExhKvGqMlPU9TH0Tve6BGFPXM1STFM/ycE='; // chart.js@4.4.4 umd.min
+            : 'sha256-zyIBaW7VExhKvGqMlPU9TH0Tve6BGFPXM1STFM/ycE=';
 
         wp_enqueue_script(
             'chart-js',
@@ -269,7 +282,6 @@ final class LTMS_Admin {
             true
         );
 
-        // Attach SRI integrity + CORS attributes.
         add_filter(
             'script_loader_tag',
             static function ( string $tag, string $handle ) use ( $chartjs_sri ): string {
@@ -338,16 +350,14 @@ final class LTMS_Admin {
     }
 
     /**
-     * Renderiza avisos de administración (errores de configuración, etc.).
+     * Renderiza avisos de administración.
      *
      * @return void
      */
     public function render_admin_notices(): void {
-        // Aviso si no se ha configurado la clave de cifrado
         if ( ! defined( 'LTMS_ENCRYPTION_KEY' ) || empty( LTMS_ENCRYPTION_KEY ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>' .
                 sprintf(
-                    /* translators: %s: Enlace a la documentación */
                     esc_html__( 'LT Marketplace Suite: La constante LTMS_ENCRYPTION_KEY no está definida en wp-config.php. %s', 'ltms' ),
                     '<a href="' . esc_url( admin_url( 'admin.php?page=ltms-settings' ) ) . '">' .
                         esc_html__( 'Configurar ahora', 'ltms' ) . '</a>'
@@ -441,6 +451,14 @@ final class LTMS_Admin {
         $this->render_view( 'html-admin-pages' );
     }
 
+    public function render_bookings(): void {
+        $this->render_view( 'html-admin-bookings' );
+    }
+
+    public function render_tourism(): void {
+        $this->render_view( 'html-admin-tourism-compliance' );
+    }
+
     /**
      * Carga e incluye una vista del directorio admin/views/.
      *
@@ -455,7 +473,6 @@ final class LTMS_Admin {
         } else {
             echo '<div class="wrap"><h1>LTMS</h1><p>' .
                 sprintf(
-                    /* translators: %s: nombre de la vista */
                     esc_html__( 'Vista no encontrada: %s', 'ltms' ),
                     esc_html( $view_name )
                 ) . '</p></div>';
