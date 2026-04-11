@@ -8,7 +8,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 ?>
-<div class="ltms-view-section" style="padding:24px;">
+<div style="padding:24px;">
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Resumen del Mes', 'ltms' ); ?></h2>
