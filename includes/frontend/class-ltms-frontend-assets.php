@@ -79,7 +79,7 @@ final class LTMS_Frontend_Assets {
 
         // Login y Registro de vendedores
         if ( $page_id === (int) ( $pages['ltms-login'] ?? 0 ) ||
-             $page_id === (int) ( $pages['ltms-register'] ?? 0 ) ) {
+             $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 ) ) {
             $this->enqueue_auth_assets( $url, $ver );
         }
     }
