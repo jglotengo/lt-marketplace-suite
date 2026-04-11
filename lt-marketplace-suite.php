@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
@@ -286,6 +286,25 @@ function ltms_load_autoloader(): void {
                 // API webhooks — subdir 'stripe'/'uber' no existe; archivo en api/webhooks/
                 'ltms-stripe-webhook-handler'       => 'api/webhooks/class-ltms-stripe-webhook-handler.php',
                 'ltms-uber-direct-webhook-handler'  => 'api/webhooks/class-ltms-uber-direct-webhook-handler.php',
+                // API webhooks v1.7.4 -- handlers individuales
+                'ltms-addi-webhook-handler'         => 'api/webhooks/class-ltms-addi-webhook-handler.php',
+                'ltms-openpay-webhook-handler'      => 'api/webhooks/class-ltms-openpay-webhook-handler.php',
+                'ltms-siigo-webhook-handler'        => 'api/webhooks/class-ltms-siigo-webhook-handler.php',
+                'ltms-aveonline-webhook-handler'    => 'api/webhooks/class-ltms-aveonline-webhook-handler.php',
+                'ltms-zapsign-webhook-handler'      => 'api/webhooks/class-ltms-zapsign-webhook-handler.php',
+                // API gateways v1.7.4
+                'ltms-api-gateway-openpay'          => 'api/gateways/class-ltms-api-gateway-openpay.php',
+                'ltms-api-gateway-addi'             => 'api/gateways/class-ltms-api-gateway-addi.php',
+                // Business listeners v1.7.4
+                'ltms-tptc-listener'                => 'business/listeners/class-ltms-tptc-listener.php',
+                'ltms-coupon-attribution-listener'  => 'business/listeners/class-ltms-coupon-attribution-listener.php',
+                // Frontend v1.7.4
+                'ltms-kitchen-ajax'                 => 'frontend/class-ltms-kitchen-ajax.php',
+                'ltms-vendor-settings-saver'        => 'frontend/class-ltms-vendor-settings-saver.php',
+                'ltms-secure-downloads'             => 'frontend/class-ltms-secure-downloads.php',
+                // Admin v1.7.4
+                'ltms-bank-reconciler'              => 'admin/class-ltms-bank-reconciler.php',
+                'ltms-legal-evidence-handler'       => 'admin/class-ltms-legal-evidence-handler.php',
                 // Frontend — subdir derivado ('dashboard', 'public') no coincide con 'frontend/'
                 'ltms-dashboard-logic'          => 'frontend/class-ltms-dashboard-logic.php',
                 'ltms-public-auth-handler'      => 'frontend/class-ltms-public-auth-handler.php',
