@@ -645,3 +645,5 @@ function ltms_emergency_dashboard_page(): void {
 
     echo '</div>';
 }
+
+class_alias('LTMS_Business_Wallet', 'LTMS_Wallet');

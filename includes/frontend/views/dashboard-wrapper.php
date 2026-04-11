@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $user_id      = get_current_user_id();
 $user         = get_userdata( $user_id );
 $store_name   = get_user_meta( $user_id, 'ltms_store_name', true ) ?: $user->display_name;
-$wallet       = LTMS_Wallet::get_or_create( $user_id );
+$wallet       = LTMS_Business_Wallet::get_or_create( $user_id );
 $unread_notif = 0;
 
 // Contar notificaciones no leídas
@@ -150,3 +150,4 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
     </main><!-- /ltms-main-content -->
 
 </div><!-- /ltms-dashboard-container -->
+ 

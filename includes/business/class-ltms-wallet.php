@@ -601,3 +601,6 @@ final class LTMS_Business_Wallet {
     }
 
 }
+
+// Alias de compatibilidad
+class_alias( 'LTMS_Business_Wallet', 'LTMS_Wallet' );
