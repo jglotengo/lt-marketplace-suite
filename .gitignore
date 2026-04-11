@@ -79,3 +79,5 @@ assets/img/generated/
 .phpunit.cache/
 coverage/
 test-results.xml
+
+*.bak
