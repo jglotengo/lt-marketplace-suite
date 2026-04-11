@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
