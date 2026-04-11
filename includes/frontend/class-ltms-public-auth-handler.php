@@ -203,7 +203,7 @@ final class LTMS_Public_Auth_Handler {
         }
 
         // Crear billetera inicial
-        LTMS_Wallet::get_or_create( $user_id );
+        LTMS_Business_Wallet::get_or_create( $user_id );
 
         // Registrar en TPTC si está habilitado
         if ( LTMS_Core_Config::get( 'ltms_tptc_enabled', 'no' ) === 'yes' && class_exists( 'LTMS_Api_Factory' ) ) {
