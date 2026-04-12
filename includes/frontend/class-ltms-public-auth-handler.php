@@ -75,9 +75,14 @@ final class LTMS_Public_Auth_Handler {
      * @return string
      */
     public function render_register_form( array $atts = [] ): string {
-        wp_enqueue_style( 'ltms-login-register', LTMS_ASSETS_URL . 'css/ltms-login-register.css', [], LTMS_VERSION );
-        wp_enqueue_script( 'ltms-login-register', LTMS_ASSETS_URL . 'js/ltms-login-register.js', ['jquery'], LTMS_VERSION, true );
-        wp_localize_script( 'ltms-login-register', 'ltmsAuth', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('ltms_auth_nonce')] );
+        add_action( 'wp_enqueue_scripts', function() {
+            wp_enqueue_style( 'ltms-login-register', LTMS_ASSETS_URL . 'css/ltms-login-register.css', [], LTMS_VERSION );
+            wp_enqueue_script( 'ltms-login-register', LTMS_ASSETS_URL . 'js/ltms-login-register.js', [ 'jquery' ], LTMS_VERSION, true );
+            wp_localize_script( 'ltms-login-register', 'ltmsAuth', [
+                'ajax_url' => admin_url( 'admin-ajax.php' ),
+                'nonce'    => wp_create_nonce( 'ltms_auth_nonce' ),
+            ]);
+        }, 5 );
         if ( is_user_logged_in() ) {
             return $this->render_already_logged_in();
         }
