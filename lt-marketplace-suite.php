@@ -37,7 +37,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '2.0.0' );
+define( 'LTMS_VERSION',          '2.0.1' );
 define( 'LTMS_DB_VERSION',       '2.0.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
