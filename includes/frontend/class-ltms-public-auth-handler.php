@@ -79,7 +79,6 @@ final class LTMS_Public_Auth_Handler {
             $nonce    = wp_create_nonce( 'ltms_auth_nonce' );
             $ajax_url = admin_url( 'admin-ajax.php' );
             echo '<link rel="stylesheet" href="' . esc_url( LTMS_ASSETS_URL . 'css/ltms-login-register.css?ver=' . LTMS_VERSION ) . '">';
-            echo '<script src="' . esc_url( LTMS_ASSETS_URL . 'js/ltms-login-register.js?ver=' . LTMS_VERSION ) . '"></script>';
             echo '<script>var ltmsAuth = ' . wp_json_encode([
                 'ajax_url' => $ajax_url,
                 'nonce'    => $nonce,
@@ -89,6 +88,7 @@ final class LTMS_Public_Auth_Handler {
                     'processing'        => 'Procesando...',
                 ],
             ]) . ';</script>';
+            echo '<script src="' . esc_url( LTMS_ASSETS_URL . 'js/ltms-login-register.js?ver=' . LTMS_VERSION ) . '"></script>';
         }, 99 );
         if ( is_user_logged_in() ) {
             return $this->render_already_logged_in();
