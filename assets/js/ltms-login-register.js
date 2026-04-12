@@ -58,6 +58,43 @@
         },
 
         bindRegisterForm() {
+            // Wizard: avanzar pasos
+            $(document).on('click', '.ltms-wizard-next', function () {
+                const $btn     = $(this);
+                const nextPage = parseInt($btn.data('next'));
+                const currPage = nextPage - 1;
+                const $currPage = $('[data-page="' + currPage + '"]');
+                // Validar campos requeridos del paso actual
+                let valid = true;
+                $currPage.find('[required]').each(function () {
+                    if (!$(this).val().trim()) {
+                        $(this).addClass('ltms-field-error');
+                        valid = false;
+                    } else {
+                        $(this).removeClass('ltms-field-error');
+                    }
+                });
+                if (!valid) {
+                    LTMS.Auth.showFormError('#ltms-register-form', ltmsAuth.i18n.required_fields);
+                    return;
+                }
+                // Avanzar al siguiente paso
+                $currPage.hide();
+                $('[data-page="' + nextPage + '"]').show();
+                // Actualizar indicadores
+                $('.ltms-step').removeClass('active');
+                $('.ltms-step[data-step="' + nextPage + '"]').addClass('active');
+            });
+            // Wizard: retroceder pasos
+            $(document).on('click', '.ltms-wizard-prev', function () {
+                const $btn     = $(this);
+                const prevPage = parseInt($btn.data('prev'));
+                const currPage = prevPage + 1;
+                $('[data-page="' + currPage + '"]').hide();
+                $('[data-page="' + prevPage + '"]').show();
+                $('.ltms-step').removeClass('active');
+                $('.ltms-step[data-step="' + prevPage + '"]').addClass('active');
+            });
             $(document).on('submit', '#ltms-register-form', function (e) {
                 e.preventDefault();
                 const $form = $(this);
