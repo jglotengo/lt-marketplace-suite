@@ -152,7 +152,7 @@ final class LTMS_Public_Auth_Handler {
             'last_name'      => sanitize_text_field( wp_unslash( $_POST['last_name'] ?? '' ) ), // phpcs:ignore
             'email'          => sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ), // phpcs:ignore
             'password'       => $_POST['password'] ?? '', // phpcs:ignore
-            'confirm_pass'   => $_POST['confirm_password'] ?? '', // phpcs:ignore
+            'confirm_pass'   => $_POST['password_confirm'] ?? '', // phpcs:ignore
             'phone'          => sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ), // phpcs:ignore
             'store_name'     => sanitize_text_field( wp_unslash( $_POST['store_name'] ?? '' ) ), // phpcs:ignore
             'document'       => sanitize_text_field( wp_unslash( $_POST['document'] ?? '' ) ), // phpcs:ignore

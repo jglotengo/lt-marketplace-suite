@@ -119,7 +119,7 @@
 
                 // Validar contraseñas
                 const pass1 = $form.find('[name="password"]').val();
-                const pass2 = $form.find('[name="confirm_password"]').val();
+                const pass2 = $form.find('[name="password_confirm"]').val();
 
                 if (pass1 !== pass2) {
                     LTMS.Auth.showFormError('#ltms-register-form', ltmsAuth.i18n.password_mismatch);
