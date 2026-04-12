@@ -52,6 +52,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_adopt_redi_product',    [ $instance, 'ajax_adopt_redi_product' ] );
         add_action( 'wp_ajax_ltms_get_shipping_quotes',   [ $instance, 'ajax_get_shipping_quotes' ] );
         add_action( 'wp_ajax_nopriv_ltms_get_shipping_quotes', [ $instance, 'ajax_get_shipping_quotes' ] );
+        add_action( 'wp_ajax_ltms_vendor_logout',         [ $instance, 'ajax_vendor_logout' ] );
 
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
@@ -87,6 +88,15 @@ final class LTMS_Dashboard_Logic {
      *
      * @return void
      */
+
+    /**
+     * AJAX: Logout del vendedor.
+     */
+    public function ajax_vendor_logout(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+        wp_logout();
+        wp_send_json_success( [ 'redirect' => home_url( '/login-vendedor/' ) ] );
+    }
     public function ajax_get_dashboard_data(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
