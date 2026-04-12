@@ -173,3 +173,46 @@
     });
 
 })(jQuery);
+
+// Fallback: si jQuery ready ya disparó, inicializar directamente
+(function() {
+    function ltmsInitAuth() {
+        if (typeof jQuery === 'undefined' || typeof ltmsAuth === 'undefined') return;
+        if (typeof LTMS !== 'undefined' && LTMS.Auth) {
+            jQuery(document).off('click.ltmsWizard', '.ltms-wizard-next');
+            jQuery(document).off('click.ltmsWizard', '.ltms-wizard-prev');
+            jQuery(document).on('click.ltmsWizard', '.ltms-wizard-next', function() {
+                var nextPage = parseInt(jQuery(this).data('next'));
+                var currPage = nextPage - 1;
+                var $curr = jQuery('[data-page="' + currPage + '"]');
+                var valid = true;
+                $curr.find('[required]').each(function() {
+                    if (!jQuery(this).val().trim()) {
+                        jQuery(this).addClass('ltms-field-error');
+                        valid = false;
+                    } else {
+                        jQuery(this).removeClass('ltms-field-error');
+                    }
+                });
+                if (!valid) return;
+                $curr.hide();
+                jQuery('[data-page="' + nextPage + '"]').show();
+                jQuery('.ltms-step').removeClass('active');
+                jQuery('.ltms-step[data-step="' + nextPage + '"]').addClass('active');
+            });
+            jQuery(document).on('click.ltmsWizard', '.ltms-wizard-prev', function() {
+                var prevPage = parseInt(jQuery(this).data('prev'));
+                var currPage = prevPage + 1;
+                jQuery('[data-page="' + currPage + '"]').hide();
+                jQuery('[data-page="' + prevPage + '"]').show();
+                jQuery('.ltms-step').removeClass('active');
+                jQuery('.ltms-step[data-step="' + prevPage + '"]').addClass('active');
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ltmsInitAuth);
+    } else {
+        ltmsInitAuth();
+    }
+})();
