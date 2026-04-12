@@ -561,16 +561,7 @@
         bindLogout() {
             $(document).on('click', '.ltms-logout-btn', (e) => {
                 e.preventDefault();
-                $.ajax({
-                    url: ltmsDashboard.ajax_url,
-                    method: 'POST',
-                    data: { action: 'ltms_vendor_logout', nonce: ltmsDashboard.nonce },
-                    success(response) {
-                        if (response.success) {
-                            window.location.href = response.data.redirect;
-                        }
-                    },
-                });
+                window.location.href = ltmsDashboard.logout_url || ltmsDashboard.ajax_url + '?action=logout';
             });
         },
 

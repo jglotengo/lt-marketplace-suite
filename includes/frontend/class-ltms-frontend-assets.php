@@ -301,7 +301,8 @@ final class LTMS_Frontend_Assets {
             'user_id'       => $user_id,
             'wallet_balance' => $wallet ? (float) $wallet['balance'] : 0,
             'version'       => LTMS_VERSION,
-            'polling_interval' => 30000, // 30 segundos para notificaciones
+            'polling_interval' => 30000,
+            'logout_url'    => wp_logout_url( home_url( '/login-vendedor/' ) ), // 30 segundos para notificaciones
             'i18n'          => [
                 'loading'      => __( 'Cargando...', 'ltms' ),
                 'error'        => __( 'Error al cargar datos', 'ltms' ),
