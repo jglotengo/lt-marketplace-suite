@@ -155,9 +155,9 @@ final class LTMS_Public_Auth_Handler {
             'confirm_pass'   => $_POST['password_confirm'] ?? '', // phpcs:ignore
             'phone'          => sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ), // phpcs:ignore
             'store_name'     => sanitize_text_field( wp_unslash( $_POST['store_name'] ?? '' ) ), // phpcs:ignore
-            'document'       => sanitize_text_field( wp_unslash( $_POST['document'] ?? '' ) ), // phpcs:ignore
+            'document_number'  => sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ), // phpcs:ignore
             'referral_code'  => sanitize_text_field( wp_unslash( $_POST['referral_code'] ?? '' ) ), // phpcs:ignore
-            'terms_accepted' => ! empty( $_POST['terms_accepted'] ), // phpcs:ignore
+            'terms_accepted' => ! empty( $_POST['accept_terms'] ), // phpcs:ignore
         ];
 
         // Validaciones
@@ -193,7 +193,7 @@ final class LTMS_Public_Auth_Handler {
 
         update_user_meta( $user_id, 'ltms_store_name', $data['store_name'] );
         update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
-        update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
+        update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document_number'] ) );
         update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
         update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
         update_user_meta( $user_id, 'ltms_referral_code', LTMS_Core_Security::generate_referral_code() );
@@ -216,7 +216,7 @@ final class LTMS_Public_Auth_Handler {
                     'last_name'   => $data['last_name'],
                     'email'       => $data['email'],
                     'phone'       => $data['phone'],
-                    'document'    => $data['document'],
+                    'document'    => $data['document_number'],
                     'sponsor_code' => $data['referral_code'],
                 ]);
             } catch ( \Throwable $e ) {
@@ -338,7 +338,7 @@ final class LTMS_Public_Auth_Handler {
         if ( empty( $data['store_name'] ) ) {
             $errors[] = __( 'El nombre de tu tienda es requerido.', 'ltms' );
         }
-        if ( empty( $data['document'] ) ) {
+        if ( empty( $data['document_number'] ) ) {
             $errors[] = __( 'El número de documento es requerido.', 'ltms' );
         }
         if ( ! $data['terms_accepted'] ) {
