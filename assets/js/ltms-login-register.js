@@ -177,7 +177,12 @@
         },
 
         showFormError(formSelector, message) {
-            const $notice = $(formSelector).find('.ltms-form-notice');
+            // Intentar con .ltms-form-notice dentro del form
+            let $notice = $(formSelector).find('.ltms-form-notice');
+            // Fallback: usar #ltms-register-notice si existe
+            if (!$notice.length) {
+                $notice = $('#ltms-register-notice');
+            }
             if ($notice.length) {
                 $notice.removeClass('ltms-notice-success').addClass('ltms-notice-error').text(message).show();
             }
