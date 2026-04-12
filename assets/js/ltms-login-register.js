@@ -108,6 +108,15 @@
                 e.preventDefault();
                 const $form = $(this);
 
+                // Fallback defensivo por si ltmsAuth fue sobrescrito sin i18n
+                if (!ltmsAuth.i18n) {
+                    ltmsAuth.i18n = {
+                        password_mismatch: 'Las contraseñas no coinciden.',
+                        required_fields:   'Por favor completa todos los campos requeridos.',
+                        processing:        'Procesando...',
+                    };
+                }
+
                 // Validar contraseñas
                 const pass1 = $form.find('[name="password"]').val();
                 const pass2 = $form.find('[name="confirm_password"]').val();
