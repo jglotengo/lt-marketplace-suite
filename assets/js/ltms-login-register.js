@@ -9,6 +9,15 @@
 (function ($) {
     'use strict';
 
+    // Asegurar que ltmsAuth tenga i18n aunque se haya sobrescrito
+    if (typeof ltmsAuth !== 'undefined' && !ltmsAuth.i18n) {
+        ltmsAuth.i18n = {
+            password_mismatch: 'Las contraseñas no coinciden.',
+            required_fields:   'Por favor completa todos los campos requeridos.',
+            processing:        'Procesando...',
+        };
+    }
+
     window.LTMS = window.LTMS || {};
 
     /**
