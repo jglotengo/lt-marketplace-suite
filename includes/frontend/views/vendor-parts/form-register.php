@@ -30,7 +30,7 @@ $country = LTMS_Core_Config::get_country();
     <div id="ltms-register-notice" class="ltms-notice" style="display:none;" role="alert"></div>
 
     <!-- Pasos del wizard -->
-    <div class="ltms-wizard-steps" aria-label="<?php esc_attr_e( 'Pasos del registro', 'ltms' ); ?>">
+    <div class="ltms-steps" aria-label="<?php esc_attr_e( 'Pasos del registro', 'ltms' ); ?>">
         <div class="ltms-step active" data-step="1"><?php esc_html_e( 'Datos Personales', 'ltms' ); ?></div>
         <div class="ltms-step" data-step="2"><?php esc_html_e( 'Tu Tienda', 'ltms' ); ?></div>
         <div class="ltms-step" data-step="3"><?php esc_html_e( 'Seguridad', 'ltms' ); ?></div>
