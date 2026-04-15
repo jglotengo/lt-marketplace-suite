@@ -134,16 +134,18 @@
                     method: 'POST',
                     data: $form.serialize() + '&action=ltms_vendor_register&nonce=' + ltmsAuth.nonce,
                     success(response) {
-                        $btn.prop('disabled', false);
-                        if (response.success) {
+                        $btn.prop('disabled', false).text('Crear Cuenta');
+                        if (response && response.success) {
                             window.location.href = response.data.redirect;
                         } else {
-                            LTMS.Auth.showFormError('#ltms-register-form', response.data);
+                            var msg = (response && response.data) ? response.data : 'Error al procesar el registro. Intenta de nuevo.';
+                            LTMS.Auth.showFormError('#ltms-register-form', msg);
                         }
                     },
-                    error() {
-                        $btn.prop('disabled', false);
-                        LTMS.Auth.showFormError('#ltms-register-form', 'Error de conexión.');
+                    error(xhr) {
+                        $btn.prop('disabled', false).text('Crear Cuenta');
+                        var msg = 'Error de conexión (HTTP ' + xhr.status + '). Intenta de nuevo.';
+                        LTMS.Auth.showFormError('#ltms-register-form', msg);
                     },
                 });
             });

@@ -65,7 +65,7 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
                 // Network falló: intentar desde cache
-                return caches.match(event.request);
+                return caches.match(event.request).then(cached => cached || Response.error());
             })
     );
 });
