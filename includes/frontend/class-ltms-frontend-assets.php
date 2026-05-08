@@ -44,8 +44,10 @@ final class LTMS_Frontend_Assets {
      * @return void
      */
     public function enqueue_frontend_assets(): void {
+        $is_prod = defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production';
         $ver     = LTMS_VERSION;
         $url     = LTMS_ASSETS_URL;
+        $suffix  = $is_prod ? '.min' : '';
         $page_id = get_queried_object_id();
         $pages   = $this->get_installed_pages();
 
@@ -67,20 +69,20 @@ final class LTMS_Frontend_Assets {
 
         // Dashboard del vendedor (SPA)
         if ( $page_id === (int) ( $pages['ltms-dashboard'] ?? 0 ) ) {
-            $this->enqueue_dashboard_assets( $url, $ver );
+            $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
 
         // Checkout / Pasarela de pagos
         if ( is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 ) ) {
-            $this->enqueue_checkout_assets( $url, $ver );
-            $this->enqueue_shipping_selector( $url, $ver );
-            $this->enqueue_stripe_assets( $url, $ver );
+            $this->enqueue_checkout_assets( $url, $ver, $suffix );
+            $this->enqueue_shipping_selector( $url, $ver, $suffix );
+            $this->enqueue_stripe_assets( $url, $ver, $suffix );
         }
 
         // Login y Registro de vendedores
         if ( $page_id === (int) ( $pages['ltms-login'] ?? 0 ) ||
-             $page_id === (int) ( $pages['ltms-register'] ?? 0 ) ) {
-            $this->enqueue_auth_assets( $url, $ver );
+             $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 ) ) {
+            $this->enqueue_auth_assets( $url, $ver, $suffix );
         }
     }
 
@@ -91,12 +93,12 @@ final class LTMS_Frontend_Assets {
      * @param string $ver Versión para cache busting.
      * @return void
      */
-    private function enqueue_dashboard_assets( string $url, string $ver ): void {
+    private function enqueue_dashboard_assets( string $url, string $ver, string $suffix = '' ): void {
         wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
 
         wp_enqueue_script(
             'ltms-modal',
-            $url . 'js/ltms-modal.js',
+            $url . 'js/ltms-modal' . $suffix . '.js',
             [ 'jquery' ],
             $ver,
             true
@@ -104,7 +106,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-notifications',
-            $url . 'js/ltms-notifications.js',
+            $url . 'js/ltms-notifications' . $suffix . '.js',
             [ 'jquery', 'ltms-modal' ],
             $ver,
             true
@@ -120,7 +122,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-dashboard',
-            $url . 'js/ltms-dashboard.js',
+            $url . 'js/ltms-dashboard' . $suffix . '.js',
             [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications' ],
             $ver,
             true
@@ -136,48 +138,25 @@ final class LTMS_Frontend_Assets {
      * @param string $ver Versión.
      * @return void
      */
-    private function enqueue_checkout_assets( string $url, string $ver ): void {
+    private function enqueue_checkout_assets( string $url, string $ver, string $suffix = '' ): void {
         $country = LTMS_Core_Config::get_country();
 
         // Openpay JS SDK
         if ( $country === 'CO' ) {
-            wp_enqueue_script(
-                'openpay-js',
-                'https://js.openpay.co/openpay.v1.min.js',
-                [],
-                '1.0',
-                true
-            );
-            wp_enqueue_script(
-                'openpay-data',
-                'https://js.openpay.co/openpay-data.v1.min.js',
-                [ 'openpay-js' ],
-                '1.0',
-                true
-            );
+            wp_enqueue_script( 'openpay-js',   'https://js.openpay.co/openpay.v1.min.js',      [], '1.0', true );
+            wp_enqueue_script( 'openpay-data', 'https://js.openpay.co/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
         } elseif ( $country === 'MX' ) {
-            wp_enqueue_script(
-                'openpay-js',
-                'https://js.openpay.mx/openpay.v1.min.js',
-                [],
-                '1.0',
-                true
-            );
-            wp_enqueue_script(
-                'openpay-data',
-                'https://js.openpay.mx/openpay-data.v1.min.js',
-                [ 'openpay-js' ],
-                '1.0',
-                true
-            );
+            wp_enqueue_script( 'openpay-js',   'https://js.openpay.mx/openpay.v1.min.js',      [], '1.0', true );
+            wp_enqueue_script( 'openpay-data', 'https://js.openpay.mx/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
 
+            // ISSUE-009 confirmado: ltms-checkout-mexico solo carga en MX
             wp_enqueue_style( 'ltms-checkout-mexico', $url . 'css/ltms-checkout-mexico.css', [], $ver );
-            wp_enqueue_script( 'ltms-checkout-mexico', $url . 'js/ltms-checkout-mexico.js', [ 'jquery', 'openpay-js' ], $ver, true );
+            wp_enqueue_script( 'ltms-checkout-mexico', $url . 'js/ltms-checkout-mexico' . $suffix . '.js', [ 'jquery', 'openpay-js' ], $ver, true );
         }
 
         wp_enqueue_script(
             'ltms-checkout',
-            $url . 'js/ltms-checkout.js',
+            $url . 'js/ltms-checkout' . $suffix . '.js',
             [ 'jquery', 'openpay-js', 'openpay-data' ],
             $ver,
             true
@@ -193,26 +172,20 @@ final class LTMS_Frontend_Assets {
      * @param string $ver Versión.
      * @return void
      */
-    private function enqueue_stripe_assets( string $url, string $ver ): void {
+    private function enqueue_stripe_assets( string $url, string $ver, string $suffix = '' ): void {
         $pub_key = LTMS_Core_Config::get( 'ltms_stripe_test_mode' )
             ? LTMS_Core_Config::get( 'ltms_stripe_test_publishable_key' )
             : LTMS_Core_Config::get( 'ltms_stripe_live_publishable_key' );
 
         if ( empty( $pub_key ) ) {
-            return; // Stripe not configured — skip
+            return;
         }
 
-        wp_enqueue_script(
-            'stripe-js',
-            'https://js.stripe.com/v3/',
-            [],
-            null, // Stripe requires no version query string
-            true
-        );
+        wp_enqueue_script( 'stripe-js', 'https://js.stripe.com/v3/', [], null, true );
 
         wp_enqueue_script(
             'ltms-stripe',
-            $url . 'js/ltms-stripe.js',
+            $url . 'js/ltms-stripe' . $suffix . '.js',
             [ 'jquery', 'stripe-js' ],
             $ver,
             true
@@ -227,17 +200,10 @@ final class LTMS_Frontend_Assets {
         ] );
     }
 
-    /**
-     * Carga el selector de envío en la página de checkout (v1.6.0).
-     *
-     * @param string $url URL base.
-     * @param string $ver Versión.
-     * @return void
-     */
-    private function enqueue_shipping_selector( string $url, string $ver ): void {
+    private function enqueue_shipping_selector( string $url, string $ver, string $suffix = '' ): void {
         wp_enqueue_script(
             'ltms-shipping-selector',
-            $url . 'js/ltms-shipping-selector.js',
+            $url . 'js/ltms-shipping-selector' . $suffix . '.js',
             [ 'jquery' ],
             $ver,
             true
@@ -255,18 +221,11 @@ final class LTMS_Frontend_Assets {
         ]);
     }
 
-    /**
-     * Carga los assets de login/registro de vendedores.
-     *
-     * @param string $url URL base.
-     * @param string $ver Versión.
-     * @return void
-     */
-    private function enqueue_auth_assets( string $url, string $ver ): void {
+    private function enqueue_auth_assets( string $url, string $ver, string $suffix = '' ): void {
         wp_enqueue_style( 'ltms-login-register', $url . 'css/ltms-login-register.css', [], $ver );
         wp_enqueue_script(
             'ltms-login-register',
-            $url . 'js/ltms-login-register.js',
+            $url . 'js/ltms-login-register' . $suffix . '.js',
             [ 'jquery' ],
             $ver,
             true
@@ -301,7 +260,8 @@ final class LTMS_Frontend_Assets {
             'user_id'       => $user_id,
             'wallet_balance' => $wallet ? (float) $wallet['balance'] : 0,
             'version'       => LTMS_VERSION,
-            'polling_interval' => 30000, // 30 segundos para notificaciones
+            'polling_interval' => 30000,
+            'logout_url'    => wp_logout_url( home_url( '/login-vendedor/' ) ), // 30 segundos para notificaciones
             'i18n'          => [
                 'loading'      => __( 'Cargando...', 'ltms' ),
                 'error'        => __( 'Error al cargar datos', 'ltms' ),

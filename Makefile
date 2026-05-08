@@ -10,7 +10,7 @@ DIST_DIR      = ./dist
 WP_TESTS_DIR  = /tmp/wordpress-tests-lib
 WP_CORE_DIR   = /tmp/wordpress
 
-.PHONY: help install build clean test lint phpcs phpstan i18n dist zip deploy dev-up dev-down db-reset
+.PHONY: help install build minify-js minify-css clean test lint phpcs phpstan i18n dist zip deploy dev-up dev-down db-reset
 
 # ── Help ─────────────────────────────────────────────────────────
 
@@ -102,6 +102,30 @@ build: ## Construye los assets JS/CSS de producción
 		done; \
 	fi
 	@echo "✅ Build complete"
+
+minify-js: ## Minifica solo los archivos JS de assets/js/ → *.min.js
+	@echo "Minifying JS assets..."
+	@command -v npx >/dev/null 2>&1 || { echo "ERROR: npx no encontrado. Ejecuta: npm install"; exit 1; }
+	@for f in assets/js/*.js; do \
+		[ "$${f%.min.js}" = "$$f" ] || continue; \
+		out="$${f%.js}.min.js"; \
+		npx terser "$$f" -o "$$out" --compress --mangle 2>/dev/null \
+			&& echo "  ✓ $$out" \
+			|| { echo "  ⚠ terser falló para $$f, copiando sin minificar"; cp "$$f" "$$out"; }; \
+	done
+	@echo "✅ JS minificado"
+
+minify-css: ## Minifica solo los archivos CSS de assets/css/ → *.min.css
+	@echo "Minifying CSS assets..."
+	@command -v npx >/dev/null 2>&1 || { echo "ERROR: npx no encontrado. Ejecuta: npm install"; exit 1; }
+	@for f in assets/css/*.css; do \
+		[ "$${f%.min.css}" = "$$f" ] || continue; \
+		out="$${f%.css}.min.css"; \
+		npx cleancss -o "$$out" "$$f" 2>/dev/null \
+			&& echo "  ✓ $$out" \
+			|| { echo "  ⚠ cleancss falló para $$f, copiando sin minificar"; cp "$$f" "$$out"; }; \
+	done
+	@echo "✅ CSS minificado"
 
 # ── Distribution ──────────────────────────────────────────────────
 

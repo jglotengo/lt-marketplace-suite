@@ -751,6 +751,37 @@ final class LTMS_DB_Migrations {
             KEY `idx_country` (`country_code`)
         ) {$charset}";
 
+        // lt_legal_snapshots — Evidencia inmutable de aceptación de T&C / contratos legales
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_legal_snapshots` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`       BIGINT UNSIGNED NOT NULL,
+            `order_id`      BIGINT UNSIGNED DEFAULT NULL,
+            `document_type` VARCHAR(60)     NOT NULL DEFAULT 'terms',
+            `document_hash` VARCHAR(64)     NOT NULL COMMENT 'SHA-256 del contenido del documento',
+            `ip_address`    VARCHAR(45)     DEFAULT NULL,
+            `user_agent`    VARCHAR(512)    DEFAULT NULL,
+            `accepted_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_user`     (`user_id`),
+            KEY `idx_order`    (`order_id`),
+            KEY `idx_doc_type` (`document_type`)
+        ) {$charset}";
+
+        // lt_wallet_holds — Saldos retenidos de la billetera (en tránsito / pendientes de aprobación)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`   BIGINT UNSIGNED NOT NULL,
+            `amount`      DECIMAL(15,2)   NOT NULL,
+            `reason`      VARCHAR(255)    NOT NULL DEFAULT '',
+            `reference`   VARCHAR(100)    DEFAULT NULL COMMENT 'ID externo: payout_id, order_id, etc.',
+            `status`      VARCHAR(20)     NOT NULL DEFAULT 'active' COMMENT 'active | released | cancelled',
+            `created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `released_at` DATETIME        DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor` (`vendor_id`),
+            KEY `idx_status` (`status`)
+        ) {$charset}";
+
         foreach ( $sqls as $sql ) {
             dbDelta( $sql );
         }

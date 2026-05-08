@@ -1,6 +1,6 @@
 ================================================================================
  LT MARKETPLACE SUITE — INSTRUCCIONES DE DESPLIEGUE
- Versión 1.7.0
+ Versión 2.0.1
 ================================================================================
 
 TABLA DE CONTENIDOS
@@ -63,7 +63,7 @@ PHP Extensions Requeridas
 
 2. Subir el ZIP:
    Administrador de archivos cPanel > wp-content/plugins/
-   Subir lt-marketplace-suite-1.5.0.zip
+   Subir lt-marketplace-suite-2.0.1.zip
    Extraer el ZIP
 
 3. Configurar wp-config.php:
@@ -234,5 +234,5 @@ En el servidor:
   cp -r /tmp/ltms-backup-TIMESTAMP/ /path/to/plugins/lt-marketplace-suite/
 
 ================================================================================
- FIN DE LAS INSTRUCCIONES DE DESPLIEGUE — LT Marketplace Suite v1.5.0
+ FIN DE LAS INSTRUCCIONES DE DESPLIEGUE — LT Marketplace Suite v2.0.1
 ================================================================================
