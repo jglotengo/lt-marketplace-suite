@@ -70,3 +70,18 @@ class LTMS_Products_Ajax {
 }
 
 add_action( 'plugins_loaded', function() { new LTMS_Products_Ajax(); }, 20 );
+
+// Permitir acceso al wp-admin para crear/editar productos
+add_filter('user_has_cap', function($caps, $cap_list, $args) {
+    if (!empty($caps['edit_products'])) {
+        $caps['read'] = true;
+    }
+    return $caps;
+}, 10, 3);
+
+add_filter('woocommerce_prevent_admin_access', function($prevent) {
+    if (current_user_can('edit_products')) {
+        return false;
+    }
+    return $prevent;
+});
