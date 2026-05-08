@@ -262,6 +262,8 @@ final class LTMS_Frontend_Assets {
             'version'       => LTMS_VERSION,
             'polling_interval' => 30000,
             'logout_url'    => wp_logout_url( home_url( '/login-vendedor/' ) ), // 30 segundos para notificaciones
+            'add_product_url' => admin_url( 'post-new.php?post_type=product' ),
+            'kyc_url'         => home_url( '/verificacion-identidad/' ),
             'i18n'          => [
                 'loading'      => __( 'Cargando...', 'ltms' ),
                 'error'        => __( 'Error al cargar datos', 'ltms' ),
