@@ -485,6 +485,9 @@ function ltms_run(): void {
         }
     });
 
+    // Cargar AJAX handlers de productos
+    require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
+
     // Inicializar el Kernel principal
     if ( class_exists( 'LTMS_Core_Kernel' ) ) {
         try {
