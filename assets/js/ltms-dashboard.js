@@ -595,7 +595,7 @@
                 ? '<tr><td colspan="5" style="text-align:center;padding:20px;">Aún no tienes productos.</td></tr>'
                 : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><a href="${p.edit_url}" class="ltms-btn ltms-btn-sm">Editar</a></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
-            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><a href="${addUrl}" class="ltms-btn ltms-btn-primary">+ Nuevo Producto</a></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" onclick="window.location.href='${addUrl}'">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
         },
         loadSettingsView(forceRefresh = false) {
             const self = this;
