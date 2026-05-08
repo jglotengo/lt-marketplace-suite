@@ -574,6 +574,83 @@
             });
         },
 
+
+        loadProductsView(forceRefresh = false) {
+            const self = this;
+            self.showLoader();
+            $.ajax({
+                url: ltmsDashboard.ajax_url, method: 'POST',
+                data: { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce },
+                success(response) {
+                    self.hideLoader();
+                    self.renderProductsView(response.success ? response.data : {});
+                    self.showSection('#ltms-view-products');
+                },
+                error: () => { self.hideLoader(); self.showSection('#ltms-view-products'); },
+            });
+        },
+        renderProductsView(data) {
+            const products = (data && data.products) ? data.products : [];
+            let rows = products.length === 0
+                ? '<tr><td colspan="5" style="text-align:center;padding:20px;">Aún no tienes productos.</td></tr>'
+                : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><a href="${p.edit_url}" class="ltms-btn ltms-btn-sm">Editar</a></td></tr>`).join('');
+            const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
+            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><a href="${addUrl}" class="ltms-btn ltms-btn-primary">+ Nuevo Producto</a></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+        },
+        loadSettingsView(forceRefresh = false) {
+            const self = this;
+            self.showLoader();
+            $.ajax({
+                url: ltmsDashboard.ajax_url, method: 'POST',
+                data: { action: 'ltms_get_vendor_settings', nonce: ltmsDashboard.nonce },
+                success(response) {
+                    self.hideLoader();
+                    self.renderSettingsView(response.success ? response.data : {});
+                    self.showSection('#ltms-view-settings');
+                },
+                error: () => { self.hideLoader(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
+            });
+        },
+        renderSettingsView(data) {
+            const kyc = data.kyc_status || 'pending';
+            const kycLabel = {pending:'Pendiente',approved:'Aprobado',rejected:'Rechazado'}[kyc] || kyc;
+            const kycColor = {pending:'#f59e0b',approved:'#10b981',rejected:'#ef4444'}[kyc] || '#888';
+            const store = data.store || {};
+            const kycUrl = ltmsDashboard.kyc_url || '/verificacion-identidad/';
+            const kycBlock = kyc !== 'approved'
+                ? `<p style="margin:10px 0;color:#666;">Para solicitar retiros, debes completar la verificación de identidad.</p><a href="${kycUrl}" class="ltms-btn ltms-btn-outline">Completar KYC</a>`
+                : '<p style="color:#10b981;">✓ Identidad verificada.</p>';
+            $('#ltms-view-settings').html(`
+                <h3 style="margin-bottom:20px;">Configuración de Mi Cuenta</h3>
+                <div class="ltms-card" style="margin-bottom:20px;padding:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong>Verificación de Identidad (KYC)</strong>
+                        <span style="color:${kycColor};font-weight:600;">${kycLabel}</span>
+                    </div>${kycBlock}
+                </div>
+                <div class="ltms-card" style="padding:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <h4 style="margin-bottom:15px;">Datos de la Tienda</h4>
+                    <div class="ltms-form-group"><label>Nombre de la Tienda</label><input type="text" class="ltms-form-control" name="store_name" value="${this.escapeHtml(store.name||'')}" placeholder="Mi Tienda"></div>
+                    <div class="ltms-form-group"><label>Teléfono de Contacto</label><input type="text" class="ltms-form-control" name="store_phone" value="${this.escapeHtml(store.phone||'')}" placeholder="+57 300 000 0000"></div>
+                    <div class="ltms-form-group"><label>Descripción</label><textarea class="ltms-form-control" name="store_description" rows="3">${this.escapeHtml(store.description||'')}</textarea></div>
+                    <div class="ltms-form-group"><label>Banco para Retiros</label><input type="text" class="ltms-form-control" name="bank_info" value="${this.escapeHtml(store.bank_info||'')}" placeholder="Banco / No. Cuenta"></div>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-settings-btn">💾 Guardar Cambios</button>
+                    <span class="ltms-settings-msg" style="margin-left:10px;display:none;"></span>
+                </div>`);
+            $(document).off('click','.ltms-save-settings-btn').on('click','.ltms-save-settings-btn', function() {
+                const btn=$(this); btn.prop('disabled',true).text('Guardando...');
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
+                    data:{ action:'ltms_save_vendor_settings', nonce:ltmsDashboard.nonce,
+                        store_name:$('[name="store_name"]').val(), store_phone:$('[name="store_phone"]').val(),
+                        store_description:$('[name="store_description"]').val(), bank_info:$('[name="bank_info"]').val() },
+                    success(r) { btn.prop('disabled',false).text('💾 Guardar Cambios');
+                        const m=$('.ltms-settings-msg');
+                        m.text(r.success?'✓ Guardado':'Error al guardar').css('color',r.success?'#10b981':'#ef4444').show();
+                        setTimeout(()=>m.hide(),3000); },
+                    error(){ btn.prop('disabled',false).text('💾 Guardar Cambios'); }
+                });
+            });
+        },
         /**
          * Carga una vista genérica como fallback.
          *
