@@ -255,7 +255,7 @@ final class LTMS_Roles {
         }
 
         $capability = $args[0] ?? '';
-        $object_id  = (int) $args[2];
+        $object_id  = is_object( $args[2] ) ? 0 : (int) $args[2];
 
         // Restricción: Vendedor (estándar y premium) solo puede editar sus propios productos
         if (
