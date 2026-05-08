@@ -577,16 +577,16 @@
 
         loadProductsView(forceRefresh = false) {
             const self = this;
-            self.showLoader();
+            self.showViewLoader();
             $.ajax({
                 url: ltmsDashboard.ajax_url, method: 'POST',
                 data: { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce },
                 success(response) {
-                    self.hideLoader();
+                    self.hideViewLoader();
                     self.renderProductsView(response.success ? response.data : {});
                     self.showSection('#ltms-view-products');
                 },
-                error: () => { self.hideLoader(); self.showSection('#ltms-view-products'); },
+                error: () => { self.hideViewLoader(); self.showSection('#ltms-view-products'); },
             });
         },
         renderProductsView(data) {
@@ -599,16 +599,16 @@
         },
         loadSettingsView(forceRefresh = false) {
             const self = this;
-            self.showLoader();
+            self.showViewLoader();
             $.ajax({
                 url: ltmsDashboard.ajax_url, method: 'POST',
                 data: { action: 'ltms_get_vendor_settings', nonce: ltmsDashboard.nonce },
                 success(response) {
-                    self.hideLoader();
+                    self.hideViewLoader();
                     self.renderSettingsView(response.success ? response.data : {});
                     self.showSection('#ltms-view-settings');
                 },
-                error: () => { self.hideLoader(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
+                error: () => { self.hideViewLoader(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
             });
         },
         renderSettingsView(data) {
