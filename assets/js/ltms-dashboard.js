@@ -582,11 +582,11 @@
                 url: ltmsDashboard.ajax_url, method: 'POST',
                 data: { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce },
                 success(response) {
-                    self.hideViewLoader();
+                    $('.ltms-view-loader').hide();
                     self.renderProductsView(response.success ? response.data : {});
                     self.showSection('#ltms-view-products');
                 },
-                error: () => { self.hideViewLoader(); self.showSection('#ltms-view-products'); },
+                error: () => { $('.ltms-view-loader').hide(); self.showSection('#ltms-view-products'); },
             });
         },
         renderProductsView(data) {
@@ -604,11 +604,11 @@
                 url: ltmsDashboard.ajax_url, method: 'POST',
                 data: { action: 'ltms_get_vendor_settings', nonce: ltmsDashboard.nonce },
                 success(response) {
-                    self.hideViewLoader();
+                    $('.ltms-view-loader').hide();
                     self.renderSettingsView(response.success ? response.data : {});
                     self.showSection('#ltms-view-settings');
                 },
-                error: () => { self.hideViewLoader(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
+                error: () => { $('.ltms-view-loader').hide(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
             });
         },
         renderSettingsView(data) {
