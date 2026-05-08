@@ -488,6 +488,14 @@ function ltms_run(): void {
     // Cargar AJAX handlers de productos
     require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
 
+    // Permitir acceso wp-admin a vendedores con edit_products
+    add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
+        if ( current_user_can( 'edit_products' ) ) {
+            return false;
+        }
+        return $prevent;
+    }, 1 );
+
     // Inicializar el Kernel principal
     if ( class_exists( 'LTMS_Core_Kernel' ) ) {
         try {
