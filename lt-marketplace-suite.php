@@ -488,6 +488,24 @@ function ltms_run(): void {
     // Cargar AJAX handlers de productos
     require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
 
+    // Permitir acceso wp-admin a vendedores solo para crear/editar productos
+    add_action( 'admin_init', function() {
+        if ( ! is_user_logged_in() ) return;
+        if ( current_user_can( 'manage_options' ) ) return;
+        if ( ! current_user_can( 'edit_products' ) ) return;
+        // Permitir solo post-new.php y post.php para productos
+        $script = isset( $_SERVER['SCRIPT_NAME'] ) ? basename( $_SERVER['SCRIPT_NAME'] ) : '';
+        $post_type = isset( $_GET['post_type'] ) ? $_GET['post_type'] : '';
+        $allowed = ( $script === 'post-new.php' && $post_type === 'product' )
+                || ( $script === 'post.php' )
+                || ( $script === 'admin-ajax.php' )
+                || ( $script === 'async-upload.php' );
+        if ( ! $allowed ) {
+            wp_safe_redirect( home_url( '/panel-vendedor/' ) );
+            exit;
+        }
+    }, 1 );
+
     // Permitir acceso wp-admin a vendedores con edit_products
     add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
         if ( current_user_can( 'edit_products' ) ) {
