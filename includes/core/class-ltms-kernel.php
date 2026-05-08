@@ -370,6 +370,9 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Vendor_Settings_Saver' ) ) {
             LTMS_Vendor_Settings_Saver::init();
         }
+        if ( class_exists( 'LTMS_Products_Ajax' ) ) {
+            new LTMS_Products_Ajax();
+        }
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }
