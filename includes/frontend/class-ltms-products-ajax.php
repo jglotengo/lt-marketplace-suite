@@ -69,4 +69,4 @@ class LTMS_Products_Ajax {
     }
 }
 
-new LTMS_Products_Ajax();
+add_action( 'plugins_loaded', function() { new LTMS_Products_Ajax(); }, 20 );
