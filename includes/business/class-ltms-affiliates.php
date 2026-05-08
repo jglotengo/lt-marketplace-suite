@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * LTMS Affiliates - Gestión de Red de Afiliados y Comisiones MLM
  *
