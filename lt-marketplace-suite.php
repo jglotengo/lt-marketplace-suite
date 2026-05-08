@@ -204,6 +204,7 @@ function ltms_load_autoloader(): void {
                 'ltms-security'   => 'core/class-ltms-security.php',
                 'ltms-firewall'   => 'core/class-ltms-firewall.php',
                 'ltms-affiliates' => 'business/class-ltms-affiliates.php',
+        'ltms-products-ajax' => 'frontend/class-ltms-products-ajax.php',
             ];
 
             if ( isset( $two_part_exceptions[ $class_file ] ) ) {
