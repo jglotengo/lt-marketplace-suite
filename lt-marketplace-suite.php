@@ -489,13 +489,13 @@ function ltms_run(): void {
     require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
 
 
-// Bloquear redirect WooCommerce para vendedores con edit_products (init prioridad 1)
-add_action( 'init', function() {
-    if ( ! is_user_logged_in() ) return;
-    if ( current_user_can( 'manage_options' ) ) return;
-    if ( ! current_user_can( 'edit_products' ) ) return;
-    add_filter( 'woocommerce_prevent_admin_access', '__return_false', 999 );
-}, 1 );
+// Bloquear redirect WooCommerce para vendedores con edit_products
+add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
+    if ( current_user_can( 'edit_products' ) ) {
+        return false;
+    }
+    return $prevent;
+}, 999 );
 
     // Permitir acceso wp-admin a vendedores solo para crear/editar productos
     add_action( 'admin_init', function() {
@@ -515,13 +515,6 @@ add_action( 'init', function() {
         }
     }, 1 );
 
-    // Permitir acceso wp-admin a vendedores con edit_products
-    add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
-        if ( current_user_can( 'edit_products' ) ) {
-            return false;
-        }
-        return $prevent;
-    }, 1 );
 
     // Inicializar el Kernel principal
     if ( class_exists( 'LTMS_Core_Kernel' ) ) {
