@@ -648,7 +648,7 @@
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
                             '<div id="ltms-np-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
                             '<button type="button" id="ltms-np-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
-                            '<input type="file" id="ltms-np-gallery-input" accept="image/*" style="display:none;" multiple>' +
+                            '<input type="file" id="ltms-np-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
                             '<input type="hidden" id="ltms-np-gallery-ids" value="">' +
                         '</div>' +
                         '<div style="display:flex;gap:10px;margin-top:20px;">' +
@@ -660,7 +660,7 @@
                     jQuery('#ltms-view-products').html(html);
                     jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
                     var npGalleryIds = [];
-                    jQuery('#ltms-np-add-gallery-btn').on('click', function(){ jQuery('#ltms-np-gallery-input').trigger('click'); });
+                    jQuery('#ltms-np-add-gallery-btn').on('click', function(){ var gi=document.getElementById('ltms-np-gallery-input'); gi.multiple=true; gi.click(); });
                     jQuery('#ltms-np-gallery-input').on('change', function() {
                         var files = this.files;
                         if (!files.length) return;
@@ -806,7 +806,7 @@
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
                         '<div id="ltms-ep-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
                         '<button type="button" id="ltms-ep-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
-                        '<input type="file" id="ltms-ep-gallery-input" accept="image/*" style="display:none;" multiple>' +
+                        '<input type="file" id="ltms-ep-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
                         '<input type="hidden" id="ltms-ep-gallery-ids" value="' + (p.gallery_ids ? p.gallery_ids.join(",") : "") + '">' +
                     '</div>' +
                     '<div style="display:flex;gap:10px;margin-top:20px;">' +
@@ -829,7 +829,7 @@
                         jQuery('#ltms-ep-gallery-wrap').append(thumb);
                     });
                 }
-                jQuery('#ltms-ep-add-gallery-btn').on('click', function(){ jQuery('#ltms-ep-gallery-input').trigger('click'); });
+                jQuery('#ltms-ep-add-gallery-btn').on('click', function(){ var gi=document.getElementById('ltms-ep-gallery-input'); gi.multiple=true; gi.click(); });
                 jQuery('#ltms-ep-gallery-input').on('change', function() {
                     var files = this.files;
                     if (!files.length) return;
