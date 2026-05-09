@@ -75,7 +75,7 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 
         <!-- Topbar -->
         <header class="ltms-topbar">
-            <button type="button" class="ltms-mobile-menu-btn" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">☰</button>
+            <button type="button" class="ltms-mobile-menu-btn" id="ltms-mobile-menu-btn">☰</button>
             <h2 class="ltms-topbar-title"><?php esc_html_e( 'Inicio', 'ltms' ); ?></h2>
 
             <div class="ltms-topbar-actions">
