@@ -12,6 +12,7 @@ class LTMS_Products_Ajax {
         add_action( 'wp_ajax_ltms_upload_product_image',  [ $this, 'upload_product_image' ] );
         add_action( 'wp_ajax_ltms_get_product',           [ $this, 'get_product' ] );
         add_action( 'wp_ajax_ltms_update_product',        [ $this, 'update_product' ] );
+        add_action( 'wp_ajax_ltms_delete_product',        [ $this, 'delete_product' ] );
     }
 
     private function check_nonce() {
@@ -202,6 +203,22 @@ class LTMS_Products_Ajax {
             'product_id' => $product_id,
             'message'    => 'Producto creado exitosamente',
         ] );
+    }
+
+
+    public function delete_product() {
+        $this->check_nonce();
+        $product_id = intval( $_POST['product_id'] ?? 0 );
+        $product = wc_get_product( $product_id );
+        if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
+            wp_send_json_error( 'Producto no encontrado o sin permiso', 403 );
+        }
+        $result = wp_delete_post( $product_id, true );
+        if ( $result ) {
+            wp_send_json_success( [ 'message' => 'Producto eliminado' ] );
+        } else {
+            wp_send_json_error( 'No se pudo eliminar el producto' );
+        }
     }
 
 }

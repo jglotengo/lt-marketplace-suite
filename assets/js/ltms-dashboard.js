@@ -594,11 +594,28 @@
             const products = (data && data.products) ? data.products : [];
             let rows = products.length === 0
                 ? '<tr><td colspan="5" style="text-align:center;padding:20px;">Aún no tienes productos.</td></tr>'
-                : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}">Editar</button></td></tr>`).join('');
+                : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}">Editar</button> <button class="ltms-btn ltms-btn-sm ltms-delete-product-btn" data-id="${p.id}" data-name="${this.escapeHtml(p.name)}" style="background:#fee;color:#c00;border:1px solid #f5c6c6;">Eliminar</button></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
             $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
         $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); LTMS.Dashboard.loadNewProductView(); });
             $(document).off('click','.ltms-edit-product-btn').on('click','.ltms-edit-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); var pid=$(this).data('id'); LTMS.Dashboard.loadEditProductView(pid); });
+            $(document).off('click','.ltms-delete-product-btn').on('click','.ltms-delete-product-btn', function(e){
+                e.stopPropagation(); e.preventDefault();
+                var pid=$(this).data('id');
+                var pname=$(this).data('name') || 'este producto';
+                if(!confirm('\u00bfEliminar "' + pname + '"? Esta accion no se puede deshacer.')) return;
+                var nonce=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.nonce:'';
+                var ajaxUrl=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.ajax_url:'/wp-admin/admin-ajax.php';
+                var $btn=$(this);
+                $btn.prop('disabled',true).text('Eliminando...');
+                $.ajax({ url:ajaxUrl, type:'POST', data:{ action:'ltms_delete_product', nonce:nonce, product_id:pid },
+                    success:function(r){
+                        if(r.success){ LTMS.Dashboard.loadView('products'); }
+                        else{ alert('Error: '+(r.data||'No se pudo eliminar')); $btn.prop('disabled',false).text('Eliminar'); }
+                    },
+                    error:function(){ alert('Error de red'); $btn.prop('disabled',false).text('Eliminar'); }
+                });
+            });
         },
         loadNewProductView() {
             const self = this;
