@@ -527,3 +527,25 @@
         gap: 4px !important;
     }
 }
+
+/* ── Fix tabla billetera: ancho mínimo para scroll ── */
+@media (max-width: 768px) {
+    .ltms-ledger-table {
+        min-width: 380px !important;
+    }
+    /* El card-body con scroll no debe tener overflow:hidden del padre */
+    .ltms-card-body.ltms-table-scroll {
+        padding: 0 !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    /* Fondo negro del footer del tema: cubrir con color del panel */
+    .ltms-main-content {
+        background: #f4f7f9 !important;
+    }
+    #ltms-dashboard-container {
+        min-height: 100vh;
+        background: #f4f7f9 !important;
+        padding-bottom: 60px !important;
+    }
+}
