@@ -552,43 +552,30 @@
             const overlay = document.querySelector('.ltms-sidebar-overlay');
 
             /**
-             * Detecta SOLO headers fixed/sticky en la parte SUPERIOR del viewport.
-             * NO usa containerTop porque el panel puede estar al fondo de la página.
+             * La referencia más confiable es el topbar del propio panel:
+             * el sidebar debe arrancar exactamente donde empieza el topbar.
              */
-            const getThemeHeaderHeight = () => {
+            const getSidebarTop = () => {
+                // Usar el topbar del panel como referencia absoluta
+                const topbar = document.querySelector('.ltms-topbar');
+                if (topbar) {
+                    const r = topbar.getBoundingClientRect();
+                    // r.top es la posición del topbar en el viewport actual
+                    return Math.max(0, Math.round(r.top));
+                }
+                // Fallback: buscar cualquier header fixed externo
                 let maxBottom = 0;
-
-                // Escanear TODOS los elementos fixed/sticky fuera del panel
-                // que estén anclados en la parte superior (top < 10px)
                 try {
-                    const all = document.querySelectorAll('header, [id*="header"], [class*="header"], [id*="masthead"], [class*="navbar"], [class*="nav-bar"], [class*="topbar"], [class*="top-bar"]');
-                    all.forEach(el => {
+                    document.querySelectorAll('*').forEach(el => {
                         if (el.closest('#ltms-dashboard-container')) return;
                         const s = window.getComputedStyle(el);
-                        if (s.position !== 'fixed' && s.position !== 'sticky') return;
+                        if (s.position !== 'fixed') return;
                         const r = el.getBoundingClientRect();
-                        // Solo contar si está anclado arriba (top entre -5 y 20px)
-                        if (r.top >= -5 && r.top <= 20 && r.height > 10 && r.height < 300) {
+                        if (r.top >= 0 && r.top <= 10 && r.height > 20 && r.height < 250 && r.width > 150) {
                             if (r.bottom > maxBottom) maxBottom = r.bottom;
                         }
                     });
                 } catch(e) {}
-
-                // Fallback: cualquier fixed con top:0 o top pequeño
-                if (maxBottom === 0) {
-                    try {
-                        document.querySelectorAll('*').forEach(el => {
-                            if (el.closest('#ltms-dashboard-container')) return;
-                            const s = window.getComputedStyle(el);
-                            if (s.position !== 'fixed') return;
-                            const r = el.getBoundingClientRect();
-                            if (r.top >= -2 && r.top <= 5 && r.height > 20 && r.height < 200 && r.width > 100) {
-                                if (r.bottom > maxBottom) maxBottom = r.bottom;
-                            }
-                        });
-                    } catch(e) {}
-                }
-
                 return Math.round(maxBottom);
             };
 
@@ -598,7 +585,7 @@
                     if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
                     return;
                 }
-                const headerH = getThemeHeaderHeight();
+                const headerH = getSidebarTop();
                 const topVal = headerH + 'px';
                 const heightVal = 'calc(100vh - ' + headerH + 'px)';
                 sidebar.style.top = topVal;
