@@ -36,6 +36,7 @@
          * Inicializa el SPA completo.
          */
         init() {
+        window.ltmsDashboardInstance = this;
             this.bindNavigation();
             this.loadView('home');
             this.startNotificationPolling();
@@ -596,7 +597,7 @@
                 : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><a href="${p.edit_url}" class="ltms-btn ltms-btn-sm">Editar</a></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
             $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
-        $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); self.loadNewProductView(); });
+        $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); if(window.ltmsDashboardInstance) window.ltmsDashboardInstance.loadNewProductView(); else self.loadNewProductView(); });
         },
         loadNewProductView() {
             const self = this;
