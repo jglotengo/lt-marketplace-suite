@@ -105,6 +105,8 @@
 }
 
 /* ── Header del Dashboard ───────────────────────────────────── */
+.ltms-mobile-menu-btn { display: none; }
+
 .ltms-topbar {
     height: var(--ltms-header-h);
     background: #fff;
