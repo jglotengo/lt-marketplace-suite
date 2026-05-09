@@ -552,49 +552,42 @@
             const overlay = document.querySelector('.ltms-sidebar-overlay');
 
             /**
-             * Detecta la altura total de todos los headers fixed/sticky
-             * del tema WordPress que están encima del panel.
-             * Funciona con Elementor, Astra, OceanWP, Storefront, etc.
+             * Detecta SOLO headers fixed/sticky en la parte SUPERIOR del viewport.
+             * NO usa containerTop porque el panel puede estar al fondo de la página.
              */
             const getThemeHeaderHeight = () => {
-                const container = document.getElementById('ltms-dashboard-container');
-                if (!container) return 0;
-
-                // Método 1: usar la posición real del contenedor en viewport
-                const containerTop = container.getBoundingClientRect().top;
-                if (containerTop > 10) return Math.round(containerTop);
-
-                // Método 2: buscar headers fixed/sticky del tema
-                const selectors = [
-                    'header.site-header', '#masthead', '.site-header',
-                    '#site-header', '.header-main', '.elementor-section[data-settings*="sticky"]',
-                    '.e--sticky', '[data-elementor-sticky]', '#header',
-                    '.mk-header', '.fusion-header-wrapper', '.et_header_style_left',
-                    '.ast-header-sticky-main-header', '.oceanwp-fixed-header',
-                ];
                 let maxBottom = 0;
-                selectors.forEach(sel => {
-                    const el = document.querySelector(sel);
-                    if (el) {
-                        const style = window.getComputedStyle(el);
-                        if (style.position === 'fixed' || style.position === 'sticky') {
-                            const r = el.getBoundingClientRect();
+
+                // Escanear TODOS los elementos fixed/sticky fuera del panel
+                // que estén anclados en la parte superior (top < 10px)
+                try {
+                    const all = document.querySelectorAll('header, [id*="header"], [class*="header"], [id*="masthead"], [class*="navbar"], [class*="nav-bar"], [class*="topbar"], [class*="top-bar"]');
+                    all.forEach(el => {
+                        if (el.closest('#ltms-dashboard-container')) return;
+                        const s = window.getComputedStyle(el);
+                        if (s.position !== 'fixed' && s.position !== 'sticky') return;
+                        const r = el.getBoundingClientRect();
+                        // Solo contar si está anclado arriba (top entre -5 y 20px)
+                        if (r.top >= -5 && r.top <= 20 && r.height > 10 && r.height < 300) {
                             if (r.bottom > maxBottom) maxBottom = r.bottom;
                         }
-                    }
-                });
-                if (maxBottom > 0) return Math.round(maxBottom);
+                    });
+                } catch(e) {}
 
-                // Método 3: buscar cualquier elemento fixed en la parte superior
-                const allFixed = Array.from(document.querySelectorAll('*')).filter(el => {
-                    if (el.closest('#ltms-dashboard-container')) return false;
-                    const s = window.getComputedStyle(el);
-                    return (s.position === 'fixed' || s.position === 'sticky') && el.getBoundingClientRect().top < 200;
-                });
-                allFixed.forEach(el => {
-                    const r = el.getBoundingClientRect();
-                    if (r.bottom > maxBottom && r.top >= 0) maxBottom = r.bottom;
-                });
+                // Fallback: cualquier fixed con top:0 o top pequeño
+                if (maxBottom === 0) {
+                    try {
+                        document.querySelectorAll('*').forEach(el => {
+                            if (el.closest('#ltms-dashboard-container')) return;
+                            const s = window.getComputedStyle(el);
+                            if (s.position !== 'fixed') return;
+                            const r = el.getBoundingClientRect();
+                            if (r.top >= -2 && r.top <= 5 && r.height > 20 && r.height < 200 && r.width > 100) {
+                                if (r.bottom > maxBottom) maxBottom = r.bottom;
+                            }
+                        });
+                    } catch(e) {}
+                }
 
                 return Math.round(maxBottom);
             };
