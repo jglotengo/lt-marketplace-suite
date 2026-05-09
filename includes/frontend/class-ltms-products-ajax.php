@@ -13,6 +13,7 @@ class LTMS_Products_Ajax {
         add_action( 'wp_ajax_ltms_get_product',           [ $this, 'get_product' ] );
         add_action( 'wp_ajax_ltms_update_product',        [ $this, 'update_product' ] );
         add_action( 'wp_ajax_ltms_delete_product',        [ $this, 'delete_product' ] );
+        add_action( 'wp_ajax_ltms_toggle_product_status', [ $this, 'toggle_product_status' ] );
     }
 
     private function check_nonce() {
@@ -205,6 +206,22 @@ class LTMS_Products_Ajax {
         ] );
     }
 
+
+    public function toggle_product_status() {
+        $this->check_nonce();
+        $product_id = intval( $_POST['product_id'] ?? 0 );
+        $new_status = sanitize_text_field( $_POST['new_status'] ?? '' );
+        if ( ! in_array( $new_status, [ 'publish', 'draft', 'pending' ] ) ) {
+            wp_send_json_error( 'Estado no valido', 400 );
+        }
+        $product = wc_get_product( $product_id );
+        if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
+            wp_send_json_error( 'Producto no encontrado o sin permiso', 403 );
+        }
+        $product->set_status( $new_status );
+        $product->save();
+        wp_send_json_success( [ 'message' => 'Estado actualizado', 'status' => $new_status ] );
+    }
 
     public function delete_product() {
         $this->check_nonce();
