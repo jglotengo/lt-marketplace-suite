@@ -249,7 +249,6 @@ final class LTMS_Public_Auth_Handler {
      * @return void
      */
     public function ajax_vendor_logout(): void {
-        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
         wp_logout();
 
         $pages    = get_option( 'ltms_installed_pages', [] );
