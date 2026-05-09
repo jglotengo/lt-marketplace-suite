@@ -638,7 +638,7 @@
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
-                            '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;" onclick="$('#ltms-np-img-input').click()"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
+                            '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
                             '<input type="file" id="ltms-np-img-input" accept="image/*" style="display:none;">' +
                             '<input type="hidden" id="ltms-np-img-id" value="">' +
                         '</div>' +
@@ -649,6 +649,7 @@
                         '</div>' +
                     '</div>';
                     $('#ltms-view-content').html(html);
+                    $('#ltms-np-img-preview').on('click', function(){ $('#ltms-np-img-input').trigger('click'); });
 
                     // Upload imagen
                     $('#ltms-np-img-input').on('change', function() {
