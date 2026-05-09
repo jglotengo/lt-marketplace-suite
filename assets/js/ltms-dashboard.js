@@ -649,7 +649,7 @@
                             '<button id="ltms-np-cancel" class="ltms-btn" style="background:#f5f5f5;color:#333;">Cancelar</button>' +
                         '</div>' +
                     '</div>';
-                    jQuery('#ltms-view-content').html(html);
+                    jQuery('#ltms-view-products').html(html);
                     jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
 
                     // Upload imagen
