@@ -596,8 +596,117 @@
                 : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><a href="${p.edit_url}" class="ltms-btn ltms-btn-sm">Editar</a></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
             $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
-        $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); var u = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.add_product_url) ? ltmsDashboard.add_product_url : '/wp-admin/post-new.php?post_type=product'; window.location.assign(u); });
+        $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); self.loadNewProductView(); });
         },
+        loadNewProductView() {
+            const self = this;
+            const nonce = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '';
+            // Cargar categorías
+            $.ajax({
+                url: (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php',
+                type: 'POST',
+                data: { action: 'ltms_get_categories', nonce: nonce },
+                success: function(res) {
+                    let catOptions = '<option value="">-- Sin categoría --</option>';
+                    if (res.success && res.data.categories) {
+                        res.data.categories.forEach(function(c) {
+                            catOptions += '<option value="' + c.id + '">' + c.name + '</option>';
+                        });
+                    }
+                    const html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
+                        '<h3 style="margin-bottom:20px;">Nuevo Producto</h3>' +
+                        '<div id="ltms-np-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Nombre del producto *</label>' +
+                            '<input type="text" id="ltms-np-name" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Nombre del producto">' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio (COP) *</label>' +
+                            '<input type="number" id="ltms-np-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0">' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción</label>' +
+                            '<textarea id="ltms-np-desc" rows="4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Descripción del producto"></textarea>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
+                            '<select id="ltms-np-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (dejar vacío = ilimitado)</label>' +
+                            '<input type="number" id="ltms-np-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Cantidad en stock" min="0">' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
+                            '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;" onclick="$('#ltms-np-img-input').click()"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
+                            '<input type="file" id="ltms-np-img-input" accept="image/*" style="display:none;">' +
+                            '<input type="hidden" id="ltms-np-img-id" value="">' +
+                        '</div>' +
+                        '<div style="display:flex;gap:10px;margin-top:20px;">' +
+                            '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;">Publicar Producto</button>' +
+                            '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
+                            '<button id="ltms-np-cancel" class="ltms-btn" style="background:#f5f5f5;color:#333;">Cancelar</button>' +
+                        '</div>' +
+                    '</div>';
+                    $('#ltms-view-content').html(html);
+
+                    // Upload imagen
+                    $('#ltms-np-img-input').on('change', function() {
+                        const file = this.files[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('action', 'ltms_upload_product_image');
+                        formData.append('nonce', nonce);
+                        formData.append('image', file);
+                        const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
+                        $.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
+                            success: function(r) {
+                                if (r.success) {
+                                    $('#ltms-np-img-id').val(r.data.attachment_id);
+                                    $('#ltms-np-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
+                                }
+                            }
+                        });
+                    });
+
+                    // Cancelar
+                    $('#ltms-np-cancel').on('click', function() { self.loadView('products'); });
+
+                    // Submit
+                    function submitProduct(status) {
+                        const name = $('#ltms-np-name').val().trim();
+                        const price = $('#ltms-np-price').val();
+                        if (!name || !price) {
+                            $('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
+                            return;
+                        }
+                        $('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
+                        const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
+                        $.ajax({ url: ajaxUrl, type: 'POST', data: {
+                            action: 'ltms_create_product', nonce: nonce,
+                            name: name, price: price, status: status,
+                            description: $('#ltms-np-desc').val(),
+                            category_id: $('#ltms-np-cat').val(),
+                            stock: $('#ltms-np-stock').val(),
+                            image_id: $('#ltms-np-img-id').val()
+                        }, success: function(r) {
+                            if (r.success) {
+                                $('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
+                                setTimeout(function() { self.loadView('products'); }, 1500);
+                            } else {
+                                $('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
+                                $('#ltms-np-submit, #ltms-np-draft').prop('disabled', false);
+                                $('#ltms-np-submit').text('Publicar Producto');
+                                $('#ltms-np-draft').text('Guardar Borrador');
+                            }
+                        }});
+                    }
+                    $('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
+                    $('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
+                }
+            });
+        },
+
         loadSettingsView(forceRefresh = false) {
             const self = this;
             self.showViewLoader();
