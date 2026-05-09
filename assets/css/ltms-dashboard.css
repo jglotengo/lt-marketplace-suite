@@ -667,3 +667,50 @@
         background: #f8f9fa !important;
     }
 }
+
+/* ========================================
+   FIXES FINALES MÓVIL v2
+   ======================================== */
+@media (max-width: 768px) {
+
+    /* Ocultar footer del tema detrás del panel */
+    .ltms-dashboard-container,
+    #ltms-dashboard-container {
+        position: relative !important;
+        z-index: 1 !important;
+        background: #f8f9fa !important;
+        padding-bottom: 40px !important;
+    }
+
+    /* Botones del formulario en fila, sin cortarse */
+    .ltms-np-actions,
+    .ltms-ep-actions,
+    .ltms-form-actions,
+    #ltms-np-submit,
+    #ltms-np-draft,
+    #ltms-np-cancel,
+    [id$="-submit"],
+    [id$="-draft"],
+    [id$="-cancel"] {
+        display: inline-flex !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Contenedor de botones del formulario */
+    .ltms-view-content > div:last-child,
+    .ltms-form > div:last-child {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        overflow: visible !important;
+    }
+
+    /* Tabla de pedidos con scroll */
+    #ltms-view-orders table,
+    .ltms-orders-table {
+        display: block !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        min-width: 500px !important;
+    }
+}
