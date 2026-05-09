@@ -561,7 +561,6 @@
          */
         bindLogout() {
             $(document).on('click', '.ltms-logout-btn', (e) => { e.preventDefault(); window.location.href = ltmsDashboard.logout_url; });
-                    });
                     jQuery('#ltms-np-gallery-wrap').on('click', '.ltms-np-rm-gallery', function() {
                         var rid = parseInt(jQuery(this).data('id'));
                         npGalleryIds = npGalleryIds.filter(function(i){ return i !== rid; });
