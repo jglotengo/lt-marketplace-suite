@@ -617,3 +617,29 @@
     flex-shrink: 0 !important;
     align-self: center !important;
 }
+
+/* Todas las tablas con scroll horizontal en móvil */
+@media (max-width: 768px) {
+    .ltms-main-content {
+        overflow-x: hidden !important;
+    }
+    .ltms-main-content table {
+        min-width: 420px !important;
+        font-size: 12px !important;
+    }
+    .ltms-main-content table td,
+    .ltms-main-content table th {
+        padding: 5px 6px !important;
+        white-space: nowrap !important;
+    }
+    /* Wrapper con scroll para TODAS las tablas */
+    .ltms-wallet-table,
+    .ltms-orders-table,
+    .ltms-view-content table,
+    #ltms-dashboard-container table {
+        display: block !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: 100% !important;
+    }
+}
