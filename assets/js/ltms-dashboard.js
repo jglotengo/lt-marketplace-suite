@@ -625,8 +625,6 @@
             document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
         },
 
-        },
-
         /**
          * Vincula el botón de logout.
          */
