@@ -46,6 +46,7 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
     <aside class="ltms-sidebar" id="ltms-sidebar">
         <div class="ltms-sidebar-logo">
             <?php echo esc_html( get_bloginfo( 'name' ) ); ?>
+            <button type="button" class="ltms-sidebar-close-btn" aria-label="Cerrar menú">&#x2715;</button>
         </div>
 
         <nav class="ltms-sidebar-nav">

@@ -547,83 +547,50 @@
          * Inicializa el menú móvil (toggle del sidebar).
          */
         initMobileMenu() {
-            const btn = document.querySelector('.ltms-mobile-menu-btn');
+            const btn     = document.querySelector('.ltms-mobile-menu-btn');
             const sidebar = document.querySelector('.ltms-sidebar');
             const overlay = document.querySelector('.ltms-sidebar-overlay');
 
-            /**
-             * La referencia más confiable es el topbar del propio panel:
-             * el sidebar debe arrancar exactamente donde empieza el topbar.
-             */
-            const getSidebarTop = () => {
-                // Usar el topbar del panel como referencia absoluta
-                const topbar = document.querySelector('.ltms-topbar');
-                if (topbar) {
-                    const r = topbar.getBoundingClientRect();
-                    // r.top es la posición del topbar en el viewport actual
-                    return Math.max(0, Math.round(r.top));
-                }
-                // Fallback: buscar cualquier header fixed externo
-                let maxBottom = 0;
-                try {
-                    document.querySelectorAll('*').forEach(el => {
-                        if (el.closest('#ltms-dashboard-container')) return;
-                        const s = window.getComputedStyle(el);
-                        if (s.position !== 'fixed') return;
-                        const r = el.getBoundingClientRect();
-                        if (r.top >= 0 && r.top <= 10 && r.height > 20 && r.height < 250 && r.width > 150) {
-                            if (r.bottom > maxBottom) maxBottom = r.bottom;
-                        }
-                    });
-                } catch(e) {}
-                return Math.round(maxBottom);
+            // Asegurar que el sidebar NO tenga inline styles de posicionamiento residuales
+            if (sidebar) { sidebar.style.top = ''; sidebar.style.height = ''; }
+            if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
+
+            const openSidebar = () => {
+                if (sidebar) sidebar.classList.add('ltms-sidebar-open');
+                if (overlay) overlay.classList.add('active');
+                document.body.style.overflow = 'hidden'; // evita scroll del fondo
             };
 
-            const positionSidebar = () => {
-                if (!sidebar || window.innerWidth > 768) {
-                    if (sidebar) { sidebar.style.top = ''; sidebar.style.height = ''; }
-                    if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
-                    return;
-                }
-                const headerH = getSidebarTop();
-                const topVal = headerH + 'px';
-                const heightVal = 'calc(100vh - ' + headerH + 'px)';
-                sidebar.style.top = topVal;
-                sidebar.style.height = heightVal;
-                if (overlay) {
-                    overlay.style.top = topVal;
-                    overlay.style.height = heightVal;
-                }
-            };
-
-            const updateBtn = () => {
-                if (btn) btn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
-                positionSidebar();
-            };
-
-            // Ejecutar cuando el DOM y los estilos están completamente cargados
-            updateBtn();
-            window.addEventListener('resize', updateBtn);
-            window.addEventListener('scroll', positionSidebar, { passive: true });
-            // Re-calcular después de que Elementor/tema termine de pintar
-            setTimeout(positionSidebar, 300);
-            setTimeout(positionSidebar, 800);
-
-            $(document).on('click', '.ltms-mobile-menu-btn', function (e) {
-                e.stopPropagation();
-                positionSidebar();
-                if (sidebar) sidebar.classList.toggle('ltms-sidebar-open');
-                if (overlay) overlay.classList.toggle('active');
-            });
-            $(document).on('click', '.ltms-sidebar-overlay', function () {
+            const closeSidebar = () => {
                 if (sidebar) sidebar.classList.remove('ltms-sidebar-open');
                 if (overlay) overlay.classList.remove('active');
-            });
-            $(document).on('click', '.ltms-nav-item', function () {
-                if (window.innerWidth <= 768) {
-                    if (sidebar) sidebar.classList.remove('ltms-sidebar-open');
-                    if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            };
+
+            // Botón hamburguesa abre el sidebar
+            $(document).on('click', '.ltms-mobile-menu-btn', function (e) {
+                e.stopPropagation();
+                if (sidebar && sidebar.classList.contains('ltms-sidebar-open')) {
+                    closeSidebar();
+                } else {
+                    openSidebar();
                 }
+            });
+
+            // Overlay cierra el sidebar
+            $(document).on('click', '.ltms-sidebar-overlay', closeSidebar);
+
+            // Botón X dentro del sidebar cierra
+            $(document).on('click', '.ltms-sidebar-close-btn', closeSidebar);
+
+            // Nav item en móvil: navegar y cerrar
+            $(document).on('click', '.ltms-nav-item', function () {
+                if (window.innerWidth <= 768) closeSidebar();
+            });
+
+            // Tecla Escape cierra el sidebar
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeSidebar();
             });
         },
 

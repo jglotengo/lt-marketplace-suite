@@ -318,187 +318,23 @@
     padding: 24px;
 }
 
-@media (max-width: 768px) {
-    .ltms-view-pad {
-        padding: 16px 12px !important;
-    }
-}
 
-/* ════════════════════════════════════════════════════════
-   RESPONSIVE — versión única y definitiva
-   ════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE — bloque único y definitivo (reemplaza todo lo anterior)
+   ════════════════════════════════════════════════════════════════ */
 
 /* Botón hamburguesa: oculto en desktop */
 .ltms-mobile-menu-btn { display: none; }
 
-/* Scroll horizontal para tablas — clase utilitaria */
-.ltms-table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-}
-
-/* ── Tablet / Móvil ≤ 768 px ── */
-@media (max-width: 768px) {
-
-    /* Layout */
-    .ltms-dashboard-container {
-        flex-direction: column;
-        background: #f4f7f9;
-    }
-
-    /* Sidebar: oculto fuera de pantalla, desliza con JS */
-    .ltms-sidebar {
-        position: fixed !important;
-        top: 0;
-        left: -280px;
-        width: 260px !important;
-        height: 100vh !important;
-        z-index: 99999 !important;
-        transition: left 0.28s ease !important;
-        overflow-y: auto;
-        box-shadow: 4px 0 24px rgba(0,0,0,0.25);
-    }
-    .ltms-sidebar.ltms-sidebar-open {
-        left: 0 !important;
-    }
-
-    /* Overlay detrás del sidebar */
-    .ltms-sidebar-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.48);
-        z-index: 99998;
-    }
-    .ltms-sidebar-overlay.active { display: block; }
-
-    /* Botón hamburguesa — visible, centrado en topbar */
-    .ltms-mobile-menu-btn {
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        flex-shrink: 0;
-        background: var(--ltms-primary);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-size: 17px;
-        cursor: pointer;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-    }
-    .ltms-mobile-menu-btn:hover,
-    .ltms-mobile-menu-btn:focus { opacity: 0.9; outline: none; }
-
-    /* Topbar */
-    .ltms-topbar {
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-        padding: 0 12px !important;
-        height: 52px !important;
-    }
-    .ltms-topbar-title {
-        flex: 1;
-        text-align: center;
-        font-size: 0.95rem;
-    }
-    .ltms-topbar-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    /* Contenido principal */
-    .ltms-main-content {
-        margin-left: 0 !important;
-        width: 100% !important;
-        padding-top: 0 !important;
-        box-sizing: border-box;
-    }
-
-    /* Sección de vista */
-    .ltms-view-section {
-        padding: 16px 12px !important;
-    }
-
-    /* View header */
-    .ltms-view-header {
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-        margin-bottom: 16px !important;
-    }
-    .ltms-view-header h2 {
-        font-size: 1.15rem !important;
-        margin: 0 !important;
-    }
-
-    /* Métricas */
-    .ltms-metrics-grid {
-        grid-template-columns: 1fr 1fr !important;
-        gap: 10px !important;
-    }
-
-    /* Tablas: el scroll lo maneja el wrapper .ltms-table-scroll del HTML */
-    .ltms-dtable {
-        min-width: 480px;
-        font-size: 0.82rem;
-    }
-    .ltms-dtable th,
-    .ltms-dtable td {
-        padding: 8px 10px !important;
-        white-space: nowrap;
-    }
-
-    /* Botones dentro de celdas: compactos */
-    .ltms-dtable .ltms-btn-sm {
-        padding: 4px 8px !important;
-        font-size: 0.75rem !important;
-    }
-
-    /* Formularios */
-    .ltms-form-row { flex-direction: column !important; }
-    .ltms-form-control { width: 100%; box-sizing: border-box; }
-
-    /* Botones de acción del formulario — siempre visibles */
-    .ltms-form-actions,
-    .ltms-np-actions,
-    .ltms-ep-actions {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-        overflow: visible !important;
-    }
-    .ltms-form-actions .ltms-btn,
-    .ltms-np-actions .ltms-btn,
-    .ltms-ep-actions .ltms-btn {
-        flex: 1 1 auto !important;
-        min-width: 90px !important;
-        text-align: center !important;
-        justify-content: center !important;
-    }
-
-    /* Wallet widget */
-    .ltms-wallet-balance { font-size: 1.8rem; }
-}
-
-/* ── Solo móvil chico ≤ 480 px ── */
-@media (max-width: 480px) {
-    .ltms-metrics-grid {
-        grid-template-columns: 1fr !important;
-    }
-    .ltms-wallet-balance { font-size: 1.5rem; }
-}
-
-/* ── Tablas generadas por JS (renderProductsView, etc.) ── */
+/* Scroll horizontal para tablas */
+.ltms-table-scroll,
 .ltms-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     width: 100%;
 }
+
+/* Tablas generadas por JS */
 .ltms-table {
     width: 100%;
     border-collapse: collapse;
@@ -519,102 +355,189 @@
     vertical-align: middle;
 }
 
-@media (max-width: 768px) {
-    .ltms-table-wrap {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-    .ltms-table {
-        min-width: 520px !important;
-        font-size: 0.82rem !important;
-    }
-    .ltms-table th,
-    .ltms-table td {
-        padding: 8px 10px !important;
-        white-space: nowrap !important;
-    }
-    /* botones de acción en tabla de productos */
-    .ltms-table td > div {
-        flex-wrap: wrap !important;
-        gap: 4px !important;
-    }
-}
-
-/* ── Fix tabla billetera: ancho mínimo para scroll ── */
-@media (max-width: 768px) {
-    .ltms-ledger-table {
-        min-width: 380px !important;
-    }
-    /* El card-body con scroll no debe tener overflow:hidden del padre */
-    .ltms-card-body.ltms-table-scroll {
-        padding: 0 !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-    /* Fondo negro del footer del tema: cubrir con color del panel */
-    .ltms-main-content {
-        background: #f4f7f9 !important;
-    }
-    #ltms-dashboard-container {
-        min-height: 100vh;
-        background: #f4f7f9 !important;
-        padding-bottom: 60px !important;
-    }
-}
-
-/* ── Fix fondo negro footer tema ── */
-/* El panel ocupa full height y cubre el footer */
+/* Fix fondo footer tema */
 .ltms-dashboard-container {
     position: relative;
     z-index: 10;
     isolation: isolate;
 }
 
+/* ── Tablet / Móvil ≤ 768px ── */
 @media (max-width: 768px) {
 
-    /* Botones formulario: en móvil angosto forzar wrap y ancho completo */
-    .ltms-new-product-form > div:last-child,
-    .ltms-edit-product-form > div:last-child {
-        flex-wrap: wrap !important;
-    }
-    .ltms-new-product-form > div:last-child .ltms-btn,
-    .ltms-edit-product-form > div:last-child .ltms-btn {
-        flex: 1 1 calc(50% - 5px) !important;
-        min-width: 0 !important;
-        text-align: center !important;
-        justify-content: center !important;
-    }
-
-    /* Tabla billetera: min-width suficiente para 4 columnas */
-    .ltms-ledger-table {
-        min-width: 400px !important;
-    }
-
-    /* Fondo del main-content cubre footer */
-    .ltms-main-content {
-        background: #f4f7f9 !important;
-        padding-bottom: 80px !important;
-        min-height: 100vh !important;
-    }
-
-    /* Fondo del container */
+    /* Layout */
     .ltms-dashboard-container,
     #ltms-dashboard-container {
+        flex-direction: column;
         background: #f4f7f9 !important;
         min-height: 100vh !important;
     }
-}
 
-/* ── Formulario Nuevo/Editar Producto en móvil ── */
-@media (max-width: 768px) {
-
-    /* El contenedor de la vista de productos no debe cortar */
-    #ltms-view-products {
-        overflow: visible !important;
-        padding: 16px 0 !important;
+    /* ── SIDEBAR: top:0 fijo, cubre viewport completo ── */
+    .ltms-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: -280px !important;
+        width: 280px !important;
+        height: 100vh !important;
+        z-index: 999999 !important;
+        transition: left 0.28s cubic-bezier(0.4,0,0.2,1) !important;
+        overflow-y: auto !important;
+        box-shadow: 6px 0 40px rgba(0,0,0,0.4) !important;
+        border-radius: 0 !important;
+    }
+    .ltms-sidebar.ltms-sidebar-open {
+        left: 0 !important;
     }
 
-    /* El formulario ocupa todo el ancho disponible */
+    /* Botón X de cerrar dentro del sidebar */
+    .ltms-sidebar-close-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 32px;
+        height: 32px;
+        background: rgba(255,255,255,0.15);
+        border: none;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+        z-index: 2;
+    }
+    .ltms-sidebar-close-btn:hover {
+        background: rgba(255,255,255,0.28);
+    }
+
+    /* Overlay */
+    .ltms-sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0 !important;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.55);
+        z-index: 999998 !important;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+    .ltms-sidebar-overlay.active { display: block; }
+
+    /* Botón hamburguesa */
+    .ltms-mobile-menu-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        flex-shrink: 0;
+        background: var(--ltms-primary);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 18px;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .ltms-mobile-menu-btn:hover,
+    .ltms-mobile-menu-btn:focus { opacity: 0.85; outline: none; }
+
+    /* Nav items */
+    .ltms-sidebar-nav .ltms-nav-item {
+        padding: 15px 22px !important;
+        font-size: 1rem !important;
+        border-left: 3px solid transparent !important;
+    }
+    .ltms-sidebar-nav .ltms-nav-item.active,
+    .ltms-sidebar-nav .ltms-nav-item:hover {
+        border-left-color: rgba(255,255,255,0.7) !important;
+        background: rgba(255,255,255,0.18) !important;
+    }
+    .ltms-nav-icon { font-size: 1.2rem !important; }
+
+    /* Logo sidebar */
+    .ltms-sidebar-logo {
+        padding: 20px 22px 20px 22px !important;
+        font-size: 1.05rem !important;
+        padding-right: 52px !important; /* espacio para el botón X */
+    }
+
+    /* Contenido principal */
+    .ltms-main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        background: #f4f7f9 !important;
+        min-height: 100vh !important;
+        padding-bottom: 80px !important;
+    }
+
+    /* Topbar */
+    .ltms-topbar {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 0 12px !important;
+        height: 52px !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+    }
+    .ltms-topbar-title {
+        flex: 1;
+        text-align: center;
+        font-size: 0.95rem;
+    }
+    .ltms-topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Secciones */
+    .ltms-view-section { padding: 16px 12px !important; }
+    .ltms-view-pad { padding: 16px 12px !important; }
+    #ltms-view-products { overflow: visible !important; padding: 16px 0 !important; }
+
+    /* View header */
+    .ltms-view-header {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        margin-bottom: 16px !important;
+    }
+    .ltms-view-header h2 { font-size: 1.1rem !important; margin: 0 !important; }
+
+    /* Métricas */
+    .ltms-metrics-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+
+    /* Tablas dtable */
+    .ltms-dtable { min-width: 480px; font-size: 0.82rem; }
+    .ltms-dtable th,
+    .ltms-dtable td { padding: 8px 10px !important; white-space: nowrap; }
+    .ltms-dtable .ltms-btn-sm { padding: 4px 8px !important; font-size: 0.75rem !important; }
+
+    /* Tablas JS */
+    .ltms-table { min-width: 520px !important; font-size: 0.82rem !important; }
+    .ltms-table th,
+    .ltms-table td { padding: 8px 10px !important; white-space: nowrap !important; }
+    .ltms-table td > div { flex-wrap: wrap !important; gap: 4px !important; }
+
+    /* Tabla billetera */
+    .ltms-ledger-table { min-width: 400px !important; }
+    .ltms-card-body.ltms-table-scroll {
+        padding: 0 !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Formularios */
+    .ltms-form-row { flex-direction: column !important; }
+    .ltms-form-control { width: 100%; box-sizing: border-box; }
     .ltms-new-product-form,
     .ltms-edit-product-form {
         max-width: 100% !important;
@@ -622,8 +545,6 @@
         padding: 0 12px !important;
         box-sizing: border-box !important;
     }
-
-    /* Inputs del formulario: ancho completo */
     .ltms-new-product-form input,
     .ltms-new-product-form textarea,
     .ltms-new-product-form select,
@@ -634,67 +555,35 @@
         box-sizing: border-box !important;
         max-width: 100% !important;
     }
+
+    /* Botones formulario */
+    .ltms-form-actions,
+    .ltms-np-actions,
+    .ltms-ep-actions,
+    .ltms-new-product-form > div:last-child,
+    .ltms-edit-product-form > div:last-child {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        overflow: visible !important;
+    }
+    .ltms-form-actions .ltms-btn,
+    .ltms-np-actions .ltms-btn,
+    .ltms-ep-actions .ltms-btn,
+    .ltms-new-product-form > div:last-child .ltms-btn,
+    .ltms-edit-product-form > div:last-child .ltms-btn {
+        flex: 1 1 calc(50% - 4px) !important;
+        min-width: 0 !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }
+
+    /* Wallet */
+    .ltms-wallet-balance { font-size: 1.8rem; }
 }
 
-/* ════════════════════════════════════════════════════════
-   SIDEBAR MÓVIL — posicionamiento dinámico via JS
-   ════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
-
-    /* El sidebar se posiciona con top/height via JS (debajo del header del tema) */
-    .ltms-sidebar {
-        top: auto !important;         /* JS lo establece dinámicamente */
-        height: 100vh !important;     /* JS lo ajusta */
-        border-radius: 0 16px 16px 0 !important;
-        box-shadow: 6px 0 32px rgba(0,0,0,0.35) !important;
-    }
-
-    /* Sidebar cerrado: fuera de pantalla a la izquierda */
-    .ltms-sidebar:not(.ltms-sidebar-open) {
-        left: -280px !important;
-    }
-
-    /* Sidebar abierto */
-    .ltms-sidebar.ltms-sidebar-open {
-        left: 0 !important;
-    }
-
-    /* Overlay: también se posiciona dinámicamente */
-    .ltms-sidebar-overlay {
-        top: 0;
-        height: 100vh;
-    }
-
-    /* Mejorar los items del nav en móvil */
-    .ltms-nav-item {
-        padding: 14px 20px !important;
-        font-size: 1rem !important;
-        border-left: 3px solid transparent !important;
-    }
-    .ltms-nav-item.active,
-    .ltms-nav-item:hover {
-        border-left-color: rgba(255,255,255,0.6) !important;
-        background: rgba(255,255,255,0.18) !important;
-    }
-    .ltms-nav-icon {
-        font-size: 1.2rem !important;
-    }
-
-    /* Logo del sidebar en móvil */
-    .ltms-sidebar-logo {
-        padding: 18px 20px !important;
-        font-size: 1rem !important;
-    }
-}
-
-/* ── Sidebar top controlado por JS en móvil ── */
-@media (max-width: 768px) {
-    /* Remover top:0 del base para que JS lo controle */
-    .ltms-sidebar {
-        top: unset !important;
-    }
-    /* Sin top hardcodeado — JS asigna inline style */
-    .ltms-sidebar-overlay {
-        top: unset !important;
-    }
+/* ── Solo móvil chico ≤ 480px ── */
+@media (max-width: 480px) {
+    .ltms-metrics-grid { grid-template-columns: 1fr !important; }
+    .ltms-wallet-balance { font-size: 1.5rem; }
 }
