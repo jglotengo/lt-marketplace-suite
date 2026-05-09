@@ -547,6 +547,12 @@
          * Inicializa el menú móvil (toggle del sidebar).
          */
         initMobileMenu() {
+            const btn = document.querySelector('.ltms-mobile-menu-btn');
+            const updateBtnVisibility = () => {
+                if (btn) btn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+            };
+            updateBtnVisibility();
+            window.addEventListener('resize', updateBtnVisibility);
             const sidebar = document.querySelector('.ltms-sidebar');
             const overlay = document.querySelector('.ltms-sidebar-overlay');
             $(document).on('click', '.ltms-mobile-menu-btn', function (e) {

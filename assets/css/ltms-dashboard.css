@@ -426,7 +426,7 @@
    ======================================== */
 
 /* Sidebar oculto en móvil por defecto */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
 
     .ltms-sidebar {
         position: fixed !important;
