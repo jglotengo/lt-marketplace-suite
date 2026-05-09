@@ -643,3 +643,27 @@
         width: 100% !important;
     }
 }
+
+/* Fix botones formulario en móvil */
+@media (max-width: 768px) {
+    .ltms-form-actions {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    .ltms-form-actions .ltms-btn {
+        flex: 1 1 auto !important;
+        min-width: 100px !important;
+        text-align: center !important;
+        white-space: nowrap !important;
+    }
+    /* Fix fondo negro del footer del tema */
+    .ltms-main-content {
+        background: #fff !important;
+        min-height: 60vh !important;
+    }
+    #ltms-dashboard-container {
+        background: #f8f9fa !important;
+    }
+}
