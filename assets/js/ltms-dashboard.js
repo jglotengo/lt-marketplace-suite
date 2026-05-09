@@ -603,7 +603,7 @@
             const self = this;
             const nonce = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '';
             // Cargar categorías
-            $.ajax({
+            jQuery.ajax({
                 url: (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php',
                 type: 'POST',
                 data: { action: 'ltms_get_categories', nonce: nonce },
@@ -649,11 +649,11 @@
                             '<button id="ltms-np-cancel" class="ltms-btn" style="background:#f5f5f5;color:#333;">Cancelar</button>' +
                         '</div>' +
                     '</div>';
-                    $('#ltms-view-content').html(html);
-                    $('#ltms-np-img-preview').on('click', function(){ $('#ltms-np-img-input').trigger('click'); });
+                    jQuery('#ltms-view-content').html(html);
+                    jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
 
                     // Upload imagen
-                    $('#ltms-np-img-input').on('change', function() {
+                    jQuery('#ltms-np-img-input').on('change', function() {
                         const file = this.files[0];
                         if (!file) return;
                         const formData = new FormData();
@@ -661,50 +661,50 @@
                         formData.append('nonce', nonce);
                         formData.append('image', file);
                         const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-                        $.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
+                        jQuery.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
                             success: function(r) {
                                 if (r.success) {
-                                    $('#ltms-np-img-id').val(r.data.attachment_id);
-                                    $('#ltms-np-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
+                                    jQuery('#ltms-np-img-id').val(r.data.attachment_id);
+                                    jQuery('#ltms-np-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
                                 }
                             }
                         });
                     });
 
                     // Cancelar
-                    $('#ltms-np-cancel').on('click', function() { self.loadView('products'); });
+                    jQuery('#ltms-np-cancel').on('click', function() { self.loadView('products'); });
 
                     // Submit
                     function submitProduct(status) {
-                        const name = $('#ltms-np-name').val().trim();
-                        const price = $('#ltms-np-price').val();
+                        const name = jQuery('#ltms-np-name').val().trim();
+                        const price = jQuery('#ltms-np-price').val();
                         if (!name || !price) {
-                            $('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
+                            jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
                             return;
                         }
-                        $('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
+                        jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
                         const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-                        $.ajax({ url: ajaxUrl, type: 'POST', data: {
+                        jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
                             action: 'ltms_create_product', nonce: nonce,
                             name: name, price: price, status: status,
-                            description: $('#ltms-np-desc').val(),
-                            category_id: $('#ltms-np-cat').val(),
-                            stock: $('#ltms-np-stock').val(),
-                            image_id: $('#ltms-np-img-id').val()
+                            description: jQuery('#ltms-np-desc').val(),
+                            category_id: jQuery('#ltms-np-cat').val(),
+                            stock: jQuery('#ltms-np-stock').val(),
+                            image_id: jQuery('#ltms-np-img-id').val()
                         }, success: function(r) {
                             if (r.success) {
-                                $('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
+                                jQuery('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
                                 setTimeout(function() { self.loadView('products'); }, 1500);
                             } else {
-                                $('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
-                                $('#ltms-np-submit, #ltms-np-draft').prop('disabled', false);
-                                $('#ltms-np-submit').text('Publicar Producto');
-                                $('#ltms-np-draft').text('Guardar Borrador');
+                                jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
+                                jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', false);
+                                jQuery('#ltms-np-submit').text('Publicar Producto');
+                                jQuery('#ltms-np-draft').text('Guardar Borrador');
                             }
                         }});
                     }
-                    $('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
-                    $('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
+                    jQuery('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
+                    jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
                 }
             });
         },
