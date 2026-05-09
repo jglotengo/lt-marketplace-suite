@@ -92,9 +92,7 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
                 </div>
 
                 <!-- Logout -->
-                <button type="button" class="ltms-logout-btn ltms-btn ltms-btn-outline ltms-btn-sm">
-                    <?php esc_html_e( 'Salir', 'ltms' ); ?>
-                </button>
+                <a href="<?php echo esc_url( wp_logout_url( home_url( '/login-vendedor/' ) ) ); ?>" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="text-decoration:none;">Salir</a>
             </div>
         </header>
 
