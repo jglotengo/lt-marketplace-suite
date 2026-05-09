@@ -49,7 +49,7 @@
     top: 0;
     left: 0;
     height: 100vh;
-    z-index: 100;
+    z-index: 99999;
     transition: transform 0.3s ease;
     overflow-y: auto;
 }
@@ -354,7 +354,7 @@
         left: -280px;
         width: 260px !important;
         height: 100vh !important;
-        z-index: 9999 !important;
+        z-index: 99999 !important;
         transition: left 0.28s ease !important;
         overflow-y: auto;
         box-shadow: 4px 0 24px rgba(0,0,0,0.25);
@@ -369,7 +369,7 @@
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.48);
-        z-index: 9998;
+        z-index: 99998;
     }
     .ltms-sidebar-overlay.active { display: block; }
 
