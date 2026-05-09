@@ -488,6 +488,15 @@ function ltms_run(): void {
     // Cargar AJAX handlers de productos
     require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
 
+
+// Bloquear redirect WooCommerce para vendedores con edit_products (init prioridad 1)
+add_action( 'init', function() {
+    if ( ! is_user_logged_in() ) return;
+    if ( current_user_can( 'manage_options' ) ) return;
+    if ( ! current_user_can( 'edit_products' ) ) return;
+    add_filter( 'woocommerce_prevent_admin_access', '__return_false', 999 );
+}, 1 );
+
     // Permitir acceso wp-admin a vendedores solo para crear/editar productos
     add_action( 'admin_init', function() {
         if ( ! is_user_logged_in() ) return;
