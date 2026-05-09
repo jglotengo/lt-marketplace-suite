@@ -699,8 +699,8 @@
                             '<input type="hidden" id="ltms-np-gallery-ids" value="">' +
                         '</div>' +
                         '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">' +
-                            '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:120px;">Publicar Producto</button>' +
-                            '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;min-width:120px;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
+                            '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:100px;">Publicar Producto</button>' +
+                            '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;min-width:100px;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
                             '<button id="ltms-np-cancel" class="ltms-btn" style="flex:1;min-width:80px;background:#f5f5f5;color:#333;">Cancelar</button>' +
                         '</div>' +
                     '</div>';

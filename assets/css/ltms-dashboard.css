@@ -549,3 +549,46 @@
         padding-bottom: 60px !important;
     }
 }
+
+/* ── Fix fondo negro footer tema ── */
+/* El panel ocupa full height y cubre el footer */
+.ltms-dashboard-container {
+    position: relative;
+    z-index: 10;
+    isolation: isolate;
+}
+
+@media (max-width: 768px) {
+
+    /* Botones formulario: en móvil angosto forzar wrap y ancho completo */
+    .ltms-new-product-form > div:last-child,
+    .ltms-edit-product-form > div:last-child {
+        flex-wrap: wrap !important;
+    }
+    .ltms-new-product-form > div:last-child .ltms-btn,
+    .ltms-edit-product-form > div:last-child .ltms-btn {
+        flex: 1 1 calc(50% - 5px) !important;
+        min-width: 0 !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }
+
+    /* Tabla billetera: min-width suficiente para 4 columnas */
+    .ltms-ledger-table {
+        min-width: 400px !important;
+    }
+
+    /* Fondo del main-content cubre footer */
+    .ltms-main-content {
+        background: #f4f7f9 !important;
+        padding-bottom: 80px !important;
+        min-height: 100vh !important;
+    }
+
+    /* Fondo del container */
+    .ltms-dashboard-container,
+    #ltms-dashboard-container {
+        background: #f4f7f9 !important;
+        min-height: 100vh !important;
+    }
+}
