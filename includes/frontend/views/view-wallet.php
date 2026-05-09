@@ -42,7 +42,7 @@ $available    = max( 0, $balance - $held );
     <!-- Historial de movimientos -->
     <div class="ltms-card">
         <div class="ltms-card-header"><?php esc_html_e( 'Últimos Movimientos', 'ltms' ); ?></div>
-        <div class="ltms-card-body" style="padding:0;">
+        <div class="ltms-card-body ltms-table-scroll" style="padding:0;">
             <table class="ltms-dtable ltms-ledger-table" style="width:100%;">
                 <thead>
                     <tr>

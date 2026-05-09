@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     </div>
 
     <div class="ltms-card">
-        <div class="ltms-card-body" style="padding:0;">
+        <div class="ltms-card-body ltms-table-scroll" style="padding:0;">
             <table class="ltms-dtable" style="width:100%;">
                 <thead>
                     <tr>

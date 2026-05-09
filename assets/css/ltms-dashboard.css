@@ -312,122 +312,30 @@
 .ltms-btn-outline  { background: transparent; border: 1px solid var(--ltms-primary); color: var(--ltms-primary); }
 .ltms-btn-sm       { padding: 5px 12px; font-size: 0.8rem; }
 
-/* ── Responsive Mobile ──────────────────────────────────────── */
-@media (max-width: 768px) {
-    .ltms-metrics-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+/* ════════════════════════════════════════════════════════
+   RESPONSIVE — versión única y definitiva
+   ════════════════════════════════════════════════════════ */
+
+/* Botón hamburguesa: oculto en desktop */
+.ltms-mobile-menu-btn { display: none; }
+
+/* Scroll horizontal para tablas — clase utilitaria */
+.ltms-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
 }
 
-@media (max-width: 480px) {
-    .ltms-metrics-grid {
-        grid-template-columns: 1fr;
-    }
-    .ltms-wallet-balance {
-        font-size: 1.8rem;
-    }
-}
-
-/* ── Responsive Mobile Fixes ─────────────────────────────── */
+/* ── Tablet / Móvil ≤ 768 px ── */
 @media (max-width: 768px) {
+
+    /* Layout */
     .ltms-dashboard-container {
         flex-direction: column;
+        background: #f4f7f9;
     }
-    .ltms-sidebar {
-        position: fixed;
-        top: 0; left: 0;
-        height: 100vh;
-        z-index: 9999;
-        transition: transform .25s ease;
-        width: 80vw;
-        max-width: 280px;
-    }
-    .ltms-mobile-menu-btn {
-        display: flex !important;
-        position: fixed;
-        top: 12px; left: 12px;
-        z-index: 10000;
-        background: var(--ltms-primary, #e63946);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        width: 40px; height: 40px;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,.2);
-    }
-    .ltms-main-content {
-        margin-left: 0 !important;
-        padding: 60px 12px 24px;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .ltms-table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    .ltms-table {
-        min-width: 500px;
-    }
-    .ltms-view-header {
-        flex-direction: column;
-        gap: 8px;
-        align-items: flex-start !important;
-    }
-    .ltms-wallet-grid {
-        grid-template-columns: 1fr !important;
-    }
-    .ltms-form-group {
-        margin-bottom: 14px;
-    }
-    .ltms-form-control {
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .ltms-sidebar-overlay {
-        display: block;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.45);
-        z-index: 9998;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .25s;
-    }
-    .ltms-sidebar.open ~ .ltms-sidebar-overlay,
-    .ltms-sidebar-overlay.active {
-        opacity: 1;
-        pointer-events: all;
-    }
-}
 
-@media (max-width: 480px) {
-    .ltms-metrics-grid {
-        grid-template-columns: 1fr !important;
-    }
-    .ltms-stat-card {
-        padding: 14px;
-    }
-    .ltms-btn {
-        width: 100%;
-        text-align: center;
-        margin-bottom: 8px;
-    }
-    .ltms-btn + .ltms-btn {
-        margin-left: 0;
-    }
-}
-
-
-/* ========================================
-   RESPONSIVE MÓVIL - FIXES COMPLETOS
-   ======================================== */
-
-/* Sidebar oculto en móvil por defecto */
-@media (max-width: 768px) {
-
+    /* Sidebar: oculto fuera de pantalla, desliza con JS */
     .ltms-sidebar {
         position: fixed !important;
         top: 0;
@@ -435,308 +343,140 @@
         width: 260px !important;
         height: 100vh !important;
         z-index: 9999 !important;
-        transition: left 0.3s ease !important;
+        transition: left 0.28s ease !important;
         overflow-y: auto;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.25);
     }
-
-    /* Sidebar visible cuando tiene clase ltms-sidebar-open */
     .ltms-sidebar.ltms-sidebar-open {
         left: 0 !important;
     }
 
-    /* Overlay oscuro detrás del sidebar */
+    /* Overlay detrás del sidebar */
     .ltms-sidebar-overlay {
         display: none;
         position: fixed;
-        top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.5);
+        inset: 0;
+        background: rgba(0,0,0,0.48);
         z-index: 9998;
     }
-    .ltms-sidebar-overlay.active {
-        display: block;
-    }
+    .ltms-sidebar-overlay.active { display: block; }
 
-    /* Botón hamburguesa - siempre visible, sin desaparecer en hover */
+    /* Botón hamburguesa — visible, centrado en topbar */
     .ltms-mobile-menu-btn {
         display: flex !important;
-        position: relative !important;
-        z-index: 100 !important;
-        width: 36px !important;
-        height: 36px !important;
-        min-width: 36px !important;
-        background: var(--ltms-primary, #e63946) !important;
-        color: #fff !important;
-        border: none !important;
-        border-radius: 6px !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 18px !important;
-        cursor: pointer !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        flex-shrink: 0 !important;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        flex-shrink: 0;
+        background: var(--ltms-primary);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 17px;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     }
     .ltms-mobile-menu-btn:hover,
-    .ltms-mobile-menu-btn:focus {
-        opacity: 1 !important;
-        visibility: visible !important;
-        background: var(--ltms-primary, #e63946) !important;
+    .ltms-mobile-menu-btn:focus { opacity: 0.9; outline: none; }
+
+    /* Topbar */
+    .ltms-topbar {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 0 12px !important;
+        height: 52px !important;
+    }
+    .ltms-topbar-title {
+        flex: 1;
+        text-align: center;
+        font-size: 0.95rem;
+    }
+    .ltms-topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
-    /* Contenido principal - no se desplace */
+    /* Contenido principal */
     .ltms-main-content {
         margin-left: 0 !important;
         width: 100% !important;
-        padding: 60px 12px 24px !important;
-        box-sizing: border-box !important;
+        padding-top: 0 !important;
+        box-sizing: border-box;
     }
 
-    /* Topbar en móvil */
-    .ltms-topbar {
-        padding: 8px 12px !important;
-        font-size: 13px !important;
+    /* Sección de vista */
+    .ltms-view-section {
+        padding: 16px 12px !important;
     }
 
-    /* Tabla responsiva */
-    .ltms-table-wrapper,
-    .ltms-products-table-wrapper {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-
-    table {
-        min-width: 500px;
-    }
-
-    /* Botones de acción más compactos en móvil */
-    .ltms-btn-sm {
-        padding: 4px 8px !important;
-        font-size: 12px !important;
-    }
-
-    /* Header de vista */
+    /* View header */
     .ltms-view-header {
         flex-wrap: wrap !important;
         gap: 8px !important;
+        margin-bottom: 16px !important;
     }
-
     .ltms-view-header h2 {
-        font-size: 1.3rem !important;
+        font-size: 1.15rem !important;
+        margin: 0 !important;
     }
 
-    /* Formularios en móvil */
-    .ltms-form-row {
-        flex-direction: column !important;
-    }
-
-    /* Dashboard metrics */
+    /* Métricas */
     .ltms-metrics-grid {
         grid-template-columns: 1fr 1fr !important;
         gap: 10px !important;
     }
-}
 
-/* ========================================
-   FIXES ADICIONALES MÓVIL
-   ======================================== */
-@media (max-width: 768px) {
-
-    /* Topbar: flex con hamburguesa centrada verticalmente */
-    .ltms-topbar {
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-        padding: 8px 12px !important;
+    /* Tablas: el scroll lo maneja el wrapper .ltms-table-scroll del HTML */
+    .ltms-dtable {
+        min-width: 480px;
+        font-size: 0.82rem;
+    }
+    .ltms-dtable th,
+    .ltms-dtable td {
+        padding: 8px 10px !important;
+        white-space: nowrap;
     }
 
-    .ltms-topbar-title {
-        flex: 1 !important;
-        text-align: center !important;
-        font-size: 14px !important;
+    /* Botones dentro de celdas: compactos */
+    .ltms-dtable .ltms-btn-sm {
+        padding: 4px 8px !important;
+        font-size: 0.75rem !important;
     }
 
-    .ltms-topbar-actions {
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-    }
+    /* Formularios */
+    .ltms-form-row { flex-direction: column !important; }
+    .ltms-form-control { width: 100%; box-sizing: border-box; }
 
-    /* Tabla: scroll horizontal y botones apilados */
-    .ltms-products-table-wrapper {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        width: 100% !important;
-    }
-
-    #ltms-view-products table,
-    .ltms-products-table-wrapper table {
-        min-width: 480px !important;
-        font-size: 12px !important;
-    }
-
-    #ltms-view-products table td,
-    #ltms-view-products table th {
-        padding: 6px 8px !important;
-        white-space: nowrap !important;
-    }
-
-    /* Botones de acción en columna vertical en móvil */
-    .ltms-action-buttons,
-    td .ltms-btn {
-        display: block !important;
-        width: 100% !important;
-        margin-bottom: 4px !important;
-        text-align: center !important;
-    }
-
-    /* Header de vista */
-    .ltms-view-header {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 8px !important;
-        padding: 8px 0 !important;
-    }
-
-    .ltms-view-header h2 {
-        font-size: 1.2rem !important;
-        margin: 0 !important;
-    }
-}
-
-/* Hamburguesa dentro del topbar - tamaño correcto */
-.ltms-topbar .ltms-mobile-menu-btn {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    font-size: 16px !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    flex-shrink: 0 !important;
-    align-self: center !important;
-}
-
-/* Todas las tablas con scroll horizontal en móvil */
-@media (max-width: 768px) {
-    .ltms-main-content {
-        overflow-x: hidden !important;
-    }
-    .ltms-main-content table {
-        min-width: 420px !important;
-        font-size: 12px !important;
-    }
-    .ltms-main-content table td,
-    .ltms-main-content table th {
-        padding: 5px 6px !important;
-        white-space: nowrap !important;
-    }
-    /* Wrapper con scroll para TODAS las tablas */
-    .ltms-wallet-table,
-    .ltms-orders-table,
-    .ltms-view-content table,
-    #ltms-dashboard-container table {
-        display: block !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        width: 100% !important;
-    }
-}
-
-/* Fix botones formulario en móvil */
-@media (max-width: 768px) {
-    .ltms-form-actions {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-        width: 100% !important;
-    }
-    .ltms-form-actions .ltms-btn {
-        flex: 1 1 auto !important;
-        min-width: 100px !important;
-        text-align: center !important;
-        white-space: nowrap !important;
-    }
-    /* Fix fondo negro del footer del tema */
-    .ltms-main-content {
-        background: #fff !important;
-        min-height: 60vh !important;
-    }
-    #ltms-dashboard-container {
-        background: #f8f9fa !important;
-    }
-}
-
-/* ========================================
-   FIXES FINALES MÓVIL v2
-   ======================================== */
-@media (max-width: 768px) {
-
-    /* Ocultar footer del tema detrás del panel */
-    .ltms-dashboard-container,
-    #ltms-dashboard-container {
-        position: relative !important;
-        z-index: 1 !important;
-        background: #f8f9fa !important;
-        padding-bottom: 40px !important;
-    }
-
-    /* Botones del formulario en fila, sin cortarse */
-    .ltms-np-actions,
-    .ltms-ep-actions,
+    /* Botones de acción del formulario — siempre visibles */
     .ltms-form-actions,
-    #ltms-np-submit,
-    #ltms-np-draft,
-    #ltms-np-cancel,
-    [id$="-submit"],
-    [id$="-draft"],
-    [id$="-cancel"] {
-        display: inline-flex !important;
-        flex-shrink: 0 !important;
-    }
-
-    /* Contenedor de botones del formulario */
-    .ltms-view-content > div:last-child,
-    .ltms-form > div:last-child {
+    .ltms-np-actions,
+    .ltms-ep-actions {
         display: flex !important;
         flex-wrap: wrap !important;
         gap: 8px !important;
         overflow: visible !important;
     }
-
-    /* Tabla de pedidos con scroll */
-    #ltms-view-orders table,
-    .ltms-orders-table {
-        display: block !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        min-width: 500px !important;
+    .ltms-form-actions .ltms-btn,
+    .ltms-np-actions .ltms-btn,
+    .ltms-ep-actions .ltms-btn {
+        flex: 1 1 auto !important;
+        min-width: 90px !important;
+        text-align: center !important;
+        justify-content: center !important;
     }
+
+    /* Wallet widget */
+    .ltms-wallet-balance { font-size: 1.8rem; }
 }
 
-/* Tabla de pedidos - scroll horizontal en móvil */
-@media (max-width: 768px) {
-    #ltms-orders-tbody,
-    #ltms-orders-tbody + *,
-    table:has(#ltms-orders-tbody) {
-        display: block !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
+/* ── Solo móvil chico ≤ 480 px ── */
+@media (max-width: 480px) {
+    .ltms-metrics-grid {
+        grid-template-columns: 1fr !important;
     }
-    /* Wrapper universal para todas las tablas del panel */
-    #ltms-dashboard-container table {
-        display: block !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        width: 100% !important;
-        min-width: 420px !important;
-    }
-    #ltms-dashboard-container thead,
-    #ltms-dashboard-container tbody,
-    #ltms-dashboard-container tr {
-        display: table !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-    }
+    .ltms-wallet-balance { font-size: 1.5rem; }
 }
