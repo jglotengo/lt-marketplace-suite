@@ -618,12 +618,8 @@
                                 jQuery('#ltms-np-submit').text('Publicar Producto');
                                 jQuery('#ltms-np-draft').text('Guardar Borrador');
                             }
-                        }});
-                    }
                     jQuery('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
                     jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
-                }
-            });
         },
 
         loadEditProductView(productId) {
