@@ -10,6 +10,8 @@ class LTMS_Products_Ajax {
         add_action( 'wp_ajax_ltms_create_product',        [ $this, 'create_product' ] );
         add_action( 'wp_ajax_ltms_get_categories',        [ $this, 'get_categories' ] );
         add_action( 'wp_ajax_ltms_upload_product_image',  [ $this, 'upload_product_image' ] );
+        add_action( 'wp_ajax_ltms_get_product',           [ $this, 'get_product' ] );
+        add_action( 'wp_ajax_ltms_update_product',        [ $this, 'update_product' ] );
     }
 
     private function check_nonce() {
@@ -69,6 +71,58 @@ class LTMS_Products_Ajax {
             }
         }
         wp_send_json_success( [ 'message' => 'Guardado' ] );
+    }
+
+    public function get_product() {
+        $this->check_nonce();
+        $product_id = intval( $_POST['product_id'] ?? 0 );
+        $product = wc_get_product( $product_id );
+        if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
+            wp_send_json_error( 'Producto no encontrado', 404 );
+        }
+        $cats = $product->get_category_ids();
+        wp_send_json_success( [
+            'id'          => $product_id,
+            'name'        => $product->get_name(),
+            'description' => $product->get_description(),
+            'price'       => $product->get_regular_price(),
+            'stock'       => $product->get_stock_quantity(),
+            'status'      => $product->get_status(),
+            'category_id' => ! empty( $cats ) ? $cats[0] : 0,
+            'image_id'    => $product->get_image_id(),
+            'image_url'   => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
+        ] );
+    }
+
+    public function update_product() {
+        $this->check_nonce();
+        $product_id  = intval( $_POST['product_id'] ?? 0 );
+        $product = wc_get_product( $product_id );
+        if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
+            wp_send_json_error( 'Producto no encontrado', 404 );
+        }
+        $name        = sanitize_text_field( $_POST['name'] ?? '' );
+        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $price       = floatval( $_POST['price'] ?? 0 );
+        $stock       = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
+        $category_id = intval( $_POST['category_id'] ?? 0 );
+        $image_id    = intval( $_POST['image_id'] ?? 0 );
+        $status      = sanitize_text_field( $_POST['status'] ?? $product->get_status() );
+        if ( empty( $name ) || $price <= 0 ) {
+            wp_send_json_error( 'Nombre y precio son requeridos', 400 );
+        }
+        $product->set_name( $name );
+        $product->set_description( $description );
+        $product->set_regular_price( $price );
+        $product->set_status( $status );
+        if ( $stock !== null ) {
+            $product->set_manage_stock( true );
+            $product->set_stock_quantity( $stock );
+        }
+        if ( $category_id ) $product->set_category_ids( [ $category_id ] );
+        if ( $image_id )    $product->set_image_id( $image_id );
+        $product->save();
+        wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
 
     public function get_categories() {

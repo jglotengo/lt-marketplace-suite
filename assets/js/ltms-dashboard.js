@@ -594,10 +594,11 @@
             const products = (data && data.products) ? data.products : [];
             let rows = products.length === 0
                 ? '<tr><td colspan="5" style="text-align:center;padding:20px;">Aún no tienes productos.</td></tr>'
-                : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><a href="${p.edit_url}" class="ltms-btn ltms-btn-sm">Editar</a></td></tr>`).join('');
+                : products.map(p => `<tr><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}">Editar</button></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
             $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
         $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); LTMS.Dashboard.loadNewProductView(); });
+            $(document).off('click','.ltms-edit-product-btn').on('click','.ltms-edit-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); var pid=$(this).data('id'); LTMS.Dashboard.loadEditProductView(pid); });
         },
         loadNewProductView() {
             const self = this;
@@ -706,6 +707,114 @@
                     jQuery('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
                     jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
                 }
+            });
+        },
+
+        loadEditProductView(productId) {
+            const nonce = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '';
+            const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
+            jQuery('#ltms-view-products').html('<div style="padding:40px;text-align:center;color:#999;">Cargando producto...</div>');
+            // Cargar producto y categorías en paralelo
+            var prodReq = jQuery.ajax({ url: ajaxUrl, type: 'POST', data: { action: 'ltms_get_product', nonce: nonce, product_id: productId } });
+            var catReq  = jQuery.ajax({ url: ajaxUrl, type: 'POST', data: { action: 'ltms_get_categories', nonce: nonce } });
+            jQuery.when(prodReq, catReq).done(function(prodRes, catRes) {
+                var p = prodRes[0].data;
+                var cats = catRes[0].data.categories || [];
+                if (!prodRes[0].success) {
+                    jQuery('#ltms-view-products').html('<div style="padding:20px;color:red;">Error: ' + (prodRes[0].data || 'Producto no encontrado') + '</div>');
+                    return;
+                }
+                var catOptions = '<option value="">-- Sin categoría --</option>';
+                cats.forEach(function(c) {
+                    catOptions += '<option value="' + c.id + '"' + (c.id == p.category_id ? ' selected' : '') + '>' + c.name + '</option>';
+                });
+                var imgHtml = p.image_url
+                    ? '<img src="' + p.image_url + '" style="width:100%;height:100%;object-fit:cover;">'
+                    : '<span style="color:#999;font-size:13px;">+ Imagen</span>';
+                var html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
+                    '<h3 style="margin-bottom:20px;">Editar Producto</h3>' +
+                    '<div id="ltms-ep-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
+                    '<input type="hidden" id="ltms-ep-product-id" value="' + p.id + '">' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Nombre del producto *</label>' +
+                        '<input type="text" id="ltms-ep-name" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.name || '') + '">' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio (COP) *</label>' +
+                        '<input type="number" id="ltms-ep-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.price || '') + '" min="0">' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción</label>' +
+                        '<textarea id="ltms-ep-desc" rows="4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + (p.description || '') + '</textarea>' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
+                        '<select id="ltms-ep-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (vacío = ilimitado)</label>' +
+                        '<input type="number" id="ltms-ep-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.stock !== null ? p.stock : '') + '" min="0">' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
+                        '<div id="ltms-ep-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;">' + imgHtml + '</div>' +
+                        '<input type="file" id="ltms-ep-img-input" accept="image/*" style="display:none;">' +
+                        '<input type="hidden" id="ltms-ep-img-id" value="' + (p.image_id || '') + '">' +
+                    '</div>' +
+                    '<div style="display:flex;gap:10px;margin-top:20px;">' +
+                        '<button id="ltms-ep-submit" class="ltms-btn ltms-btn-primary" style="flex:1;">Guardar Cambios</button>' +
+                        '<button id="ltms-ep-cancel" class="ltms-btn" style="background:#f5f5f5;color:#333;">Cancelar</button>' +
+                    '</div>' +
+                '</div>';
+                jQuery('#ltms-view-products').html(html);
+                // Click en preview abre file input
+                jQuery('#ltms-ep-img-preview').on('click', function(){ jQuery('#ltms-ep-img-input').trigger('click'); });
+                // Upload imagen
+                jQuery('#ltms-ep-img-input').on('change', function() {
+                    var file = this.files[0];
+                    if (!file) return;
+                    var formData = new FormData();
+                    formData.append('action', 'ltms_upload_product_image');
+                    formData.append('nonce', nonce);
+                    formData.append('image', file);
+                    jQuery.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
+                        success: function(r) {
+                            if (r.success) {
+                                jQuery('#ltms-ep-img-id').val(r.data.attachment_id);
+                                jQuery('#ltms-ep-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
+                            }
+                        }
+                    });
+                });
+                // Cancelar
+                jQuery('#ltms-ep-cancel').on('click', function() { LTMS.Dashboard.loadView('products'); });
+                // Guardar
+                jQuery('#ltms-ep-submit').on('click', function() {
+                    var name = jQuery('#ltms-ep-name').val().trim();
+                    var price = jQuery('#ltms-ep-price').val();
+                    if (!name || !price) {
+                        jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
+                        return;
+                    }
+                    jQuery('#ltms-ep-submit').prop('disabled', true).text('Guardando...');
+                    jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
+                        action: 'ltms_update_product', nonce: nonce,
+                        product_id: jQuery('#ltms-ep-product-id').val(),
+                        name: name, price: price,
+                        description: jQuery('#ltms-ep-desc').val(),
+                        category_id: jQuery('#ltms-ep-cat').val(),
+                        stock: jQuery('#ltms-ep-stock').val(),
+                        image_id: jQuery('#ltms-ep-img-id').val()
+                    }, success: function(r) {
+                        if (r.success) {
+                            jQuery('#ltms-ep-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
+                            setTimeout(function() { LTMS.Dashboard.loadView('products'); }, 1500);
+                        } else {
+                            jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
+                            jQuery('#ltms-ep-submit').prop('disabled', false).text('Guardar Cambios');
+                        }
+                    }});
+                });
             });
         },
 
