@@ -42,6 +42,7 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
 
     <!-- Sidebar -->
+    <div class="ltms-sidebar-overlay" id="ltms-sidebar-overlay"></div>
     <aside class="ltms-sidebar" id="ltms-sidebar">
         <div class="ltms-sidebar-logo">
             <?php echo esc_html( get_bloginfo( 'name' ) ); ?>

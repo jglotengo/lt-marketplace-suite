@@ -547,12 +547,23 @@
          * Inicializa el menú móvil (toggle del sidebar).
          */
         initMobileMenu() {
-            $(document).on('click', '.ltms-mobile-menu-btn', function () {
-                $('.ltms-sidebar').toggleClass('open');
+            const sidebar = document.querySelector('.ltms-sidebar');
+            const overlay = document.querySelector('.ltms-sidebar-overlay');
+            $(document).on('click', '.ltms-mobile-menu-btn', function (e) {
+                e.stopPropagation();
+                if (sidebar) sidebar.classList.toggle('ltms-sidebar-open');
+                if (overlay) overlay.classList.toggle('active');
             });
-
             $(document).on('click', '.ltms-sidebar-overlay', function () {
-                $('.ltms-sidebar').removeClass('open');
+                if (sidebar) sidebar.classList.remove('ltms-sidebar-open');
+                if (overlay) overlay.classList.remove('active');
+            });
+            // Cerrar sidebar al navegar en móvil
+            $(document).on('click', '.ltms-nav-item', function () {
+                if (window.innerWidth <= 768) {
+                    if (sidebar) sidebar.classList.remove('ltms-sidebar-open');
+                    if (overlay) overlay.classList.remove('active');
+                }
             });
         },
 
