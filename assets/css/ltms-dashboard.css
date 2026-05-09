@@ -714,3 +714,29 @@
         min-width: 500px !important;
     }
 }
+
+/* Tabla de pedidos - scroll horizontal en móvil */
+@media (max-width: 768px) {
+    #ltms-orders-tbody,
+    #ltms-orders-tbody + *,
+    table:has(#ltms-orders-tbody) {
+        display: block !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    /* Wrapper universal para todas las tablas del panel */
+    #ltms-dashboard-container table {
+        display: block !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: 100% !important;
+        min-width: 420px !important;
+    }
+    #ltms-dashboard-container thead,
+    #ltms-dashboard-container tbody,
+    #ltms-dashboard-container tr {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+}
