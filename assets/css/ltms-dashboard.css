@@ -312,6 +312,18 @@
 .ltms-btn-outline  { background: transparent; border: 1px solid var(--ltms-primary); color: var(--ltms-primary); }
 .ltms-btn-sm       { padding: 5px 12px; font-size: 0.8rem; }
 
+
+/* Padding de vistas SPA */
+.ltms-view-pad {
+    padding: 24px;
+}
+
+@media (max-width: 768px) {
+    .ltms-view-pad {
+        padding: 16px 12px !important;
+    }
+}
+
 /* ════════════════════════════════════════════════════════
    RESPONSIVE — versión única y definitiva
    ════════════════════════════════════════════════════════ */
@@ -590,5 +602,36 @@
     #ltms-dashboard-container {
         background: #f4f7f9 !important;
         min-height: 100vh !important;
+    }
+}
+
+/* ── Formulario Nuevo/Editar Producto en móvil ── */
+@media (max-width: 768px) {
+
+    /* El contenedor de la vista de productos no debe cortar */
+    #ltms-view-products {
+        overflow: visible !important;
+        padding: 16px 0 !important;
+    }
+
+    /* El formulario ocupa todo el ancho disponible */
+    .ltms-new-product-form,
+    .ltms-edit-product-form {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Inputs del formulario: ancho completo */
+    .ltms-new-product-form input,
+    .ltms-new-product-form textarea,
+    .ltms-new-product-form select,
+    .ltms-edit-product-form input,
+    .ltms-edit-product-form textarea,
+    .ltms-edit-product-form select {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
     }
 }

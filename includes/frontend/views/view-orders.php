@@ -8,7 +8,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 ?>
-<div style="padding:24px;">
+<div class="ltms-view-pad">
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Mis Pedidos', 'ltms' ); ?></h2>

@@ -14,7 +14,7 @@ $balance      = (float) $wallet['balance'];
 $held         = (float) $wallet['held_balance'];
 $available    = max( 0, $balance - $held );
 ?>
-<div style="padding:24px;">
+<div class="ltms-view-pad">
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Billetera', 'ltms' ); ?></h2>
