@@ -96,6 +96,34 @@ final class LTMS_Frontend_Assets {
     private function enqueue_dashboard_assets( string $url, string $ver, string $suffix = '' ): void {
         wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
 
+        // Neutralizar el tema WP: el contenedor del dashboard ocupa todo el ancho sin márgenes del tema
+        wp_add_inline_style( 'ltms-dashboard', '
+            /* Neutralizar contenedor del tema para el dashboard del vendedor */
+            .ltms-dashboard-container,
+            #ltms-dashboard-container {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                float: none !important;
+                box-sizing: border-box !important;
+            }
+            /* Neutralizar wrappers del tema que puedan tener max-width o padding */
+            #ltms-dashboard-container .ltms-main-content,
+            .ltms-dashboard-container .ltms-main-content {
+                min-width: 0 !important;
+            }
+            /* Asegurar que el topbar fixed cubra todo el ancho en móvil */
+            @media (max-width: 768px) {
+                .ltms-topbar {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                }
+            }
+        ' );
+
         wp_enqueue_script(
             'ltms-modal',
             $url . 'js/ltms-modal' . $suffix . '.js',

@@ -29,13 +29,23 @@
 }
 
 /* ── Layout Principal SPA ───────────────────────────────────── */
-.ltms-dashboard-container {
+/* Neutralizar márgenes/padding que el tema WP pueda aplicar al contenedor */
+.ltms-dashboard-container,
+#ltms-dashboard-container {
     display: flex;
     min-height: 100vh;
     background: var(--ltms-light-bg);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 15px;
     color: var(--ltms-dark);
+    /* Neutralizar el tema */
+    max-width: 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
 }
 
 /* ── Sidebar ────────────────────────────────────────────────── */
@@ -468,35 +478,23 @@
         padding-right: 52px !important; /* espacio para el botón X */
     }
 
+    /* Fix: el tema puede tener overflow-x:hidden que corta contenido */
+    .ltms-dashboard-container,
+    #ltms-dashboard-container,
+    .ltms-main-content {
+        overflow-x: visible !important;
+    }
+
     /* Contenido principal */
     .ltms-main-content {
         margin-left: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
         background: #f4f7f9 !important;
         min-height: 100vh !important;
+        padding-top: 52px !important;
         padding-bottom: 80px !important;
-    }
-
-    /* Topbar */
-    .ltms-topbar {
-        display: flex !important;
-        align-items: center !important;
-        gap: 10px !important;
-        padding: 0 12px !important;
-        height: 52px !important;
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 100 !important;
-    }
-    .ltms-topbar-title {
-        flex: 1;
-        text-align: center;
-        font-size: 0.95rem;
-    }
-    .ltms-topbar-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        box-sizing: border-box !important;
     }
 
     /* Secciones */
