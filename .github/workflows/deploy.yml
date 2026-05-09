@@ -12,13 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Deploy via SSH
+      - name: Deploy via SSH (password)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASS }}
           script: |
             cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
             git fetch origin && git reset --hard origin/main
