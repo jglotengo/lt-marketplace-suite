@@ -547,62 +547,84 @@
          * Inicializa el menú móvil (toggle del sidebar).
          */
         initMobileMenu() {
-            const btn     = document.querySelector('.ltms-mobile-menu-btn');
+            if (window.innerWidth > 768) return;
+
             const sidebar = document.querySelector('.ltms-sidebar');
             const overlay = document.querySelector('.ltms-sidebar-overlay');
+            const topbar  = document.querySelector('.ltms-topbar');
+            const main    = document.querySelector('.ltms-main-content');
+            const TOPBAR_H = 52;
 
-            // CRÍTICO: Mover sidebar y overlay al <body> para que position:fixed
-            // funcione correctamente sin que Elementor/tema lo interfiera.
-            // Elementor aplica transform/will-change a sus contenedores, lo que
-            // convierte position:fixed en relativo al padre en lugar del viewport.
-            if (sidebar && sidebar.parentElement !== document.body) {
-                document.body.appendChild(sidebar);
-            }
-            if (overlay && overlay.parentElement !== document.body) {
-                document.body.appendChild(overlay);
-            }
-
-            // Limpiar inline styles residuales
-            if (sidebar) { sidebar.style.top = ''; sidebar.style.height = ''; }
-            if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
-
-            const openSidebar = () => {
-                if (sidebar) sidebar.classList.add('ltms-sidebar-open');
-                if (overlay) overlay.classList.add('active');
-                document.body.style.overflow = 'hidden';
+            // Medir el header del tema (elementos fixed/sticky fuera del panel)
+            const getThemeHeaderH = () => {
+                let maxBottom = 0;
+                document.querySelectorAll('*').forEach(el => {
+                    if (el.closest('#ltms-dashboard-container') || el.closest('.ltms-dashboard-container')) return;
+                    const s = window.getComputedStyle(el);
+                    if (s.position !== 'fixed' && s.position !== 'sticky') return;
+                    if (s.display === 'none') return;
+                    const r = el.getBoundingClientRect();
+                    if (r.height < 10 || r.height > 350 || r.top < -5 || r.top > 80 || r.width < 100) return;
+                    if (r.bottom > maxBottom) maxBottom = r.bottom;
+                });
+                return Math.round(maxBottom);
             };
 
-            const closeSidebar = () => {
-                if (sidebar) sidebar.classList.remove('ltms-sidebar-open');
-                if (overlay) overlay.classList.remove('active');
-                document.body.style.overflow = '';
-            };
+            const themeH = getThemeHeaderH();
 
-            // Botón hamburguesa abre el sidebar
-            $(document).on('click', '.ltms-mobile-menu-btn', function (e) {
-                e.stopPropagation();
-                if (sidebar && sidebar.classList.contains('ltms-sidebar-open')) {
-                    closeSidebar();
-                } else {
-                    openSidebar();
-                }
+            // Mover elementos al <body>
+            // Elementor aplica transform a sus secciones, lo que hace que
+            // position:fixed sea relativo al padre en vez del viewport.
+            [sidebar, overlay, topbar].forEach(el => {
+                if (el && el.parentElement !== document.body) document.body.appendChild(el);
             });
 
-            // Overlay cierra el sidebar
-            $(document).on('click', '.ltms-sidebar-overlay', closeSidebar);
+            // Posicionar topbar justo debajo del header del tema
+            if (topbar) {
+                Object.assign(topbar.style, {
+                    position: 'fixed',
+                    top: themeH + 'px',
+                    left: '0',
+                    right: '0',
+                    width: '100%',
+                    height: TOPBAR_H + 'px',
+                    zIndex: '2147483645',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '0 12px',
+                    background: '#1a5276',
+                    color: '#fff',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    boxSizing: 'border-box'
+                });
+                const title = topbar.querySelector('.ltms-topbar-title');
+                if (title) Object.assign(title.style, { flex: '1', textAlign: 'center', color: '#fff', fontSize: '0.95rem', fontWeight: '600' });
+                const menuBtn = topbar.querySelector('.ltms-mobile-menu-btn');
+                if (menuBtn) Object.assign(menuBtn.style, { background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none' });
+                topbar.querySelectorAll('.ltms-btn').forEach(b => { b.style.borderColor = 'rgba(255,255,255,0.5)'; b.style.color = '#fff'; });
+                const notif = topbar.querySelector('.ltms-topbar-notif');
+                if (notif) notif.style.color = '#fff';
+                const storeEl = topbar.querySelector('[style*="color:#374151"]');
+                if (storeEl) storeEl.style.color = '#fff';
+            }
 
-            // Botón X dentro del sidebar cierra
-            $(document).on('click', '.ltms-sidebar-close-btn', closeSidebar);
+            // Sidebar y overlay arrancan debajo del topbar del panel
+            const panelTop = themeH + TOPBAR_H;
+            if (sidebar) { sidebar.style.top = panelTop + 'px'; sidebar.style.height = 'calc(100vh - ' + panelTop + 'px)'; }
+            if (overlay) { overlay.style.top = panelTop + 'px'; overlay.style.height = 'calc(100vh - ' + panelTop + 'px)'; }
+            if (main) main.style.paddingTop = panelTop + 'px';
 
-            // Nav item en móvil: navegar y cerrar
-            $(document).on('click', '.ltms-nav-item', function () {
-                if (window.innerWidth <= 768) closeSidebar();
-            });
+            const open  = () => { sidebar?.classList.add('ltms-sidebar-open'); overlay?.classList.add('active'); document.body.style.overflow = 'hidden'; };
+            const close = () => { sidebar?.classList.remove('ltms-sidebar-open'); overlay?.classList.remove('active'); document.body.style.overflow = ''; };
 
-            // Tecla Escape cierra el sidebar
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeSidebar();
-            });
+            $(document).on('click', '.ltms-mobile-menu-btn', e => { e.stopPropagation(); sidebar?.classList.contains('ltms-sidebar-open') ? close() : open(); });
+            $(document).on('click', '.ltms-sidebar-overlay', close);
+            $(document).on('click', '.ltms-sidebar-close-btn', close);
+            $(document).on('click', '.ltms-nav-item', () => close());
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+        },
+
         },
 
         /**
