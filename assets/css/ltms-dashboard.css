@@ -390,7 +390,7 @@
         left: -280px !important;
         width: 280px !important;
         height: 100vh !important;
-        z-index: 999999 !important;
+        z-index: 2147483647 !important;
         transition: left 0.28s cubic-bezier(0.4,0,0.2,1) !important;
         overflow-y: auto !important;
         box-shadow: 6px 0 40px rgba(0,0,0,0.4) !important;
@@ -432,7 +432,7 @@
         right: 0;
         bottom: 0;
         background: rgba(0,0,0,0.55);
-        z-index: 999998 !important;
+        z-index: 2147483646 !important;
         backdrop-filter: blur(2px);
         -webkit-backdrop-filter: blur(2px);
     }

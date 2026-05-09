@@ -551,14 +551,25 @@
             const sidebar = document.querySelector('.ltms-sidebar');
             const overlay = document.querySelector('.ltms-sidebar-overlay');
 
-            // Asegurar que el sidebar NO tenga inline styles de posicionamiento residuales
+            // CRÍTICO: Mover sidebar y overlay al <body> para que position:fixed
+            // funcione correctamente sin que Elementor/tema lo interfiera.
+            // Elementor aplica transform/will-change a sus contenedores, lo que
+            // convierte position:fixed en relativo al padre en lugar del viewport.
+            if (sidebar && sidebar.parentElement !== document.body) {
+                document.body.appendChild(sidebar);
+            }
+            if (overlay && overlay.parentElement !== document.body) {
+                document.body.appendChild(overlay);
+            }
+
+            // Limpiar inline styles residuales
             if (sidebar) { sidebar.style.top = ''; sidebar.style.height = ''; }
             if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
 
             const openSidebar = () => {
                 if (sidebar) sidebar.classList.add('ltms-sidebar-open');
                 if (overlay) overlay.classList.add('active');
-                document.body.style.overflow = 'hidden'; // evita scroll del fondo
+                document.body.style.overflow = 'hidden';
             };
 
             const closeSidebar = () => {
