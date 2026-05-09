@@ -468,22 +468,22 @@
     /* Botón hamburguesa - siempre visible, sin desaparecer en hover */
     .ltms-mobile-menu-btn {
         display: flex !important;
-        position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 10000 !important;
-        width: 40px !important;
-        height: 40px !important;
+        position: relative !important;
+        z-index: 100 !important;
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
         background: var(--ltms-primary, #e63946) !important;
         color: #fff !important;
         border: none !important;
         border-radius: 6px !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 20px !important;
+        font-size: 18px !important;
         cursor: pointer !important;
         opacity: 1 !important;
         visibility: visible !important;
+        flex-shrink: 0 !important;
     }
     .ltms-mobile-menu-btn:hover,
     .ltms-mobile-menu-btn:focus {
