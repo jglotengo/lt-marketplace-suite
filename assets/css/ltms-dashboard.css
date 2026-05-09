@@ -312,15 +312,6 @@
 
 /* ── Responsive Mobile ──────────────────────────────────────── */
 @media (max-width: 768px) {
-    .ltms-sidebar {
-        transform: translateX(-100%);
-    }
-    .ltms-sidebar.open {
-        transform: translateX(0);
-    }
-    .ltms-main-content {
-        margin-left: 0;
-    }
     .ltms-metrics-grid {
         grid-template-columns: repeat(2, 1fr);
     }
