@@ -644,6 +644,13 @@
                             '<input type="file" id="ltms-np-img-input" accept="image/*" style="display:none;">' +
                             '<input type="hidden" id="ltms-np-img-id" value="">' +
                         '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
+                            '<div id="ltms-np-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
+                            '<button type="button" id="ltms-np-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
+                            '<input type="file" id="ltms-np-gallery-input" accept="image/*" style="display:none;" multiple>' +
+                            '<input type="hidden" id="ltms-np-gallery-ids" value="">' +
+                        '</div>' +
                         '<div style="display:flex;gap:10px;margin-top:20px;">' +
                             '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;">Publicar Producto</button>' +
                             '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
@@ -652,6 +659,39 @@
                     '</div>';
                     jQuery('#ltms-view-products').html(html);
                     jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
+                    var npGalleryIds = [];
+                    jQuery('#ltms-np-add-gallery-btn').on('click', function(){ jQuery('#ltms-np-gallery-input').trigger('click'); });
+                    jQuery('#ltms-np-gallery-input').on('change', function() {
+                        var files = this.files;
+                        if (!files.length) return;
+                        Array.from(files).forEach(function(file) {
+                            var fd = new FormData();
+                            fd.append('action','ltms_upload_product_image');
+                            fd.append('nonce', nonce);
+                            fd.append('image', file);
+                            var ajaxUrl2 = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
+                            jQuery.ajax({ url: ajaxUrl2, type:'POST', data:fd, processData:false, contentType:false,
+                                success: function(r) {
+                                    if (r.success) {
+                                        npGalleryIds.push(r.data.attachment_id);
+                                        jQuery('#ltms-np-gallery-ids').val(npGalleryIds.join(','));
+                                        var thumb = '<div style="position:relative;width:80px;height:80px;">' +
+                                            '<img src="'+r.data.url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
+                                            '<button type="button" data-id="'+r.data.attachment_id+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-np-rm-gallery">×</button>' +
+                                        '</div>';
+                                        jQuery('#ltms-np-gallery-wrap').append(thumb);
+                                    }
+                                }
+                            });
+                        });
+                        this.value = '';
+                    });
+                    jQuery('#ltms-np-gallery-wrap').on('click', '.ltms-np-rm-gallery', function() {
+                        var rid = parseInt(jQuery(this).data('id'));
+                        npGalleryIds = npGalleryIds.filter(function(i){ return i !== rid; });
+                        jQuery('#ltms-np-gallery-ids').val(npGalleryIds.join(','));
+                        jQuery(this).parent().remove();
+                    });
 
                     // Upload imagen
                     jQuery('#ltms-np-img-input').on('change', function() {
@@ -691,7 +731,8 @@
                             description: jQuery('#ltms-np-desc').val(),
                             category_id: jQuery('#ltms-np-cat').val(),
                             stock: jQuery('#ltms-np-stock').val(),
-                            image_id: jQuery('#ltms-np-img-id').val()
+                            image_id: jQuery('#ltms-np-img-id').val(),
+                            gallery_ids: jQuery('#ltms-np-gallery-ids').val()
                         }, success: function(r) {
                             if (r.success) {
                                 jQuery('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
@@ -761,6 +802,13 @@
                         '<input type="file" id="ltms-ep-img-input" accept="image/*" style="display:none;">' +
                         '<input type="hidden" id="ltms-ep-img-id" value="' + (p.image_id || '') + '">' +
                     '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
+                        '<div id="ltms-ep-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
+                        '<button type="button" id="ltms-ep-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
+                        '<input type="file" id="ltms-ep-gallery-input" accept="image/*" style="display:none;" multiple>' +
+                        '<input type="hidden" id="ltms-ep-gallery-ids" value="' + (p.gallery_ids ? p.gallery_ids.join(",") : "") + '">' +
+                    '</div>' +
                     '<div style="display:flex;gap:10px;margin-top:20px;">' +
                         '<button id="ltms-ep-submit" class="ltms-btn ltms-btn-primary" style="flex:1;">Guardar Cambios</button>' +
                         '<button id="ltms-ep-cancel" class="ltms-btn" style="background:#f5f5f5;color:#333;">Cancelar</button>' +
@@ -769,6 +817,49 @@
                 jQuery('#ltms-view-products').html(html);
                 // Click en preview abre file input
                 jQuery('#ltms-ep-img-preview').on('click', function(){ jQuery('#ltms-ep-img-input').trigger('click'); });
+                // Cargar galería existente
+                var epGalleryIds = p.gallery_ids ? p.gallery_ids.slice() : [];
+                if (p.gallery_urls && p.gallery_urls.length) {
+                    p.gallery_urls.forEach(function(url, idx) {
+                        var gid = p.gallery_ids[idx];
+                        var thumb = '<div style="position:relative;width:80px;height:80px;">' +
+                            '<img src="'+url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
+                            '<button type="button" data-id="'+gid+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-ep-rm-gallery">×</button>' +
+                        '</div>';
+                        jQuery('#ltms-ep-gallery-wrap').append(thumb);
+                    });
+                }
+                jQuery('#ltms-ep-add-gallery-btn').on('click', function(){ jQuery('#ltms-ep-gallery-input').trigger('click'); });
+                jQuery('#ltms-ep-gallery-input').on('change', function() {
+                    var files = this.files;
+                    if (!files.length) return;
+                    Array.from(files).forEach(function(file) {
+                        var fd = new FormData();
+                        fd.append('action','ltms_upload_product_image');
+                        fd.append('nonce', nonce);
+                        fd.append('image', file);
+                        jQuery.ajax({ url: ajaxUrl, type:'POST', data:fd, processData:false, contentType:false,
+                            success: function(r) {
+                                if (r.success) {
+                                    epGalleryIds.push(r.data.attachment_id);
+                                    jQuery('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
+                                    var thumb = '<div style="position:relative;width:80px;height:80px;">' +
+                                        '<img src="'+r.data.url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
+                                        '<button type="button" data-id="'+r.data.attachment_id+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-ep-rm-gallery">×</button>' +
+                                    '</div>';
+                                    jQuery('#ltms-ep-gallery-wrap').append(thumb);
+                                }
+                            }
+                        });
+                    });
+                    this.value = '';
+                });
+                jQuery('#ltms-ep-gallery-wrap').on('click', '.ltms-ep-rm-gallery', function() {
+                    var rid = parseInt(jQuery(this).data('id'));
+                    epGalleryIds = epGalleryIds.filter(function(i){ return i !== rid; });
+                    jQuery('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
+                    jQuery(this).parent().remove();
+                });
                 // Upload imagen
                 jQuery('#ltms-ep-img-input').on('change', function() {
                     var file = this.files[0];
@@ -804,7 +895,8 @@
                         description: jQuery('#ltms-ep-desc').val(),
                         category_id: jQuery('#ltms-ep-cat').val(),
                         stock: jQuery('#ltms-ep-stock').val(),
-                        image_id: jQuery('#ltms-ep-img-id').val()
+                        image_id: jQuery('#ltms-ep-img-id').val(),
+                        gallery_ids: jQuery('#ltms-ep-gallery-ids').val()
                     }, success: function(r) {
                         if (r.success) {
                             jQuery('#ltms-ep-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);

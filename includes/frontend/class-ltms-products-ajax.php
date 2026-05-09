@@ -91,6 +91,8 @@ class LTMS_Products_Ajax {
             'category_id' => ! empty( $cats ) ? $cats[0] : 0,
             'image_id'    => $product->get_image_id(),
             'image_url'   => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
+            'gallery_ids' => $product->get_gallery_image_ids(),
+            'gallery_urls'=> array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
         ] );
     }
 
@@ -121,6 +123,8 @@ class LTMS_Products_Ajax {
         }
         if ( $category_id ) $product->set_category_ids( [ $category_id ] );
         if ( $image_id )    $product->set_image_id( $image_id );
+        $gallery_ids = isset( $_POST['gallery_ids'] ) ? array_filter( array_map( 'intval', explode( ',', $_POST['gallery_ids'] ) ) ) : null;
+        if ( $gallery_ids !== null ) { $product->set_gallery_image_ids( $gallery_ids ); }
         $product->save();
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
@@ -188,6 +192,8 @@ class LTMS_Products_Ajax {
         if ( $image_id ) {
             $product->set_image_id( $image_id );
         }
+        $gallery_ids = isset( $_POST['gallery_ids'] ) ? array_filter( array_map( 'intval', explode( ',', $_POST['gallery_ids'] ) ) ) : [];
+        if ( ! empty( $gallery_ids ) ) { $product->set_gallery_image_ids( $gallery_ids ); }
         // Asignar al vendedor actual
         $product_id = $product->save();
         wp_update_post( [ 'ID' => $product_id, 'post_author' => get_current_user_id() ] );
