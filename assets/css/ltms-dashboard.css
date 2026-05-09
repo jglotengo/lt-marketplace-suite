@@ -480,3 +480,50 @@
     }
     .ltms-wallet-balance { font-size: 1.5rem; }
 }
+
+/* ── Tablas generadas por JS (renderProductsView, etc.) ── */
+.ltms-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+.ltms-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+.ltms-table thead th {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+.ltms-table tbody tr:hover { background: #f9fafb; }
+.ltms-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+    .ltms-table-wrap {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    .ltms-table {
+        min-width: 520px !important;
+        font-size: 0.82rem !important;
+    }
+    .ltms-table th,
+    .ltms-table td {
+        padding: 8px 10px !important;
+        white-space: nowrap !important;
+    }
+    /* botones de acción en tabla de productos */
+    .ltms-table td > div {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+}
