@@ -44,7 +44,8 @@ class LTMS_Products_Ajax {
                 'status'   => $p->post_status,
                 'price'    => $product ? (float) $product->get_price() : 0,
                 'stock'    => $product ? $product->get_stock_quantity() : null,
-                'edit_url' => get_edit_post_link( $p->ID, 'raw' ),
+                    'image'   => ( $product && $product->get_image_id() ) ? wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) : '',
+                    'edit_url' => get_edit_post_link( $p->ID, 'raw' ),
             ];
         }
         wp_send_json_success( [ 'products' => $products ] );
