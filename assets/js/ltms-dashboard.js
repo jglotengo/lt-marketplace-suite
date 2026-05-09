@@ -551,24 +551,68 @@
             const sidebar = document.querySelector('.ltms-sidebar');
             const overlay = document.querySelector('.ltms-sidebar-overlay');
 
-            // Calcular offset del header del tema para que el sidebar arranque debajo
-            const positionSidebar = () => {
+            /**
+             * Detecta la altura total de todos los headers fixed/sticky
+             * del tema WordPress que están encima del panel.
+             * Funciona con Elementor, Astra, OceanWP, Storefront, etc.
+             */
+            const getThemeHeaderHeight = () => {
                 const container = document.getElementById('ltms-dashboard-container');
-                if (!container || !sidebar) return;
-                if (window.innerWidth > 768) {
-                    sidebar.style.top = '';
-                    sidebar.style.height = '';
+                if (!container) return 0;
+
+                // Método 1: usar la posición real del contenedor en viewport
+                const containerTop = container.getBoundingClientRect().top;
+                if (containerTop > 10) return Math.round(containerTop);
+
+                // Método 2: buscar headers fixed/sticky del tema
+                const selectors = [
+                    'header.site-header', '#masthead', '.site-header',
+                    '#site-header', '.header-main', '.elementor-section[data-settings*="sticky"]',
+                    '.e--sticky', '[data-elementor-sticky]', '#header',
+                    '.mk-header', '.fusion-header-wrapper', '.et_header_style_left',
+                    '.ast-header-sticky-main-header', '.oceanwp-fixed-header',
+                ];
+                let maxBottom = 0;
+                selectors.forEach(sel => {
+                    const el = document.querySelector(sel);
+                    if (el) {
+                        const style = window.getComputedStyle(el);
+                        if (style.position === 'fixed' || style.position === 'sticky') {
+                            const r = el.getBoundingClientRect();
+                            if (r.bottom > maxBottom) maxBottom = r.bottom;
+                        }
+                    }
+                });
+                if (maxBottom > 0) return Math.round(maxBottom);
+
+                // Método 3: buscar cualquier elemento fixed en la parte superior
+                const allFixed = Array.from(document.querySelectorAll('*')).filter(el => {
+                    if (el.closest('#ltms-dashboard-container')) return false;
+                    const s = window.getComputedStyle(el);
+                    return (s.position === 'fixed' || s.position === 'sticky') && el.getBoundingClientRect().top < 200;
+                });
+                allFixed.forEach(el => {
+                    const r = el.getBoundingClientRect();
+                    if (r.bottom > maxBottom && r.top >= 0) maxBottom = r.bottom;
+                });
+
+                return Math.round(maxBottom);
+            };
+
+            const positionSidebar = () => {
+                if (!sidebar || window.innerWidth > 768) {
+                    if (sidebar) { sidebar.style.top = ''; sidebar.style.height = ''; }
                     if (overlay) { overlay.style.top = ''; overlay.style.height = ''; }
                     return;
                 }
-                const rect = container.getBoundingClientRect();
-                const offsetTop = Math.max(0, rect.top + window.scrollY);
-                // En móvil el sidebar arranca desde el top del contenedor del panel
-                sidebar.style.top = offsetTop + 'px';
-                sidebar.style.height = 'calc(100vh - ' + offsetTop + 'px)';
+                const headerH = getThemeHeaderHeight();
+                const topVal = headerH + 'px';
+                const heightVal = 'calc(100vh - ' + headerH + 'px)';
+                sidebar.style.top = topVal;
+                sidebar.style.height = heightVal;
                 if (overlay) {
-                    overlay.style.top = offsetTop + 'px';
-                    overlay.style.height = 'calc(100vh - ' + offsetTop + 'px)';
+                    overlay.style.top = topVal;
+                    overlay.style.height = heightVal;
                 }
             };
 
@@ -577,9 +621,13 @@
                 positionSidebar();
             };
 
+            // Ejecutar cuando el DOM y los estilos están completamente cargados
             updateBtn();
             window.addEventListener('resize', updateBtn);
-            window.addEventListener('scroll', positionSidebar);
+            window.addEventListener('scroll', positionSidebar, { passive: true });
+            // Re-calcular después de que Elementor/tema termine de pintar
+            setTimeout(positionSidebar, 300);
+            setTimeout(positionSidebar, 800);
 
             $(document).on('click', '.ltms-mobile-menu-btn', function (e) {
                 e.stopPropagation();

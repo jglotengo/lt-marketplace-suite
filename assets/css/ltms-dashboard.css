@@ -686,3 +686,15 @@
         font-size: 1rem !important;
     }
 }
+
+/* ── Sidebar top controlado por JS en móvil ── */
+@media (max-width: 768px) {
+    /* Remover top:0 del base para que JS lo controle */
+    .ltms-sidebar {
+        top: unset !important;
+    }
+    /* Sin top hardcodeado — JS asigna inline style */
+    .ltms-sidebar-overlay {
+        top: unset !important;
+    }
+}
