@@ -635,3 +635,54 @@
         max-width: 100% !important;
     }
 }
+
+/* ════════════════════════════════════════════════════════
+   SIDEBAR MÓVIL — posicionamiento dinámico via JS
+   ════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* El sidebar se posiciona con top/height via JS (debajo del header del tema) */
+    .ltms-sidebar {
+        top: auto !important;         /* JS lo establece dinámicamente */
+        height: 100vh !important;     /* JS lo ajusta */
+        border-radius: 0 16px 16px 0 !important;
+        box-shadow: 6px 0 32px rgba(0,0,0,0.35) !important;
+    }
+
+    /* Sidebar cerrado: fuera de pantalla a la izquierda */
+    .ltms-sidebar:not(.ltms-sidebar-open) {
+        left: -280px !important;
+    }
+
+    /* Sidebar abierto */
+    .ltms-sidebar.ltms-sidebar-open {
+        left: 0 !important;
+    }
+
+    /* Overlay: también se posiciona dinámicamente */
+    .ltms-sidebar-overlay {
+        top: 0;
+        height: 100vh;
+    }
+
+    /* Mejorar los items del nav en móvil */
+    .ltms-nav-item {
+        padding: 14px 20px !important;
+        font-size: 1rem !important;
+        border-left: 3px solid transparent !important;
+    }
+    .ltms-nav-item.active,
+    .ltms-nav-item:hover {
+        border-left-color: rgba(255,255,255,0.6) !important;
+        background: rgba(255,255,255,0.18) !important;
+    }
+    .ltms-nav-icon {
+        font-size: 1.2rem !important;
+    }
+
+    /* Logo del sidebar en móvil */
+    .ltms-sidebar-logo {
+        padding: 18px 20px !important;
+        font-size: 1rem !important;
+    }
+}
