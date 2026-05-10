@@ -30,6 +30,12 @@ class LTMS_Core_Cron_Manager {
         add_action( 'ltms_cron_auto_checkout',            [ self::class, 'auto_checkout' ] );
         add_action( 'ltms_cron_check_rnt_expiry',         [ self::class, 'check_rnt_expiry' ] );
         add_action( 'ltms_cron_release_booking_deposits', [ self::class, 'release_booking_deposits' ] );
+        add_action( 'ltms_update_tracking',               [ self::class, 'update_tracking' ] );
+        add_action( 'ltms_sync_siigo',                    [ self::class, 'sync_siigo' ] );
+        add_action( 'ltms_integrity_check',               [ self::class, 'integrity_check' ] );
+        add_action( 'ltms_clean_logs',                    [ self::class, 'clean_logs' ] );
+        add_action( 'ltms_process_job_queue',             [ self::class, 'process_job_queue' ] );
+        add_action( 'ltms_send_notifications',            [ self::class, 'send_notifications' ] );
 
         self::schedule_jobs();
     }
@@ -114,6 +120,280 @@ class LTMS_Core_Cron_Manager {
             }
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Cron: check_rnt_expiry — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 8: Sincroniza facturas pendientes con Siigo. */
+    public static function sync_siigo(): void {
+        global $wpdb;
+        try {
+            // Dispatch pending ltms_sync_siigo_invoice jobs from job queue
+            $jobs = $wpdb->get_results(
+                "SELECT * FROM {$wpdb->prefix}lt_job_queue
+                 WHERE hook = 'ltms_sync_siigo_invoice' AND status = 'pending'
+                 ORDER BY priority ASC, scheduled_at ASC LIMIT 20",
+                ARRAY_A
+            ) ?: [];
+
+            foreach ( $jobs as $job ) {
+                try {
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [ 'status' => 'processing', 'started_at' => current_time( 'mysql' ), 'attempts' => (int) $job['attempts'] + 1 ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s', '%d' ],
+                        [ '%d' ]
+                    );
+                    $args = $job['args'] ? json_decode( $job['args'], true ) : [];
+                    do_action( 'ltms_sync_siigo_invoice', $args );
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [ 'status' => 'completed', 'completed_at' => current_time( 'mysql' ) ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s' ],
+                        [ '%d' ]
+                    );
+                } catch ( \Throwable $inner ) {
+                    $max = (int) $job['max_attempts'];
+                    $att = (int) $job['attempts'] + 1;
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [
+                            'status'        => $att >= $max ? 'failed' : 'pending',
+                            'error_message' => $inner->getMessage(),
+                        ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s' ],
+                        [ '%d' ]
+                    );
+                    error_log( 'LTMS Cron: sync_siigo job #' . $job['id'] . ' — ' . $inner->getMessage() );
+                }
+            }
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: sync_siigo — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 9: Verifica integridad de comisiones y wallets vs transacciones WC. */
+    public static function integrity_check(): void {
+        global $wpdb;
+        try {
+            // Detectar comisiones huérfanas (orden cancelada pero comisión pendiente)
+            $orphaned = $wpdb->get_col(
+                "SELECT c.id FROM {$wpdb->prefix}lt_commissions c
+                 LEFT JOIN {$wpdb->posts} p ON p.ID = c.order_id
+                 WHERE c.status = 'pending'
+                 AND ( p.ID IS NULL OR p.post_status IN ('cancelled','trash','wc-cancelled','wc-failed') )"
+            ) ?: [];
+
+            foreach ( $orphaned as $commission_id ) {
+                $wpdb->update(
+                    $wpdb->prefix . 'lt_commissions',
+                    [ 'status' => 'cancelled' ],
+                    [ 'id' => (int) $commission_id ],
+                    [ '%s' ],
+                    [ '%d' ]
+                );
+            }
+
+            if ( ! empty( $orphaned ) ) {
+                LTMS_Core_Logger::warning(
+                    'INTEGRITY_CHECK',
+                    sprintf( '%d comisiones huérfanas marcadas como canceladas.', count( $orphaned ) )
+                );
+            } else {
+                LTMS_Core_Logger::info( 'INTEGRITY_CHECK', 'Sin anomalías detectadas.' );
+            }
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: integrity_check — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 10: Elimina logs antiguos según la política de retención configurada. */
+    public static function clean_logs(): void {
+        global $wpdb;
+        try {
+            $retention_days = (int) LTMS_Core_Config::get( 'ltms_log_retention_days', 90 );
+            $deleted = $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM {$wpdb->prefix}lt_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+                    $retention_days
+                )
+            );
+            LTMS_Core_Logger::info(
+                'CLEAN_LOGS',
+                sprintf( 'Logs eliminados: %d (retención: %d días).', (int) $deleted, $retention_days )
+            );
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: clean_logs — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 11: Procesa la cola de jobs pendientes (genérico). */
+    public static function process_job_queue(): void {
+        global $wpdb;
+        try {
+            $jobs = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT * FROM {$wpdb->prefix}lt_job_queue
+                     WHERE status = 'pending' AND scheduled_at <= %s
+                     ORDER BY priority ASC, scheduled_at ASC LIMIT 10",
+                    current_time( 'mysql' )
+                ),
+                ARRAY_A
+            ) ?: [];
+
+            foreach ( $jobs as $job ) {
+                // Skip siigo jobs — handled by sync_siigo cron
+                if ( 'ltms_sync_siigo_invoice' === $job['hook'] ) {
+                    continue;
+                }
+                try {
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [ 'status' => 'processing', 'started_at' => current_time( 'mysql' ), 'attempts' => (int) $job['attempts'] + 1 ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s', '%d' ],
+                        [ '%d' ]
+                    );
+                    $args = $job['args'] ? json_decode( $job['args'], true ) : [];
+                    do_action( $job['hook'], $args );
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [ 'status' => 'completed', 'completed_at' => current_time( 'mysql' ) ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s' ],
+                        [ '%d' ]
+                    );
+                } catch ( \Throwable $inner ) {
+                    $max = (int) $job['max_attempts'];
+                    $att = (int) $job['attempts'] + 1;
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_job_queue',
+                        [
+                            'status'        => $att >= $max ? 'failed' : 'pending',
+                            'error_message' => $inner->getMessage(),
+                        ],
+                        [ 'id' => (int) $job['id'] ],
+                        [ '%s', '%s' ],
+                        [ '%d' ]
+                    );
+                    error_log( 'LTMS Cron: job_queue hook=' . $job['hook'] . ' — ' . $inner->getMessage() );
+                }
+            }
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: process_job_queue — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 12: Envía notificaciones en cola (push/email pendientes). */
+    public static function send_notifications(): void {
+        global $wpdb;
+        try {
+            $notifications = $wpdb->get_results(
+                "SELECT * FROM {$wpdb->prefix}lt_notifications
+                 WHERE status = 'pending' AND send_at <= NOW()
+                 ORDER BY created_at ASC LIMIT 50",
+                ARRAY_A
+            ) ?: [];
+
+            foreach ( $notifications as $notif ) {
+                try {
+                    do_action( 'ltms_dispatch_notification', $notif );
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_notifications',
+                        [ 'status' => 'sent', 'sent_at' => current_time( 'mysql' ) ],
+                        [ 'id' => (int) $notif['id'] ],
+                        [ '%s', '%s' ],
+                        [ '%d' ]
+                    );
+                } catch ( \Throwable $inner ) {
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_notifications',
+                        [ 'status' => 'failed' ],
+                        [ 'id' => (int) $notif['id'] ],
+                        [ '%s' ],
+                        [ '%d' ]
+                    );
+                    error_log( 'LTMS Cron: send_notifications notif #' . $notif['id'] . ' — ' . $inner->getMessage() );
+                }
+            }
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: send_notifications — ' . $e->getMessage() );
+        }
+    }
+
+    /** Cron 7: Actualiza el estado de los envíos en tránsito consultando Heka y Aveonline.
+     *
+     * Busca órdenes WooCommerce con meta '_ltms_aveonline_tracking' o
+     * '_ltms_absorbed_shipping_provider' = 'heka' que sigan en estado 'processing'
+     * o 'shipped', consulta la API correspondiente y actualiza la orden.
+     */
+    public static function update_tracking(): void {
+        try {
+            if ( ! function_exists( 'wc_get_orders' ) ) {
+                return;
+            }
+
+            $orders = wc_get_orders( [
+                'status'       => [ 'processing', 'wc-shipped' ],
+                'limit'        => 50,
+                'meta_query'   => [
+                    'relation' => 'OR',
+                    [
+                        'key'     => '_ltms_aveonline_tracking',
+                        'compare' => 'EXISTS',
+                    ],
+                    [
+                        'key'     => '_ltms_absorbed_shipping_provider',
+                        'value'   => 'heka',
+                    ],
+                ],
+            ] );
+
+            foreach ( $orders as $order ) {
+                try {
+                    $provider        = $order->get_meta( '_ltms_absorbed_shipping_provider' );
+                    $aveonline_track = $order->get_meta( '_ltms_aveonline_tracking' );
+
+                    if ( $aveonline_track && class_exists( 'LTMS_Api_Factory' ) ) {
+                        /** @var \LTMS_Api_Aveonline $api */
+                        $api    = LTMS_Api_Factory::get( 'aveonline' );
+                        $result = $api->track_shipment( $aveonline_track );
+                        $status = $result['status'] ?? '';
+                        if ( $status ) {
+                            $order->add_order_note(
+                                sprintf( __( 'Aveonline tracking %s — estado actualizado: %s', 'ltms' ), $aveonline_track, sanitize_text_field( $status ) )
+                            );
+                            if ( in_array( $status, [ 'delivered', 'entregado', 'DELIVERED' ], true ) ) {
+                                $order->update_status( 'completed', __( 'Entregado vía Aveonline.', 'ltms' ) );
+                            }
+                        }
+                    } elseif ( 'heka' === $provider && class_exists( 'LTMS_Api_Factory' ) ) {
+                        $tracking_number = $order->get_meta( '_ltms_heka_tracking_number' );
+                        if ( $tracking_number ) {
+                            /** @var \LTMS_Api_TPTC $api */
+                            $api    = LTMS_Api_Factory::get( 'heka' );
+                            $result = $api->track_shipment( $tracking_number );
+                            $status = $result['status'] ?? '';
+                            if ( $status ) {
+                                $order->add_order_note(
+                                    sprintf( __( 'Heka tracking %s — estado actualizado: %s', 'ltms' ), $tracking_number, sanitize_text_field( $status ) )
+                                );
+                                if ( in_array( $status, [ 'delivered', 'entregado', 'DELIVERED' ], true ) ) {
+                                    $order->update_status( 'completed', __( 'Entregado vía Heka.', 'ltms' ) );
+                                }
+                            }
+                        }
+                    }
+
+                    $order->save();
+                } catch ( \Throwable $inner ) {
+                    error_log( 'LTMS Cron: update_tracking order #' . $order->get_id() . ' — ' . $inner->getMessage() );
+                }
+            }
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS Cron: update_tracking — ' . $e->getMessage() );
         }
     }
 
