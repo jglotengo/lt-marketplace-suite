@@ -22,7 +22,7 @@ $security_events = $wpdb->get_results(
 $blocked_ips_table = $wpdb->prefix . 'lt_waf_blocked_ips';
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $blocked_ips = $wpdb->get_results(
-    $wpdb->prepare( "SELECT * FROM `{$blocked_ips_table}` WHERE blocked_until > NOW() ORDER BY blocked_at DESC LIMIT %d", 20 ),
+    $wpdb->prepare( "SELECT * FROM `{$blocked_ips_table}` WHERE (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT %d", 20 ),
     ARRAY_A
 );
 ?>
