@@ -323,7 +323,7 @@ final class LTMS_Dashboard_Logic {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $monthly_commissions = (float) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT SUM(vendor_net) FROM `{$commissions_table}` WHERE vendor_id = %d AND created_at >= %s",
+                "SELECT SUM(vendor_amount) FROM `{$commissions_table}` WHERE vendor_id = %d AND created_at >= %s",
                 $vendor_id, $month_start
             )
         );
@@ -445,7 +445,7 @@ final class LTMS_Dashboard_Logic {
                 ));
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $commissions[] = (float) $wpdb->get_var( $wpdb->prepare(
-                    "SELECT SUM(vendor_net) FROM `{$table}` WHERE vendor_id = %d AND DATE_FORMAT(created_at, '%%Y-%%m') = %s",
+                    "SELECT SUM(vendor_amount) FROM `{$table}` WHERE vendor_id = %d AND DATE_FORMAT(created_at, '%%Y-%%m') = %s",
                     $vendor_id, $date
                 ));
             }
