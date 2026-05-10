@@ -35,6 +35,11 @@ final class LTMS_Dashboard_Logic {
 
         // Shortcode del dashboard
         add_shortcode( 'ltms_vendor_dashboard', [ $instance, 'render_dashboard_shortcode' ] );
+        add_shortcode( 'ltms_vendor_store',     [ $instance, 'render_store_shortcode' ] );
+        add_shortcode( 'ltms_vendor_orders',    [ $instance, 'render_orders_shortcode' ] );
+        add_shortcode( 'ltms_vendor_wallet',    [ $instance, 'render_wallet_shortcode' ] );
+        add_shortcode( 'ltms_vendor_kyc',       [ $instance, 'render_kyc_shortcode' ] );
+        add_shortcode( 'ltms_vendor_insurance', [ $instance, 'render_insurance_shortcode' ] );
 
         // AJAX handlers autenticados
         add_action( 'wp_ajax_ltms_get_dashboard_data',    [ $instance, 'ajax_get_dashboard_data' ] );
@@ -62,6 +67,51 @@ final class LTMS_Dashboard_Logic {
      * @param array $atts Atributos del shortcode.
      * @return string HTML del dashboard.
      */
+
+    public function render_store_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-home.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    public function render_orders_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-orders.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    public function render_wallet_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-wallet.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    public function render_kyc_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-settings.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    public function render_insurance_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-insurance.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
     public function render_dashboard_shortcode( array $atts = [] ): string {
         // Verificar que el usuario esté autenticado y sea vendedor
         if ( ! is_user_logged_in() ) {
