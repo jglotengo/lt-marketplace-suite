@@ -113,14 +113,18 @@ final class LTMS_Payout_Scheduler {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // Calcular fee una sola vez para garantizar consistencia entre fee y net_amount
+        $payout_fee = self::calculate_payout_fee( $amount, $method );
+        $net_amount = round( $amount - $payout_fee, 2 );
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert(
             $table,
             [
                 'vendor_id'       => $vendor_id,
                 'amount'          => $amount,
-                'fee'             => self::calculate_payout_fee( $amount, $method ),
-                'net_amount'      => $amount - self::calculate_payout_fee( $amount, $method ),
+                'fee'             => $payout_fee,
+                'net_amount'      => $net_amount,
                 'method'          => $method,
                 'bank_account_id' => sanitize_text_field( $bank_account_id ),
                 'status'          => 'pending',
