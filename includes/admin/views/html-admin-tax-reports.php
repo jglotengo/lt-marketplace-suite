@@ -22,10 +22,10 @@ if ( $month ) {
     $tax_summary = $wpdb->get_row(
         $wpdb->prepare(
             "SELECT
-                SUM(gross_amount)    as total_gross,
-                SUM(platform_fee)    as total_platform_fee,
-                SUM(vendor_net)      as total_vendor_net,
-                COUNT(*)             as total_transactions
+                SUM(gross_amount)      as total_gross,
+                SUM(commission_amount) as total_platform_fee,
+                SUM(vendor_amount)     as total_vendor_net,
+                COUNT(*)               as total_transactions
             FROM `{$commissions_table}` c
             WHERE status = 'paid'
               AND DATE_FORMAT(c.created_at, '%%Y-%%m') = %s",
@@ -37,10 +37,10 @@ if ( $month ) {
     $tax_summary = $wpdb->get_row(
         $wpdb->prepare(
             "SELECT
-                SUM(gross_amount)    as total_gross,
-                SUM(platform_fee)    as total_platform_fee,
-                SUM(vendor_net)      as total_vendor_net,
-                COUNT(*)             as total_transactions
+                SUM(gross_amount)      as total_gross,
+                SUM(commission_amount) as total_platform_fee,
+                SUM(vendor_amount)     as total_vendor_net,
+                COUNT(*)               as total_transactions
             FROM `{$commissions_table}` c
             WHERE status = 'paid'
               AND YEAR(c.created_at) = %d",
