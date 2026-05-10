@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class LTMS_Api_Aveonline
  */
-class LTMS_Api_Aveonline extends LTMS_Abstract_Api_Client {
+class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
 
     const API_BASE_LIVE    = 'https://api.aveonline.co/v1';
     const API_BASE_SANDBOX = 'https://sandbox.aveonline.co/v1';

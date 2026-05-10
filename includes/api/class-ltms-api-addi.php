@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class LTMS_Api_Addi
  */
-class LTMS_Api_Addi extends LTMS_Abstract_Api_Client {
+class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
 
     /**
      * URLs de la API por entorno y país.
