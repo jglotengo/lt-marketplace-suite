@@ -188,6 +188,9 @@ final class LTMS_Payout_Scheduler {
                 [ '%d' ]
             );
 
+            // M-41: disparar acción para que Affiliates y otros listeners procesen la comisión de referido.
+            do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'] );
+
             LTMS_Core_Logger::info(
                 'PAYOUT_APPROVED',
                 sprintf( 'Retiro #%d aprobado y procesado por admin #%d', $payout_id, $admin_id )

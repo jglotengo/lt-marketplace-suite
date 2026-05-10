@@ -232,6 +232,10 @@ final class LTMS_Public_Auth_Handler {
             }
         }
 
+        // M-41: disparar acción para que Affiliates y otros listeners procesen el nuevo vendedor.
+        // Se dispara luego de que meta_data y red de referidos ya están registrados.
+        do_action( 'ltms_vendor_registered', $user_id, $data['referral_code'] ?? '' );
+
         // Login automático
         wp_set_current_user( $user_id );
         wp_set_auth_cookie( $user_id, false );
