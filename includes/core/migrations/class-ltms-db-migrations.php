@@ -757,7 +757,7 @@ final class LTMS_DB_Migrations {
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_booking_season_rules` (
             `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `product_id`     BIGINT UNSIGNED NOT NULL,
-            `name`           VARCHAR(100)    NOT NULL,
+            `season_name`    VARCHAR(100)    NOT NULL COMMENT 'Nombre de la temporada',
             `season_type`    VARCHAR(20)     NOT NULL DEFAULT 'custom',
             `country_code`   VARCHAR(3)      DEFAULT NULL,
             `date_from`      DATE            NOT NULL,
@@ -766,6 +766,7 @@ final class LTMS_DB_Migrations {
             `min_nights`     TINYINT UNSIGNED DEFAULT 1,
             `is_active`      TINYINT(1)      DEFAULT 1,
             `created_at`     DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`     DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_product` (`product_id`),
             KEY `idx_dates`   (`date_from`, `date_to`),
