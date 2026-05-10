@@ -324,7 +324,10 @@
 }
 
 /* Wizard page + nav */
+/* Pages 2+ are hidden by default; JS shows/hides via .show()/.hide() */
 .ltms-wizard-page { animation: ltmsPageIn .2s ease; }
+.ltms-wizard-page + .ltms-wizard-page,
+.ltms-wizard-page ~ .ltms-wizard-page { display: none; }
 @keyframes ltmsPageIn {
     from { opacity:0; transform:translateX(12px); }
     to   { opacity:1; transform:translateX(0); }
@@ -385,6 +388,30 @@
     flex-direction: column;
     gap: 4px;
     margin-bottom: 14px;
+}
+.ltms-form-group label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+.ltms-form-control {
+    width: 100%;
+    padding: 9px 13px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+}
+.ltms-form-control:focus {
+    border-color: #6d28d9;
+    box-shadow: 0 0 0 3px rgba(109,40,217,.12);
+}
+.ltms-form-control::placeholder {
+    color: #9ca3af;
 }
 .ltms-field-error {
     font-size: 0.78rem;

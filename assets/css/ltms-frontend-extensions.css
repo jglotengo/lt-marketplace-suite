@@ -509,3 +509,113 @@
     border: 1px solid #bbf7d0;
     border-radius: 6px;
 }
+
+/* ── Badge System (frontend — replicates admin badges for vendor dashboard) ── */
+.ltms-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.ltms-badge-success  { background: #d4edda; color: #155724; }
+.ltms-badge-warning  { background: #fff3cd; color: #856404; }
+.ltms-badge-danger   { background: #f8d7da; color: #721c24; }
+.ltms-badge-info     { background: #d1ecf1; color: #0c5460; }
+.ltms-badge-pending  { background: #e2e3e5; color: #383d41; }
+.ltms-badge-primary  { background: #cce5ff; color: #004085; }
+
+/* ── Toast Notifications ─────────────────────────────────────────── */
+.ltms-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 999999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    display: none;
+    max-width: 320px;
+    line-height: 1.4;
+}
+.ltms-toast-success { background: #16a34a; color: #fff; }
+.ltms-toast-error   { background: #dc2626; color: #fff; }
+.ltms-toast-info    { background: #1a5276; color: #fff; }
+
+/* ── Dashboard Form Controls (used by renderSettingsView JS and view-kyc.php) ── */
+.ltms-form-group {
+    margin-bottom: 16px;
+}
+.ltms-form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+.ltms-form-control {
+    display: block;
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ltms-form-control:focus {
+    outline: none;
+    border-color: #1a5276;
+    box-shadow: 0 0 0 3px rgba(26,82,118,0.12);
+}
+.ltms-form-control.ltms-input-error {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220,38,38,0.1);
+}
+.ltms-field-hint {
+    display: block;
+    font-size: 0.78rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* ── Empty Cell (data tables) ──────────────────────────────────────── */
+.ltms-empty-cell {
+    text-align: center;
+    padding: 32px 20px;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* ── Password Strength Bar ────────────────────────────────────────── */
+/* .ltms-strength-bar is a real <div> — jQuery sets .css('width') on it directly */
+.ltms-password-strength {
+    margin-top: 6px;
+}
+.ltms-strength-bar {
+    display: block;
+    height: 4px;
+    width: 0%;
+    border-radius: 4px;
+    background: #e5e7eb;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+.ltms-strength-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 3px;
+    display: block;
+}
+
+/* Strength bar color by level (class set on .ltms-password-strength parent) */
+.ltms-password-strength.weak   .ltms-strength-bar { background: #ef4444; }
+.ltms-password-strength.fair   .ltms-strength-bar { background: #f97316; }
+.ltms-password-strength.good   .ltms-strength-bar { background: #eab308; }
+.ltms-password-strength.strong .ltms-strength-bar { background: #22c55e; }

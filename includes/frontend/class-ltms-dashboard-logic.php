@@ -49,6 +49,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_get_notifications',     [ $instance, 'ajax_get_notifications' ] );
         add_action( 'wp_ajax_ltms_mark_notification_read', [ $instance, 'ajax_mark_notification_read' ] );
         add_action( 'wp_ajax_ltms_get_analytics_data',    [ $instance, 'ajax_get_analytics_data' ] );
+        add_action( 'wp_ajax_ltms_submit_kyc',            [ $instance, 'ajax_submit_kyc' ] );
 
         // v1.6.0 — Nuevos módulos enterprise
         add_action( 'wp_ajax_ltms_get_insurance_data',    [ $instance, 'ajax_get_insurance_data' ] );
@@ -99,7 +100,7 @@ final class LTMS_Dashboard_Logic {
         if ( ! is_user_logged_in() ) return $this->render_login_redirect();
         if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
         ob_start();
-        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-settings.php';
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-kyc.php';
         if ( file_exists( $view_path ) ) include $view_path;
         return ob_get_clean();
     }
@@ -290,6 +291,77 @@ final class LTMS_Dashboard_Logic {
         );
 
         wp_send_json_success();
+    }
+
+
+    /**
+     * AJAX: Envía la solicitud de verificación KYC del vendedor.
+     *
+     * Inserta o actualiza el registro en lt_vendor_kyc y actualiza
+     * el user meta ltms_kyc_status a 'pending'.
+     *
+     * @return void
+     */
+    public function ajax_submit_kyc(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $vendor_id = get_current_user_id();
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) {
+            wp_send_json_error( __( 'Acceso denegado.', 'ltms' ), 403 );
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_vendor_kyc';
+
+        // Sanitise inputs
+        $full_name       = sanitize_text_field( wp_unslash( $_POST['full_name']       ?? '' ) ); // phpcs:ignore
+        $document_type   = sanitize_key(        $_POST['document_type']   ?? 'cc' );             // phpcs:ignore
+        $document_number = sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ); // phpcs:ignore
+        $file_path       = sanitize_text_field( wp_unslash( $_POST['file_path']       ?? '' ) ); // phpcs:ignore
+
+        $allowed_types = [ 'cc', 'ce', 'nit', 'passport' ];
+        if ( ! in_array( $document_type, $allowed_types, true ) ) {
+            $document_type = 'cc';
+        }
+
+        if ( empty( $full_name ) || empty( $document_number ) ) {
+            wp_send_json_error( __( 'El nombre completo y número de documento son obligatorios.', 'ltms' ) );
+        }
+
+        // Block re-submission if already approved or pending
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id, status FROM `{$table}` WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
+            $vendor_id
+        ) );
+
+        if ( $existing && in_array( $existing->status, [ 'approved', 'pending' ], true ) ) {
+            $msg = 'pending' === $existing->status
+                ? __( 'Ya tienes una solicitud en revisión.', 'ltms' )
+                : __( 'Tu identidad ya fue verificada.', 'ltms' );
+            wp_send_json_error( $msg );
+        }
+
+        // Insert KYC record
+        $inserted = $wpdb->insert( $table, [
+            'vendor_id'       => $vendor_id,
+            'document_type'   => $document_type,
+            'document_number' => $document_number,
+            'full_name'       => $full_name,
+            'file_path'       => $file_path,
+            'status'          => 'pending',
+            'submitted_at'    => current_time( 'mysql' ),
+            'country_code'    => defined( 'LTMS_COUNTRY' ) ? LTMS_COUNTRY : 'CO',
+        ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ] );
+
+        if ( false === $inserted ) {
+            wp_send_json_error( __( 'Error al guardar la solicitud. Intenta de nuevo.', 'ltms' ) );
+        }
+
+        // Sync user meta so dashboard/settings show correct status immediately
+        update_user_meta( $vendor_id, 'ltms_kyc_status', 'pending' );
+        update_user_meta( $vendor_id, 'ltms_full_name',   $full_name );
+
+        wp_send_json_success( [ 'message' => __( 'Solicitud enviada. Recibirás una respuesta en 1-2 días hábiles.', 'ltms' ) ] );
     }
 
     /**
