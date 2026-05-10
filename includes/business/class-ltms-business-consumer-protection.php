@@ -68,7 +68,7 @@ class LTMS_Business_Consumer_Protection {
         ], [ '%d', '%f', '%d', '%s', '%s', '%s', '%s' ] );
 
         if ( $inserted ) {
-            self::log_info(
+            self::log_info_static(
                 'COMMISSION_HELD',
                 sprintf( 'Fondos retenidos: %.2f para vendedor #%d, pedido #%d, liberación: %s', $amount, $vendor_id, $order_id, $release_at )
             );
@@ -145,7 +145,7 @@ class LTMS_Business_Consumer_Protection {
             );
         }
 
-        self::log_info(
+        self::log_info_static(
             'HOLD_RELEASED',
             sprintf( 'Hold #%d liberado: %.2f para vendedor #%d', $hold_id, $hold->amount, $vendor_id )
         );
