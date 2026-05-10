@@ -180,22 +180,32 @@ final class LTMS_Business_Order_Split {
 
         $table = $wpdb->prefix . 'lt_commissions';
 
+        // Obtener el primer product_id del pedido (este registro es agregado por pedido/vendedor)
+        $first_product_id = 0;
+        foreach ( $order->get_items() as $item ) {
+            $first_product_id = (int) $item->get_product_id();
+            break;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert(
             $table,
             [
                 'order_id'          => $order->get_id(),
                 'vendor_id'         => $vendor_id,
+                'product_id'        => $first_product_id,          // NOT NULL — primer producto del pedido
                 'gross_amount'      => $gross_amount,
-                'commission_amount' => $platform_fee,   // comisión de la plataforma
-                'vendor_amount'     => $vendor_net,     // monto neto para el vendedor
+                'commission_amount' => $platform_fee,               // comisión de la plataforma
+                'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
                 'tax_withholding'   => $tax_breakdown['withholding_total'] ?? 0.0,
+                'iva_amount'        => $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
                 'currency'          => $order->get_currency(),
+                'country_code'      => LTMS_Core_Config::get_country(),
                 'status'            => 'paid',
                 'metadata'          => wp_json_encode( $tax_breakdown ),
                 'created_at'        => LTMS_Utils::now_utc(),
             ],
-            [ '%d', '%d', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s' ]
+            [ '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
         );
     }
 
