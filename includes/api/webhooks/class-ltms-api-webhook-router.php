@@ -117,11 +117,12 @@ final class LTMS_Api_Webhook_Router {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert( $table, [
             'provider'   => $provider,
+            'event_type' => sanitize_text_field( $request->get_header( 'x-event-type' ) ?: 'unknown' ),
             'payload'    => wp_json_encode( $request->get_params() ),
-            'headers'    => wp_json_encode( $request->get_headers() ),
+            'ip_address' => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ),
             'status'     => 'received',
             'created_at' => gmdate( 'Y-m-d H:i:s' ),
-        ], [ '%s', '%s', '%s', '%s', '%s' ] );
+        ], [ '%s', '%s', '%s', '%s', '%s', '%s' ] );
     }
 
     /** Prevenir instanciación */
