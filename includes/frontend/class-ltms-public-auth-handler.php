@@ -207,10 +207,8 @@ final class LTMS_Public_Auth_Handler {
         // M-42: ltms_referral_code lo genera LTMS_Affiliates::on_vendor_registered() via do_action('ltms_vendor_registered').
         // No generar aqui para evitar doble escritura con codigo diferente.
 
-        // Registrar en la red de referidos si hay código patrocinador
-        if ( $data['referral_code'] && class_exists( 'LTMS_Referral_Tree' ) ) {
-            LTMS_Referral_Tree::register_node( $user_id, $data['referral_code'] );
-        }
+        // M-43: el registro en LTMS_Referral_Tree lo hace LTMS_Affiliates::on_vendor_registered()
+        // via do_action('ltms_vendor_registered') — no duplicar aqui.
 
         // Crear billetera inicial
         LTMS_Wallet::get_or_create( $user_id );
