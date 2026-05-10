@@ -379,6 +379,9 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
             LTMS_Frontend_Checkout_Handler::init();
         }
+        if ( class_exists( 'LTMS_Frontend_Checkout_Mexico_Handler' ) ) {
+            LTMS_Frontend_Checkout_Mexico_Handler::init();
+        }
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }

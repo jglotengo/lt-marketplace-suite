@@ -84,7 +84,7 @@ LTMS.KDS = (function ($) {
             url: config.ajaxUrl,
             method: 'POST',
             data: {
-                action: 'ltms_kds_get_orders',
+                action: 'ltms_kitchen_get_orders',
                 nonce: config.nonce,
                 vendor_id: config.vendorId,
             },
@@ -253,7 +253,7 @@ LTMS.KDS = (function ($) {
             url: config.ajaxUrl,
             method: 'POST',
             data: {
-                action: 'ltms_kds_update_status',
+                action: 'ltms_kitchen_update_status',
                 nonce: config.nonce,
                 order_id: orderId,
                 new_status: newStatus,

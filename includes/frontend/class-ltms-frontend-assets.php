@@ -72,6 +72,12 @@ final class LTMS_Frontend_Assets {
             $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
 
+        // KDS — Kitchen Display System (tab=kds dentro del dashboard)
+        if ( $page_id === (int) ( $pages['ltms-dashboard'] ?? 0 ) &&
+             isset( $_GET['tab'] ) && sanitize_key( $_GET['tab'] ) === 'kds' ) {
+            $this->enqueue_kds_assets( $url, $ver, $suffix );
+        }
+
         // Checkout / Pasarela de pagos
         if ( is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 ) ) {
             $this->enqueue_checkout_assets( $url, $ver, $suffix );
@@ -245,6 +251,49 @@ final class LTMS_Frontend_Assets {
                 'loading'       => __( 'Cargando cotizaciones...', 'ltms' ),
                 'unavailable'   => __( 'No disponible', 'ltms' ),
                 'free'          => __( 'Gratis', 'ltms' ),
+            ],
+        ]);
+    }
+
+    /**
+     * Carga el Kitchen Display System (KDS) — solo cuando tab=kds.
+     * Bug M-21: el script ltms-kds.js nunca fue enqueued ni localizado.
+     *
+     * @param string $url    URL base de assets.
+     * @param string $ver    Versión para cache busting.
+     * @param string $suffix '.min' en producción.
+     * @return void
+     */
+    private function enqueue_kds_assets( string $url, string $ver, string $suffix = '' ): void {
+        wp_enqueue_style( 'ltms-kds', $url . 'css/ltms-kds.css', [ 'ltms-dashboard' ], $ver );
+
+        wp_enqueue_script(
+            'ltms-kds',
+            $url . 'js/ltms-kds' . $suffix . '.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
+
+        $vendor_id = 0;
+        if ( is_user_logged_in() ) {
+            $vendor_id = (int) get_user_meta( get_current_user_id(), '_ltms_vendor_id', true );
+            if ( ! $vendor_id ) {
+                $vendor_id = get_current_user_id();
+            }
+        }
+
+        wp_localize_script( 'ltms-kds', 'ltmsKds', [
+            'ajax_url'      => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'ltms_kitchen_nonce' ),
+            'vendor_id'     => $vendor_id,
+            'poll_interval' => 15000,
+            'i18n'          => [
+                'loading'        => __( 'Cargando pedidos...', 'ltms' ),
+                'no_orders'      => __( 'No hay pedidos activos', 'ltms' ),
+                'error_loading'  => __( 'Error al cargar pedidos. Reintentando...', 'ltms' ),
+                'status_updated' => __( 'Estado actualizado', 'ltms' ),
+                'new_order'      => __( '¡Nuevo pedido!', 'ltms' ),
             ],
         ]);
     }
