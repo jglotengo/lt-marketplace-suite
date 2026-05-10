@@ -71,25 +71,34 @@ final class LTMS_Business_Order_Split {
         $withholding_total = $tax_breakdown['withholding_total'] ?? 0.0;
         $vendor_net        = max( 0.0, $vendor_gross - $withholding_total );
 
-        // Acreditar en billetera del vendedor
-        LTMS_Wallet::credit(
-            $vendor_id,
-            $vendor_net,
-            sprintf(
-                /* translators: %1$s: número de pedido, %2$s: total del pedido */
-                __( 'Comisión pedido #%1$s - Total bruto: %2$s', 'ltms' ),
-                $order->get_order_number(),
-                LTMS_Utils::format_money( $gross_amount )
-            ),
-            [
-                'type'             => 'commission',
-                'gross_amount'     => $gross_amount,
-                'platform_fee'     => $platform_fee,
-                'withholding'      => $withholding_total,
-                'tax_breakdown'    => $tax_breakdown,
-            ],
-            $order->get_id()
-        );
+        // Retener comisión durante el período de protección al consumidor (Ley 1480 Colombia)
+        // Los fondos se liberan a la billetera del vendedor al vencer el período de retención.
+        $held = false;
+        if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
+            $held = LTMS_Business_Consumer_Protection::hold_commission( $vendor_id, $vendor_net, $order->get_id() );
+        }
+
+        // Fallback: si Consumer Protection no está disponible, acreditar directamente
+        if ( ! $held ) {
+            LTMS_Wallet::credit(
+                $vendor_id,
+                $vendor_net,
+                sprintf(
+                    /* translators: %1$s: número de pedido, %2$s: total del pedido */
+                    __( 'Comisión pedido #%1$s - Total bruto: %2$s', 'ltms' ),
+                    $order->get_order_number(),
+                    LTMS_Utils::format_money( $gross_amount )
+                ),
+                [
+                    'type'          => 'commission',
+                    'gross_amount'  => $gross_amount,
+                    'platform_fee'  => $platform_fee,
+                    'withholding'   => $withholding_total,
+                    'tax_breakdown' => $tax_breakdown,
+                ],
+                $order->get_id()
+            );
+        }
 
         // Registrar comisión en la tabla de comisiones
         self::record_commission( $order, $vendor_id, $gross_amount, $platform_fee, $vendor_net, $tax_breakdown );
