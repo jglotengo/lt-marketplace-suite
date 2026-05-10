@@ -585,3 +585,183 @@
     .ltms-metrics-grid { grid-template-columns: 1fr !important; }
     .ltms-wallet-balance { font-size: 1.5rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-badge & variantes (sólo estaban en admin)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.ltms-badge-success  { background: #d1fae5; color: #065f46; }
+.ltms-badge-info     { background: #dbeafe; color: #1e40af; }
+.ltms-badge-warning  { background: #fef3c7; color: #92400e; }
+.ltms-badge-danger   { background: #fee2e2; color: #991b1b; }
+.ltms-badge-primary  { background: #ede9fe; color: #5b21b6; }
+.ltms-badge-pending  { background: #f3f4f6; color: #374151; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-toast (notificaciones flotantes)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 99999;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    animation: ltmsToastIn .25s ease;
+    max-width: 340px;
+    line-height: 1.4;
+}
+.ltms-toast-success { background: #065f46; color: #fff; }
+.ltms-toast-error   { background: #991b1b; color: #fff; }
+.ltms-toast-info    { background: #1e40af; color: #fff; }
+@keyframes ltmsToastIn {
+    from { opacity:0; transform: translateY(16px); }
+    to   { opacity:1; transform: translateY(0);    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-10 FIX: .ltms-form-group y .ltms-form-control completos
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 16px;
+}
+.ltms-form-group label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+}
+.ltms-form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+}
+.ltms-form-control:focus {
+    border-color: #6d28d9;
+    box-shadow: 0 0 0 3px rgba(109,40,217,.12);
+}
+.ltms-form-control::placeholder { color: #9ca3af; }
+textarea.ltms-form-control { resize: vertical; min-height: 80px; }
+select.ltms-form-control    { cursor: pointer; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-empty-cell (tabla vacía)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-empty-cell {
+    text-align: center;
+    padding: 32px 16px !important;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-badge variantes (sólo estaban en ltms-admin.css)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.ltms-badge-success  { background: #d1fae5; color: #065f46; }
+.ltms-badge-info     { background: #dbeafe; color: #1e40af; }
+.ltms-badge-warning  { background: #fef3c7; color: #92400e; }
+.ltms-badge-danger   { background: #fee2e2; color: #991b1b; }
+.ltms-badge-primary  { background: #ede9fe; color: #5b21b6; }
+.ltms-badge-pending  { background: #f3f4f6; color: #374151; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-toast (notificaciones flotantes)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 99999;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    animation: ltmsToastIn .25s ease;
+    max-width: 340px;
+    line-height: 1.4;
+}
+.ltms-toast-success { background: #065f46; color: #fff; }
+.ltms-toast-error   { background: #991b1b; color: #fff; }
+.ltms-toast-info    { background: #1e40af; color: #fff; }
+@keyframes ltmsToastIn {
+    from { opacity:0; transform: translateY(16px); }
+    to   { opacity:1; transform: translateY(0);    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-10 FIX: .ltms-form-group y .ltms-form-control completos
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 16px;
+}
+.ltms-form-group label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+}
+.ltms-form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+}
+.ltms-form-control:focus {
+    border-color: #6d28d9;
+    box-shadow: 0 0 0 3px rgba(109,40,217,.12);
+}
+.ltms-form-control::placeholder { color: #9ca3af; }
+textarea.ltms-form-control { resize: vertical; min-height: 80px; }
+select.ltms-form-control   { cursor: pointer; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-9 FIX: .ltms-empty-cell (tabla vacía)
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-empty-cell {
+    text-align: center;
+    padding: 32px 16px !important;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}

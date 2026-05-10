@@ -36,12 +36,13 @@
          * Inicializa el SPA completo.
          */
         init() {
-        window.ltmsDashboardInstance = this;
+            window.ltmsDashboardInstance = this;
             this.bindNavigation();
             this.loadView('home');
             this.startNotificationPolling();
             this.initMobileMenu();
             this.bindLogout();
+            this.bindOrderFilter();
         },
 
         /**
@@ -632,6 +633,47 @@
             $(document).on('click', '.ltms-logout-btn', (e) => {
                 e.preventDefault();
                 window.location.href = ltmsDashboard.logout_url;
+            });
+        },
+
+        /**
+         * BUG M-8 FIX: Vincula el select de filtro de estado de pedidos.
+         * Antes no tenía listener — filtrar nunca hacía nada.
+         */
+        bindOrderFilter() {
+            const self = this;
+            $(document).on('change', '#ltms-order-status-filter', function () {
+                const status = $(this).val();
+                self.loadOrdersFiltered(status);
+            });
+        },
+
+        /**
+         * Recarga pedidos filtrando por estado.
+         * @param {string} status Estado a filtrar ('all' o WC status).
+         */
+        loadOrdersFiltered(status) {
+            const self = this;
+            const $tbody = $('#ltms-orders-tbody');
+            $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">Cargando...</td></tr>');
+            $.ajax({
+                url: ltmsDashboard.ajax_url,
+                method: 'POST',
+                data: {
+                    action: 'ltms_get_orders_data',
+                    nonce: ltmsDashboard.nonce,
+                    page: 1,
+                    per_page: 20,
+                    status: status && status !== 'all' ? status : '',
+                },
+                success(response) {
+                    if (response.success) {
+                        self.renderOrdersTable(response.data.orders);
+                    } else {
+                        $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">' + (response.data || ltmsDashboard.i18n.error) + '</td></tr>');
+                    }
+                },
+                error: () => $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">' + ltmsDashboard.i18n.error + '</td></tr>'),
             });
         },
 

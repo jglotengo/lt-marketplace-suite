@@ -238,3 +238,90 @@
         font-size: 1.25rem;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG WIZARD FIX: Pasos del wizard de registro sin CSS
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-wizard-steps {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 28px;
+    counter-reset: ltms-step;
+}
+.ltms-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    flex: 1;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-align: center;
+    padding-top: 36px;
+    counter-increment: ltms-step;
+}
+.ltms-step::before {
+    content: counter(ltms-step);
+    position: absolute;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #e5e7eb;
+    z-index: 1;
+    transition: background .2s, border-color .2s, color .2s;
+}
+.ltms-step::after {
+    content: '';
+    position: absolute;
+    top: 13px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 0;
+}
+.ltms-step:last-child::after { display: none; }
+.ltms-step.active {
+    color: #6d28d9;
+}
+.ltms-step.active::before {
+    background: #6d28d9;
+    border-color: #6d28d9;
+    color: #fff;
+}
+.ltms-step.done {
+    color: #059669;
+}
+.ltms-step.done::before {
+    content: '✓';
+    background: #059669;
+    border-color: #059669;
+    color: #fff;
+}
+.ltms-step.done::after {
+    background: #059669;
+}
+
+/* Wizard page + nav */
+.ltms-wizard-page { animation: ltmsPageIn .2s ease; }
+@keyframes ltmsPageIn {
+    from { opacity:0; transform:translateX(12px); }
+    to   { opacity:1; transform:translateX(0); }
+}
+.ltms-wizard-nav {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+.ltms-wizard-nav .ltms-btn { flex: 1; }
