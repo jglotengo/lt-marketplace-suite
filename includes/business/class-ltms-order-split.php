@@ -184,17 +184,18 @@ final class LTMS_Business_Order_Split {
         $wpdb->insert(
             $table,
             [
-                'order_id'      => $order->get_id(),
-                'vendor_id'     => $vendor_id,
-                'gross_amount'  => $gross_amount,
-                'platform_fee'  => $platform_fee,
-                'vendor_net'    => $vendor_net,
-                'tax_breakdown' => wp_json_encode( $tax_breakdown ),
-                'currency'      => $order->get_currency(),
-                'status'        => 'paid',
-                'created_at'    => LTMS_Utils::now_utc(),
+                'order_id'          => $order->get_id(),
+                'vendor_id'         => $vendor_id,
+                'gross_amount'      => $gross_amount,
+                'commission_amount' => $platform_fee,   // comisión de la plataforma
+                'vendor_amount'     => $vendor_net,     // monto neto para el vendedor
+                'tax_withholding'   => $tax_breakdown['withholding_total'] ?? 0.0,
+                'currency'          => $order->get_currency(),
+                'status'            => 'paid',
+                'metadata'          => wp_json_encode( $tax_breakdown ),
+                'created_at'        => LTMS_Utils::now_utc(),
             ],
-            [ '%d', '%d', '%f', '%f', '%f', '%s', '%s', '%s', '%s' ]
+            [ '%d', '%d', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s' ]
         );
     }
 
