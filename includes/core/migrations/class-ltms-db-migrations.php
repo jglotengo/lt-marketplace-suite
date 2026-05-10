@@ -790,6 +790,27 @@ final class LTMS_DB_Migrations {
             KEY `idx_doc_type` (`document_type`)
         ) {$charset}";
 
+        // lt_order_snapshots — Evidencia legal inmutable de snapshots de pedidos (legal-evidence-handler)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_order_snapshots` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`       BIGINT UNSIGNED NOT NULL,
+            `status`         VARCHAR(50)     NOT NULL DEFAULT '',
+            `total`          DECIMAL(15,2)   NOT NULL DEFAULT 0.00,
+            `vendor_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `customer_email` VARCHAR(255)    DEFAULT NULL,
+            `items_json`     LONGTEXT        DEFAULT NULL,
+            `meta_json`      LONGTEXT        DEFAULT NULL,
+            `trigger`        VARCHAR(100)    NOT NULL DEFAULT '',
+            `actor_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `ip_address`     VARCHAR(45)     DEFAULT NULL,
+            `created_at`     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_order_id`  (`order_id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_trigger`   (`trigger`),
+            KEY `idx_created_at`(`created_at`)
+        ) {$charset}";
+
         // lt_wallet_holds — Saldos retenidos de la billetera (consumer protection / vesting)
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
             `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

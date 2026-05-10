@@ -81,7 +81,7 @@ class LTMS_Legal_Evidence_Handler {
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'lt_legal_snapshots';
+        $table = $wpdb->prefix . 'lt_order_snapshots';
         if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
             return;
         }
