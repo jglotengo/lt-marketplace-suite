@@ -373,6 +373,12 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Products_Ajax' ) ) {
             new LTMS_Products_Ajax();
         }
+
+        // M-14 FIX: handler de checkout AJAX (ltms_process_checkout + ltms_get_pse_banks)
+        // El JS ltms-checkout.js llamaba estas acciones pero no existía ningún handler PHP.
+        if ( class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
+            LTMS_Frontend_Checkout_Handler::init();
+        }
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }

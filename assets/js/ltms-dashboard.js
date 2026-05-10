@@ -409,12 +409,18 @@
                     since: this.lastNotifDate,
                 },
                 success: (response) => {
-                    if (response.success && response.data.count > 0) {
-                        this.updateNotificationBadge(response.data.count);
-                        this.renderNotifications(response.data.notifications);
-                        if (response.data.notifications.length > 0) {
-                            this.lastNotifDate = response.data.notifications[0].created_at;
-                        }
+                    if (!response.success) return;
+
+                    // M-15 FIX: usar `count` (total real no leídas) para el badge SIEMPRE,
+                    // independientemente de si hay nuevas. Esto permite que el badge se
+                    // ponga en 0 cuando el vendedor marca todo como leído.
+                    this.updateNotificationBadge(response.data.count);
+
+                    // Solo renderizar si hay notificaciones nuevas desde `since`
+                    const newNotifs = response.data.notifications || [];
+                    if (newNotifs.length > 0) {
+                        this.renderNotifications(newNotifs);
+                        this.lastNotifDate = newNotifs[0].created_at;
                     }
                 },
             });

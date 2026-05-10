@@ -765,3 +765,343 @@ select.ltms-form-control   { cursor: pointer; }
     color: #9ca3af;
     font-size: 0.9rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-16 FIX: Clases del dashboard JS sin CSS en el frontend
+   Agrupadas por área funcional
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Vistas SPA (view-loader, view-home, etc.) ── */
+.ltms-view-loader {
+    text-align: center;
+    padding: 40px 20px;
+    color: #9ca3af;
+    font-size: 0.95rem;
+}
+.ltms-view-home,
+.ltms-view-orders,
+.ltms-view-products,
+.ltms-view-settings,
+.ltms-view-wallet {
+    display: none;
+    animation: ltmsFadeIn .2s ease;
+}
+@keyframes ltmsFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Métricas del home ── */
+.ltms-metric-orders,
+.ltms-metric-sales,
+.ltms-metric-commissions,
+.ltms-metric-balance {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    line-height: 1;
+}
+
+/* ── Notificaciones ── */
+.ltms-notif-list {
+    max-height: 380px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+}
+.ltms-notif-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 2px;
+}
+.ltms-notif-msg {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin: 0 0 4px;
+}
+.ltms-notif-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+/* ── Select de filtro de pedidos ── */
+.ltms-order-status-filter {
+    padding: 7px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #374151;
+    background: #fff;
+    cursor: pointer;
+}
+
+/* ── Tbody de pedidos y wallet ── */
+.ltms-orders-tbody td,
+.ltms-wallet-tbody td {
+    vertical-align: middle;
+    padding: 10px 12px;
+    font-size: 0.88rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* ── Wallet balance chips ── */
+.ltms-wallet-available,
+.ltms-wallet-held {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.ltms-wallet-available { color: #065f46; }
+.ltms-wallet-held       { color: #92400e; }
+
+/* ── Modal de retiro (payout) ── */
+.ltms-modal-payout {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+.ltms-modal-payout.open { display: flex; }
+.ltms-payout-amount,
+.ltms-payout-method,
+.ltms-payout-account {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+.ltms-payout-balance-display {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #065f46;
+    margin-bottom: 12px;
+}
+
+/* ── Botones de productos ── */
+.ltms-add-product-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    background: #6d28d9;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-add-product-btn:hover { background: #5b21b6; }
+
+.ltms-edit-product-btn,
+.ltms-delete-product-btn,
+.ltms-toggle-product-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: opacity .15s;
+}
+.ltms-edit-product-btn   { background: #ede9fe; color: #5b21b6; }
+.ltms-delete-product-btn { background: #fee2e2; color: #991b1b; }
+.ltms-toggle-product-btn { background: #d1fae5; color: #065f46; }
+.ltms-edit-product-btn:hover,
+.ltms-delete-product-btn:hover,
+.ltms-toggle-product-btn:hover { opacity: .8; }
+
+/* ── Formulario nuevo producto (np-*) y editar producto (ep-*) ── */
+.ltms-np-name, .ltms-ep-name,
+.ltms-np-price, .ltms-ep-price,
+.ltms-np-stock, .ltms-ep-stock,
+.ltms-np-desc, .ltms-ep-desc,
+.ltms-np-cat, .ltms-ep-cat {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    margin-bottom: 4px;
+    outline: none;
+    transition: border-color .15s;
+}
+.ltms-np-name:focus, .ltms-ep-name:focus,
+.ltms-np-price:focus, .ltms-ep-price:focus,
+.ltms-np-stock:focus, .ltms-ep-stock:focus,
+.ltms-np-desc:focus, .ltms-ep-desc:focus,
+.ltms-np-cat:focus, .ltms-ep-cat:focus {
+    border-color: #6d28d9;
+    box-shadow: 0 0 0 3px rgba(109,40,217,.1);
+}
+
+.ltms-np-submit, .ltms-ep-submit {
+    padding: 10px 24px;
+    background: #6d28d9;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-np-submit:hover, .ltms-ep-submit:hover { background: #5b21b6; }
+
+.ltms-np-draft {
+    padding: 10px 18px;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.ltms-np-cancel, .ltms-ep-cancel {
+    padding: 8px 16px;
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.ltms-np-msg, .ltms-ep-msg {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-top: 8px;
+    display: none;
+}
+.ltms-np-msg.success, .ltms-ep-msg.success { background: #d1fae5; color: #065f46; display: block; }
+.ltms-np-msg.error, .ltms-ep-msg.error     { background: #fee2e2; color: #991b1b; display: block; }
+
+/* ── Imagen principal del producto ── */
+.ltms-np-img-preview, .ltms-ep-img-preview {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #e5e7eb;
+    display: block;
+    margin-bottom: 8px;
+}
+.ltms-np-img-input, .ltms-ep-img-input,
+.ltms-np-img-id, .ltms-ep-img-id,
+.ltms-np-gallery-ids, .ltms-ep-gallery-ids { display: none; }
+
+/* ── Galería de imágenes ── */
+.ltms-np-gallery-wrap, .ltms-ep-gallery-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+}
+.ltms-np-add-gallery-btn, .ltms-ep-add-gallery-btn {
+    padding: 6px 12px;
+    background: #ede9fe;
+    color: #5b21b6;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+.ltms-np-rm-gallery, .ltms-ep-rm-gallery {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    cursor: pointer;
+    line-height: 18px;
+    text-align: center;
+    padding: 0;
+}
+.ltms-np-gallery-input, .ltms-ep-gallery-input { display: none; }
+
+/* ── Botón de guardar settings y mensaje ── */
+.ltms-save-settings-btn {
+    padding: 10px 24px;
+    background: #6d28d9;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-save-settings-btn:hover { background: #5b21b6; }
+.ltms-settings-msg {
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-top: 10px;
+    display: none;
+}
+.ltms-settings-msg.success { background: #d1fae5; color: #065f46; display: block; }
+.ltms-settings-msg.error   { background: #fee2e2; color: #991b1b; display: block; }
+
+/* ── Botón de logout ── */
+.ltms-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all .15s;
+}
+.ltms-logout-btn:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+/* ── Etiqueta de nav ── */
+.ltms-nav-label {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 12px;
+    padding: 0 12px;
+}
+
+/* ── Aviso de error inline ── */
+.ltms-notice-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+}
+.ltms-notice-error p { margin: 0; }
+
+/* ── Gráfica de ventas ── */
+.ltms-vendor-sales-chart {
+    width: 100%;
+    height: 260px;
+    display: block;
+}

@@ -450,3 +450,133 @@
         display: none; /* Ocultar wizard steps en móvil muy pequeño */
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-17 FIX: Clases del checkout JS sin CSS en el frontend
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Formulario de checkout ── */
+.ltms-checkout-form {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 24px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+
+/* ── Aviso de checkout (error / éxito) ── */
+.ltms-checkout-notice {
+    display: none;
+    padding: 12px 16px;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+.ltms-checkout-notice p { margin: 0; }
+.ltms-notice-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+}
+.ltms-notice-error p { margin: 0; }
+.ltms-notice-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+}
+.ltms-notice-success p { margin: 0; }
+
+/* ── Paneles de método de pago ── */
+.ltms-payment-panel {
+    display: none;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-top: 12px;
+    background: #fafafa;
+}
+
+/* ── Campos de tarjeta ── */
+.ltms-card-number,
+.ltms-card-name,
+.ltms-card-expiry,
+.ltms-card-cvv,
+.ltms-card-installments,
+.ltms-pse-bank,
+.ltms-pse-document,
+.ltms-pse-document-type,
+.ltms-nequi-phone {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 13px;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    font-size: 0.92rem;
+    color: #111827;
+    background: #fff;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+}
+.ltms-card-number:focus,
+.ltms-card-name:focus,
+.ltms-card-expiry:focus,
+.ltms-card-cvv:focus,
+.ltms-card-installments:focus,
+.ltms-pse-bank:focus,
+.ltms-pse-document:focus,
+.ltms-pse-document-type:focus,
+.ltms-nequi-phone:focus {
+    border-color: #6d28d9;
+    box-shadow: 0 0 0 3px rgba(109,40,217,.11);
+}
+.ltms-card-number { letter-spacing: 0.12em; font-size: 1.05rem; }
+
+/* ── Logo de marca de tarjeta ── */
+.ltms-card-brand-logo {
+    height: 28px;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+/* ── Botón pagar ── */
+.ltms-place-order-btn {
+    display: block;
+    width: 100%;
+    padding: 13px 24px;
+    background: #6d28d9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, opacity .15s;
+    margin-top: 20px;
+    letter-spacing: 0.02em;
+}
+.ltms-place-order-btn:hover    { background: #5b21b6; }
+.ltms-place-order-btn:disabled { opacity: .65; cursor: not-allowed; }
+
+/* ── Spinner de loading ── */
+.ltms-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: ltmsSpinnerRotate .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+@keyframes ltmsSpinnerRotate {
+    to { transform: rotate(360deg); }
+}

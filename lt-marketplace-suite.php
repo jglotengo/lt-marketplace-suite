@@ -276,7 +276,9 @@ function ltms_load_autoloader(): void {
                 'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
-                'ltms-xcover-checkout-handler'  => 'business/class-ltms-xcover-checkout-handler.php',
+                'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
+                // M-14: handler de checkout AJAX (ltms_process_checkout + ltms_get_pse_banks)
+                'ltms-frontend-checkout-handler'    => 'frontend/class-ltms-frontend-checkout-handler.php',
                 // Business listeners
                 'ltms-order-paid-listener'      => 'business/listeners/class-ltms-order-paid-listener.php',
                 'ltms-redi-order-listener'      => 'business/listeners/class-ltms-redi-order-listener.php',

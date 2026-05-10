@@ -325,3 +325,87 @@
     margin-top: 20px;
 }
 .ltms-wizard-nav .ltms-btn { flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BUG M-18 FIX: Clases del login-register JS sin CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Formularios de login y registro ── */
+.ltms-login-form,
+.ltms-register-form {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 28px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 14px rgba(0,0,0,.09);
+}
+
+/* ── Notificación de login/registro ── */
+.ltms-login-notice,
+.ltms-register-notice,
+.ltms-notice {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 0.87rem;
+    margin-bottom: 14px;
+    display: none;
+}
+.ltms-login-notice.error,
+.ltms-register-notice.error,
+.ltms-notice.error {
+    display: block;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+.ltms-login-notice.success,
+.ltms-register-notice.success,
+.ltms-notice.success {
+    display: block;
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+/* ── Grupo de campo con error ── */
+.ltms-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.ltms-field-error {
+    font-size: 0.78rem;
+    color: #dc2626;
+    margin-top: 2px;
+    display: none;
+}
+.ltms-input-error {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 3px rgba(220,38,38,.12) !important;
+}
+
+/* ── Botones del wizard ── */
+.ltms-wizard-next,
+.ltms-wizard-back {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, opacity .15s;
+}
+.ltms-wizard-next {
+    background: #6d28d9;
+    color: #fff;
+}
+.ltms-wizard-next:hover { background: #5b21b6; }
+.ltms-wizard-back {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    margin-right: 8px;
+}
+.ltms-wizard-back:hover { background: #e5e7eb; }

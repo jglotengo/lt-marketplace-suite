@@ -199,9 +199,20 @@ final class LTMS_Dashboard_Logic {
             ARRAY_A
         );
 
+        // M-15 FIX: devolver el total REAL de no leídas (sin filtro `since`) para que el badge
+        // del topbar siempre refleje el número correcto y se ponga en 0 cuando no hay ninguna.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $total_unread = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$table}` WHERE user_id = %d AND is_read = 0",
+                $user_id
+            )
+        );
+
         wp_send_json_success([
             'notifications' => $notifications,
-            'count'         => count( $notifications ),
+            'count'         => $total_unread,    // Total real para el badge del topbar
+            'new_count'     => count( $notifications ), // Nuevas desde `since` para renderizar
         ]);
     }
 
