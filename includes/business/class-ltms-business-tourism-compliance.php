@@ -126,7 +126,7 @@ class LTMS_Business_Tourism_Compliance {
                 'rnt_verified' => $approved ? 1 : 0,
                 'status'       => $approved ? 'verified' : 'rejected',
                 'admin_notes'  => sanitize_textarea_field( $notes ),
-                'verified_at'  => $approved ? current_time( 'mysql' ) : null,
+                'rnt_verified_at' => $approved ? current_time( 'mysql' ) : null,
                 'updated_at'   => current_time( 'mysql' ),
             ],
             [ 'vendor_id' => $vendor_id ],
