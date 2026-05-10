@@ -113,6 +113,17 @@
 .ltms-password-strength.good   { color: #f39c12; }
 .ltms-password-strength.strong { color: #27ae60; }
 
+/* Strength bar (animated fill inside .ltms-password-strength) */
+.ltms-strength-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: currentColor;
+    width: 0%;
+    transition: width 0.3s ease, background 0.3s;
+    margin-bottom: 3px;
+}
+.ltms-strength-label { display: block; }
+
 /* ── Checkbox de términos ───────────────────────────────────── */
 .ltms-auth-checkbox {
     display: flex;

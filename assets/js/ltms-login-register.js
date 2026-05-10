@@ -149,20 +149,30 @@
         },
 
         initPasswordStrength() {
-            $(document).on('input', '[name="password"]', function () {
-                const val      = $(this).val();
-                const $meter   = $(this).siblings('.ltms-password-strength');
+            // Only the register form has a strength meter (#ltms-reg-password).
+            // The .ltms-password-strength div is a sibling of .ltms-input-group, not of the input.
+            // Use closest('.ltms-form-group').find() to locate it correctly.
+            $(document).on('input', '#ltms-reg-password', function () {
+                const val    = $(this).val();
+                const $group = $(this).closest('.ltms-form-group');
+                const $meter = $group.find('.ltms-password-strength');
                 if ($meter.length === 0) return;
 
                 let strength = 0;
-                if (val.length >= 8)  strength++;
-                if (/[A-Z]/.test(val)) strength++;
-                if (/[0-9]/.test(val)) strength++;
-                if (/[^A-Za-z0-9]/.test(val)) strength++;
+                if (val.length >= 8)            strength++;
+                if (/[A-Z]/.test(val))          strength++;
+                if (/[0-9]/.test(val))          strength++;
+                if (/[^A-Za-z0-9]/.test(val))  strength++;
 
-                const classes  = ['', 'weak', 'fair', 'good', 'strong'];
-                const labels   = ['', 'Débil', 'Regular', 'Buena', 'Fuerte'];
-                $meter.removeClass('weak fair good strong').addClass(classes[strength]).text(labels[strength]);
+                const classes = ['', 'weak', 'fair', 'good', 'strong'];
+                const labels  = ['', 'Débil', 'Regular', 'Buena', 'Fuerte'];
+
+                // Update the bar width and label text separately — don't overwrite the inner HTML
+                $meter
+                    .removeClass('weak fair good strong')
+                    .addClass(classes[strength]);
+                $meter.find('.ltms-strength-label').text(labels[strength]);
+                $meter.find('.ltms-strength-bar').css('width', (strength * 25) + '%');
             });
         },
 
