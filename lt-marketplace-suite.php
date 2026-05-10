@@ -485,8 +485,8 @@ function ltms_run(): void {
         }
     });
 
-    // Cargar AJAX handlers de productos
-    require_once LTMS_INCLUDES_DIR . 'frontend/class-ltms-products-ajax.php';
+    // Nota: class-ltms-products-ajax.php es cargado por el autoloader del Kernel en boot_frontend().
+    // El require_once explícito aquí causaba una tercera instanciación de LTMS_Products_Ajax.
 
 
 // Bloquear redirect WooCommerce para vendedores con edit_products

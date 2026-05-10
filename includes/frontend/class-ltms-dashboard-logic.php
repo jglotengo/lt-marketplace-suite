@@ -659,7 +659,7 @@ final class LTMS_Dashboard_Logic {
      */
     private function render_not_vendor_notice(): string {
         $pages       = get_option( 'ltms_installed_pages', [] );
-        $register_id = $pages['ltms-register'] ?? 0;
+        $register_id = $pages['ltms-vendor-register'] ?? 0;
         $register_url = $register_id ? get_permalink( $register_id ) : '';
 
         $msg = esc_html__( 'Esta página es exclusiva para vendedores registrados.', 'ltms' );

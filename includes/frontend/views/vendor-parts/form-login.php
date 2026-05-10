@@ -67,7 +67,10 @@ defined( 'ABSPATH' ) || exit;
                 <?php esc_html_e( 'Recordarme', 'ltms' ); ?>
             </label>
             <?php
-            $lost_password_url = wp_lostpassword_url( home_url( '/ltms-login/' ) );
+            $ltms_pages_login    = get_option( 'ltms_installed_pages', [] );
+            $ltms_login_page_id  = $ltms_pages_login['ltms-login'] ?? 0;
+            $ltms_login_self_url = $ltms_login_page_id ? get_permalink( $ltms_login_page_id ) : home_url( '/login-vendedor/' );
+            $lost_password_url   = wp_lostpassword_url( $ltms_login_self_url );
             ?>
             <a href="<?php echo esc_url( $lost_password_url ); ?>" class="ltms-forgot-link">
                 <?php esc_html_e( '¿Olvidaste tu contraseña?', 'ltms' ); ?>
@@ -84,7 +87,11 @@ defined( 'ABSPATH' ) || exit;
     <div class="ltms-auth-footer">
         <p>
             <?php esc_html_e( '¿No tienes cuenta?', 'ltms' ); ?>
-            <a href="<?php echo esc_url( home_url( '/ltms-registro/' ) ); ?>" class="ltms-auth-switch-link">
+            <?php
+            $ltms_register_id  = $ltms_pages_login['ltms-vendor-register'] ?? 0;
+            $ltms_register_url = $ltms_register_id ? get_permalink( $ltms_register_id ) : home_url( '/registro-vendedor/' );
+            ?>
+            <a href="<?php echo esc_url( $ltms_register_url ); ?>" class="ltms-auth-switch-link">
                 <?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?>
             </a>
         </p>

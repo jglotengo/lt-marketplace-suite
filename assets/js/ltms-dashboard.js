@@ -65,7 +65,7 @@
 
                 // Cerrar sidebar en móvil
                 if ($(window).width() <= 768) {
-                    $('.ltms-sidebar').removeClass('open');
+                    $('.ltms-sidebar').removeClass('ltms-sidebar-open');
                 }
             });
         },

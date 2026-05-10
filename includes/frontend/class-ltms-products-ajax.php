@@ -144,7 +144,7 @@ class LTMS_Products_Ajax {
 
     public function upload_product_image() {
         $this->check_nonce();
-        if ( ! current_user_can( 'edit_products' ) ) {
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
             wp_send_json_error( 'Sin permiso', 403 );
         }
         if ( empty( $_FILES['image'] ) ) {
@@ -165,7 +165,7 @@ class LTMS_Products_Ajax {
 
     public function create_product() {
         $this->check_nonce();
-        if ( ! current_user_can( 'edit_products' ) ) {
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
             wp_send_json_error( 'Sin permiso', 403 );
         }
         $name        = sanitize_text_field( $_POST['name'] ?? '' );
@@ -241,7 +241,8 @@ class LTMS_Products_Ajax {
 
 }
 
-add_action( 'plugins_loaded', function() { new LTMS_Products_Ajax(); }, 20 );
+// Nota: LTMS_Products_Ajax se instancia en LTMS_Core_Kernel::boot_frontend().
+// No instanciar aquí para evitar el registro triple de hooks AJAX.
 
 // Permitir acceso al wp-admin para crear/editar productos
 add_filter('user_has_cap', function($caps, $cap_list, $args) {

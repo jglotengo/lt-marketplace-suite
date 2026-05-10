@@ -151,12 +151,14 @@ final class LTMS_Public_Auth_Handler {
             'last_name'      => sanitize_text_field( wp_unslash( $_POST['last_name'] ?? '' ) ), // phpcs:ignore
             'email'          => sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ), // phpcs:ignore
             'password'       => $_POST['password'] ?? '', // phpcs:ignore
-            'confirm_pass'   => $_POST['confirm_password'] ?? '', // phpcs:ignore
+            'confirm_pass'   => $_POST['password_confirm'] ?? '', // phpcs:ignore — form field: name="password_confirm"
             'phone'          => sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ), // phpcs:ignore
             'store_name'     => sanitize_text_field( wp_unslash( $_POST['store_name'] ?? '' ) ), // phpcs:ignore
-            'document'       => sanitize_text_field( wp_unslash( $_POST['document'] ?? '' ) ), // phpcs:ignore
+            'store_description' => sanitize_textarea_field( wp_unslash( $_POST['store_description'] ?? '' ) ), // phpcs:ignore
+            'document_type'  => sanitize_text_field( wp_unslash( $_POST['document_type'] ?? '' ) ), // phpcs:ignore
+            'document'       => sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ), // phpcs:ignore — form field: name="document_number"
             'referral_code'  => sanitize_text_field( wp_unslash( $_POST['referral_code'] ?? '' ) ), // phpcs:ignore
-            'terms_accepted' => ! empty( $_POST['terms_accepted'] ), // phpcs:ignore
+            'terms_accepted' => ! empty( $_POST['accept_terms'] ), // phpcs:ignore — form field: name="accept_terms"
         ];
 
         // Validaciones
@@ -191,8 +193,10 @@ final class LTMS_Public_Auth_Handler {
         ]);
 
         update_user_meta( $user_id, 'ltms_store_name', $data['store_name'] );
+        update_user_meta( $user_id, 'ltms_store_description', $data['store_description'] );
         update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
         update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
+        update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
         update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
         update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
         update_user_meta( $user_id, 'ltms_referral_code', LTMS_Core_Security::generate_referral_code() );

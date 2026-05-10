@@ -187,7 +187,12 @@ $country = LTMS_Core_Config::get_country();
     <div class="ltms-auth-footer">
         <p>
             <?php esc_html_e( '¿Ya tienes cuenta?', 'ltms' ); ?>
-            <a href="<?php echo esc_url( home_url( '/ltms-login/' ) ); ?>" class="ltms-auth-switch-link">
+            <?php
+            $ltms_pages   = get_option( 'ltms_installed_pages', [] );
+            $ltms_login_id = $ltms_pages['ltms-login'] ?? 0;
+            $ltms_login_url = $ltms_login_id ? get_permalink( $ltms_login_id ) : home_url( '/login-vendedor/' );
+            ?>
+            <a href="<?php echo esc_url( $ltms_login_url ); ?>" class="ltms-auth-switch-link">
                 <?php esc_html_e( 'Iniciar sesión', 'ltms' ); ?>
             </a>
         </p>
