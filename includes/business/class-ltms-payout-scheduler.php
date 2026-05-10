@@ -165,7 +165,14 @@ final class LTMS_Payout_Scheduler {
         $table = $wpdb->prefix . 'lt_payout_requests';
 
         if ( $payment_result['success'] ) {
-            // Liberar el hold y debitar el balance
+            // 1. Liberar el hold (balance_pending → balance) para que el debit tenga saldo disponible
+            LTMS_Wallet::release(
+                (int) $payout['vendor_id'],
+                (float) $payout['amount'],
+                sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id )
+            );
+
+            // 2. Debitar el balance ahora disponible (tipo payout para el ledger)
             LTMS_Wallet::debit(
                 (int) $payout['vendor_id'],
                 (float) $payout['amount'],
