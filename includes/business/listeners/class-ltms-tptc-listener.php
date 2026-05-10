@@ -42,7 +42,7 @@ class LTMS_TPTC_Listener {
         }
 
         try {
-            if ( ! class_exists( 'LTMS_Api_Tptc' ) ) {
+            if ( ! class_exists( 'LTMS_Api_TPTC' ) ) {
                 return;
             }
 

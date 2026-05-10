@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class LTMS_Api_Tptc
  */
-class LTMS_Api_Tptc extends LTMS_Abstract_Api_Client {
+class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
 
     const API_BASE_LIVE    = 'https://api.tptc.com.co/v2';
     const API_BASE_SANDBOX = 'https://sandbox.api.tptc.com.co/v2';

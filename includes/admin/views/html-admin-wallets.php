@@ -70,7 +70,7 @@ $total_held    = (float) $wpdb->get_var( "SELECT SUM(balance_pending) FROM `{$ta
                 </td></tr>
                 <?php else : ?>
                 <?php foreach ( $wallets as $wallet ) :
-                    $available = (float) $wallet['balance'] - (float) $wallet['held_balance'];
+                    $available = (float) $wallet['balance'] - (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
                 ?>
                 <tr>
                     <td>
@@ -78,7 +78,7 @@ $total_held    = (float) $wpdb->get_var( "SELECT SUM(balance_pending) FROM `{$ta
                         <small style="color:#888;"><?php echo esc_html( $wallet['user_email'] ); ?></small>
                     </td>
                     <td><strong><?php echo esc_html( LTMS_Utils::format_money( (float) $wallet['balance'] ) ); ?></strong></td>
-                    <td><?php echo esc_html( LTMS_Utils::format_money( (float) $wallet['held_balance'] ) ); ?></td>
+                    <td><?php echo esc_html( LTMS_Utils::format_money( (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 ) ) ); ?></td>
                     <td><?php echo esc_html( LTMS_Utils::format_money( $available ) ); ?></td>
                     <td>
                         <?php if ( $wallet['is_frozen'] ) : ?>

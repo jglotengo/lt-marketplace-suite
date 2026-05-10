@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class LTMS_Api_Xcover
  */
-class LTMS_Api_Xcover extends LTMS_Abstract_Api_Client {
+class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
 
     const API_BASE_LIVE    = 'https://api.xcover.com/xcover';
     const API_BASE_SANDBOX = 'https://api.staging.xcover.com/xcover';

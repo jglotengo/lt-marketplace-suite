@@ -137,8 +137,8 @@ final class LTMS_Dashboard_Logic {
 
         wp_send_json_success([
             'balance'      => (float) $wallet['balance'],
-            'held'         => (float) $wallet['held_balance'],
-            'available'    => (float) $wallet['balance'] - (float) $wallet['held_balance'],
+            'held'         => (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 ),
+            'available'    => (float) $wallet['balance'] - (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 ),
             'currency'     => LTMS_Core_Config::get_currency(),
             'formatted'    => LTMS_Utils::format_money( (float) $wallet['balance'] ),
             'transactions' => $transactions,
@@ -243,46 +243,6 @@ final class LTMS_Dashboard_Logic {
     }
 
     /**
-     * AJAX: Guardar configuración del vendedor.
-     *
-     * @return void
-     */
-    public function ajax_save_vendor_settings(): void {
-        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
-
-        $user_id  = get_current_user_id();
-        $settings = $_POST['settings'] ?? []; // phpcs:ignore
-
-        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) || ! is_array( $settings ) ) {
-            wp_send_json_error( __( 'Datos inválidos.', 'ltms' ) );
-        }
-
-        // Campos permitidos para actualización directa
-        $allowed_fields = [
-            'ltms_store_name', 'ltms_store_description', 'ltms_store_phone',
-            'ltms_bank_name', 'ltms_bank_account_type', 'ltms_payment_method',
-            'ltms_shipping_policy', 'ltms_return_policy',
-        ];
-
-        foreach ( $allowed_fields as $field ) {
-            if ( isset( $settings[ $field ] ) ) {
-                update_user_meta( $user_id, $field, sanitize_text_field( $settings[ $field ] ) );
-            }
-        }
-
-        // Campos sensibles (requieren cifrado)
-        if ( ! empty( $settings['ltms_bank_account_number'] ) ) {
-            update_user_meta(
-                $user_id,
-                'ltms_bank_account_number',
-                LTMS_Core_Security::encrypt( sanitize_text_field( $settings['ltms_bank_account_number'] ) )
-            );
-        }
-
-        wp_send_json_success( [ 'message' => __( 'Configuración guardada exitosamente.', 'ltms' ) ] );
-    }
-
-    /**
      * AJAX: Datos analíticos del vendedor (gráficas).
      *
      * @return void
@@ -376,7 +336,7 @@ final class LTMS_Dashboard_Logic {
             'monthly_orders'      => $monthly_orders,
             'monthly_commissions' => $monthly_commissions,
             'wallet_balance'      => (float) $wallet['balance'],
-            'wallet_held'         => (float) $wallet['held_balance'],
+            'wallet_held'         => (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 ),
             'currency'            => LTMS_Core_Config::get_currency(),
             'commission_rate_summary' => class_exists( 'LTMS_Commission_Strategy' )
                 ? LTMS_Commission_Strategy::get_rate_summary( $vendor_id )

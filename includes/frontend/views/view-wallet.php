@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $vendor_id    = get_current_user_id();
 $wallet       = LTMS_Wallet::get_or_create( $vendor_id );
 $balance      = (float) $wallet['balance'];
-$held         = (float) $wallet['held_balance'];
+$held         = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
 $available    = max( 0, $balance - $held );
 ?>
 <div class="ltms-view-pad">
