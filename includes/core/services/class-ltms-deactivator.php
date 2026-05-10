@@ -47,6 +47,8 @@ final class LTMS_Core_Deactivator {
             'ltms_integrity_check',
             'ltms_process_job_queue',
             'ltms_update_tracking',
+            'ltms_clean_logs',
+            'ltms_send_notifications',
             'ltms_cleanup_sessions',
             'ltms_generate_tax_reports',
             'ltms_approve_payout_cron',
