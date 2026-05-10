@@ -1096,7 +1096,34 @@
                     <div class="ltms-form-group"><label>Banco para Retiros</label><input type="text" class="ltms-form-control" name="bank_info" value="${this.escapeHtml(store.bank_info||'')}" placeholder="Banco / No. Cuenta"></div>
                     <button type="button" class="ltms-btn ltms-btn-primary ltms-save-settings-btn">💾 Guardar Cambios</button>
                     <span class="ltms-settings-msg" style="margin-left:10px;display:none;"></span>
+                </div>
+                <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <h4 style="margin-bottom:15px;">Perfil Público de la Tienda</h4>
+                    <div class="ltms-form-group"><label>Nombre Público</label><input type="text" class="ltms-form-control" name="ltms_store_name" value="${this.escapeHtml(store.store_name||store.name||'')}" placeholder="Nombre visible al comprador"></div>
+                    <div class="ltms-form-group"><label>Dirección</label><input type="text" class="ltms-form-control" name="ltms_store_address" value="${this.escapeHtml(store.store_address||'')}" placeholder="Calle, carrera, barrio"></div>
+                    <div class="ltms-form-group"><label>Ciudad</label><input type="text" class="ltms-form-control" name="ltms_store_city" value="${this.escapeHtml(store.store_city||'')}" placeholder="Bogotá, Medellín..."></div>
+                    <div class="ltms-form-group"><label>Teléfono Público</label><input type="text" class="ltms-form-control" name="ltms_store_phone" value="${this.escapeHtml(store.store_phone||store.phone||'')}" placeholder="+57 300 000 0000"></div>
+                    <div class="ltms-form-group"><label>Horario de Atención</label><textarea class="ltms-form-control" name="ltms_store_schedule" rows="2" placeholder="Lun-Vie 8am-6pm">${this.escapeHtml(store.store_schedule||'')}</textarea></div>
+                    <div class="ltms-form-group"><label>Categorías (separadas por coma)</label><input type="text" class="ltms-form-control" name="ltms_store_categories" value="${this.escapeHtml(store.store_categories||'')}" placeholder="Ropa, Calzado, Accesorios"></div>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-profile-btn">💾 Guardar Perfil</button>
+                    <span class="ltms-profile-msg" style="margin-left:10px;display:none;"></span>
+                </div>
+                <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <h4 style="margin-bottom:15px;">Banner de la Tienda</h4>
+                    <input type="file" id="ltms-banner-file" accept="image/*" style="margin-bottom:10px;">
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-upload-banner-btn">🖼️ Subir Banner</button>
+                    <span class="ltms-banner-msg" style="margin-left:10px;display:none;"></span>
+                </div>
+                <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <h4 style="margin-bottom:15px;">Zona de Despacho</h4>
+                    <div class="ltms-form-group"><label>Ciudades de cobertura (separadas por coma)</label><input type="text" class="ltms-form-control" id="ltms-dz-cities" value="${this.escapeHtml((store.delivery_zone&&store.delivery_zone.cities||[]).join(', '))}" placeholder="Bogotá, Soacha"></div>
+                    <div class="ltms-form-group"><label>Radio máximo (km)</label><input type="number" class="ltms-form-control" id="ltms-dz-radius" min="0" value="${store.delivery_zone&&store.delivery_zone.radius_km||0}"></div>
+                    <div class="ltms-form-group"><label>Envío gratis desde (COP)</label><input type="number" class="ltms-form-control" id="ltms-dz-free" min="0" value="${store.delivery_zone&&store.delivery_zone.free_from||0}"></div>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-zone-btn">💾 Guardar Zona</button>
+                    <span class="ltms-zone-msg" style="margin-left:10px;display:none;"></span>
                 </div>`);
+
+            // Handler: guardar configuración básica (products-ajax)
             $(document).off('click','.ltms-save-settings-btn').on('click','.ltms-save-settings-btn', function() {
                 const btn=$(this); btn.prop('disabled',true).text('Guardando...');
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
@@ -1108,6 +1135,65 @@
                         m.text(r.success?'✓ Guardado':'Error al guardar').css('color',r.success?'#10b981':'#ef4444').show();
                         setTimeout(()=>m.hide(),3000); },
                     error(){ btn.prop('disabled',false).text('💾 Guardar Cambios'); }
+                });
+            });
+
+            // Handler: guardar perfil público (ltms_save_vendor_profile — Vendor_Settings_Saver)
+            $(document).off('click','.ltms-save-profile-btn').on('click','.ltms-save-profile-btn', function() {
+                const btn=$(this); btn.prop('disabled',true).text('Guardando...');
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
+                    data:{
+                        action:'ltms_save_vendor_profile', nonce:ltmsDashboard.nonce,
+                        ltms_store_name:$('[name="ltms_store_name"]').val(),
+                        ltms_store_description:$('[name="store_description"]').val(),
+                        ltms_store_city:$('[name="ltms_store_city"]').val(),
+                        ltms_store_address:$('[name="ltms_store_address"]').val(),
+                        ltms_store_phone:$('[name="ltms_store_phone"]').val(),
+                        ltms_store_schedule:$('[name="ltms_store_schedule"]').val(),
+                        ltms_store_categories:$('[name="ltms_store_categories"]').val(),
+                    },
+                    success(r){ btn.prop('disabled',false).text('💾 Guardar Perfil');
+                        const m=$('.ltms-profile-msg');
+                        m.text(r.success?'✓ Perfil guardado':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        setTimeout(()=>m.hide(),3000);
+                    },
+                    error(){ btn.prop('disabled',false).text('💾 Guardar Perfil'); }
+                });
+            });
+
+            // Handler: subir banner (ltms_upload_store_banner — Vendor_Settings_Saver)
+            $(document).off('click','.ltms-upload-banner-btn').on('click','.ltms-upload-banner-btn', function() {
+                const file = $('#ltms-banner-file')[0].files[0];
+                if (!file) { alert('Selecciona una imagen primero.'); return; }
+                const btn=$(this); btn.prop('disabled',true).text('Subiendo...');
+                const fd = new FormData();
+                fd.append('action','ltms_upload_store_banner');
+                fd.append('nonce',ltmsDashboard.nonce);
+                fd.append('banner',file);
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST', data:fd,
+                    processData:false, contentType:false,
+                    success(r){ btn.prop('disabled',false).text('🖼️ Subir Banner');
+                        const m=$('.ltms-banner-msg');
+                        m.text(r.success?'✓ Banner actualizado':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        setTimeout(()=>m.hide(),4000);
+                    },
+                    error(){ btn.prop('disabled',false).text('🖼️ Subir Banner'); }
+                });
+            });
+
+            // Handler: guardar zona de despacho (ltms_save_delivery_zone — Vendor_Settings_Saver)
+            $(document).off('click','.ltms-save-zone-btn').on('click','.ltms-save-zone-btn', function() {
+                const btn=$(this); btn.prop('disabled',true).text('Guardando...');
+                const cities=$('#ltms-dz-cities').val().split(',').map(s=>s.trim()).filter(Boolean);
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
+                    data:{ action:'ltms_save_delivery_zone', nonce:ltmsDashboard.nonce,
+                        cities:cities, radius_km:$('#ltms-dz-radius').val(), free_from:$('#ltms-dz-free').val() },
+                    success(r){ btn.prop('disabled',false).text('💾 Guardar Zona');
+                        const m=$('.ltms-zone-msg');
+                        m.text(r.success?'✓ Zona guardada':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        setTimeout(()=>m.hide(),3000);
+                    },
+                    error(){ btn.prop('disabled',false).text('💾 Guardar Zona'); }
                 });
             });
         },
