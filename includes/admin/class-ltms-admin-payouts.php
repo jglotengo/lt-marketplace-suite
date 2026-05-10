@@ -123,6 +123,9 @@ final class LTMS_Admin_Payouts {
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
         update_user_meta( $vendor_id, 'ltms_kyc_approved_at', LTMS_Utils::now_utc() );
 
+        // M-45: disparar ltms_vendor_approved para que listeners (tourism compliance, kernel) procesen la aprobación.
+        do_action( 'ltms_vendor_approved', $vendor_id );
+
         LTMS_Core_Logger::security(
             'KYC_APPROVED',
             sprintf( 'KYC #%d del vendedor #%d aprobado por admin #%d', $kyc_id, $vendor_id, get_current_user_id() )

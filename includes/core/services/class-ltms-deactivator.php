@@ -52,6 +52,7 @@ final class LTMS_Core_Deactivator {
             'ltms_cleanup_sessions',
             'ltms_generate_tax_reports',
             'ltms_approve_payout_cron',
+            'ltms_daily_cron',             // M-46
         ];
 
         foreach ( $hooks as $hook ) {

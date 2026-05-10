@@ -237,6 +237,7 @@ final class LTMS_Core_Activator {
             'ltms_send_notifications'    => [ 'recurrence' => 'hourly',            'time' => null ],
             'ltms_update_tracking'       => [ 'recurrence' => 'every_30_minutes',  'time' => null ],
             'ltms_approve_payout_cron'   => [ 'recurrence' => 'daily',             'time' => '06:00:00' ],
+            'ltms_daily_cron'            => [ 'recurrence' => 'daily',             'time' => '01:00:00' ], // M-46: consumer protection holds
         ];
 
         foreach ( $jobs as $hook => $config ) {
