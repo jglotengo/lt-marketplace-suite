@@ -253,18 +253,19 @@ final class LTMS_DB_Migrations {
         $sqls[] = "CREATE TABLE `{$p}lt_referral_network` (
             `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `vendor_id`        BIGINT UNSIGNED NOT NULL,
-            `referrer_id`      BIGINT UNSIGNED NOT NULL,
+            `sponsor_id`       BIGINT UNSIGNED NOT NULL,
             `level`            TINYINT UNSIGNED NOT NULL DEFAULT 1,
-            `referral_code`    VARCHAR(50) NOT NULL,
+            `ancestor_path`    VARCHAR(1000) DEFAULT NULL COMMENT 'Slash-separated ancestor IDs root-first',
             `source`           VARCHAR(100) DEFAULT NULL,
             `total_sales`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `total_commission` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `status`           ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
-            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `joined_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            UNIQUE KEY `udx_vendor_referrer` (`vendor_id`, `referrer_id`),
-            KEY `idx_referral_code` (`referral_code`)
+            UNIQUE KEY `udx_vendor_sponsor` (`vendor_id`, `sponsor_id`),
+            KEY `idx_sponsor_id` (`sponsor_id`),
+            KEY `idx_joined_at`  (`joined_at`)
         ) {$charset}";
 
         // lt_notifications
