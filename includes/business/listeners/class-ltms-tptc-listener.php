@@ -64,10 +64,10 @@ class LTMS_TPTC_Listener {
             update_post_meta( $order_id, '_ltms_tptc_synced', 1 );
             update_post_meta( $order_id, '_ltms_tptc_transaction_id', $result['transaction_id'] ?? '' );
 
-            self::log_info( 'TPTC_SYNCED', "Pedido #{$order_id} sincronizado con TPTC." );
+            self::log_info_static( 'TPTC_SYNCED', "Pedido #{$order_id} sincronizado con TPTC." );
 
         } catch ( \Throwable $e ) {
-            self::log_error( 'TPTC_SYNC_FAILED', "Pedido #{$order_id}: " . $e->getMessage() );
+            self::log_error_static( 'TPTC_SYNC_FAILED', "Pedido #{$order_id}: " . $e->getMessage() );
         }
     }
 }

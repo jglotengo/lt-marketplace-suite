@@ -14,6 +14,9 @@ trait LTMS_Logger_Aware {
     protected function log_error( string $event, string $msg, array $ctx = [] ): void { $this->log( $event, $msg, $ctx, 'ERROR' ); }
     protected function log_critical( string $event, string $msg, array $ctx = [] ): void { $this->log( $event, $msg, $ctx, 'CRITICAL' ); }
     protected function log_security( string $event, string $msg, array $ctx = [] ): void { $this->log( $event, $msg, $ctx, 'SECURITY' ); }
+    protected static function log_error_static( string $event, string $msg, array $ctx = [] ): void {
+        if ( class_exists( 'LTMS_Core_Logger' ) ) { LTMS_Core_Logger::log( $event, $msg, $ctx, 'ERROR' ); }
+    }
     protected static function log_info_static( string $event, string $msg, array $ctx = [] ): void {
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::log( $event, $msg, $ctx, 'INFO' );

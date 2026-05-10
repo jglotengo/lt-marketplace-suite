@@ -98,7 +98,7 @@ class LTMS_Coupon_Attribution_Listener {
             update_post_meta( $order_id, '_ltms_referral_credited', 1 );
             update_post_meta( $order_id, '_ltms_referrer_id', $referrer_id );
 
-            self::log_info(
+            self::log_info_static(
                 'REFERRAL_CREDITED',
                 sprintf( 'Comisión %.2f acreditada al referidor #%d por pedido #%d', $commission, $referrer_id, $order_id )
             );
