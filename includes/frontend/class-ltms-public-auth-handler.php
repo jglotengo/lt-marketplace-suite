@@ -204,7 +204,8 @@ final class LTMS_Public_Auth_Handler {
         if ( ! empty( $data['sagrilaft_accepted'] ) ) {
             update_user_meta( $user_id, 'ltms_sagrilaft_accepted_at', LTMS_Utils::now_utc() );
         }
-        update_user_meta( $user_id, 'ltms_referral_code', LTMS_Core_Security::generate_referral_code() );
+        // M-42: ltms_referral_code lo genera LTMS_Affiliates::on_vendor_registered() via do_action('ltms_vendor_registered').
+        // No generar aqui para evitar doble escritura con codigo diferente.
 
         // Registrar en la red de referidos si hay código patrocinador
         if ( $data['referral_code'] && class_exists( 'LTMS_Referral_Tree' ) ) {
