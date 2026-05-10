@@ -767,19 +767,23 @@ final class LTMS_DB_Migrations {
             KEY `idx_doc_type` (`document_type`)
         ) {$charset}";
 
-        // lt_wallet_holds — Saldos retenidos de la billetera (en tránsito / pendientes de aprobación)
+        // lt_wallet_holds — Saldos retenidos de la billetera (consumer protection / vesting)
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
-            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `vendor_id`   BIGINT UNSIGNED NOT NULL,
-            `amount`      DECIMAL(15,2)   NOT NULL,
-            `reason`      VARCHAR(255)    NOT NULL DEFAULT '',
-            `reference`   VARCHAR(100)    DEFAULT NULL COMMENT 'ID externo: payout_id, order_id, etc.',
-            `status`      VARCHAR(20)     NOT NULL DEFAULT 'active' COMMENT 'active | released | cancelled',
-            `created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `released_at` DATETIME        DEFAULT NULL,
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`      BIGINT UNSIGNED NOT NULL,
+            `amount`         DECIMAL(15,2)   NOT NULL,
+            `order_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT 'Pedido WooCommerce asociado',
+            `reason`         VARCHAR(255)    NOT NULL DEFAULT '',
+            `freeze_reason`  VARCHAR(255)    DEFAULT NULL COMMENT 'Razón de congelamiento por disputa',
+            `status`         VARCHAR(20)     NOT NULL DEFAULT 'held' COMMENT 'held | released | frozen | cancelled',
+            `release_at`     DATETIME        DEFAULT NULL COMMENT 'Fecha programada de liberación',
+            `created_at`     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `released_at`    DATETIME        DEFAULT NULL,
             PRIMARY KEY (`id`),
-            KEY `idx_vendor` (`vendor_id`),
-            KEY `idx_status` (`status`)
+            KEY `idx_vendor`     (`vendor_id`),
+            KEY `idx_status`     (`status`),
+            KEY `idx_release_at` (`release_at`),
+            KEY `idx_order_id`   (`order_id`)
         ) {$charset}";
 
         foreach ( $sqls as $sql ) {
