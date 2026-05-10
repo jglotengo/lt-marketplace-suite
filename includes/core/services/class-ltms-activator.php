@@ -229,13 +229,14 @@ final class LTMS_Core_Activator {
         } );
 
         $jobs = [
-            'ltms_process_payouts'    => [ 'recurrence' => 'daily',   'time' => '02:00:00' ],
-            'ltms_sync_siigo'         => [ 'recurrence' => 'hourly',  'time' => null ],
-            'ltms_integrity_check'    => [ 'recurrence' => 'daily',   'time' => '03:00:00' ],
-            'ltms_clean_logs'         => [ 'recurrence' => 'weekly',  'time' => '04:00:00' ],
-            'ltms_process_job_queue'  => [ 'recurrence' => 'every_5_minutes', 'time' => null ],
-            'ltms_send_notifications' => [ 'recurrence' => 'hourly',  'time' => null ],
-            'ltms_update_tracking'    => [ 'recurrence' => 'every_30_minutes', 'time' => null ],
+            'ltms_process_payouts'       => [ 'recurrence' => 'daily',             'time' => '02:00:00' ],
+            'ltms_sync_siigo'            => [ 'recurrence' => 'hourly',            'time' => null ],
+            'ltms_integrity_check'       => [ 'recurrence' => 'daily',             'time' => '03:00:00' ],
+            'ltms_clean_logs'            => [ 'recurrence' => 'weekly',            'time' => '04:00:00' ],
+            'ltms_process_job_queue'     => [ 'recurrence' => 'every_5_minutes',   'time' => null ],
+            'ltms_send_notifications'    => [ 'recurrence' => 'hourly',            'time' => null ],
+            'ltms_update_tracking'       => [ 'recurrence' => 'every_30_minutes',  'time' => null ],
+            'ltms_approve_payout_cron'   => [ 'recurrence' => 'daily',             'time' => '06:00:00' ],
         ];
 
         foreach ( $jobs as $hook => $config ) {
