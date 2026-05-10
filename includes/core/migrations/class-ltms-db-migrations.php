@@ -688,6 +688,7 @@ final class LTMS_DB_Migrations {
             `block_reason` VARCHAR(255)    DEFAULT NULL,
             `base_price`   DECIMAL(15,2)   DEFAULT NULL,
             `created_at`   DATETIME        DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`   DATETIME        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             UNIQUE KEY `idx_product_date_time` (`product_id`, `slot_date`, `slot_time`),
             KEY `idx_date`  (`slot_date`),
