@@ -39,7 +39,7 @@
                         nonce:    ltmsAuth.nonce,
                         username: $form.find('[name="username"]').val(),
                         password: $form.find('[name="password"]').val(),
-                        remember: $form.find('[name="remember"]').is(':checked'),
+                        remember: $form.find('[name="rememberme"]').is(':checked'),
                     },
                     success(response) {
                         $btn.prop('disabled', false).text('Iniciar Sesión');
@@ -58,6 +58,60 @@
         },
 
         bindRegisterForm() {
+            // ── Wizard: Siguiente ──────────────────────────────────────────────
+            $(document).on('click', '.ltms-wizard-next', function () {
+                const $btn      = $(this);
+                const nextPage  = parseInt($btn.data('next'), 10);
+                const $form     = $btn.closest('form');
+                const $curPage  = $btn.closest('.ltms-wizard-page');
+
+                // Validate required fields in current page before advancing
+                let valid = true;
+                $curPage.find('[required]').each(function () {
+                    const $field = $(this);
+                    if ($field.is(':checkbox')) {
+                        if (!$field.is(':checked')) { valid = false; $field.closest('.ltms-form-group').addClass('ltms-field-error'); }
+                        else { $field.closest('.ltms-form-group').removeClass('ltms-field-error'); }
+                    } else {
+                        if (!$field.val().trim()) { valid = false; $field.addClass('ltms-input-error'); }
+                        else { $field.removeClass('ltms-input-error'); }
+                    }
+                });
+
+                if (!valid) {
+                    LTMS.Auth.showFormError('#ltms-register-form', ltmsAuth.i18n.required_fields || 'Por favor completa todos los campos requeridos.');
+                    return;
+                }
+
+                // Hide all pages, show target page
+                $form.find('.ltms-wizard-page').hide();
+                $form.find('.ltms-wizard-page[data-page="' + nextPage + '"]').show();
+
+                // Update step indicators
+                $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
+                    const step = parseInt($(this).data('step'), 10);
+                    $(this).toggleClass('active', step === nextPage);
+                    $(this).toggleClass('completed', step < nextPage);
+                });
+            });
+
+            // ── Wizard: Atrás ──────────────────────────────────────────────────
+            $(document).on('click', '.ltms-wizard-back', function () {
+                const $btn     = $(this);
+                const prevPage = parseInt($btn.data('back'), 10);
+                const $form    = $btn.closest('form');
+
+                $form.find('.ltms-wizard-page').hide();
+                $form.find('.ltms-wizard-page[data-page="' + prevPage + '"]').show();
+
+                $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
+                    const step = parseInt($(this).data('step'), 10);
+                    $(this).toggleClass('active', step === prevPage);
+                    $(this).removeClass('completed');
+                });
+            });
+
+            // ── Submit ─────────────────────────────────────────────────────────
             $(document).on('submit', '#ltms-register-form', function (e) {
                 e.preventDefault();
                 const $form = $(this);
@@ -122,9 +176,18 @@
         },
 
         showFormError(formSelector, message) {
-            const $notice = $(formSelector).find('.ltms-form-notice');
+            // Notice divs use IDs: #ltms-login-notice / #ltms-register-notice
+            // They live outside the <form> tag, so search in the parent card wrapper
+            const $form   = $(formSelector);
+            const $card   = $form.closest('.ltms-auth-card');
+            const $notice = $card.length
+                ? $card.find('.ltms-notice')
+                : $form.find('.ltms-notice');
             if ($notice.length) {
-                $notice.removeClass('ltms-notice-success').addClass('ltms-notice-error').text(message).show();
+                $notice.removeClass('ltms-notice-success')
+                       .addClass('ltms-notice-error')
+                       .text(message)
+                       .show();
             }
         },
     };
