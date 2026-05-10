@@ -37,6 +37,20 @@ class LTMS_Core_Cron_Manager {
         add_action( 'ltms_process_job_queue',             [ self::class, 'process_job_queue' ] );
         add_action( 'ltms_send_notifications',            [ self::class, 'send_notifications' ] );
 
+        // M-44: listeners para hooks disparados sin receptor registrado
+        add_action( 'ltms_dispatch_notification',             [ self::class, 'handle_dispatch_notification' ], 10, 1 );
+        add_action( 'ltms_sync_siigo_invoice',                [ self::class, 'handle_sync_siigo_invoice'    ], 10, 1 );
+        add_action( 'ltms_booking_created',                   [ self::class, 'handle_booking_created'       ], 10, 2 );
+        add_action( 'ltms_booking_confirmed',                 [ self::class, 'handle_booking_confirmed'     ], 10, 1 );
+        add_action( 'ltms_booking_cancelled',                 [ self::class, 'handle_booking_cancelled'     ], 10, 3 );
+        add_action( 'ltms_booking_deposit_released',          [ self::class, 'handle_deposit_released'      ], 10, 2 );
+        add_action( 'ltms_booking_refund_processed',          [ self::class, 'handle_booking_refund'        ], 10, 3 );
+        add_action( 'ltms_send_booking_checkin_reminder',     [ self::class, 'handle_checkin_reminder'      ], 10, 1 );
+        add_action( 'ltms_send_booking_balance_reminder',     [ self::class, 'handle_balance_reminder'      ], 10, 1 );
+        add_action( 'ltms_rnt_approved',                      [ self::class, 'handle_rnt_approved'          ], 10, 1 );
+        add_action( 'ltms_rnt_rejected',                      [ self::class, 'handle_rnt_rejected'          ], 10, 2 );
+        add_action( 'ltms_rnt_expired',                       [ self::class, 'handle_rnt_expired'           ], 10, 2 );
+
         self::schedule_jobs();
     }
 
@@ -446,5 +460,230 @@ class LTMS_Core_Cron_Manager {
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Cron: release_booking_deposits — ' . $e->getMessage() );
         }
+    }
+
+    // ── M-44: Handlers para hooks sin listener ────────────────────
+
+    /**
+     * Despacha una notificación según su canal (email, whatsapp, inapp, etc.).
+     *
+     * @param array $notif Fila de lt_notifications.
+     */
+    public static function handle_dispatch_notification( array $notif ): void {
+        $channel = $notif['channel'] ?? 'inapp';
+        $user_id = (int) ( $notif['user_id'] ?? 0 );
+
+        if ( ! $user_id ) return;
+
+        if ( 'email' === $channel ) {
+            $user = get_userdata( $user_id );
+            if ( $user && $user->user_email ) {
+                wp_mail(
+                    $user->user_email,
+                    wp_strip_all_tags( $notif['title'] ?? '' ),
+                    wp_kses_post( $notif['message'] ?? '' )
+                );
+            }
+        }
+        // inapp/push: ya está registrado en lt_notifications por el cron send_notifications.
+        // whatsapp/sms: requiere integración externa — loguear para revisión manual.
+        if ( in_array( $channel, [ 'whatsapp', 'sms' ], true ) ) {
+            LTMS_Core_Logger::info(
+                'NOTIFICATION_CHANNEL_PENDING',
+                sprintf( 'Notificación #%d canal %s pendiente de integración externa', (int) $notif['id'], $channel ),
+                [ 'user_id' => $user_id, 'type' => $notif['type'] ?? '' ]
+            );
+        }
+    }
+
+    /**
+     * Procesa un job individual de sincronización de factura con Siigo.
+     *
+     * @param array $args Argumentos del job: order_id, retry_count.
+     */
+    public static function handle_sync_siigo_invoice( array $args ): void {
+        $order_id = (int) ( $args['order_id'] ?? 0 );
+        if ( ! $order_id ) return;
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) return;
+
+        try {
+            $siigo    = LTMS_Api_Factory::get( 'siigo' );
+            $customer = $siigo->get_or_create_customer( [
+                'email'      => $order->get_billing_email(),
+                'first_name' => $order->get_billing_first_name(),
+                'last_name'  => $order->get_billing_last_name(),
+                'phone'      => $order->get_billing_phone(),
+            ] );
+
+            $invoice_data = $siigo->build_invoice_payload( $order, $customer, [] );
+            $result       = $siigo->create_invoice( $invoice_data );
+
+            if ( ! empty( $result['id'] ) ) {
+                $order->update_meta_data( '_ltms_siigo_invoice_id', $result['id'] );
+                $order->save();
+                LTMS_Core_Logger::info( 'SIIGO_INVOICE_SYNCED', "Pedido #{$order_id} facturado en Siigo: {$result['id']}" );
+            }
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::error( 'SIIGO_INVOICE_SYNC_ERROR', $e->getMessage(), [ 'order_id' => $order_id ] );
+            throw $e; // Re-lanzar para que el Cron Manager marque el job como fallido/reintento
+        }
+    }
+
+    /**
+     * Acciones al crear una nueva reserva (log + notificación inapp al vendedor).
+     *
+     * @param int   $booking_id ID de la reserva.
+     * @param array $data       Datos de la reserva (product_id, vendor_id, customer_id, etc.).
+     */
+    public static function handle_booking_created( int $booking_id, array $data ): void {
+        LTMS_Core_Logger::info(
+            'BOOKING_CREATED',
+            sprintf( 'Nueva reserva #%d creada — producto #%d, vendedor #%d', $booking_id, (int) ( $data['product_id'] ?? 0 ), (int) ( $data['vendor_id'] ?? 0 ) ),
+            [ 'booking_id' => $booking_id ]
+        );
+    }
+
+    /**
+     * Acciones al confirmar una reserva (log + nota de pago).
+     *
+     * @param int $booking_id ID de la reserva.
+     */
+    public static function handle_booking_confirmed( int $booking_id ): void {
+        LTMS_Core_Logger::info( 'BOOKING_CONFIRMED', "Reserva #{$booking_id} confirmada", [ 'booking_id' => $booking_id ] );
+    }
+
+    /**
+     * Acciones al cancelar una reserva (log).
+     *
+     * @param int    $booking_id    ID de la reserva.
+     * @param array  $booking       Datos completos de la reserva.
+     * @param string $cancelled_by  'customer'|'vendor'|'admin'|'system'.
+     */
+    public static function handle_booking_cancelled( int $booking_id, array $booking, string $cancelled_by ): void {
+        LTMS_Core_Logger::info(
+            'BOOKING_CANCELLED',
+            sprintf( 'Reserva #%d cancelada por: %s', $booking_id, $cancelled_by ),
+            [ 'booking_id' => $booking_id, 'cancelled_by' => $cancelled_by ]
+        );
+    }
+
+    /**
+     * Acciones al liberar el depósito de una reserva (log).
+     *
+     * @param int   $booking_id ID de la reserva.
+     * @param array $booking    Datos de la reserva.
+     */
+    public static function handle_deposit_released( int $booking_id, array $booking ): void {
+        LTMS_Core_Logger::info(
+            'BOOKING_DEPOSIT_RELEASED',
+            sprintf( 'Depósito de reserva #%d liberado al vendedor #%d', $booking_id, (int) ( $booking['vendor_id'] ?? 0 ) ),
+            [ 'booking_id' => $booking_id ]
+        );
+    }
+
+    /**
+     * Acciones al procesar un reembolso de reserva (log).
+     *
+     * @param int    $booking_id    ID de la reserva.
+     * @param float  $refund_amount Monto reembolsado.
+     * @param mixed  $refund        Objeto WC_Order_Refund o array.
+     */
+    public static function handle_booking_refund( int $booking_id, float $refund_amount, $refund ): void {
+        LTMS_Core_Logger::info(
+            'BOOKING_REFUND_PROCESSED',
+            sprintf( 'Reembolso de %.2f procesado para reserva #%d', $refund_amount, $booking_id ),
+            [ 'booking_id' => $booking_id, 'refund_amount' => $refund_amount ]
+        );
+    }
+
+    /**
+     * Envía recordatorio de check-in al cliente.
+     *
+     * @param array $booking Datos de la reserva desde lt_bookings.
+     */
+    public static function handle_checkin_reminder( array $booking ): void {
+        $customer_id = (int) ( $booking['customer_id'] ?? 0 );
+        if ( ! $customer_id ) return;
+
+        $user = get_userdata( $customer_id );
+        if ( ! $user ) return;
+
+        $checkin = $booking['checkin_date'] ?? '';
+        wp_mail(
+            $user->user_email,
+            __( 'Recordatorio: Tu reserva está próxima', 'ltms' ),
+            sprintf(
+                /* translators: 1: check-in date */
+                __( 'Hola %s, tu check-in está programado para el %s. ¡Nos vemos pronto!', 'ltms' ),
+                esc_html( $user->display_name ),
+                esc_html( $checkin )
+            )
+        );
+        LTMS_Core_Logger::info( 'CHECKIN_REMINDER_SENT', "Recordatorio check-in enviado para reserva #{$booking['id']}" );
+    }
+
+    /**
+     * Envía recordatorio de saldo pendiente al cliente.
+     *
+     * @param array $booking Datos de la reserva desde lt_bookings.
+     */
+    public static function handle_balance_reminder( array $booking ): void {
+        $customer_id = (int) ( $booking['customer_id'] ?? 0 );
+        if ( ! $customer_id ) return;
+
+        $user = get_userdata( $customer_id );
+        if ( ! $user ) return;
+
+        $balance = number_format( (float) ( $booking['balance_amount'] ?? 0 ), 2 );
+        wp_mail(
+            $user->user_email,
+            __( 'Saldo pendiente en tu reserva', 'ltms' ),
+            sprintf(
+                /* translators: 1: balance amount */
+                __( 'Hola %s, tienes un saldo pendiente de $%s para completar tu reserva. Por favor realiza el pago antes del check-in.', 'ltms' ),
+                esc_html( $user->display_name ),
+                esc_html( $balance )
+            )
+        );
+        LTMS_Core_Logger::info( 'BALANCE_REMINDER_SENT', "Recordatorio saldo enviado para reserva #{$booking['id']}" );
+    }
+
+    /**
+     * Acciones al aprobar RNT de un vendedor (log + notificación).
+     *
+     * @param int $vendor_id ID del vendedor.
+     */
+    public static function handle_rnt_approved( int $vendor_id ): void {
+        update_user_meta( $vendor_id, 'ltms_rnt_status', 'approved' );
+        LTMS_Core_Logger::info( 'RNT_APPROVED', "RNT aprobado para vendedor #{$vendor_id}" );
+    }
+
+    /**
+     * Acciones al rechazar RNT de un vendedor (log + meta).
+     *
+     * @param int    $vendor_id ID del vendedor.
+     * @param string $notes     Motivo del rechazo.
+     */
+    public static function handle_rnt_rejected( int $vendor_id, string $notes ): void {
+        update_user_meta( $vendor_id, 'ltms_rnt_status', 'rejected' );
+        update_user_meta( $vendor_id, 'ltms_rnt_rejection_notes', sanitize_textarea_field( $notes ) );
+        LTMS_Core_Logger::info( 'RNT_REJECTED', "RNT rechazado para vendedor #{$vendor_id}: {$notes}" );
+    }
+
+    /**
+     * Acciones al expirar RNT de un vendedor (log + suspensión preventiva).
+     *
+     * @param int   $vendor_id ID del vendedor.
+     * @param array $row       Fila de la tabla de cumplimiento.
+     */
+    public static function handle_rnt_expired( int $vendor_id, array $row ): void {
+        update_user_meta( $vendor_id, 'ltms_rnt_status', 'expired' );
+        LTMS_Core_Logger::warning(
+            'RNT_EXPIRED',
+            sprintf( 'RNT expirado para vendedor #%d — requiere renovación', $vendor_id ),
+            [ 'vendor_id' => $vendor_id, 'rnt_number' => $row['rnt_number'] ?? '' ]
+        );
     }
 }
