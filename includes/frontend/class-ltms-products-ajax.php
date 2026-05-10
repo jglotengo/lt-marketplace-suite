@@ -235,7 +235,11 @@ class LTMS_Products_Ajax {
         if ( ! empty( $gallery_ids ) ) { $product->set_gallery_image_ids( $gallery_ids ); }
         // Asignar al vendedor actual
         $product_id = $product->save();
-        wp_update_post( [ 'ID' => $product_id, 'post_author' => get_current_user_id() ] );
+        $current_user_id = get_current_user_id();
+        wp_update_post( [ 'ID' => $product_id, 'post_author' => $current_user_id ] );
+        // M-12 FIX: guardar _ltms_vendor_id para que los pedidos del producto
+        // aparezcan en el dashboard del vendedor (get_vendor_orders filtra por esta meta).
+        update_post_meta( $product_id, '_ltms_vendor_id', $current_user_id );
 
         wp_send_json_success( [
             'product_id' => $product_id,
