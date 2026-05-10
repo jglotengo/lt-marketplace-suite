@@ -1,0 +1,456 @@
+/**
+ * LTMS KDS (Kitchen Display System) — Estilos
+ * Bug M-22: este archivo no existía — el KDS cargaba sin ningún estilo.
+ * @version 1.0.0
+ */
+
+/* =========================================================================
+   Layout principal del KDS
+   ========================================================================= */
+
+#ltms-kds-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #0f172a;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+}
+
+/* ── Barra superior ─────────────────────────────────────────────────────── */
+
+#ltms-kds-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #1e293b;
+    border-bottom: 2px solid #334155;
+    flex-shrink: 0;
+}
+
+#ltms-kds-header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: 0.02em;
+}
+
+#ltms-kds-clock {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #38bdf8;
+    min-width: 90px;
+    text-align: right;
+}
+
+#ltms-kds-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 9999px;
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding: 0 8px;
+    margin-left: 10px;
+}
+
+#ltms-kds-last-updated {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-left: 16px;
+}
+
+/* Botones de la cabecera */
+
+#ltms-kds-refresh-btn,
+#ltms-kds-sound-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    background: #334155;
+    color: #e2e8f0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-left: 8px;
+}
+
+#ltms-kds-refresh-btn:hover,
+#ltms-kds-sound-toggle:hover {
+    background: #475569;
+    border-color: #64748b;
+}
+
+#ltms-kds-sound-toggle.ltms-kds-sound-off {
+    color: #94a3b8;
+    border-color: #334155;
+    background: #1e293b;
+}
+
+/* =========================================================================
+   Grid de tarjetas de pedidos
+   ========================================================================= */
+
+#ltms-kds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+    align-content: start;
+}
+
+#ltms-kds-grid.ltms-kds-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ── Estado vacío ───────────────────────────────────────────────────────── */
+
+.ltms-kds-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #475569;
+    text-align: center;
+}
+
+.ltms-kds-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.ltms-kds-empty p {
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* =========================================================================
+   Tarjeta de pedido
+   ========================================================================= */
+
+.ltms-kds-order-card {
+    display: flex;
+    flex-direction: column;
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s, box-shadow 0.15s;
+    position: relative;
+}
+
+.ltms-kds-order-card:hover {
+    border-color: #38bdf8;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Colores de borde por estado */
+.ltms-kds-order-card[data-status="processing"] { border-color: #ef4444; }
+.ltms-kds-order-card[data-status="preparing"]  { border-color: #f59e0b; }
+.ltms-kds-order-card[data-status="ready"]       { border-color: #22c55e; }
+.ltms-kds-order-card[data-status="completed"]   { border-color: #4b5563; opacity: 0.7; }
+.ltms-kds-order-card[data-status="cancelled"]   { border-color: #374151; opacity: 0.5; }
+
+/* Nuevo pedido — animación de entrada */
+.ltms-kds-order-card.ltms-kds-new {
+    animation: ltms-kds-pulse 1.5s ease-in-out 3;
+}
+
+@keyframes ltms-kds-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    50%       { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+}
+
+/* ── Cabecera de la tarjeta ─────────────────────────────────────────────── */
+
+.ltms-kds-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid #334155;
+}
+
+.ltms-kds-order-number {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.ltms-kds-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ltms-kds-status-badge[data-status="processing"] { background: #7f1d1d; color: #fca5a5; }
+.ltms-kds-status-badge[data-status="preparing"]  { background: #78350f; color: #fcd34d; }
+.ltms-kds-status-badge[data-status="ready"]       { background: #14532d; color: #86efac; }
+.ltms-kds-status-badge[data-status="completed"]   { background: #1f2937; color: #9ca3af; }
+.ltms-kds-status-badge[data-status="cancelled"]   { background: #1f2937; color: #6b7280; }
+
+/* ── Información del cliente ─────────────────────────────────────────────── */
+
+.ltms-kds-customer-info {
+    padding: 8px 14px 4px;
+}
+
+.ltms-kds-customer-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ltms-kds-order-type {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+/* ── Lista de ítems ──────────────────────────────────────────────────────── */
+
+.ltms-kds-items-list {
+    list-style: none;
+    margin: 8px 0;
+    padding: 0 14px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 180px;
+}
+
+.ltms-kds-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.875rem;
+}
+
+.ltms-kds-item:last-child {
+    border-bottom: none;
+}
+
+.ltms-kds-item-qty {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    min-width: 28px;
+    height: 24px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #38bdf8;
+    padding: 0 6px;
+}
+
+.ltms-kds-item-name {
+    flex: 1;
+    color: #e2e8f0;
+    line-height: 1.3;
+}
+
+.ltms-kds-item-note {
+    font-size: 0.75rem;
+    color: #f59e0b;
+    font-style: italic;
+    margin-left: 36px;
+    padding-bottom: 4px;
+}
+
+/* ── Notas del pedido ────────────────────────────────────────────────────── */
+
+.ltms-kds-order-notes {
+    margin: 4px 14px 8px;
+    padding: 8px 10px;
+    background: #0f172a;
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #fcd34d;
+    line-height: 1.5;
+}
+
+/* ── Pie de la tarjeta ───────────────────────────────────────────────────── */
+
+.ltms-kds-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-top: 1px solid #334155;
+    background: #0f172a;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ltms-kds-order-time {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.ltms-kds-elapsed {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+}
+
+.ltms-kds-elapsed-urgent {
+    color: #ef4444;
+    animation: ltms-kds-blink 1s step-end infinite;
+}
+
+@keyframes ltms-kds-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+
+.ltms-kds-done-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    background: #14532d;
+    color: #86efac;
+}
+
+/* ── Botones de cambio de estado ─────────────────────────────────────────── */
+
+.ltms-kds-status-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 6px 12px;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    background: #1e293b;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.ltms-kds-status-btn:hover:not(:disabled) {
+    background: #38bdf8;
+    border-color: #38bdf8;
+    color: #0f172a;
+}
+
+.ltms-kds-status-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.ltms-kds-status-btn[data-next="preparing"] { border-color: #f59e0b; }
+.ltms-kds-status-btn[data-next="preparing"]:hover { background: #f59e0b; border-color: #f59e0b; color: #0f172a; }
+
+.ltms-kds-status-btn[data-next="ready"] { border-color: #22c55e; }
+.ltms-kds-status-btn[data-next="ready"]:hover { background: #22c55e; border-color: #22c55e; color: #0f172a; }
+
+.ltms-kds-status-btn[data-next="completed"] { border-color: #6b7280; }
+.ltms-kds-status-btn[data-next="completed"]:hover { background: #6b7280; border-color: #6b7280; color: #fff; }
+
+/* =========================================================================
+   Panel de detalle de pedido (modal lateral)
+   ========================================================================= */
+
+#ltms-kds-order-detail {
+    position: fixed;
+    top: 0;
+    right: -420px;
+    width: 400px;
+    height: 100vh;
+    background: #1e293b;
+    border-left: 2px solid #334155;
+    padding: 20px;
+    overflow-y: auto;
+    transition: right 0.3s ease;
+    z-index: 9999;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+#ltms-kds-order-detail.ltms-kds-detail-open {
+    right: 0;
+}
+
+.ltms-kds-order-detail-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+    transition: color 0.15s;
+}
+
+.ltms-kds-order-detail-close:hover {
+    color: #f8fafc;
+}
+
+/* =========================================================================
+   Responsivo
+   ========================================================================= */
+
+@media (max-width: 640px) {
+    #ltms-kds-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
+    }
+
+    #ltms-kds-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    #ltms-kds-clock {
+        font-size: 1.25rem;
+    }
+
+    #ltms-kds-order-detail {
+        width: 100vw;
+        right: -100vw;
+    }
+}

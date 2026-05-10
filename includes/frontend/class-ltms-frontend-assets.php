@@ -285,7 +285,7 @@ final class LTMS_Frontend_Assets {
 
         wp_localize_script( 'ltms-kds', 'ltmsKds', [
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
-            'nonce'         => wp_create_nonce( 'ltms_kitchen_nonce' ),
+            'nonce'         => wp_create_nonce( 'ltms_dashboard_nonce' ),
             'vendor_id'     => $vendor_id,
             'poll_interval' => 15000,
             'i18n'          => [
