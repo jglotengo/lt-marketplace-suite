@@ -116,11 +116,12 @@ final class LTMS_DB_Migrations {
             `order_id`          BIGINT UNSIGNED NOT NULL,
             `order_item_id`     BIGINT UNSIGNED DEFAULT NULL,
             `vendor_id`         BIGINT UNSIGNED NOT NULL,
-            `product_id`        BIGINT UNSIGNED NOT NULL,
+            `product_id`        BIGINT UNSIGNED DEFAULT NULL,
+            `type`              VARCHAR(50) NOT NULL DEFAULT 'commission' COMMENT 'commission | referral | redi | adjustment',
             `gross_amount`      DECIMAL(15,2) NOT NULL,
-            `commission_rate`   DECIMAL(5,4) NOT NULL,
-            `commission_amount` DECIMAL(15,2) NOT NULL,
-            `vendor_amount`     DECIMAL(15,2) NOT NULL,
+            `commission_rate`   DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+            `commission_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Comisión de la plataforma',
+            `vendor_amount`     DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto neto para el vendedor',
             `tax_withholding`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `iva_amount`        DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `currency`          CHAR(3) NOT NULL DEFAULT 'COP',
@@ -128,13 +129,15 @@ final class LTMS_DB_Migrations {
             `status`            ENUM('pending','approved','paid','reversed','disputed') NOT NULL DEFAULT 'pending',
             `paid_at`           DATETIME DEFAULT NULL,
             `strategy_applied`  VARCHAR(100) DEFAULT NULL,
+            `notes`             TEXT DEFAULT NULL COMMENT 'Notas internas; ej: vendor_id:123 para referidos',
             `metadata`          LONGTEXT DEFAULT NULL,
             `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            KEY `idx_order_id` (`order_id`),
+            KEY `idx_order_id`  (`order_id`),
             KEY `idx_vendor_id` (`vendor_id`),
-            KEY `idx_status` (`status`)
+            KEY `idx_status`    (`status`),
+            KEY `idx_type`      (`type`)
         ) {$charset}";
 
         // lt_payout_requests

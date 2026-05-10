@@ -263,7 +263,7 @@ class LTMS_Affiliates {
                 rn.sponsor_id AS vendor_id,
                 u.display_name,
                 COUNT(DISTINCT rn.vendor_id) AS total_referrals,
-                COALESCE(SUM(c.vendor_net), 0) AS monthly_referral_income
+                COALESCE(SUM(c.vendor_amount), 0) AS monthly_referral_income
              FROM {$wpdb->prefix}lt_referral_network rn
              INNER JOIN {$wpdb->users} u ON u.ID = rn.sponsor_id
              LEFT JOIN {$wpdb->prefix}lt_commissions c
