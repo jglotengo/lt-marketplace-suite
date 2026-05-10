@@ -652,6 +652,8 @@ final class LTMS_DB_Migrations {
             `payment_mode`         VARCHAR(20)   NOT NULL DEFAULT 'full',
             `status`               VARCHAR(20)   NOT NULL DEFAULT 'pending',
             `cancellation_reason`  TEXT          DEFAULT NULL,
+            `cancelled_by`         VARCHAR(50)   DEFAULT NULL COMMENT 'system | customer | vendor | admin',
+            `cancel_notes`         TEXT          DEFAULT NULL COMMENT 'Notas internas de cancelación',
             `instant_booking`      TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '1 = confirmación automática sin aprobación del vendedor',
             `insurance_quote_id`   VARCHAR(255)  DEFAULT NULL COMMENT 'ID de cotización de seguro (xCover/similar)',
             `zapsign_doc_token`    VARCHAR(255)  DEFAULT NULL,
