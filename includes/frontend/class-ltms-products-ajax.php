@@ -55,11 +55,20 @@ class LTMS_Products_Ajax {
         $this->check_nonce();
         $user_id    = get_current_user_id();
         $kyc_status = get_user_meta( $user_id, 'ltms_kyc_status', true ) ?: 'pending';
-        $store      = [
-            'name'        => get_user_meta( $user_id, 'ltms_store_name', true ),
-            'phone'       => get_user_meta( $user_id, 'ltms_store_phone', true ),
-            'description' => get_user_meta( $user_id, 'ltms_store_description', true ),
-            'bank_info'   => get_user_meta( $user_id, 'ltms_bank_info', true ),
+        $dz_raw = get_user_meta( $user_id, '_ltms_delivery_zone', true );
+        $store  = [
+            'name'             => get_user_meta( $user_id, 'ltms_store_name',        true ),
+            'phone'            => get_user_meta( $user_id, 'ltms_store_phone',       true ),
+            'description'      => get_user_meta( $user_id, 'ltms_store_description', true ),
+            'bank_info'        => get_user_meta( $user_id, 'ltms_bank_info',         true ),
+            // Extended profile fields (Vendor_Settings_Saver)
+            'store_name'       => get_user_meta( $user_id, 'ltms_store_name',        true ),
+            'store_phone'      => get_user_meta( $user_id, 'ltms_store_phone',       true ),
+            'store_address'    => get_user_meta( $user_id, 'ltms_store_address',     true ),
+            'store_city'       => get_user_meta( $user_id, 'ltms_store_city',        true ),
+            'store_schedule'   => get_user_meta( $user_id, 'ltms_store_schedule',    true ),
+            'store_categories' => get_user_meta( $user_id, 'ltms_store_categories',  true ),
+            'delivery_zone'    => $dz_raw ? json_decode( $dz_raw, true ) : [ 'cities' => [], 'radius_km' => 0, 'free_from' => 0 ],
         ];
         wp_send_json_success( [ 'kyc_status' => $kyc_status, 'store' => $store ] );
     }
