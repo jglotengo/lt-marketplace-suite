@@ -71,31 +71,45 @@ class LTMS_Business_Redi_Order_Split {
 
         $origin_vendor_net = max( 0.0, $origin_vendor_gross - $tax_withholding );
 
-        // Credit origin vendor
-        $origin_tx_id = LTMS_Wallet::credit(
-            $origin_vendor_id,
-            $origin_vendor_net,
-            'commission',
-            sprintf(
-                /* translators: %1$s: order number */
-                __( 'Comisión ReDi pedido #%1$s (origen)', 'ltms' ),
-                $order->get_order_number()
-            ),
-            [ 'order_id' => $order->get_id(), 'redi' => true, 'gross' => $gross ]
-        );
+        // Retener comisión del vendedor origen durante el período de protección al consumidor
+        $origin_held = false;
+        if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
+            $origin_held = LTMS_Business_Consumer_Protection::hold_commission( $origin_vendor_id, $origin_vendor_net, $order->get_id() );
+        }
+        if ( ! $origin_held ) {
+            LTMS_Wallet::credit(
+                $origin_vendor_id,
+                $origin_vendor_net,
+                'commission',
+                sprintf(
+                    /* translators: %1$s: order number */
+                    __( 'Comisión ReDi pedido #%1$s (origen)', 'ltms' ),
+                    $order->get_order_number()
+                ),
+                [ 'order_id' => $order->get_id(), 'redi' => true, 'gross' => $gross ]
+            );
+        }
+        $origin_tx_id = $origin_held ? null : true; // compat for record_redi_commission
 
-        // Credit reseller
-        $reseller_tx_id = LTMS_Wallet::credit(
-            $reseller_id,
-            $reseller_commission,
-            'commission',
-            sprintf(
-                /* translators: %1$s: order number */
-                __( 'Comisión ReDi pedido #%1$s (revendedor)', 'ltms' ),
-                $order->get_order_number()
-            ),
-            [ 'order_id' => $order->get_id(), 'redi' => true ]
-        );
+        // Retener comisión del revendedor durante el período de protección al consumidor
+        $reseller_held = false;
+        if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
+            $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
+        }
+        if ( ! $reseller_held ) {
+            LTMS_Wallet::credit(
+                $reseller_id,
+                $reseller_commission,
+                'commission',
+                sprintf(
+                    /* translators: %1$s: order number */
+                    __( 'Comisión ReDi pedido #%1$s (revendedor)', 'ltms' ),
+                    $order->get_order_number()
+                ),
+                [ 'order_id' => $order->get_id(), 'redi' => true ]
+            );
+        }
+        $reseller_tx_id = $reseller_held ? null : true; // compat for record_redi_commission
 
         self::record_redi_commission(
             $order, $origin_vendor_id, $reseller_id,
