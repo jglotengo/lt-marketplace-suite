@@ -45,14 +45,15 @@ $fiscal_summary = $wpdb->get_row( $wpdb->prepare(
 
 // Últimos eventos de seguridad
 $security_events_query = "
-    SELECT level, event_type, user_id, ip_address, created_at, summary
+    SELECT severity AS level, event_type, user_id, ip_address, created_at,
+           CONCAT(request_method, ' ', request_uri) AS summary
     FROM {$wpdb->prefix}lt_security_events
     WHERE created_at BETWEEN %s AND %s
 ";
 $security_params = [ $date_from . ' 00:00:00', $date_to . ' 23:59:59' ];
 
 if ( $event_level ) {
-    $security_events_query .= " AND level = %s";
+    $security_events_query .= " AND severity = %s";
     $security_params[] = $event_level;
 }
 $security_events_query .= " ORDER BY created_at DESC LIMIT 50";
@@ -125,10 +126,10 @@ $large_payouts = $wpdb->get_results( $wpdb->prepare(
                 <td>
                     <select name="level">
                         <option value=""><?php esc_html_e( 'Todos', 'ltms' ); ?></option>
-                        <option value="CRITICAL" <?php selected( $event_level, 'CRITICAL' ); ?>>CRITICAL</option>
-                        <option value="ERROR"    <?php selected( $event_level, 'ERROR' ); ?>>ERROR</option>
-                        <option value="WARNING"  <?php selected( $event_level, 'WARNING' ); ?>>WARNING</option>
-                        <option value="INFO"     <?php selected( $event_level, 'INFO' ); ?>>INFO</option>
+                        <option value="critical" <?php selected( $event_level, 'critical' ); ?>>CRITICAL</option>
+                        <option value="high"     <?php selected( $event_level, 'high' ); ?>>HIGH</option>
+                        <option value="medium"   <?php selected( $event_level, 'medium' ); ?>>MEDIUM</option>
+                        <option value="low"      <?php selected( $event_level, 'low' ); ?>>LOW</option>
                     </select>
                 </td>
             </tr>
@@ -246,10 +247,10 @@ $large_payouts = $wpdb->get_results( $wpdb->prepare(
         </thead>
         <tbody>
             <?php foreach ( $security_events as $event ) :
-                $level_class = match( strtoupper( $event['level'] ) ) {
-                    'CRITICAL' => 'ltms-badge-danger',
-                    'ERROR'    => 'ltms-badge-warning',
-                    'WARNING'  => 'ltms-badge-secondary',
+                $level_class = match( strtolower( $event['level'] ) ) {
+                    'critical' => 'ltms-badge-danger',
+                    'high'     => 'ltms-badge-warning',
+                    'medium'   => 'ltms-badge-secondary',
                     default    => 'ltms-badge-info',
                 };
             ?>
