@@ -216,13 +216,13 @@ class LTMS_Core_Cron_Manager {
             $retention_days = (int) LTMS_Core_Config::get( 'ltms_log_retention_days', 90 );
             $deleted = $wpdb->query(
                 $wpdb->prepare(
-                    "DELETE FROM {$wpdb->prefix}lt_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+                    "DELETE FROM {$wpdb->prefix}lt_audit_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
                     $retention_days
                 )
             );
             LTMS_Core_Logger::info(
                 'CLEAN_LOGS',
-                sprintf( 'Logs eliminados: %d (retención: %d días).', (int) $deleted, $retention_days )
+                sprintf( 'Audit logs eliminados: %d (retención: %d días).', (int) $deleted, $retention_days )
             );
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Cron: clean_logs — ' . $e->getMessage() );
@@ -286,33 +286,44 @@ class LTMS_Core_Cron_Manager {
         }
     }
 
-    /** Cron 12: Envía notificaciones en cola (push/email pendientes). */
+    /**
+     * Cron 12: Envía notificaciones en cola (email/push/whatsapp pendientes).
+     *
+     * La tabla lt_notifications no tiene status — identifica notificaciones
+     * no enviadas por sent_at IS NULL y las despacha vía do_action.
+     */
     public static function send_notifications(): void {
         global $wpdb;
         try {
+            // Notificaciones aún no enviadas (sent_at IS NULL) creadas hace > 1 min
+            // para evitar doble-envío en requests concurrentes.
             $notifications = $wpdb->get_results(
                 "SELECT * FROM {$wpdb->prefix}lt_notifications
-                 WHERE status = 'pending' AND send_at <= NOW()
+                 WHERE sent_at IS NULL
+                   AND channel != 'inapp'
+                   AND created_at < DATE_SUB(NOW(), INTERVAL 1 MINUTE)
                  ORDER BY created_at ASC LIMIT 50",
                 ARRAY_A
             ) ?: [];
 
             foreach ( $notifications as $notif ) {
                 try {
-                    do_action( 'ltms_dispatch_notification', $notif );
+                    // Marcar sent_at optimistamente antes de despachar
                     $wpdb->update(
                         $wpdb->prefix . 'lt_notifications',
-                        [ 'status' => 'sent', 'sent_at' => current_time( 'mysql' ) ],
-                        [ 'id' => (int) $notif['id'] ],
-                        [ '%s', '%s' ],
-                        [ '%d' ]
-                    );
-                } catch ( \Throwable $inner ) {
-                    $wpdb->update(
-                        $wpdb->prefix . 'lt_notifications',
-                        [ 'status' => 'failed' ],
+                        [ 'sent_at' => current_time( 'mysql' ) ],
                         [ 'id' => (int) $notif['id'] ],
                         [ '%s' ],
+                        [ '%d' ]
+                    );
+                    do_action( 'ltms_dispatch_notification', $notif );
+                } catch ( \Throwable $inner ) {
+                    // Revertir sent_at para reintento en el próximo ciclo
+                    $wpdb->update(
+                        $wpdb->prefix . 'lt_notifications',
+                        [ 'sent_at' => null ],
+                        [ 'id' => (int) $notif['id'] ],
+                        [ null ],
                         [ '%d' ]
                     );
                     error_log( 'LTMS Cron: send_notifications notif #' . $notif['id'] . ' — ' . $inner->getMessage() );
