@@ -234,7 +234,7 @@ final class LTMS_Admin_Settings {
             for ( $i = $days - 1; $i >= 0; $i-- ) {
                 $date     = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
                 $labels[] = $date;
-                $column   = $type === 'commissions' ? 'vendor_net' : 'gross_amount';
+                $column   = $type === 'commissions' ? 'vendor_amount' : 'gross_amount';
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $values[] = (float) $wpdb->get_var(
                     $wpdb->prepare(
@@ -247,7 +247,7 @@ final class LTMS_Admin_Settings {
             for ( $i = 11; $i >= 0; $i-- ) {
                 $month    = gmdate( 'Y-m', strtotime( "-{$i} months" ) );
                 $labels[] = $month;
-                $column   = $type === 'commissions' ? 'vendor_net' : 'gross_amount';
+                $column   = $type === 'commissions' ? 'vendor_amount' : 'gross_amount';
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
                 $values[] = (float) $wpdb->get_var(
                     $wpdb->prepare(
