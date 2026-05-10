@@ -28,16 +28,16 @@ $event_level = isset( $_GET['level'] )   ? sanitize_text_field( $_GET['level'] )
 $fiscal_summary = $wpdb->get_row( $wpdb->prepare(
     "SELECT
         COUNT(*) AS total_transactions,
-        SUM(vendor_gross) AS total_gross,
-        SUM(platform_fee) AS total_platform_fee,
-        SUM(vendor_net) AS total_vendor_net,
-        SUM(rete_fuente) AS total_rete_fuente,
-        SUM(iva_fee) AS total_iva_fee,
-        SUM(rete_ica) AS total_rete_ica,
-        SUM(impoconsumo) AS total_impoconsumo
+        SUM(gross_amount)    AS total_gross,
+        SUM(commission_amount) AS total_platform_fee,
+        SUM(vendor_amount)   AS total_vendor_net,
+        SUM(tax_withholding) AS total_rete_fuente,
+        SUM(iva_amount)      AS total_iva_fee,
+        0                    AS total_rete_ica,
+        0                    AS total_impoconsumo
      FROM {$wpdb->prefix}lt_commissions
      WHERE created_at BETWEEN %s AND %s
-     " . ( $country ? "AND country = %s" : '' ),
+     " . ( $country ? "AND country_code = %s" : '' ),
     $date_from . ' 00:00:00',
     $date_to . ' 23:59:59',
     ...( $country ? [ $country ] : [] )
