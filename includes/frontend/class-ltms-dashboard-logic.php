@@ -43,7 +43,6 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_request_payout',        [ $instance, 'ajax_request_payout' ] );
         add_action( 'wp_ajax_ltms_get_notifications',     [ $instance, 'ajax_get_notifications' ] );
         add_action( 'wp_ajax_ltms_mark_notification_read', [ $instance, 'ajax_mark_notification_read' ] );
-        add_action( 'wp_ajax_ltms_save_vendor_settings',  [ $instance, 'ajax_save_vendor_settings' ] );
         add_action( 'wp_ajax_ltms_get_analytics_data',    [ $instance, 'ajax_get_analytics_data' ] );
 
         // v1.6.0 — Nuevos módulos enterprise

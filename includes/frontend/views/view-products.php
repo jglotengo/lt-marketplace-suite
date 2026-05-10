@@ -21,7 +21,7 @@ $products  = wc_get_products([
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Mis Productos', 'ltms' ); ?></h2>
-        <button type="button" class="ltms-btn ltms-btn-primary" data-ltms-modal-open="ltms-modal-new-product">
+        <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">
             ➕ <?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?>
         </button>
     </div>
@@ -31,7 +31,7 @@ $products  = wc_get_products([
         <div class="ltms-empty-icon">🛍️</div>
         <h3><?php esc_html_e( 'Aún no tienes productos', 'ltms' ); ?></h3>
         <p><?php esc_html_e( 'Agrega tu primer producto para comenzar a vender.', 'ltms' ); ?></p>
-        <button type="button" class="ltms-btn ltms-btn-primary" data-ltms-modal-open="ltms-modal-new-product">
+        <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn-empty">
             <?php esc_html_e( 'Agregar Producto', 'ltms' ); ?>
         </button>
     </div>
@@ -226,10 +226,8 @@ $products  = wc_get_products([
         }
 
         const $btn     = $(this);
-        const $text    = $btn.find('.ltms-btn-text');
-        const $spinner = $btn.find('.ltms-btn-spinner');
-        $btn.prop('disabled', true);
-        $text.hide(); $spinner.show();
+        const origText = $btn.html();
+        $btn.prop('disabled', true).text('Guardando...');
 
         $.ajax({
             url: ltmsDashboard.ajax_url,
@@ -246,8 +244,7 @@ $products  = wc_get_products([
                 status:      $('#ltms-np-status').val(),
             },
             success: function(res){
-                $btn.prop('disabled', false);
-                $text.show(); $spinner.hide();
+                $btn.prop('disabled', false).html(origText);
 
                 if (res.success){
                     $notice.removeClass('ltms-notice-error')
@@ -269,8 +266,7 @@ $products  = wc_get_products([
                 }
             },
             error: function(){
-                $btn.prop('disabled', false);
-                $text.show(); $spinner.hide();
+                $btn.prop('disabled', false).html(origText);
                 $notice.removeClass('ltms-notice-success')
                        .addClass('ltms-notice-error')
                        .text('<?php esc_js( __( 'Error de conexión. Intenta de nuevo.', 'ltms' ) ); ?>')
@@ -279,9 +275,23 @@ $products  = wc_get_products([
         });
     });
 
+    // ── Botones del estado inicial PHP → SPA fallback ────────────
+    $(document).on('click', '#ltms-add-product-btn, #ltms-add-product-btn-empty', function(e){
+        e.preventDefault();
+        if (typeof LTMS !== 'undefined' && LTMS.Dashboard && typeof LTMS.Dashboard.loadNewProductView === 'function') {
+            LTMS.Dashboard.loadNewProductView();
+        } else {
+            LTMS.Modal.open('ltms-modal-new-product');
+        }
+    });
+
     // ── Limpiar modal al cerrar ───────────────────────────────────
-    $(document).on('click', '[data-ltms-modal-close="ltms-modal-new-product"], .ltms-modal-overlay', function(){
-        $('#ltms-np-notice').hide();
+    $(document).on('click', '.ltms-modal-backdrop, .ltms-modal-close', function(){
+        $('#ltms-np-notice').hide().text('');
+        $('#ltms-np-name, #ltms-np-desc, #ltms-np-stock, #ltms-np-price').val('');
+        $('#ltms-np-image-id').val('');
+        $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
+        $('#ltms-np-img-status').text('');
     });
 
 })(jQuery);

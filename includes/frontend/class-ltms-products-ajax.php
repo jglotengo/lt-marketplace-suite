@@ -67,13 +67,49 @@ class LTMS_Products_Ajax {
     public function save_vendor_settings() {
         $this->check_nonce();
         $user_id = get_current_user_id();
-        $fields  = [ 'store_name', 'store_phone', 'store_description', 'bank_info' ];
-        foreach ( $fields as $field ) {
-            if ( isset( $_POST[ $field ] ) ) {
-                update_user_meta( $user_id, 'ltms_' . $field, sanitize_text_field( $_POST[ $field ] ) );
+
+        // Support two call formats:
+        // 1. Flat POST fields: store_name, store_phone, store_description, bank_info (from renderSettingsView JS)
+        // 2. Nested settings object: settings[ltms_store_name], etc. (from view-settings.php inline JS)
+        $settings_map = [
+            'ltms_store_name'        => $_POST['store_name']        ?? ( $_POST['settings']['ltms_store_name']        ?? null ), // phpcs:ignore
+            'ltms_store_phone'       => $_POST['store_phone']       ?? ( $_POST['settings']['ltms_store_phone']       ?? null ), // phpcs:ignore
+            'ltms_store_description' => $_POST['store_description'] ?? ( $_POST['settings']['ltms_store_description'] ?? null ), // phpcs:ignore
+            'ltms_bank_info'         => $_POST['bank_info']         ?? ( $_POST['settings']['ltms_bank_info']         ?? null ), // phpcs:ignore
+            'ltms_bank_name'         => null,
+            'ltms_bank_account_type' => null,
+            'ltms_shipping_policy'   => null,
+            'ltms_return_policy'     => null,
+        ];
+
+        // Also handle any remaining ltms_* fields from the nested settings object
+        if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) { // phpcs:ignore
+            $allowed = [
+                'ltms_bank_name', 'ltms_bank_account_type', 'ltms_payment_method',
+                'ltms_shipping_policy', 'ltms_return_policy',
+            ];
+            foreach ( $allowed as $field ) {
+                if ( isset( $_POST['settings'][ $field ] ) ) { // phpcs:ignore
+                    $settings_map[ $field ] = $_POST['settings'][ $field ]; // phpcs:ignore
+                }
+            }
+            // Handle encrypted bank account number
+            if ( ! empty( $_POST['settings']['ltms_bank_account_number'] ) ) { // phpcs:ignore
+                update_user_meta(
+                    $user_id,
+                    'ltms_bank_account_number',
+                    LTMS_Core_Security::encrypt( sanitize_text_field( $_POST['settings']['ltms_bank_account_number'] ) ) // phpcs:ignore
+                );
             }
         }
-        wp_send_json_success( [ 'message' => 'Guardado' ] );
+
+        foreach ( $settings_map as $meta_key => $value ) {
+            if ( $value !== null ) {
+                update_user_meta( $user_id, $meta_key, sanitize_text_field( wp_unslash( $value ) ) );
+            }
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Configuración guardada exitosamente.', 'ltms' ) ] );
     }
 
     public function get_product() {

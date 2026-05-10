@@ -452,3 +452,60 @@
         flex-direction: column;
     }
 }
+
+/* ── Modal System (ltms-modal.js) ──────────────────────────────── */
+.ltms-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.ltms-modal.ltms-modal-open {
+    display: flex;
+}
+
+.ltms-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+.ltms-modal-inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    animation: ltmsModalIn 0.2s ease;
+}
+
+@keyframes ltmsModalIn {
+    from { opacity: 0; transform: translateY(-16px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ltms-modal-body-lock {
+    overflow: hidden;
+}
+
+.ltms-modal-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    padding: 8px 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+}
+
+.ltms-modal-success {
+    color: #16a34a;
+    font-size: 0.875rem;
+    padding: 8px 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+}
