@@ -87,7 +87,7 @@ class LTMS_Admin_SAT_Report {
 
         foreach ( $rows as $row ) {
             $total_sales   += (float) $row->gross_amount;
-            $total_tax     += (float) ( $row->tax_amount ?? 0 );
+            $total_tax     += (float) ( $row->tax_withholding ?? 0 ) + (float) ( $row->iva_amount ?? 0 );
             $vendor_set[]   = $row->vendor_id;
             $records[]      = $row;
         }
