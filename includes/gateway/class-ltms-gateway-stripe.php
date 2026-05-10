@@ -253,20 +253,21 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
         $order->update_meta_data( '_ltms_stripe_payment_method_id', $payment_method_id );
         $order->save();
 
-        // Marcar el pedido como pagado.
-        $order->payment_complete( $intent_id );
-        $order->add_order_note(
+        // M-40: NO llamar payment_complete() aquí. El PaymentIntent recién creado
+        // está en estado 'requires_confirmation'. La confirmación real llega via
+        // webhook payment_intent.succeeded, que es quien llama payment_complete() y
+        // reduce stock. Llamarlo aquí causaría doble ejecución y marcaría pedidos
+        // como pagados antes de que Stripe haya cobrado realmente.
+        $order->update_status(
+            'on-hold',
             sprintf(
                 /* translators: %s: Stripe PaymentIntent ID */
-                __( 'Pago procesado correctamente vía Stripe. PaymentIntent: %s', 'ltms' ),
+                __( 'Pago iniciado vía Stripe. En espera de confirmación. PaymentIntent: %s', 'ltms' ),
                 $intent_id
             )
         );
 
-        // Reducir stock.
-        wc_reduce_stock_levels( $order_id );
-
-        // Vaciar el carrito.
+        // Vaciar el carrito. Stock se reduce cuando el webhook confirme el pago.
         WC()->cart->empty_cart();
 
         return [
