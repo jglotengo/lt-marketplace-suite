@@ -812,6 +812,23 @@ final class LTMS_DB_Migrations {
             KEY `idx_created_at`(`created_at`)
         ) {$charset}";
 
+        // lt_wallet_ledger — Vista desnormalizada para historial de transacciones del payout handler
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_ledger` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`   BIGINT UNSIGNED NOT NULL,
+            `type`        ENUM('credit','debit','hold','release','reversal','adjustment','payout','fee','tax_withholding') NOT NULL,
+            `amount`      DECIMAL(15,2)  NOT NULL,
+            `description` VARCHAR(500)   NOT NULL DEFAULT '',
+            `status`      ENUM('pending','completed','failed','reversed') NOT NULL DEFAULT 'completed',
+            `order_id`    BIGINT UNSIGNED DEFAULT NULL,
+            `reference`   VARCHAR(255)   DEFAULT NULL,
+            `created_at`  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_id`   (`vendor_id`),
+            KEY `idx_vendor_date` (`vendor_id`, `created_at`),
+            KEY `idx_type`        (`type`)
+        ) {$charset}";
+
         // lt_wallet_holds — Saldos retenidos de la billetera (consumer protection / vesting)
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
             `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
