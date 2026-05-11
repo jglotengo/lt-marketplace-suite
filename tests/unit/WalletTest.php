@@ -74,12 +74,10 @@ class WalletTest extends LTMS_Unit_Test_Case {
 
         $this->original_wpdb = $GLOBALS['wpdb'];
 
-        if ( class_exists( 'LTMS_Wallet' ) ) {
-            $this->wallet = new \LTMS_Wallet();
-        } elseif ( class_exists( 'LTMS_Business_Wallet' ) ) {
+        if ( class_exists( 'LTMS_Business_Wallet' ) ) {
             $this->wallet = new \LTMS_Business_Wallet();
         } else {
-            $this->markTestSkipped( 'LTMS_Wallet no disponible.' );
+            $this->markTestSkipped( 'LTMS_Business_Wallet no disponible.' );
         }
     }
 

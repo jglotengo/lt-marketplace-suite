@@ -134,13 +134,12 @@ class AutoloaderTest extends LTMS_Unit_Test_Case {
         ltms_load_autoloader();
 
         $two_part_classes = [
-            'LTMS_Admin'    => 'includes/admin/class-ltms-admin.php',
-            'LTMS_Roles'    => 'includes/roles/class-ltms-roles.php',
-            'LTMS_Wallet'   => 'includes/business/class-ltms-wallet.php',
-            'LTMS_Config'   => 'includes/core/class-ltms-config.php',
-            'LTMS_Logger'   => 'includes/core/class-ltms-logger.php',
-            'LTMS_Security' => 'includes/core/class-ltms-security.php',
-            'LTMS_Kernel'   => 'includes/core/class-ltms-kernel.php',
+            'LTMS_Admin'         => 'includes/admin/class-ltms-admin.php',
+            'LTMS_Roles'         => 'includes/roles/class-ltms-roles.php',
+            'LTMS_Config'        => 'includes/core/class-ltms-config.php',
+            'LTMS_Logger'        => 'includes/core/class-ltms-logger.php',
+            'LTMS_Security'      => 'includes/core/class-ltms-security.php',
+            'LTMS_Kernel'        => 'includes/core/class-ltms-kernel.php',
         ];
 
         foreach ( $two_part_classes as $class => $relative_file ) {
