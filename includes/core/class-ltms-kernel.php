@@ -488,6 +488,68 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Core_Cron_Manager' ) ) {
             LTMS_Core_Cron_Manager::init();
         }
+
+        // M-32: ltms_update_tracking was scheduled in the activator but had no handler.
+        // Poll all shipping APIs (Heka, Aveonline, Uber) for orders still in transit.
+        add_action( 'ltms_update_tracking', static function(): void {
+            global $wpdb;
+
+            // Find orders in transit with a tracking number assigned by LTMS.
+            $order_ids = $wpdb->get_col(
+                "SELECT DISTINCT p.ID FROM {$wpdb->posts} p
+                 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+                 WHERE p.post_type   = 'shop_order'
+                   AND p.post_status IN ('wc-processing','wc-shipped')
+                   AND pm.meta_key   = '_ltms_tracking_number'
+                   AND pm.meta_value != ''"
+            );
+
+            if ( empty( $order_ids ) ) {
+                return;
+            }
+
+            foreach ( $order_ids as $order_id ) {
+                try {
+                    $order           = wc_get_order( (int) $order_id );
+                    $tracking_number = $order ? $order->get_meta( '_ltms_tracking_number' ) : '';
+                    $carrier         = $order ? $order->get_meta( '_ltms_shipping_carrier' ) : '';
+
+                    if ( ! $order || ! $tracking_number ) {
+                        continue;
+                    }
+
+                    $status = '';
+
+                    if ( class_exists( 'LTMS_Api_Factory' ) ) {
+                        if ( in_array( $carrier, [ 'heka', '' ], true ) && class_exists( 'LTMS_Api_Heka' ) ) {
+                            $api    = LTMS_Api_Factory::get( 'heka' );
+                            $result = $api->track_shipment( $tracking_number );
+                            $status = $result['status'] ?? '';
+                        } elseif ( $carrier === 'aveonline' && class_exists( 'LTMS_Api_Aveonline' ) ) {
+                            $api    = LTMS_Api_Factory::get( 'aveonline' );
+                            $result = $api->track_shipment( $tracking_number );
+                            $status = $result['status'] ?? '';
+                        }
+                    }
+
+                    if ( $status ) {
+                        $order->update_meta_data( '_ltms_tracking_status', sanitize_text_field( $status ) );
+                        $order->update_meta_data( '_ltms_tracking_updated_at', gmdate( 'c' ) );
+                        $order->save();
+
+                        // Mark delivered orders as completed.
+                        if ( in_array( strtolower( $status ), [ 'delivered', 'entregado', 'delivered_final' ], true ) ) {
+                            $order->update_status( 'completed', __( 'Entregado — actualizado automáticamente por tracking.', 'ltms' ) );
+                        }
+                    }
+                } catch ( \Throwable $e ) {
+                    LTMS_Core_Logger::warning(
+                        'TRACKING_UPDATE_FAILED',
+                        sprintf( 'Order #%d: %s', $order_id, $e->getMessage() )
+                    );
+                }
+            }
+        } );
     }
 
 
