@@ -324,13 +324,17 @@
 
             data.transactions.forEach(tx => {
                 const isCredit = parseFloat(tx.amount) >= 0;
+                // C5-4 fix: handler devuelve tx.formatted (no tx.formatted_amount)
+                const displayAmount = tx.formatted || tx.formatted_amount || tx.amount || '—';
+                // C5-5 fix: handler devuelve tx.date (no tx.created_at)
+                const displayDate = tx.date || tx.created_at || '—';
                 $tbody.append(`
                     <tr>
-                        <td>${tx.created_at}</td>
-                        <td>${this.escapeHtml(tx.description)}</td>
+                        <td>${displayDate}</td>
+                        <td>${this.escapeHtml(tx.description || '')}</td>
                         <td><span class="ltms-badge ${this.getTxTypeBadge(tx.type)}">${tx.type}</span></td>
                         <td class="${isCredit ? 'credit' : 'debit'}">
-                            ${isCredit ? '+' : ''}${tx.formatted_amount}
+                            ${isCredit ? '+' : ''}${displayAmount}
                         </td>
                     </tr>
                 `);
