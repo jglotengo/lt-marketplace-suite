@@ -294,17 +294,24 @@ class LTMS_Products_Ajax {
 // Nota: LTMS_Products_Ajax se instancia en LTMS_Core_Kernel::boot_frontend().
 // No instanciar aquí para evitar el registro triple de hooks AJAX.
 
-// Permitir acceso al wp-admin para crear/editar productos
-add_filter('user_has_cap', function($caps, $cap_list, $args) {
-    if (!empty($caps['edit_products'])) {
+// C5-2 FIX: Solo añadir 'read' para que WP procese el AJAX de productos.
+// NO permitir acceso al wp-admin UI — solo wp-admin/admin-ajax.php.
+add_filter( 'user_has_cap', function( $caps, $cap_list, $args ) {
+    if ( ! empty( $caps['edit_products'] ) && LTMS_Utils::is_ltms_vendor( $args[1] ?? 0 ) ) {
         $caps['read'] = true;
     }
     return $caps;
-}, 10, 3);
+}, 10, 3 );
 
-add_filter('woocommerce_prevent_admin_access', function($prevent) {
-    if (current_user_can('edit_products')) {
-        return false;
+// C5-2 FIX: Bloquear acceso al wp-admin para vendedores LTMS.
+// WooCommerce llama a este filtro en admin_init; si devuelve true, redirige al frontend.
+// Permitimos únicamente las peticiones AJAX (wp-admin/admin-ajax.php).
+add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
+    if ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) {
+        // No es AJAX — si el usuario es vendedor LTMS, bloquear acceso al panel.
+        if ( LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
+            return true; // Prevenir acceso al wp-admin
+        }
     }
     return $prevent;
-});
+} );
