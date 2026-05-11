@@ -80,11 +80,14 @@ class LTMS_Vendor_Settings_Saver {
             wp_send_json_error( $attachment_id->get_error_message() );
         }
 
-        update_user_meta( $vendor_id, 'ltms_store_banner_id', $attachment_id );
+        $banner_url = wp_get_attachment_url( $attachment_id );
+        update_user_meta( $vendor_id, 'ltms_store_banner_id',  $attachment_id );
+        // M-47: también guardar la URL directamente para que get_vendor_settings la retorne sin una consulta extra.
+        update_user_meta( $vendor_id, 'ltms_store_banner_url', $banner_url );
 
         wp_send_json_success( [
             'attachment_id' => $attachment_id,
-            'url'           => wp_get_attachment_url( $attachment_id ),
+            'url'           => $banner_url,
         ] );
     }
 
