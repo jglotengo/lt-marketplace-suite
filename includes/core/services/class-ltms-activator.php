@@ -196,6 +196,116 @@ final class LTMS_Core_Activator {
             'ltms_booking_checkin_reminder_hours'     => 48,
             'ltms_booking_max_advance_booking_days'   => 365,
             'ltms_zapsign_booking_template_id'        => '',
+
+            // v2.0.0 — Comisiones avanzadas
+            'ltms_basic_commission_rate'      => '0.10',
+            'ltms_premium_commission_rate'    => '0.08',
+            'ltms_platform_commission_rate'   => '0.05',
+            'ltms_category_commission_rates'  => '',
+            'ltms_volume_tiers_enabled'       => false,
+            'ltms_custom_commission_rate'     => '',
+            'ltms_mlm_enabled'                => false,
+            'ltms_mlm_referral_rate'          => '0.02',
+            'ltms_referral_rates'             => '',
+
+            // v2.0.0 — Seguridad / WAF / 2FA
+            'ltms_2fa_required_auditors'         => 'no',
+            'ltms_waf_block_duration_seconds'    => 3600,
+            'ltms_waf_ip_cache_ttl_seconds'      => 300,
+            'ltms_circuit_breaker_cooldown_minutes' => 5,
+            'ltms_vault_signed_url_ttl_seconds'  => 300,
+
+            // v2.0.0 — KYC
+            'ltms_kyc_required_for_payout'  => 'yes',
+            'ltms_kyc_max_file_size_mb'     => 5,
+            'ltms_kyc_allowed_mime_types'   => 'image/jpeg,image/png,application/pdf',
+
+            // v2.0.0 — Pagos / Payouts
+            'ltms_min_payout_amount'                 => '50000',
+            'ltms_auto_approve_payouts'              => 'no',
+            'ltms_auto_approve_max_amount'           => '500000',
+            'ltms_consumer_protection_days'          => 7,
+            'ltms_pse_enabled'                       => false,
+            'ltms_orchestration_stripe_threshold_cop' => 1000000,
+            'ltms_orchestration_stripe_threshold_mxn' => 50000,
+
+            // v2.0.0 — API timeouts / retry
+            'ltms_api_timeout_seconds'              => 10,
+            'ltms_api_max_retries'                  => 3,
+            'ltms_api_retry_delay_seconds'          => 2,
+
+            // v2.0.0 — Shipping
+            'ltms_min_shipping_weight_kg'           => 0.1,
+            'ltms_shipping_parallel_timeout'        => 5,
+
+            // v2.0.0 — Store info
+            'ltms_store_address'  => '',
+            'ltms_store_city'     => '',
+            'ltms_store_state'    => '',
+            'ltms_store_zip'      => '',
+
+            // v2.0.0 — Impuestos CO
+            'ltms_iva_general'                  => '0.19',
+            'ltms_iva_reducido'                 => '0.05',
+            'ltms_impoconsumo_rate'             => '0.08',
+            'ltms_retefuente_compras'           => '0.025',
+            'ltms_retefuente_servicios'         => '0.04',
+            'ltms_retefuente_honorarios'        => '0.11',
+            'ltms_retefuente_tech'              => '0.035',
+            'ltms_retefuente_min_compras_uvt'   => 27,
+            'ltms_retefuente_min_servicios_uvt' => 4,
+            'ltms_reteiva_rate'                 => '0.15',
+            'ltms_sagrilaft_uvt_threshold'      => 10000,
+            'ltms_uvt_valor'                    => '47065',
+
+            // v2.0.0 — Impuestos MX
+            'ltms_mx_iva_general'      => '0.16',
+            'ltms_mx_iva_frontera'     => '0.08',
+            'ltms_mx_isr_honorarios'   => '0.10',
+            'ltms_mx_retencion_iva_pm' => '0.106',
+
+            // v2.0.0 — Booking extra
+            'ltms_booking_pending_timeout_minutes' => 30,
+            'ltms_booking_rnt_required'            => true,
+
+            // v2.0.0 — Integraciones (secrets vacíos por defecto, se configuran en Settings)
+            'ltms_siigo_enabled'              => false,
+            'ltms_siigo_username'             => '',
+            'ltms_siigo_access_key'           => '',
+            'ltms_siigo_seller_id'            => '',
+            'ltms_siigo_invoice_document_id'  => '',
+            'ltms_siigo_payment_method_id'    => '',
+            'ltms_addi_enabled'               => false,
+            'ltms_addi_client_id'             => '',
+            'ltms_addi_client_secret'         => '',
+            'ltms_addi_webhook_token'         => '',
+            'ltms_tptc_enabled'               => false,
+            'ltms_tptc_api_key'               => '',
+            'ltms_tptc_program_id'            => '',
+            'ltms_heka_api_key'               => '',
+            'ltms_heka_account_id'            => '',
+            'ltms_aveonline_api_key'          => '',
+            'ltms_aveonline_account_id'       => '',
+            'ltms_xcover_api_key'             => '',
+            'ltms_xcover_partner_code'        => '',
+            'ltms_xcover_purchase_protection' => false,
+            'ltms_xcover_parcel_protection'   => false,
+            'ltms_zapsign_api_token'          => '',
+            'ltms_openpay_merchant_id'        => '',
+            'ltms_openpay_public_key'         => '',
+            'ltms_stripe_test_mode'           => true,
+            'ltms_stripe_test_publishable_key'  => '',
+            'ltms_stripe_live_publishable_key'  => '',
+            'ltms_stripe_webhook_secret'        => '',
+            'ltms_uber_direct_client_id'        => '',
+            'ltms_uber_direct_client_secret'    => '',
+            'ltms_uber_direct_customer_id'      => '',
+            'ltms_uber_direct_webhook_secret'   => '',
+            'ltms_backblaze_key_id'             => '',
+            'ltms_backblaze_app_key'            => '',
+            'ltms_backblaze_endpoint'           => '',
+            'ltms_backblaze_default_bucket'     => '',
+            'ltms_backblaze_private_bucket'     => '',
         ];
 
         $current_settings = get_option( 'ltms_settings', [] );
