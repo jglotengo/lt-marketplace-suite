@@ -67,14 +67,42 @@ class LTMS_Business_Consumer_Protection {
             'created_at' => gmdate( 'Y-m-d H:i:s' ),
         ], [ '%d', '%f', '%d', '%s', '%s', '%s', '%s' ] );
 
-        if ( $inserted ) {
-            if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::log( 
-                'COMMISSION_HELD',
-                sprintf( 'Fondos retenidos: %.2f para vendedor #%d, pedido #%d, liberación: %s', $amount, $vendor_id, $order_id, $release_at )
-            );
+        if ( ! $inserted ) {
+            return false;
         }
 
-        return (bool) $inserted;
+        // M-84: Acreditar y retener en wallet para que balance_pending refleje los fondos
+        // retenidos y el vendedor NO los vea como disponibles hasta que venza el periodo.
+        if ( class_exists( 'LTMS_Business_Wallet' ) ) {
+            try {
+                LTMS_Business_Wallet::credit(
+                    $vendor_id,
+                    $amount,
+                    sprintf( 'Comision pedido #%d - en retencion (proteccion al consumidor)', $order_id ),
+                    [ 'type' => 'commission', 'order_id' => $order_id, 'held_until' => $release_at ],
+                    $order_id
+                );
+                LTMS_Business_Wallet::hold(
+                    $vendor_id,
+                    $amount,
+                    sprintf( 'Retencion Ley 1480 - pedido #%d, libera: %s', $order_id, $release_at ),
+                    [ 'type' => 'consumer_protection', 'order_id' => $order_id, 'release_at' => $release_at ]
+                );
+            } catch ( \Throwable $e ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::log( 'COMMISSION_HOLD_WALLET_FAILED',
+                        sprintf( 'Error al registrar hold en wallet vendedor #%d: %s', $vendor_id, $e->getMessage() )
+                    );
+                }
+            }
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::log(
+            'COMMISSION_HELD',
+            sprintf( 'Fondos retenidos: %.2f para vendedor #%d, pedido #%d, liberacion: %s', $amount, $vendor_id, $order_id, $release_at )
+        );
+
+        return true;
     }
 
     /**
@@ -135,13 +163,15 @@ class LTMS_Business_Consumer_Protection {
             return;
         }
 
-        // Acreditar en billetera
+        // M-84: Liberar desde balance_pending → balance usando release() (NO credit).
+        // El dinero ya fue acreditado en hold_commission() — solo hay que moverlo
+        // de retenido a disponible para evitar doble acreditación.
         if ( class_exists( 'LTMS_Business_Wallet' ) ) {
-            LTMS_Business_Wallet::credit(
+            LTMS_Business_Wallet::release(
                 $vendor_id,
                 (float) $hold->amount,
-                'hold_released',
-                sprintf( __( 'Fondos liberados — Hold #%d, Pedido #%d', 'ltms' ), $hold_id, $hold->order_id )
+                sprintf( 'Fondos liberados por vencimiento de retencion — Hold #%d, Pedido #%d', $hold_id, $hold->order_id ),
+                [ 'hold_id' => $hold_id, 'order_id' => $hold->order_id ]
             );
         }
 

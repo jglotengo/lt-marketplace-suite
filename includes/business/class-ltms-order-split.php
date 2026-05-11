@@ -278,13 +278,13 @@ final class LTMS_Business_Order_Split {
         }
 
         return [
-            'vendor_id'      => $vendor_id,
-            'regime'         => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'responsable_iva',
-            'nit'            => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
-            'is_gran_contrib' => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),
-            'ciiu_code'      => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',
-            'municipality'   => get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: 'bogota',
-            'monthly_income' => (float) get_user_meta( $vendor_id, 'ltms_monthly_income_avg', true ),
+            'vendor_id'               => $vendor_id,
+            'tax_regime'              => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'responsable_iva', // M-81: era 'regime', tax-strategy espera 'tax_regime'
+            'nit'                     => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
+            'is_gran_contribuyente'   => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),   // M-83: era 'is_gran_contrib'
+            'ciiu_code'               => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',
+            'municipality_code'       => get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: 'bogota',        // M-82: era 'municipality', tax-strategy espera 'municipality_code'
+            'monthly_income'          => (float) get_user_meta( $vendor_id, 'ltms_monthly_income_avg', true ),
         ];
     }
 
