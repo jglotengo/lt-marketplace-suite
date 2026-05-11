@@ -35,9 +35,18 @@ class LTMS_Zapsign_Webhook_Handler {
             // Avanzar KYC si el documento era el contrato de vendedor
             $doc_type = sanitize_key( $body['document_type'] ?? 'vendor_contract' );
             if ( 'vendor_contract' === $doc_type ) {
-                $current_kyc = get_user_meta( $vendor_id, '_ltms_kyc_status', true );
-                if ( 'pending_signature' === $current_kyc ) {
-                    update_user_meta( $vendor_id, '_ltms_kyc_status', 'approved' );
+                // M-99: usar 'ltms_kyc_status' sin guion bajo — '_ltms_kyc_status' era key incorrecta
+                $current_kyc = get_user_meta( $vendor_id, 'ltms_kyc_status', true );
+                if ( in_array( $current_kyc, [ 'pending', 'pending_signature' ], true ) ) {
+                    update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
+                    update_user_meta( $vendor_id, 'ltms_kyc_approved_at', gmdate( 'Y-m-d H:i:s' ) );
+                    // Disparar la misma acción que el flujo manual de admin
+                    do_action( 'ltms_vendor_approved', $vendor_id );
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::info( 'ZAPSIGN_KYC_AUTO_APPROVED',
+                            sprintf( 'Vendor #%d KYC auto-aprobado por firma ZapSign', $vendor_id )
+                        );
+                    }
                 }
             }
         }

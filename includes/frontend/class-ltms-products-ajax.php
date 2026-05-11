@@ -94,9 +94,11 @@ class LTMS_Products_Ajax {
 
         // Also handle any remaining ltms_* fields from the nested settings object
         if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) { // phpcs:ignore
+            // M-101: campos fiscales agregados a la lista de permitidos
             $allowed = [
                 'ltms_bank_name', 'ltms_bank_account_type', 'ltms_payment_method',
                 'ltms_shipping_policy', 'ltms_return_policy',
+                'ltms_tax_regime', 'ltms_nit', 'ltms_ciiu_code', 'ltms_municipality',
             ];
             foreach ( $allowed as $field ) {
                 if ( isset( $_POST['settings'][ $field ] ) ) { // phpcs:ignore
@@ -117,6 +119,13 @@ class LTMS_Products_Ajax {
             if ( $value !== null ) {
                 update_user_meta( $user_id, $meta_key, sanitize_text_field( wp_unslash( $value ) ) );
             }
+        }
+
+        // M-101: manejar checkbox gran contribuyente (solo llega si está marcado)
+        if ( isset( $_POST['settings']['ltms_is_gran_contribuyente'] ) ) { // phpcs:ignore
+            update_user_meta( $user_id, 'ltms_is_gran_contribuyente', 1 );
+        } else {
+            update_user_meta( $user_id, 'ltms_is_gran_contribuyente', 0 );
         }
 
         wp_send_json_success( [ 'message' => __( 'Configuración guardada exitosamente.', 'ltms' ) ] );

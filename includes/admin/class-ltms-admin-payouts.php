@@ -179,6 +179,23 @@ final class LTMS_Admin_Payouts {
 
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'rejected' );
 
+        // M-100: enviar email de notificación al vendedor cuando se rechaza KYC
+        $vendor_user = get_userdata( $vendor_id );
+        if ( $vendor_user ) {
+            $subject = __( '[Lo Tengo] Tu verificación de identidad necesita correcciones', 'ltms' );
+            $body    = sprintf(
+                /* translators: 1: nombre, 2: motivo, 3: URL */
+                __( "Hola %1\$s,\n\nTu solicitud de verificación de identidad fue revisada y necesita correcciones.\n\nMotivo: %2\$s\n\nPor favor ingresa a tu panel y envía una nueva solicitud con los documentos correctos:\n%3\$s\n\nSi tienes dudas, contáctanos.", 'ltms' ),
+                $vendor_user->display_name,
+                $reason,
+                home_url( '/panel-vendedor/' )
+            );
+            wp_mail( $vendor_user->user_email, $subject, $body );
+        }
+
+        // M-100: disparar action para que otros listeners puedan reaccionar al rechazo
+        do_action( 'ltms_vendor_kyc_rejected', $vendor_id, $reason );
+
         wp_send_json_success([
             'message' => __( 'KYC rechazado y vendedor notificado.', 'ltms' ),
         ]);

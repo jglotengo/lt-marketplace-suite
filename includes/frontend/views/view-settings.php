@@ -72,6 +72,73 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
     </div>
     <?php endif; ?>
 
+    <!-- Información Fiscal (M-101) -->
+    <div class="ltms-card" style="margin-bottom:20px;">
+        <div class="ltms-card-header"><?php esc_html_e( 'Información Fiscal / Tributaria', 'ltms' ); ?></div>
+        <div class="ltms-card-body">
+            <p style="color:#6b7280;font-size:.875rem;margin-bottom:16px;">
+                <?php esc_html_e( 'Estos datos se usan para calcular correctamente ReteFuente, ReteICA y ReteIVA sobre tus ventas.', 'ltms' ); ?>
+            </p>
+            <?php
+            $tax_regime    = get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'simplified';
+            $nit           = get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '';
+            $ciiu_code     = get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '';
+            $municipality  = get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: '';
+            $gran_contrib  = get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ) ? 'yes' : 'no';
+            ?>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div>
+                    <label style="display:block;font-size:.875rem;font-weight:500;margin-bottom:6px;">
+                        <?php esc_html_e( 'Régimen Tributario', 'ltms' ); ?>
+                    </label>
+                    <select name="ltms_tax_regime" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                        <option value="simplified" <?php selected( $tax_regime, 'simplified' ); ?>><?php esc_html_e( 'Simplificado (No responsable de IVA)', 'ltms' ); ?></option>
+                        <option value="common" <?php selected( $tax_regime, 'common' ); ?>><?php esc_html_e( 'Régimen Común (Responsable de IVA)', 'ltms' ); ?></option>
+                        <option value="special" <?php selected( $tax_regime, 'special' ); ?>><?php esc_html_e( 'Régimen Especial (ESAL)', 'ltms' ); ?></option>
+                        <option value="gran_contribuyente" <?php selected( $tax_regime, 'gran_contribuyente' ); ?>><?php esc_html_e( 'Gran Contribuyente', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.875rem;font-weight:500;margin-bottom:6px;">
+                        <?php esc_html_e( 'NIT / Cédula Fiscal', 'ltms' ); ?>
+                    </label>
+                    <input type="text" name="ltms_nit"
+                           value="<?php echo esc_attr( $nit ); ?>"
+                           placeholder="<?php esc_attr_e( 'Ej: 900123456-1', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.875rem;font-weight:500;margin-bottom:6px;">
+                        <?php esc_html_e( 'Código CIIU (actividad económica)', 'ltms' ); ?>
+                    </label>
+                    <input type="text" name="ltms_ciiu_code"
+                           value="<?php echo esc_attr( $ciiu_code ); ?>"
+                           placeholder="<?php esc_attr_e( 'Ej: 4791', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                    <span style="font-size:.75rem;color:#9ca3af;"><?php esc_html_e( 'Código de 4 dígitos DIAN', 'ltms' ); ?></span>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.875rem;font-weight:500;margin-bottom:6px;">
+                        <?php esc_html_e( 'Municipio (para ReteICA)', 'ltms' ); ?>
+                    </label>
+                    <input type="text" name="ltms_municipality"
+                           value="<?php echo esc_attr( $municipality ); ?>"
+                           placeholder="<?php esc_attr_e( 'Ej: 11001 (código DANE Bogotá)', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
+            </div>
+            <div style="margin-bottom:8px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" name="ltms_is_gran_contribuyente" value="yes"
+                           <?php checked( $gran_contrib, 'yes' ); ?>>
+                    <span style="font-size:.875rem;font-weight:500;">
+                        <?php esc_html_e( 'Soy Gran Contribuyente (activará ReteIVA 15%)', 'ltms' ); ?>
+                    </span>
+                </label>
+            </div>
+        </div>
+    </div>
+
     <!-- Formulario de configuración -->
     <div class="ltms-card">
         <div class="ltms-card-header"><?php esc_html_e( 'Datos de la Tienda', 'ltms' ); ?></div>
