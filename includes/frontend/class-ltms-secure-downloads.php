@@ -45,8 +45,14 @@ class LTMS_Secure_Downloads {
         // Invalidar el token (uso único)
         delete_transient( 'ltms_dl_' . md5( $token ) );
 
-        $filename = basename( $file_path );
+        // M-48: eliminar CRLF y comillas para prevenir header injection.
+        $filename = preg_replace( '/[\x00-\x1F\x7F"\'\\\\]/', '', basename( $file_path ) );
         $mime     = mime_content_type( $file_path ) ?: 'application/octet-stream';
+        // Restringir MIME a tipos seguros para descarga — evitar MIME sniffing en navegadores.
+        $allowed_mimes = [ 'application/pdf', 'image/jpeg', 'image/png', 'application/octet-stream' ];
+        if ( ! in_array( $mime, $allowed_mimes, true ) ) {
+            $mime = 'application/octet-stream';
+        }
 
         header( 'Content-Type: ' . $mime );
         header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
