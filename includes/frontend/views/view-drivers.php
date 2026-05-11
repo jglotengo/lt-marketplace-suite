@@ -146,9 +146,18 @@ $delivery_message = (string) get_user_meta( $vendor_id, 'ltms_own_delivery_messa
 					</span>
 				</td>
 				<td>
-					<?php echo $driver['current_order_id']
-						? '<a href="' . esc_url( wc_get_order( (int) $driver['current_order_id'] )->get_view_order_url() ) . '">#' . esc_html( $driver['current_order_id'] ) . '</a>'
-						: '—'; ?>
+					<?php
+					if ( $driver['current_order_id'] ) {
+						$_order = wc_get_order( (int) $driver['current_order_id'] );
+						if ( $_order ) {
+							echo '<a href="' . esc_url( $_order->get_view_order_url() ) . '">#' . esc_html( $driver['current_order_id'] ) . '</a>';
+						} else {
+							echo '#' . esc_html( $driver['current_order_id'] );
+						}
+					} else {
+						echo '—';
+					}
+					?>
 				</td>
 				<td class="ltms-driver-actions">
 					<button class="ltms-btn ltms-btn-link ltms-driver-toggle-active"
