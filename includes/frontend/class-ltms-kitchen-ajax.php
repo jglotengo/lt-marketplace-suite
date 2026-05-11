@@ -144,7 +144,7 @@ class LTMS_Kitchen_Ajax {
             sprintf( __( 'Estado cambiado desde Kitchen Display por vendedor #%d.', 'ltms' ), $vendor_id )
         );
 
-        self::log_info(
+        $this->log_info(
             'KITCHEN_STATUS_CHANGED',
             sprintf( 'Pedido #%d → %s por vendedor #%d', $order_id, $new_status, $vendor_id )
         );

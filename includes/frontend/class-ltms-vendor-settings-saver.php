@@ -48,7 +48,7 @@ class LTMS_Vendor_Settings_Saver {
             }
         }
 
-        self::log_info( 'VENDOR_PROFILE_SAVED', "Perfil del vendedor #{$vendor_id} actualizado." );
+        $this->log_info( 'VENDOR_PROFILE_SAVED', "Perfil del vendedor #{$vendor_id} actualizado." );
 
         wp_send_json_success( [ 'message' => __( 'Perfil guardado exitosamente.', 'ltms' ) ] );
     }
