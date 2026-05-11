@@ -27,7 +27,9 @@ final class LTMS_Core_Activator {
     public static function activate(): void {
         self::run_migrations();
         self::install_roles();
-        self::install_pages();
+        // install_pages() eliminada: creaba páginas con shortcodes no registrados ([ltms_login], [ltms_register], etc.)
+        // y llenaba ltms_installed_pages como array indexado, rompiendo create_required_pages().
+        // create_required_pages() es la función canónica y cubre todos los casos.
         self::create_required_pages();
         self::set_default_options();
         self::schedule_cron_jobs();
@@ -73,41 +75,42 @@ final class LTMS_Core_Activator {
     /**
      * Crea las páginas necesarias del plugin si no existen.
      *
+     * @deprecated Usar create_required_pages() en su lugar. Esta función ya no se llama desde activate().
+     *             Se conserva sólo por compatibilidad con posibles llamadas externas.
      * @return void
      */
     private static function install_pages(): void {
+        // Shortcodes corregidos a los que sí están registrados en LTMS_Public_Auth_Handler y LTMS_Dashboard_Logic
         $pages = [
             'ltms-dashboard'    => [
-                'title'     => __( 'Mi Panel de Vendedor', 'ltms' ),
-                'content'   => '[ltms_vendor_dashboard]',
-                'option'    => 'ltms_page_dashboard',
+                'title'   => __( 'Mi Panel de Vendedor', 'ltms' ),
+                'content' => '[ltms_vendor_dashboard]',
+                'option'  => 'ltms_page_dashboard',
             ],
             'ltms-login'        => [
-                'title'     => __( 'Acceder - Marketplace', 'ltms' ),
-                'content'   => '[ltms_login]',
-                'option'    => 'ltms_page_login',
+                'title'   => __( 'Acceder - Marketplace', 'ltms' ),
+                'content' => '[ltms_vendor_login]',    // era [ltms_login] — shortcode no registrado
+                'option'  => 'ltms_page_login',
             ],
             'ltms-register'     => [
-                'title'     => __( 'Registrarse como Vendedor', 'ltms' ),
-                'content'   => '[ltms_register]',
-                'option'    => 'ltms_page_register',
+                'title'   => __( 'Registrarse como Vendedor', 'ltms' ),
+                'content' => '[ltms_vendor_register]', // era [ltms_register] — shortcode no registrado
+                'option'  => 'ltms_page_register',
             ],
             'ltms-store'        => [
-                'title'     => __( 'Tienda', 'ltms' ),
-                'content'   => '[ltms_store]',
-                'option'    => 'ltms_page_store',
+                'title'   => __( 'Tienda', 'ltms' ),
+                'content' => '[ltms_vendor_store]',    // era [ltms_store] — shortcode no registrado
+                'option'  => 'ltms_page_store',
             ],
             'ltms-track-order'  => [
-                'title'     => __( 'Rastrear Pedido', 'ltms' ),
-                'content'   => '[ltms_track_order]',
-                'option'    => 'ltms_page_track_order',
+                'title'   => __( 'Rastrear Pedido', 'ltms' ),
+                'content' => '',                        // [ltms_track_order] no existe — página vacía hasta implementación
+                'option'  => 'ltms_page_track_order',
             ],
         ];
 
-        $installed_pages = get_option( 'ltms_installed_pages', [] );
-
         foreach ( $pages as $slug => $data ) {
-            // Verificar si ya existe
+            // Verificar si ya existe por la opción guardada
             $existing = get_option( $data['option'], 0 );
             if ( $existing && get_post( $existing ) ) {
                 continue;
@@ -124,11 +127,10 @@ final class LTMS_Core_Activator {
 
             if ( ! is_wp_error( $page_id ) ) {
                 update_option( $data['option'], $page_id );
-                $installed_pages[] = $page_id;
+                // NO se escribe en ltms_installed_pages para no romper el array asociativo de create_required_pages()
             }
         }
-
-        update_option( 'ltms_installed_pages', $installed_pages );
+        // No se actualiza ltms_installed_pages aquí — create_required_pages() es la fuente de verdad
     }
 
     /**
