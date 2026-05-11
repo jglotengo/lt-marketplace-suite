@@ -6,7 +6,8 @@ class LTMS_Products_Ajax {
     public function __construct() {
         add_action( 'wp_ajax_ltms_get_products_data',    [ $this, 'get_products_data' ] );
         add_action( 'wp_ajax_ltms_save_vendor_settings', [ $this, 'save_vendor_settings' ] );
-        add_action( 'wp_ajax_ltms_get_vendor_settings',  [ $this, 'get_vendor_settings' ] );
+        // C5-1 FIX: ltms_get_vendor_settings eliminado — lo maneja LTMS_Vendor_Settings_Saver
+        // con respuesta más completa (bank_info, delivery_zone, store_address, etc).
         add_action( 'wp_ajax_ltms_create_product',        [ $this, 'create_product' ] );
         add_action( 'wp_ajax_ltms_get_categories',        [ $this, 'get_categories' ] );
         add_action( 'wp_ajax_ltms_upload_product_image',  [ $this, 'upload_product_image' ] );
