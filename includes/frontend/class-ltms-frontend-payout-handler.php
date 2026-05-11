@@ -185,7 +185,8 @@ final class LTMS_Frontend_Payout_Handler {
     private function get_wallet_transactions( int $vendor_id ): array {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'lt_wallet_ledger';
+        // lt_wallet_transactions is the canonical ledger; lt_wallet_ledger was an alias.
+        $table = $wpdb->prefix . 'lt_wallet_transactions';
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rows = $wpdb->get_results(
