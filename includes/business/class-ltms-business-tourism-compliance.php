@@ -259,7 +259,15 @@ class LTMS_Business_Tourism_Compliance {
     public static function ajax_save_rnt(): void {
         try {
             check_ajax_referer( 'ltms_save_rnt', 'nonce' );
-            parse_str( $_POST['data'] ?? '', $data );
+            // M-46: sanitizar cada campo tras parse_str para evitar XSS/injection en save_rnt.
+            parse_str( wp_unslash( $_POST['data'] ?? '' ), $raw );
+            $data = [
+                'rnt_number'               => sanitize_text_field( $raw['rnt_number']               ?? '' ),
+                'rnt_expiry_date'          => sanitize_text_field( $raw['rnt_expiry_date']          ?? '' ),
+                'sectur_folio'             => sanitize_text_field( $raw['sectur_folio']             ?? '' ),
+                'country_code'             => sanitize_text_field( $raw['country_code']             ?? '' ),
+                'sworn_declaration_signed' => (bool) ( $raw['sworn_declaration_signed']            ?? false ),
+            ];
             $vendor_id = get_current_user_id();
             if ( ! $vendor_id ) { wp_send_json_error( __( 'No autenticado.', 'ltms' ) ); return; }
             self::save_rnt( $vendor_id, $data );
