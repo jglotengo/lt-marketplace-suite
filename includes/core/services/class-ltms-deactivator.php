@@ -53,6 +53,13 @@ final class LTMS_Core_Deactivator {
             'ltms_generate_tax_reports',
             'ltms_approve_payout_cron',
             'ltms_daily_cron',             // M-46
+            // Booking cron hooks (LTMS_Core_Cron_Manager)
+            'ltms_cron_cleanup_pending_bookings',
+            'ltms_cron_send_checkin_reminders',
+            'ltms_cron_balance_due_reminders',
+            'ltms_cron_auto_checkout',
+            'ltms_cron_check_rnt_expiry',
+            'ltms_cron_release_booking_deposits',
         ];
 
         foreach ( $hooks as $hook ) {
