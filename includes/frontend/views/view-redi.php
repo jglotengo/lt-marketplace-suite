@@ -165,7 +165,7 @@
 		<button
 			id="ltms-explore-redi-btn"
 			class="ltms-btn ltms-btn-primary"
-			data-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_vendor_nonce' ) ); ?>"
+			data-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_dashboard_nonce' ) ); ?>"
 		>
 			<?php esc_html_e( 'Explorar Productos ReDi', 'ltms' ); ?>
 		</button>
