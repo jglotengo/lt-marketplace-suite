@@ -1206,6 +1206,240 @@
          *
          * @param {string} view Nombre de la vista.
          */
+        // ── Vista: Seguros ────────────────────────────────────────
+        loadInsuranceView(forceRefresh = false) {
+            const self = this;
+            if (!forceRefresh && this.dataCache['insurance']) {
+                this.renderInsuranceView(this.dataCache['insurance']);
+                return;
+            }
+            $.ajax({
+                url: ltmsDashboard.ajax_url, method: 'POST',
+                data: { action: 'ltms_get_insurance_data', nonce: ltmsDashboard.nonce },
+                success(r) {
+                    const data = r.success ? r.data : { policies: [] };
+                    self.dataCache['insurance'] = data;
+                    self.renderInsuranceView(data);
+                },
+                error() { self.renderInsuranceView({ policies: [] }); }
+            });
+        },
+
+        renderInsuranceView(data) {
+            const policies = data.policies || [];
+            let rows = '';
+            if (policies.length === 0) {
+                rows = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">Sin pólizas registradas.</td></tr>';
+            } else {
+                policies.forEach(p => {
+                    const statusColor = p.status === 'active' ? '#10b981' : p.status === 'claimed' ? '#f59e0b' : '#6b7280';
+                    rows += `<tr>
+                        <td>#${p.order_id}</td>
+                        <td>${this.escapeHtml(p.insurance_type || '')}</td>
+                        <td>${this.escapeHtml(p.policy_number || p.policy_id || '')}</td>
+                        <td>${this.formatMoney(parseFloat(p.premium_amount || 0))}</td>
+                        <td><span style="color:${statusColor};font-weight:600;">${p.status}</span></td>
+                        <td>${p.certificate_url ? `<a href="${this.escapeHtml(p.certificate_url)}" target="_blank">📄 Ver</a>` : '—'}</td>
+                    </tr>`;
+                });
+            }
+            this.showSection('#ltms-view-insurance');
+            $('#ltms-view-insurance').html(`
+                <div class="ltms-section-header"><h2>🛡️ Mis Seguros</h2></div>
+                <div class="ltms-card" style="overflow-x:auto;">
+                    <table class="ltms-table" style="width:100%;border-collapse:collapse;">
+                        <thead><tr>
+                            <th>Pedido</th><th>Tipo</th><th>Póliza</th>
+                            <th>Prima</th><th>Estado</th><th>Certificado</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`);
+        },
+
+        // ── Vista: ReDi ───────────────────────────────────────────
+        loadRediView(forceRefresh = false) {
+            const self = this;
+            if (!forceRefresh && this.dataCache['redi']) {
+                this.renderRediView(this.dataCache['redi']);
+                return;
+            }
+            $.ajax({
+                url: ltmsDashboard.ajax_url, method: 'POST',
+                data: { action: 'ltms_get_redi_data', nonce: ltmsDashboard.nonce },
+                success(r) {
+                    const data = r.success ? r.data : { agreements: [], available_products: [] };
+                    self.dataCache['redi'] = data;
+                    self.renderRediView(data);
+                },
+                error() { self.renderRediView({ agreements: [], available_products: [] }); }
+            });
+        },
+
+        renderRediView(data) {
+            const agreements = data.agreements || [];
+            const available  = data.available_products || [];
+
+            let agreementRows = agreements.length === 0
+                ? '<tr><td colspan="4" style="text-align:center;padding:20px;color:#888;">Sin acuerdos activos.</td></tr>'
+                : agreements.map(a => `<tr>
+                    <td>${this.escapeHtml(a.origin_product_name || a.origin_product_id)}</td>
+                    <td>${parseFloat(a.commission_rate || 0).toFixed(1)}%</td>
+                    <td><span style="color:#10b981;font-weight:600;">${a.status}</span></td>
+                    <td>
+                        <button class="ltms-btn ltms-btn-sm ltms-btn-danger ltms-revoke-redi"
+                            data-id="${a.id}" style="font-size:12px;">Revocar</button>
+                    </td>
+                </tr>`).join('');
+
+            let availableRows = available.length === 0
+                ? '<tr><td colspan="3" style="text-align:center;padding:20px;color:#888;">Sin productos disponibles.</td></tr>'
+                : available.map(p => `<tr>
+                    <td>${this.escapeHtml(p.post_title)}</td>
+                    <td>${parseFloat(p.redi_rate || 0).toFixed(1)}%</td>
+                    <td>
+                        <button class="ltms-btn ltms-btn-sm ltms-btn-primary ltms-adopt-redi"
+                            data-id="${p.ID}" style="font-size:12px;">Adoptar</button>
+                    </td>
+                </tr>`).join('');
+
+            this.showSection('#ltms-view-redi');
+            $('#ltms-view-redi').html(`
+                <div class="ltms-section-header"><h2>🔁 ReDi — Productos en Reventa</h2></div>
+                <div class="ltms-card" style="margin-bottom:20px;">
+                    <h4 style="margin-bottom:12px;">Mis Acuerdos Activos</h4>
+                    <div style="overflow-x:auto;">
+                        <table class="ltms-table" style="width:100%;border-collapse:collapse;">
+                            <thead><tr><th>Producto</th><th>Comisión</th><th>Estado</th><th>Acción</th></tr></thead>
+                            <tbody>${agreementRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="ltms-card">
+                    <h4 style="margin-bottom:12px;">Productos Disponibles para Adoptar</h4>
+                    <div style="overflow-x:auto;">
+                        <table class="ltms-table" style="width:100%;border-collapse:collapse;">
+                            <thead><tr><th>Producto</th><th>Comisión</th><th>Acción</th></tr></thead>
+                            <tbody>${availableRows}</tbody>
+                        </table>
+                    </div>
+                </div>`);
+
+            // Handler: Adoptar producto ReDi
+            $(document).off('click', '.ltms-adopt-redi').on('click', '.ltms-adopt-redi', function () {
+                const btn = $(this); const productId = btn.data('id');
+                btn.prop('disabled', true).text('Adoptando...');
+                $.ajax({
+                    url: ltmsDashboard.ajax_url, method: 'POST',
+                    data: { action: 'ltms_adopt_redi_product', nonce: ltmsDashboard.nonce, product_id: productId },
+                    success(r) {
+                        btn.prop('disabled', false).text('Adoptar');
+                        if (r.success) { delete LtmsDashboard.dataCache['redi']; LtmsDashboard.loadRediView(true); }
+                        else alert(r.data || 'Error al adoptar producto.');
+                    },
+                    error() { btn.prop('disabled', false).text('Adoptar'); }
+                });
+            });
+
+            // Handler: Revocar acuerdo ReDi
+            $(document).off('click', '.ltms-revoke-redi').on('click', '.ltms-revoke-redi', function () {
+                if (!confirm('¿Confirmar revocación del acuerdo?')) return;
+                const btn = $(this); const agreementId = btn.data('id');
+                btn.prop('disabled', true).text('Revocando...');
+                $.ajax({
+                    url: ltmsDashboard.ajax_url, method: 'POST',
+                    data: { action: 'ltms_revoke_redi_agreement', nonce: ltmsDashboard.nonce, agreement_id: agreementId },
+                    success(r) {
+                        btn.prop('disabled', false).text('Revocar');
+                        if (r.success) { delete LtmsDashboard.dataCache['redi']; LtmsDashboard.loadRediView(true); }
+                        else alert(r.data || 'Error al revocar.');
+                    },
+                    error() { btn.prop('disabled', false).text('Revocar'); }
+                });
+            });
+        },
+
+        // ── Vista: Descargas Seguras ──────────────────────────────
+        loadDownloadsView(forceRefresh = false) {
+            const self = this;
+            if (!forceRefresh && this.dataCache['downloads']) {
+                this.renderDownloadsView(this.dataCache['downloads']);
+                return;
+            }
+            // La vista de descargas la renderiza PHP directamente; solo mostramos
+            // la sección estática y un botón para generar token de descarga si hay productos digitales.
+            $.ajax({
+                url: ltmsDashboard.ajax_url, method: 'POST',
+                data: { action: 'ltms_get_dashboard_data', section: 'downloads', nonce: ltmsDashboard.nonce },
+                success(r) {
+                    const downloads = r.success && r.data.downloads ? r.data.downloads : [];
+                    self.dataCache['downloads'] = { downloads };
+                    self.renderDownloadsView({ downloads });
+                },
+                error() { self.renderDownloadsView({ downloads: [] }); }
+            });
+        },
+
+        renderDownloadsView(data) {
+            const downloads = data.downloads || [];
+            let rows = '';
+            if (downloads.length === 0) {
+                rows = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">Sin productos digitales vendidos aún.</td></tr>';
+            } else {
+                downloads.forEach(d => {
+                    rows += `<tr>
+                        <td>#${d.order_id}</td>
+                        <td>${this.escapeHtml(d.product_name || '')}</td>
+                        <td>${this.escapeHtml(d.buyer_name || '')}</td>
+                        <td>${this.escapeHtml(d.date || '')}</td>
+                        <td>
+                            <button class="ltms-btn ltms-btn-sm ltms-btn-outline ltms-gen-token"
+                                data-product="${d.product_id}" data-order="${d.order_id}"
+                                style="font-size:12px;">🔑 Generar Token</button>
+                        </td>
+                    </tr>`;
+                });
+            }
+            this.showSection('#ltms-view-downloads');
+            $('#ltms-view-downloads').html(`
+                <div class="ltms-section-header"><h2>📦 Descargas Seguras</h2></div>
+                <div class="ltms-card" style="overflow-x:auto;">
+                    <table class="ltms-table" style="width:100%;border-collapse:collapse;">
+                        <thead><tr>
+                            <th>Pedido</th><th>Producto</th><th>Comprador</th>
+                            <th>Fecha</th><th>Token</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <div id="ltms-token-result" style="display:none;margin-top:15px;padding:12px;background:#f0fdf4;border:1px solid #10b981;border-radius:6px;"></div>`);
+
+            $(document).off('click', '.ltms-gen-token').on('click', '.ltms-gen-token', function () {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Generando...');
+                $.ajax({
+                    url: ltmsDashboard.ajax_url, method: 'POST',
+                    data: {
+                        action: 'ltms_generate_download_token',
+                        nonce: ltmsDashboard.nonce,
+                        product_id: btn.data('product'),
+                        order_id: btn.data('order'),
+                    },
+                    success(r) {
+                        btn.prop('disabled', false).text('🔑 Generar Token');
+                        if (r.success && r.data.token_url) {
+                            $('#ltms-token-result')
+                                .html(`✅ Token generado: <a href="${r.data.token_url}" target="_blank">${r.data.token_url}</a>`)
+                                .show();
+                        } else {
+                            alert(r.data || 'Error al generar token.');
+                        }
+                    },
+                    error() { btn.prop('disabled', false).text('🔑 Generar Token'); }
+                });
+            });
+        },
+
         loadGenericView(view) {
             this.showSection('#ltms-view-' + view);
         },
