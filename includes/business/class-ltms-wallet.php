@@ -310,7 +310,7 @@ final class LTMS_Business_Wallet {
                     if ( (float) $new_balance_pending < $amount ) {
                         throw new \InvalidArgumentException(
                             sprintf(
-                                'LTMS Wallet: No se puede liberar %s Ã¢â‚¬â€ saldo pendiente disponible: %s.',
+                                'LTMS Wallet: No se puede liberar %s — saldo pendiente disponible: %s.',
                                 $amount,
                                 $new_balance_pending
                             )
@@ -536,7 +536,7 @@ final class LTMS_Business_Wallet {
 
     // â”€â”€ MÃ©todos de instancia requeridos por WalletTest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Estos mÃ©todos encapsulan la lÃ³gica matemÃ¡tica pura del ledger.
-    // No tocan la BD â€” son cÃ¡lculos puros, testeables sin WordPress.
+    // No tocan la BD — son calculos puros, testeables sin WordPress.
 
     /**
      * Calcula el balance disponible: balance total menos fondos retenidos.
