@@ -204,7 +204,7 @@ final class LTMS_Admin_Payouts {
         }
 
         try {
-            LTMS_Wallet::freeze( $vendor_id, $reason );
+            LTMS_Business_Wallet::freeze( $vendor_id, $reason );
             wp_send_json_success([
                 'message' => sprintf(
                     /* translators: %d: ID del vendedor */

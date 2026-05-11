@@ -55,14 +55,14 @@ class LTMS_Redi_Order_Listener {
         foreach ( $commissions as $commission ) {
             // Reversal wallet entries
             try {
-                LTMS_Wallet::debit(
+                LTMS_Business_Wallet::debit(
                     (int) $commission->origin_vendor_id,
                     (float) $commission->origin_vendor_net,
                     'reversal',
                     sprintf( __( 'Reversión ReDi pedido #%s', 'ltms' ), $order->get_order_number() ),
                     [ 'order_id' => $order_id, 'redi_commission_id' => $commission->id ]
                 );
-                LTMS_Wallet::debit(
+                LTMS_Business_Wallet::debit(
                     (int) $commission->reseller_vendor_id,
                     (float) $commission->reseller_commission,
                     'reversal',

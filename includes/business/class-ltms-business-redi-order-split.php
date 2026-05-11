@@ -77,7 +77,7 @@ class LTMS_Business_Redi_Order_Split {
             $origin_held = LTMS_Business_Consumer_Protection::hold_commission( $origin_vendor_id, $origin_vendor_net, $order->get_id() );
         }
         if ( ! $origin_held ) {
-            LTMS_Wallet::credit(
+            LTMS_Business_Wallet::credit(
                 $origin_vendor_id,
                 $origin_vendor_net,
                 'commission',
@@ -97,7 +97,7 @@ class LTMS_Business_Redi_Order_Split {
             $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
         }
         if ( ! $reseller_held ) {
-            LTMS_Wallet::credit(
+            LTMS_Business_Wallet::credit(
                 $reseller_id,
                 $reseller_commission,
                 'commission',

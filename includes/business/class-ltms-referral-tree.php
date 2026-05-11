@@ -129,7 +129,7 @@ final class LTMS_Referral_Tree {
             }
 
             try {
-                LTMS_Wallet::credit(
+                LTMS_Business_Wallet::credit(
                     $sponsor_id,
                     $commission,
                     'referral',

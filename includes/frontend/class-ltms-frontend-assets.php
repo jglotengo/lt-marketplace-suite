@@ -326,7 +326,7 @@ final class LTMS_Frontend_Assets {
      */
     private function localize_dashboard_script(): void {
         $user_id = get_current_user_id();
-        $wallet  = $user_id ? LTMS_Wallet::get_or_create( $user_id ) : null;
+        $wallet  = $user_id ? LTMS_Business_Wallet::get_or_create( $user_id ) : null;
 
         wp_localize_script( 'ltms-dashboard', 'ltmsDashboard', [
             'ajax_url'      => admin_url( 'admin-ajax.php' ),

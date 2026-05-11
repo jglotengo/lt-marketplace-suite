@@ -80,7 +80,7 @@ final class LTMS_Business_Order_Split {
 
         // Fallback: si Consumer Protection no está disponible, acreditar directamente
         if ( ! $held ) {
-            LTMS_Wallet::credit(
+            LTMS_Business_Wallet::credit(
                 $vendor_id,
                 $vendor_net,
                 sprintf(

@@ -69,7 +69,7 @@ final class LTMS_Payout_Scheduler {
         }
 
         // Verificar balance disponible
-        $wallet  = LTMS_Wallet::get_or_create( $vendor_id );
+        $wallet  = LTMS_Business_Wallet::get_or_create( $vendor_id );
         $balance = (float) $wallet['balance'];
 
         if ( $amount > $balance ) {
@@ -100,7 +100,7 @@ final class LTMS_Payout_Scheduler {
 
         // Poner en hold el monto en la billetera
         try {
-            LTMS_Wallet::hold( $vendor_id, $amount, 'Retiro solicitado en procesamiento' );
+            LTMS_Business_Wallet::hold( $vendor_id, $amount, 'Retiro solicitado en procesamiento' );
         } catch ( \Throwable $e ) {
             return [
                 'success'   => false,
@@ -170,14 +170,14 @@ final class LTMS_Payout_Scheduler {
 
         if ( $payment_result['success'] ) {
             // 1. Liberar el hold (balance_pending → balance) para que el debit tenga saldo disponible
-            LTMS_Wallet::release(
+            LTMS_Business_Wallet::release(
                 (int) $payout['vendor_id'],
                 (float) $payout['amount'],
                 sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id )
             );
 
             // 2. Debitar el balance ahora disponible (tipo payout para el ledger)
-            LTMS_Wallet::debit(
+            LTMS_Business_Wallet::debit(
                 (int) $payout['vendor_id'],
                 (float) $payout['amount'],
                 'payout',
@@ -238,7 +238,7 @@ final class LTMS_Payout_Scheduler {
         }
 
         // Liberar el hold en la billetera
-        LTMS_Wallet::release( (int) $payout['vendor_id'], (float) $payout['amount'], 'Retiro rechazado: ' . $reason );
+        LTMS_Business_Wallet::release( (int) $payout['vendor_id'], (float) $payout['amount'], 'Retiro rechazado: ' . $reason );
 
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';

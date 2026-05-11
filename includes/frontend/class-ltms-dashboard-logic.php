@@ -183,7 +183,7 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( __( 'Acceso denegado.', 'ltms' ), 403 );
         }
 
-        $wallet       = LTMS_Wallet::get_or_create( $user_id );
+        $wallet       = LTMS_Business_Wallet::get_or_create( $user_id );
         $transactions = $this->get_wallet_transactions( $user_id );
 
         wp_send_json_success([
@@ -451,7 +451,7 @@ final class LTMS_Dashboard_Logic {
         );
 
         // Billetera
-        $wallet = LTMS_Wallet::get_or_create( $vendor_id );
+        $wallet = LTMS_Business_Wallet::get_or_create( $vendor_id );
 
         return [
             'monthly_sales'       => $monthly_sales,

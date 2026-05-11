@@ -79,7 +79,7 @@ final class LTMS_Frontend_Payout_Handler {
         }
 
         try {
-            $wallet    = LTMS_Wallet::get_or_create( $vendor_id );
+            $wallet    = LTMS_Business_Wallet::get_or_create( $vendor_id );
             $balance   = (float) ( $wallet['balance']      ?? 0 );
             $held      = (float) ( ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 ) ?? 0 );
             $available = max( 0.0, $balance - $held );

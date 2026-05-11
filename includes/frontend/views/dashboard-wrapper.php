@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $user_id      = get_current_user_id();
 $user         = get_userdata( $user_id );
 $store_name   = get_user_meta( $user_id, 'ltms_store_name', true ) ?: $user->display_name;
-$wallet       = class_exists( 'LTMS_Wallet' ) ? LTMS_Wallet::get_or_create( $user_id ) : [ 'balance' => 0, 'balance_reserved' => 0 ];
+$wallet       = class_exists( 'LTMS_Business_Wallet' ) ? LTMS_Business_Wallet::get_or_create( $user_id ) : [ 'balance' => 0, 'balance_reserved' => 0 ];
 $unread_notif = 0;
 
 // Contar notificaciones no leídas

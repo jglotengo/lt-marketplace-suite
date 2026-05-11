@@ -76,7 +76,7 @@ $total      = $user_query->get_total();
                 <?php foreach ( $vendors as $vendor ) :
                     $store_name  = get_user_meta( $vendor->ID, 'ltms_store_name', true ) ?: '—';
                     $kyc_status  = get_user_meta( $vendor->ID, 'ltms_kyc_status', true ) ?: 'pending';
-                    $wallet      = LTMS_Wallet::get_or_create( $vendor->ID );
+                    $wallet      = LTMS_Business_Wallet::get_or_create( $vendor->ID );
                     $is_premium  = in_array( 'ltms_vendor_premium', $vendor->roles, true );
                     $kyc_classes = [ 'approved' => 'ltms-badge-success', 'pending' => 'ltms-badge-warning', 'rejected' => 'ltms-badge-danger' ];
                 ?>
