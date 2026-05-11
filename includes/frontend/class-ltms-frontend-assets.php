@@ -51,6 +51,14 @@ final class LTMS_Frontend_Assets {
         $page_id = get_queried_object_id();
         $pages   = $this->get_installed_pages();
 
+        // Nonce público para live search (disponible para todos los visitantes)
+        wp_add_inline_script(
+            'jquery-core',
+            'window.ltmsPublic = window.ltmsPublic || {}; window.ltmsPublic.searchNonce = ' .
+            wp_json_encode( wp_create_nonce( 'ltms_public_search' ) ) . ';',
+            'after'
+        );
+
         // CSS base del dashboard (siempre en páginas LTMS)
         if ( $this->is_ltms_page( $page_id, $pages ) ) {
             wp_enqueue_style(

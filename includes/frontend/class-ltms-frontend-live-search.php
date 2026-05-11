@@ -18,7 +18,25 @@ class LTMS_Frontend_Live_Search {
      * @return void
      */
     public function handle_search(): void {
-        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+        // La búsqueda en vivo es pública (productos/vendedores) y también interna (pedidos del vendedor).
+        // Para usuarios no autenticados usamos un nonce público; para autenticados el nonce del dashboard.
+        if ( is_user_logged_in() ) {
+            check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+        } else {
+            // Verificar nonce público para búsquedas anónimas (productos y vendedores).
+            // Si no se provee nonce válido, limitamos a búsquedas de solo lectura (no pedidos).
+            $nonce_ok = isset( $_POST['nonce'] ) && wp_verify_nonce(
+                sanitize_text_field( wp_unslash( $_POST['nonce'] ) ),
+                'ltms_public_search'
+            );
+            if ( ! $nonce_ok ) {
+                // Sin nonce válido: solo permitimos búsqueda pública básica (no pedidos)
+                $type_check = sanitize_key( $_POST['type'] ?? 'products' );
+                if ( ! in_array( $type_check, [ 'products', 'vendors' ], true ) ) {
+                    wp_send_json_error( 'Nonce inválido', 403 );
+                }
+            }
+        }
 
         $query  = sanitize_text_field( wp_unslash( $_POST['q'] ?? '' ) );
         $type   = sanitize_key( $_POST['type'] ?? 'products' );

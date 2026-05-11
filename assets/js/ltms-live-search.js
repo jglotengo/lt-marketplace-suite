@@ -372,7 +372,7 @@ LTMS.LiveSearch = (function ($) {
             create($el, {
                 action:     $el.data('ltms-search-action') || 'ltms_live_search',
                 searchType: $el.data('ltms-search-type')   || 'products',
-                nonce:      $el.data('ltms-nonce')          || (typeof ltmsDashboard !== 'undefined' ? ltmsDashboard.nonce : ''),
+                nonce:      $el.data('ltms-nonce')          || (typeof ltmsDashboard !== 'undefined' ? ltmsDashboard.nonce : (typeof ltmsPublic !== 'undefined' ? ltmsPublic.searchNonce : '')),
                 ajaxUrl:    $el.data('ltms-ajax-url')       || '/wp-admin/admin-ajax.php',
             });
         });
