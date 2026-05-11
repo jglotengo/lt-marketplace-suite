@@ -90,6 +90,7 @@ class LTMS_Booking_Calendar {
             'currency'       => get_woocommerce_currency_symbol(),
             'restUrl'        => rest_url( 'ltms/v1/booking-calendar/' ),
             'nonce'          => wp_create_nonce( 'wp_rest' ),
+            'bookingNonce'   => wp_create_nonce( 'ltms_add_booking_' . get_the_ID() ),
             'i18n'           => [
                 'selectDates'    => __( 'Selecciona las fechas de tu estadía', 'ltms' ),
                 'nights'         => __( 'noches', 'ltms' ),
@@ -113,6 +114,8 @@ class LTMS_Booking_Calendar {
         ?>
         <div class="ltms-booking-widget" id="ltms-booking-widget">
             <h3 class="ltms-booking-widget__title"><?php esc_html_e( 'Reserva tu estadía', 'ltms' ); ?></h3>
+
+            <input type="hidden" name="ltms_booking_nonce" value="<?php echo esc_attr( wp_create_nonce( 'ltms_add_booking_' . $product->get_id() ) ); ?>">
 
             <div class="ltms-booking-widget__calendar">
                 <label for="ltms-date-range"><?php esc_html_e( 'Fechas', 'ltms' ); ?></label>
@@ -211,6 +214,13 @@ class LTMS_Booking_Calendar {
     public static function capture_booking_data( array $cart_item_data, int $product_id, int $variation_id ): array {
         $product = wc_get_product( $product_id );
         if ( ! $product || 'ltms_bookable' !== $product->get_type() ) {
+            return $cart_item_data;
+        }
+
+        // Verify nonce before reading booking POST data.
+        $nonce = sanitize_text_field( wp_unslash( $_POST['ltms_booking_nonce'] ?? '' ) );
+        if ( ! wp_verify_nonce( $nonce, 'ltms_add_booking_' . $product_id ) ) {
+            wc_add_notice( __( 'Error de seguridad. Por favor recarga la página e inténtalo de nuevo.', 'ltms' ), 'error' );
             return $cart_item_data;
         }
 

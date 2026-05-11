@@ -44,18 +44,22 @@ class LTMS_Booking_Policy_Handler {
 
         $defaults = [
             [
+                'name'                => __( 'Flexible', 'ltms' ),
                 'policy_type'         => 'flexible',
                 'free_cancel_hours'   => 24,
                 'partial_refund_pct'  => 100,
                 'partial_refund_hours'=> 48,
                 'non_refundable_pct'  => 0,
+                'is_default'          => 1,
             ],
             [
+                'name'                => __( 'Moderada', 'ltms' ),
                 'policy_type'         => 'moderate',
-                'free_cancel_hours'   => 72,
+                'free_cancel_hours'   => 168, // 7 days
                 'partial_refund_pct'  => 50,
-                'partial_refund_hours'=> 168, // 7 days
+                'partial_refund_hours'=> 72,  // 3 days — partial window between 72h and 168h
                 'non_refundable_pct'  => 0,
+                'is_default'          => 0,
             ],
         ];
 
@@ -124,12 +128,25 @@ class LTMS_Booking_Policy_Handler {
         $deposit             = (float) ( $booking['deposit_amount'] ?? 0 );
         $paid                = 'deposit' === $booking['payment_mode'] ? $deposit : $total;
 
-        if ( $hours_until_checkin >= (int) $policy['free_cancel_hours'] ) {
-            return $paid; // Full refund within free cancel window.
+        $free_cancel_hours   = (int) $policy['free_cancel_hours'];
+        $partial_hours       = isset( $policy['partial_refund_hours'] ) ? (int) $policy['partial_refund_hours'] : 0;
+
+        // Windows must be checked from largest to smallest:
+        // partial_refund_hours >= free_cancel_hours >= 0
+        // If partial_refund_hours > free_cancel_hours: order is partial → full refund check.
+        // i.e. cancel very early (>= partial) → partial refund; cancel closer (>= free_cancel but < partial) → full; cancel last minute → 0.
+        // The semantic: free_cancel_hours = window inside which you get FULL refund with no questions.
+        //               partial_refund_hours = wider outer window where you get PARTIAL refund.
+        // Correct order: check >= partial_refund_hours first, then >= free_cancel_hours.
+
+        if ( $partial_hours > 0 && $hours_until_checkin >= $partial_hours ) {
+            // Cancelled far in advance — partial refund window.
+            return round( $paid * (float) $policy['partial_refund_pct'] / 100, 2 );
         }
 
-        if ( isset( $policy['partial_refund_hours'] ) && $hours_until_checkin >= (int) $policy['partial_refund_hours'] ) {
-            return round( $paid * (float) $policy['partial_refund_pct'] / 100, 2 );
+        if ( $hours_until_checkin >= $free_cancel_hours ) {
+            // Within free-cancel window — full refund.
+            return $paid;
         }
 
         if ( isset( $policy['non_refundable_pct'] ) && (float) $policy['non_refundable_pct'] > 0 ) {
