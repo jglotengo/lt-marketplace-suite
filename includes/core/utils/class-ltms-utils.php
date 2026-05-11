@@ -80,6 +80,21 @@ final class LTMS_Utils {
      * @param string $country_code Código de país ('CO' o 'MX').
      * @return string Teléfono en formato E.164 (+573001234567).
      */
+    /**
+     * Sanitiza un número de teléfono eliminando todo excepto dígitos y el + inicial.
+     * Útil para pasarelas de pago que requieren formato numérico limpio.
+     *
+     * @param string $phone Número de teléfono crudo.
+     * @return string Teléfono con solo dígitos (máx 15 según E.164).
+     */
+    public static function sanitize_phone( string $phone ): string {
+        // Conservar el + inicial si existe, luego solo dígitos
+        $has_plus = str_starts_with( ltrim( $phone ), '+' );
+        $clean    = preg_replace( '/[^0-9]/', '', $phone );
+        $clean    = substr( $clean, 0, 15 ); // E.164 max
+        return $has_plus ? '+' . $clean : $clean;
+    }
+
     public static function format_phone_e164( string $phone, string $country_code = '' ): string {
         if ( empty( $country_code ) ) {
             $country_code = LTMS_Core_Config::get_country();

@@ -73,8 +73,9 @@ class LTMS_Admin_Marketing_Manager {
         $vendor_id = absint( $_POST['vendor_id'] ?? 0 );
 
         if ( class_exists( 'LTMS_Referral_Tree' ) ) {
-            $tree = LTMS_Referral_Tree::get_tree( $vendor_id );
-            wp_send_json_success( [ 'tree' => $tree ] );
+            $tree  = LTMS_Referral_Tree::get_descendant_tree( $vendor_id );
+            $stats = LTMS_Referral_Tree::get_network_stats( $vendor_id );
+            wp_send_json_success( [ 'tree' => $tree, 'stats' => $stats ] );
         }
 
         wp_send_json_success( [ 'tree' => [] ] );
