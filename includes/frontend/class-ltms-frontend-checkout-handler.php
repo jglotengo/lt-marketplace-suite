@@ -179,6 +179,22 @@ final class LTMS_Frontend_Checkout_Handler {
             ] );
         }
 
+        // ── 4b. M-105: Verificar propiedad del pedido ─────────────────────────
+        // Si el order_id fue enviado explícitamente en POST, validar que pertenece
+        // al usuario actual o a la sesión de WooCommerce activa.
+        if ( $order_id ) {
+            $current_user_id   = get_current_user_id();
+            $order_customer_id = (int) $order->get_customer_id();
+            $session_order_ids = WC()->session ? (array) WC()->session->get( 'order_awaiting_payment' ) : [];
+
+            $is_owner = ( $current_user_id && $current_user_id === $order_customer_id )
+                        || in_array( $order->get_id(), $session_order_ids, true );
+
+            if ( ! $is_owner ) {
+                wp_send_json_error( __( 'No tienes permiso para pagar este pedido.', 'ltms' ), 403 );
+            }
+        }
+
         // ── 5. Preparar datos del cliente para la pasarela ───────────────────
         $customer = [
             'name'         => trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() ),

@@ -73,6 +73,8 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
             wp_send_json_error( [ 'message' => __( 'Pedido no encontrado.', 'ltms' ) ] );
         }
 
+        $this->verify_order_ownership( $order, $order_id ); // M-105
+
         if ( $order->is_paid() ) {
             wp_send_json_error( [ 'message' => __( 'Este pedido ya fue pagado.', 'ltms' ) ] );
         }
@@ -176,6 +178,8 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
         if ( ! $order ) {
             wp_send_json_error( [ 'message' => __( 'Pedido no encontrado.', 'ltms' ) ] );
         }
+
+        $this->verify_order_ownership( $order, $order_id ); // M-105
 
         // Devolver CLABE existente si ya fue generada
         $existing_clabe = $order->get_meta( '_ltms_spei_clabe' );
@@ -295,6 +299,29 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * M-105: Verifica que el pedido pertenece al usuario o sesión actual.
+     * Llama a wp_send_json_error y exit si no es propietario.
+     *
+     * @param WC_Order $order
+     * @param int      $posted_order_id 0 si el pedido vino de la sesión (ya es seguro).
+     */
+    private function verify_order_ownership( WC_Order $order, int $posted_order_id ): void {
+        if ( ! $posted_order_id ) {
+            return; // Vino de la sesión — seguro
+        }
+        $current_user_id   = get_current_user_id();
+        $order_customer_id = (int) $order->get_customer_id();
+        $session_order_ids = WC()->session ? (array) WC()->session->get( 'order_awaiting_payment' ) : [];
+
+        $is_owner = ( $current_user_id && $current_user_id === $order_customer_id )
+                    || in_array( $order->get_id(), $session_order_ids, true );
+
+        if ( ! $is_owner ) {
+            wp_send_json_error( [ 'message' => __( 'No tienes permiso para operar este pedido.', 'ltms' ) ], 403 );
+        }
+    }
 
     private function get_order_from_session(): ?WC_Order {
         if ( ! function_exists( 'WC' ) || ! WC()->session ) {

@@ -1,6 +1,9 @@
 <?php
 class LTMS_Siigo_Webhook_Handler {
 
+    /** Valores válidos de estado que Siigo puede enviar. */
+    private const ALLOWED_STATUSES = [ 'emitted', 'accepted', 'rejected', 'cancelled', 'pending' ];
+
     public static function init(): void {}
 
     /**
@@ -8,6 +11,16 @@ class LTMS_Siigo_Webhook_Handler {
      * @return WP_REST_Response
      */
     public static function handle( WP_REST_Request $request ): WP_REST_Response {
+        // M-104: Verificar token compartido (configurable en Ajustes → APIs → Siigo)
+        $expected = LTMS_Core_Config::get( 'ltms_siigo_webhook_token', '' );
+        $received = $request->get_header( 'x-siigo-token' ) ?: (string) $request->get_param( 'token' );
+        if ( $expected && ! hash_equals( $expected, $received ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'SIIGO_WEBHOOK_AUTH', 'Token inválido o ausente en webhook Siigo' );
+            }
+            return new WP_REST_Response( [ 'error' => 'Invalid token' ], 401 );
+        }
+
         $body = $request->get_json_params();
 
         $invoice_id = sanitize_text_field( $body['invoiceId'] ?? '' );
@@ -15,6 +28,11 @@ class LTMS_Siigo_Webhook_Handler {
 
         if ( ! $invoice_id || ! $status ) {
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
+        }
+
+        // Validar status contra lista blanca
+        if ( ! in_array( $status, self::ALLOWED_STATUSES, true ) ) {
+            return new WP_REST_Response( [ 'error' => 'Invalid status' ], 422 );
         }
 
         // Buscar el pedido asociado

@@ -8,6 +8,25 @@ class LTMS_Openpay_Webhook_Handler {
      * @return WP_REST_Response
      */
     public static function handle( WP_REST_Request $request ): WP_REST_Response {
+        // M-104: Verificar firma HMAC-SHA256 del payload con la clave privada de Openpay
+        // Openpay envía el header X-Openpay-Signature: sha256=<hmac>
+        $country     = LTMS_Core_Config::get_country();
+        $enc_key     = LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
+        $private_key = $enc_key ? LTMS_Core_Security::decrypt( $enc_key ) : '';
+
+        if ( $private_key ) {
+            $raw_body      = $request->get_body();
+            $expected_hmac = 'sha256=' . hash_hmac( 'sha256', $raw_body, $private_key );
+            $received_hmac = $request->get_header( 'x-openpay-signature' ) ?: '';
+
+            if ( ! hash_equals( $expected_hmac, $received_hmac ) ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning( 'OPENPAY_WEBHOOK_AUTH', 'Firma HMAC inválida en webhook Openpay' );
+                }
+                return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
+            }
+        }
+
         $body = $request->get_json_params();
 
         $event_type = sanitize_key( $body['type'] ?? '' );
