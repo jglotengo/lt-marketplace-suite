@@ -180,9 +180,8 @@ final class LTMS_Payout_Scheduler {
             LTMS_Business_Wallet::debit(
                 (int) $payout['vendor_id'],
                 (float) $payout['amount'],
-                'payout',
                 sprintf( __( 'Retiro procesado #%d', 'ltms' ), $payout_id ),
-                [ 'payout_id' => $payout_id ]
+                [ 'payout_id' => $payout_id, 'type' => 'payout' ]
             );
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery

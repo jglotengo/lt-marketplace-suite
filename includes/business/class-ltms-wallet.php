@@ -28,8 +28,11 @@ final class LTMS_Business_Wallet {
      * @return void
      */
     public static function init(): void {
-        // Manejar liberación automática de fondos retenidos
-        add_action( 'ltms_process_payouts', [ __CLASS__, 'process_automatic_releases' ] );
+        // M-98: process_automatic_releases deshabilitado — Consumer_Protection::release_eligible_holds()
+        // gestiona la liberación individual de holds via ltms_daily_cron (lt_wallet_holds como fuente
+        // de verdad). La query de process_automatic_releases usaba lt_wallet_transactions con un
+        // subquery incorrecto que podría causar doble liberación o exclusión incorrecta de vendors.
+        // add_action( 'ltms_process_payouts', [ __CLASS__, 'process_automatic_releases' ] );
     }
 
     /**

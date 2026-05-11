@@ -68,7 +68,7 @@ final class LTMS_Business_Order_Split {
         $vendor_gross   = $gross_amount - $platform_fee;
 
         // Calcular retenciones a descontar del pago al vendedor
-        $withholding_total = $tax_breakdown['withholding_total'] ?? 0.0;
+        $withholding_total = $tax_breakdown['total_withholding'] ?? $tax_breakdown['withholding_total'] ?? 0.0;
         $vendor_net        = max( 0.0, $vendor_gross - $withholding_total );
 
         // Retener comisión durante el período de protección al consumidor (Ley 1480 Colombia)
@@ -141,7 +141,8 @@ final class LTMS_Business_Order_Split {
             'order_id'     => $order->get_id(),
             'product_type' => $order->get_meta( '_ltms_product_type' ) ?: 'physical',
             'buyer_type'   => $order->get_meta( '_ltms_buyer_type' ) ?: 'person',
-            'buyer_regime' => $order->get_meta( '_ltms_buyer_regime' ) ?: 'persona_natural',
+            'buyer_regime'              => $order->get_meta( '_ltms_buyer_regime' ) ?: 'persona_natural',
+            'buyer_is_gran_contribuyente' => (bool) $order->get_meta( '_ltms_buyer_is_gran_contribuyente' ),
             'municipality' => $order->get_billing_city(),
             'items'        => self::get_order_items_summary( $order ),
         ];
@@ -197,8 +198,8 @@ final class LTMS_Business_Order_Split {
                 'gross_amount'      => $gross_amount,
                 'commission_amount' => $platform_fee,               // comisión de la plataforma
                 'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
-                'tax_withholding'   => $tax_breakdown['withholding_total'] ?? 0.0,
-                'iva_amount'        => $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
+                'tax_withholding'   => $tax_breakdown['total_withholding'] ?? $tax_breakdown['withholding_total'] ?? 0.0,
+                'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
                 'currency'          => $order->get_currency(),
                 'country_code'      => LTMS_Core_Config::get_country(),
                 'status'            => 'paid',
@@ -279,7 +280,7 @@ final class LTMS_Business_Order_Split {
 
         return [
             'vendor_id'               => $vendor_id,
-            'tax_regime'              => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'responsable_iva', // M-81: era 'regime', tax-strategy espera 'tax_regime'
+            'tax_regime'              => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'simplified', // M-81: era 'regime', tax-strategy espera 'tax_regime'
             'nit'                     => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
             'is_gran_contribuyente'   => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),   // M-83: era 'is_gran_contrib'
             'ciiu_code'               => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',

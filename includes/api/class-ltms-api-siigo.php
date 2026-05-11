@@ -257,6 +257,19 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             ];
         }
 
+        // M-97: agregar retenciones colombianas como descuentos en observaciones
+        // Siigo no tiene campo nativo de retenciones en v1 — se documentan en observaciones
+        $retention_notes = '';
+        if ( ! empty( $tax_data['retefuente'] ) && $tax_data['retefuente'] > 0 ) {
+            $retention_notes .= sprintf( ' | ReteFuente: $%s', number_format( $tax_data['retefuente'], 2 ) );
+        }
+        if ( ! empty( $tax_data['reteica'] ) && $tax_data['reteica'] > 0 ) {
+            $retention_notes .= sprintf( ' | ReteICA: $%s', number_format( $tax_data['reteica'], 2 ) );
+        }
+        if ( ! empty( $tax_data['reteiva'] ) && $tax_data['reteiva'] > 0 ) {
+            $retention_notes .= sprintf( ' | ReteIVA: $%s', number_format( $tax_data['reteiva'], 2 ) );
+        }
+
         return [
             'document'  => [ 'id' => (int) LTMS_Core_Config::get( 'ltms_siigo_invoice_document_id', 1 ) ],
             'date'      => gmdate( 'Y-m-d' ),
@@ -272,7 +285,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
                     'due_date' => gmdate( 'Y-m-d' ),
                 ],
             ],
-            'observations' => sprintf( 'Pedido WooCommerce #%s - LTMS', $order->get_order_number() ),
+            'observations' => sprintf( 'Pedido WooCommerce #%s - LTMS%s', $order->get_order_number(), $retention_notes ),
         ];
     }
 

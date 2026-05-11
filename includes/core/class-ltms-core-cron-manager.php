@@ -517,7 +517,17 @@ class LTMS_Core_Cron_Manager {
                 'phone'      => $order->get_billing_phone(),
             ] );
 
-            $invoice_data = $siigo->build_invoice_payload( $order, $customer, [] );
+            // M-96: pasar el tax_breakdown guardado en metadata de la comisión
+            $tax_data = [];
+            global $wpdb;
+            $commission_meta = $wpdb->get_var( $wpdb->prepare(
+                "SELECT metadata FROM {$wpdb->prefix}lt_commissions WHERE order_id = %d LIMIT 1",
+                $order_id
+            ) );
+            if ( $commission_meta ) {
+                $tax_data = json_decode( $commission_meta, true ) ?: [];
+            }
+            $invoice_data = $siigo->build_invoice_payload( $order, $customer, $tax_data );
             $result       = $siigo->create_invoice( $invoice_data );
 
             if ( ! empty( $result['id'] ) ) {
