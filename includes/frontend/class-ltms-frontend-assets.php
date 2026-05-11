@@ -75,8 +75,18 @@ final class LTMS_Frontend_Assets {
             );
         }
 
-        // Dashboard del vendedor (SPA)
-        if ( $page_id === (int) ( $pages['ltms-dashboard'] ?? 0 ) ) {
+        // Dashboard del vendedor (SPA) + páginas de panel independientes
+        // ltms_vendor_orders, ltms_vendor_wallet, ltms_vendor_kyc, ltms_vendor_insurance, ltms_vendor_store
+        // necesitan los mismos assets que el SPA para hacer sus llamadas AJAX.
+        $vendor_panel_pages = [ 'ltms-dashboard', 'ltms-orders', 'ltms-wallet', 'ltms-kyc', 'ltms-insurance' ];
+        $is_vendor_panel    = false;
+        foreach ( $vendor_panel_pages as $key ) {
+            if ( $page_id === (int) ( $pages[ $key ] ?? 0 ) ) {
+                $is_vendor_panel = true;
+                break;
+            }
+        }
+        if ( $is_vendor_panel ) {
             $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
 
