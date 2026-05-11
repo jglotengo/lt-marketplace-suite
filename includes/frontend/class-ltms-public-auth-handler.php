@@ -213,23 +213,8 @@ final class LTMS_Public_Auth_Handler {
         // Crear billetera inicial
         LTMS_Business_Wallet::get_or_create( $user_id );
 
-        // Registrar en TPTC si está habilitado
-        if ( LTMS_Core_Config::get( 'ltms_tptc_enabled', 'no' ) === 'yes' && class_exists( 'LTMS_Api_Factory' ) ) {
-            try {
-                $tptc = LTMS_Api_Factory::get( 'tptc' );
-                $tptc->register_affiliate([
-                    'vendor_id'   => $user_id,
-                    'first_name'  => $data['first_name'],
-                    'last_name'   => $data['last_name'],
-                    'email'       => $data['email'],
-                    'phone'       => $data['phone'],
-                    'document'    => $data['document'],
-                    'sponsor_code' => $data['referral_code'],
-                ]);
-            } catch ( \Throwable $e ) {
-                LTMS_Core_Logger::warning( 'TPTC_REGISTER_FAILED', $e->getMessage() );
-            }
-        }
+        // M-103: TPTC se registra en Affiliates::on_vendor_registered() con los datos completos del perfil.
+        // No registrar aquí para evitar duplicado y race condition con ltms_referral_code.
 
         // M-41: disparar acción para que Affiliates y otros listeners procesen el nuevo vendedor.
         // Se dispara luego de que meta_data y red de referidos ya están registrados.

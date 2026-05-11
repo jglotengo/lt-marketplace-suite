@@ -65,12 +65,28 @@ class LTMS_Affiliates {
             LTMS_Referral_Tree::register_node( $vendor_id, '' );
         }
 
-        // Sincronizar con TPTC
-        try {
-            $tptc = LTMS_Api_Factory::get( 'tptc' );
-            $tptc->register_affiliate( $vendor_id, $code, $referral_code );
-        } catch ( \Exception $e ) {
-            $this->log_warning( 'tptc_sync_failed', 'TPTC affiliate sync failed: ' . $e->getMessage(), [ 'vendor_id' => $vendor_id ] );
+        // Sincronizar con TPTC si está habilitado (fuente única de verdad para registro de afiliados)
+        if ( LTMS_Core_Config::get( 'ltms_tptc_enabled', 'no' ) === 'yes' && LTMS_Api_Factory::has( 'tptc' ) ) {
+            try {
+                $vendor  = get_userdata( $vendor_id );
+                $tptc    = LTMS_Api_Factory::get( 'tptc' );
+                $result  = $tptc->register_affiliate([
+                    'vendor_id'    => $vendor_id,
+                    'first_name'   => $vendor ? $vendor->first_name : '',
+                    'last_name'    => $vendor ? $vendor->last_name  : '',
+                    'email'        => $vendor ? $vendor->user_email : '',
+                    'phone'        => get_user_meta( $vendor_id, 'ltms_phone', true ) ?: '',
+                    'document'     => '', // cifrado, no se envía
+                    'document_type' => get_user_meta( $vendor_id, 'ltms_document_type', true ) ?: 'CC',
+                    'sponsor_code'  => $referral_code,
+                ]);
+                // Si TPTC devuelve su propio código de referido, usarlo como canónico
+                if ( ! empty( $result['referral_code'] ) ) {
+                    update_user_meta( $vendor_id, 'ltms_referral_code', sanitize_text_field( $result['referral_code'] ) );
+                }
+            } catch ( \Exception $e ) {
+                $this->log_warning( 'tptc_sync_failed', 'TPTC affiliate sync failed: ' . $e->getMessage(), [ 'vendor_id' => $vendor_id ] );
+            }
         }
     }
 

@@ -116,6 +116,18 @@ final class LTMS_Api_Factory {
     }
 
     /**
+     * Verifica si un proveedor está registrado en el factory.
+     * Uso seguro antes de llamar get() cuando la disponibilidad del proveedor es opcional.
+     *
+     * @param string $provider Identificador del proveedor (ej. 'stripe', 'siigo').
+     * @return bool
+     */
+    public static function has( string $provider ): bool {
+        $provider = strtolower( trim( $provider ) );
+        return isset( self::$client_map[ $provider ] ) && class_exists( self::$client_map[ $provider ] );
+    }
+
+    /**
      * Prevenir instanciación.
      */
     private function __construct() {}
