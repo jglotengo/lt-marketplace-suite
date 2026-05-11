@@ -391,7 +391,7 @@ final class LTMS_Business_Wallet {
 
             LTMS_Core_Logger::info(
                 'WALLET_TRANSACTION',
-                sprintf( '[%s] Billetera vendedor #%d: %s %s Ã¢â€ â€™ Saldo: %s',
+                sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
                     strtoupper( $type ),
                     $vendor_id,
                     LTMS_Utils::format_money( $amount, $wallet['currency'] ),
@@ -534,8 +534,8 @@ final class LTMS_Business_Wallet {
         }
     }
 
-    // â”€â”€ MÃ©todos de instancia requeridos por WalletTest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Estos mÃ©todos encapsulan la lÃ³gica matemÃ¡tica pura del ledger.
+    // â”€â”€ Métodos de instancia requeridos por WalletTest â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Estos métodos encapsulan la lógica matemática pura del ledger.
     // No tocan la BD — son calculos puros, testeables sin WordPress.
 
     /**
@@ -550,21 +550,21 @@ final class LTMS_Business_Wallet {
     }
 
     /**
-     * Valida si un dÃ©bito es posible dado el balance disponible actual.
+     * Valida si un débito es posible dado el balance disponible actual.
      *
      * @param float $amount    Monto a debitar.
      * @param float $available Balance disponible.
-     * @return bool True si el dÃ©bito es vÃ¡lido (amount <= available).
+     * @return bool True si el débito es válido (amount <= available).
      */
     public function validate_debit( float $amount, float $available ): bool {
         return $amount > 0 && $amount <= $available;
     }
 
     /**
-     * Valida si un monto de transacciÃ³n es positivo y mayor a cero.
+     * Valida si un monto de transacción es positivo y mayor a cero.
      *
      * @param float $amount Monto a validar.
-     * @return bool True si el monto es vÃ¡lido (> 0).
+     * @return bool True si el monto es válido (> 0).
      */
     public function validate_amount( float $amount ): bool {
         return $amount > 0;
@@ -575,16 +575,16 @@ final class LTMS_Business_Wallet {
      *
      * @param float $hold_amount Monto a retener.
      * @param float $available   Balance disponible.
-     * @return bool True si el hold es vÃ¡lido (hold_amount <= available).
+     * @return bool True si el hold es válido (hold_amount <= available).
      */
     public function validate_hold( float $hold_amount, float $available ): bool {
         return $hold_amount > 0 && $hold_amount <= $available;
     }
 
     /**
-     * Verifica si un tipo de transacciÃ³n es vÃ¡lido para el sistema.
+     * Verifica si un tipo de transacción es válido para el sistema.
      *
-     * @param string $type Tipo de transacciÃ³n a verificar.
+     * @param string $type Tipo de transacción a verificar.
      * @return bool True si el tipo es reconocido por el sistema.
      */
     public function is_valid_transaction_type( string $type ): bool {
