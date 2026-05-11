@@ -72,8 +72,8 @@
 										<?php esc_html_e( 'N/D', 'ltms' ); ?>
 									<?php endif; ?>
 								</td>
-								<td><?php echo $policy_num; ?></td>
-								<td><?php echo $policy_type; ?></td>
+								<td><?php echo esc_html( $policy_num ); ?></td>
+								<td><?php echo esc_html( $policy_type ); ?></td>
 								<td><?php echo esc_html( $prima ); ?></td>
 								<td>
 									<span style="
@@ -101,7 +101,7 @@
 										<?php esc_html_e( 'N/D', 'ltms' ); ?>
 									<?php endif; ?>
 								</td>
-								<td><?php echo $created_at; ?></td>
+								<td><?php echo esc_html( $created_at ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>

@@ -63,14 +63,14 @@
 								<tr>
 									<td>
 										<?php if ( $product_url ) : ?>
-											<a href="<?php echo $product_url; ?>" target="_blank" rel="noopener noreferrer">
-												<?php echo $product_title; ?>
+											<a href="<?php echo esc_url( $product_url ); ?>" target="_blank" rel="noopener noreferrer">
+												<?php echo esc_html( $product_title ); ?>
 											</a>
 										<?php else : ?>
-											<?php echo $product_title; ?>
+											<?php echo esc_html( $product_title ); ?>
 										<?php endif; ?>
 									</td>
-									<td><?php echo $origin_name; ?></td>
+									<td><?php echo esc_html( $origin_name ); ?></td>
 									<td><?php echo esc_html( $redi_rate ); ?>%</td>
 									<td><?php echo esc_html( $total_commis ); ?></td>
 									<td>
@@ -146,7 +146,7 @@
 											<?php echo esc_html( $status_lbl ); ?>
 										</span>
 									</td>
-									<td><?php echo $created_at; ?></td>
+									<td><?php echo esc_html( $created_at ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 						</tbody>
