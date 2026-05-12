@@ -206,7 +206,7 @@ function ltms_render_generic_settings_section( string $tab ): void {
             [ 'key' => 'ltms_alegra_invoice_on_processing',  'label' => __( 'Crear factura en "En proceso"', 'ltms' ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Por defecto, la factura se crea cuando el pedido llega a "Completado".', 'ltms' ) ],
             [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( 'Enviar factura por email', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Alegra envía automáticamente la factura al email del comprador.', 'ltms' ) ],
             [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( 'Webhook Secret (token)', 'ltms' ),              'type' => 'text',     'desc' => __( 'Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => home_url( '/wp-json/ltms/v1/webhooks/alegra' ), 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => home_url( '/wp-json/ltms/v1/webhooks/alegra' ), 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
         ],
     ];
 

@@ -88,6 +88,7 @@ final class LTMS_Admin_Settings {
                 'ltms_aveonline_api_key', 'ltms_zapsign_api_token', 'ltms_tptc_api_key',
                 'ltms_xcover_api_key', 'ltms_backblaze_app_key',
                 'ltms_uber_direct_client_secret', 'ltms_heka_api_key',
+                'ltms_alegra_token', // v2.1.0
             ];
 
             if ( in_array( $key, $encrypted_fields, true ) && ! empty( $value ) ) {
@@ -176,7 +177,7 @@ final class LTMS_Admin_Settings {
         }
 
         $provider = sanitize_key( $_POST['provider'] ?? '' ); // phpcs:ignore
-        $allowed  = [ 'siigo', 'openpay', 'addi', 'aveonline', 'zapsign', 'tptc', 'xcover', 'backblaze', 'uber', 'heka' ];
+        $allowed  = [ 'siigo', 'openpay', 'addi', 'aveonline', 'zapsign', 'tptc', 'xcover', 'backblaze', 'uber', 'heka', 'alegra' ];
 
         if ( ! in_array( $provider, $allowed, true ) ) {
             wp_send_json_error( __( 'Proveedor no válido.', 'ltms' ) );
