@@ -134,10 +134,6 @@ final class LTMS_Api_Factory {
      * @param string $provider Identificador del proveedor (ej. 'stripe', 'siigo').
      * @return bool
      */
-    public static function has( string $provider ): bool {
-        $provider = strtolower( trim( $provider ) );
-        return isset( self::$client_map[ $provider ] ) && class_exists( self::$client_map[ $provider ] );
-    }
 
     /**
      * Prevenir instanciación.
