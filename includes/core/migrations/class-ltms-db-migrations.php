@@ -551,24 +551,6 @@ final class LTMS_DB_Migrations {
             KEY `idx_provider_created` (`provider`, `created_at`)
         ) {$charset}";
 
-        // lt_vendor_drivers — Domiciliarios propios del vendedor
-        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vendor_drivers` (
-            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `vendor_id`        BIGINT UNSIGNED NOT NULL,
-            `name`             VARCHAR(100) NOT NULL,
-            `phone`            VARCHAR(20)  NOT NULL,
-            `document_number`  VARCHAR(500) DEFAULT NULL COMMENT 'Cifrado AES-256',
-            `vehicle_type`     ENUM('moto','bici','carro','pie') NOT NULL DEFAULT 'moto',
-            `vehicle_plate`    VARCHAR(500) DEFAULT NULL COMMENT 'Cifrado AES-256',
-            `is_active`        TINYINT(1)   NOT NULL DEFAULT 1,
-            `is_available`     TINYINT(1)   NOT NULL DEFAULT 1,
-            `current_order_id` BIGINT UNSIGNED DEFAULT NULL,
-            `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY `idx_vendor_active` (`vendor_id`, `is_active`, `is_available`)
-        ) {$charset}";
-
         // lt_commission_tiers — Tiers de volumen configurables desde admin
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_commission_tiers` (
             `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1086,21 +1068,6 @@ final class LTMS_DB_Migrations {
             PRIMARY KEY (`id`),
             KEY `idx_vendor` (`vendor_id`),
             KEY `idx_wp_user` (`wp_user_id`)
-        ) {$charset}";
-
-        // lt_wallet_holds — Retenciones temporales de saldo (para disputas/reembolsos pendientes)
-        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
-            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `vendor_id`   BIGINT UNSIGNED NOT NULL,
-            `amount`      DECIMAL(15,2) NOT NULL,
-            `currency`    VARCHAR(3) NOT NULL DEFAULT 'COP',
-            `reason`      VARCHAR(255) NOT NULL,
-            `reference`   VARCHAR(120) DEFAULT NULL,
-            `expires_at`  DATETIME DEFAULT NULL,
-            `released_at` DATETIME DEFAULT NULL,
-            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY `idx_vendor_active` (`vendor_id`, `released_at`, `expires_at`)
         ) {$charset}";
 
     }
