@@ -131,8 +131,10 @@ class LTMS_Shipping_Method_Own_Delivery extends WC_Shipping_Method {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
+				// M-51: lt_vendor_drivers has no is_active/is_available columns — use status ENUM.
+				// Availability (transient) is ephemeral and not queryable via SQL — count active drivers as proxy.
 				"SELECT COUNT(*) FROM `{$wpdb->prefix}lt_vendor_drivers`
-				 WHERE vendor_id = %d AND is_active = 1 AND is_available = 1",
+				 WHERE vendor_id = %d AND status = 'active'",
 				$vendor_id
 			)
 		);
