@@ -103,9 +103,21 @@ final class LTMS_Frontend_Assets {
             $this->enqueue_stripe_assets( $url, $ver, $suffix );
         }
 
-        // Login y Registro de vendedores
-        if ( $page_id === (int) ( $pages['ltms-login'] ?? 0 ) ||
-             $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 ) ) {
+        // Login y Registro de vendedores — detección por ID o por shortcode (M-121 fallback)
+        $is_auth_page = (
+            $page_id === (int) ( $pages['ltms-login'] ?? 0 ) ||
+            $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 )
+        );
+        if ( ! $is_auth_page && $page_id > 0 ) {
+            $post = get_post( $page_id );
+            if ( $post && (
+                has_shortcode( $post->post_content, 'ltms_vendor_login' ) ||
+                has_shortcode( $post->post_content, 'ltms_vendor_register' )
+            ) ) {
+                $is_auth_page = true;
+            }
+        }
+        if ( $is_auth_page ) {
             $this->enqueue_auth_assets( $url, $ver, $suffix );
         }
     }
@@ -449,7 +461,34 @@ final class LTMS_Frontend_Assets {
      * @return bool
      */
     private function is_ltms_page( int $page_id, array $pages ): bool {
-        return in_array( $page_id, array_map( 'intval', $pages ), true );
+        // Detección primaria: por ID de página registrada en ltms_installed_pages.
+        if ( in_array( $page_id, array_map( 'intval', $pages ), true ) ) {
+            return true;
+        }
+
+        // M-121 FIX: Fallback por shortcode — si la página actual contiene cualquier
+        // shortcode LTMS, cargamos los assets aunque el page_id no coincida con
+        // ltms_installed_pages (puede pasar si se reinstalaron páginas con nuevos IDs).
+        if ( $page_id > 0 ) {
+            $post = get_post( $page_id );
+            if ( $post && has_shortcode( $post->post_content, 'ltms_vendor_login' ) ) {
+                return true;
+            }
+            if ( $post ) {
+                $ltms_shortcodes = [
+                    'ltms_vendor_dashboard', 'ltms_vendor_login', 'ltms_vendor_register',
+                    'ltms_vendor_store', 'ltms_vendor_orders', 'ltms_vendor_wallet',
+                    'ltms_vendor_kyc', 'ltms_vendor_insurance', 'ltms_vendor_redi',
+                ];
+                foreach ( $ltms_shortcodes as $sc ) {
+                    if ( has_shortcode( $post->post_content, $sc ) ) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
