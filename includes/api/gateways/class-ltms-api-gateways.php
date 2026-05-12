@@ -41,6 +41,149 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
         $this->enabled     = $this->get_option( 'enabled', 'yes' );
 
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
+        add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_checkout_scripts' ] );
+    }
+
+    /**
+     * Saves WC gateway settings AND syncs credentials to LTMS config options
+     * so that LTMS_Api_Openpay (which reads from LTMS_Core_Config) finds them.
+     *
+     * @return void
+     */
+    public function process_admin_options(): void {
+        parent::process_admin_options();
+
+        $country = LTMS_Core_Config::get_country();
+        update_option( "ltms_openpay_{$country}_merchant_id", $this->get_option( 'merchant_id', '' ) );
+        update_option( "ltms_openpay_{$country}_private_key",  $this->get_option( 'private_key', '' ) );
+        update_option( 'ltms_openpay_merchant_id', $this->get_option( 'merchant_id', '' ) );
+        update_option( 'ltms_openpay_private_key',  $this->get_option( 'private_key', '' ) );
+        update_option( 'ltms_openpay_public_key',   $this->get_option( 'public_key', '' ) );
+    }
+
+    /**
+     * Encola Openpay.js y el script de tokenización en el checkout.
+     *
+     * @return void
+     */
+    public function enqueue_checkout_scripts(): void {
+        if ( ! is_checkout() || $this->enabled !== 'yes' ) {
+            return;
+        }
+
+        $country = LTMS_Core_Config::get_country();
+        $sdk_url = $country === 'MX' ? 'https://js.openpay.mx/' : 'https://js.openpay.co/';
+
+        if ( ! wp_script_is( 'openpay-js', 'enqueued' ) ) {
+            wp_enqueue_script( 'openpay-js',   $sdk_url . 'openpay.v1.min.js',      [], '1.0', true );
+            wp_enqueue_script( 'openpay-data', $sdk_url . 'openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
+        }
+
+        wp_enqueue_script(
+            'ltms-openpay-gateway',
+            LTMS_ASSETS_URL . 'js/ltms-openpay-gateway.js',
+            [ 'jquery', 'openpay-data' ],
+            LTMS_VERSION,
+            true
+        );
+
+        wp_localize_script( 'ltms-openpay-gateway', 'ltmsOpenpay', [
+            'merchant_id' => $this->get_option( 'merchant_id', '' ),
+            'public_key'  => $this->get_option( 'public_key', '' ),
+            'is_sandbox'  => $this->get_option( 'testmode', 'yes' ) === 'yes',
+            'i18n'        => [
+                'fill_all_fields'    => __( 'Por favor completa todos los datos de la tarjeta.', 'ltms' ),
+                'card_error'         => __( 'Error al procesar la tarjeta. Verifica los datos.', 'ltms' ),
+                'sdk_unavailable'    => __( 'El módulo de pago no está disponible. Recarga la página.', 'ltms' ),
+                'invalid_card'       => __( 'Número de tarjeta inválido.', 'ltms' ),
+                'card_declined'      => __( 'La tarjeta fue rechazada.', 'ltms' ),
+                'card_expired'       => __( 'La tarjeta ha vencido.', 'ltms' ),
+                'insufficient_funds' => __( 'Fondos insuficientes.', 'ltms' ),
+                'card_blocked'       => __( 'Tarjeta bloqueada por sospecha de fraude.', 'ltms' ),
+            ],
+        ] );
+    }
+
+    /**
+     * Renderiza el formulario de tarjeta de crédito en el checkout de WooCommerce.
+     *
+     * @return void
+     */
+    public function payment_fields(): void {
+        if ( $this->description ) {
+            echo '<p>' . wp_kses_post( $this->description ) . '</p>';
+        }
+        ?>
+        <fieldset id="ltms-openpay-fields" style="border:0;padding:0;margin:0;">
+            <p class="form-row form-row-wide">
+                <label for="ltms-card-number"><?php esc_html_e( 'Número de tarjeta', 'ltms' ); ?> <span class="required">*</span></label>
+                <input
+                    id="ltms-card-number"
+                    type="text"
+                    class="input-text"
+                    maxlength="19"
+                    placeholder="1234 5678 9012 3456"
+                    autocomplete="cc-number"
+                    inputmode="numeric"
+                />
+            </p>
+            <p class="form-row form-row-wide">
+                <label for="ltms-card-name"><?php esc_html_e( 'Nombre del titular', 'ltms' ); ?> <span class="required">*</span></label>
+                <input
+                    id="ltms-card-name"
+                    type="text"
+                    class="input-text"
+                    placeholder="<?php esc_attr_e( 'Como aparece en la tarjeta', 'ltms' ); ?>"
+                    autocomplete="cc-name"
+                />
+            </p>
+            <p class="form-row form-row-first">
+                <label for="ltms-card-expiry"><?php esc_html_e( 'Vencimiento (MM/AA)', 'ltms' ); ?> <span class="required">*</span></label>
+                <input
+                    id="ltms-card-expiry"
+                    type="text"
+                    class="input-text"
+                    maxlength="5"
+                    placeholder="MM/AA"
+                    autocomplete="cc-exp"
+                    inputmode="numeric"
+                />
+            </p>
+            <p class="form-row form-row-last">
+                <label for="ltms-card-cvv"><?php esc_html_e( 'CVV', 'ltms' ); ?> <span class="required">*</span></label>
+                <input
+                    id="ltms-card-cvv"
+                    type="password"
+                    class="input-text"
+                    maxlength="4"
+                    placeholder="•••"
+                    autocomplete="cc-csc"
+                    inputmode="numeric"
+                />
+            </p>
+            <div id="ltms-openpay-card-errors" role="alert" style="display:none;color:#dc3232;padding:8px;margin-top:4px;font-size:13px;background:#fbeaea;border-radius:3px;"></div>
+            <input type="hidden" name="openpay_token" id="ltms_openpay_token" value="" />
+            <input type="hidden" name="openpay_device_session_id" id="ltms_openpay_device" value="" />
+        </fieldset>
+        <?php
+    }
+
+    /**
+     * Valida que el token de Openpay fue generado antes de continuar.
+     *
+     * @return bool
+     */
+    public function validate_fields(): bool {
+        $token = isset( $_POST['openpay_token'] )
+            ? sanitize_text_field( wp_unslash( $_POST['openpay_token'] ) )
+            : '';
+
+        if ( empty( $token ) ) {
+            wc_add_notice( __( 'Por favor completa los datos de tu tarjeta para continuar.', 'ltms' ), 'error' );
+            return false;
+        }
+
+        return true;
     }
 
     public function init_form_fields(): void {
@@ -103,9 +246,20 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
                 throw new \RuntimeException( __( 'Módulo Openpay no disponible.', 'ltms' ) );
             }
 
+            // Sync gateway credentials to LTMS_Core_Config options so LTMS_Api_Openpay finds them.
+            // The factory caches instances, so reset it to force fresh instantiation with new creds.
+            $country = LTMS_Core_Config::get_country();
+            update_option( "ltms_openpay_{$country}_merchant_id", $this->get_option( 'merchant_id', '' ) );
+            update_option( "ltms_openpay_{$country}_private_key",  $this->get_option( 'private_key', '' ) );
+            update_option( 'ltms_openpay_merchant_id', $this->get_option( 'merchant_id', '' ) );
+            update_option( 'ltms_openpay_private_key',  $this->get_option( 'private_key', '' ) );
+            LTMS_Api_Factory::reset( 'openpay' );
+
             $client  = LTMS_Api_Factory::get( 'openpay' );
-            $token   = sanitize_text_field( $_POST['openpay_token'] ?? '' ); // phpcs:ignore
-            $device  = sanitize_text_field( $_POST['openpay_device_session_id'] ?? '' ); // phpcs:ignore
+            // phpcs:ignore WordPress.Security.NonceVerification
+            $token   = sanitize_text_field( wp_unslash( $_POST['openpay_token'] ?? '' ) );
+            // phpcs:ignore WordPress.Security.NonceVerification
+            $device  = sanitize_text_field( wp_unslash( $_POST['openpay_device_session_id'] ?? '' ) );
 
             $result = $client->charge( [
                 'order_id'         => $order_id,

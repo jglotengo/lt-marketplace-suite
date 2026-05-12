@@ -237,9 +237,12 @@ final class LTMS_Frontend_Assets {
      * @return void
      */
     private function enqueue_stripe_assets( string $url, string $ver, string $suffix = '' ): void {
-        $pub_key = LTMS_Core_Config::get( 'ltms_stripe_test_mode' )
-            ? LTMS_Core_Config::get( 'ltms_stripe_test_publishable_key' )
-            : LTMS_Core_Config::get( 'ltms_stripe_live_publishable_key' );
+        // Stripe gateway stores settings in WooCommerce's option, not in standalone WP options.
+        $stripe_settings = get_option( 'woocommerce_ltms_stripe_settings', [] );
+        $is_testmode     = ( $stripe_settings['testmode'] ?? 'yes' ) === 'yes';
+        $pub_key         = $is_testmode
+            ? ( $stripe_settings['publishable_key'] ?? '' )
+            : ( $stripe_settings['publishable_key_live'] ?? '' );
 
         if ( empty( $pub_key ) ) {
             return;
