@@ -67,17 +67,23 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
                 : 'https://sandbox-api.openpay.co/v1';
         }
 
-        $encrypted_merchant = LTMS_Core_Config::get( "ltms_openpay_{$this->country}_merchant_id" );
-        $encrypted_key      = LTMS_Core_Config::get( "ltms_openpay_{$this->country}_private_key" );
+        // Buscar primero por clave con país (ltms_openpay_CO_*), luego genérica (ltms_openpay_*)
+        $merchant_raw = LTMS_Core_Config::get( "ltms_openpay_{$this->country}_merchant_id" )
+                     ?: LTMS_Core_Config::get( 'ltms_openpay_merchant_id' );
+        $private_raw  = LTMS_Core_Config::get( "ltms_openpay_{$this->country}_private_key" )
+                     ?: LTMS_Core_Config::get( 'ltms_openpay_private_key' );
 
-        if ( empty( $encrypted_merchant ) || empty( $encrypted_key ) ) {
+        if ( empty( $merchant_raw ) || empty( $private_raw ) ) {
             throw new \RuntimeException(
                 sprintf( 'LTMS Openpay: Credenciales no configuradas para país %s.', $this->country )
             );
         }
 
-        $this->merchant_id = LTMS_Core_Security::decrypt( $encrypted_merchant );
-        $this->private_key = LTMS_Core_Security::decrypt( $encrypted_key );
+        // merchant_id no se cifra; private_key solo se descifra si tiene formato 'v1:...'
+        $this->merchant_id = (string) $merchant_raw;
+        $this->private_key = str_starts_with( (string) $private_raw, 'v1:' )
+            ? LTMS_Core_Security::decrypt( $private_raw )
+            : (string) $private_raw;
     }
 
     /**
