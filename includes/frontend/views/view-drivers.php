@@ -147,16 +147,9 @@ $delivery_message = (string) get_user_meta( $vendor_id, 'ltms_own_delivery_messa
 				</td>
 				<td>
 					<?php
-					if ( $driver['current_order_id'] ) {
-						$_order = wc_get_order( (int) $driver['current_order_id'] );
-						if ( $_order ) {
-							echo '<a href="' . esc_url( $_order->get_view_order_url() ) . '">#' . esc_html( $driver['current_order_id'] ) . '</a>';
-						} else {
-							echo '#' . esc_html( $driver['current_order_id'] );
-						}
-					} else {
-						echo '—';
-					}
+					// current_order_id no existe en lt_vendor_drivers; disponibilidad
+					// se gestiona via transient (ltms_driver_available_{id}).
+					echo '—';
 					?>
 				</td>
 				<td class="ltms-driver-actions">
