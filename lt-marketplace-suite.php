@@ -537,6 +537,17 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
                 . ' in ' . $e->getFile() . ':' . $e->getLine() );
         }
     }
+
+    // Aliases de compatibilidad — usados en smoke-tests, docs y código de terceros.
+    // LTMS_Firewall y LTMS_Encryption apuntan a LTMS_Core_Security (la clase real).
+    if ( class_exists( 'LTMS_Core_Security' ) ) {
+        if ( ! class_exists( 'LTMS_Encryption', false ) ) {
+            class_alias( 'LTMS_Core_Security', 'LTMS_Encryption' );
+        }
+        if ( ! class_exists( 'LTMS_Firewall', false ) ) {
+            class_alias( 'LTMS_Core_Security', 'LTMS_Firewall' );
+        }
+    }
 }
 
 // Arrancar en 'plugins_loaded' con prioridad 15 (después de WooCommerce @ 10)
