@@ -382,7 +382,11 @@
                         this.showToast('success', response.data.message);
                         this.loadView('wallet', true);
                     } else {
-                        this.showToast('error', response.data);
+                        // M-123 FIX: response.data puede ser objeto o string — extraer mensaje seguro
+                        const errMsg = (typeof response.data === 'string')
+                            ? response.data
+                            : (response.data?.message || ltmsDashboard.i18n.error);
+                        this.showToast('error', errMsg);
                     }
                 },
             });
@@ -532,7 +536,10 @@
          */
         showError(selector, message) {
             $('.ltms-view-loader').hide();
-            $(selector).html(`<div class="ltms-notice ltms-notice-error"><p>${this.escapeHtml(message)}</p></div>`).show();
+            // M-123 FIX: message puede ser objeto cuando viene de wp_send_json_error
+            const msg = (typeof message === 'string') ? message
+                : (message?.message || message?.data || ltmsDashboard?.i18n?.error || 'Error');
+            $(selector).html(`<div class="ltms-notice ltms-notice-error"><p>${this.escapeHtml(msg)}</p></div>`).show();
         },
 
         /**
