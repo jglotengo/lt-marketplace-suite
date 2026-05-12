@@ -204,9 +204,23 @@ final class LTMS_Utils {
         if ( ! $user ) {
             return false;
         }
-        return in_array( 'ltms_vendor', (array) $user->roles, true ) ||
-               in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ||
-               (bool) get_user_meta( $user_id, 'ltms_is_vendor', true );
+        $roles = (array) $user->roles;
+
+        // Verificar rol primero — evita llamada a DB si el rol ya lo determina.
+        if ( in_array( 'ltms_vendor', $roles, true ) || in_array( 'ltms_vendor_premium', $roles, true ) ) {
+            return true;
+        }
+
+        // Roles de sistema que nunca son vendor — retornar false sin consultar meta.
+        $non_vendor_roles = [ 'administrator', 'editor', 'author', 'contributor', 'subscriber', 'shop_manager', 'customer' ];
+        foreach ( $roles as $role ) {
+            if ( in_array( $role, $non_vendor_roles, true ) ) {
+                return false;
+            }
+        }
+
+        // Fallback: meta flag para vendedores migrados sin rol asignado aún.
+        return (bool) get_user_meta( $user_id, 'ltms_is_vendor', true );
     }
 
     /**
