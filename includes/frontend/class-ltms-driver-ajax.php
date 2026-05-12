@@ -81,7 +81,7 @@ class LTMS_Driver_Ajax {
                 return;
             }
 
-            $data   = [ 'name' => $name, 'phone' => $phone, 'vehicle_type' => $vehicle, 'updated_at' => current_time( 'mysql' ) ];
+            $data   = [ 'full_name' => $name, 'phone' => $phone, 'vehicle_type' => $vehicle, 'updated_at' => current_time( 'mysql' ) ];
             $format = [ '%s', '%s', '%s', '%s' ];
             if ( $doc_stored )   { $data['document_number'] = $doc_stored;  $format[] = '%s'; }
             if ( $plate_stored ) { $data['vehicle_plate']   = $plate_stored; $format[] = '%s'; }
@@ -104,13 +104,12 @@ class LTMS_Driver_Ajax {
             $table,
             [
                 'vendor_id'       => $vendor_id,
-                'name'            => $name,
+                'full_name'       => $name,
                 'phone'           => $phone,
                 'vehicle_type'    => $vehicle,
                 'document_number' => $doc_stored,
                 'vehicle_plate'   => $plate_stored,
-                'is_active'       => 1,
-                'is_available'    => 1,
+                'status'          => 'active',
                 'created_at'      => current_time( 'mysql' ),
                 'updated_at'      => current_time( 'mysql' ),
             ],
@@ -165,15 +164,11 @@ class LTMS_Driver_Ajax {
 
     // ── Toggle activo ────────────────────────────────────────────────────
 
-    public function ajax_toggle_active(): void {
-        $this->toggle_flag( 'is_active' );
-    }
+
 
     // ── Toggle disponible ────────────────────────────────────────────────
 
-    public function ajax_toggle_available(): void {
-        $this->toggle_flag( 'is_available' );
-    }
+
 
     // ── Configuración de entrega propia ──────────────────────────────────
 
@@ -201,7 +196,12 @@ class LTMS_Driver_Ajax {
 
     // ── Helper privado ───────────────────────────────────────────────────
 
-    private function toggle_flag( string $flag ): void {
+    /**
+     * M-49: toggle_active — alterna el status de la columna ENUM status('active'/'inactive').
+     * Reemplaza el antiguo toggle_flag($flag) que interpolaba $flag en SQL directamente (SQLi risk)
+     * y usaba columnas is_active/is_available que no existen en lt_vendor_drivers.
+     */
+    public function ajax_toggle_active(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -210,7 +210,7 @@ class LTMS_Driver_Ajax {
             return;
         }
 
-        $driver_id = (int) ( $_POST['driver_id'] ?? 0 );
+        $driver_id = absint( $_POST['driver_id'] ?? 0 );
         if ( ! $driver_id ) {
             wp_send_json_error( __( 'ID de repartidor inválido.', 'ltms' ) );
             return;
@@ -220,7 +220,7 @@ class LTMS_Driver_Ajax {
         $table = $wpdb->prefix . 'lt_vendor_drivers';
 
         $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT vendor_id, $flag FROM `$table` WHERE id = %d", $driver_id ), // phpcs:ignore
+            $wpdb->prepare( 'SELECT vendor_id, status FROM `' . $table . '` WHERE id = %d', $driver_id ),
             ARRAY_A
         );
 
@@ -229,15 +229,59 @@ class LTMS_Driver_Ajax {
             return;
         }
 
-        $new_value = $row[ $flag ] ? 0 : 1;
+        $new_status = ( 'active' === $row['status'] ) ? 'inactive' : 'active';
         $wpdb->update(
             $table,
-            [ $flag => $new_value, 'updated_at' => current_time( 'mysql' ) ],
+            [ 'status' => $new_status, 'updated_at' => current_time( 'mysql' ) ],
             [ 'id' => $driver_id ],
-            [ '%d', '%s' ],
+            [ '%s', '%s' ],
             [ '%d' ]
         );
 
-        wp_send_json_success( [ 'new_value' => $new_value ] );
+        wp_send_json_success( [ 'new_status' => $new_status ] );
+    }
+
+    /**
+     * M-49: toggle_available — almacena disponibilidad en user_meta del driver (no existe columna en tabla).
+     * El estado "disponible/no disponible" es efímero y se guarda en transient/meta, no en la tabla maestra.
+     */
+    public function ajax_toggle_available(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $vendor_id = get_current_user_id();
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) {
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+            return;
+        }
+
+        $driver_id = absint( $_POST['driver_id'] ?? 0 );
+        if ( ! $driver_id ) {
+            wp_send_json_error( __( 'ID de repartidor inválido.', 'ltms' ) );
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_vendor_drivers';
+
+        // Verify ownership.
+        $owner = (int) $wpdb->get_var(
+            $wpdb->prepare( 'SELECT vendor_id FROM `' . $table . '` WHERE id = %d', $driver_id )
+        );
+        if ( $owner !== $vendor_id ) {
+            wp_send_json_error( __( 'No tienes permiso para modificar este repartidor.', 'ltms' ), 403 );
+            return;
+        }
+
+        // Availability stored as transient (ephemeral, not persisted in main table).
+        $key     = 'ltms_driver_available_' . $driver_id;
+        $current = (bool) get_transient( $key );
+        $new_val = ! $current;
+        if ( $new_val ) {
+            set_transient( $key, 1, 8 * HOUR_IN_SECONDS );
+        } else {
+            delete_transient( $key );
+        }
+
+        wp_send_json_success( [ 'is_available' => $new_val ] );
     }
 }
