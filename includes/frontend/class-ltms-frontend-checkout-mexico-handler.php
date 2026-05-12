@@ -200,16 +200,15 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
                 'email' => $order->get_billing_email(),
             ];
 
-            $charge = $openpay->create_pse_charge(
+            // M-114: SPEI es México — usar create_spei_reference(), no create_pse_charge() (Colombia)
+            $charge = $openpay->create_spei_reference(
                 (float) $order->get_total(),
                 sprintf( __( 'Pedido #%d — Lo Tengo', 'ltms' ), $order->get_id() ),
                 $customer,
-                '',
-                $order->get_checkout_order_received_url(),
                 'LTMS-SPEI-' . $order->get_id() . '-' . time()
             );
 
-            $clabe       = $charge['payment_method']['clabe'] ?? $charge['payment_method']['url'] ?? '';
+            $clabe       = $charge['payment_method']['clabe'] ?? '';
             $bank_name   = $charge['payment_method']['name'] ?? 'STP';
             $expiry_date = gmdate( 'd/m/Y H:i', strtotime( '+24 hours' ) );
 

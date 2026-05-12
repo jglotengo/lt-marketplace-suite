@@ -29,10 +29,18 @@ class LTMS_XCover_Policy_Listener {
         if ( ! $quote_id ) return;
 
         $policy_data = self::build_policy_data( $order );
+        $quote_id    = $policy_data['quote_id']; // M-113: preservar antes de pasar a la API
 
         try {
             $xcover = LTMS_Api_Factory::get( 'xcover' );
-            $result = $xcover->create_policy( $policy_data );
+            // M-110/M-112: create_policy(quote_id, holder_data) — separar quote_id del payload de cliente
+            $result = $xcover->create_policy( $quote_id, [
+                'first_name' => $policy_data['customer']['first_name'],
+                'last_name'  => $policy_data['customer']['last_name'],
+                'email'      => $policy_data['customer']['email'],
+                'phone'      => $policy_data['customer']['phone'],
+                'order_id'   => $policy_data['order_id'],
+            ] );
 
             $policy_id     = $result['policy_id'] ?? $result['id'] ?? '';
             $policy_number = $result['policy_number'] ?? $result['certificate_number'] ?? '';
@@ -46,6 +54,7 @@ class LTMS_XCover_Policy_Listener {
             $order->save();
 
             $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+            $result['quote_id'] = $quote_id; // M-113: inyectar quote_id en result para record_policy
             self::record_policy( $order_id, $vendor_id, $result, $premium );
 
             LTMS_Core_Logger::info( 'XCOVER_POLICY_CREATED', sprintf( 'Policy %s created for order #%d', $policy_id, $order_id ) );
@@ -67,7 +76,8 @@ class LTMS_XCover_Policy_Listener {
 
         try {
             $xcover = LTMS_Api_Factory::get( 'xcover' );
-            $result = $xcover->cancel_policy( $policy_id );
+            // M-111: cancel_policy(policy_id, reason) requiere dos argumentos
+            $result = $xcover->cancel_policy( $policy_id, 'order_cancelled' );
 
             $order->update_meta_data( '_ltms_insurance_policy_cancelled', true );
             $order->save();

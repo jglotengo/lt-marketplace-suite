@@ -188,6 +188,41 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Crea una referencia SPEI para México (transferencia bancaria).
+     * M-114: el checkout México usaba create_pse_charge() (Colombia) incorrectamente.
+     *
+     * @param float  $amount      Monto en MXN.
+     * @param string $description Descripción.
+     * @param array  $customer    Datos del cliente.
+     * @param string $order_id    ID de referencia.
+     * @return array{id: string, payment_method: array{clabe: string, name: string}}
+     */
+    public function create_spei_reference(
+        float  $amount,
+        string $description,
+        array  $customer,
+        string $order_id
+    ): array {
+        if ( $this->country !== 'MX' ) {
+            throw new \RuntimeException( 'SPEI solo disponible en México.' );
+        }
+
+        $payload = [
+            'method'      => 'bank_account',
+            'amount'      => $this->format_amount( $amount ),
+            'currency'    => 'MXN',
+            'description' => substr( $description, 0, 250 ),
+            'order_id'    => $order_id,
+            'customer'    => [
+                'name'  => sanitize_text_field( $customer['name'] ?? '' ),
+                'email' => sanitize_email( $customer['email'] ?? '' ),
+            ],
+        ];
+
+        return $this->perform_request( 'POST', "/{$this->merchant_id}/charges", $payload );
+    }
+
+    /**
      * Crea un cargo por OXXO (México).
      *
      * @param float  $amount      Monto en MXN.
