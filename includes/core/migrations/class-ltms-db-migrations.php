@@ -942,6 +942,167 @@ final class LTMS_DB_Migrations {
                 [ '%d', '%s', '%s', '%s', '%s', '%s', '%f', '%d', '%d' ]
             );
         }
+
+        // ── v2.1.0 Tables — M-122 FIX: tablas usadas en el código pero ausentes en migraciones ──
+
+        // lt_booking_policies — Políticas de cancelación y depósito por producto
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_booking_policies` (
+            `id`                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `product_id`             BIGINT UNSIGNED NOT NULL,
+            `cancellation_policy`    ENUM('flexible','moderate','strict','non_refundable') NOT NULL DEFAULT 'moderate',
+            `deposit_required`       TINYINT(1) NOT NULL DEFAULT 0,
+            `deposit_percentage`     DECIMAL(5,2) NOT NULL DEFAULT 30.00,
+            `min_nights`             TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            `max_nights`             SMALLINT UNSIGNED DEFAULT NULL,
+            `advance_booking_days`   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            `created_at`             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_product` (`product_id`)
+        ) {$charset}";
+
+        // lt_booking_season_rules — Reglas de temporada por producto (si no existe ya)
+        if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->prefix . 'lt_booking_season_rules' ) ) ) {
+            $sqls[] = "CREATE TABLE `{$p}lt_booking_season_rules` (
+                `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `product_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 = regla global',
+                `name`           VARCHAR(120) NOT NULL,
+                `season_type`    ENUM('low','medium','high','very_high') NOT NULL DEFAULT 'medium',
+                `country_code`   CHAR(2) NOT NULL DEFAULT 'CO',
+                `date_from`      DATE NOT NULL,
+                `date_to`        DATE NOT NULL,
+                `price_modifier` DECIMAL(8,4) NOT NULL DEFAULT 1.0000,
+                `min_nights`     TINYINT UNSIGNED NOT NULL DEFAULT 1,
+                `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
+                `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_product_season` (`product_id`, `date_from`, `date_to`)
+            ) {$charset}";
+        }
+
+        // lt_commission_tiers — Escalonado de comisiones por nivel de ventas
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_commission_tiers` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `name`            VARCHAR(120) NOT NULL,
+            `min_gmv`         DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'GMV mínimo para este tier',
+            `commission_rate` DECIMAL(5,4) NOT NULL DEFAULT 0.1500 COMMENT 'Tasa de comisión (0.15 = 15%)',
+            `country_code`    CHAR(2) NOT NULL DEFAULT 'CO',
+            `is_active`       TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_country_gmv` (`country_code`, `min_gmv`)
+        ) {$charset}";
+
+        // lt_mx_ieps_rates — Tasas IEPS para México (Impuesto Especial)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_mx_ieps_rates` (
+            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `category`     VARCHAR(120) NOT NULL,
+            `rate`         DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+            `is_active`    TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`)
+        ) {$charset}";
+
+        // lt_mx_isr_tramos — Tramos ISR para retención en México
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_mx_isr_tramos` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `lower_limit`     DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `upper_limit`     DECIMAL(15,2) DEFAULT NULL COMMENT 'NULL = sin límite superior',
+            `fixed_fee`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `rate_excess`     DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+            `year`            SMALLINT UNSIGNED NOT NULL DEFAULT 2024,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_year_lower` (`year`, `lower_limit`)
+        ) {$charset}";
+
+        // lt_order_snapshots — Snapshot del pedido en el momento del pago (auditoría fiscal)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_order_snapshots` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`    BIGINT UNSIGNED NOT NULL,
+            `snapshot`    LONGTEXT NOT NULL COMMENT 'JSON serializado del WC_Order',
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_order` (`order_id`)
+        ) {$charset}";
+
+        // lt_provider_health — Estado de salud de integraciones externas (APIs)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_provider_health` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `provider`       VARCHAR(60) NOT NULL,
+            `status`         ENUM('ok','degraded','down','unknown') NOT NULL DEFAULT 'unknown',
+            `latency_ms`     SMALLINT UNSIGNED DEFAULT NULL,
+            `last_check`     DATETIME DEFAULT NULL,
+            `error_message`  TEXT DEFAULT NULL,
+            `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_provider` (`provider`)
+        ) {$charset}";
+
+        // lt_tax_rates_history — Histórico de tasas de impuestos para auditoría
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_tax_rates_history` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `country_code`  CHAR(2) NOT NULL,
+            `tax_type`      VARCHAR(20) NOT NULL COMMENT 'IVA, ISR, IEPS, ICA, etc.',
+            `rate`          DECIMAL(5,4) NOT NULL,
+            `effective_from` DATE NOT NULL,
+            `effective_to`  DATE DEFAULT NULL,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_country_type_date` (`country_code`, `tax_type`, `effective_from`)
+        ) {$charset}";
+
+        // lt_tourism_compliance — Registro de cumplimiento turístico (RNT/SECTUR)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_tourism_compliance` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`       BIGINT UNSIGNED NOT NULL,
+            `product_id`      BIGINT UNSIGNED DEFAULT NULL,
+            `country_code`    CHAR(2) NOT NULL DEFAULT 'CO',
+            `registry_number` VARCHAR(100) DEFAULT NULL COMMENT 'RNT (CO) o Folio SECTUR (MX)',
+            `status`          ENUM('pending','active','expired','suspended') NOT NULL DEFAULT 'pending',
+            `expires_at`      DATE DEFAULT NULL,
+            `notes`           TEXT DEFAULT NULL,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor` (`vendor_id`),
+            KEY `idx_product` (`product_id`)
+        ) {$charset}";
+
+        // lt_vendor_drivers — Domiciliarios/conductores asociados al vendedor
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vendor_drivers` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`       BIGINT UNSIGNED NOT NULL,
+            `wp_user_id`      BIGINT UNSIGNED DEFAULT NULL COMMENT 'WP user si tiene cuenta',
+            `full_name`       VARCHAR(200) NOT NULL,
+            `document_number` VARCHAR(30) NOT NULL,
+            `phone`           VARCHAR(20) DEFAULT NULL,
+            `vehicle_type`    VARCHAR(50) DEFAULT NULL,
+            `vehicle_plate`   VARCHAR(20) DEFAULT NULL,
+            `status`          ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor` (`vendor_id`),
+            KEY `idx_wp_user` (`wp_user_id`)
+        ) {$charset}";
+
+        // lt_wallet_holds — Retenciones temporales de saldo (para disputas/reembolsos pendientes)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`   BIGINT UNSIGNED NOT NULL,
+            `amount`      DECIMAL(15,2) NOT NULL,
+            `currency`    VARCHAR(3) NOT NULL DEFAULT 'COP',
+            `reason`      VARCHAR(255) NOT NULL,
+            `reference`   VARCHAR(120) DEFAULT NULL,
+            `expires_at`  DATETIME DEFAULT NULL,
+            `released_at` DATETIME DEFAULT NULL,
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_vendor_active` (`vendor_id`, `released_at`, `expires_at`)
+        ) {$charset}";
+
     }
 
     /**
