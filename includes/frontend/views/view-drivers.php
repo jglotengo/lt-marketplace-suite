@@ -23,8 +23,8 @@ $table = $wpdb->prefix . 'lt_vendor_drivers';
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 $drivers = $wpdb->get_results(
 	$wpdb->prepare(
-		"SELECT id, name, phone, vehicle_type, is_active, is_available, current_order_id, created_at
-		 FROM `{$table}` WHERE vendor_id = %d ORDER BY name ASC",
+		"SELECT id, full_name, phone, vehicle_type, vehicle_plate, status, created_at
+		 FROM `{$table}` WHERE vendor_id = %d ORDER BY full_name ASC",
 		$vendor_id
 	),
 	ARRAY_A
@@ -128,21 +128,21 @@ $delivery_message = (string) get_user_meta( $vendor_id, 'ltms_own_delivery_messa
 					'walking' => __( 'A pie', 'ltms' ),
 				];
 				$vehicle_label = $vehicle_labels[ $driver['vehicle_type'] ] ?? ucfirst( $driver['vehicle_type'] );
-				$active_class  = $driver['is_active'] ? 'ltms-badge-success' : 'ltms-badge-secondary';
-				$avail_class   = $driver['is_available'] ? 'ltms-badge-success' : 'ltms-badge-warning';
+				$active_class  = ( 'active' === $driver['status'] ) ? 'ltms-badge-success' : 'ltms-badge-secondary';
+				$avail_class   = 'ltms-badge-warning'  /* availability via transient */;
 			?>
 			<tr data-driver-id="<?php echo esc_attr( $driver['id'] ); ?>">
-				<td><?php echo esc_html( $driver['name'] ); ?></td>
+				<td><?php echo esc_html( $driver['full_name'] ); ?></td>
 				<td><?php echo esc_html( $driver['phone'] ); ?></td>
 				<td><?php echo esc_html( $vehicle_label ); ?></td>
 				<td>
 					<span class="ltms-badge <?php echo esc_attr( $active_class ); ?>">
-						<?php echo $driver['is_active'] ? esc_html__( 'Sí', 'ltms' ) : esc_html__( 'No', 'ltms' ); ?>
+						<?php echo ( 'active' === $driver['status'] ) ? esc_html__( 'Sí', 'ltms' ) : esc_html__( 'No', 'ltms' ); ?>
 					</span>
 				</td>
 				<td>
 					<span class="ltms-badge <?php echo esc_attr( $avail_class ); ?>">
-						<?php echo $driver['is_available'] ? esc_html__( 'Disponible', 'ltms' ) : esc_html__( 'Ocupado', 'ltms' ); ?>
+						<?php echo (bool) get_transient( 'ltms_driver_available_' . $driver['id'] ) ? esc_html__( 'Disponible', 'ltms' ) : esc_html__( 'Ocupado', 'ltms' ); ?>
 					</span>
 				</td>
 				<td>
@@ -162,13 +162,13 @@ $delivery_message = (string) get_user_meta( $vendor_id, 'ltms_own_delivery_messa
 				<td class="ltms-driver-actions">
 					<button class="ltms-btn ltms-btn-link ltms-driver-toggle-active"
 							data-driver-id="<?php echo esc_attr( $driver['id'] ); ?>"
-							data-active="<?php echo esc_attr( $driver['is_active'] ); ?>">
-						<?php echo $driver['is_active'] ? esc_html__( 'Desactivar', 'ltms' ) : esc_html__( 'Activar', 'ltms' ); ?>
+							data-active="<?php echo esc_attr( 'active' === $driver['status'] ? 1 : 0 ); ?>">
+						<?php echo ( 'active' === $driver['status'] ) ? esc_html__( 'Desactivar', 'ltms' ) : esc_html__( 'Activar', 'ltms' ); ?>
 					</button>
 					<button class="ltms-btn ltms-btn-link ltms-driver-toggle-available"
 							data-driver-id="<?php echo esc_attr( $driver['id'] ); ?>"
-							data-available="<?php echo esc_attr( $driver['is_available'] ); ?>">
-						<?php echo $driver['is_available'] ? esc_html__( 'Marcar ocupado', 'ltms' ) : esc_html__( 'Marcar disponible', 'ltms' ); ?>
+							data-available="<?php echo esc_attr( (bool) get_transient( 'ltms_driver_available_' . $driver['id'] ) ? 1 : 0 ); ?>">
+						<?php echo (bool) get_transient( 'ltms_driver_available_' . $driver['id'] ) ? esc_html__( 'Marcar ocupado', 'ltms' ) : esc_html__( 'Marcar disponible', 'ltms' ); ?>
 					</button>
 					<button class="ltms-btn ltms-btn-link ltms-driver-delete ltms-btn-danger-link"
 							data-driver-id="<?php echo esc_attr( $driver['id'] ); ?>">
