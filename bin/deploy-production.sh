@@ -190,6 +190,22 @@ if command -v wp &>/dev/null; then
     $WP_CLI rewrite flush 2>/dev/null || true
 fi
 
+# ── Limpiar PHP OPcache ───────────────────────────────────────────────────────
+# Si OPcache está activo y no se limpia, los archivos PHP viejos siguen en cache
+# aunque el disco ya tenga los nuevos. Esto hace que los cambios no sean visibles.
+echo ""
+echo "Limpiando PHP OPcache..."
+if command -v wp &>/dev/null; then
+    $WP_CLI eval 'if (function_exists("opcache_reset")) { opcache_reset(); echo "OPcache limpiado.\n"; } else { echo "OPcache no activo.\n"; }' 2>/dev/null || true
+fi
+# Alternativa: si php-fpm está disponible, reiniciarlo garantiza limpieza total
+if command -v systemctl &>/dev/null; then
+    PHP_FPM=$(systemctl list-units --type=service --state=running 2>/dev/null | grep -oE 'php[0-9\.\-]+fpm' | head -1)
+    if [ -n "$PHP_FPM" ]; then
+        systemctl reload "$PHP_FPM" 2>/dev/null && echo "      ✓ $PHP_FPM recargado (OPcache limpiado)" || true
+    fi
+fi
+
 echo ""
 echo "============================================================"
 echo " DEPLOY COMPLETADO"

@@ -65,7 +65,7 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
         if ( file_exists( $section_file ) ) {
             include $section_file;
         } else {
-            ltms_render_generic_settings_section( $active_tab );
+            ltms_render_generic_settings_section( $active_tab, $tabs );
         }
         ?>
 
@@ -121,9 +121,11 @@ jQuery(function($) {
 /**
  * Renderiza una sección de configuración genérica con los campos del grupo.
  *
- * @param string $tab Pestaña activa.
+ * @param string $tab       Pestaña activa.
+ * @param array  $tab_labels Mapa slug => etiqueta para el título de sección.
  */
-function ltms_render_generic_settings_section( string $tab ): void {
+if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) :
+function ltms_render_generic_settings_section( string $tab, array $tab_labels = [] ): void {
     $fields_map = [
         'general' => [
             [ 'key' => 'ltms_platform_name',    'label' => __( 'Nombre de la Plataforma', 'ltms' ),   'type' => 'text',   'default' => get_bloginfo( 'name' ) ],
@@ -216,9 +218,8 @@ function ltms_render_generic_settings_section( string $tab ): void {
         return;
     }
 
-    global $tabs;
     echo '<div class="ltms-form-section">';
-    echo '<h2>' . esc_html( $tabs[ $tab ] ?? $tab ) . '</h2>';
+    echo '<h2>' . esc_html( $tab_labels[ $tab ] ?? $tab ) . '</h2>';
 
     foreach ( $fields as $field ) {
         $value = LTMS_Core_Config::get( $field['key'], $field['default'] ?? '' );
@@ -261,3 +262,4 @@ function ltms_render_generic_settings_section( string $tab ): void {
 
     echo '</div>';
 }
+endif;
