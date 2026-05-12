@@ -472,10 +472,24 @@ class LTMS_Stripe_Webhook_Handler {
      * @return string
      */
     private static function get_webhook_secret(): string {
-        $gateways = WC()->payment_gateways()->payment_gateways();
-        if ( isset( $gateways['ltms_stripe'] ) ) {
-            return $gateways['ltms_stripe']->get_option( 'webhook_secret', '' );
+        // M-202: WC() puede no estar disponible en contextos tempranos (cron, WP-CLI,
+        // antes de woocommerce_init). Guard defensivo para evitar fatal PHP.
+        if ( ! function_exists( 'WC' ) || ! WC() || ! WC()->payment_gateways ) {
+            return LTMS_Core_Config::get( 'ltms_stripe_webhook_secret', '' );
         }
+
+        try {
+            $gateways = WC()->payment_gateways()->payment_gateways();
+            if ( isset( $gateways['ltms_stripe'] ) ) {
+                return $gateways['ltms_stripe']->get_option( 'webhook_secret', '' );
+            }
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::warning(
+                'STRIPE_WEBHOOK_SECRET_FETCH_FAIL',
+                'Error al obtener webhook secret desde WC gateways: ' . $e->getMessage()
+            );
+        }
+
         // Fallback: leer desde LTMS_Core_Config.
         return LTMS_Core_Config::get( 'ltms_stripe_webhook_secret', '' );
     }

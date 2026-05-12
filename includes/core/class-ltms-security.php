@@ -48,6 +48,64 @@ final class LTMS_Core_Security {
         // Eliminar headers que revelan versiones
         add_filter( 'the_generator', '__return_empty_string' );
         remove_action( 'wp_head', 'wp_generator' );
+
+        // M-201: Agregar headers de seguridad HTTP en todas las respuestas
+        add_action( 'send_headers', [ __CLASS__, 'send_security_headers' ] );
+        // También en REST API
+        add_filter( 'rest_post_dispatch', [ __CLASS__, 'add_rest_security_headers' ], 10, 1 );
+    }
+
+    /**
+     * Envía headers de seguridad HTTP en respuestas de página.
+     * M-201: X-Content-Type-Options, X-Frame-Options, HSTS ausentes.
+     *
+     * @return void
+     */
+    public static function send_security_headers(): void {
+        // Prevenir MIME sniffing.
+        if ( ! headers_sent() ) {
+            header( 'X-Content-Type-Options: nosniff' );
+        }
+
+        // Prevenir clickjacking. Usar CSP frame-ancestors en producción es preferible,
+        // pero SAMEORIGIN es el mínimo aceptable.
+        if ( ! headers_sent() ) {
+            header( 'X-Frame-Options: SAMEORIGIN' );
+        }
+
+        // HSTS: sólo en HTTPS y producción para evitar romper entornos locales.
+        if ( is_ssl() && LTMS_Core_Config::is_production() && ! headers_sent() ) {
+            // max-age=31536000 (1 año); includeSubDomains opcional según infraestructura.
+            header( 'Strict-Transport-Security: max-age=31536000; includeSubDomains' );
+        }
+
+        // Ocultar versión de PHP si aún aparece.
+        if ( ! headers_sent() ) {
+            header_remove( 'X-Powered-By' );
+        }
+
+        // Referrer policy: no enviar referrer a terceros.
+        if ( ! headers_sent() ) {
+            header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+        }
+
+        // Permissions policy: deshabilitar APIs sensibles que el plugin no usa.
+        if ( ! headers_sent() ) {
+            header( 'Permissions-Policy: geolocation=(), microphone=(), camera=()' );
+        }
+    }
+
+    /**
+     * Agrega headers de seguridad a respuestas de la REST API.
+     *
+     * @param WP_REST_Response $response Respuesta REST.
+     * @return WP_REST_Response
+     */
+    public static function add_rest_security_headers( WP_REST_Response $response ): WP_REST_Response {
+        $response->header( 'X-Content-Type-Options', 'nosniff' );
+        $response->header( 'X-Frame-Options', 'SAMEORIGIN' );
+        $response->header( 'Referrer-Policy', 'strict-origin-when-cross-origin' );
+        return $response;
     }
 
     /**
