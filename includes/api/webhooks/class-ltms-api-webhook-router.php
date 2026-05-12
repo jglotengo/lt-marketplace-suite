@@ -35,6 +35,7 @@ final class LTMS_Api_Webhook_Router {
         'siigo'     => 'LTMS_Siigo_Webhook_Handler',
         'aveonline' => 'LTMS_Aveonline_Webhook_Handler',
         'zapsign'   => 'LTMS_Zapsign_Webhook_Handler',
+        'alegra'    => 'LTMS_Alegra_Webhook_Handler',
     ];
 
     /**

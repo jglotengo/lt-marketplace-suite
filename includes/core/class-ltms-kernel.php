@@ -241,6 +241,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Business_Pickup_Handler' ) ) {
             LTMS_Business_Pickup_Handler::init();
         }
+
+        // v2.1.0 — Sincronización contable con Alegra
+        if ( class_exists( 'LTMS_Alegra_Sync' ) ) {
+            LTMS_Alegra_Sync::init();
+        }
     }
 
     /**
@@ -295,6 +300,11 @@ final class LTMS_Core_Kernel {
             if ( class_exists( $handler ) ) {
                 $handler::init();
             }
+        }
+
+        // v2.1.0 — Webhook handler de Alegra
+        if ( class_exists( 'LTMS_Alegra_Webhook_Handler' ) ) {
+            LTMS_Alegra_Webhook_Handler::init();
         }
     }
 

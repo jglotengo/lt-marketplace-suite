@@ -26,6 +26,8 @@ $tabs = [
     'uber_direct' => __( 'Uber Direct', 'ltms' ),
     'heka'        => __( 'Heka Entrega', 'ltms' ),
     'xcover'      => __( 'Seguros XCover', 'ltms' ),
+    // v2.1.0 — Contabilidad
+    'alegra'      => __( 'Alegra Contabilidad', 'ltms' ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación
@@ -193,6 +195,18 @@ function ltms_render_generic_settings_section( string $tab ): void {
             [ 'key' => 'ltms_xcover_partner_code',          'label' => __( 'XCover Partner Code', 'ltms' ),             'type' => 'text' ],
             [ 'key' => 'ltms_xcover_parcel_protection',     'label' => __( 'Protección del Paquete', 'ltms' ),          'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Muestra opción de seguro de paquete en checkout.', 'ltms' ) ],
             [ 'key' => 'ltms_xcover_purchase_protection',   'label' => __( 'Protección de Compra', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Muestra opción de protección de compra en checkout.', 'ltms' ) ],
+        ],
+        // v2.1.0 — Alegra Contabilidad
+        'alegra' => [
+            [ 'key' => 'ltms_alegra_enabled',                'label' => __( 'Alegra Activo', 'ltms' ),                       'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_alegra_email',                  'label' => __( 'Email de la cuenta Alegra', 'ltms' ),           'type' => 'email',    'desc' => __( 'El mismo email con el que accedes a app.alegra.com.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_token',                  'label' => __( 'Token de API Alegra 🔐', 'ltms' ),              'type' => 'password', 'desc' => __( 'Ajustes → API en Alegra. Se guarda cifrado con AES-256.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_default_number_template','label' => __( 'ID Numeración de Facturas', 'ltms' ),           'type' => 'number',   'desc' => __( 'ID de la plantilla de numeración en Alegra (ej: 1). Déjalo en 0 para usar la numeración por defecto.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_bank_account_id',        'label' => __( 'ID Cuenta Bancaria Alegra', 'ltms' ),           'type' => 'number',   'desc' => __( 'ID de la cuenta bancaria en Alegra para registrar pagos de retiros.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_invoice_on_processing',  'label' => __( 'Crear factura en "En proceso"', 'ltms' ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Por defecto, la factura se crea cuando el pedido llega a "Completado".', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( 'Enviar factura por email', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Alegra envía automáticamente la factura al email del comprador.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( 'Webhook Secret (token)', 'ltms' ),              'type' => 'text',     'desc' => __( 'Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => home_url( '/wp-json/ltms/v1/webhooks/alegra' ), 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
         ],
     ];
 

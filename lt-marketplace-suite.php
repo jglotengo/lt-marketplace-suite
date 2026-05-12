@@ -37,7 +37,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '2.0.3' );
+define( 'LTMS_VERSION',          '2.1.0' );
 define( 'LTMS_DB_VERSION',       '2.0.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
@@ -325,6 +325,9 @@ function ltms_load_autoloader(): void {
                 // Data/DB — subdir incorrecto en nombre de clase
                 'ltms-data-masking'             => 'core/class-ltms-data-masking.php',
                 'ltms-db-migrations'            => 'core/migrations/class-ltms-db-migrations.php',
+                // v2.1.0 — Alegra (subdir 'alegra/' no existe; archivo en business/ y api/webhooks/)
+                'ltms-alegra-sync'              => 'business/class-ltms-alegra-sync.php',
+                'ltms-alegra-webhook-handler'   => 'api/webhooks/class-ltms-alegra-webhook-handler.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
