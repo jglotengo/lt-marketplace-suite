@@ -157,9 +157,26 @@ final class LTMS_Payout_Scheduler {
      * @return array{success: bool, message: string}
      */
     public static function approve( int $payout_id, int $admin_id ): array {
-        $payout = self::get_payout( $payout_id );
-        if ( ! $payout || $payout['status'] !== 'pending' ) {
+        global $wpdb;
+
+        // M-117: Atomic claim — prevents double-approval race condition.
+        // Two admins clicking approve simultaneously will both pass get_payout() check
+        // but only one will succeed on this UPDATE with WHERE status = 'pending'.
+        $claimed = $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "UPDATE `{$wpdb->prefix}lt_payout_requests`
+             SET status = 'processing', approved_by = %d, processed_at = %s
+             WHERE id = %d AND status = 'pending'",
+            $admin_id,
+            LTMS_Utils::now_utc(),
+            $payout_id
+        ) );
+        if ( ! $claimed ) {
             return [ 'success' => false, 'message' => __( 'Solicitud no encontrada o ya procesada.', 'ltms' ) ];
+        }
+
+        $payout = self::get_payout( $payout_id );
+        if ( ! $payout ) {
+            return [ 'success' => false, 'message' => __( 'Error al obtener datos del retiro.', 'ltms' ) ];
         }
 
         // Intentar procesar el pago vía gateway
@@ -185,16 +202,15 @@ final class LTMS_Payout_Scheduler {
             );
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update(
+            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $table,
                 [
-                    'status'          => 'completed',
-                    'gateway_ref'     => $payment_result['reference'] ?? '',
-                    'approved_by'     => $admin_id,
-                    'processed_at'    => LTMS_Utils::now_utc(),
+                    'status'      => 'completed',
+                    'gateway_ref' => $payment_result['reference'] ?? '',
+                    // approved_by and processed_at already set in the atomic claim above
                 ],
                 [ 'id' => $payout_id ],
-                [ '%s', '%s', '%d', '%s' ],
+                [ '%s', '%s' ],
                 [ '%d' ]
             );
 

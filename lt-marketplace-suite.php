@@ -281,6 +281,8 @@ function ltms_load_autoloader(): void {
                 'ltms-frontend-checkout-handler'    => 'frontend/class-ltms-frontend-checkout-handler.php',
                 // M-20: handler de checkout México (OXXO, SPEI, MSI)
                 'ltms-frontend-checkout-mexico-handler' => 'frontend/class-ltms-frontend-checkout-mexico-handler.php',
+                // M-114: handler AJAX para módulo de domiciliarios
+                'ltms-driver-ajax'                  => 'frontend/class-ltms-driver-ajax.php',
                 // Business listeners
                 'ltms-order-paid-listener'      => 'business/listeners/class-ltms-order-paid-listener.php',
                 'ltms-redi-order-listener'      => 'business/listeners/class-ltms-redi-order-listener.php',
