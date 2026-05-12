@@ -151,13 +151,17 @@ class LTMS_Core_Cron_Manager {
 
             foreach ( $jobs as $job ) {
                 try {
-                    $wpdb->update(
-                        $wpdb->prefix . 'lt_job_queue',
-                        [ 'status' => 'processing', 'started_at' => current_time( 'mysql' ), 'attempts' => (int) $job['attempts'] + 1 ],
-                        [ 'id' => (int) $job['id'] ],
-                        [ '%s', '%s', '%d' ],
-                        [ '%d' ]
-                    );
+                    // M-116: Atomic claim for siigo sync jobs
+                    $claimed = $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                        "UPDATE `{$wpdb->prefix}lt_job_queue`
+                         SET status = 'processing', started_at = %s, attempts = attempts + 1
+                         WHERE id = %d AND status = 'pending'",
+                        current_time( 'mysql' ),
+                        (int) $job['id']
+                    ) );
+                    if ( ! $claimed ) {
+                        continue;
+                    }
                     $args = $job['args'] ? json_decode( $job['args'], true ) : [];
                     do_action( 'ltms_sync_siigo_invoice', $args );
                     $wpdb->update(
@@ -263,13 +267,18 @@ class LTMS_Core_Cron_Manager {
                     continue;
                 }
                 try {
-                    $wpdb->update(
-                        $wpdb->prefix . 'lt_job_queue',
-                        [ 'status' => 'processing', 'started_at' => current_time( 'mysql' ), 'attempts' => (int) $job['attempts'] + 1 ],
-                        [ 'id' => (int) $job['id'] ],
-                        [ '%s', '%s', '%d' ],
-                        [ '%d' ]
-                    );
+                    // M-116: Atomic claim — only proceed if we can transition from pending→processing.
+                    // Prevents double-execution when two cron workers run concurrently.
+                    $claimed = $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                        "UPDATE `{$wpdb->prefix}lt_job_queue`
+                         SET status = 'processing', started_at = %s, attempts = attempts + 1
+                         WHERE id = %d AND status = 'pending'",
+                        current_time( 'mysql' ),
+                        (int) $job['id']
+                    ) );
+                    if ( ! $claimed ) {
+                        continue; // Another worker already claimed this job
+                    }
                     $args = $job['args'] ? json_decode( $job['args'], true ) : [];
                     do_action( $job['hook'], $args );
                     $wpdb->update(

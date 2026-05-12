@@ -77,6 +77,51 @@ class LTMS_Business_Redi_Manager {
             return 0;
         }
 
+        // Guard (a): product must explicitly be ReDi-enabled by its owner
+        $redi_enabled = get_post_meta( $origin_product_id, '_ltms_redi_enabled', true );
+        if ( 'yes' !== $redi_enabled ) {
+            LTMS_Core_Logger::error(
+                'REDI_ADOPT_NOT_ENABLED',
+                sprintf( 'Origin product #%d is not ReDi-enabled (_ltms_redi_enabled != yes)', $origin_product_id )
+            );
+            return 0;
+        }
+
+        // Guard (b): prevent self-adoption (vendor adopting their own product)
+        $origin_vendor_id = (int) get_post_meta( $origin_product_id, '_ltms_vendor_id', true );
+        if ( 0 === $origin_vendor_id ) {
+            $origin_vendor_id = (int) get_post_field( 'post_author', $origin_product_id );
+        }
+        if ( $origin_vendor_id === $reseller_id ) {
+            LTMS_Core_Logger::error(
+                'REDI_ADOPT_SELF_ADOPTION',
+                sprintf( 'Vendor #%d attempted to self-adopt product #%d', $reseller_id, $origin_product_id )
+            );
+            return 0;
+        }
+
+        // Guard (c): prevent duplicate active agreements for the same origin product
+        global $wpdb;
+        $existing_agreement = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->prepare(
+                "SELECT id FROM `{$wpdb->prefix}lt_redi_agreements`
+                 WHERE reseller_vendor_id = %d AND origin_product_id = %d AND status = 'active'
+                 LIMIT 1",
+                $reseller_id,
+                $origin_product_id
+            )
+        );
+        if ( $existing_agreement ) {
+            LTMS_Core_Logger::error(
+                'REDI_ADOPT_DUPLICATE',
+                sprintf(
+                    'Vendor #%d already has active agreement #%d for origin product #%d',
+                    $reseller_id, $existing_agreement, $origin_product_id
+                )
+            );
+            return 0;
+        }
+
         // Determine effective ReDi rate
         $redi_rate = ( $override_rate >= 0.0 )
             ? $override_rate
@@ -109,14 +154,14 @@ class LTMS_Business_Redi_Manager {
         $wpdb->insert(
             $wpdb->prefix . 'lt_redi_agreements',
             [
-                'reseller_id'       => $reseller_id,
-                'origin_product_id' => $origin_product_id,
-                'origin_vendor_id'  => self::get_origin_vendor_id_from_product( $origin_product_id ),
+                'reseller_vendor_id'  => $reseller_id,
+                'origin_product_id'   => $origin_product_id,
+                'origin_vendor_id'    => $origin_vendor_id,
                 'reseller_product_id' => $new_product_id,
-                'redi_rate'         => $redi_rate,
-                'status'            => 'active',
-                'created_at'        => LTMS_Utils::now_utc(),
-                'updated_at'        => LTMS_Utils::now_utc(),
+                'redi_rate'           => $redi_rate,
+                'status'              => 'active',
+                'created_at'          => LTMS_Utils::now_utc(),
+                'updated_at'          => LTMS_Utils::now_utc(),
             ],
             [ '%d', '%d', '%d', '%d', '%f', '%s', '%s', '%s' ]
         );
