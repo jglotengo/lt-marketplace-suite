@@ -211,7 +211,13 @@ final class LTMS_Utils {
             return true;
         }
 
-        // Roles de sistema que nunca son vendor — retornar false sin consultar meta.
+        // Meta flag tiene prioridad sobre roles de sistema — permite marcar como vendor
+        // a usuarios con rol subscriber/customer durante migración o registro progresivo.
+        if ( get_user_meta( $user_id, 'ltms_is_vendor', true ) ) {
+            return true;
+        }
+
+        // Roles de sistema que nunca son vendor — retornar false.
         $non_vendor_roles = [ 'administrator', 'editor', 'author', 'contributor', 'subscriber', 'shop_manager', 'customer' ];
         foreach ( $roles as $role ) {
             if ( in_array( $role, $non_vendor_roles, true ) ) {
@@ -219,8 +225,7 @@ final class LTMS_Utils {
             }
         }
 
-        // Fallback: meta flag para vendedores migrados sin rol asignado aún.
-        return (bool) get_user_meta( $user_id, 'ltms_is_vendor', true );
+        return false;
     }
 
     /**

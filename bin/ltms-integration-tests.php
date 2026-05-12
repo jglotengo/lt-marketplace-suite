@@ -19,6 +19,11 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WP_CLI' ) ) {
     die( "Ejecutar via WP-CLI: wp eval-file ltms-integration-tests.php --allow-root\n" );
 }
 
+// Forzar invalidación de OPcache para que las clases recién actualizadas se lean del disco.
+if ( function_exists( 'opcache_reset' ) ) {
+    opcache_reset();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Framework de pruebas minimalista
 // ─────────────────────────────────────────────────────────────────────────────
