@@ -258,7 +258,7 @@ final class LTMS_Referral_Tree {
         // Total ganado en comisiones de referido
         $earned = (float) $wpdb->get_var( // phpcs:ignore
             $wpdb->prepare(
-                "SELECT SUM(amount) FROM `{$wallet_table}` WHERE user_id = %d AND type = 'referral'", // phpcs:ignore
+                "SELECT SUM(amount) FROM `{$wallet_table}` WHERE vendor_id = %d AND type = 'referral'", // phpcs:ignore
                 $vendor_id
             )
         );

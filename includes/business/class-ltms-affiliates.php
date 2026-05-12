@@ -252,7 +252,7 @@ class LTMS_Affiliates {
              LEFT JOIN {$wpdb->users} u ON u.ID = CAST(
                  JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.source_vendor_id')) AS UNSIGNED
              )
-             WHERE wt.user_id = %d
+             WHERE wt.vendor_id = %d
                AND wt.type = 'credit'
                AND wt.metadata LIKE %s
              ORDER BY wt.created_at DESC
@@ -284,7 +284,7 @@ class LTMS_Affiliates {
              FROM {$wpdb->prefix}lt_referral_network rn
              INNER JOIN {$wpdb->users} u ON u.ID = rn.sponsor_id
              LEFT JOIN {$wpdb->prefix}lt_wallet_transactions wt
-                ON wt.user_id = rn.sponsor_id
+                ON wt.vendor_id = rn.sponsor_id
                AND wt.type = 'credit'
                AND wt.metadata LIKE '%%\"type\":\"referral\"%%'
                AND wt.created_at >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
