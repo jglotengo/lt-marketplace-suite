@@ -205,7 +205,8 @@ final class LTMS_Utils {
             return false;
         }
         return in_array( 'ltms_vendor', (array) $user->roles, true ) ||
-               in_array( 'ltms_vendor_premium', (array) $user->roles, true );
+               in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ||
+               (bool) get_user_meta( $user_id, 'ltms_is_vendor', true );
     }
 
     /**

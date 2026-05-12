@@ -204,7 +204,6 @@ function ltms_load_autoloader(): void {
                 'ltms-security'   => 'core/class-ltms-security.php',
                 'ltms-firewall'   => 'core/class-ltms-firewall.php',
                 'ltms-affiliates' => 'business/class-ltms-affiliates.php',
-        'ltms-products-ajax' => 'frontend/class-ltms-products-ajax.php',
             ];
 
             if ( isset( $two_part_exceptions[ $class_file ] ) ) {
@@ -283,6 +282,8 @@ function ltms_load_autoloader(): void {
                 'ltms-frontend-checkout-mexico-handler' => 'frontend/class-ltms-frontend-checkout-mexico-handler.php',
                 // M-114: handler AJAX para módulo de domiciliarios
                 'ltms-driver-ajax'                  => 'frontend/class-ltms-driver-ajax.php',
+                // M-40: handler AJAX de productos del vendor (get_products_data, create_product, etc.)
+                'ltms-products-ajax'                => 'frontend/class-ltms-products-ajax.php',
                 // Live search AJAX (public + authenticated)
                 'ltms-frontend-live-search'         => 'frontend/class-ltms-frontend-live-search.php',
                 // Business listeners

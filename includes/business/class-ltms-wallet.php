@@ -453,6 +453,32 @@ final class LTMS_Business_Wallet {
     }
 
     /**
+     * Obtiene el historial de transacciones de un vendor.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @param int $limit     Número máximo de registros a retornar.
+     * @param int $offset    Desplazamiento para paginación.
+     * @return array[]
+     */
+    public static function get_transactions( int $vendor_id, int $limit = 20, int $offset = 0 ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_wallet_transactions';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM `{$table}` WHERE vendor_id = %d ORDER BY created_at DESC LIMIT %d OFFSET %d",
+                $vendor_id,
+                $limit,
+                $offset
+            ),
+            ARRAY_A
+        );
+
+        return $rows ?: [];
+    }
+
+    /**
      * Congela una billetera (bloquea retiros por compliance).
      *
      * @param int    $vendor_id ID del vendedor.

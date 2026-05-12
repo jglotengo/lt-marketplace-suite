@@ -1,7 +1,28 @@
 <?php
 class LTMS_Openpay_Webhook_Handler {
 
-    public static function init(): void {}
+    public static function init(): void {
+        add_action( 'rest_api_init', [ __CLASS__, 'register_route' ] );
+    }
+
+    /**
+     * Registra la ruta REST de Openpay Webhooks.
+     *
+     * @return void
+     */
+    public static function register_route(): void {
+        register_rest_route(
+            'ltms/v1',
+            '/webhooks/openpay',
+            [
+                'methods'             => 'POST',
+                'callback'            => [ __CLASS__, 'handle' ],
+                // SEC-H2: '__return_true' es intencional — webhooks de Openpay deben ser públicamente
+                // accesibles. La autenticación se aplica dentro de handle() via HMAC-SHA256.
+                'permission_callback' => '__return_true',
+            ]
+        );
+    }
 
     /**
      * @param WP_REST_Request $request
