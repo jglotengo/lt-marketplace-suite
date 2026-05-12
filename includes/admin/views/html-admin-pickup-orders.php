@@ -44,7 +44,7 @@
 					?>
 					<tr>
 						<td>
-							<a href="<?php echo $edit_url; ?>">#<?php echo esc_html( $order_id ); ?></a>
+							<a href="<?php echo esc_url( $edit_url ); ?>">#<?php echo esc_html( $order_id ); ?></a>
 						</td>
 						<td><?php echo $customer; ?></td>
 						<td><?php echo $vendor_name; ?></td>

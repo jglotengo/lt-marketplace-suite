@@ -209,7 +209,7 @@
 								<td><?php echo esc_html( $commission->id ); ?></td>
 								<td>
 									<?php if ( $edit_url ) : ?>
-										<a href="<?php echo $edit_url; ?>">#<?php echo esc_html( $order_id ); ?></a>
+										<a href="<?php echo esc_url( $edit_url ); ?>">#<?php echo esc_html( $order_id ); ?></a>
 									<?php else : ?>
 										<?php esc_html_e( 'N/D', 'ltms' ); ?>
 									<?php endif; ?>
