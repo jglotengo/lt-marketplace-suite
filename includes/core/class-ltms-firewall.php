@@ -189,7 +189,11 @@ final class LTMS_Core_Firewall {
                 continue;
             }
             if ( is_array( $value ) ) {
-                $value = implode( ' ', array_map( 'strval', $value ) );
+                $flat = [];
+                array_walk_recursive( $value, static function ( $v ) use ( &$flat ) {
+                    $flat[] = (string) $v;
+                } );
+                $value = implode( ' ', $flat );
             }
             $matched_rule = self::check_patterns( (string) $value );
             if ( $matched_rule ) {

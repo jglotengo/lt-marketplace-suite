@@ -64,7 +64,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
     public function __construct() {
         $this->country       = LTMS_Core_Config::get_country();
         $environment         = LTMS_ENVIRONMENT === 'production' ? 'live' : 'sandbox';
-        $this->base_url      = self::API_URLS[ $this->country ][ $environment ] ?? self::API_URLS['CO']['sandbox'];
+        $this->api_url       = self::API_URLS[ $this->country ][ $environment ] ?? self::API_URLS['CO']['sandbox'];
         $this->client_id     = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_id', '' ) );
         $this->client_secret = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_secret', '' ) );
 

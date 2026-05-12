@@ -40,7 +40,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      * Constructor.
      */
     public function __construct() {
-        $this->base_url   = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
+        $this->api_url    = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
         $this->api_key    = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_aveonline_api_key', '' ) );
         $this->account_id = LTMS_Core_Config::get( 'ltms_aveonline_account_id', '' );
         parent::__construct();
