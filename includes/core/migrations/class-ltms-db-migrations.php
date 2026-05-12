@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.0.0';
+    private const CURRENT_VERSION = '2.0.1';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -40,6 +40,11 @@ final class LTMS_DB_Migrations {
         // Ejecutar migraciones en orden
         self::create_tables();
         self::create_indexes();
+
+        // Migraciones de actualización de esquema (no cubiertas por dbDelta)
+        if ( version_compare( $installed_version, '2.0.1', '<' ) ) {
+            self::migrate_2_0_1_payout_schema();
+        }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
 
@@ -1121,6 +1126,44 @@ final class LTMS_DB_Migrations {
             }
 
             $wpdb->query( "ALTER TABLE `{$table}` ADD INDEX `{$idx_name}` {$cols}" );
+        }
+        // phpcs:enable
+    }
+
+    /**
+     * v2.0.1: Fix lt_payout_requests schema.
+     *
+     * - wallet_id was deployed as NOT NULL with no default, blocking all INSERTs.
+     * - Missing columns (fee, net_amount, bank_account_id, reference, gateway_ref,
+     *   notes, approved_by) are added by dbDelta() in create_tables() above.
+     *   This method only handles what dbDelta cannot: changing NOT NULL → nullable.
+     *
+     * @return void
+     */
+    private static function migrate_2_0_1_payout_schema(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_payout_requests';
+
+        // Check whether wallet_id is still NOT NULL (idempotent guard).
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $col = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT IS_NULLABLE, COLUMN_TYPE
+                   FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME   = %s
+                    AND COLUMN_NAME  = 'wallet_id'",
+                DB_NAME,
+                $table
+            ),
+            ARRAY_A
+        );
+
+        if ( $col && $col['IS_NULLABLE'] === 'NO' ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}`
+                 MODIFY COLUMN `wallet_id` BIGINT UNSIGNED DEFAULT NULL"
+            );
         }
         // phpcs:enable
     }
