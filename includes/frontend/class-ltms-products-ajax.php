@@ -184,6 +184,12 @@ class LTMS_Products_Ajax {
         $gallery_ids = isset( $_POST['gallery_ids'] ) ? array_filter( array_map( 'intval', explode( ',', $_POST['gallery_ids'] ) ) ) : null;
         if ( $gallery_ids !== null ) { $product->set_gallery_image_ids( $gallery_ids ); }
         $product->save();
+
+        // M-23 FIX: re-guardar _ltms_vendor_id después de cada actualización.
+        // $product->save() de WooCommerce puede eliminar metas no gestionadas
+        // por WC, lo que haría que el producto dejara de aparecer en pedidos del dashboard.
+        update_post_meta( $product_id, '_ltms_vendor_id', get_current_user_id() );
+
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
 

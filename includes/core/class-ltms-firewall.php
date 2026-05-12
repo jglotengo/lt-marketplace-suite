@@ -28,7 +28,7 @@ final class LTMS_Core_Firewall {
         'sql_injection_union'    => '/(\bunion\b.*\bselect\b|\bselect\b.*\bfrom\b.*\bwhere\b)/i',
         'sql_injection_drop'     => '/(\bdrop\b.*\b(table|database)\b|\btruncate\b.*\btable\b)/i',
         'sql_injection_insert'   => '/(\binsert\b.*\binto\b|\bupdate\b.*\bset\b.*\bwhere\b)/i',
-        'sql_injection_comment'  => '/(--|#|\/\*[\s\S]*?\*\/)/i', // SEC-L1: [\s\S] catches multi-line comment bypass
+        'sql_injection_comment'  => '/(?:(?<![\w\-])-{2,}(?![\w\-])|#[^\n]*$|\/\*[\s\S]*?\*\/)/mi', // SEC-L1+M-120: avoid matching -- in base64/URLs
         'xss_script'             => '/<\s*script(\s[^>]*)?>/is',
         'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit)\s*=/i',
         'xss_javascript'         => '/javascript\s*:/i',
@@ -166,6 +166,17 @@ final class LTMS_Core_Firewall {
         }
 
         // 2. Análisis de parámetros GET y POST
+        // M-120 FIX: Lista blanca de keys que NUNCA se escanean — los nonces de WordPress
+        // son hashes base64 que pueden contener '--' y disparar sql_injection_comment,
+        // y campos de descripción pueden contener 'update ... set ... where' legítimamente.
+        $waf_key_whitelist = [
+            'nonce', '_wpnonce', '_wp_http_referer', 'nonce_field',
+            'ltms_nonce', 'security', 'action',   // WP standard
+            'password', 'pwd', 'pass',             // passwords no escanear (pueden contener --)
+            'description', 'content', 'message',  // rich-text fields
+            'store_description', 'banner_url',
+        ];
+
         $params_to_check = array_merge(
             $_GET,
             $_POST,
@@ -173,6 +184,10 @@ final class LTMS_Core_Firewall {
         );
 
         foreach ( $params_to_check as $key => $value ) {
+            // Saltar keys en la whitelist para evitar falsos positivos con nonces y campos de texto
+            if ( in_array( $key, $waf_key_whitelist, true ) ) {
+                continue;
+            }
             if ( is_array( $value ) ) {
                 $value = implode( ' ', array_map( 'strval', $value ) );
             }

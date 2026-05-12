@@ -449,11 +449,19 @@
          *
          * @param {Array} notifications Lista de notificaciones.
          */
-        renderNotifications(notifications) {
+        renderNotifications(notifications, replaceAll = false) {
             const $list = $('#ltms-notif-list');
-            $list.empty();
+
+            // M-22 FIX: $list.empty() en el polling borraba todas las notificaciones
+            // existentes en cada ciclo. Solo vaciar en carga inicial (replaceAll=true).
+            // En polling, prepend sin borrar + anti-duplicados por data-id.
+            if (replaceAll) {
+                $list.empty();
+            }
 
             notifications.forEach(notif => {
+                if ($list.find('[data-id="' + notif.id + '"]').length > 0) return;
+
                 const $item = $('<div>').addClass('ltms-notif-item unread').attr('data-id', notif.id);
                 $item.html(`
                     <p class="ltms-notif-title">${this.escapeHtml(notif.title)}</p>

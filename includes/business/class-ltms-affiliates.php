@@ -302,13 +302,13 @@ class LTMS_Affiliates {
         register_rest_route( 'ltms/v1', '/affiliates/stats', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'rest_get_stats' ],
-            'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
+            'permission_callback' => fn() => is_user_logged_in() && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) // M-121 FIX: ltms_is_vendor() no existe,
         ] );
 
         register_rest_route( 'ltms/v1', '/affiliates/leaderboard', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'rest_get_leaderboard' ],
-            'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
+            'permission_callback' => fn() => is_user_logged_in() && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) // M-121 FIX: ltms_is_vendor() no existe,
         ] );
     }
 
