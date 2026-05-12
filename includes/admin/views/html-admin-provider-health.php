@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$providers  = [ 'stripe', 'openpay', 'addi', 'aveonline', 'heka', 'uber' ];
+$providers  = [ 'stripe', 'openpay', 'addi', 'aveonline', 'heka', 'uber', 'alegra' ];
 $since_24h  = gmdate( 'Y-m-d H:i:s', time() - 86400 );
 $since_1h   = gmdate( 'Y-m-d H:i:s', time() - 3600 );
 
