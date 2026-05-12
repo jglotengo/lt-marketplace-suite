@@ -447,11 +447,12 @@ class LTMS_Core_Cron_Manager {
             foreach ( $bookings as $booking ) {
                 try {
                     if ( class_exists( 'LTMS_Business_Wallet' ) && (float) $booking['deposit_amount'] > 0 ) {
+                        // M-109: firma correcta = credit(vendor, amount, description:string, metadata:array)
                         LTMS_Business_Wallet::credit(
                             (int) $booking['vendor_id'],
                             (float) $booking['deposit_amount'],
-                            'booking_deposit_release',
-                            sprintf( __( 'Depósito liberado — Reserva #%d', 'ltms' ), (int) $booking['id'] )
+                            sprintf( __( 'Depósito liberado — Reserva #%d', 'ltms' ), (int) $booking['id'] ),
+                            [ 'type' => 'booking_deposit_release', 'booking_id' => (int) $booking['id'] ]
                         );
                     }
                     $wpdb->update(

@@ -77,16 +77,17 @@ class LTMS_Business_Redi_Order_Split {
             $origin_held = LTMS_Business_Consumer_Protection::hold_commission( $origin_vendor_id, $origin_vendor_net, $order->get_id() );
         }
         if ( ! $origin_held ) {
+            // M-108: firma correcta = credit(vendor, amount, description:string, metadata:array, order_id:int)
             LTMS_Business_Wallet::credit(
                 $origin_vendor_id,
                 $origin_vendor_net,
-                'commission',
                 sprintf(
                     /* translators: %1$s: order number */
                     __( 'Comisión ReDi pedido #%1$s (origen)', 'ltms' ),
                     $order->get_order_number()
                 ),
-                [ 'order_id' => $order->get_id(), 'redi' => true, 'gross' => $gross ]
+                [ 'type' => 'commission', 'order_id' => $order->get_id(), 'redi' => true, 'gross' => $gross ],
+                $order->get_id()
             );
         }
         $origin_tx_id = $origin_held ? null : true; // compat for record_redi_commission
@@ -97,16 +98,17 @@ class LTMS_Business_Redi_Order_Split {
             $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
         }
         if ( ! $reseller_held ) {
+            // M-108: firma correcta
             LTMS_Business_Wallet::credit(
                 $reseller_id,
                 $reseller_commission,
-                'commission',
                 sprintf(
                     /* translators: %1$s: order number */
                     __( 'Comisión ReDi pedido #%1$s (revendedor)', 'ltms' ),
                     $order->get_order_number()
                 ),
-                [ 'order_id' => $order->get_id(), 'redi' => true ]
+                [ 'type' => 'commission', 'order_id' => $order->get_id(), 'redi' => true ],
+                $order->get_id()
             );
         }
         $reseller_tx_id = $reseller_held ? null : true; // compat for record_redi_commission

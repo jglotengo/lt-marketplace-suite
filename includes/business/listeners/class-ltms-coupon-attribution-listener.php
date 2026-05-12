@@ -88,11 +88,13 @@ class LTMS_Coupon_Attribution_Listener {
         $commission = (float) $order->get_total() * $rate;
 
         if ( $commission > 0 && class_exists( 'LTMS_Business_Wallet' ) ) {
+            // M-107: firma correcta = credit(vendor, amount, description:string, metadata:array, order_id:int)
             LTMS_Business_Wallet::credit(
                 $referrer_id,
                 $commission,
-                'referral_commission',
-                sprintf( __( 'Comisión de referido — Pedido #%d', 'ltms' ), $order_id )
+                sprintf( __( 'Comisión de referido — Pedido #%d', 'ltms' ), $order_id ),
+                [ 'type' => 'referral_commission', 'order_id' => $order_id ],
+                $order_id
             );
 
             update_post_meta( $order_id, '_ltms_referral_credited', 1 );
