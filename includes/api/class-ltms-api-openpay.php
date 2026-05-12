@@ -335,6 +335,37 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Alias para compatibilidad con WC_Payment_Gateway::process_payment().
+     * Acepta array de parámetros y delega a create_charge().
+     *
+     * @param array $params [source_id, amount, description, customer, order_id, device_session_id].
+     * @return array
+     */
+    public function charge( array $params ): array {
+        return $this->create_charge(
+            $params['source_id']          ?? '',
+            (float) ( $params['amount']   ?? 0 ),
+            $params['description']        ?? '',
+            $params['customer']           ?? [],
+            (string) ( $params['order_id'] ?? '' ),
+            $params['device_session_id']  ?? '',
+            true
+        );
+    }
+
+    /**
+     * Alias para compatibilidad con WC_Payment_Gateway::process_refund().
+     *
+     * @param string $charge_id   ID del cobro Openpay.
+     * @param float  $amount      Monto a reembolsar (0 = total).
+     * @param string $description Motivo.
+     * @return array
+     */
+    public function refund( string $charge_id, float $amount = 0.0, string $description = '' ): array {
+        return $this->create_refund( $charge_id, $amount, $description );
+    }
+
+    /**
      * Sobrescribe perform_request para agregar autenticación HTTP Basic.
      *
      * @inheritDoc
