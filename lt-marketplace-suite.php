@@ -283,6 +283,8 @@ function ltms_load_autoloader(): void {
                 'ltms-frontend-checkout-mexico-handler' => 'frontend/class-ltms-frontend-checkout-mexico-handler.php',
                 // M-114: handler AJAX para módulo de domiciliarios
                 'ltms-driver-ajax'                  => 'frontend/class-ltms-driver-ajax.php',
+                // Live search AJAX (public + authenticated)
+                'ltms-frontend-live-search'         => 'frontend/class-ltms-frontend-live-search.php',
                 // Business listeners
                 'ltms-order-paid-listener'      => 'business/listeners/class-ltms-order-paid-listener.php',
                 'ltms-redi-order-listener'      => 'business/listeners/class-ltms-redi-order-listener.php',

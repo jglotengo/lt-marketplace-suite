@@ -159,30 +159,35 @@ final class LTMS_Payout_Scheduler {
     public static function approve( int $payout_id, int $admin_id ): array {
         global $wpdb;
 
-        // M-117: Atomic claim — prevents double-approval race condition.
-        // Two admins clicking approve simultaneously will both pass get_payout() check
-        // but only one will succeed on this UPDATE with WHERE status = 'pending'.
-        $claimed = $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            "UPDATE `{$wpdb->prefix}lt_payout_requests`
-             SET status = 'processing', approved_by = %d, processed_at = %s
-             WHERE id = %d AND status = 'pending'",
-            $admin_id,
-            LTMS_Utils::now_utc(),
-            $payout_id
-        ) );
-        if ( ! $claimed ) {
+        // Step 1: Read the current payout row — fast guard that works in tests and prod.
+        $payout = self::get_payout( $payout_id );
+        if ( ! $payout || $payout['status'] !== 'pending' ) {
             return [ 'success' => false, 'message' => __( 'Solicitud no encontrada o ya procesada.', 'ltms' ) ];
         }
 
-        $payout = self::get_payout( $payout_id );
-        if ( ! $payout ) {
-            return [ 'success' => false, 'message' => __( 'Error al obtener datos del retiro.', 'ltms' ) ];
+        // Step 2: M-117 — Atomic claim to prevent double-approval race condition.
+        // Only one of two concurrent admin clicks will see rows_affected = 1.
+        // In unit tests (mock wpdb) this UPDATE always returns 1, which is fine because
+        // the Step 1 guard already filtered non-pending payouts.
+        $rows = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->prefix . 'lt_payout_requests',
+            [
+                'status'       => 'processing',
+                'approved_by'  => $admin_id,
+                'processed_at' => LTMS_Utils::now_utc(),
+            ],
+            [ 'id' => $payout_id, 'status' => 'pending' ],
+            [ '%s', '%d', '%s' ],
+            [ '%d', '%s' ]
+        );
+        if ( $rows === false || $rows === 0 ) {
+            // Another worker already claimed this payout between Step 1 and Step 2
+            return [ 'success' => false, 'message' => __( 'Solicitud ya está siendo procesada por otro administrador.', 'ltms' ) ];
         }
 
         // Intentar procesar el pago vía gateway
         $payment_result = self::execute_payout_payment( $payout );
 
-        global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
         if ( $payment_result['success'] ) {
