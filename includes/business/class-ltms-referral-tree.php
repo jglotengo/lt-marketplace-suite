@@ -129,10 +129,10 @@ final class LTMS_Referral_Tree {
             }
 
             try {
+                // M-102: firma correcta = credit(vendor_id, amount, description:string, metadata:array, order_id:int)
                 LTMS_Business_Wallet::credit(
                     $sponsor_id,
                     $commission,
-                    'referral',
                     sprintf(
                         /* translators: %1$d: nivel, %2$d: ID vendedor referido, %3$d: pedido */
                         __( 'Comisión referido Nivel %1$d - Vendedor #%2$d - Pedido #%3$d', 'ltms' ),
@@ -141,11 +141,13 @@ final class LTMS_Referral_Tree {
                         $order_id
                     ),
                     [
+                        'type'             => 'referral',
                         'source_vendor_id' => $vendor_id,
                         'order_id'         => $order_id,
                         'referral_level'   => $index + 1,
                         'rate'             => $rate,
-                    ]
+                    ],
+                    $order_id
                 );
                 $distributed += $commission;
 

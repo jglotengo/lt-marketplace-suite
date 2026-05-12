@@ -65,26 +65,14 @@ class LTMS_Affiliates {
             LTMS_Referral_Tree::register_node( $vendor_id, '' );
         }
 
-        // Sincronizar con TPTC si está habilitado (fuente única de verdad para registro de afiliados)
-        if ( LTMS_Core_Config::get( 'ltms_tptc_enabled', 'no' ) === 'yes' && LTMS_Api_Factory::has( 'tptc' ) ) {
+        // Sincronizar con TPTC (M-104: verificar que el driver esté registrado antes de intentar)
+        if ( LTMS_Core_Config::get( 'ltms_tptc_enabled', 'no' ) === 'yes'
+             && class_exists( 'LTMS_Api_Factory' )
+             && LTMS_Api_Factory::has( 'tptc' ) ) {
             try {
-                $vendor  = get_userdata( $vendor_id );
-                $tptc    = LTMS_Api_Factory::get( 'tptc' );
-                $result  = $tptc->register_affiliate([
-                    'vendor_id'    => $vendor_id,
-                    'first_name'   => $vendor ? $vendor->first_name : '',
-                    'last_name'    => $vendor ? $vendor->last_name  : '',
-                    'email'        => $vendor ? $vendor->user_email : '',
-                    'phone'        => get_user_meta( $vendor_id, 'ltms_phone', true ) ?: '',
-                    'document'     => '', // cifrado, no se envía
-                    'document_type' => get_user_meta( $vendor_id, 'ltms_document_type', true ) ?: 'CC',
-                    'sponsor_code'  => $referral_code,
-                ]);
-                // Si TPTC devuelve su propio código de referido, usarlo como canónico
-                if ( ! empty( $result['referral_code'] ) ) {
-                    update_user_meta( $vendor_id, 'ltms_referral_code', sanitize_text_field( $result['referral_code'] ) );
-                }
-            } catch ( \Exception $e ) {
+                $tptc = LTMS_Api_Factory::get( 'tptc' );
+                $tptc->register_affiliate( $vendor_id, $code, $referral_code );
+            } catch ( \Throwable $e ) {
                 $this->log_warning( 'tptc_sync_failed', 'TPTC affiliate sync failed: ' . $e->getMessage(), [ 'vendor_id' => $vendor_id ] );
             }
         }
@@ -250,15 +238,27 @@ class LTMS_Affiliates {
     public function get_commission_history( int $vendor_id, int $limit = 20 ): array {
         global $wpdb;
 
+        // M-105: las comisiones de referido se almacenan en lt_wallet_transactions
+        // (acreditadas por Wallet::credit() con type=referral en metadata), NO en lt_commissions
         return $wpdb->get_results( $wpdb->prepare(
-            "SELECT c.*, u.display_name AS source_vendor_name
-             FROM {$wpdb->prefix}lt_commissions c
-             LEFT JOIN {$wpdb->users} u ON u.ID = c.vendor_id
-             WHERE c.type = 'referral'
-               AND c.notes LIKE %s
-             ORDER BY c.created_at DESC
+            "SELECT
+                wt.id,
+                wt.amount,
+                wt.description,
+                wt.metadata,
+                wt.created_at,
+                u.display_name AS source_vendor_name
+             FROM {$wpdb->prefix}lt_wallet_transactions wt
+             LEFT JOIN {$wpdb->users} u ON u.ID = CAST(
+                 JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.source_vendor_id')) AS UNSIGNED
+             )
+             WHERE wt.user_id = %d
+               AND wt.type = 'credit'
+               AND wt.metadata LIKE %s
+             ORDER BY wt.created_at DESC
              LIMIT %d",
-            '%vendor_id:' . $vendor_id . '%',
+            $vendor_id,
+            '%"type":"referral"%',
             $limit
         ), ARRAY_A );
     }
@@ -274,18 +274,20 @@ class LTMS_Affiliates {
     public function get_leaderboard( int $limit = 10 ): array {
         global $wpdb;
 
+        // M-105: usar lt_wallet_transactions para comisiones de referido
         return $wpdb->get_results( $wpdb->prepare(
             "SELECT
                 rn.sponsor_id AS vendor_id,
                 u.display_name,
                 COUNT(DISTINCT rn.vendor_id) AS total_referrals,
-                COALESCE(SUM(c.vendor_amount), 0) AS monthly_referral_income
+                COALESCE(SUM(wt.amount), 0) AS monthly_referral_income
              FROM {$wpdb->prefix}lt_referral_network rn
              INNER JOIN {$wpdb->users} u ON u.ID = rn.sponsor_id
-             LEFT JOIN {$wpdb->prefix}lt_commissions c
-                ON c.type = 'referral'
-               AND c.notes LIKE CONCAT('%vendor_id:', rn.sponsor_id, '%')
-               AND c.created_at >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
+             LEFT JOIN {$wpdb->prefix}lt_wallet_transactions wt
+                ON wt.user_id = rn.sponsor_id
+               AND wt.type = 'credit'
+               AND wt.metadata LIKE '%%\"type\":\"referral\"%%'
+               AND wt.created_at >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
              GROUP BY rn.sponsor_id, u.display_name
              ORDER BY monthly_referral_income DESC
              LIMIT %d",
@@ -302,13 +304,13 @@ class LTMS_Affiliates {
         register_rest_route( 'ltms/v1', '/affiliates/stats', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'rest_get_stats' ],
-            'permission_callback' => fn() => is_user_logged_in() && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) // M-121 FIX: ltms_is_vendor() no existe,
+            'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
         ] );
 
         register_rest_route( 'ltms/v1', '/affiliates/leaderboard', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'rest_get_leaderboard' ],
-            'permission_callback' => fn() => is_user_logged_in() && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) // M-121 FIX: ltms_is_vendor() no existe,
+            'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
         ] );
     }
 

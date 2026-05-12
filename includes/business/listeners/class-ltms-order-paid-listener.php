@@ -163,11 +163,13 @@ final class LTMS_Order_Paid_Listener {
             if ( $already ) return;
 
             if ( class_exists( 'LTMS_Business_Wallet' ) ) {
+                // M-103: firma correcta = debit(vendor_id, amount, description:string, metadata:array, order_id:int)
                 LTMS_Business_Wallet::debit(
                     $vendor_id,
                     $cost,
-                    'shipping_absorbed',
-                    sprintf( __( 'Envío absorbido — Pedido #%d', 'ltms' ), $order->get_id() )
+                    sprintf( __( 'Envío absorbido — Pedido #%d', 'ltms' ), $order->get_id() ),
+                    [ 'type' => 'shipping_absorbed', 'order_id' => $order->get_id() ],
+                    $order->get_id()
                 );
             }
 

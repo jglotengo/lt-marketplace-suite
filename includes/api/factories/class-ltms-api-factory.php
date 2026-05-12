@@ -86,6 +86,18 @@ final class LTMS_Api_Factory {
     }
 
     /**
+     * Verifica si un proveedor está registrado y su clase disponible.
+     * M-104: usado por Affiliates para evitar llamadas a TPTC sin configuración.
+     *
+     * @param string $provider Slug del proveedor.
+     * @return bool
+     */
+    public static function has( string $provider ): bool {
+        $provider = strtolower( trim( $provider ) );
+        return isset( self::$client_map[ $provider ] ) && class_exists( self::$client_map[ $provider ] );
+    }
+
+    /**
      * Registra un nuevo proveedor de API (permite extensibilidad).
      *
      * @param string $slug       Identificador único del proveedor.
