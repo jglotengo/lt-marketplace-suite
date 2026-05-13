@@ -226,6 +226,14 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
     foreach ( $fields as $field ) {
         $value = LTMS_Core_Config::get( $field['key'], $field['default'] ?? '' );
 
+        // A-6 FIX: Los campos _rate/_percent se guardan como decimales (0.1 = 10%)
+        // pero el UI los muestra como porcentaje — multiplicar por 100 al mostrar.
+        if ( isset( $field['type'] ) && $field['type'] === 'number'
+            && ( strpos( $field['key'], '_rate' ) !== false || strpos( $field['key'], '_percent' ) !== false )
+            && is_numeric( $value ) && (float) $value <= 1 && (float) $value > 0 ) {
+            $value = round( (float) $value * 100, 4 );
+        }
+
         // No mostrar contraseñas cifradas en texto plano
         if ( ( $field['type'] ?? '' ) === 'password' && strpos( $value, 'v1:' ) === 0 ) {
             $value = '';

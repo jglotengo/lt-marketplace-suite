@@ -101,9 +101,16 @@ final class LTMS_Admin_Settings {
                 continue;
             }
 
-            // Campos de porcentaje (0-100)
+            // A-6 FIX: Campos de porcentaje — el UI muestra el valor como porcentaje (0-100).
+            // Solo dividir entre 100 si el valor es > 1, lo que indica que el usuario
+            // lo ingresó como porcentaje. Si ya es ≤ 1, ya está en formato decimal correcto.
             if ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false ) {
-                $sanitized[ $key ] = max( 0, min( 100, (float) $value ) ) / 100;
+                $float_val = (float) $value;
+                if ( $float_val > 1 ) {
+                    $sanitized[ $key ] = max( 0, min( 1, $float_val / 100 ) );
+                } else {
+                    $sanitized[ $key ] = max( 0, min( 1, $float_val ) );
+                }
                 continue;
             }
 

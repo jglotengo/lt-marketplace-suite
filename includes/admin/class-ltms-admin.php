@@ -308,10 +308,12 @@ final class LTMS_Admin {
             'country'   => LTMS_Core_Config::get_country(),
             'version'   => LTMS_VERSION,
             'i18n'      => [
-                'confirm_delete' => __( '¿Confirmas que deseas eliminar este elemento?', 'ltms' ),
-                'processing'     => __( 'Procesando...', 'ltms' ),
-                'error_generic'  => __( 'Ocurrió un error. Por favor intenta de nuevo.', 'ltms' ),
-                'success'        => __( '¡Operación exitosa!', 'ltms' ),
+                'confirm_delete'         => __( '¿Confirmas que deseas eliminar este elemento?', 'ltms' ),
+                'confirm_approve_payout' => __( '¿Aprobar este retiro? El pago se procesará de inmediato.', 'ltms' ),
+                'processing'             => __( 'Procesando...', 'ltms' ),
+                'error'                  => __( 'Ocurrió un error. Por favor intenta de nuevo.', 'ltms' ),
+                'error_generic'          => __( 'Ocurrió un error. Por favor intenta de nuevo.', 'ltms' ),
+                'success'                => __( '¡Operación exitosa!', 'ltms' ),
             ],
         ]);
     }

@@ -122,14 +122,17 @@
             $(document).on('click', '.ltms-approve-payout', function (e) {
                 e.preventDefault();
                 const payoutId = $(this).data('payout-id');
-                if (!confirm(ltmsAdmin.i18n.confirm_delete)) return;
+                // A-7 FIX: texto correcto para aprobación (no reutilizar confirm_delete)
+                if (!confirm(ltmsAdmin.i18n.confirm_approve_payout || '¿Aprobar este retiro? El pago se procesará de inmediato.')) return;
 
                 self.ajaxAction('ltms_approve_payout', { payout_id: payoutId }, (response) => {
                     if (response.success) {
                         self.showNotice('success', response.data.message);
                         $(this).closest('tr').fadeOut(400, function () { $(this).remove(); });
                     } else {
-                        self.showNotice('error', response.data);
+                        // A-7 FIX: response.data puede ser objeto
+                        const errMsg = typeof response.data === 'string' ? response.data : (response.data?.message || ltmsAdmin.i18n.error || 'Error');
+                        self.showNotice('error', errMsg);
                     }
                 }.bind(this));
             });

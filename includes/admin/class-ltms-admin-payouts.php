@@ -34,7 +34,8 @@ final class LTMS_Admin_Payouts {
         $instance = new self();
         add_action( 'wp_ajax_ltms_approve_payout',  [ $instance, 'ajax_approve_payout' ] );
         add_action( 'wp_ajax_ltms_reject_payout',   [ $instance, 'ajax_reject_payout' ] );
-        add_action( 'wp_ajax_ltms_approve_kyc',     [ $instance, 'ajax_approve_kyc' ] );
+        add_action( 'wp_ajax_ltms_approve_kyc',       [ $instance, 'ajax_approve_kyc' ] );
+        add_action( 'wp_ajax_ltms_quick_approve_kyc', [ $instance, 'ajax_quick_approve_kyc' ] ); // A-5
         add_action( 'wp_ajax_ltms_reject_kyc',      [ $instance, 'ajax_reject_kyc' ] );
         add_action( 'wp_ajax_ltms_freeze_wallet',   [ $instance, 'ajax_freeze_wallet' ] );
         add_action( 'wp_ajax_ltms_unfreeze_wallet', [ $instance, 'ajax_unfreeze_wallet' ] );
@@ -138,6 +139,46 @@ final class LTMS_Admin_Payouts {
                 $vendor_id
             ),
         ]);
+    }
+
+    /**
+     * AJAX: Aprobación rápida de KYC desde la lista de vendedores.
+     * A-5 FIX: Permite aprobar directamente sin un documento KYC previo enviado.
+     *
+     * @return void
+     */
+    public function ajax_quick_approve_kyc(): void {
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
+            wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
+        }
+
+        $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 ); // phpcs:ignore
+        if ( ! $vendor_id || ! get_userdata( $vendor_id ) ) {
+            wp_send_json_error( __( 'Vendedor no encontrado.', 'ltms' ) );
+        }
+
+        update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
+        update_user_meta( $vendor_id, 'ltms_vendor_status', 'approved' );
+        update_user_meta( $vendor_id, 'ltms_kyc_approved_at', LTMS_Utils::now_utc() );
+        update_user_meta( $vendor_id, 'ltms_kyc_approved_by', get_current_user_id() );
+
+        // Disparar acción para listeners (notificaciones, compliance, etc.)
+        do_action( 'ltms_vendor_approved', $vendor_id );
+
+        LTMS_Core_Logger::security(
+            'KYC_QUICK_APPROVED',
+            sprintf( 'Vendedor #%d aprobado rápidamente por admin #%d desde lista de vendedores', $vendor_id, get_current_user_id() )
+        );
+
+        wp_send_json_success( [
+            'message' => sprintf(
+                /* translators: %d: ID del vendedor */
+                __( 'Vendedor #%d aprobado exitosamente.', 'ltms' ),
+                $vendor_id
+            ),
+        ] );
     }
 
     /**
