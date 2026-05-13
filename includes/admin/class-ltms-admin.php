@@ -406,6 +406,11 @@ final class LTMS_Admin {
     }
 
     public function render_settings(): void {
+        // Asegurar que la función helper esté disponible antes de incluir la vista.
+        // Esto evita el error de SiteGround cuando include carga el archivo dos veces.
+        if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) {
+            require_once LTMS_INCLUDES_DIR . 'admin/views/html-admin-settings.php';
+        }
         $this->render_view( 'html-admin-settings' );
     }
 
@@ -469,7 +474,7 @@ final class LTMS_Admin {
         $view_path = LTMS_INCLUDES_DIR . 'admin/views/' . $view_name . '.php';
 
         if ( file_exists( $view_path ) ) {
-            include $view_path;
+            include_once $view_path;
         } else {
             echo '<div class="wrap"><h1>LTMS</h1><p>' .
                 sprintf(
