@@ -150,12 +150,14 @@ class WalletTest extends LTMS_Unit_Test_Case {
         $this->assertIsFloat( $result );
     }
 
-    public function test_available_balance_held_mayor_que_balance_retorna_negativo(): void {
+    public function test_available_balance_held_mayor_que_balance_retorna_cero(): void {
         if ( ! method_exists( $this->wallet, 'get_available_balance' ) ) {
             $this->markTestSkipped();
         }
+        // Cuando held > balance el disponible es 0 (nunca negativo) — M-WL-1
         $result = $this->wallet->get_available_balance( 50.0, 100.0 );
-        $this->assertEqualsWithDelta( -50.0, $result, 0.01 );
+        $this->assertGreaterThanOrEqual( 0.0, $result );
+        $this->assertEqualsWithDelta( 0.0, $result, 0.01 );
     }
 
     public function test_available_balance_aplica_round_2_decimales(): void {
