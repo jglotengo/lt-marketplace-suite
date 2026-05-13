@@ -381,6 +381,18 @@
     color: #065f46;
     border: 1px solid #6ee7b7;
 }
+/* M-54: info variant used by render_already_logged_in() */
+.ltms-notice.ltms-notice-info {
+    display: block;
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 12px 16px;
+}
+.ltms-notice.ltms-notice-info a {
+    color: #1d4ed8;
+    font-weight: 600;
+}
 
 /* ── Grupo de campo con error ── */
 .ltms-form-group {

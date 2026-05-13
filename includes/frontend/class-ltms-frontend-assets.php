@@ -104,9 +104,11 @@ final class LTMS_Frontend_Assets {
         }
 
         // Login y Registro de vendedores — detección por ID o por shortcode (M-121 fallback)
+        // M-53: activator stores register page under key 'ltms-register', not 'ltms-vendor-register'.
         $is_auth_page = (
-            $page_id === (int) ( $pages['ltms-login'] ?? 0 ) ||
-            $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 )
+            $page_id === (int) ( $pages['ltms-login']           ?? 0 ) ||
+            $page_id === (int) ( $pages['ltms-register']        ?? 0 ) ||
+            $page_id === (int) ( $pages['ltms-vendor-register'] ?? 0 )  // legacy fallback
         );
         if ( ! $is_auth_page && $page_id > 0 ) {
             $post = get_post( $page_id );
