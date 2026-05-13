@@ -31,9 +31,13 @@ final class LTMS_Public_Auth_Handler {
         add_shortcode( 'ltms_vendor_login',    [ $instance, 'render_login_form' ] );
         add_shortcode( 'ltms_vendor_register', [ $instance, 'render_register_form' ] );
 
-        // AJAX handlers (no autenticados para login/registro)
+        // AJAX handlers. M-57: registrar también la variante priv para que admins
+        // (y otros roles no-vendor) puedan probar el flujo desde wp-admin sin obtener
+        // 0/HTTP-200 que el JS interpreta como "Error de conexión".
         add_action( 'wp_ajax_nopriv_ltms_vendor_login',    [ $instance, 'ajax_vendor_login' ] );
+        add_action( 'wp_ajax_ltms_vendor_login',           [ $instance, 'ajax_vendor_login' ] );
         add_action( 'wp_ajax_nopriv_ltms_vendor_register', [ $instance, 'ajax_vendor_register' ] );
+        add_action( 'wp_ajax_ltms_vendor_register',        [ $instance, 'ajax_vendor_register' ] );
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
 
         // Listener de verificación de email (?ltms_verify_email=<token>&uid=<id>)

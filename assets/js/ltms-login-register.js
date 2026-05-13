@@ -23,13 +23,30 @@
             this.initTogglePassword();
         },
 
+        // M-57: helper para mostrar/ocultar estado "procesando" sin destruir
+        // los <span> internos del botón (.ltms-btn-text / .ltms-btn-spinner).
+        setBtnProcessing($btn, isProcessing) {
+            if (isProcessing) {
+                if (!$btn.data('ltms-original-html')) {
+                    $btn.data('ltms-original-html', $btn.html());
+                }
+                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+            } else {
+                const original = $btn.data('ltms-original-html');
+                if (original) {
+                    $btn.html(original);
+                }
+                $btn.prop('disabled', false);
+            }
+        },
+
         bindLoginForm() {
             $(document).on('submit', '#ltms-login-form', function (e) {
                 e.preventDefault();
                 const $form = $(this);
                 const $btn  = $form.find('[type="submit"]');
 
-                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+                LTMS.Auth.setBtnProcessing($btn, true);
 
                 $.ajax({
                     url: ltmsAuth.ajax_url,
@@ -42,16 +59,22 @@
                         remember: $form.find('[name="rememberme"]').is(':checked'),
                     },
                     success(response) {
-                        $btn.prop('disabled', false).text('Iniciar Sesión');
+                        LTMS.Auth.setBtnProcessing($btn, false);
                         if (response.success) {
                             window.location.href = response.data.redirect;
                         } else {
-                            LTMS.Auth.showFormError('#ltms-login-form', response.data);
+                            const msg = (typeof response.data === 'string')
+                                ? response.data
+                                : (response.data && response.data.message) || 'Error en el inicio de sesión.';
+                            LTMS.Auth.showFormError('#ltms-login-form', msg);
                         }
                     },
-                    error() {
-                        $btn.prop('disabled', false);
-                        LTMS.Auth.showFormError('#ltms-login-form', 'Error de conexión. Intenta de nuevo.');
+                    error(xhr) {
+                        LTMS.Auth.setBtnProcessing($btn, false);
+                        let msg = 'Error de conexión. Intenta de nuevo.';
+                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Espera 15 minutos.';
+                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
+                        LTMS.Auth.showFormError('#ltms-login-form', msg);
                     },
                 });
             });
@@ -134,14 +157,14 @@
                 }
 
                 const $btn = $form.find('[type="submit"]');
-                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+                LTMS.Auth.setBtnProcessing($btn, true);
 
                 $.ajax({
                     url: ltmsAuth.ajax_url,
                     method: 'POST',
                     data: $form.serialize() + '&action=ltms_vendor_register&nonce=' + ltmsAuth.nonce,
                     success(response) {
-                        $btn.prop('disabled', false);
+                        LTMS.Auth.setBtnProcessing($btn, false);
                         if (response.success) {
                             window.location.href = response.data.redirect;
                         } else {
@@ -193,11 +216,11 @@
                         }
                     },
                     error(xhr) {
-                        $btn.prop('disabled', false);
+                        LTMS.Auth.setBtnProcessing($btn, false);
                         let msg = 'Error de conexión.';
-                        if (xhr && xhr.status === 429) {
-                            msg = 'Demasiados intentos. Intenta más tarde.';
-                        }
+                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Intenta más tarde.';
+                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
+                        if (xhr && xhr.status === 403) msg = 'Sesión expirada. Recarga la página.';
                         LTMS.Auth.showFormError('#ltms-register-form', msg);
                     },
                 });
