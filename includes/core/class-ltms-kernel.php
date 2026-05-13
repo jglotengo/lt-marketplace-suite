@@ -210,6 +210,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Booking_Manager' ) ) {
             LTMS_Booking_Manager::init();
         }
+        // M-52: Booking Season Manager tiene init() con add_filter — faltaba boot en kernel.
+        if ( class_exists( 'LTMS_Booking_Season_Manager' ) ) {
+            LTMS_Booking_Season_Manager::init();
+        }
 
         // Listeners de eventos de dominio
         if ( class_exists( 'LTMS_Order_Paid_Listener' ) ) {
