@@ -42,6 +42,39 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
 
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_checkout_scripts' ] );
+
+        // A-9 FIX: Aviso en wp-admin si el gateway está activo pero sin credenciales
+        if ( is_admin() && 'yes' === $this->enabled ) {
+            add_action( 'admin_notices', [ $this, 'maybe_show_credentials_notice' ] );
+        }
+    }
+
+    /**
+     * Muestra un aviso en wp-admin si Openpay está activo pero sin credenciales configuradas.
+     *
+     * @return void
+     */
+    public function maybe_show_credentials_notice(): void {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            return;
+        }
+
+        $merchant_id = $this->get_option( 'merchant_id', '' );
+        $private_key = $this->get_option( 'private_key', '' );
+
+        if ( empty( $merchant_id ) || empty( $private_key ) ) {
+            $config_url = admin_url( 'admin.php?page=wc-settings&tab=checkout&section=ltms_openpay' );
+            echo '<div class="notice notice-error is-dismissible"><p>' .
+                 sprintf(
+                     // translators: %s: URL de configuración
+                     wp_kses(
+                         __( '<strong>LTMS Openpay:</strong> El gateway de pago está activo pero las credenciales no están configuradas. Los compradores verán un mensaje de "método no disponible". <a href="%s">Configura las credenciales aquí</a>.', 'ltms' ),
+                         [ 'strong' => [], 'a' => [ 'href' => [] ] ]
+                     ),
+                     esc_url( $config_url )
+                 ) .
+                 '</p></div>';
+        }
     }
 
     /**
@@ -110,6 +143,27 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
      * @return void
      */
     public function payment_fields(): void {
+        // A-9 FIX: Mostrar aviso de credenciales faltantes solo a admins, no al comprador.
+        // Antes el error del constructor (RuntimeException) llegaba al wc_add_notice y el
+        // comprador veía "Credenciales no configuradas para país CO" en el checkout.
+        $merchant_id = $this->get_option( 'merchant_id', '' );
+        $private_key = $this->get_option( 'private_key', '' );
+
+        if ( empty( $merchant_id ) || empty( $private_key ) ) {
+            if ( current_user_can( 'manage_woocommerce' ) ) {
+                echo '<div class="woocommerce-info">' .
+                     '<strong>LTMS Admin:</strong> ' .
+                     esc_html__( 'Las credenciales de Openpay no están configuradas. Ve a WooCommerce → Pagos → LTMS Openpay → Configurar.', 'ltms' ) .
+                     '</div>';
+            } else {
+                // Al comprador: mostrar mensaje amigable sin detalles técnicos
+                echo '<p class="woocommerce-info">' .
+                     esc_html__( 'Este método de pago no está disponible en este momento. Por favor selecciona otro método.', 'ltms' ) .
+                     '</p>';
+            }
+            return;
+        }
+
         if ( $this->description ) {
             echo '<p>' . wp_kses_post( $this->description ) . '</p>';
         }
