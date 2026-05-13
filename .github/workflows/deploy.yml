@@ -6,55 +6,22 @@ on:
       - main
 
 jobs:
-  unit-tests:
-    uses: ./.github/workflows/ci.yml
-    if: false  # skip in deploy workflow
-
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    steps:
-      - name: Wait for server to be ready
-        run: sleep 5
 
-      - name: Trigger deploy via REST API (bypass SiteGround bot detection)
-        run: |
-          # Use full browser User-Agent to avoid SiteGround CAPTCHA bot detection
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
-            --max-time 45 \
-            --retry 3 \
-            --retry-delay 5 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" \
-            -H "Accept: text/plain,application/json" \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            -H "X-GitHub-Ref: ${{ github.ref }}" \
-            -H "X-GitHub-SHA: ${{ github.sha }}" \
-            "https://lo-tengo.com.co/ltms-deploy-webhook.php?token=${{ secrets.DEPLOY_TOKEN }}&ref=${{ github.sha }}")
-          
-          echo "HTTP status: $HTTP_CODE"
-          cat /tmp/response.txt
-          
-          # Accept 200 (success) or 202 (accepted/queued)
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
-            echo "Deploy triggered successfully"
-          else
-            echo "Deploy webhook failed with status $HTTP_CODE"
-            
-            # Fallback: try alternate URL pattern
-            echo "Trying fallback deploy URL..."
-            HTTP_CODE2=$(curl -s -o /tmp/response2.txt -w "%{http_code}" \
-              --max-time 45 \
-              -H "User-Agent: Mozilla/5.0 (compatible; LTMS-Deploy/1.0)" \
-              -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-              "https://lo-tengo.com.co/?ltms_deploy=1&token=${{ secrets.DEPLOY_TOKEN }}")
-            
-            echo "Fallback HTTP status: $HTTP_CODE2"
-            cat /tmp/response2.txt
-            
-            if [ "$HTTP_CODE2" != "200" ]; then
-              echo "Both deploy methods failed. Manual deployment may be required."
-              echo "Run on server: cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite && git fetch origin && git reset --hard origin/main"
-              # Don't fail the action — code is on GitHub, manual deploy is possible
-              exit 0
-            fi
-          fi
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ssh.lo-tengo.com.co
+          port: 18765
+          username: u1549-ruo8hvwpk9dt
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            set -e
+            PLUGIN_DIR="/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite"
+            cd "$PLUGIN_DIR"
+            git fetch origin
+            git reset --hard origin/main
+            echo "✅ Deploy completado: $(git log --oneline -1)"
