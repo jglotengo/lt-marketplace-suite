@@ -1,0 +1,21 @@
+# ================================================================
+# LTMS Deploy Webhook — SiteGround CAPTCHA bypass
+# 
+# INSTRUCCIONES: Agregar estas líneas al .htaccess de public_html
+# ANTES de las reglas de WordPress (antes de "# BEGIN WordPress")
+# ================================================================
+
+# Excluir el webhook del bot-protection de SiteGround
+<Files "ltms-deploy-webhook.php">
+    # Permitir acceso sin CAPTCHA
+    Order allow,deny
+    Allow from all
+    
+    # Bypass de SiteGround Security para este archivo específico
+    SetEnv nosgcaptcha 1
+    SetEnv SGCAPTCHA_DISABLED 1
+</Files>
+
+# Regla RewriteRule alternativa para el webhook (evita redirects de bot-protection)
+RewriteEngine On
+RewriteRule ^ltms-deploy-webhook\.php$ - [L,E=NOSGCAPTCHA:1]

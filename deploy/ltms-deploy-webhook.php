@@ -15,9 +15,16 @@ define( 'MAX_LOG_LINES',  200 );
 
 // ── Seguridad ─────────────────────────────────────────────────────────────────
 header( 'Content-Type: text/plain; charset=utf-8' );
+// Prevent SiteGround from caching this response or redirecting to CAPTCHA
+header( 'Cache-Control: no-store, no-cache, must-revalidate' );
+header( 'X-Robots-Tag: noindex' );
 
-$token = $_GET['token'] ?? '';
-if ( ! hash_equals( DEPLOY_TOKEN, $token ) ) {
+// Accept token via GET param or X-Deploy-Token header (bypass bot detection)
+$token = $_GET['token'] 
+    ?? ($_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '')
+    ?? '';
+
+if ( empty( $token ) || ! hash_equals( DEPLOY_TOKEN, $token ) ) {
     http_response_code( 403 );
     echo "Forbidden: invalid token\n";
     exit;
