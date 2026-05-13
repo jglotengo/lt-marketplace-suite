@@ -47,7 +47,9 @@ final class LTMS_Public_Auth_Handler {
     }
 
     public function render_login_form( array $atts = [] ): string {
-        if ( is_user_logged_in() ) {
+        // Solo bloquear si el user actual ya es vendor (no necesita login). Admins
+        // y otros roles pueden ver el form (útil para QA, soporte, demo).
+        if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
             return $this->render_already_logged_in();
         }
 
@@ -55,12 +57,19 @@ final class LTMS_Public_Auth_Handler {
         $view = LTMS_INCLUDES_DIR . 'frontend/views/vendor-parts/form-login.php';
         if ( file_exists( $view ) ) {
             include $view;
+        } else {
+            // Mensaje explícito si el template no se encontró — evita "página en blanco" silenciosa.
+            echo '<div class="ltms-notice ltms-notice-error"><p>'
+                . esc_html__( 'Error: plantilla de login no encontrada. Contacta al soporte.', 'ltms' )
+                . '</p></div>';
         }
         return ob_get_clean();
     }
 
     public function render_register_form( array $atts = [] ): string {
-        if ( is_user_logged_in() ) {
+        // M-56: si el user ya es vendor → notice + link al panel (no tiene sentido
+        // re-registrarse). Si es admin u otro rol, mostrar el form igual.
+        if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
             return $this->render_already_logged_in();
         }
 
@@ -68,8 +77,25 @@ final class LTMS_Public_Auth_Handler {
         $view = LTMS_INCLUDES_DIR . 'frontend/views/vendor-parts/form-register.php';
         if ( file_exists( $view ) ) {
             include $view;
+        } else {
+            echo '<div class="ltms-notice ltms-notice-error"><p>'
+                . esc_html__( 'Error: plantilla de registro no encontrada. Contacta al soporte.', 'ltms' )
+                . '</p></div>';
         }
         return ob_get_clean();
+    }
+
+    /**
+     * Devuelve true solo si el usuario actual tiene rol ltms_vendor o ltms_vendor_premium.
+     * Admins/editores NO cuentan como vendor — pueden ver los formularios.
+     */
+    private function current_user_is_vendor(): bool {
+        $user = wp_get_current_user();
+        if ( ! $user || ! $user->ID ) {
+            return false;
+        }
+        $roles = (array) $user->roles;
+        return in_array( 'ltms_vendor', $roles, true ) || in_array( 'ltms_vendor_premium', $roles, true );
     }
 
     public function ajax_vendor_login(): void {

@@ -86,6 +86,20 @@ final class LTMS_Frontend_Assets {
                 break;
             }
         }
+        // M-56: fallback por shortcode — si ltms_installed_pages está desincronizado
+        // con las páginas reales (slug existe pero key no apunta), detectar por contenido.
+        if ( ! $is_vendor_panel && $page_id > 0 ) {
+            $post = get_post( $page_id );
+            $dashboard_shortcodes = [ 'ltms_vendor_dashboard', 'ltms_vendor_orders', 'ltms_vendor_wallet', 'ltms_vendor_kyc', 'ltms_vendor_insurance', 'ltms_vendor_store' ];
+            if ( $post ) {
+                foreach ( $dashboard_shortcodes as $sc ) {
+                    if ( has_shortcode( $post->post_content, $sc ) ) {
+                        $is_vendor_panel = true;
+                        break;
+                    }
+                }
+            }
+        }
         if ( $is_vendor_panel ) {
             $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
