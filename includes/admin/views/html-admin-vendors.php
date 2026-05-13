@@ -102,6 +102,16 @@ $total      = $user_query->get_total();
                         <a href="<?php echo esc_url( get_edit_user_link( $vendor->ID ) ); ?>" class="ltms-btn ltms-btn-outline ltms-btn-sm">
                             ✏️ <?php esc_html_e( 'Editar', 'ltms' ); ?>
                         </a>
+                        <?php
+                        // A-5 FIX: Botón de aprobación rápida para vendedores con KYC pendiente
+                        $kyc_status = get_user_meta( $vendor->ID, 'ltms_kyc_status', true ) ?: 'pending';
+                        if ( 'pending' === $kyc_status && current_user_can( 'ltms_manage_kyc' ) ) :
+                        ?>
+                        <button type="button" class="ltms-btn ltms-btn-success ltms-btn-sm"
+                                onclick="if(confirm('<?php esc_attr_e( '¿Aprobar KYC de este vendedor?', 'ltms' ); ?>')) LTMS.Admin.ajaxAction('ltms_quick_approve_kyc', {vendor_id: <?php echo esc_js( $vendor->ID ); ?>}, function(r){ if(r.success){ location.reload(); } else { alert(r.data||'Error'); } })">
+                            ✅ <?php esc_html_e( 'Aprobar KYC', 'ltms' ); ?>
+                        </button>
+                        <?php endif; ?>
                         <?php if ( $wallet['is_frozen'] ) : ?>
                         <button type="button" class="ltms-btn ltms-btn-warning ltms-btn-sm"
                                 data-vendor-id="<?php echo esc_attr( $vendor->ID ); ?>"

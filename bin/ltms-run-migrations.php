@@ -7,7 +7,10 @@ if ( ! defined( 'ABSPATH' ) ) { die; }
 
 if ( function_exists( 'opcache_reset' ) ) {
     opcache_reset();
-    echo "[OK] OPcache flushed\n";
+    echo "[OK] OPcache reset\n";
+    // Invalidar archivo específico
+    $utils_file = LTMS_PLUGIN_DIR . 'includes/core/utils/class-ltms-utils.php';
+    if ( function_exists( 'opcache_invalidate' ) ) { opcache_invalidate( $utils_file, true ); echo "[OK] OPcache invalidated utils\n"; } else { touch( $utils_file ); echo "[OK] Touched utils\n"; }
 }
 
 if ( class_exists( 'LTMS_DB_Migrations' ) ) {

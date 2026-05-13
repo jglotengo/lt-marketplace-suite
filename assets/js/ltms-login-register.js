@@ -23,13 +23,30 @@
             this.initTogglePassword();
         },
 
+        // M-57: helper para mostrar/ocultar estado "procesando" sin destruir
+        // los <span> internos del botón (.ltms-btn-text / .ltms-btn-spinner).
+        setBtnProcessing($btn, isProcessing) {
+            if (isProcessing) {
+                if (!$btn.data('ltms-original-html')) {
+                    $btn.data('ltms-original-html', $btn.html());
+                }
+                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+            } else {
+                const original = $btn.data('ltms-original-html');
+                if (original) {
+                    $btn.html(original);
+                }
+                $btn.prop('disabled', false);
+            }
+        },
+
         bindLoginForm() {
             $(document).on('submit', '#ltms-login-form', function (e) {
                 e.preventDefault();
                 const $form = $(this);
                 const $btn  = $form.find('[type="submit"]');
 
-                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+                LTMS.Auth.setBtnProcessing($btn, true);
 
                 $.ajax({
                     url: ltmsAuth.ajax_url,
@@ -42,16 +59,22 @@
                         remember: $form.find('[name="rememberme"]').is(':checked'),
                     },
                     success(response) {
-                        $btn.prop('disabled', false).text('Iniciar Sesión');
+                        LTMS.Auth.setBtnProcessing($btn, false);
                         if (response.success) {
                             window.location.href = response.data.redirect;
                         } else {
-                            LTMS.Auth.showFormError('#ltms-login-form', response.data);
+                            const msg = (typeof response.data === 'string')
+                                ? response.data
+                                : (response.data && response.data.message) || 'Error en el inicio de sesión.';
+                            LTMS.Auth.showFormError('#ltms-login-form', msg);
                         }
                     },
-                    error() {
-                        $btn.prop('disabled', false);
-                        LTMS.Auth.showFormError('#ltms-login-form', 'Error de conexión. Intenta de nuevo.');
+                    error(xhr) {
+                        LTMS.Auth.setBtnProcessing($btn, false);
+                        let msg = 'Error de conexión. Intenta de nuevo.';
+                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Espera 15 minutos.';
+                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
+                        LTMS.Auth.showFormError('#ltms-login-form', msg);
                     },
                 });
             });
@@ -116,6 +139,14 @@
                 e.preventDefault();
                 const $form = $(this);
 
+                // M-7: normalizar referral code a uppercase antes de enviar.
+                const $ref = $form.find('[name="referral_code"]');
+                if ($ref.length) $ref.val(($ref.val() || '').toUpperCase().trim());
+
+                // Limpiar errores previos por campo.
+                $form.find('.ltms-input-error').removeClass('ltms-input-error');
+                $form.find('.ltms-field-error').removeClass('ltms-field-error');
+
                 // Validar contraseñas
                 const pass1 = $form.find('[name="password"]').val();
                 const pass2 = $form.find('[name="password_confirm"]').val();
@@ -126,23 +157,71 @@
                 }
 
                 const $btn = $form.find('[type="submit"]');
-                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
+                LTMS.Auth.setBtnProcessing($btn, true);
 
                 $.ajax({
                     url: ltmsAuth.ajax_url,
                     method: 'POST',
                     data: $form.serialize() + '&action=ltms_vendor_register&nonce=' + ltmsAuth.nonce,
                     success(response) {
-                        $btn.prop('disabled', false);
+                        LTMS.Auth.setBtnProcessing($btn, false);
                         if (response.success) {
                             window.location.href = response.data.redirect;
                         } else {
-                            LTMS.Auth.showFormError('#ltms-register-form', response.data);
+                            // M-10: el handler puede devolver un objeto con {message, errors:[{field,message}]}
+                            // o un string plano. Soportar ambos formatos.
+                            const payload = response.data || {};
+                            let msg = '';
+                            let fieldErrors = [];
+
+                            if (typeof payload === 'string') {
+                                msg = payload;
+                            } else {
+                                msg = payload.message || 'Error en el registro.';
+                                fieldErrors = Array.isArray(payload.errors) ? payload.errors : [];
+                            }
+
+                            LTMS.Auth.showFormError('#ltms-register-form', msg);
+
+                            // Resaltar campos específicos y enfocar el primero.
+                            if (fieldErrors.length) {
+                                let firstField = null;
+                                fieldErrors.forEach(function (err) {
+                                    const $field = $form.find('[name="' + err.field + '"]');
+                                    if (!$field.length) return;
+                                    if ($field.is(':checkbox')) {
+                                        $field.closest('.ltms-form-group').addClass('ltms-field-error');
+                                    } else {
+                                        $field.addClass('ltms-input-error');
+                                    }
+                                    if (!firstField) firstField = $field;
+                                });
+
+                                if (firstField) {
+                                    // Saltar al wizard step que contiene el primer campo en error.
+                                    const $page = firstField.closest('.ltms-wizard-page');
+                                    if ($page.length) {
+                                        const stepNum = parseInt($page.data('page'), 10);
+                                        $form.find('.ltms-wizard-page').hide();
+                                        $page.show();
+                                        $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
+                                            const step = parseInt($(this).data('step'), 10);
+                                            $(this).toggleClass('active', step === stepNum);
+                                            $(this).toggleClass('completed', step < stepNum);
+                                        });
+                                    }
+                                    firstField.focus();
+                                }
+                            }
                         }
                     },
-                    error() {
-                        $btn.prop('disabled', false);
-                        LTMS.Auth.showFormError('#ltms-register-form', 'Error de conexión.');
+                    error(xhr) {
+                        LTMS.Auth.setBtnProcessing($btn, false);
+                        let msg = 'Error de conexión.';
+                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Intenta más tarde.';
+                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
+                        if (xhr && xhr.status === 403) msg = 'Sesión expirada. Recarga la página.';
+                        LTMS.Auth.showFormError('#ltms-register-form', msg);
                     },
                 });
             });
@@ -193,10 +272,24 @@
             const $notice = $card.length
                 ? $card.find('.ltms-notice')
                 : $form.find('.ltms-notice');
+
+            // M-58: defensa contra objetos — evita "[object Object]" si el caller
+            // pasa accidentalmente un payload de respuesta sin extraer .message.
+            let text;
+            if (typeof message === 'string') {
+                text = message;
+            } else if (message && typeof message === 'object') {
+                text = message.message
+                    || (Array.isArray(message.errors) && message.errors[0] && message.errors[0].message)
+                    || JSON.stringify(message);
+            } else {
+                text = String(message);
+            }
+
             if ($notice.length) {
                 $notice.removeClass('ltms-notice-success')
                        .addClass('ltms-notice-error')
-                       .text(message)
+                       .text(text)
                        .show();
             }
         },

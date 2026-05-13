@@ -378,8 +378,9 @@ ltms_test( 'create_request() rechaza sin KYC aprobado', function () {
 
 ltms_test( 'create_request() crea solicitud para vendedor KYC aprobado', function () use ( $qa_vendor ) {
     if ( ! $qa_vendor ) return [ 'FAIL', 'Sin usuario' ];
+    // Saldo previo holgado y monto > 50.000 COP (mínimo de retiro vigente).
     LTMS_Business_Wallet::credit( $qa_vendor, 100000, 'Saldo previo QA', [], 0 );
-    $r = LTMS_Payout_Scheduler::create_request( $qa_vendor, 30000, '', 'bank_transfer' );
+    $r = LTMS_Payout_Scheduler::create_request( $qa_vendor, 60000, '', 'bank_transfer' );
     return ( isset( $r['success'] ) && $r['success'] )
         ? [ 'PASS', 'Solicitud creada ✓ — ID: ' . ( $r['payout_id'] ?? '?' ) ]
         : [ 'WARN', 'No creada: ' . json_encode( $r ) ];

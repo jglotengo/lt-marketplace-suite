@@ -63,11 +63,11 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
         <?php
         $section_file = LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . $active_tab . '.php';
         if ( file_exists( $section_file ) ) {
-            include $section_file;
-        } elseif ( function_exists( 'ltms_render_generic_settings_section' ) ) {
-            ltms_render_generic_settings_section( $active_tab, $tabs );
+            include_once $section_file;
         } else {
-            echo '<div class="notice notice-error"><p><strong>Error LTMS:</strong> función ltms_render_generic_settings_section no disponible. Desactiva y reactiva el plugin.</p></div>';
+            echo '<div class="notice notice-warning inline" style="margin:16px 0;"><p>';
+            echo '<strong>Sección "' . esc_html( $active_tab ) . '" no encontrada.</strong> ';
+            echo 'Intenta desactivar y reactivar el plugin.</p></div>';
         }
         ?>
 
@@ -225,6 +225,14 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
 
     foreach ( $fields as $field ) {
         $value = LTMS_Core_Config::get( $field['key'], $field['default'] ?? '' );
+
+        // A-6 FIX: Los campos _rate/_percent se guardan como decimales (0.1 = 10%)
+        // pero el UI los muestra como porcentaje — multiplicar por 100 al mostrar.
+        if ( isset( $field['type'] ) && $field['type'] === 'number'
+            && ( strpos( $field['key'], '_rate' ) !== false || strpos( $field['key'], '_percent' ) !== false )
+            && is_numeric( $value ) && (float) $value <= 1 && (float) $value > 0 ) {
+            $value = round( (float) $value * 100, 4 );
+        }
 
         // No mostrar contraseñas cifradas en texto plano
         if ( ( $field['type'] ?? '' ) === 'password' && strpos( $value, 'v1:' ) === 0 ) {

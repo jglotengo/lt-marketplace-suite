@@ -193,7 +193,7 @@ final class LTMS_Utils {
      * @param int|null $user_id ID del usuario (null = usuario actual).
      * @return bool
      */
-    public static function is_ltms_vendor( ?int $user_id = null ): bool {
+    public static function is_ltms_vendor( ?int $user_id = null ): bool { // v2 — meta antes del gate
         if ( $user_id === null ) {
             $user_id = get_current_user_id();
         }
@@ -206,14 +206,14 @@ final class LTMS_Utils {
         }
         $roles = (array) $user->roles;
 
-        // Verificar rol primero — evita llamada a DB si el rol ya lo determina.
+        // Verificar rol vendor primero — path más rápido, sin DB.
         if ( in_array( 'ltms_vendor', $roles, true ) || in_array( 'ltms_vendor_premium', $roles, true ) ) {
             return true;
         }
 
-        // Roles de sistema que NUNCA son vendor — retornar false sin tocar la DB.
-        // Este gate debe ir ANTES de get_user_meta para evitar llamadas innecesarias
-        // y para que los tests unitarios no necesiten mockear get_user_meta.
+        // Roles de sistema que nunca son vendor — gate temprano, antes de cualquier llamada a DB.
+        // Esto garantiza que get_user_meta nunca se llama para admin/editor/etc.
+        // (necesario también para que los unit tests no requieran mock de get_user_meta para non-vendors).
         $non_vendor_roles = [ 'administrator', 'editor', 'author', 'contributor', 'subscriber', 'shop_manager', 'customer' ];
         foreach ( $roles as $role ) {
             if ( in_array( $role, $non_vendor_roles, true ) ) {
@@ -221,8 +221,12 @@ final class LTMS_Utils {
             }
         }
 
-        // Fallback: meta flag para usuarios con rol desconocido (migración o registro progresivo).
-        return (bool) get_user_meta( $user_id, 'ltms_is_vendor', true );
+        // Meta flag para vendedores en migración o registro progresivo (rol subscriber/customer ya fue descartado arriba).
+        if ( get_user_meta( $user_id, 'ltms_is_vendor', true ) ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

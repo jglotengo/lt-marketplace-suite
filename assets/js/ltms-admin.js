@@ -122,14 +122,17 @@
             $(document).on('click', '.ltms-approve-payout', function (e) {
                 e.preventDefault();
                 const payoutId = $(this).data('payout-id');
-                if (!confirm(ltmsAdmin.i18n.confirm_delete)) return;
+                // A-7 FIX: texto correcto para aprobación (no reutilizar confirm_delete)
+                if (!confirm(ltmsAdmin.i18n.confirm_approve_payout || '¿Aprobar este retiro? El pago se procesará de inmediato.')) return;
 
                 self.ajaxAction('ltms_approve_payout', { payout_id: payoutId }, (response) => {
                     if (response.success) {
                         self.showNotice('success', response.data.message);
                         $(this).closest('tr').fadeOut(400, function () { $(this).remove(); });
                     } else {
-                        self.showNotice('error', response.data);
+                        // A-7 FIX: response.data puede ser objeto
+                        const errMsg = typeof response.data === 'string' ? response.data : (response.data?.message || ltmsAdmin.i18n.error || 'Error');
+                        self.showNotice('error', errMsg);
                     }
                 }.bind(this));
             });
@@ -181,6 +184,90 @@
                         self.showNotice('error', response.data);
                     }
                 }.bind(this));
+            });
+
+            // Exportar solicitudes de retiro a CSV (A-8a)
+            $(document).on('click', '.ltms-export-payouts', function (e) {
+                e.preventDefault();
+                const $btn = $(this);
+                $btn.prop('disabled', true).text('Exportando…');
+
+                $.ajax({
+                    url: ltmsAdmin.ajax_url,
+                    method: 'POST',
+                    data: { action: 'ltms_export_payouts', nonce: ltmsAdmin.nonce },
+                    xhrFields: { responseType: 'blob' },
+                    success(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a   = document.createElement('a');
+                        a.href  = url;
+                        a.download = 'retiros-ltms-' + new Date().toISOString().slice(0,10) + '.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    },
+                    error() {
+                        LTMS.Admin.showNotice('error', 'No se pudo exportar el CSV. Intenta de nuevo.');
+                    },
+                    complete() {
+                        $btn.prop('disabled', false).text('Exportar CSV');
+                    },
+                });
+            });
+
+            // Rechazar KYC desde la vista KYC (A-8b)
+            $(document).on('click', '.ltms-reject-kyc', function (e) {
+                e.preventDefault();
+                const kycId = $(this).data('kyc-id');
+                const reason = prompt('Motivo del rechazo (requerido):');
+                if (!reason || !reason.trim()) return;
+
+                LTMS.Admin.ajaxAction('ltms_reject_kyc', { kyc_id: kycId, reason }, (response) => {
+                    if (response.success) {
+                        LTMS.Admin.showNotice('success', response.data?.message || 'KYC rechazado.');
+                        $(this).closest('tr').find('.ltms-badge')
+                            .removeClass().addClass('ltms-badge ltms-badge-danger').text('Rechazado');
+                        $(this).closest('.ltms-actions, td').find('.ltms-approve-kyc, .ltms-reject-kyc').hide();
+                    } else {
+                        const msg = typeof response.data === 'string' ? response.data : (response.data?.message || 'Error');
+                        LTMS.Admin.showNotice('error', msg);
+                    }
+                });
+            });
+
+            // Aprobación rápida de KYC desde lista de vendedores (A-8c)
+            $(document).on('click', '.ltms-quick-approve-kyc', function (e) {
+                e.preventDefault();
+                const vendorId = $(this).data('vendor-id');
+                if (!confirm('¿Aprobar el KYC de este vendedor y activar su cuenta?')) return;
+                const $btn = $(this);
+                $btn.prop('disabled', true);
+
+                LTMS.Admin.ajaxAction('ltms_quick_approve_kyc', { vendor_id: vendorId }, (response) => {
+                    $btn.prop('disabled', false);
+                    if (response.success) {
+                        LTMS.Admin.showNotice('success', response.data?.message || 'KYC aprobado.');
+                        $btn.closest('tr').find('.ltms-badge-warning')
+                            .removeClass('ltms-badge-warning').addClass('ltms-badge-success').text('Aprobado');
+                        $btn.closest('.ltms-kyc-actions').hide();
+                    } else {
+                        const msg = typeof response.data === 'string' ? response.data : (response.data?.message || 'Error');
+                        LTMS.Admin.showNotice('error', msg);
+                    }
+                });
+            });
+
+            // Verificar RNT (turismo) (A-8d)
+            $(document).on('click', '.ltms-approve-rnt', function (e) {
+                e.preventDefault();
+                const id = $(this).data('compliance-id') || $(this).data('id');
+                LTMS.Admin.ajaxAction('ltms_admin_verify_rnt', { id }, (response) => {
+                    if (response.success) {
+                        LTMS.Admin.showNotice('success', response.data?.message || 'RNT verificado.');
+                        location.reload();
+                    } else {
+                        LTMS.Admin.showNotice('error', response.data?.message || 'Error al verificar RNT.');
+                    }
+                });
             });
 
             // Probar conexión con API externa
