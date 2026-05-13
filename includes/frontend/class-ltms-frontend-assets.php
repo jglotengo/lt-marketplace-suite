@@ -34,8 +34,53 @@ final class LTMS_Frontend_Assets {
     public static function init(): void {
         $instance = new self();
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_frontend_assets' ] );
+        add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_header_nav' ], 5 );
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
+    }
+
+    /**
+     * Carga los assets del header nav (Seller/Cliente) en TODAS las páginas del sitio.
+     * Se carga con prioridad 5 para sobreescribir estilos del tema.
+     *
+     * @return void
+     */
+    public function enqueue_header_nav(): void {
+        $ver = LTMS_VERSION;
+        $url = LTMS_ASSETS_URL;
+
+        wp_enqueue_style(
+            'ltms-header-nav',
+            $url . 'css/ltms-header-nav.css',
+            [],
+            $ver
+        );
+
+        wp_enqueue_script(
+            'ltms-header-nav',
+            $url . 'js/ltms-header-nav.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
+
+        $user_id    = get_current_user_id();
+        $is_vendor  = $user_id ? LTMS_Utils::is_ltms_vendor( $user_id ) : false;
+        $is_logged  = is_user_logged_in();
+        $pages      = get_option( 'ltms_installed_pages', [] );
+        $name       = $is_logged ? wp_get_current_user()->display_name : '';
+
+        wp_localize_script( 'ltms-header-nav', 'ltmsHeaderNav', [
+            'is_logged_in'   => $is_logged,
+            'is_vendor'      => $is_vendor,
+            'display_name'   => $name,
+            'sellers_url'    => home_url( '/sellers/' ),
+            'mi_cuenta_url'  => wc_get_page_permalink( 'myaccount' ) ?: home_url( '/mi-cuenta/' ),
+            'dashboard_url'  => ! empty( $pages['ltms-dashboard'] ) ? get_permalink( $pages['ltms-dashboard'] ) : home_url( '/panel-vendedor/' ),
+            'orders_url'     => ! empty( $pages['ltms-orders'] ) ? get_permalink( $pages['ltms-orders'] ) : home_url( '/mis-pedidos/' ),
+            'wallet_url'     => ! empty( $pages['ltms-wallet'] ) ? get_permalink( $pages['ltms-wallet'] ) : home_url( '/mi-billetera/' ),
+            'logout_url'     => wp_logout_url( home_url() ),
+        ] );
     }
 
     /**

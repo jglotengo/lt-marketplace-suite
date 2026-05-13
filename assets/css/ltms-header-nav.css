@@ -1,0 +1,241 @@
+/**
+ * LTMS Header Nav — Botones Seller / Cliente
+ * Mejora UX/UI de los botones de acceso en el header del sitio.
+ * Se inyecta globalmente via wp_head en todas las páginas.
+ * Versión: 1.0.0
+ */
+
+/* ── Variables ────────────────────────────────────────────── */
+:root {
+  --ltms-red:        #D62828;
+  --ltms-red-dark:   #a81e1e;
+  --ltms-white:      #ffffff;
+  --ltms-dark:       #0d0d0d;
+  --ltms-gold:       #F7B731;
+  --ltms-radius:     10px;
+  --ltms-font:       'Montserrat', sans-serif;
+  --ltms-transition: 0.22s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Contenedor de accesos rápidos en el header ──────────── */
+.ltms-header-access {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--ltms-font);
+}
+
+/* ── Botón base ─────────────────────────────────────────── */
+.ltms-header-access .ltms-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--ltms-radius);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: all var(--ltms-transition);
+  white-space: nowrap;
+  border: 2px solid transparent;
+  line-height: 1;
+}
+
+/* ── Botón SELLER (vendedor) — estilo primario ──────────── */
+.ltms-nav-btn.ltms-btn-seller {
+  background: var(--ltms-gold);
+  color: var(--ltms-dark) !important;
+  border-color: var(--ltms-gold);
+  box-shadow: 0 2px 8px rgba(247,183,49,0.25);
+}
+.ltms-nav-btn.ltms-btn-seller:hover,
+.ltms-nav-btn.ltms-btn-seller:focus {
+  background: #e5a800;
+  border-color: #e5a800;
+  box-shadow: 0 4px 16px rgba(247,183,49,0.4);
+  transform: translateY(-1px);
+  color: var(--ltms-dark) !important;
+}
+.ltms-nav-btn.ltms-btn-seller:active { transform: translateY(0); }
+
+/* ── Botón CLIENTE — estilo secundario ──────────────────── */
+.ltms-nav-btn.ltms-btn-cliente {
+  background: transparent;
+  color: var(--ltms-white) !important;
+  border-color: rgba(255,255,255,0.55);
+}
+.ltms-nav-btn.ltms-btn-cliente:hover,
+.ltms-nav-btn.ltms-btn-cliente:focus {
+  background: rgba(255,255,255,0.12);
+  border-color: var(--ltms-white);
+  color: var(--ltms-white) !important;
+  transform: translateY(-1px);
+}
+.ltms-nav-btn.ltms-btn-cliente:active { transform: translateY(0); }
+
+/* ── Iconos SVG inline ─────────────────────────────────── */
+.ltms-nav-btn .ltms-btn-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+/* ── Badge "nuevo" ─────────────────────────────────────── */
+.ltms-nav-btn .ltms-badge {
+  background: var(--ltms-red);
+  color: var(--ltms-white);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+.ltms-btn-seller .ltms-badge {
+  background: var(--ltms-dark);
+}
+
+/* ── Tooltip informativo ───────────────────────────────── */
+.ltms-nav-btn-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.ltms-nav-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ltms-dark);
+  color: var(--ltms-white);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--ltms-transition);
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.ltms-nav-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ltms-dark);
+}
+.ltms-nav-btn-wrap:hover .ltms-nav-tooltip { opacity: 1; }
+
+/* ── Usuario logueado: avatar + nombre ─────────────────── */
+.ltms-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 40px;
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  color: var(--ltms-white) !important;
+  text-decoration: none !important;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--ltms-font);
+  transition: all var(--ltms-transition);
+}
+.ltms-user-chip:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.5);
+}
+.ltms-user-chip img,
+.ltms-user-chip .ltms-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--ltms-gold);
+}
+.ltms-user-chip .ltms-avatar-initials {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ltms-gold);
+  color: var(--ltms-dark);
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Dropdown del usuario logueado ─────────────────────── */
+.ltms-user-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.ltms-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: var(--ltms-white);
+  border-radius: var(--ltms-radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  overflow: hidden;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: all var(--ltms-transition);
+}
+.ltms-user-dropdown-wrap:hover .ltms-user-dropdown,
+.ltms-user-dropdown-wrap:focus-within .ltms-user-dropdown {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.ltms-user-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--ltms-font);
+  color: var(--ltms-dark) !important;
+  text-decoration: none !important;
+  transition: background var(--ltms-transition);
+  border-bottom: 1px solid #f0f0f0;
+}
+.ltms-user-dropdown a:last-child { border-bottom: none; }
+.ltms-user-dropdown a:hover { background: #fff9e6; color: var(--ltms-red) !important; }
+.ltms-user-dropdown a svg { width: 15px; height: 15px; flex-shrink: 0; }
+.ltms-dropdown-divider {
+  height: 1px;
+  background: #eee;
+  margin: 4px 0;
+}
+
+/* ── RESPONSIVO ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ltms-header-access { gap: 7px; }
+  .ltms-nav-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+    gap: 5px;
+  }
+  .ltms-nav-btn .ltms-btn-label { display: none; }
+  .ltms-nav-btn .ltms-btn-icon { width: 18px; height: 18px; }
+  .ltms-nav-btn.ltms-btn-seller { padding: 8px; }
+  .ltms-nav-btn.ltms-btn-cliente { padding: 8px; }
+  .ltms-user-chip .ltms-chip-name { display: none; }
+}
+
+@media (max-width: 480px) {
+  .ltms-header-access { gap: 5px; }
+  .ltms-nav-tooltip { display: none; }
+}
