@@ -714,6 +714,8 @@ class UtilsTest extends TestCase
         $user        = new \stdClass();
         $user->roles = ['administrator'];
         Functions\when('get_userdata')->justReturn($user);
+        // Admin nunca es vendor aunque tenga meta — get_user_meta retorna false
+        Functions\when('get_user_meta')->justReturn(false);
         $this->assertFalse(\LTMS_Utils::is_ltms_vendor(1));
     }
 }
