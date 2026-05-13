@@ -64,8 +64,10 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
         $section_file = LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . $active_tab . '.php';
         if ( file_exists( $section_file ) ) {
             include $section_file;
-        } else {
+        } elseif ( function_exists( 'ltms_render_generic_settings_section' ) ) {
             ltms_render_generic_settings_section( $active_tab, $tabs );
+        } else {
+            echo '<div class="notice notice-error"><p><strong>Error LTMS:</strong> función ltms_render_generic_settings_section no disponible. Desactiva y reactiva el plugin.</p></div>';
         }
         ?>
 
@@ -128,7 +130,7 @@ if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) :
 function ltms_render_generic_settings_section( string $tab, array $tab_labels = [] ): void {
     $fields_map = [
         'general' => [
-            [ 'key' => 'ltms_platform_name',    'label' => __( 'Nombre de la Plataforma', 'ltms' ),   'type' => 'text',   'default' => get_bloginfo( 'name' ) ],
+            [ 'key' => 'ltms_platform_name',    'label' => __( 'Nombre de la Plataforma', 'ltms' ),   'type' => 'text',   'default' => get_bloginfo( 'name' ) ?? '' ],
             [ 'key' => 'ltms_country',           'label' => __( 'País Principal', 'ltms' ),            'type' => 'select', 'options' => [ 'CO' => 'Colombia', 'MX' => 'México' ] ],
             [ 'key' => 'ltms_environment',       'label' => __( 'Entorno', 'ltms' ),                   'type' => 'select', 'options' => [ 'sandbox' => 'Sandbox (Pruebas)', 'production' => 'Producción' ] ],
             [ 'key' => 'ltms_currency',          'label' => __( 'Moneda', 'ltms' ),                    'type' => 'select', 'options' => [ 'COP' => 'COP (Peso Colombiano)', 'MXN' => 'MXN (Peso Mexicano)' ] ],
@@ -170,9 +172,9 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
             [ 'key' => 'ltms_rate_limit_enabled',   'label' => __( 'Rate Limiting API', 'ltms' ),     'type' => 'checkbox', 'default' => 'yes' ],
         ],
         'emails' => [
-            [ 'key' => 'ltms_email_from_name',    'label' => __( 'Nombre Remitente', 'ltms' ),   'type' => 'text', 'default' => get_bloginfo( 'name' ) ],
-            [ 'key' => 'ltms_email_from_address', 'label' => __( 'Email Remitente', 'ltms' ),    'type' => 'email', 'default' => get_option( 'admin_email' ) ],
-            [ 'key' => 'ltms_email_header_color', 'label' => __( 'Color Header Email', 'ltms' ), 'type' => 'text', 'default' => '#1a5276' ],
+            [ 'key' => 'ltms_email_from_name',    'label' => __( 'Nombre Remitente', 'ltms' ),   'type' => 'text',  'default' => get_bloginfo( 'name' ) ?? '' ],
+            [ 'key' => 'ltms_email_from_address', 'label' => __( 'Email Remitente', 'ltms' ),    'type' => 'email', 'default' => get_option( 'admin_email' ) ?? '' ],
+            [ 'key' => 'ltms_email_header_color', 'label' => __( 'Color Header Email', 'ltms' ), 'type' => 'text',  'default' => '#1a5276' ],
         ],
         // v1.6.0 — Enterprise Module Settings
         'backblaze' => [
@@ -208,7 +210,7 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
             [ 'key' => 'ltms_alegra_invoice_on_processing',  'label' => __( 'Crear factura en "En proceso"', 'ltms' ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Por defecto, la factura se crea cuando el pedido llega a "Completado".', 'ltms' ) ],
             [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( 'Enviar factura por email', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Alegra envía automáticamente la factura al email del comprador.', 'ltms' ) ],
             [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( 'Webhook Secret (token)', 'ltms' ),              'type' => 'text',     'desc' => __( 'Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => home_url( '/wp-json/ltms/v1/webhooks/alegra' ), 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => function_exists( 'home_url' ) ? home_url( '/wp-json/ltms/v1/webhooks/alegra' ) : '', 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
         ],
     ];
 
