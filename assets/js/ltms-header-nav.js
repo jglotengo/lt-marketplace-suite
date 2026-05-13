@@ -83,10 +83,21 @@
 
     function injectButtons() {
         var data = ltmsHeaderNav;
-        var $existing = $('a[href*="/sellers/"], a[href*="sellers"]').filter(function() {
+
+        // Intentar encontrar los botones Seller/Cliente del tema
+        var $sellerEl = $('a').filter(function() {
+            var href = ($(this).attr('href') || '').toLowerCase();
             var text = $(this).text().trim().toLowerCase();
-            return text === 'seller' || text === 'vendedor' || text === 'vender';
-        });
+            return (href.includes('seller') || href.includes('vendors')) ||
+                   (text === 'seller' || text === 'vendedor' || text === 'vender');
+        }).first();
+
+        var $clienteEl = $('a').filter(function() {
+            var href = ($(this).attr('href') || '').toLowerCase();
+            var text = $(this).text().trim().toLowerCase();
+            return (href.includes('mi-cuenta') || href.includes('my-account')) ||
+                   (text === 'cliente' || text === 'mi cuenta' || text === 'cliente');
+        }).first();
 
         var sellerUrl  = data.sellers_url  || '/sellers/';
         var clienteUrl = data.mi_cuenta_url || '/mi-cuenta/';
@@ -96,25 +107,17 @@
         var clienteHTML = buildClienteBtn(clienteUrl);
         if (clienteHTML) $wrap.append(clienteHTML);
 
-        if ($existing.length) {
-            // Reemplazar los botones existentes
-            var $clienteExisting = $('a[href*="mi-cuenta"]').filter(function() {
-                var text = $(this).text().trim().toLowerCase();
-                return text === 'cliente' || text === 'mi cuenta';
-            });
-            var $container = $existing.closest('li, div, span').first().parent();
-            $existing.closest('li, div, span').first().replaceWith($wrap);
-            if ($clienteExisting.length) {
-                $clienteExisting.closest('li, div, span').first().remove();
+        if ($sellerEl.length) {
+            // Reemplazar botones existentes del tema
+            $sellerEl.closest('li, div, span').first().replaceWith($wrap);
+            if ($clienteEl.length) {
+                $clienteEl.closest('li, div, span').first().remove();
             }
+        } else if ($clienteEl.length) {
+            $clienteEl.closest('li, div, span').first().replaceWith($wrap);
         } else {
-            // Buscar contenedor del header y añadir
-            var $headerRight = $('.header-right, .nav-right, .header-actions, .site-header .menu, header .menu').first();
-            if ($headerRight.length) {
-                $headerRight.prepend($wrap);
-            } else {
-                $('header, #masthead, .site-header').first().append($wrap);
-            }
+            // Fallback: barra flotante fija en esquina superior derecha
+            $('body').append($('<div id="ltms-floating-access"></div>').append($wrap));
         }
     }
 

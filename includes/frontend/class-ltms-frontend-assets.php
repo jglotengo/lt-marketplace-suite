@@ -70,17 +70,38 @@ final class LTMS_Frontend_Assets {
         $pages      = get_option( 'ltms_installed_pages', [] );
         $name       = $is_logged ? wp_get_current_user()->display_name : '';
 
+        $dashboard_url = ! empty( $pages['ltms-dashboard'] ) ? get_permalink( $pages['ltms-dashboard'] ) : home_url( '/panel-vendedor/' );
+        $wallet_url    = ! empty( $pages['ltms-wallet'] )    ? get_permalink( $pages['ltms-wallet'] )    : home_url( '/mi-billetera/' );
+        $orders_url    = ! empty( $pages['ltms-orders'] )    ? get_permalink( $pages['ltms-orders'] )    : home_url( '/mis-pedidos/' );
+        $my_account    = wc_get_page_permalink( 'myaccount' ) ?: home_url( '/mi-cuenta/' );
+
         wp_localize_script( 'ltms-header-nav', 'ltmsHeaderNav', [
             'is_logged_in'   => $is_logged,
             'is_vendor'      => $is_vendor,
             'display_name'   => $name,
             'sellers_url'    => home_url( '/sellers/' ),
-            'mi_cuenta_url'  => wc_get_page_permalink( 'myaccount' ) ?: home_url( '/mi-cuenta/' ),
-            'dashboard_url'  => ! empty( $pages['ltms-dashboard'] ) ? get_permalink( $pages['ltms-dashboard'] ) : home_url( '/panel-vendedor/' ),
-            'orders_url'     => ! empty( $pages['ltms-orders'] ) ? get_permalink( $pages['ltms-orders'] ) : home_url( '/mis-pedidos/' ),
-            'wallet_url'     => ! empty( $pages['ltms-wallet'] ) ? get_permalink( $pages['ltms-wallet'] ) : home_url( '/mi-billetera/' ),
+            'mi_cuenta_url'  => $my_account,
+            'dashboard_url'  => $dashboard_url,
+            'orders_url'     => $orders_url,
+            'wallet_url'     => $wallet_url,
             'logout_url'     => wp_logout_url( home_url() ),
         ] );
+
+        // Inyectar CSS de posicionamiento para forzar visibilidad del botón flotante
+        wp_add_inline_style( 'ltms-header-nav', '
+            #ltms-floating-access {
+                position: fixed;
+                top: 12px;
+                right: 16px;
+                z-index: 99999;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            @media (max-width: 600px) {
+                #ltms-floating-access { top: 8px; right: 8px; }
+            }
+        ' );
     }
 
     /**
