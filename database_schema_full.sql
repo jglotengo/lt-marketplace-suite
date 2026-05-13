@@ -229,25 +229,26 @@ CREATE TABLE IF NOT EXISTS `{WP_PREFIX}lt_vendor_kyc` (
 -- ============================================================
 -- TABLA: lt_referral_network
 -- Árbol genealógico de referidos (MLM)
+-- IMPORTANTE: este schema debe coincidir con class-ltms-db-migrations.php.
+-- El Kernel ejecuta las migraciones PHP en activación; este .sql es solo
+-- documentación / restauración manual.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `{WP_PREFIX}lt_referral_network` (
-    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `vendor_id`     BIGINT UNSIGNED NOT NULL COMMENT 'El referido',
-    `referrer_id`   BIGINT UNSIGNED NOT NULL COMMENT 'Quien lo refirió',
-    `level`         TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Nivel en la red (1=directo, 2=indirecto)',
-    `referral_code` VARCHAR(50) NOT NULL COMMENT 'Código único de referido',
-    `source`        VARCHAR(100) DEFAULT NULL COMMENT 'UTM source / canal de adquisición',
-    `total_sales`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `vendor_id`        BIGINT UNSIGNED NOT NULL COMMENT 'El referido',
+    `sponsor_id`       BIGINT UNSIGNED NOT NULL COMMENT 'Quien lo refirió (referrer)',
+    `level`            TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Nivel en la red (1=directo)',
+    `ancestor_path`    VARCHAR(1000) DEFAULT NULL COMMENT 'Slash-separated ancestor IDs root-first (ej: "1/5/12")',
+    `source`           VARCHAR(100) DEFAULT NULL COMMENT 'UTM source / canal de adquisición',
+    `total_sales`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     `total_commission` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    `status`        ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `status`           ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active',
+    `joined_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `udx_vendor_referrer` (`vendor_id`, `referrer_id`),
-    KEY `idx_vendor_id` (`vendor_id`),
-    KEY `idx_referrer_id` (`referrer_id`),
-    KEY `idx_referral_code` (`referral_code`),
-    KEY `idx_level` (`level`)
+    UNIQUE KEY `udx_vendor_sponsor` (`vendor_id`, `sponsor_id`),
+    KEY `idx_sponsor_id`  (`sponsor_id`),
+    KEY `idx_joined_at`   (`joined_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Red de referidos multi-nivel del sistema MLM';
 

@@ -37,7 +37,17 @@ $country = LTMS_Core_Config::get_country();
     </div>
 
     <form id="ltms-register-form" class="ltms-auth-form" novalidate>
-        <?php wp_nonce_field( 'ltms_vendor_register', 'ltms_register_nonce' ); ?>
+        <?php
+        // El nonce real viaja en ltmsAuth.nonce (wp_localize_script, action
+        // 'ltms_auth_nonce') y lo verifica el handler con check_ajax_referer.
+        // M-2: se eliminó wp_nonce_field duplicado que era código muerto.
+        ?>
+
+        <!-- C-5: Honeypot anti-bot. Campo oculto que humanos no rellenan. -->
+        <div class="ltms-hp-field" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+            <label for="ltms-hp-email">Email (do not fill)</label>
+            <input type="text" name="ltms_hp_email" id="ltms-hp-email" tabindex="-1" autocomplete="off" value="">
+        </div>
 
         <!-- Paso 1: Datos personales -->
         <div class="ltms-wizard-page" data-page="1">
@@ -111,9 +121,11 @@ $country = LTMS_Core_Config::get_country();
                     name="referral_code"
                     class="ltms-form-control"
                     placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>"
-                    value="<?php echo esc_attr( $_GET['ref'] ?? '' ); ?>"
+                    maxlength="8"
+                    style="text-transform: uppercase;"
+                    value="<?php echo esc_attr( strtoupper( sanitize_text_field( wp_unslash( $_GET['ref'] ?? '' ) ) ) ); ?>"
                 >
-                <small class="ltms-field-hint"><?php esc_html_e( 'Si alguien te invitó, ingresa su código.', 'ltms' ); ?></small>
+                <small class="ltms-field-hint"><?php esc_html_e( 'Si alguien te invitó, ingresa su código (8 caracteres).', 'ltms' ); ?></small>
             </div>
 
             <div class="ltms-wizard-nav">

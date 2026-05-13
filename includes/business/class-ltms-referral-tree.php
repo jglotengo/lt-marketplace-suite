@@ -278,9 +278,12 @@ final class LTMS_Referral_Tree {
      * @return int 0 si no existe.
      */
     private static function get_vendor_by_code( string $code ): int {
+        // M-7: los códigos se almacenan en uppercase (LTMS_Affiliates::generate_unique_code
+        // hace strtoupper). Normalizar aquí para evitar fallar el lookup si el caller
+        // envía el código en minúsculas.
         $users = get_users([
             'meta_key'   => 'ltms_referral_code',
-            'meta_value' => sanitize_text_field( $code ),
+            'meta_value' => strtoupper( sanitize_text_field( $code ) ),
             'number'     => 1,
             'fields'     => 'ID',
         ]);

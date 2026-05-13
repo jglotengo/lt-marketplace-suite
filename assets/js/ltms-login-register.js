@@ -116,6 +116,14 @@
                 e.preventDefault();
                 const $form = $(this);
 
+                // M-7: normalizar referral code a uppercase antes de enviar.
+                const $ref = $form.find('[name="referral_code"]');
+                if ($ref.length) $ref.val(($ref.val() || '').toUpperCase().trim());
+
+                // Limpiar errores previos por campo.
+                $form.find('.ltms-input-error').removeClass('ltms-input-error');
+                $form.find('.ltms-field-error').removeClass('ltms-field-error');
+
                 // Validar contraseñas
                 const pass1 = $form.find('[name="password"]').val();
                 const pass2 = $form.find('[name="password_confirm"]').val();
@@ -137,12 +145,60 @@
                         if (response.success) {
                             window.location.href = response.data.redirect;
                         } else {
-                            LTMS.Auth.showFormError('#ltms-register-form', response.data);
+                            // M-10: el handler puede devolver un objeto con {message, errors:[{field,message}]}
+                            // o un string plano. Soportar ambos formatos.
+                            const payload = response.data || {};
+                            let msg = '';
+                            let fieldErrors = [];
+
+                            if (typeof payload === 'string') {
+                                msg = payload;
+                            } else {
+                                msg = payload.message || 'Error en el registro.';
+                                fieldErrors = Array.isArray(payload.errors) ? payload.errors : [];
+                            }
+
+                            LTMS.Auth.showFormError('#ltms-register-form', msg);
+
+                            // Resaltar campos específicos y enfocar el primero.
+                            if (fieldErrors.length) {
+                                let firstField = null;
+                                fieldErrors.forEach(function (err) {
+                                    const $field = $form.find('[name="' + err.field + '"]');
+                                    if (!$field.length) return;
+                                    if ($field.is(':checkbox')) {
+                                        $field.closest('.ltms-form-group').addClass('ltms-field-error');
+                                    } else {
+                                        $field.addClass('ltms-input-error');
+                                    }
+                                    if (!firstField) firstField = $field;
+                                });
+
+                                if (firstField) {
+                                    // Saltar al wizard step que contiene el primer campo en error.
+                                    const $page = firstField.closest('.ltms-wizard-page');
+                                    if ($page.length) {
+                                        const stepNum = parseInt($page.data('page'), 10);
+                                        $form.find('.ltms-wizard-page').hide();
+                                        $page.show();
+                                        $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
+                                            const step = parseInt($(this).data('step'), 10);
+                                            $(this).toggleClass('active', step === stepNum);
+                                            $(this).toggleClass('completed', step < stepNum);
+                                        });
+                                    }
+                                    firstField.focus();
+                                }
+                            }
                         }
                     },
-                    error() {
+                    error(xhr) {
                         $btn.prop('disabled', false);
-                        LTMS.Auth.showFormError('#ltms-register-form', 'Error de conexión.');
+                        let msg = 'Error de conexión.';
+                        if (xhr && xhr.status === 429) {
+                            msg = 'Demasiados intentos. Intenta más tarde.';
+                        }
+                        LTMS.Auth.showFormError('#ltms-register-form', msg);
                     },
                 });
             });
