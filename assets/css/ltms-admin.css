@@ -301,3 +301,160 @@
         font-size: 0.8rem;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   A-10 FIX: Clases del admin usadas en vistas PHP sin CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Contenedor de acciones (botones en cada fila de tabla) ── */
+.ltms-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* ── Heading de alertas ── */
+.ltms-alert-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+/* ── Botones de acción contextuales ── */
+.ltms-approve-kyc,
+.ltms-approve-payout,
+.ltms-approve-rnt,
+.ltms-mark-pickup-completed,
+.ltms-redi-activate {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-approve-kyc:hover,
+.ltms-approve-payout:hover,
+.ltms-approve-rnt:hover,
+.ltms-mark-pickup-completed:hover,
+.ltms-redi-activate:hover {
+    background: #a7f3d0;
+}
+
+.ltms-reject-payout,
+.ltms-redi-revoke,
+.ltms-cancel-booking {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-reject-payout:hover,
+.ltms-redi-revoke:hover,
+.ltms-cancel-booking:hover {
+    background: #fecaca;
+}
+
+.ltms-freeze-wallet {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-freeze-wallet:hover { background: #fde68a; }
+
+/* ── Botón pequeño ── */
+.ltms-btn-sm {
+    padding: 4px 10px !important;
+    font-size: 0.82rem !important;
+    border-radius: 4px !important;
+}
+
+/* ── Auditor panel (vista de auditoría) ── */
+.ltms-auditor-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.ltms-audit-summary {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+}
+.ltms-audit-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+/* ── Estado de guardado (settings form) ── */
+.ltms-save-status {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #065f46;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* ── Formulario de settings ── */
+.ltms-settings-form {
+    max-width: 900px;
+}
+
+/* ── Estado genérico (texto) ── */
+.ltms-status {
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* ── Tabla con búsqueda ── */
+.ltms-searchable-table { width: 100%; }
+.ltms-table-search {
+    width: 260px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    margin-bottom: 10px;
+}
+
+/* ── Botón de test de API en provider-health ── */
+.ltms-test-provider-btn {
+    padding: 5px 12px;
+    background: #ede9fe;
+    color: #5b21b6;
+    border: 1px solid #c4b5fd;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ltms-test-provider-btn:hover { background: #ddd6fe; }
+.ltms-test-result {
+    font-size: 0.8rem;
+    margin-top: 4px;
+    color: #6b7280;
+}
