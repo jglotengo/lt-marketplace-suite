@@ -193,7 +193,7 @@ final class LTMS_Utils {
      * @param int|null $user_id ID del usuario (null = usuario actual).
      * @return bool
      */
-    public static function is_ltms_vendor( ?int $user_id = null ): bool {
+    public static function is_ltms_vendor( ?int $user_id = null ): bool { // v2 — meta antes del gate
         if ( $user_id === null ) {
             $user_id = get_current_user_id();
         }
