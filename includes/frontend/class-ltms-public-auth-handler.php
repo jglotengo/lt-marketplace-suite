@@ -28,8 +28,9 @@ final class LTMS_Public_Auth_Handler {
         $instance = new self();
 
         // Shortcodes
-        add_shortcode( 'ltms_vendor_login',    [ $instance, 'render_login_form' ] );
-        add_shortcode( 'ltms_vendor_register', [ $instance, 'render_register_form' ] );
+        add_shortcode( 'ltms_vendor_login',     [ $instance, 'render_login_form' ] );
+        add_shortcode( 'ltms_vendor_register',  [ $instance, 'render_register_form' ] );
+        add_shortcode( 'ltms_sellers_landing',  [ $instance, 'render_sellers_landing' ] );
 
         // AJAX handlers. M-57: registrar también la variante priv para que admins
         // (y otros roles no-vendor) puedan probar el flujo desde wp-admin sin obtener
@@ -50,7 +51,23 @@ final class LTMS_Public_Auth_Handler {
         add_filter( 'login_redirect', [ $instance, 'vendor_login_redirect' ], 10, 3 );
     }
 
-    public function render_login_form( array $atts = [] ): string {
+    /**
+     * Shortcode [ltms_sellers_landing] — Landing page para captar vendedores.
+     * Se usa en la página /sellers/ para convertir visitantes en vendedores.
+     *
+     * @return string HTML de la landing.
+     */
+    public function render_sellers_landing( array $atts = [] ): string {
+        ob_start();
+        $view = LTMS_PLUGIN_DIR . 'includes/frontend/views/view-sellers-landing.php';
+        if ( file_exists( $view ) ) {
+            include $view;
+        }
+        return ob_get_clean();
+    }
+
+    /**
+     * Renderiza el formulario de inicio de sesión para vendedores.
         // Solo bloquear si el user actual ya es vendor (no necesita login). Admins
         // y otros roles pueden ver el form (útil para QA, soporte, demo).
         if ( is_user_logged_in() && $this->current_user_is_vendor() ) {

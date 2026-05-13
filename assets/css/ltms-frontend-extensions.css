@@ -721,3 +721,132 @@
 .ltms-kds-status-ready      { background:#d1e7dd; color:#0a3622; }
 .ltms-kds-status-delivered  { background:#e2e3e5; color:#41464b; }
 .ltms-kds-status-cancelled  { background:#f8d7da; color:#842029; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SELLERS LANDING PAGE — /sellers/
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-sellers-landing {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #1a1a2e;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Hero */
+.ltms-sl-hero {
+    background: linear-gradient(135deg, #c0392b 0%, #6d28d9 100%);
+    border-radius: 16px;
+    padding: 72px 40px;
+    text-align: center;
+    margin: 32px 0 56px;
+    color: #fff;
+}
+.ltms-sl-hero__tag {
+    display: inline-block;
+    background: rgba(255,255,255,.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: .8rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    margin-bottom: 18px;
+}
+.ltms-sl-hero__title {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 0 18px;
+    color: #fff;
+}
+.ltms-sl-hero__sub {
+    font-size: 1.1rem;
+    opacity: .92;
+    max-width: 580px;
+    margin: 0 auto 36px;
+    line-height: 1.6;
+}
+.ltms-sl-hero__cta {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.ltms-sl-btn {
+    display: inline-block;
+    padding: 14px 30px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+}
+.ltms-sl-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.ltms-sl-btn--primary { background: #fff; color: #c0392b; }
+.ltms-sl-btn--outline { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.7); }
+.ltms-sl-btn--lg { padding: 18px 40px; font-size: 1.1rem; }
+
+/* Section titles */
+.ltms-sl-section-title {
+    text-align: center;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 800;
+    margin-bottom: 40px;
+    color: #1a1a2e;
+}
+
+/* Grid */
+.ltms-sl-grid { display: grid; gap: 24px; margin-bottom: 64px; }
+.ltms-sl-grid--3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+/* Benefit cards */
+.ltms-sl-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 28px 24px;
+    transition: box-shadow .2s, transform .2s;
+}
+.ltms-sl-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.08); transform: translateY(-3px); }
+.ltms-sl-card__icon { font-size: 2rem; margin-bottom: 14px; }
+.ltms-sl-card h3 { font-size: 1rem; font-weight: 700; margin: 0 0 8px; color: #1a1a2e; }
+.ltms-sl-card p  { font-size: .9rem; color: #475569; line-height: 1.6; margin: 0; }
+
+/* Steps */
+.ltms-sl-steps { margin-bottom: 64px; }
+.ltms-sl-step { text-align: center; padding: 24px; }
+.ltms-sl-step__num {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #c0392b, #6d28d9);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+.ltms-sl-step h3 { font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; }
+.ltms-sl-step p  { font-size: .9rem; color: #475569; margin: 0; line-height: 1.6; }
+
+/* CTA final */
+.ltms-sl-cta {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d1b69 100%);
+    border-radius: 16px;
+    padding: 56px 40px;
+    text-align: center;
+    margin-bottom: 56px;
+    color: #fff;
+}
+.ltms-sl-cta h2 { font-size: clamp(1.4rem,3vw,2rem); font-weight: 800; margin: 0 0 12px; color: #fff; }
+.ltms-sl-cta p  { font-size: 1rem; opacity: .85; margin: 0 0 28px; }
+.ltms-sl-cta .ltms-sl-btn--primary { background: #c0392b; color: #fff; }
+.ltms-sl-cta .ltms-sl-btn--primary:hover { background: #a93226; }
+
+@media (max-width: 600px) {
+    .ltms-sl-hero { padding: 48px 20px; }
+    .ltms-sl-cta  { padding: 40px 20px; }
+}

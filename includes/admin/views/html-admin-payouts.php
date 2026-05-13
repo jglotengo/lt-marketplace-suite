@@ -66,7 +66,7 @@ $status_labels = [
             <?php echo esc_html( $info['label'] ); ?>
         </a>
         <?php endforeach; ?>
-        <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-export-payouts" style="margin-left:auto">
+        <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-export-payouts" style="margin-left:auto">
             📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
         </button>
     </div>

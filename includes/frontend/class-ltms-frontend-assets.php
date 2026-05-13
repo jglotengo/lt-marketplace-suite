@@ -564,6 +564,7 @@ final class LTMS_Frontend_Assets {
                     'ltms_vendor_dashboard', 'ltms_vendor_login', 'ltms_vendor_register',
                     'ltms_vendor_store', 'ltms_vendor_orders', 'ltms_vendor_wallet',
                     'ltms_vendor_kyc', 'ltms_vendor_insurance', 'ltms_vendor_redi',
+                    'ltms_sellers_landing', // /sellers/ page
                 ];
                 foreach ( $ltms_shortcodes as $sc ) {
                     if ( has_shortcode( $post->post_content, $sc ) ) {
