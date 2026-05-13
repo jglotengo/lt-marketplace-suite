@@ -52,14 +52,15 @@ function ltms_provider_stats( string $provider, string $since ): array {
 	<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;">
 	<?php foreach ( $providers as $provider ) :
 		$stats_24h = ltms_provider_stats( $provider, $since_24h );
-		$total     = max( 1, (int) ( $stats_24h['total'] ?? 0 ) );
+		$total     = (int) ( $stats_24h['total'] ?? 0 );
+		$has_data  = $total > 0;
 		$successes = (int) ( $stats_24h['successes'] ?? 0 );
-		$uptime    = round( ( $successes / $total ) * 100, 1 );
+		$uptime    = $has_data ? round( ( $successes / $total ) * 100, 1 ) : null;
 		$avg_lat   = (int) ( $stats_24h['avg_latency'] ?? 0 );
 		$is_down   = (bool) get_transient( 'ltms_circuit_' . $provider . '_down' );
-		$dot       = $is_down ? '🔴' : ( $uptime >= 95 ? '🟢' : '🟡' );
+		$dot       = $is_down ? '🔴' : ( ! $has_data ? '🟡' : ( $uptime >= 95 ? '🟢' : '🟡' ) );
 		$status    = $is_down ? '⛔ Down (Circuit Breaker)' : '✅ Activo';
-		$alert     = ( ! $is_down && $uptime < 95 && (int) $stats_24h['total'] > 0 );
+		$alert     = ( ! $is_down && $has_data && $uptime < 95 );
 	?>
 	<div class="card" style="min-width:280px;max-width:340px;padding:16px;">
 		<?php if ( $alert ) : ?>
@@ -67,11 +68,19 @@ function ltms_provider_stats( string $provider, string $since ): array {
 		<?php endif; ?>
 		<h3 style="margin-top:0;"><?php echo esc_html( $dot . ' ' . strtoupper( $provider ) ); ?></h3>
 		<table class="widefat striped" style="width:100%;">
-			<tr><td><strong><?php esc_html_e( 'Uptime 24h', 'ltms' ); ?></strong></td><td><?php echo esc_html( $uptime . '%' ); ?></td></tr>
-			<tr><td><strong><?php esc_html_e( 'Latencia prom.', 'ltms' ); ?></strong></td><td><?php echo esc_html( $avg_lat . ' ms' ); ?></td></tr>
-			<tr><td><strong><?php esc_html_e( 'Llamadas 24h', 'ltms' ); ?></strong></td><td><?php echo esc_html( (string) $stats_24h['total'] ); ?></td></tr>
+			<tr><td><strong><?php esc_html_e( 'Uptime 24h', 'ltms' ); ?></strong></td><td><?php echo $has_data ? esc_html( $uptime . '%' ) : '<em style="color:#888">Sin datos aún</em>'; // phpcs:ignore ?></td></tr>
+			<tr><td><strong><?php esc_html_e( 'Latencia prom.', 'ltms' ); ?></strong></td><td><?php echo $has_data ? esc_html( $avg_lat . ' ms' ) : '<em style="color:#888">—</em>'; // phpcs:ignore ?></td></tr>
+			<tr><td><strong><?php esc_html_e( 'Llamadas 24h', 'ltms' ); ?></strong></td><td><?php echo esc_html( (string) $total ); ?></td></tr>
 			<tr><td><strong><?php esc_html_e( 'Estado', 'ltms' ); ?></strong></td><td><?php echo esc_html( $status ); ?></td></tr>
 		</table>
+		<!-- Botón de prueba de conexión — registra en lt_provider_health y actualiza stats -->
+		<button type="button"
+			class="button button-secondary ltms-test-provider-btn"
+			data-provider="<?php echo esc_attr( $provider ); ?>"
+			style="margin-top:10px;width:100%;">
+			🔌 <?php echo esc_html( sprintf( __( 'Probar %s', 'ltms' ), strtoupper( $provider ) ) ); ?>
+		</button>
+		<span class="ltms-test-result-<?php echo esc_attr( $provider ); ?>" style="display:none;font-size:12px;margin-top:6px;display:block;"></span>
 		<?php if ( $is_down ) : ?>
 		<form method="post" style="margin-top:8px;">
 			<?php wp_nonce_field( 'ltms_reset_circuit_' . $provider ); ?>
@@ -82,6 +91,35 @@ function ltms_provider_stats( string $provider, string $since ): array {
 	</div>
 	<?php endforeach; ?>
 	</div>
+
+	<script>
+	jQuery(function($) {
+		$('.ltms-test-provider-btn').on('click', function() {
+			var $btn      = $(this);
+			var provider  = $btn.data('provider');
+			var $result   = $('.ltms-test-result-' + provider);
+			$btn.prop('disabled', true).text('⏳ Probando...');
+			$.post(ajaxurl, {
+				action:   'ltms_test_api_connection',
+				nonce:    ltmsAdmin.nonce,
+				provider: provider,
+			}, function(res) {
+				if (res.success) {
+					var lat = res.data && res.data.latency_ms ? ' (' + res.data.latency_ms + ' ms)' : '';
+					$result.show().css('color','#27ae60').html('✅ OK' + lat + ' — recarga para ver el uptime actualizado');
+					$btn.text('✅ Conectado').css('border-color','#27ae60');
+				} else {
+					$result.show().css('color','#e74c3c').html('❌ ' + (res.data || 'Error de conexión'));
+					$btn.text('❌ Error').css('border-color','#e74c3c');
+				}
+				setTimeout(function(){ $btn.prop('disabled', false); }, 3000);
+			}).fail(function() {
+				$result.show().css('color','#e74c3c').html('❌ Error de red');
+				$btn.prop('disabled', false).text('🔌 Probar ' + provider.toUpperCase());
+			});
+		});
+	});
+	</script>
 
 	<hr>
 	<h2><?php esc_html_e( 'Últimos 50 eventos', 'ltms' ); ?></h2>

@@ -184,15 +184,54 @@ final class LTMS_Admin_Settings {
         }
 
         try {
-            $client = LTMS_Api_Factory::get( $provider );
-            $result = $client->health_check();
+            $client  = LTMS_Api_Factory::get( $provider );
+            $start   = microtime( true );
+            $result  = $client->health_check();
+            $latency = (int) round( ( microtime( true ) - $start ) * 1000 );
+            $success = ( $result['status'] ?? '' ) === 'ok';
 
-            if ( ( $result['status'] ?? '' ) === 'ok' ) {
-                wp_send_json_success( $result );
+            // Registrar en lt_provider_health para que Salud APIs muestre datos reales
+            if ( class_exists( 'LTMS_Payment_Orchestrator' ) ) {
+                LTMS_Payment_Orchestrator::record_provider_event(
+                    $provider,
+                    $success ? 'success' : 'error',
+                    $latency,
+                    $success ? null : ( $result['message'] ?? 'health_check_failed' )
+                );
+            } else {
+                global $wpdb;
+                $wpdb->insert(
+                    $wpdb->prefix . 'lt_provider_health',
+                    [
+                        'provider'   => $provider,
+                        'status'     => $success ? 'success' : 'error',
+                        'latency_ms' => $latency,
+                        'error_code' => $success ? null : 'health_check_failed',
+                        'created_at' => gmdate( 'Y-m-d H:i:s' ),
+                    ],
+                    [ '%s', '%s', '%d', '%s', '%s' ]
+                );
+            }
+
+            if ( $success ) {
+                wp_send_json_success( array_merge( $result, [ 'latency_ms' => $latency ] ) );
             } else {
                 wp_send_json_error( $result['message'] ?? __( 'Error de conexión.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
+            // Registrar el error también
+            global $wpdb;
+            $wpdb->insert(
+                $wpdb->prefix . 'lt_provider_health',
+                [
+                    'provider'   => $provider,
+                    'status'     => 'error',
+                    'latency_ms' => 0,
+                    'error_code' => substr( $e->getMessage(), 0, 100 ),
+                    'created_at' => gmdate( 'Y-m-d H:i:s' ),
+                ],
+                [ '%s', '%s', '%d', '%s', '%s' ]
+            );
             wp_send_json_error( $e->getMessage() );
         }
     }
