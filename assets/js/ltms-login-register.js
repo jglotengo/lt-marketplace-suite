@@ -272,10 +272,24 @@
             const $notice = $card.length
                 ? $card.find('.ltms-notice')
                 : $form.find('.ltms-notice');
+
+            // M-58: defensa contra objetos — evita "[object Object]" si el caller
+            // pasa accidentalmente un payload de respuesta sin extraer .message.
+            let text;
+            if (typeof message === 'string') {
+                text = message;
+            } else if (message && typeof message === 'object') {
+                text = message.message
+                    || (Array.isArray(message.errors) && message.errors[0] && message.errors[0].message)
+                    || JSON.stringify(message);
+            } else {
+                text = String(message);
+            }
+
             if ($notice.length) {
                 $notice.removeClass('ltms-notice-success')
                        .addClass('ltms-notice-error')
-                       .text(message)
+                       .text(text)
                        .show();
             }
         },
