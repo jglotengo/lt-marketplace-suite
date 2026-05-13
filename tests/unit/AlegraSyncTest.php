@@ -64,6 +64,8 @@ class AlegraSyncTest extends TestCase
             return true;
         });
 
+        // Habilitar Alegra para que init() no retorne temprano
+        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
 
         $this->assertGreaterThanOrEqual(
@@ -83,6 +85,7 @@ class AlegraSyncTest extends TestCase
             return true;
         });
 
+        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
 
         $this->assertContains(
@@ -102,6 +105,7 @@ class AlegraSyncTest extends TestCase
             return true;
         });
 
+        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
 
         $this->assertContains(

@@ -575,7 +575,7 @@ final class LTMS_Business_Wallet {
      * @return float Balance disponible para operar.
      */
     public function get_available_balance( float $balance, float $held ): float {
-        return round( $balance - $held, 2 );
+        return max( 0.0, round( $balance - $held, 2 ) );
     }
 
     /**

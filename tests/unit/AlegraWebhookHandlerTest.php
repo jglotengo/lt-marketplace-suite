@@ -34,6 +34,7 @@ class AlegraWebhookHandlerTest extends TestCase
             'add_action'          => static fn() => true,
             'register_rest_route' => static fn() => true,
             'get_option'          => static fn(string $k, mixed $d = false): mixed => $d,
+            'update_option'       => static fn(): bool => true,
         ]);
 
         \LTMS_Core_Config::flush_cache();

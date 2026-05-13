@@ -52,8 +52,9 @@ class AlegraApiTest extends TestCase
 
     private function set_credentials(): void
     {
-        \LTMS_Core_Config::set('ltms_alegra_token', \LTMS_Core_Security::encrypt('test_user:test_token'));
-        \LTMS_Core_Config::set('ltms_alegra_user',  \LTMS_Core_Security::encrypt('test@empresa.com'));
+        // El constructor lee 'ltms_alegra_email' y 'ltms_alegra_token'
+        \LTMS_Core_Config::set('ltms_alegra_email', 'test@empresa.com');
+        \LTMS_Core_Config::set('ltms_alegra_token', 'test_token_plain');
     }
 
     private function make_client(): \LTMS_Api_Alegra
