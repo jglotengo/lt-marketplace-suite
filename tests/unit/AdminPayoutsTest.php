@@ -294,6 +294,55 @@ class AdminPayoutsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertNotEmpty($msg);
     }
 
+    // ── SECCIÓN 4b: ajax_quick_approve_kyc() (A-5) ───────────────────────────
+
+    public function test_init_registers_quick_approve_kyc_hook(): void
+    {
+        $actions = [];
+        Functions\when("add_action")->alias(
+            static function(string $hook) use (&$actions): void { $actions[] = $hook; }
+        );
+
+        \LTMS_Admin_Payouts::init();
+
+        $this->assertContains("wp_ajax_ltms_quick_approve_kyc", $actions);
+    }
+
+    public function test_quick_approve_kyc_sends_error_when_no_permission(): void
+    {
+        Functions\when("current_user_can")->justReturn(false);
+        Functions\when("check_ajax_referer")->justReturn(true);
+        $_POST = ["vendor_id" => "5"];
+
+        $msg = $this->capture_json_error(fn() => $this->payouts->ajax_quick_approve_kyc());
+
+        $this->assertNotEmpty($msg);
+    }
+
+    public function test_quick_approve_kyc_sends_error_when_vendor_id_zero(): void
+    {
+        Functions\when("current_user_can")->justReturn(true);
+        Functions\when("check_ajax_referer")->justReturn(true);
+        Functions\when("get_userdata")->justReturn(false);
+        $_POST = ["vendor_id" => "0"];
+
+        $msg = $this->capture_json_error(fn() => $this->payouts->ajax_quick_approve_kyc());
+
+        $this->assertNotEmpty($msg);
+    }
+
+    public function test_quick_approve_kyc_sends_error_when_vendor_not_found(): void
+    {
+        Functions\when("current_user_can")->justReturn(true);
+        Functions\when("check_ajax_referer")->justReturn(true);
+        Functions\when("get_userdata")->justReturn(false);
+        $_POST = ["vendor_id" => "999"];
+
+        $msg = $this->capture_json_error(fn() => $this->payouts->ajax_quick_approve_kyc());
+
+        $this->assertNotEmpty($msg);
+    }
+
     // ── SECCIÓN 5: ajax_reject_kyc() ─────────────────────────────────────────
 
     public function test_reject_kyc_sends_error_when_no_permission(): void

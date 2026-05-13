@@ -442,6 +442,24 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertEqualsWithDelta(0.5, $result['platform_rate'], 0.001);
     }
 
+    /**
+     * A-6 regression: valor ya en decimal (≤ 1) no debe dividirse de nuevo.
+     * Sin el fix, 0.15 / 100 = 0.0015 — incorrecto.
+     */
+    public function test_sanitize_rate_already_decimal_not_divided_again(): void
+    {
+        $result = $this->settings->sanitize_settings(['commission_rate' => '0.15']);
+        $this->assertEqualsWithDelta(0.15, $result['commission_rate'], 0.001,
+            'A-6 regression: decimal value ≤ 1 should not be divided by 100 again');
+    }
+
+    public function test_sanitize_rate_one_stays_one(): void
+    {
+        $result = $this->settings->sanitize_settings(['commission_rate' => '1']);
+        $this->assertEqualsWithDelta(1.0, $result['commission_rate'], 0.001,
+            'Value of exactly 1 (= 100%) should not be divided');
+    }
+
     public function test_sanitize_enabled_no_string_returns_no(): void
     {
         $result = $this->settings->sanitize_settings(['feature_enabled' => 'no']);
