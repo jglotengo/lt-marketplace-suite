@@ -17,7 +17,7 @@ $offset   = ( $page_num - 1 ) * $per_page;
 // phpcs:disable WordPress.DB.DirectDatabaseQuery
 $wallets = $wpdb->get_results(
     $wpdb->prepare(
-        "SELECT w.*, u.display_name, u.user_email FROM `{$table}` w LEFT JOIN `{$wpdb->users}` u ON u.ID = w.user_id ORDER BY w.balance DESC LIMIT %d OFFSET %d",
+        "SELECT w.*, u.display_name, u.user_email FROM `{$table}` w LEFT JOIN `{$wpdb->users}` u ON u.ID = w.vendor_id ORDER BY w.balance DESC LIMIT %d OFFSET %d",
         $per_page,
         $offset
     ),
@@ -90,12 +90,12 @@ $total_held    = (float) $wpdb->get_var( "SELECT SUM(balance_pending) FROM `{$ta
                     <td>
                         <?php if ( (int) $wallet['is_frozen'] ) : ?>
                         <button type="button" class="ltms-btn ltms-btn-success ltms-btn-sm"
-                                onclick="LTMS.Admin.ajaxAction('ltms_unfreeze_wallet', {vendor_id: <?php echo esc_js( $wallet['user_id'] ); ?>}, function(r){if(r.success)location.reload();})">
+                                onclick="LTMS.Admin.ajaxAction('ltms_unfreeze_wallet', {vendor_id: <?php echo esc_js( $wallet['vendor_id'] ); ?>}, function(r){if(r.success)location.reload();})">
                             🔓 <?php esc_html_e( 'Descongelar', 'ltms' ); ?>
                         </button>
                         <?php else : ?>
                         <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm ltms-freeze-wallet"
-                                data-vendor-id="<?php echo esc_attr( $wallet['user_id'] ); ?>">
+                                data-vendor-id="<?php echo esc_attr( $wallet['vendor_id'] ); ?>">
                             🔒 <?php esc_html_e( 'Congelar', 'ltms' ); ?>
                         </button>
                         <?php endif; ?>

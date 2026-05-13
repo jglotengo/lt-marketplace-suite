@@ -69,7 +69,8 @@ $orders = wc_get_orders( $wc_args );
                 <?php else : ?>
                 <?php foreach ( $orders as $order ) :
                     $vendor_id   = (int) $order->get_meta( '_ltms_vendor_id' );
-                    $vendor_name = $vendor_id ? get_userdata( $vendor_id )->display_name ?? '—' : '—';
+                    $vendor_user = $vendor_id ? get_userdata( $vendor_id ) : false;
+                    $vendor_name = ( $vendor_user && $vendor_user->display_name ) ? $vendor_user->display_name : '—';
                     $status_class = [
                         'completed'  => 'ltms-badge-success',
                         'processing' => 'ltms-badge-info',

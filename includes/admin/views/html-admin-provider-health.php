@@ -25,8 +25,10 @@ if ( isset( $_POST['ltms_reset_provider'] ) ) {
 }
 
 /**
- * Get provider stats for a time window.
+ * A-4 FIX: Envolver en function_exists para evitar "already declared" si el view
+ * se carga más de una vez (double-include en algunos setups de WordPress).
  */
+if ( ! function_exists( 'ltms_provider_stats' ) ) :
 function ltms_provider_stats( string $provider, string $since ): array {
 	global $wpdb;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -44,6 +46,7 @@ function ltms_provider_stats( string $provider, string $since ): array {
 	);
 	return $row ?: [ 'total' => 0, 'successes' => 0, 'avg_latency' => 0 ];
 }
+endif;
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( '🩺 Dashboard de Salud de Proveedores', 'ltms' ); ?></h1>
