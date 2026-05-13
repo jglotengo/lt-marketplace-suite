@@ -138,9 +138,26 @@ final class LTMS_Public_Auth_Handler {
 
         delete_transient( $key );
 
-        $pages       = get_option( 'ltms_installed_pages', [] );
+        $pages        = get_option( 'ltms_installed_pages', [] );
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
-        $redirect    = $dashboard_id ? get_permalink( $dashboard_id ) : home_url();
+
+        // Determinar el redirect según el rol del usuario autenticado
+        $user_roles = (array) $user->roles;
+        $is_vendor  = in_array( 'ltms_vendor', $user_roles, true )
+                   || in_array( 'ltms_vendor_premium', $user_roles, true );
+        $is_admin   = in_array( 'administrator', $user_roles, true )
+                   || in_array( 'editor', $user_roles, true );
+
+        if ( $is_vendor ) {
+            // Vendedor → su panel
+            $redirect = $dashboard_id ? get_permalink( $dashboard_id ) : home_url();
+        } elseif ( $is_admin ) {
+            // Admin/editor → wp-admin (no tiene sentido enviarlo al panel del vendedor)
+            $redirect = admin_url();
+        } else {
+            // Otro usuario (cliente WC) → mi-cuenta de WooCommerce
+            $redirect = wc_get_page_permalink( 'myaccount' ) ?: home_url();
+        }
 
         wp_send_json_success([
             'redirect' => $redirect,

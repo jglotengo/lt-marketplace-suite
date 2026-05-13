@@ -750,8 +750,24 @@ final class LTMS_Dashboard_Logic {
      * @return string
      */
     private function render_not_vendor_notice(): string {
-        $pages       = get_option( 'ltms_installed_pages', [] );
-        $register_id = $pages['ltms-vendor-register'] ?? 0;
+        $current_user = wp_get_current_user();
+        $user_roles   = (array) $current_user->roles;
+        $is_admin     = in_array( 'administrator', $user_roles, true )
+                     || in_array( 'editor', $user_roles, true );
+
+        // Si es admin, mostrar mensaje contextual y link al WP-admin, no "regístrate"
+        if ( $is_admin ) {
+            return '<div class="ltms-notice ltms-notice-info" style="max-width:560px;margin:40px auto;padding:20px 24px;background:#f0f6fc;border-left:4px solid #0073aa;border-radius:6px;">'
+                . '<p style="font-size:15px;margin:0 0 10px;font-weight:600;">👋 Hola, administrador</p>'
+                . '<p style="margin:0 0 12px;">Estás viendo el panel del vendedor como administrador. '
+                . 'Este panel es exclusivo para usuarios con rol <strong>ltms_vendor</strong> o <strong>ltms_vendor_premium</strong>.</p>'
+                . '<p style="margin:0;"><a href="' . esc_url( admin_url( 'admin.php?page=ltms-dashboard' ) ) . '" class="button" style="margin-right:8px;">← Ir al Admin</a>'
+                . '<a href="' . esc_url( admin_url( 'admin.php?page=ltms-vendors' ) ) . '" class="button button-primary">Ver Vendedores</a></p>'
+                . '</div>';
+        }
+
+        $pages        = get_option( 'ltms_installed_pages', [] );
+        $register_id  = $pages['ltms-vendor-register'] ?? 0;
         $register_url = $register_id ? get_permalink( $register_id ) : '';
 
         $msg = esc_html__( 'Esta página es exclusiva para vendedores registrados.', 'ltms' );
