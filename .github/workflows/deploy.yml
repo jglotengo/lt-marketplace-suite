@@ -14,10 +14,10 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ssh.lo-tengo.com.co
-          port: 18765
-          username: u1549-ruo8hvwpk9dt
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASS }}
           script: |
             set -e
             PLUGIN_DIR="/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite"
