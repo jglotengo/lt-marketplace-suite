@@ -152,6 +152,23 @@ final class LTMS_Admin_Settings {
             wp_send_json_error( __( 'Datos inválidos.', 'ltms' ) );
         }
 
+        // M-116: los checkboxes desmarcados no se envían en el POST — resetear a 'no'
+        // antes de guardar los valores recibidos para que un checkbox desmarcado persista.
+        $checkbox_keys = [
+            'ltms_alegra_enabled', 'ltms_alegra_invoice_on_processing',
+            'ltms_alegra_send_invoice_email',
+            'ltms_xcover_parcel_protection', 'ltms_xcover_purchase_protection',
+            'ltms_siigo_enabled', 'ltms_openpay_enabled', 'ltms_addi_enabled',
+            'ltms_tptc_enabled', 'ltms_uber_direct_enabled', 'ltms_heka_enabled',
+            'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled',
+            'ltms_stripe_enabled',
+        ];
+        foreach ( $checkbox_keys as $cb_key ) {
+            if ( ! array_key_exists( $cb_key, $data ) ) {
+                update_option( $cb_key, 'no' );
+            }
+        }
+
         // Guardar cada opción individualmente
         $sanitized = $this->sanitize_settings( $data );
         foreach ( $sanitized as $key => $value ) {
