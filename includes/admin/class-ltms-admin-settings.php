@@ -258,6 +258,9 @@ final class LTMS_Admin_Settings {
                 wp_send_json_error( $result['message'] ?? __( 'Error de conexión.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
+            // M-118 debug: capturar detalle exacto de la excepción
+            $err_detail = sprintf( '%s en %s:%d', $e->getMessage(), basename( $e->getFile() ), $e->getLine() );
+            LTMS_Core_Logger::info( 'TEST_CONN_EXCEPTION', $err_detail );
             // Registrar el error también
             global $wpdb;
             $wpdb->insert(
@@ -271,7 +274,7 @@ final class LTMS_Admin_Settings {
                 ],
                 [ '%s', '%s', '%d', '%s', '%s' ]
             );
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( $err_detail ?: get_class( $e ) );
         }
     }
 
