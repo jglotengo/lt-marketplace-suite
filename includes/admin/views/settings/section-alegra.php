@@ -66,7 +66,8 @@ $test_result = get_transient('ltms_alegra_test_result');
             body: 'action=ltms_test_api_connection&provider=alegra&nonce=' + (document.getElementById('ltms_nonce')?.value||'')
         }).then(r=>r.json()).then(d => {
             btn.disabled = false; btn.textContent = '🔌 Probar Conexión con Alegra';
-            result.textContent = d.success ? '✅ ' + (d.data?.message||'Conexión OK') : '❌ ' + (d.data||'Error');
+            var errMsg = typeof d.data === 'string' ? d.data : (d.data?.message || JSON.stringify(d.data) || 'Error desconocido');
+            result.textContent = d.success ? '✅ ' + (d.data?.message||'Conexión OK') : '❌ ' + errMsg;
             result.style.color = d.success ? '#27ae60' : '#c0392b';
         }).catch(()=>{ btn.disabled=false; result.textContent='❌ Error de red'; result.style.color='#c0392b'; });
     });

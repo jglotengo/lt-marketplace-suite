@@ -216,6 +216,12 @@ final class LTMS_Admin_Settings {
         }
 
         try {
+            // M-118: resetear instancia cacheada y caché de config para que las
+            // credenciales recién guardadas se lean desde la BD, no desde caché.
+            LTMS_Api_Factory::reset( $provider );
+            if ( class_exists( 'LTMS_Core_Config' ) ) {
+                LTMS_Core_Config::flush_cache();
+            }
             $client  = LTMS_Api_Factory::get( $provider );
             $start   = microtime( true );
             $result  = $client->health_check();
