@@ -14,10 +14,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Mapeo definitivo key → slug. DEBE coincidir con LTMS_Activator::create_required_pages().
+// M-57: updated to match LTMS_Activator::create_required_pages() canonical keys.
 $key_to_slug = [
-    'ltms-vendor-register' => 'registro-vendedor',
+    'ltms-sellers'         => 'sellers',           // landing captación vendedores (M-55)
     'ltms-dashboard'       => 'panel-vendedor',
     'ltms-login'           => 'login-vendedor',
+    'ltms-register'        => 'registro-vendedor',  // clave canónica (era ltms-vendor-register)
+    'ltms-vendor-register' => 'registro-vendedor',  // alias legacy — mismo slug
     'ltms-store'           => 'tienda',
     'ltms-orders'          => 'mis-pedidos',
     'ltms-wallet'          => 'mi-billetera',
