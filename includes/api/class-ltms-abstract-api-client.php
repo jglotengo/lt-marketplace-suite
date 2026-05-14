@@ -58,6 +58,14 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
     protected int $retry_delay = 1;
 
     /**
+     * Constructor base — M-115: faltaba, todas las subclases llaman parent::__construct()
+     * pero no existia en la clase abstracta generando: Cannot call constructor.
+     */
+    public function __construct() {
+        $this->init_configurable_settings();
+    }
+
+    /**
      * Inicializa valores configurables desde LTMS_Core_Config.
      * Llamar en el constructor de subclases (o usar __construct).
      */
