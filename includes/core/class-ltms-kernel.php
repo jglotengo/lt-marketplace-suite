@@ -371,6 +371,11 @@ final class LTMS_Core_Kernel {
         }
         if ( class_exists( 'LTMS_Public_Auth_Handler' ) ) {
             LTMS_Public_Auth_Handler::init();
+
+            // Google OAuth — login / registro con Google.
+            if ( class_exists( 'LTMS_Google_OAuth' ) ) {
+                LTMS_Google_OAuth::init();
+            }
         }
         if ( class_exists( 'LTMS_Frontend_Live_Search' ) ) {
             LTMS_Frontend_Live_Search::init();

@@ -84,6 +84,13 @@ defined( 'ABSPATH' ) || exit;
 
     </form>
 
+    <?php if ( class_exists( 'LTMS_Google_OAuth' ) && LTMS_Google_OAuth::is_configured() ) : ?>
+    <div class="ltms-oauth-divider">
+        <span><?php esc_html_e( 'o continúa con', 'ltms' ); ?></span>
+    </div>
+    <?php echo LTMS_Google_OAuth::render_google_button(); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+    <?php endif; ?>
+
     <div class="ltms-auth-footer">
         <p>
             <?php esc_html_e( '¿No tienes cuenta?', 'ltms' ); ?>

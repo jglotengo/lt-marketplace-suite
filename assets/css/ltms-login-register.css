@@ -487,3 +487,47 @@
     margin-right: 8px;
 }
 .ltms-wizard-back:hover { background: #e5e7eb; }
+
+/* ── Google OAuth ─────────────────────────────────────── */
+.ltms-oauth-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0 16px;
+    color: #9ca3af;
+    font-size: .85rem;
+}
+.ltms-oauth-divider::before,
+.ltms-oauth-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e5e7eb;
+}
+.ltms-oauth-divider span { padding: 0 12px; }
+
+.ltms-google-oauth-wrap { width: 100%; }
+
+.ltms-btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 18px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #374151;
+    font-size: .95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+.ltms-btn-google:hover {
+    background: #f9fafb;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.ltms-btn-google:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}

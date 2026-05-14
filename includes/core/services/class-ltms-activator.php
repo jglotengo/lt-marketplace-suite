@@ -173,6 +173,8 @@ final class LTMS_Core_Activator {
 
             // v2.0.0 — SEO
             'ltms_google_search_console_verify' => '',
+            'ltms_google_client_id'             => 'GOOGLE_CLIENT_ID_PLACEHOLDER',
+            'ltms_google_client_secret'         => '',  // Se guarda cifrado; ver ltms_google_client_secret_raw
             'ltms_sitemap_exclude_outofstock'   => true,
             'ltms_og_site_name'                 => '',
             'ltms_og_locale'                    => 'es_CO',
