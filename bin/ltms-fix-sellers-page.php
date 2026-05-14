@@ -73,10 +73,30 @@ $template = get_post_meta( $sellers_page->ID, '_wp_page_template', true );
 echo "[INFO] Template: " . ( $template ?: 'default' ) . "\n";
 
 // 4. Verify shortcode registration
+// NOTE: En WP-CLI eval-file el kernel puede no haber terminado su boot_frontend().
+// Forzamos init() para que los shortcodes estén disponibles en este contexto.
+if ( class_exists( 'LTMS_Public_Auth_Handler' ) && ! shortcode_exists( 'ltms_sellers_landing' ) ) {
+    LTMS_Public_Auth_Handler::init();
+}
+
 echo "\n[DIAG] Shortcodes LTMS registrados:\n";
 $ltms_shortcodes = [ 'ltms_sellers_landing', 'ltms_vendor_dashboard', 'ltms_vendor_login', 'ltms_vendor_register' ];
 foreach ( $ltms_shortcodes as $sc ) {
     echo "  " . ( shortcode_exists( $sc ) ? '✓' : '✗' ) . " [$sc]\n";
+}
+
+// 5. Verify Google OAuth config
+echo "\n[DIAG] Google OAuth:\n";
+if ( class_exists( 'LTMS_Core_Config' ) ) {
+    LTMS_Core_Config::init();
+    $id_ok  = ! empty( LTMS_Core_Config::get( 'ltms_google_client_id', '' ) );
+    $sec_ok = ! empty( LTMS_Core_Config::get( 'ltms_google_client_secret', '' ) );
+    echo "  Client ID guardado:     " . ( $id_ok  ? '✓' : '✗ — ejecutar ltms-store-google-secret.php' ) . "\n";
+    echo "  Client Secret guardado: " . ( $sec_ok ? '✓' : '✗ — ejecutar ltms-store-google-secret.php' ) . "\n";
+    $configured = $id_ok && $sec_ok;
+    echo "  is_configured():        " . ( $configured ? '✅ Listo' : '❌ Faltan credenciales' ) . "\n";
+} else {
+    echo "  ✗ LTMS_Core_Config no disponible\n";
 }
 
 echo "\n[DONE]\n";
