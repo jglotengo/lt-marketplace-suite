@@ -27,7 +27,7 @@ $fields = [
                 <?php endforeach; ?>
             </select>
         <?php elseif ( $field['type'] === 'checkbox' ) : ?>
-            <label><input type="checkbox" name="<?php echo esc_attr($key); ?>" value="1" <?php checked($value,'1'); ?>> <?php echo esc_html($field['desc']??''); ?></label>
+            <label><input type="checkbox" name="<?php echo esc_attr($key); ?>" value="yes" <?php checked($value,'yes'); ?>> <?php echo esc_html($field['desc']??''); ?></label>
         <?php else : ?>
             <input type="number" step="0.01" min="0" name="<?php echo esc_attr($key); ?>" value="<?php echo esc_attr($value); ?>" class="small-text">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>

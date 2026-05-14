@@ -27,7 +27,7 @@ $fields = [
         <th scope="row"><label for="<?php echo esc_attr($key);?>"><?php echo esc_html($field['label']);?></label></th>
         <td>
         <?php if($field['type']==='checkbox'):?>
-            <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="1" <?php checked($value,'1');?>> <?php echo esc_html($field['desc']??'');?></label>
+            <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="yes" <?php checked($value,'yes');?>> <?php echo esc_html($field['desc']??'');?></label>
         <?php elseif($field['type']==='password'):?>
             <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text" autocomplete="new-password">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>

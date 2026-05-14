@@ -33,7 +33,7 @@ $fields = [
                     <?php endforeach; ?>
                 </select>
             <?php elseif ( $field['type'] === 'checkbox' ) : ?>
-                <label><input type="checkbox" name="<?php echo esc_attr( $key ); ?>" value="1" <?php checked( $value, '1' ); ?>> <?php echo esc_html( $field['desc'] ?? '' ); ?></label>
+                <label><input type="checkbox" name="<?php echo esc_attr( $key ); ?>" value="yes" <?php checked( $value, 'yes' ); ?>> <?php echo esc_html( $field['desc'] ?? '' ); ?></label>
             <?php else : ?>
                 <input type="<?php echo esc_attr( $field['type'] ); ?>"
                        id="<?php echo esc_attr( $key ); ?>"

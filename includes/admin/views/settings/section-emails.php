@@ -17,7 +17,7 @@ $fields = [
         <th scope="row"><?php echo esc_html($field['label']); ?></th>
         <td>
         <?php if($field['type']==='checkbox'):?>
-            <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="1" <?php checked($value,'1');?>> <?php echo esc_html($field['desc']??'');?></label>
+            <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="yes" <?php checked($value,'yes');?>> <?php echo esc_html($field['desc']??'');?></label>
         <?php else:?>
             <input type="<?php echo esc_attr($field['type']);?>" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text">
         <?php endif;?>

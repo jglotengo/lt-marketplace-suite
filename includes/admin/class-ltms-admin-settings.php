@@ -152,16 +152,24 @@ final class LTMS_Admin_Settings {
             wp_send_json_error( __( 'Datos inválidos.', 'ltms' ) );
         }
 
-        // M-116: los checkboxes desmarcados no se envían en el POST — resetear a 'no'
+        // M-116 + FIX: los checkboxes desmarcados no se envían en el POST — resetear a 'no'
         // antes de guardar los valores recibidos para que un checkbox desmarcado persista.
         $checkbox_keys = [
-            'ltms_alegra_enabled', 'ltms_alegra_invoice_on_processing',
-            'ltms_alegra_send_invoice_email',
+            // Alegra
+            'ltms_alegra_enabled', 'ltms_alegra_auto_invoice',
+            'ltms_alegra_auto_payment', 'ltms_alegra_sandbox',
+            'ltms_alegra_invoice_on_processing', 'ltms_alegra_send_invoice_email',
+            // XCover
             'ltms_xcover_parcel_protection', 'ltms_xcover_purchase_protection',
+            // Pasarelas / APIs
             'ltms_siigo_enabled', 'ltms_openpay_enabled', 'ltms_addi_enabled',
             'ltms_tptc_enabled', 'ltms_uber_direct_enabled', 'ltms_heka_enabled',
             'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled',
-            'ltms_stripe_enabled',
+            'ltms_stripe_enabled', 'ltms_mlm_enabled',
+            // KYC / Compliance
+            'ltms_kyc_zapsign_enabled', 'ltms_kyc_require_document',
+            // Seguridad
+            'ltms_waf_enabled', 'ltms_rate_limit_enabled',
         ];
         foreach ( $checkbox_keys as $cb_key ) {
             if ( ! array_key_exists( $cb_key, $data ) ) {
