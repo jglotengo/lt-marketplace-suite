@@ -92,6 +92,12 @@ final class LTMS_Core_Activator {
                 'content' => '[ltms_vendor_login]',    // era [ltms_login] — shortcode no registrado
                 'option'  => 'ltms_page_login',
             ],
+            'ltms-sellers'      => [
+                'title'   => __( 'Vende en Lo Tengo', 'ltms' ),
+                'content' => '[ltms_sellers_landing]', // M-55: landing page de captación de vendedores
+                'slug'    => 'sellers',
+                'option'  => 'ltms_page_sellers',
+            ],
             'ltms-register'     => [
                 'title'   => __( 'Registrarse como Vendedor', 'ltms' ),
                 'content' => '[ltms_vendor_register]', // era [ltms_register] — shortcode no registrado

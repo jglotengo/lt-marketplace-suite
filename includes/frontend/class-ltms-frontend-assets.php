@@ -202,6 +202,21 @@ final class LTMS_Frontend_Assets {
         if ( $is_auth_page ) {
             $this->enqueue_auth_assets( $url, $ver, $suffix );
         }
+
+        // M-56: Sellers landing — /sellers/ — necesita ltms-frontend-extensions.css (contiene .ltms-sellers-landing).
+        // El shortcode [ltms_sellers_landing] es público (sin login); encolamos extensions standalone.
+        $is_sellers_page = ( $page_id === (int) ( $pages['ltms-sellers'] ?? 0 ) );
+        if ( ! $is_sellers_page && $page_id > 0 ) {
+            $post = get_post( $page_id );
+            if ( $post && has_shortcode( $post->post_content, 'ltms_sellers_landing' ) ) {
+                $is_sellers_page = true;
+            }
+        }
+        if ( $is_sellers_page ) {
+            // Cargar ltms-dashboard.css como dependencia base de ltms-frontend-extensions.
+            wp_enqueue_style( 'ltms-dashboard', $url . 'css/ltms-dashboard.css', [], $ver );
+            wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
+        }
     }
 
     /**
