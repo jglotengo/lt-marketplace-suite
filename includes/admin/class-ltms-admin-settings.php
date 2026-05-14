@@ -216,11 +216,12 @@ final class LTMS_Admin_Settings {
 
             // Registrar en lt_provider_health para que Salud APIs muestre datos reales
             if ( class_exists( 'LTMS_Payment_Orchestrator' ) ) {
+                // M-117: record_provider_event arg#4 debe ser string, no null
                 LTMS_Payment_Orchestrator::record_provider_event(
                     $provider,
                     $success ? 'success' : 'error',
                     $latency,
-                    $success ? null : ( $result['message'] ?? 'health_check_failed' )
+                    $success ? '' : ( $result['message'] ?? 'health_check_failed' )
                 );
             } else {
                 global $wpdb;
