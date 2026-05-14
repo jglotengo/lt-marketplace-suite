@@ -41,6 +41,11 @@ final class LTMS_Public_Auth_Handler {
         add_action( 'wp_ajax_ltms_vendor_register',        [ $instance, 'ajax_vendor_register' ] );
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
 
+        // M-73: /sellers/ usa Hello Elementor — Elementor no llama the_content() y el
+        // shortcode no se renderiza. Interceptamos template_include con prioridad 999
+        // para servir nuestro propio template cuando la página contiene ltms_sellers_landing.
+        add_filter( 'template_include', [ $instance, 'maybe_serve_sellers_template' ], 999 );
+
         // Listener de verificación de email (?ltms_verify_email=<token>&uid=<id>)
         add_action( 'init', [ $instance, 'handle_email_verification' ], 20 );
 
@@ -64,6 +69,28 @@ final class LTMS_Public_Auth_Handler {
             include $view;
         }
         return ob_get_clean();
+    }
+
+    /**
+     * M-73: Sirve un template propio para /sellers/ cuando el tema (Hello Elementor)
+     * no llama the_content() y el shortcode no se renderiza.
+     *
+     * @param string $template Template seleccionado por WordPress.
+     * @return string Template a usar.
+     */
+    public function maybe_serve_sellers_template( string $template ): string {
+        if ( ! is_singular() ) {
+            return $template;
+        }
+        $post = get_queried_object();
+        if ( ! $post || ! has_shortcode( $post->post_content, 'ltms_sellers_landing' ) ) {
+            return $template;
+        }
+        $custom = LTMS_PLUGIN_DIR . 'includes/frontend/views/template-sellers-page.php';
+        if ( file_exists( $custom ) ) {
+            return $custom;
+        }
+        return $template;
     }
 
     /**
