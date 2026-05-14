@@ -2,11 +2,6 @@
 /**
  * AlegraWebhookHandlerTest — Tests unitarios para LTMS_Alegra_Webhook_Handler
  *
- * Cubre la lógica pura sin HTTP real:
- *   1. verify_signature() — hash_equals timing-safe correcto e incorrecto
- *   2. init() — registra hooks REST
- *   3. Estructura de clase — final, método init estático
- *
  * @package LTMS\Tests\Unit
  */
 
@@ -18,18 +13,20 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use ReflectionMethod;
 
 /**
  * @covers LTMS_Alegra_Webhook_Handler
  */
 class AlegraWebhookHandlerTest extends TestCase
 {
+    private string $secret = 'test_webhook_secret_alegra_2026';
+
     protected function setUp(): void
     {
         parent::setUp();
         Monkey\setUp();
 
+        // Must stub ALL functions that may be called — including update_option
         Functions\stubs([
             'add_action'          => static fn() => true,
             'register_rest_route' => static fn() => true,
@@ -38,6 +35,7 @@ class AlegraWebhookHandlerTest extends TestCase
         ]);
 
         \LTMS_Core_Config::flush_cache();
+        $this->inject_secret($this->secret);
     }
 
     protected function tearDown(): void
@@ -47,104 +45,74 @@ class AlegraWebhookHandlerTest extends TestCase
         parent::tearDown();
     }
 
-    // ── Section 1: verify_signature ───────────────────────────────────────────
+    private function inject_secret(string $secret): void
+    {
+        $r = new ReflectionClass(\LTMS_Core_Config::class);
+        $cache = $r->getProperty('cache');
+        $cache->setAccessible(true);
+        $cur = $cache->getValue(null);
+        // Store plaintext — verify_signature will decrypt or use as-is depending on implementation
+        $cur['ltms_alegra_webhook_secret'] = $secret;
+        $cache->setValue(null, $cur);
+        $settings = $r->getProperty('settings');
+        $settings->setAccessible(true);
+        $cur2 = $settings->getValue(null) ?? [];
+        $cur2['ltms_alegra_webhook_secret'] = $secret;
+        $settings->setValue(null, $cur2);
+    }
+
+    private function call_verify(string $payload, string $sig): bool|null
+    {
+        $r = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
+        if (! $r->hasMethod('verify_signature')) {
+            $this->markTestSkipped('verify_signature not accessible');
+        }
+        $method = $r->getMethod('verify_signature');
+        $method->setAccessible(true);
+        return $method->invoke(null, $payload, $sig);
+    }
 
     /** @test */
     public function test_verify_signature_accepts_correct_hmac(): void
     {
-        $secret  = 'test_webhook_secret_alegra_2026';
         $payload = '{"event":"invoice.created","data":{"id":123}}';
-        $sig     = hash_hmac('sha256', $payload, $secret);
-
-        // Set secret in config
-        \LTMS_Core_Config::set('ltms_alegra_webhook_secret', \LTMS_Core_Security::encrypt($secret));
-
-        $r      = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        if (! $r->hasMethod('verify_signature')) {
-            $this->markTestSkipped('verify_signature not accessible');
-        }
-
-        $method = $r->getMethod('verify_signature');
-        $method->setAccessible(true);
-
-        $result = $method->invoke(null, $payload, $sig);
-        $this->assertTrue($result, 'Firma HMAC válida debe ser aceptada');
+        $sig     = hash_hmac('sha256', $payload, $this->secret);
+        $this->assertTrue($this->call_verify($payload, $sig), 'Firma válida debe ser aceptada');
     }
 
     /** @test */
     public function test_verify_signature_rejects_wrong_hmac(): void
     {
-        $secret  = 'test_webhook_secret_alegra_2026';
         $payload = '{"event":"invoice.created","data":{"id":123}}';
-
-        \LTMS_Core_Config::set('ltms_alegra_webhook_secret', \LTMS_Core_Security::encrypt($secret));
-
-        $r = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        if (! $r->hasMethod('verify_signature')) {
-            $this->markTestSkipped('verify_signature not accessible');
-        }
-
-        $method = $r->getMethod('verify_signature');
-        $method->setAccessible(true);
-
-        $result = $method->invoke(null, $payload, 'firma_incorrecta_maliciosa');
-        $this->assertFalse($result, 'Firma HMAC inválida debe ser rechazada — RIESGO DE SEGURIDAD');
+        $this->assertFalse($this->call_verify($payload, 'firma_incorrecta'), 'Firma inválida debe ser rechazada');
     }
 
     /** @test */
     public function test_verify_signature_rejects_empty_signature(): void
     {
-        $secret  = 'test_webhook_secret';
-        $payload = '{"event":"test"}';
-
-        \LTMS_Core_Config::set('ltms_alegra_webhook_secret', \LTMS_Core_Security::encrypt($secret));
-
-        $r = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        if (! $r->hasMethod('verify_signature')) {
-            $this->markTestSkipped('verify_signature not accessible');
-        }
-
-        $method = $r->getMethod('verify_signature');
-        $method->setAccessible(true);
-
-        $result = $method->invoke(null, $payload, '');
-        $this->assertFalse($result, 'Firma vacía debe ser rechazada');
+        $this->assertFalse($this->call_verify('{"event":"test"}', ''), 'Firma vacía debe ser rechazada');
     }
-
-    // ── Section 2: Class structure ─────────────────────────────────────────────
 
     /** @test */
     public function test_class_is_final(): void
     {
+        $this->assertTrue((new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class))->isFinal());
+    }
+
+    /** @test */
+    public function test_init_is_public_static(): void
+    {
         $r = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        $this->assertTrue($r->isFinal(), 'LTMS_Alegra_Webhook_Handler debe ser final');
+        $m = $r->getMethod('init');
+        $this->assertTrue($m->isStatic());
+        $this->assertTrue($m->isPublic());
     }
 
     /** @test */
-    public function test_has_init_static_method(): void
+    public function test_has_handle_method(): void
     {
-        $r      = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        $method = $r->getMethod('init');
-        $this->assertTrue($method->isStatic(), 'init() debe ser estático');
-        $this->assertTrue($method->isPublic(), 'init() debe ser público');
-    }
-
-    /** @test */
-    public function test_has_required_handler_methods(): void
-    {
-        $required = ['init', 'handle'];
-        $r        = new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class);
-        $missing  = [];
-
-        foreach ($required as $m) {
-            if (! $r->hasMethod($m)) {
-                $missing[] = $m;
-            }
-        }
-
-        $this->assertEmpty(
-            $missing,
-            'Métodos faltantes: ' . implode(', ', $missing)
+        $this->assertTrue(
+            (new ReflectionClass(\LTMS_Alegra_Webhook_Handler::class))->hasMethod('handle')
         );
     }
 }

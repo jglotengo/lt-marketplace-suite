@@ -84,40 +84,67 @@
     function injectButtons() {
         var data = ltmsHeaderNav;
 
-        // Intentar encontrar los botones Seller/Cliente del tema
-        var $sellerEl = $('a').filter(function() {
-            var href = ($(this).attr('href') || '').toLowerCase();
-            var text = $(this).text().trim().toLowerCase();
-            return (href.includes('seller') || href.includes('vendors')) ||
-                   (text === 'seller' || text === 'vendedor' || text === 'vender');
-        }).first();
+        // Evitar doble inyección
+        if ($('#ltms-floating-access').length || $('.ltms-header-access').length) return;
 
-        var $clienteEl = $('a').filter(function() {
-            var href = ($(this).attr('href') || '').toLowerCase();
-            var text = $(this).text().trim().toLowerCase();
-            return (href.includes('mi-cuenta') || href.includes('my-account')) ||
-                   (text === 'cliente' || text === 'mi cuenta' || text === 'cliente');
-        }).first();
-
-        var sellerUrl  = data.sellers_url  || '/sellers/';
+        var sellerUrl  = data.sellers_url   || '/sellers/';
         var clienteUrl = data.mi_cuenta_url || '/mi-cuenta/';
 
-        var $wrap = $('<div class="ltms-header-access"></div>');
+        var $wrap = $('<div class="ltms-header-access" id="ltms-header-access"></div>');
         $wrap.append(buildSellerBtn(sellerUrl));
         var clienteHTML = buildClienteBtn(clienteUrl);
         if (clienteHTML) $wrap.append(clienteHTML);
 
+        // 1. Buscar botón "VENDER / Seller / Vendedor" explícito en el tema
+        var $sellerEl = $('a').filter(function() {
+            var href = ($(this).attr('href') || '').toLowerCase();
+            var text = $(this).text().trim().toLowerCase();
+            return (href.includes('/sellers') || href.includes('/vendors') || href.includes('/vender')) ||
+                   (text === 'seller' || text === 'vendedor' || text === 'vender' || text === 'sell');
+        }).first();
+
+        // 2. Buscar botón Mi Cuenta / My Account en el tema
+        var $clienteEl = $('a').filter(function() {
+            var href = ($(this).attr('href') || '').toLowerCase();
+            var text = $(this).text().trim().toLowerCase();
+            return (href.includes('mi-cuenta') || href.includes('my-account') || href.includes('/cuenta')) ||
+                   (text === 'cliente' || text === 'mi cuenta' || text === 'my account');
+        }).first();
+
+        // 3. Buscar zonas comunes del header de temas donde agregar el bloque
+        var $headerTarget = $(
+            '.site-header__actions, .header-actions, .header__right,' +
+            '.nav-bar__actions, .header-end, .header-cta, .header__cta,' +
+            '.masthead-actions, header .right, .header-tools,' +
+            'header nav .menu-item:last-child, .primary-menu-container'
+        ).first();
+
         if ($sellerEl.length) {
-            // Reemplazar botones existentes del tema
-            $sellerEl.closest('li, div, span').first().replaceWith($wrap);
+            // Reemplazar botón existente del tema (caso ideal)
+            var $parentSeller = $sellerEl.closest('li').length
+                ? $sellerEl.closest('li')
+                : $sellerEl.closest('.menu-item, [class*="btn"], div, span').first();
+            $parentSeller.replaceWith($wrap);
             if ($clienteEl.length) {
-                $clienteEl.closest('li, div, span').first().remove();
+                $clienteEl.closest('li, .menu-item, div, span').first().remove();
             }
         } else if ($clienteEl.length) {
-            $clienteEl.closest('li, div, span').first().replaceWith($wrap);
+            // Reemplazar botón Mi Cuenta del tema
+            var $parentCliente = $clienteEl.closest('li').length
+                ? $clienteEl.closest('li')
+                : $clienteEl.closest('.menu-item, [class*="btn"], div, span').first();
+            $parentCliente.replaceWith($wrap);
+        } else if ($headerTarget.length) {
+            // Insertar en zona del header detectada
+            $headerTarget.append($wrap);
         } else {
-            // Fallback: barra flotante fija en esquina superior derecha
-            $('body').append($('<div id="ltms-floating-access"></div>').append($wrap));
+            // Fallback: barra flotante fija (solo cuando no hay nada más)
+            // En desktop: esquina superior derecha con margen adecuado
+            // En mobile: ya manejado por CSS
+            $('body').append(
+                $('<div id="ltms-floating-access" role="navigation" aria-label="Acceso vendedor"></div>')
+                    .append($wrap)
+            );
         }
     }
 

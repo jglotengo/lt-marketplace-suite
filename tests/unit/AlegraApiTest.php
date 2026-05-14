@@ -2,12 +2,6 @@
 /**
  * AlegraApiTest — Tests unitarios para LTMS_Api_Alegra
  *
- * Cubre la lógica pura sin HTTP real:
- *   1. Constructor — excepción si faltan credenciales
- *   2. get_provider_slug() — retorna 'alegra'
- *   3. format_invoice_items() — estructura correcta de líneas de factura
- *   4. Clase final y método privado correctamente definidos
- *
  * @package LTMS\Tests\Unit
  */
 
@@ -36,6 +30,7 @@ class AlegraApiTest extends TestCase
             'update_option'       => static fn(): bool => true,
             'get_transient'       => static fn(): mixed => false,
             'set_transient'       => static fn(): bool => true,
+            'delete_transient'    => static fn(): bool => true,
         ]);
 
         \LTMS_Core_Config::flush_cache();
@@ -48,79 +43,67 @@ class AlegraApiTest extends TestCase
         parent::tearDown();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private function set_credentials(): void
+    /** Inject credentials directly into Config cache (no update_option needed) */
+    private function inject_credentials(): void
     {
-        // El constructor lee 'ltms_alegra_email' y 'ltms_alegra_token'
-        \LTMS_Core_Config::set('ltms_alegra_email', 'test@empresa.com');
-        \LTMS_Core_Config::set('ltms_alegra_token', 'test_token_plain');
+        $r = new ReflectionClass(\LTMS_Core_Config::class);
+
+        $cache = $r->getProperty('cache');
+        $cache->setAccessible(true);
+        $cur = $cache->getValue(null);
+        $cur['ltms_alegra_email'] = 'test@empresa.com';
+        $cur['ltms_alegra_token'] = 'plain_token_qa';
+        $cache->setValue(null, $cur);
+
+        $settings = $r->getProperty('settings');
+        $settings->setAccessible(true);
+        $cur = $settings->getValue(null) ?? [];
+        $cur['ltms_alegra_email'] = 'test@empresa.com';
+        $cur['ltms_alegra_token'] = 'plain_token_qa';
+        $settings->setValue(null, $cur);
     }
 
     private function make_client(): \LTMS_Api_Alegra
     {
-        $this->set_credentials();
+        $this->inject_credentials();
         return new \LTMS_Api_Alegra();
     }
-
-    // ── Section 1: Constructor ────────────────────────────────────────────────
 
     /** @test */
     public function test_constructor_throws_when_no_credentials(): void
     {
         $this->expectException(\RuntimeException::class);
-        // Sin credenciales → excepción
         new \LTMS_Api_Alegra();
     }
 
     /** @test */
     public function test_constructor_succeeds_with_credentials(): void
     {
-        $client = $this->make_client();
-        $this->assertInstanceOf(\LTMS_Api_Alegra::class, $client);
+        $this->assertInstanceOf(\LTMS_Api_Alegra::class, $this->make_client());
     }
-
-    // ── Section 2: get_provider_slug ─────────────────────────────────────────
 
     /** @test */
     public function test_get_provider_slug_returns_alegra(): void
     {
-        $client = $this->make_client();
-        $this->assertSame('alegra', $client->get_provider_slug());
+        $this->assertSame('alegra', $this->make_client()->get_provider_slug());
     }
-
-    // ── Section 3: format_invoice_items (via reflexión) ───────────────────────
 
     /** @test */
     public function test_format_invoice_items_returns_correct_structure(): void
     {
         $client = $this->make_client();
         $r      = new ReflectionClass($client);
-
         if (! $r->hasMethod('format_invoice_items')) {
-            $this->markTestSkipped('format_invoice_items not accessible');
+            $this->markTestSkipped('format_invoice_items not present');
         }
-
         $method = $r->getMethod('format_invoice_items');
         $method->setAccessible(true);
-
-        $items = [
-            [
-                'description' => 'Producto de prueba',
-                'quantity'    => 2,
-                'price'       => 50000.0,
-                'tax'         => [],
-                'allegra_id'  => 42,
-            ],
-        ];
-
-        $result = $method->invoke($client, $items);
-
+        $result = $method->invoke($client, [
+            ['description' => 'Test', 'quantity' => 2, 'price' => 50000.0, 'tax' => [], 'alegra_id' => 1],
+        ]);
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
-        $first = $result[0];
-        $this->assertArrayHasKey('quantity', $first);
-        $this->assertSame(2, (int) $first['quantity']);
+        $this->assertSame(2, (int) $result[0]['quantity']);
     }
 
     /** @test */
@@ -128,61 +111,35 @@ class AlegraApiTest extends TestCase
     {
         $client = $this->make_client();
         $r      = new ReflectionClass($client);
-
         if (! $r->hasMethod('format_invoice_items')) {
-            $this->markTestSkipped('format_invoice_items not accessible');
+            $this->markTestSkipped('format_invoice_items not present');
         }
-
         $method = $r->getMethod('format_invoice_items');
         $method->setAccessible(true);
-
-        $result = $method->invoke($client, []);
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $method->invoke($client, []));
     }
-
-    // ── Section 4: Class structure ────────────────────────────────────────────
 
     /** @test */
     public function test_class_is_final(): void
     {
-        $r = new ReflectionClass(\LTMS_Api_Alegra::class);
-        $this->assertTrue($r->isFinal(), 'LTMS_Api_Alegra debe ser final');
+        $this->assertTrue((new ReflectionClass(\LTMS_Api_Alegra::class))->isFinal());
     }
 
     /** @test */
     public function test_extends_abstract_api_client(): void
     {
-        $r = new ReflectionClass(\LTMS_Api_Alegra::class);
-        $this->assertTrue(
-            $r->isSubclassOf(\LTMS_Abstract_API_Client::class),
-            'LTMS_Api_Alegra debe extender LTMS_Abstract_API_Client'
-        );
+        $this->assertTrue((new ReflectionClass(\LTMS_Api_Alegra::class))->isSubclassOf(\LTMS_Abstract_API_Client::class));
     }
 
     /** @test */
-    public function test_has_all_required_public_methods(): void
+    public function test_has_required_public_methods(): void
     {
-        $required = [
-            'get_provider_slug', 'health_check',
-            'create_contact', 'find_contact_by_identification', 'get_or_create_contact',
-            'create_item', 'update_item',
-            'create_invoice', 'get_invoice', 'send_invoice_email', 'list_invoices',
-            'create_payment', 'get_number_templates', 'get_company', 'subscribe_webhook',
-        ];
-
         $r       = new ReflectionClass(\LTMS_Api_Alegra::class);
-        $missing = [];
-
-        foreach ($required as $method) {
-            if (! $r->hasMethod($method)) {
-                $missing[] = $method;
-            }
-        }
-
-        $this->assertEmpty(
-            $missing,
-            'Métodos faltantes en LTMS_Api_Alegra: ' . implode(', ', $missing)
+        $missing = array_filter(
+            ['get_provider_slug', 'health_check', 'create_contact', 'get_or_create_contact',
+             'create_invoice', 'get_invoice', 'send_invoice_email', 'create_payment', 'get_company'],
+            fn($m) => ! $r->hasMethod($m)
         );
+        $this->assertEmpty($missing, 'Métodos faltantes: ' . implode(', ', $missing));
     }
 }

@@ -850,3 +850,242 @@
     .ltms-sl-hero { padding: 48px 20px; }
     .ltms-sl-cta  { padding: 40px 20px; }
 }
+
+/* =============================================================
+   Header Nav — Botón VENDER GRATIS / Mi Cuenta / Avatar vendedor
+   Estilos para ltms-header-nav.js — Versión responsive correcta
+   ============================================================= */
+
+/* Contenedor principal — se inserta donde el tema tenga los botones */
+.ltms-header-access {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Wrapper individual de cada botón (posición relativa para tooltip) */
+.ltms-nav-btn-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Botón base */
+.ltms-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none !important;
+    white-space: nowrap;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .2s, transform .15s, box-shadow .2s;
+    border: 2px solid transparent;
+    letter-spacing: .3px;
+}
+
+/* Botón VENDER */
+.ltms-btn-seller {
+    background: #e8112d;
+    color: #fff !important;
+    border-color: #e8112d;
+}
+.ltms-btn-seller:hover {
+    background: #c40e26;
+    border-color: #c40e26;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232,17,45,.35);
+}
+
+/* Botón MI CUENTA (visitante) */
+.ltms-btn-cliente {
+    background: transparent;
+    color: #333 !important;
+    border-color: #ddd;
+}
+.ltms-btn-cliente:hover {
+    background: #f5f5f5;
+    border-color: #bbb;
+}
+
+/* Icono SVG dentro del botón */
+.ltms-nav-btn .ltms-btn-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    flex-shrink: 0;
+}
+
+/* Badge GRATIS */
+.ltms-nav-btn .ltms-badge {
+    font-size: 9px;
+    font-weight: 800;
+    background: #fff;
+    color: #e8112d;
+    padding: 2px 5px;
+    border-radius: 8px;
+    letter-spacing: .5px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+
+/* Tooltip */
+.ltms-nav-tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #222;
+    color: #fff;
+    font-size: 11px;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 9999;
+}
+.ltms-nav-btn-wrap:hover .ltms-nav-tooltip { opacity: 1; }
+.ltms-nav-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    right: 16px;
+    border: 5px solid transparent;
+    border-bottom-color: #222;
+}
+
+/* ── Avatar chip (vendedor / usuario logueado) ─────────────── */
+.ltms-user-dropdown-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.ltms-user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 24px;
+    background: #f5f5f5;
+    border: 2px solid #e0e0e0;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: background .2s;
+    max-width: 200px;
+}
+.ltms-user-chip:hover { background: #ebebeb; }
+
+.ltms-avatar-initials {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e8112d;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: .5px;
+}
+
+.ltms-chip-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+/* Dropdown del avatar */
+.ltms-user-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    min-width: 180px;
+    z-index: 99999;
+    display: none;
+    overflow: hidden;
+}
+.ltms-user-dropdown-wrap:hover .ltms-user-dropdown,
+.ltms-user-dropdown-wrap:focus-within .ltms-user-dropdown { display: block; }
+
+.ltms-user-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #333 !important;
+    text-decoration: none !important;
+    transition: background .15s;
+}
+.ltms-user-dropdown a:hover { background: #f7f8ff; }
+.ltms-user-dropdown a svg {
+    width: 16px;
+    height: 16px;
+    fill: #555;
+    flex-shrink: 0;
+}
+.ltms-dropdown-divider {
+    height: 1px;
+    background: #eee;
+    margin: 4px 0;
+}
+
+/* ── Floating fallback (#ltms-floating-access) ─────────────── */
+/* Solo se activa cuando el tema NO tiene botones que reemplazar */
+#ltms-floating-access {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    z-index: 99999;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    /* Nunca más ancho que la pantalla */
+    max-width: calc(100vw - 32px);
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+/* Tablet: ocultar nombre en chip, solo avatar */
+@media (max-width: 900px) {
+    .ltms-chip-name { display: none; }
+    .ltms-user-chip { padding: 5px; }
+    .ltms-btn-label { display: none; }
+    .ltms-nav-btn { padding: 7px 10px; border-radius: 50%; }
+    .ltms-nav-btn .ltms-badge { display: none; }
+}
+
+/* Mobile: botón seller más compacto, sin desborde */
+@media (max-width: 600px) {
+    #ltms-floating-access {
+        top: 8px;
+        right: 8px;
+        gap: 6px;
+    }
+    .ltms-nav-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    /* Asegurar que nunca salga de la pantalla */
+    .ltms-header-access,
+    #ltms-floating-access > * {
+        max-width: calc(50vw - 16px);
+    }
+    .ltms-user-dropdown { right: 0; left: auto; min-width: 160px; }
+}

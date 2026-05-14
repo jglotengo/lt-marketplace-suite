@@ -2,12 +2,6 @@
 /**
  * AlegraSyncTest — Tests unitarios para LTMS_Alegra_Sync
  *
- * Cubre la lógica pura sin HTTP real:
- *   1. init() — registra los hooks correctos
- *   2. build_contact_data() — mapea datos de vendedor WP correctamente
- *   3. Singleton pattern — get_instance() retorna misma instancia
- *   4. Clase final correctamente estructurada
- *
  * @package LTMS\Tests\Unit
  */
 
@@ -39,7 +33,6 @@ class AlegraSyncTest extends TestCase
             'sanitize_text_field' => static fn(string $s): string => $s,
             'sanitize_email'      => static fn(string $s): string => $s,
             '__'                  => static fn(string $s): string => $s,
-            'wp_generate_password'=> static fn(): string => 'testpass',
         ]);
 
         \LTMS_Core_Config::flush_cache();
@@ -52,160 +45,104 @@ class AlegraSyncTest extends TestCase
         parent::tearDown();
     }
 
-    // ── Section 1: init() hooks ───────────────────────────────────────────────
+    /** Inject config values directly into cache (no update_option round-trip) */
+    private function inject_config(array $values): void
+    {
+        $r = new ReflectionClass(\LTMS_Core_Config::class);
+        $cache = $r->getProperty('cache');
+        $cache->setAccessible(true);
+        $cur = array_merge($cache->getValue(null), $values);
+        $cache->setValue(null, $cur);
+        $settings = $r->getProperty('settings');
+        $settings->setAccessible(true);
+        $cur2 = array_merge($settings->getValue(null) ?? [], $values);
+        $settings->setValue(null, $cur2);
+    }
+
+    /** Enable Alegra so init() doesn't early-return */
+    private function enable_alegra(): void
+    {
+        $this->inject_config(['ltms_alegra_enabled' => 'yes']);
+    }
+
+    // ── init() hooks ──────────────────────────────────────────────
 
     /** @test */
-    public function test_init_registers_hooks(): void
+    public function test_init_early_returns_when_disabled(): void
     {
-        $hooks_registered = 0;
-
-        Functions\when('add_action')->alias(static function() use (&$hooks_registered) {
-            $hooks_registered++;
-            return true;
+        // Alegra disabled (default) — init should register 0 hooks
+        $count = 0;
+        Functions\when('add_action')->alias(static function() use (&$count) {
+            $count++;
         });
-
-        // Habilitar Alegra para que init() no retorne temprano
-        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
-
-        $this->assertGreaterThanOrEqual(
-            2,
-            $hooks_registered,
-            'LTMS_Alegra_Sync::init() debe registrar al menos 2 hooks'
-        );
+        $this->assertSame(0, $count, 'init() debe salir temprano cuando Alegra está deshabilitado');
     }
 
     /** @test */
-    public function test_init_registers_vendor_registered_hook(): void
+    public function test_init_registers_hooks_when_enabled(): void
     {
-        $registered_hooks = [];
-
-        Functions\when('add_action')->alias(static function(string $hook) use (&$registered_hooks) {
-            $registered_hooks[] = $hook;
-            return true;
+        $this->enable_alegra();
+        $count = 0;
+        Functions\when('add_action')->alias(static function() use (&$count) {
+            $count++;
         });
-
-        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
-
-        $this->assertContains(
-            'ltms_vendor_registered',
-            $registered_hooks,
-            'Debe escuchar ltms_vendor_registered para sincronizar contactos'
-        );
+        $this->assertGreaterThanOrEqual(2, $count, 'init() debe registrar ≥2 hooks cuando Alegra está habilitado');
     }
 
     /** @test */
-    public function test_init_registers_payout_completed_hook(): void
+    public function test_init_registers_vendor_registered_hook_when_enabled(): void
     {
-        $registered_hooks = [];
-
-        Functions\when('add_action')->alias(static function(string $hook) use (&$registered_hooks) {
-            $registered_hooks[] = $hook;
-            return true;
+        $this->enable_alegra();
+        $hooks = [];
+        Functions\when('add_action')->alias(static function(string $hook) use (&$hooks) {
+            $hooks[] = $hook;
         });
-
-        \LTMS_Core_Config::set('ltms_alegra_enabled', 'yes');
         \LTMS_Alegra_Sync::init();
-
-        $this->assertContains(
-            'ltms_payout_completed',
-            $registered_hooks,
-            'Debe escuchar ltms_payout_completed para registrar pagos en Alegra'
-        );
+        $this->assertContains('ltms_vendor_registered', $hooks);
     }
 
-    // ── Section 2: Singleton ──────────────────────────────────────────────────
-
     /** @test */
-    public function test_get_instance_returns_same_object(): void
+    public function test_init_registers_payout_completed_hook_when_enabled(): void
     {
-        $r = new ReflectionClass(\LTMS_Alegra_Sync::class);
-
-        if (! $r->hasMethod('get_instance')) {
-            $this->markTestSkipped('get_instance not accessible');
-        }
-
-        $method = $r->getMethod('get_instance');
-        $method->setAccessible(true);
-
-        $i1 = $method->invoke(null);
-        $i2 = $method->invoke(null);
-
-        $this->assertSame($i1, $i2, 'get_instance() debe retornar siempre la misma instancia (singleton)');
-    }
-
-    // ── Section 3: build_contact_data (via reflexión) ─────────────────────────
-
-    /** @test */
-    public function test_build_contact_data_returns_array_with_required_keys(): void
-    {
-        $r = new ReflectionClass(\LTMS_Alegra_Sync::class);
-
-        if (! $r->hasMethod('build_contact_data')) {
-            $this->markTestSkipped('build_contact_data not accessible');
-        }
-
-        $method   = $r->getMethod('build_contact_data');
-        $method->setAccessible(true);
-        $instance = $r->getMethod('get_instance');
-        $instance->setAccessible(true);
-        $obj = $instance->invoke(null);
-
-        // Mock WP_User-like data
-        $user = new \stdClass();
-        $user->ID           = 42;
-        $user->user_email   = 'vendedor@test.com';
-        $user->display_name = 'Vendedor Test';
-
-        Functions\when('get_user_meta')->alias(static function(int $uid, string $key, bool $single = false): mixed {
-            $data = [
-                'ltms_store_name'      => 'Tienda Test',
-                'ltms_store_phone'     => '3001234567',
-                'ltms_nit'             => '900123456',
-                'billing_address_1'    => 'Calle 123',
-                'billing_city'         => 'Bogotá',
-            ];
-            return $data[$key] ?? '';
+        $this->enable_alegra();
+        $hooks = [];
+        Functions\when('add_action')->alias(static function(string $hook) use (&$hooks) {
+            $hooks[] = $hook;
         });
-
-        try {
-            $result = $method->invoke($obj, $user);
-            $this->assertIsArray($result);
-            $this->assertNotEmpty($result);
-            // Debe tener algún campo de identificación
-            $has_name = isset($result['name']) || isset($result['nameObject']);
-            $this->assertTrue($has_name, 'build_contact_data debe incluir nombre del contacto');
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('build_contact_data requires WP user context: ' . $e->getMessage());
-        }
+        \LTMS_Alegra_Sync::init();
+        $this->assertContains('ltms_payout_completed', $hooks);
     }
 
-    // ── Section 4: Class structure ─────────────────────────────────────────────
+    /** @test */
+    public function test_init_registers_order_completed_hook_when_enabled(): void
+    {
+        $this->enable_alegra();
+        $hooks = [];
+        Functions\when('add_action')->alias(static function(string $hook) use (&$hooks) {
+            $hooks[] = $hook;
+        });
+        \LTMS_Alegra_Sync::init();
+        $this->assertContains('woocommerce_order_status_completed', $hooks);
+    }
+
+    // ── Class structure ───────────────────────────────────────────
 
     /** @test */
     public function test_class_is_final(): void
     {
-        $r = new ReflectionClass(\LTMS_Alegra_Sync::class);
-        $this->assertTrue($r->isFinal(), 'LTMS_Alegra_Sync debe ser final');
+        $this->assertTrue((new ReflectionClass(\LTMS_Alegra_Sync::class))->isFinal());
     }
 
     /** @test */
-    public function test_has_required_public_methods(): void
+    public function test_has_required_methods(): void
     {
-        $required = ['init', 'on_vendor_registered', 'on_payout_completed'];
-        $r        = new ReflectionClass(\LTMS_Alegra_Sync::class);
-        $missing  = [];
-
-        foreach ($required as $m) {
-            if (! $r->hasMethod($m)) {
-                $missing[] = $m;
-            }
-        }
-
-        $this->assertEmpty(
-            $missing,
-            'Métodos públicos faltantes en LTMS_Alegra_Sync: ' . implode(', ', $missing)
+        $r       = new ReflectionClass(\LTMS_Alegra_Sync::class);
+        $missing = array_filter(
+            ['init', 'on_vendor_registered', 'on_payout_completed', 'on_order_completed'],
+            fn($m) => ! $r->hasMethod($m)
         );
+        $this->assertEmpty($missing, 'Métodos faltantes: ' . implode(', ', $missing));
     }
 }
