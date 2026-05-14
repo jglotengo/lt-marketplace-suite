@@ -17,6 +17,14 @@
   --ltms-transition: 0.22s cubic-bezier(.4,0,.2,1);
 }
 
+/* ── Variantes standalone (cuando se inyectan por separado) ── */
+.ltms-header-access--seller,
+.ltms-header-access--cliente {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--ltms-font);
+}
+
 /* ── Contenedor de accesos rápidos en el header ──────────── */
 .ltms-header-access {
   display: flex;

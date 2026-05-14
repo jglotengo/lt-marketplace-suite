@@ -120,13 +120,26 @@
         ).first();
 
         if ($sellerEl.length) {
-            // Reemplazar botón existente del tema (caso ideal)
+            // Reemplazar SOLO el botón seller del tema — evita desbordamiento
+            var $sellerOnly = $('<div class="ltms-header-access ltms-header-access--seller" id="ltms-header-access-seller"></div>');
+            $sellerOnly.append(buildSellerBtn(sellerUrl));
             var $parentSeller = $sellerEl.closest('li').length
                 ? $sellerEl.closest('li')
                 : $sellerEl.closest('.menu-item, [class*="btn"], div, span').first();
-            $parentSeller.replaceWith($wrap);
+            $parentSeller.replaceWith($sellerOnly);
+            // Reemplazar el botón cliente por separado si existe
             if ($clienteEl.length) {
-                $clienteEl.closest('li, .menu-item, div, span').first().remove();
+                var $clienteOnly = $('<div class="ltms-header-access ltms-header-access--cliente" id="ltms-header-access-cliente"></div>');
+                var clienteHTML2 = buildClienteBtn(clienteUrl);
+                if (clienteHTML2) {
+                    $clienteOnly.append(clienteHTML2);
+                    var $parentCliente2 = $clienteEl.closest('li').length
+                        ? $clienteEl.closest('li')
+                        : $clienteEl.closest('.menu-item, [class*="btn"], div, span').first();
+                    $parentCliente2.replaceWith($clienteOnly);
+                } else {
+                    $clienteEl.closest('li, .menu-item, div, span').first().remove();
+                }
             }
         } else if ($clienteEl.length) {
             // Reemplazar botón Mi Cuenta del tema
