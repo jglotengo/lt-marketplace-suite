@@ -202,7 +202,13 @@ final class LTMS_Admin_Settings {
      * @return void
      */
     public function ajax_test_api_connection(): void {
-        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        // M-118: el form de settings usa 'ltms_settings_nonce' (no 'ltms_admin_nonce')
+        // Aceptar ambos para compatibilidad con otros contextos que llamen este endpoint.
+        $nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) ); // phpcs:ignore
+        if ( ! wp_verify_nonce( $nonce, 'ltms_settings_nonce' ) &&
+             ! wp_verify_nonce( $nonce, 'ltms_admin_nonce' ) ) {
+            wp_send_json_error( __( 'Nonce inválido.', 'ltms' ), 403 );
+        }
 
         if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
