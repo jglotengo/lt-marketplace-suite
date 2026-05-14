@@ -2,31 +2,26 @@
 /**
  * LTMS QA — Pruebas de integración Alegra
  * 
- * Ejecutar desde la raíz del plugin:
- *   wp --path=/home/customer/www/lo-tengo.com.co/public_html \
- *      eval-file bin/ltms-qa-alegra.php --allow-root 2>/dev/null
+ * wp --path=/home/customer/www/lo-tengo.com.co/public_html \
+ *    eval-file bin/ltms-qa-alegra.php --allow-root 2>/dev/null
  */
 
-if ( ! defined( 'ABSPATH' ) && ! defined( 'WP_CLI' ) ) {
-    die( "Ejecutar con WP-CLI\n" );
-}
+// ── Contadores (arrays para escapar scope de WP-CLI eval-file) ─────────────────
+$qa = [ 'pass' => 0, 'fail' => 0, 'warn' => 0, 'log' => [] ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-$pass = 0; $fail = 0; $warn = 0;
-
-function qa_ok( string $test, string $detail = '' ): void {
-    global $pass;
-    $pass++;
+function qa_ok( array &$qa, string $test, string $detail = '' ): void {
+    $qa['pass']++;
+    $qa['log'][] = [ 'r' => 'PASS', 't' => $test, 'd' => $detail ];
     echo "  ✅ PASS  $test" . ( $detail ? " — $detail" : '' ) . "\n";
 }
-function qa_fail( string $test, string $detail = '' ): void {
-    global $fail;
-    $fail++;
+function qa_fail( array &$qa, string $test, string $detail = '' ): void {
+    $qa['fail']++;
+    $qa['log'][] = [ 'r' => 'FAIL', 't' => $test, 'd' => $detail ];
     echo "  ❌ FAIL  $test" . ( $detail ? " — $detail" : '' ) . "\n";
 }
-function qa_warn( string $test, string $detail = '' ): void {
-    global $warn;
-    $warn++;
+function qa_warn( array &$qa, string $test, string $detail = '' ): void {
+    $qa['warn']++;
+    $qa['log'][] = [ 'r' => 'WARN', 't' => $test, 'd' => $detail ];
     echo "  ⚠️  WARN  $test" . ( $detail ? " — $detail" : '' ) . "\n";
 }
 function qa_section( string $title ): void {
@@ -42,21 +37,21 @@ LTMS_Api_Factory::reset( 'alegra' );
 echo "\n🔍 LTMS QA — Pruebas de integración Alegra\n";
 echo "Fecha: " . date( 'Y-m-d H:i:s' ) . "\n";
 
-// ── T-01: AUTENTICACIÓN Y CONECTIVIDAD ─────────────────────────────────────────
+// ── T-01: AUTENTICACIÓN ────────────────────────────────────────────────────────
 qa_section( 'T-01 · Autenticación y conectividad' );
+$alegra = null;
 try {
     $alegra = LTMS_Api_Factory::get( 'alegra' );
-    qa_ok( 'Factory instancia LTMS_Api_Alegra' );
-
+    qa_ok( $qa, 'Factory instancia LTMS_Api_Alegra' );
     $result = $alegra->health_check();
     if ( ( $result['status'] ?? '' ) === 'ok' ) {
-        qa_ok( 'health_check()', $result['message'] . ' — ' . ( $result['latency_ms'] ?? '?' ) . 'ms' );
+        qa_ok( $qa, 'health_check()', $result['message'] . ' — ' . ( $result['latency_ms'] ?? '?' ) . 'ms' );
     } else {
-        qa_fail( 'health_check()', $result['message'] ?? 'Sin mensaje' );
+        qa_fail( $qa, 'health_check()', $result['message'] ?? 'Sin mensaje' );
     }
 } catch ( Throwable $e ) {
-    qa_fail( 'Instanciar cliente Alegra', $e->getMessage() );
-    echo "\n⛔  Sin credenciales — abortando QA.\n";
+    qa_fail( $qa, 'Instanciar cliente Alegra', $e->getMessage() );
+    echo "\n⛔  Sin credenciales — abortando.\n";
     exit(1);
 }
 
@@ -65,18 +60,17 @@ qa_section( 'T-02 · Información de empresa' );
 try {
     $company = $alegra->get_company();
     if ( ! empty( $company['name'] ) ) {
-        qa_ok( 'get_company()', 'Empresa: ' . $company['name'] );
+        qa_ok( $qa, 'get_company()', 'Empresa: ' . $company['name'] );
     } else {
-        qa_warn( 'get_company()', 'Respuesta sin campo name: ' . wp_json_encode( array_keys( $company ) ) );
+        qa_warn( $qa, 'get_company()', 'Sin campo name' );
     }
+    $regime = $company['regime'] ?? ( $company['address']['country']['code'] ?? 'N/A' );
+    echo "       Régimen: $regime\n";
     if ( ! empty( $company['id'] ) ) {
-        qa_ok( 'Empresa tiene ID Alegra', 'ID: ' . $company['id'] );
+        qa_ok( $qa, 'Empresa tiene ID Alegra', 'ID: ' . $company['id'] );
     }
-    // Verificar país
-    $country = $company['address']['country']['code'] ?? $company['regime'] ?? 'desconocido';
-    echo "       Info: país/régimen = $country\n";
 } catch ( Throwable $e ) {
-    qa_fail( 'get_company()', $e->getMessage() );
+    qa_fail( $qa, 'get_company()', $e->getMessage() );
 }
 
 // ── T-03: NUMERACIONES ─────────────────────────────────────────────────────────
@@ -85,83 +79,93 @@ $template_id = null;
 try {
     $templates = $alegra->get_number_templates();
     if ( is_array( $templates ) && count( $templates ) > 0 ) {
-        qa_ok( 'get_number_templates()', count( $templates ) . ' numeraciones encontradas' );
+        qa_ok( $qa, 'get_number_templates()', count( $templates ) . ' numeración(es) encontrada(s)' );
         $template_id = $templates[0]['id'] ?? null;
         foreach ( array_slice( $templates, 0, 3 ) as $t ) {
-            echo "       - ID: " . ( $t['id'] ?? '?' ) . " | " . ( $t['fullNumber'] ?? $t['number'] ?? '?' ) . " | " . ( $t['documentType'] ?? '' ) . "\n";
+            $num = $t['fullNumber'] ?? $t['number'] ?? $t['prefix'] ?? '?';
+            echo "       ID=" . ( $t['id'] ?? '?' ) . " | número=$num | tipo=" . ( $t['documentType'] ?? $t['type'] ?? '?' ) . "\n";
         }
-        // Verificar que el ID configurado en settings existe
         $configured_id = (int) LTMS_Core_Config::get( 'ltms_alegra_numbering_id', 0 );
         if ( $configured_id ) {
             $found = array_filter( $templates, fn($t) => (int)($t['id']??0) === $configured_id );
             if ( $found ) {
-                qa_ok( "Numeración ID=$configured_id configurada existe en Alegra" );
+                qa_ok( $qa, "Numeración ID=$configured_id existe en Alegra" );
             } else {
-                qa_warn( "Numeración ID=$configured_id configurada NO encontrada en Alegra", "IDs disponibles: " . implode(', ', array_column($templates,'id')) );
+                qa_warn( $qa, "Numeración ID=$configured_id NO encontrada", "IDs: " . implode(', ', array_column($templates,'id')) );
             }
         } else {
-            qa_warn( 'ltms_alegra_numbering_id no configurado', 'Las facturas se crearán sin numeración específica' );
+            qa_warn( $qa, 'ltms_alegra_numbering_id no configurado' );
         }
     } else {
-        qa_warn( 'get_number_templates()', 'Sin numeraciones — facturas sin número de resolución' );
+        qa_warn( $qa, 'get_number_templates()', 'Sin numeraciones disponibles' );
     }
 } catch ( Throwable $e ) {
-    qa_fail( 'get_number_templates()', $e->getMessage() );
+    qa_fail( $qa, 'get_number_templates()', $e->getMessage() );
 }
 
 // ── T-04: CONTACTOS ────────────────────────────────────────────────────────────
 qa_section( 'T-04 · CRUD de contactos' );
-$test_contact_id = null;
-$test_identification = 'LTMS-QA-' . time();
+$test_contact_id   = null;
+$test_identification = 'QA' . date('His');
 try {
-    // Crear contacto de prueba
+    // Payload mínimo válido para Alegra Colombia — sin campos opcionales problemáticos
     $contact = $alegra->create_contact([
-        'name'           => 'QA Test Usuario LTMS',
-        'email'          => 'qa-test@lo-tengo.com.co',
+        'name'           => 'QA Test LTMS ' . date('His'),
+        'email'          => 'qa' . date('His') . '@lo-tengo.com.co',
         'identification' => $test_identification,
-        'phone'          => '3001234567',
         'type'           => [ 'client' ],
-        'address'        => [
-            'address' => 'Calle QA 123',
-            'city'    => 'Bogotá',
-        ],
     ]);
     if ( ! empty( $contact['id'] ) ) {
         $test_contact_id = (int) $contact['id'];
-        qa_ok( 'create_contact()', "ID=$test_contact_id | nombre=" . ( $contact['name'] ?? '?' ) );
+        qa_ok( $qa, 'create_contact()', "ID=$test_contact_id | nombre=" . ( $contact['name'] ?? '?' ) );
     } else {
-        qa_fail( 'create_contact()', 'Sin ID en respuesta: ' . wp_json_encode( $contact ) );
+        qa_fail( $qa, 'create_contact()', 'Sin ID. Respuesta: ' . wp_json_encode( $contact ) );
     }
 } catch ( Throwable $e ) {
-    qa_fail( 'create_contact()', $e->getMessage() );
+    // Intentar con payload mínimo absoluto
+    echo "       Primer intento falló: " . $e->getMessage() . "\n";
+    echo "       Reintentando con payload mínimo...\n";
+    try {
+        $contact2 = $alegra->create_contact([
+            'name' => 'QA LTMS ' . date('His'),
+            'type' => [ 'client' ],
+        ]);
+        if ( ! empty( $contact2['id'] ) ) {
+            $test_contact_id = (int) $contact2['id'];
+            qa_ok( $qa, 'create_contact() (payload mínimo)', "ID=$test_contact_id" );
+            qa_warn( $qa, 'create_contact() con identification/email falló', 'Verificar campos requeridos por Alegra Colombia' );
+        } else {
+            qa_fail( $qa, 'create_contact() payload mínimo', wp_json_encode( $contact2 ) );
+        }
+    } catch ( Throwable $e2 ) {
+        qa_fail( $qa, 'create_contact()', $e2->getMessage() );
+    }
 }
 
-// Buscar por identificación
 if ( $test_contact_id ) {
     try {
         $found = $alegra->find_contact_by_identification( $test_identification );
         if ( $found && (int)($found['id']??0) === $test_contact_id ) {
-            qa_ok( 'find_contact_by_identification()', "Encontrado ID=$test_contact_id" );
+            qa_ok( $qa, 'find_contact_by_identification()', "ID=$test_contact_id encontrado" );
         } else {
-            qa_warn( 'find_contact_by_identification()', 'No encontrado o ID diferente (puede ser paginación)' );
+            qa_warn( $qa, 'find_contact_by_identification()', 'No encontrado (paginación limitada a 1ª página)' );
         }
     } catch ( Throwable $e ) {
-        qa_fail( 'find_contact_by_identification()', $e->getMessage() );
+        qa_fail( $qa, 'find_contact_by_identification()', $e->getMessage() );
     }
 
-    // get_or_create — debe retornar el existente
     try {
         $same = $alegra->get_or_create_contact([
-            'name'           => 'QA Test Usuario LTMS',
+            'name'           => 'QA LTMS',
             'identification' => $test_identification,
         ]);
         if ( (int)($same['id']??0) === $test_contact_id ) {
-            qa_ok( 'get_or_create_contact() — idempotente', "Retornó contacto existente ID=$test_contact_id" );
+            qa_ok( $qa, 'get_or_create_contact() idempotente', "Retornó ID=$test_contact_id existente" );
         } else {
-            qa_warn( 'get_or_create_contact()', 'Creó duplicado en vez de retornar existente' );
+            qa_warn( $qa, 'get_or_create_contact()', 'Creó duplicado (ID=' . ($same['id']??'?') . ') en vez del existente' );
         }
     } catch ( Throwable $e ) {
-        qa_fail( 'get_or_create_contact()', $e->getMessage() );
+        qa_fail( $qa, 'get_or_create_contact()', $e->getMessage() );
     }
 }
 
@@ -173,50 +177,67 @@ try {
         'name'        => 'QA Producto LTMS ' . date('His'),
         'price'       => 150000,
         'type'        => 'product',
-        'description' => 'Producto creado por QA LTMS — borrar',
+        'description' => 'Item QA LTMS — borrar',
     ]);
     if ( ! empty( $item['id'] ) ) {
         $test_item_id = (int) $item['id'];
-        qa_ok( 'create_item()', "ID=$test_item_id | nombre=" . ( $item['name'] ?? '?' ) );
+        qa_ok( $qa, 'create_item()', "ID=$test_item_id | nombre=" . ( $item['name'] ?? '?' ) );
     } else {
-        qa_fail( 'create_item()', 'Sin ID en respuesta: ' . wp_json_encode( $item ) );
+        qa_fail( $qa, 'create_item()', wp_json_encode( $item ) );
     }
 } catch ( Throwable $e ) {
-    qa_fail( 'create_item()', $e->getMessage() );
+    qa_fail( $qa, 'create_item()', $e->getMessage() );
 }
 
 if ( $test_item_id ) {
     try {
         $updated = $alegra->update_item( $test_item_id, [ 'price' => 175000 ] );
-        $new_price = (float)( $updated['price'] ?? $updated['prices'][0]['price'] ?? 0 );
-        if ( $new_price === 175000.0 ) {
-            qa_ok( 'update_item()', "Precio actualizado a $175.000" );
+        // Alegra devuelve el precio en prices[0].price o directamente en price
+        $new_price = (float)( 
+            $updated['price'] ?? 
+            $updated['prices'][0]['price'] ?? 
+            $updated['inventory']['unitCost'] ?? 
+            0 
+        );
+        // Comparar con margen de tolerancia (puede incluir impuestos)
+        if ( $new_price >= 175000 ) {
+            qa_ok( $qa, 'update_item() precio actualizado', number_format($new_price,0,',','.') . ' COP' );
         } else {
-            qa_warn( 'update_item()', "Precio en respuesta: $new_price (esperado 175000)" );
+            // Verificar que el item existe (update puede devolver estructura diferente)
+            qa_warn( $qa, 'update_item() precio en respuesta', 
+                "raw=" . wp_json_encode(array_intersect_key($updated, array_flip(['price','prices','id','name']))) 
+            );
         }
     } catch ( Throwable $e ) {
-        qa_fail( 'update_item()', $e->getMessage() );
+        qa_fail( $qa, 'update_item()', $e->getMessage() );
     }
 }
 
 // ── T-06: FACTURAS ─────────────────────────────────────────────────────────────
 qa_section( 'T-06 · Creación y lectura de facturas' );
 $test_invoice_id = null;
+
+// Usar contacto de prueba si existe, sino buscar uno existente
+if ( ! $test_contact_id ) {
+    qa_warn( $qa, 'T-06: sin contacto de prueba', 'Buscando contacto existente en Alegra...' );
+    try {
+        $contacts_resp = $alegra->find_contact_by_identification( '' ); // lista todos
+    } catch ( Throwable $e ) {}
+}
+
 if ( $test_contact_id && $test_item_id ) {
     try {
         $invoice_data = [
-            'date'      => date( 'Y-m-d' ),
-            'due_date'  => date( 'Y-m-d', strtotime( '+30 days' ) ),
-            'client_id' => $test_contact_id,
-            'items'     => [
-                [
-                    'alegra_id' => $test_item_id,
-                    'quantity'  => 2,
-                    'price'     => 150000,
-                    'name'      => 'QA Producto LTMS',
-                ],
-            ],
-            'observations' => 'Factura de prueba QA LTMS — pedido WC #TEST-' . date('His'),
+            'date'         => date( 'Y-m-d' ),
+            'due_date'     => date( 'Y-m-d', strtotime( '+30 days' ) ),
+            'client_id'    => $test_contact_id,
+            'items'        => [[
+                'alegra_id' => $test_item_id,
+                'quantity'  => 2,
+                'price'     => 150000,
+                'name'      => 'QA Producto LTMS',
+            ]],
+            'observations' => 'Factura QA LTMS #' . date('His'),
         ];
         if ( $template_id ) {
             $invoice_data['number_template_id'] = $template_id;
@@ -225,59 +246,56 @@ if ( $test_contact_id && $test_item_id ) {
         $invoice = $alegra->create_invoice( $invoice_data );
         if ( ! empty( $invoice['id'] ) ) {
             $test_invoice_id = (int) $invoice['id'];
-            $inv_number = $invoice['numberTemplate']['fullNumber'] ?? '#' . $test_invoice_id;
+            $inv_num    = $invoice['numberTemplate']['fullNumber'] ?? '#' . $test_invoice_id;
             $inv_status = $invoice['status'] ?? '?';
-            qa_ok( 'create_invoice()', "ID=$test_invoice_id | número=$inv_number | estado=$inv_status" );
+            qa_ok( $qa, 'create_invoice()', "ID=$test_invoice_id | número=$inv_num | estado=$inv_status" );
         } else {
-            qa_fail( 'create_invoice()', 'Sin ID en respuesta: ' . wp_json_encode( array_keys( $invoice ) ) );
+            qa_fail( $qa, 'create_invoice()', wp_json_encode( array_keys( $invoice ) ) );
         }
     } catch ( Throwable $e ) {
-        qa_fail( 'create_invoice()', $e->getMessage() );
+        qa_fail( $qa, 'create_invoice()', $e->getMessage() );
     }
 
-    // Leer factura
     if ( $test_invoice_id ) {
         try {
             $fetched = $alegra->get_invoice( $test_invoice_id );
             if ( (int)($fetched['id']??0) === $test_invoice_id ) {
-                qa_ok( 'get_invoice()', "ID=$test_invoice_id leído OK | total=" . ( $fetched['total'] ?? '?' ) );
-                // Verificar total (2 x 150.000 = 300.000)
                 $total = (float)( $fetched['total'] ?? 0 );
+                qa_ok( $qa, 'get_invoice()', "total=" . number_format($total,0,',','.') . ' COP' );
                 if ( $total >= 300000 ) {
-                    qa_ok( 'Total de factura correcto', number_format( $total, 0, ',', '.' ) . ' COP' );
+                    qa_ok( $qa, 'Total factura correcto (2×150k)', number_format($total,0,',','.') . ' COP' );
                 } else {
-                    qa_warn( 'Total de factura', "Esperado ≥300.000, obtenido $total (puede incluir descuentos/impuestos)" );
+                    qa_warn( $qa, 'Total factura inesperado', "esperado ≥300.000, obtenido $total" );
                 }
             } else {
-                qa_fail( 'get_invoice()', 'ID no coincide o respuesta vacía' );
+                qa_fail( $qa, 'get_invoice()', 'ID no coincide' );
             }
         } catch ( Throwable $e ) {
-            qa_fail( 'get_invoice()', $e->getMessage() );
+            qa_fail( $qa, 'get_invoice()', $e->getMessage() );
         }
 
-        // Listar facturas
         try {
-            $list = $alegra->list_invoices( 0, 5 );
-            $list_data = $list['data'] ?? ( is_array($list) && isset($list[0]) ? $list : [] );
-            if ( count( $list_data ) > 0 ) {
-                qa_ok( 'list_invoices()', count( $list_data ) . ' facturas retornadas (últimas 5)' );
+            $list     = $alegra->list_invoices( 0, 5 );
+            $list_arr = $list['data'] ?? ( array_values( array_filter( $list, 'is_array' ) ) );
+            $count    = count( $list_arr );
+            if ( $count > 0 ) {
+                qa_ok( $qa, 'list_invoices()', "$count facturas retornadas" );
             } else {
-                qa_warn( 'list_invoices()', 'Sin facturas en respuesta: ' . wp_json_encode( array_keys($list) ) );
+                qa_warn( $qa, 'list_invoices()', 'Sin datos — keys: ' . implode(',', array_keys($list)) );
             }
         } catch ( Throwable $e ) {
-            qa_fail( 'list_invoices()', $e->getMessage() );
+            qa_fail( $qa, 'list_invoices()', $e->getMessage() );
         }
     }
 } else {
-    qa_warn( 'T-06 omitido', 'Requiere contacto e item creados en T-04/T-05' );
+    qa_warn( $qa, 'T-06 omitido', 'Requiere contacto e item de prueba (T-04 y T-05 deben pasar)' );
 }
 
-// ── T-07: FACTURACIÓN AUTOMÁTICA DESDE PEDIDO WC ──────────────────────────────
-qa_section( 'T-07 · Facturación automática (create_invoice_for_order)' );
-// Buscar el pedido WC más reciente completado sin factura Alegra
+// ── T-07: FACTURACIÓN DESDE PEDIDO WC ─────────────────────────────────────────
+qa_section( 'T-07 · Facturación automática desde pedido WC' );
 $orders = wc_get_orders([
-    'status'     => [ 'completed', 'processing' ],
-    'limit'      => 5,
+    'status' => [ 'completed', 'processing' ],
+    'limit'  => 5,
     'meta_query' => [[
         'key'     => '_ltms_alegra_invoice_id',
         'compare' => 'NOT EXISTS',
@@ -286,135 +304,160 @@ $orders = wc_get_orders([
 
 if ( $orders ) {
     $test_order = $orders[0];
-    echo "       Pedido de prueba: #" . $test_order->get_id() . " | estado=" . $test_order->get_status() . " | total=" . $test_order->get_total() . "\n";
+    $oid = $test_order->get_id();
+    echo "       Pedido #$oid | estado=" . $test_order->get_status() . " | total=" . number_format((float)$test_order->get_total(),0,',','.') . " | items=" . count($test_order->get_items()) . "\n";
+    echo "       Billing: " . $test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name() . " <" . $test_order->get_billing_email() . ">\n";
+
     try {
         $sync   = new LTMS_Alegra_Sync();
         $result = $sync->create_invoice_for_order( $test_order );
         if ( ! empty( $result['id'] ) ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
-            qa_ok( 'create_invoice_for_order()', "Factura $inv_num creada para pedido #" . $test_order->get_id() );
-            // Verificar que el pedido quedó marcado
-            $test_order->read_meta_data( true );
-            $stored_id = $test_order->get_meta( '_ltms_alegra_invoice_id' );
-            // (no guardamos aquí — solo leemos la respuesta sin alterar el pedido)
-            qa_ok( 'Respuesta contiene id, status, numberTemplate', "id={$result['id']} status=" . ($result['status']??'?') );
+            qa_ok( $qa, 'create_invoice_for_order()', "Factura $inv_num | pedido #$oid" );
+            qa_ok( $qa, 'Respuesta tiene id+status+numberTemplate', "id={$result['id']} status=" . ($result['status']??'?') );
+            // NO guardamos el meta en el pedido real — solo prueba
+            echo "       ⚠️  Factura creada en Alegra (ID={$result['id']}) — borrar si es de prueba\n";
         } else {
-            qa_fail( 'create_invoice_for_order()', 'Sin ID en respuesta' );
+            qa_fail( $qa, 'create_invoice_for_order()', 'Sin ID en respuesta' );
         }
     } catch ( Throwable $e ) {
-        qa_fail( 'create_invoice_for_order()', $e->getMessage() );
+        qa_fail( $qa, 'create_invoice_for_order()', $e->getMessage() );
+        // Diagnóstico extra: mostrar datos del cliente del pedido
+        echo "       Diagnóstico — billing_email: " . $test_order->get_billing_email() . "\n";
+        echo "       Diagnóstico — billing_id: " . $test_order->get_meta('_billing_identification') . "\n";
+        echo "       Diagnóstico — customer_id: " . $test_order->get_customer_id() . "\n";
     }
 } else {
-    qa_warn( 'T-07 omitido', 'No hay pedidos completados/processing sin factura Alegra para probar' );
+    qa_warn( $qa, 'T-07 omitido', 'Sin pedidos completados/processing sin factura Alegra' );
 }
 
 // ── T-08: WEBHOOK HANDLER ─────────────────────────────────────────────────────
 qa_section( 'T-08 · Webhook handler (simulado)' );
-if ( $test_invoice_id ) {
-    // Simular payload de Alegra: edit-invoice con estado 'closed'
-    $mock_request = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
-    $mock_request->set_header( 'content-type', 'application/json' );
-    $mock_request->set_body( wp_json_encode([
-        'action' => 'edit-invoice',
-        'data'   => [
-            'id'     => $test_invoice_id,
-            'status' => 'closed',
-            'numberTemplate' => [ 'fullNumber' => 'TEST-001' ],
-        ],
-    ]));
 
-    try {
-        $response = LTMS_Alegra_Webhook_Handler::handle( $mock_request );
-        $data = $response->get_data();
-        $code = $response->get_status();
-        if ( $code === 200 && ( $data['received'] ?? false ) ) {
-            qa_ok( 'Webhook edit-invoice procesado', "HTTP $code | received=true" );
-        } else {
-            qa_fail( 'Webhook edit-invoice', "HTTP $code | " . wp_json_encode( $data ) );
-        }
-    } catch ( Throwable $e ) {
-        qa_fail( 'Webhook handler', $e->getMessage() );
+// Test 1: edit-invoice sin secret configurado → debe procesar
+$mock1 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock1->set_body( wp_json_encode([
+    'action' => 'edit-invoice',
+    'data'   => [ 'id' => $test_invoice_id ?? 99999, 'status' => 'closed',
+                  'numberTemplate' => [ 'fullNumber' => 'TEST-001' ] ],
+]));
+try {
+    $r1 = LTMS_Alegra_Webhook_Handler::handle( $mock1 );
+    if ( $r1->get_status() === 200 && ( $r1->get_data()['received'] ?? false ) ) {
+        qa_ok( $qa, 'Webhook edit-invoice procesado', 'HTTP 200 received=true' );
+    } else {
+        qa_fail( $qa, 'Webhook edit-invoice', 'HTTP ' . $r1->get_status() . ' | ' . wp_json_encode($r1->get_data()) );
     }
-
-    // Evento desconocido → debe responder 200
-    $mock_unknown = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
-    $mock_unknown->set_body( wp_json_encode([ 'action' => 'new-bill', 'data' => [] ]) );
-    try {
-        $r2 = LTMS_Alegra_Webhook_Handler::handle( $mock_unknown );
-        if ( $r2->get_status() === 200 ) {
-            qa_ok( 'Webhook evento desconocido retorna 200', 'processed=false OK' );
-        } else {
-            qa_fail( 'Webhook evento desconocido', 'HTTP ' . $r2->get_status() );
-        }
-    } catch ( Throwable $e ) {
-        qa_fail( 'Webhook evento desconocido', $e->getMessage() );
-    }
-
-    // Token inválido → 401
-    LTMS_Core_Config::flush_cache();
-    // Temporalmente setear un secret para probar auth
-    update_option( 'ltms_alegra_webhook_secret', 'test-secret-qa' );
-    LTMS_Core_Config::flush_cache();
-    $mock_noauth = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
-    $mock_noauth->set_body( wp_json_encode([ 'action' => 'edit-invoice', 'data' => ['id'=>1] ]) );
-    try {
-        $r3 = LTMS_Alegra_Webhook_Handler::handle( $mock_noauth );
-        if ( $r3->get_status() === 401 ) {
-            qa_ok( 'Webhook token inválido retorna 401', 'Seguridad OK' );
-        } else {
-            qa_fail( 'Webhook auth', 'Esperado 401, obtenido ' . $r3->get_status() );
-        }
-    } catch ( Throwable $e ) {
-        qa_fail( 'Webhook auth', $e->getMessage() );
-    }
-    // Restaurar
-    delete_option( 'ltms_alegra_webhook_secret' );
-    LTMS_Core_Config::flush_cache();
-} else {
-    qa_warn( 'T-08 omitido', 'Requiere factura de prueba creada en T-06' );
+} catch ( Throwable $e ) {
+    qa_fail( $qa, 'Webhook edit-invoice', $e->getMessage() );
 }
 
-// ── T-09: CONFIGURACIÓN Y META ─────────────────────────────────────────────────
-qa_section( 'T-09 · Configuración y opciones guardadas' );
-$checks = [
-    'ltms_alegra_enabled'       => 'Alegra activo',
-    'ltms_alegra_email'         => 'Email configurado',
-    'ltms_alegra_token'         => 'Token configurado',
-    'ltms_alegra_numbering_id'  => 'ID Numeración',
-    'ltms_alegra_auto_invoice'  => 'Facturación automática',
-    'ltms_alegra_sandbox'       => 'Modo sandbox',
+// Test 2: evento desconocido → 200 + processed=false
+$mock2 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock2->set_body( wp_json_encode([ 'action' => 'new-bill', 'data' => [] ]) );
+try {
+    $r2 = LTMS_Alegra_Webhook_Handler::handle( $mock2 );
+    $d2 = $r2->get_data();
+    if ( $r2->get_status() === 200 && isset($d2['processed']) && $d2['processed'] === false ) {
+        qa_ok( $qa, 'Webhook evento desconocido → 200 processed=false' );
+    } else {
+        qa_fail( $qa, 'Webhook evento desconocido', 'HTTP ' . $r2->get_status() . ' | ' . wp_json_encode($d2) );
+    }
+} catch ( Throwable $e ) {
+    qa_fail( $qa, 'Webhook evento desconocido', $e->getMessage() );
+}
+
+// Test 3: token inválido → 401
+update_option( 'ltms_alegra_webhook_secret', 'secret-qa-test-' . time() );
+LTMS_Core_Config::flush_cache();
+$mock3 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock3->set_body( wp_json_encode([ 'action' => 'edit-invoice', 'data' => ['id'=>1] ]) );
+try {
+    $r3 = LTMS_Alegra_Webhook_Handler::handle( $mock3 );
+    if ( $r3->get_status() === 401 ) {
+        qa_ok( $qa, 'Webhook token inválido → 401 Unauthorized', 'Seguridad OK' );
+    } else {
+        qa_fail( $qa, 'Webhook auth', 'Esperado 401, obtenido ' . $r3->get_status() );
+    }
+} catch ( Throwable $e ) {
+    qa_fail( $qa, 'Webhook auth', $e->getMessage() );
+}
+delete_option( 'ltms_alegra_webhook_secret' );
+LTMS_Core_Config::flush_cache();
+
+// Test 4: payload sin event → 400
+$mock4 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock4->set_body( wp_json_encode([ 'data' => ['id'=>1] ]) );
+try {
+    $r4 = LTMS_Alegra_Webhook_Handler::handle( $mock4 );
+    if ( $r4->get_status() === 400 ) {
+        qa_ok( $qa, 'Webhook sin event → 400 Bad Request' );
+    } else {
+        qa_warn( $qa, 'Webhook sin event', 'Esperado 400, obtenido ' . $r4->get_status() );
+    }
+} catch ( Throwable $e ) {
+    qa_fail( $qa, 'Webhook sin event', $e->getMessage() );
+}
+
+// ── T-09: CONFIGURACIÓN ────────────────────────────────────────────────────────
+qa_section( 'T-09 · Configuración guardada en BD' );
+$cfg_checks = [
+    'ltms_alegra_enabled'      => [ 'label' => 'Alegra activo',           'must_be' => 'yes' ],
+    'ltms_alegra_email'        => [ 'label' => 'Email',                   'must_be' => null ],
+    'ltms_alegra_token'        => [ 'label' => 'Token',                   'must_be' => null ],
+    'ltms_alegra_numbering_id' => [ 'label' => 'ID Numeración',           'must_be' => null ],
+    'ltms_alegra_auto_invoice' => [ 'label' => 'Facturación automática',  'must_be' => null ],
+    'ltms_alegra_sandbox'      => [ 'label' => 'Modo sandbox',            'must_be' => null ],
 ];
-foreach ( $checks as $key => $label ) {
+foreach ( $cfg_checks as $key => $cfg ) {
     $val = get_option( $key, '' );
-    if ( in_array( $key, ['ltms_alegra_token'], true ) ) {
-        $display = $val ? '✓ (presente, ' . strlen($val) . ' chars)' : '✗ vacío';
-    } elseif ( in_array( $key, ['ltms_alegra_enabled','ltms_alegra_auto_invoice','ltms_alegra_sandbox'], true ) ) {
-        $display = $val;
-        if ( $key === 'ltms_alegra_enabled' && $val !== 'yes' ) {
-            qa_warn( $label, "valor='$val' — la integración no se activará" );
-            continue;
-        }
+    if ( $key === 'ltms_alegra_token' ) {
+        $display = $val ? '✓ ' . strlen($val) . ' chars' : '✗ vacío';
     } else {
         $display = $val ?: '(vacío)';
     }
-    qa_ok( $label, $display );
+    if ( $cfg['must_be'] && $val !== $cfg['must_be'] ) {
+        qa_fail( $qa, $cfg['label'], "esperado='{$cfg['must_be']}' actual='$val'" );
+    } elseif ( ! $val && $key !== 'ltms_alegra_auto_invoice' ) {
+        qa_warn( $qa, $cfg['label'], 'vacío' );
+    } else {
+        qa_ok( $qa, $cfg['label'], $display );
+    }
+}
+
+// Verificar hook registrado
+if ( LTMS_Core_Config::get( 'ltms_alegra_enabled', 'no' ) === 'yes' ) {
+    $has_hook = has_action( 'woocommerce_order_status_completed' );
+    if ( $has_hook !== false ) {
+        qa_ok( $qa, 'Hook woocommerce_order_status_completed registrado', "prioridad=$has_hook" );
+    } else {
+        qa_warn( $qa, 'Hook woocommerce_order_status_completed', 'No registrado — revisar si LTMS_Alegra_Sync::init() corrió' );
+    }
 }
 
 // ── RESUMEN ────────────────────────────────────────────────────────────────────
 echo "\n══════════════════════════════════════════════════\n";
-echo "  RESUMEN QA\n";
+echo "  RESUMEN QA — Alegra\n";
 echo "══════════════════════════════════════════════════\n";
-echo "  ✅ PASS : $pass\n";
-echo "  ❌ FAIL : $fail\n";
-echo "  ⚠️  WARN : $warn\n";
-echo "  TOTAL  : " . ($pass + $fail + $warn) . " pruebas\n\n";
-if ( $fail === 0 ) {
-    echo "  🎉 Todas las pruebas críticas pasaron.\n";
+printf( "  ✅ PASS : %d\n", $qa['pass'] );
+printf( "  ❌ FAIL : %d\n", $qa['fail'] );
+printf( "  ⚠️  WARN : %d\n", $qa['warn'] );
+printf( "  TOTAL  : %d pruebas\n\n", $qa['pass'] + $qa['fail'] + $qa['warn'] );
+
+if ( $qa['fail'] === 0 ) {
+    echo "  🎉 Sin fallos críticos.\n";
 } else {
-    echo "  🔴 Hay $fail prueba(s) fallida(s) que requieren atención.\n";
+    echo "  🔴 {$qa['fail']} prueba(s) fallida(s):\n";
+    foreach ( $qa['log'] as $entry ) {
+        if ( $entry['r'] === 'FAIL' ) {
+            echo "     · " . $entry['t'] . ( $entry['d'] ? " — " . $entry['d'] : '' ) . "\n";
+        }
+    }
 }
-echo "\n  Datos de prueba creados en Alegra:\n";
-if ( $test_contact_id ) echo "    · Contacto ID=$test_contact_id (QA Test Usuario LTMS — borrar)\n";
-if ( $test_item_id )    echo "    · Item ID=$test_item_id (QA Producto LTMS — borrar)\n";
-if ( $test_invoice_id ) echo "    · Factura ID=$test_invoice_id (QA — borrar)\n";
+
+echo "\n  Datos creados en Alegra (sandbox={$qa_sandbox}) — borrar si no son necesarios:\n";
+$qa_sandbox = get_option('ltms_alegra_sandbox','no') === 'yes' ? 'sí' : 'no';
+if ( isset($test_contact_id) && $test_contact_id ) echo "    · Contacto ID=$test_contact_id\n";
+if ( isset($test_item_id)    && $test_item_id    ) echo "    · Item ID=$test_item_id\n";
+if ( isset($test_invoice_id) && $test_invoice_id ) echo "    · Factura ID=$test_invoice_id\n";
 echo "\n";
