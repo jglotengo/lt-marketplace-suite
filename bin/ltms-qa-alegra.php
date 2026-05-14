@@ -106,7 +106,7 @@ try {
 // ── T-04: CONTACTOS ────────────────────────────────────────────────────────────
 qa_section( 'T-04 · CRUD de contactos' );
 $test_contact_id   = null;
-$test_identification = 'QA' . date('His');
+$test_identification = '9' . date('mdHis'); // Alegra Colombia requiere identificación numérica
 try {
     // Payload mínimo válido para Alegra Colombia — sin campos opcionales problemáticos
     $contact = $alegra->create_contact([
@@ -336,6 +336,7 @@ qa_section( 'T-08 · Webhook handler (simulado)' );
 
 // Test 1: edit-invoice sin secret configurado → debe procesar
 $mock1 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock1->set_header( 'content-type', 'application/json' );
 $mock1->set_body( wp_json_encode([
     'action' => 'edit-invoice',
     'data'   => [ 'id' => $test_invoice_id ?? 99999, 'status' => 'closed',
@@ -354,6 +355,7 @@ try {
 
 // Test 2: evento desconocido → 200 + processed=false
 $mock2 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock2->set_header( 'content-type', 'application/json' );
 $mock2->set_body( wp_json_encode([ 'action' => 'new-bill', 'data' => [] ]) );
 try {
     $r2 = LTMS_Alegra_Webhook_Handler::handle( $mock2 );
@@ -371,6 +373,7 @@ try {
 update_option( 'ltms_alegra_webhook_secret', 'secret-qa-test-' . time() );
 LTMS_Core_Config::flush_cache();
 $mock3 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock3->set_header( 'content-type', 'application/json' );
 $mock3->set_body( wp_json_encode([ 'action' => 'edit-invoice', 'data' => ['id'=>1] ]) );
 try {
     $r3 = LTMS_Alegra_Webhook_Handler::handle( $mock3 );
@@ -387,6 +390,7 @@ LTMS_Core_Config::flush_cache();
 
 // Test 4: payload sin event → 400
 $mock4 = new WP_REST_Request( 'POST', '/ltms/v1/webhooks/alegra' );
+$mock4->set_header( 'content-type', 'application/json' );
 $mock4->set_body( wp_json_encode([ 'data' => ['id'=>1] ]) );
 try {
     $r4 = LTMS_Alegra_Webhook_Handler::handle( $mock4 );

@@ -90,8 +90,8 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      */
     public function create_contact( array $contact_data ): array {
         $payload = [
-            'name'  => sanitize_text_field( $contact_data['name'] ?? '' ),
-            'type'  => $contact_data['type'] ?? [ 'client' ],
+            'name' => sanitize_text_field( $contact_data['name'] ?? 'Sin nombre' ),
+            'type' => [ 'client' ],
         ];
 
         if ( ! empty( $contact_data['identification'] ) ) {
@@ -101,17 +101,21 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['email'] = sanitize_email( $contact_data['email'] );
         }
         if ( ! empty( $contact_data['phone'] ) ) {
-            $payload['phonePrimary'] = sanitize_text_field( $contact_data['phone'] );
+            // Alegra Colombia acepta solo dígitos en phonePrimary (máx 10 dígitos)
+            $phone = preg_replace( '/\D/', '', $contact_data['phone'] );
+            if ( strlen( $phone ) >= 7 ) {
+                $payload['phonePrimary'] = substr( $phone, 0, 10 );
+            }
         }
-        if ( ! empty( $contact_data['address'] ) ) {
+        if ( ! empty( $contact_data['address']['address'] ) ) {
             $payload['address'] = [
-                'address' => sanitize_text_field( $contact_data['address']['address'] ?? '' ),
+                'address' => sanitize_text_field( $contact_data['address']['address'] ),
                 'city'    => sanitize_text_field( $contact_data['address']['city'] ?? '' ),
             ];
         }
 
-        // Evitar duplicados si el contacto ya existe (Alegra lo indica en el error)
-        $payload['ignoreRepeated'] = false;
+        // Nota: ignoreRepeated NO es un campo válido de la API Alegra Colombia (causa 400).
+        // La deduplicación se maneja vía get_or_create_contact() + find_contact_by_identification().
 
         return $this->perform_request( 'POST', '/contacts', $payload );
     }
