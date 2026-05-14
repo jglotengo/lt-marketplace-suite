@@ -70,6 +70,11 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         }
 
         parent::__construct();
+
+        // BUG FIX: El abstract client solo tiene Content-Type/Accept en default_headers.
+        // Alegra usa HTTP Basic Auth — agregar el header Authorization aquí después de
+        // que parent::__construct() inicialice la clase, usando las credenciales ya validadas.
+        $this->default_headers['Authorization'] = 'Basic ' . base64_encode( $this->email . ':' . $this->api_token );
     }
 
     /**

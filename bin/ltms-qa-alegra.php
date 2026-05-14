@@ -110,11 +110,15 @@ $test_identification = '9' . date('mdHis'); // Alegra Colombia requiere identifi
 
 // Diagnóstico directo — ver respuesta cruda de Alegra
 $diag_email = get_option('ltms_alegra_email','');
-$diag_token = get_option('ltms_alegra_api_key','') ?: get_option('ltms_alegra_token','');
+// Fix: usar la clave correcta de la opción del token
+$diag_token_raw = get_option('ltms_alegra_token','');
+$diag_token = (str_starts_with($diag_token_raw, 'v1:') && class_exists('LTMS_Core_Security'))
+    ? LTMS_Core_Security::decrypt($diag_token_raw)
+    : $diag_token_raw;
 $diag_url   = 'https://api.alegra.com/api/v1/contacts';
 $diag_payload = wp_json_encode([
     'name' => 'QA LTMS ' . date('His'),
-    'type' => ['client'],
+    'type' => 'client',  // Fix: string no array
 ]);
 $diag_response = wp_remote_post($diag_url, [
     'headers' => [
@@ -135,7 +139,7 @@ try {
     // Intento 1: Solo nombre + tipo (mínimo absoluto — sin email que puede causar duplicado)
     $contact = $alegra->create_contact([
         'name' => 'QA Test LTMS ' . date('His'),
-        'type' => [ 'client' ],
+        // type is set to string 'client' inside create_contact() — no need to pass it
     ]);
     if ( ! empty( $contact['id'] ) ) {
         $test_contact_id = (int) $contact['id'];
