@@ -107,33 +107,64 @@ try {
 qa_section( 'T-04 · CRUD de contactos' );
 $test_contact_id   = null;
 $test_identification = '9' . date('mdHis'); // Alegra Colombia requiere identificación numérica
+
+// Diagnóstico directo — ver respuesta cruda de Alegra
+$diag_email = get_option('ltms_alegra_email','');
+$diag_token = get_option('ltms_alegra_api_key','') ?: get_option('ltms_alegra_token','');
+$diag_url   = 'https://api.alegra.com/api/v1/contacts';
+$diag_payload = wp_json_encode([
+    'name' => 'QA LTMS ' . date('His'),
+    'type' => ['client'],
+]);
+$diag_response = wp_remote_post($diag_url, [
+    'headers' => [
+        'Authorization' => 'Basic ' . base64_encode($diag_email . ':' . $diag_token),
+        'Content-Type'  => 'application/json',
+        'Accept'        => 'application/json',
+    ],
+    'body'    => $diag_payload,
+    'timeout' => 30,
+]);
+$diag_code = wp_remote_retrieve_response_code($diag_response);
+$diag_body = wp_remote_retrieve_body($diag_response);
+echo "       [DIAG] POST /contacts → HTTP $diag_code\n";
+echo "       [DIAG] Body enviado: $diag_payload\n";
+echo "       [DIAG] Respuesta: $diag_body\n";
+
 try {
-    // Payload mínimo válido para Alegra Colombia — sin campos opcionales problemáticos
+    // Intento 1: Solo nombre + tipo (mínimo absoluto — sin email que puede causar duplicado)
     $contact = $alegra->create_contact([
-        'name'           => 'QA Test LTMS ' . date('His'),
-        'email'          => 'qa' . date('His') . '@lo-tengo.com.co',
-        'identification' => $test_identification,
-        'type'           => [ 'client' ],
+        'name' => 'QA Test LTMS ' . date('His'),
+        'type' => [ 'client' ],
     ]);
     if ( ! empty( $contact['id'] ) ) {
         $test_contact_id = (int) $contact['id'];
         qa_ok( $qa, 'create_contact()', "ID=$test_contact_id | nombre=" . ( $contact['name'] ?? '?' ) );
     } else {
-        qa_fail( $qa, 'create_contact()', 'Sin ID. Respuesta: ' . wp_json_encode( $contact ) );
-    }
-} catch ( Throwable $e ) {
-    // Intentar con payload mínimo absoluto
-    echo "       Primer intento falló: " . $e->getMessage() . "\n";
-    echo "       Reintentando con payload mínimo...\n";
-    try {
+        // Intento 2: Con identification pero sin email
         $contact2 = $alegra->create_contact([
-            'name' => 'QA LTMS ' . date('His'),
-            'type' => [ 'client' ],
+            'name'           => 'QA LTMS ' . date('His'),
+            'identification' => $test_identification,
         ]);
         if ( ! empty( $contact2['id'] ) ) {
             $test_contact_id = (int) $contact2['id'];
-            qa_ok( $qa, 'create_contact() (payload mínimo)', "ID=$test_contact_id" );
-            qa_warn( $qa, 'create_contact() con identification/email falló', 'Verificar campos requeridos por Alegra Colombia' );
+            qa_ok( $qa, 'create_contact()', "ID=$test_contact_id" );
+        } else {
+            qa_fail( $qa, 'create_contact()', 'Sin ID. Respuesta: ' . wp_json_encode( $contact2 ) );
+        }
+    }
+} catch ( Throwable $e ) {
+    // Intento 2: Con identification numérica, sin email
+    echo "       Primer intento falló: " . $e->getMessage() . "\n";
+    echo "       Reintentando sin email...\n";
+    try {
+        $contact2 = $alegra->create_contact([
+            'name'           => 'QA LTMS ' . date('His'),
+            'identification' => $test_identification,
+        ]);
+        if ( ! empty( $contact2['id'] ) ) {
+            $test_contact_id = (int) $contact2['id'];
+            qa_ok( $qa, 'create_contact() (sin email)', "ID=$test_contact_id" );
         } else {
             qa_fail( $qa, 'create_contact() payload mínimo', wp_json_encode( $contact2 ) );
         }

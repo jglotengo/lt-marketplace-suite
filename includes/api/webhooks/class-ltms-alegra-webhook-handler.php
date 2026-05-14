@@ -70,7 +70,14 @@ final class LTMS_Alegra_Webhook_Handler {
         }
 
         // 2. Parsear payload
-        $body  = $request->get_json_params();
+        // get_json_params() requiere Content-Type registrado en $_SERVER.
+        // En entornos de prueba (WP_REST_Request mock) puede devolver null.
+        // Usar get_body() + json_decode como fallback garantiza compatibilidad.
+        $body = $request->get_json_params();
+        if ( empty( $body ) ) {
+            $raw  = $request->get_body();
+            $body = $raw ? (array) json_decode( $raw, true ) : [];
+        }
         $event = sanitize_key( $body['action'] ?? $body['event'] ?? '' );
 
         if ( empty( $event ) ) {
