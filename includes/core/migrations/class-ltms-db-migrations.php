@@ -1013,20 +1013,6 @@ final class LTMS_DB_Migrations {
             UNIQUE KEY `udx_order` (`order_id`)
         ) {$charset}";
 
-        // lt_provider_health — Estado de salud de integraciones externas (APIs)
-        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_provider_health` (
-            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `provider`       VARCHAR(60) NOT NULL,
-            `status`         ENUM('ok','degraded','down','unknown') NOT NULL DEFAULT 'unknown',
-            `latency_ms`     SMALLINT UNSIGNED DEFAULT NULL,
-            `last_check`     DATETIME DEFAULT NULL,
-            `error_message`  TEXT DEFAULT NULL,
-            `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            UNIQUE KEY `udx_provider` (`provider`)
-        ) {$charset}";
-
         // lt_tax_rates_history — Histórico de tasas de impuestos para auditoría
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_tax_rates_history` (
             `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

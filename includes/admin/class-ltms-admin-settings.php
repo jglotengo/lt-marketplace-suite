@@ -177,11 +177,18 @@ final class LTMS_Admin_Settings {
             }
         }
 
-        // Guardar cada opción individualmente
+        // Guardar cada opción individualmente (para get_option() compatibility)
+        // y también en ltms_settings (para LTMS_Core_Config::get() directo)
         $sanitized = $this->sanitize_settings( $data );
+        $ltms_settings = get_option( 'ltms_settings', [] );
+        if ( ! is_array( $ltms_settings ) ) {
+            $ltms_settings = [];
+        }
         foreach ( $sanitized as $key => $value ) {
             update_option( $key, $value );
+            $ltms_settings[ $key ] = $value; // espejo en ltms_settings
         }
+        update_option( 'ltms_settings', $ltms_settings, true );
 
         // Invalidar caché de config
         if ( class_exists( 'LTMS_Core_Config' ) ) {
