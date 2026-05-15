@@ -30,7 +30,10 @@ function qa_section( string $title ): void {
     echo "══════════════════════════════════════════════════\n";
 }
 
-// Flush caches
+// Flush caches — incluyendo OPcache PHP para forzar recarga de clases actualizadas
+if ( function_exists('opcache_reset') ) {
+    opcache_reset();
+}
 LTMS_Core_Config::flush_cache();
 LTMS_Api_Factory::reset( 'alegra' );
 
@@ -184,13 +187,14 @@ if ( $test_contact_id ) {
     }
 
     try {
-        // Idempotencia: usar el mismo nombre + identificación + email del contacto ya creado.
-        // get_or_create_contact debe detectar el duplicado y devolver el contacto existente.
-        // Si falla, muestra diagnóstico detallado.
+        // Idempotencia: usar exactamente el mismo nombre + email + identification del contacto creado.
+        // get_or_create_contact debe encontrarlo por nombre (Alegra soporta ?query=nombre)
+        // y devolver el mismo ID sin crear un duplicado.
         $same = $alegra->get_or_create_contact([
-            'name'           => 'QA LTMS ' . date('His'),  // nombre diferente — prueba por email/id
-            'identification' => $test_identification,        // misma identification → debe encontrarlo
-            'email'          => $test_contact_email ?? '',   // mismo email → fallback
+            'name'           => $test_contact_name,          // mismo nombre exacto → find_by_name lo detecta
+            'identification' => $test_identification,         // misma identification
+            'email'          => $test_contact_email ?? '',    // mismo email → fallback
+            'type'           => ['client'],
             'kindOfPerson'   => 'PERSON_ENTITY',
             'regime'         => 'SIMPLIFIED_REGIME',
         ]);
@@ -344,26 +348,63 @@ if ( $orders ) {
     echo "       Billing: " . $test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name() . " <" . $test_order->get_billing_email() . ">\n";
 
     // Pre-diagnóstico: ver si el contacto ya existe en Alegra y cachearlo
+    // Usamos curl directo (igual que DIAG T-04) para evitar OPcache de clase vieja
     $billing_email  = $test_order->get_billing_email();
     $billing_cid    = $test_order->get_customer_id();
     $cached_contact = $billing_cid ? (int)get_user_meta($billing_cid, '_ltms_alegra_contact_id', true) : 0;
     echo "       Cache _ltms_alegra_contact_id: " . ($cached_contact ?: 'no cacheado') . "\n";
 
     if ( ! $cached_contact && $billing_email ) {
-        // Pre-buscar el contacto en Alegra y cachear para evitar el 400
-        try {
-            $contact_found = $alegra->find_contact_by_email( $billing_email );
-            if ( $contact_found && isset($contact_found['id']) ) {
-                $found_id = (int)$contact_found['id'];
-                if ( $billing_cid ) {
-                    update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $found_id );
-                }
-                echo "       Pre-cacheado contacto Alegra ID=$found_id para email $billing_email\n";
-            } else {
-                echo "       No encontrado por email $billing_email — se intentará crear\n";
+        // Buscar por query directo en Alegra (sin depender de método de clase)
+        $pre_email_raw = get_option('ltms_alegra_email','');
+        $pre_token_raw = get_option('ltms_alegra_token','');
+        $pre_token = (str_starts_with($pre_token_raw, 'v1:') && class_exists('LTMS_Core_Security'))
+            ? LTMS_Core_Security::decrypt($pre_token_raw) : $pre_token_raw;
+        $pre_auth = 'Basic ' . base64_encode($pre_email_raw . ':' . $pre_token);
+
+        // Estrategia 1: ?query=email
+        $pre_resp = wp_remote_get('https://api.alegra.com/api/v1/contacts?' . http_build_query(['query' => $billing_email, 'limit' => 50]), [
+            'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
+            'timeout' => 20,
+        ]);
+        $pre_contacts = json_decode(wp_remote_retrieve_body($pre_resp), true);
+        $pre_contacts = is_array($pre_contacts) ? ($pre_contacts['data'] ?? $pre_contacts) : [];
+
+        $found_contact = null;
+        $billing_email_lower = strtolower(trim($billing_email));
+        foreach ( (array)$pre_contacts as $pc ) {
+            if ( strtolower(trim($pc['email'] ?? '')) === $billing_email_lower ) {
+                $found_contact = $pc; break;
             }
-        } catch ( Throwable $e_pre ) {
-            echo "       Pre-búsqueda falló: " . $e_pre->getMessage() . "\n";
+        }
+
+        // Estrategia 2: scan paginado si no encontró
+        if ( ! $found_contact ) {
+            for ( $ps = 0; $ps < 3; $ps++ ) {
+                $pr = wp_remote_get('https://api.alegra.com/api/v1/contacts?start=' . ($ps*50) . '&limit=50', [
+                    'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
+                    'timeout' => 20,
+                ]);
+                $pcs = json_decode(wp_remote_retrieve_body($pr), true);
+                $pcs = is_array($pcs) ? ($pcs['data'] ?? $pcs) : [];
+                if ( ! is_array($pcs) || count($pcs) === 0 ) break;
+                foreach ( $pcs as $pc ) {
+                    if ( strtolower(trim($pc['email'] ?? '')) === $billing_email_lower ) {
+                        $found_contact = $pc; break 2;
+                    }
+                }
+                if ( count($pcs) < 50 ) break;
+            }
+        }
+
+        if ( $found_contact && isset($found_contact['id']) ) {
+            $found_id = (int)$found_contact['id'];
+            if ( $billing_cid ) {
+                update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $found_id );
+            }
+            echo "       Pre-cacheado contacto Alegra ID=$found_id para email $billing_email\n";
+        } else {
+            echo "       No encontrado por email $billing_email — se intentará crear\n";
         }
     }
 
