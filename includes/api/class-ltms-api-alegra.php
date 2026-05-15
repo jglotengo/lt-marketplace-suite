@@ -528,7 +528,37 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @param string $url   URL destino del webhook (debe ser HTTPS).
      * @return array
      */
-    public function subscribe_webhook( string $event, string $url ): array {
+    /**
+     * Crea una nota de crédito (credit note) en Alegra asociada a una factura.
+     *
+     * @param array $data {
+     *     @type int    $invoice_id   ID de la factura origen en Alegra.
+     *     @type float  $amount       Monto total de la nota de crédito.
+     *     @type string $observations Observaciones opcionales.
+     * }
+     * @return array Respuesta de la API con el ID de la nota de crédito.
+     */
+    public function create_credit_note( array $data ): array {
+        $payload = [
+            'date'    => current_time( 'Y-m-d' ),
+            'invoice' => [ 'id' => (int) $data['invoice_id'] ],
+            'items'   => [
+                [
+                    'name'     => $data['observations'] ?? 'Nota de crédito',
+                    'price'    => (float) $data['amount'],
+                    'quantity' => 1,
+                ],
+            ],
+        ];
+
+        if ( ! empty( $data['observations'] ) ) {
+            $payload['observations'] = substr( sanitize_textarea_field( $data['observations'] ), 0, 500 );
+        }
+
+        return $this->perform_request( 'POST', '/credit-notes', $payload );
+    }
+
+    /**
         return $this->perform_request( 'POST', '/webhooks/subscriptions', [
             'event' => $event,
             'url'   => esc_url_raw( $url ),

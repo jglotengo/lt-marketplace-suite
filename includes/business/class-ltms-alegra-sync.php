@@ -66,6 +66,9 @@ final class LTMS_Alegra_Sync {
 
         // Payout aprobado → registrar en Alegra
         add_action( 'ltms_payout_completed', [ $instance, 'on_payout_completed' ], 20, 2 );
+
+        // Nota de crédito automática cuando WooCommerce procesa un reembolso
+        add_action( 'woocommerce_order_refunded', [ $instance, 'on_order_refunded' ], 20, 2 );
     }
 
     // ── Handlers de eventos ───────────────────────────────────────
@@ -464,6 +467,29 @@ final class LTMS_Alegra_Sync {
                 $entry['alegra_id'] = $alegra_item_id;
             }
 
+            // ── IVA y retenciones ────────────────────────────────────────────
+            // Calcular IVA del ítem basado en los impuestos reales de WooCommerce
+            $item_taxes   = $item->get_taxes();
+            $total_tax    = array_sum( $item_taxes['total'] ?? [] );
+            $subtotal     = (float) $item->get_subtotal();
+
+            if ( $subtotal > 0 && $total_tax > 0 ) {
+                $tax_rate_pct = round( ( $total_tax / $subtotal ) * 100, 2 );
+
+                // Mapear tasa a código de impuesto Alegra Colombia
+                // IVA Colombia: 0%, 5%, 19% son las tasas estándar DIAN
+                if ( $tax_rate_pct >= 18 ) {
+                    $alegra_tax_id = 3; // IVA 19%
+                } elseif ( $tax_rate_pct >= 4 ) {
+                    $alegra_tax_id = 2; // IVA 5%
+                } else {
+                    $alegra_tax_id = 1; // IVA 0% (exento)
+                }
+
+                $entry['tax'] = [ [ 'id' => $alegra_tax_id ] ];
+            }
+            // ────────────────────────────────────────────────────────────────
+
             $items[] = $entry;
         }
 
@@ -487,7 +513,48 @@ final class LTMS_Alegra_Sync {
      * @param \WC_Order $order             Pedido WC.
      * @return void
      */
-    private function maybe_send_invoice_email( int $alegra_invoice_id, \WC_Order $order ): void {
+    /**
+     * Crea una nota de crédito en Alegra cuando WooCommerce procesa un reembolso.
+     *
+     * @param int $order_id  ID del pedido original.
+     * @param int $refund_id ID del reembolso WC.
+     * @return void
+     */
+    public function on_order_refunded( int $order_id, int $refund_id ): void {
+        $alegra_invoice_id = (int) get_post_meta( $order_id, '_ltms_alegra_invoice_id', true );
+        if ( ! $alegra_invoice_id ) {
+            LTMS_Core_Logger::info( 'alegra_sync', "Reembolso #{$refund_id}: sin factura Alegra para orden #{$order_id}" );
+            return;
+        }
+
+        $refund = wc_get_order( $refund_id );
+        if ( ! $refund ) {
+            return;
+        }
+
+        try {
+            $client = new LTMS_Api_Alegra();
+        } catch ( \RuntimeException $e ) {
+            LTMS_Core_Logger::warning( 'alegra_sync', 'Alegra no configurado — nota crédito omitida: ' . $e->getMessage() );
+            return;
+        }
+
+        try {
+            $result = $client->create_credit_note([
+                'invoice_id'   => $alegra_invoice_id,
+                'amount'       => abs( (float) $refund->get_amount() ),
+                'observations' => sprintf( 'Reembolso WC #%d — Orden #%d', $refund_id, $order_id ),
+            ]);
+            if ( ! empty( $result['id'] ) ) {
+                update_post_meta( $order_id, '_ltms_alegra_credit_note_id', $result['id'] );
+                LTMS_Core_Logger::info( 'alegra_sync', "Nota crédito #{$result['id']} para reembolso #{$refund_id}" );
+            }
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::error( 'alegra_sync', 'Error nota de crédito: ' . $e->getMessage() );
+        }
+    }
+
+        private function maybe_send_invoice_email( int $alegra_invoice_id, \WC_Order $order ): void {
         $email = $order->get_billing_email();
         if ( ! $email ) {
             return;
