@@ -880,6 +880,10 @@ final class LTMS_DB_Migrations {
         // v2.1.x: Catálogo DANE + tarifas ReteICA municipales (cumplimiento territorialidad)
         self::seed_dane_municipalities();
         self::seed_reteica_municipal_rates();
+
+        // M-200: migra user_meta `ltms_municipality` de slug legacy ('bogota') a código DANE ('11001')
+        // para vendedores registrados antes del dropdown DANE. One-shot, idempotente.
+        self::migrate_vendor_municipality_slugs_to_dane();
     }
 
     /**
@@ -1255,6 +1259,66 @@ final class LTMS_DB_Migrations {
                     'valid_from'        => $valid_from,
                 ],
                 [ '%s', '%s', '%f', '%s', '%s', '%s' ]
+            );
+        }
+    }
+
+    /**
+     * Migra user_meta `ltms_municipality` de slug ('bogota', 'cali', etc.) a código DANE.
+     * One-shot, idempotente: usa option `ltms_municipality_slug_migrated` como guard.
+     *
+     * @return void
+     */
+    private static function migrate_vendor_municipality_slugs_to_dane(): void {
+        if ( get_option( 'ltms_municipality_slug_migrated' ) === '1' ) {
+            return;
+        }
+
+        $slug_to_dane = [
+            'bogota'        => '11001', 'bogotá'        => '11001',
+            'medellin'      => '05001', 'medellín'      => '05001',
+            'cali'          => '76001',
+            'barranquilla'  => '08001',
+            'cartagena'     => '13001',
+            'bucaramanga'   => '68001',
+            'pereira'       => '66001',
+            'manizales'     => '17001',
+            'cucuta'        => '54001', 'cúcuta'        => '54001',
+            'ibague'        => '73001', 'ibagué'        => '73001',
+            'villavicencio' => '50001',
+            'pasto'         => '52001',
+            'monteria'      => '23001', 'montería'      => '23001',
+            'neiva'         => '41001',
+            'armenia'       => '63001',
+            'santa marta'   => '47001', 'santamarta'    => '47001',
+            'valledupar'    => '20001',
+            'tunja'         => '15001',
+            'popayan'       => '19001', 'popayán'       => '19001',
+        ];
+
+        global $wpdb;
+        $meta_table = $wpdb->usermeta;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results( "SELECT user_id, meta_value FROM `{$meta_table}` WHERE meta_key = 'ltms_municipality' AND meta_value != ''", ARRAY_A );
+        $migrated = 0;
+        foreach ( (array) $rows as $row ) {
+            $value = strtolower( trim( (string) ( $row['meta_value'] ?? '' ) ) );
+            if ( $value === '' || preg_match( '/^\d{5}$/', $value ) ) {
+                continue; // ya es DANE o vacío
+            }
+            if ( isset( $slug_to_dane[ $value ] ) ) {
+                update_user_meta( (int) $row['user_id'], 'ltms_municipality', $slug_to_dane[ $value ] );
+                $migrated++;
+            }
+        }
+
+        update_option( 'ltms_municipality_slug_migrated', '1', false );
+
+        if ( $migrated > 0 && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'MUNI_SLUG_MIGRATED',
+                sprintf( 'Migrados %d vendedores: ltms_municipality slug → código DANE.', $migrated )
             );
         }
     }

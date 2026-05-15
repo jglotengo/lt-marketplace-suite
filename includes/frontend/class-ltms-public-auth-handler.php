@@ -268,6 +268,7 @@ final class LTMS_Public_Auth_Handler {
             'phone'              => sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ), // phpcs:ignore
             'store_name'         => sanitize_text_field( wp_unslash( $_POST['store_name'] ?? '' ) ), // phpcs:ignore
             'store_description'  => sanitize_textarea_field( wp_unslash( $_POST['store_description'] ?? '' ) ), // phpcs:ignore
+            'municipality_code'  => sanitize_text_field( wp_unslash( $_POST['municipality_code'] ?? '' ) ), // M-200 phpcs:ignore
             'document_type'      => sanitize_text_field( wp_unslash( $_POST['document_type'] ?? '' ) ), // phpcs:ignore
             'document'           => sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ), // phpcs:ignore
             // M-7: normalizar referral code a uppercase.
@@ -332,6 +333,14 @@ final class LTMS_Public_Auth_Handler {
             // en el panel de Settings.
             update_user_meta( $user_id, 'ltms_store_name', $data['store_name'] );
             update_user_meta( $user_id, 'ltms_store_description', $data['store_description'] );
+
+            // M-200: municipio DANE del vendedor (territorialidad ReteICA).
+            // Si el catálogo no está cargado o el código no es válido, dejamos vacío y Order_Split
+            // resuelve con fallback. Validación estricta solo si llegó algo en el POST.
+            if ( $data['municipality_code'] !== '' && class_exists( 'LTMS_Business_Dane_Catalog' )
+                 && LTMS_Business_Dane_Catalog::exists( $data['municipality_code'] ) ) {
+                update_user_meta( $user_id, 'ltms_municipality', $data['municipality_code'] );
+            }
             update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
             update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );

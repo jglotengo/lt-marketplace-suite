@@ -404,6 +404,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Mexico_Handler' ) ) {
             LTMS_Frontend_Checkout_Mexico_Handler::init();
         }
+        // M-200: dropdown DANE de municipios en checkout CO (territorialidad ReteICA).
+        if ( class_exists( 'LTMS_Frontend_Checkout_Municipality_Field' ) ) {
+            LTMS_Frontend_Checkout_Municipality_Field::init();
+        }
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }

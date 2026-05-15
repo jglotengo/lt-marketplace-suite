@@ -121,10 +121,29 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
                     <label style="display:block;font-size:.875rem;font-weight:500;margin-bottom:6px;">
                         <?php esc_html_e( 'Municipio (para ReteICA)', 'ltms' ); ?>
                     </label>
-                    <input type="text" name="ltms_municipality"
-                           value="<?php echo esc_attr( $municipality ); ?>"
-                           placeholder="<?php esc_attr_e( 'Ej: 11001 (código DANE Bogotá)', 'ltms' ); ?>"
-                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                    <?php
+                    // M-200: select DANE — fuente de verdad para territorialidad ReteICA.
+                    // Si el valor guardado es legacy ('bogota', etc.), Order_Split lo resuelve a DANE.
+                    $muni_options = class_exists( 'LTMS_Business_Dane_Catalog' )
+                        ? LTMS_Business_Dane_Catalog::get_options( true )
+                        : [];
+                    ?>
+                    <select name="ltms_municipality"
+                            style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                        <?php if ( empty( $muni_options ) ) : ?>
+                            <option value=""><?php esc_html_e( 'Catálogo no disponible', 'ltms' ); ?></option>
+                        <?php else : ?>
+                            <?php foreach ( $muni_options as $code => $label ) : ?>
+                                <option value="<?php echo esc_attr( (string) $code ); ?>"
+                                    <?php selected( (string) $municipality, (string) $code ); ?>>
+                                    <?php echo esc_html( $label ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                    <span style="font-size:.75rem;color:#9ca3af;">
+                        <?php esc_html_e( 'Código DANE — define la tarifa ReteICA municipal aplicable.', 'ltms' ); ?>
+                    </span>
                 </div>
             </div>
             <div style="margin-bottom:8px;">

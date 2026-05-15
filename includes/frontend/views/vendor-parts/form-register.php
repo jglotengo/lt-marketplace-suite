@@ -113,6 +113,25 @@ $country = LTMS_Core_Config::get_country();
                 <textarea id="ltms-reg-store-description" name="store_description" class="ltms-form-control" rows="3" placeholder="<?php esc_attr_e( 'Vendo productos de...', 'ltms' ); ?>"></textarea>
             </div>
 
+            <?php
+            // M-200: dropdown DANE de municipio del vendedor. Solo CO — define la tarifa ReteICA aplicable.
+            if ( 'CO' === $country && class_exists( 'LTMS_Business_Dane_Catalog' ) ) :
+                $muni_options = LTMS_Business_Dane_Catalog::get_options( true );
+                if ( count( $muni_options ) > 1 ) :
+            ?>
+            <div class="ltms-form-group">
+                <label for="ltms-reg-municipality"><?php esc_html_e( 'Municipio de tu tienda *', 'ltms' ); ?></label>
+                <select id="ltms-reg-municipality" name="municipality_code" class="ltms-form-control" required>
+                    <?php foreach ( $muni_options as $code => $label ) : ?>
+                        <option value="<?php echo esc_attr( (string) $code ); ?>"><?php echo esc_html( $label ); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <small class="ltms-field-hint">
+                    <?php esc_html_e( 'Define la tarifa ReteICA aplicable a tus ventas según el estatuto municipal.', 'ltms' ); ?>
+                </small>
+            </div>
+            <?php endif; endif; ?>
+
             <div class="ltms-form-group">
                 <label for="ltms-reg-referral-code"><?php esc_html_e( 'Código de Referido', 'ltms' ); ?></label>
                 <input
