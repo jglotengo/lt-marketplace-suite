@@ -118,7 +118,8 @@ $diag_token = (str_starts_with($diag_token_raw, 'v1:') && class_exists('LTMS_Cor
 $diag_url   = 'https://api.alegra.com/api/v1/contacts';
 $diag_payload = wp_json_encode([
     'name' => 'QA LTMS ' . date('His'),
-    'type' => 'client',  // Fix: string no array
+    'type' => ['client'],  // Alegra API v1: ARRAY requerido
+    'email' => 'qa-ltms-test@lo-tengo.com.co',  // email ayuda a evitar 400
 ]);
 $diag_response = wp_remote_post($diag_url, [
     'headers' => [
@@ -136,10 +137,11 @@ echo "       [DIAG] Body enviado: $diag_payload\n";
 echo "       [DIAG] Respuesta: $diag_body\n";
 
 try {
-    // Intento 1: Solo nombre + tipo (mínimo absoluto — sin email que puede causar duplicado)
+    // Intento 1: nombre + tipo array + email (formato correcto Alegra API v1)
     $contact = $alegra->create_contact([
-        'name' => 'QA Test LTMS ' . date('His'),
-        // type is set to string 'client' inside create_contact() — no need to pass it
+        'name'  => 'QA Test LTMS ' . date('His'),
+        'type'  => ['client'],
+        'email' => 'qa-ltms-' . date('His') . '@test.lo-tengo.com.co',
     ]);
     if ( ! empty( $contact['id'] ) ) {
         $test_contact_id = (int) $contact['id'];

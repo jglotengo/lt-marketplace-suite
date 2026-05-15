@@ -96,9 +96,9 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     public function create_contact( array $contact_data ): array {
         $payload = [
             'name' => sanitize_text_field( $contact_data['name'] ?? 'Sin nombre' ),
-            // Alegra Colombia acepta 'type' como string — no array.
-            // Versiones antiguas de la API usaban array; la v1 actual espera string.
-            'type' => 'client',
+            // Alegra Colombia API v1 requiere 'type' como ARRAY: ['client'] o ['supplier'].
+            // get_or_create_buyer_contact() ya envía ['client'] — respetar el valor del caller.
+            'type' => is_array( $contact_data['type'] ?? 'client' ) ? ( $contact_data['type'] ?? ['client'] ) : [ $contact_data['type'] ?? 'client' ],
         ];
 
         if ( ! empty( $contact_data['identification'] ) ) {
