@@ -116,10 +116,13 @@ $diag_token = (str_starts_with($diag_token_raw, 'v1:') && class_exists('LTMS_Cor
     ? LTMS_Core_Security::decrypt($diag_token_raw)
     : $diag_token_raw;
 $diag_url   = 'https://api.alegra.com/api/v1/contacts';
+// M-119: incluir kindOfPerson+regime requeridos por Alegra Colombia facturación electrónica
 $diag_payload = wp_json_encode([
-    'name' => 'QA LTMS ' . date('His'),
-    'type' => ['client'],  // Alegra API v1: ARRAY requerido
-    'email' => 'qa-ltms-' . date('His') . '@test.lo-tengo.com.co',
+    'name'         => 'QA LTMS ' . date('His'),
+    'type'         => ['client'],
+    'email'        => 'qa-ltms-' . date('His') . '@test.lo-tengo.com.co',
+    'kindOfPerson' => 'PERSON_ENTITY',
+    'regime'       => 'SIMPLIFIED_REGIME',
 ]);
 $diag_response = wp_remote_post($diag_url, [
     'headers' => [
