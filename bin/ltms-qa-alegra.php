@@ -490,22 +490,42 @@ if ( $orders ) {
                 'kindOfPerson' => 'PERSON_ENTITY',
                 'regime'       => 'SIMPLIFIED_REGIME',
             ]);
-            $pre_create = wp_remote_post('https://api.alegra.com/api/v1/contacts', [
-                'headers' => ['Authorization' => $pre_auth, 'Content-Type' => 'application/json', 'Accept' => 'application/json'],
-                'body'    => $pre_payload,
+            // Estrategia: primero buscar por email en Alegra; si no existe, crear.
+        // Esto evita el 400 cuando el contacto ya existe.
+        $pre_search = wp_remote_get('https://api.alegra.com/api/v1/contacts?start=0&limit=30', [
+                'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
                 'timeout' => 20,
             ]);
+        $pre_search_list = json_decode(wp_remote_retrieve_body($pre_search), true) ?: [];
+        $found_contact = null;
+        foreach ($pre_search_list as $c) {
+            if ( strtolower(trim($c['email']??'')) === strtolower(trim($billing_email)) ) {
+                $found_contact = $c; break;
+            }
+        }
+        if ( $found_contact ) {
+            $t07_contact_id = (int)($found_contact['id']??0);
+            echo "       [DIAG-T07] Contacto existente encontrado por email → ID=$t07_contact_id\n";
+        } else {
+            $pre_create = wp_remote_post('https://api.alegra.com/api/v1/contacts', [
+                    'headers' => ['Authorization' => $pre_auth, 'Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                    'body'    => $pre_payload,
+                    'timeout' => 20,
+                ]);
             $pre_create_code = wp_remote_retrieve_response_code($pre_create);
             $pre_create_body = wp_remote_retrieve_body($pre_create);
             $pre_create_dec  = json_decode($pre_create_body, true);
             echo "       [DIAG-T07] POST /contacts → HTTP $pre_create_code\n";
-            echo "       [DIAG-T07] Payload: $pre_payload\n";
-            echo "       [DIAG-T07] Respuesta: " . ($pre_create_body ?: '(vacía)') . "\n";
             if ( $pre_create_code === 200 && !empty($pre_create_dec['id']) ) {
                 $t07_contact_id = (int)$pre_create_dec['id'];
-                if ( $billing_cid ) update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $t07_contact_id );
-                echo "       [DIAG-T07] Contacto ID=$t07_contact_id cacheado → create_invoice_for_order usará este ID\n";
+            } else {
+                echo "       [DIAG-T07] Create falló → " . ($pre_create_body ?: '(vacía)') . "\n";
             }
+        }
+        if ( $t07_contact_id && $billing_cid ) {
+            update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $t07_contact_id );
+            echo "       [DIAG-T07] Contacto ID=$t07_contact_id cacheado → create_invoice_for_order usará este ID\n";
+        }
         }
     }
 
