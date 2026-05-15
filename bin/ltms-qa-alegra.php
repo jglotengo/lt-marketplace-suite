@@ -237,6 +237,7 @@ if ( $test_contact_id ) {
     }
 
     try {
+<<<<<<< Updated upstream
         // Idempotencia: usar exactamente el mismo nombre + email + identification del contacto creado.
         $same = $alegra->get_or_create_contact([
             'name'           => $test_contact_name,
@@ -252,6 +253,17 @@ if ( $test_contact_id ) {
             qa_warn( $qa, 'get_or_create_contact()', 'Retornó contacto diferente ID=' . $same['id'] . ' (esperado ' . $test_contact_id . ')' );
         } else {
             qa_fail( $qa, 'get_or_create_contact()', 'Sin ID en respuesta: ' . wp_json_encode($same) );
+=======
+        // Buscar por email del contacto ya creado — verifica idempotencia por email
+        $same = $alegra->get_or_create_contact([
+            'name'  => 'QA LTMS',
+            'email' => 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co',
+        ]);
+        if ( (int)($same['id']??0) === $test_contact_id ) {
+            qa_ok( $qa, 'get_or_create_contact() idempotente por email', "Retornó ID=$test_contact_id existente" );
+        } else {
+            qa_warn( $qa, 'get_or_create_contact()', 'ID diferente: ' . ($same['id']??'?') . ' (esperado ' . $test_contact_id . ')' );
+>>>>>>> Stashed changes
         }
     } catch ( Throwable $e ) {
         // Si el DIAG2 confirmó que ?query=nombre SÍ encuentra el contacto → OPcache sirvió clase vieja.
