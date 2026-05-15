@@ -186,14 +186,47 @@ if ( $test_contact_id ) {
         qa_fail( $qa, 'find_contact_by_identification()', $e->getMessage() );
     }
 
+    // Diagnóstico: ver exactamente qué retorna ?query= con el nombre del contacto creado
+    $diag2_resp = wp_remote_get( 'https://api.alegra.com/api/v1/contacts?' . http_build_query(['query' => $test_contact_name, 'limit' => 50]), [
+        'headers' => [
+            'Authorization' => 'Basic ' . base64_encode( get_option('ltms_alegra_email','') . ':' . (
+                (str_starts_with(get_option('ltms_alegra_token',''), 'v1:') && class_exists('LTMS_Core_Security'))
+                    ? LTMS_Core_Security::decrypt(get_option('ltms_alegra_token',''))
+                    : get_option('ltms_alegra_token','')
+            )),
+            'Accept' => 'application/json',
+        ],
+        'timeout' => 20,
+    ]);
+    $diag2_body = json_decode( wp_remote_retrieve_body($diag2_resp), true );
+    $diag2_contacts = is_array($diag2_body) ? ($diag2_body['data'] ?? $diag2_body) : [];
+    echo "       [DIAG2] ?query=" . $test_contact_name . " → " . count((array)$diag2_contacts) . " resultado(s)\n";
+    foreach ( (array)$diag2_contacts as $dc ) {
+        echo "       [DIAG2]   ID=" . ($dc['id']??'?') . " name=" . ($dc['name']??'?') . " email=" . ($dc['email']??'?') . " identification=" . ($dc['identification'] ?? $dc['identificationObject']['number'] ?? '-') . "\n";
+    }
+
+    // Buscar directamente por ID (el DIAG nos dio el ID=8 exacto)
+    $diag3_resp = wp_remote_get( 'https://api.alegra.com/api/v1/contacts/' . $test_contact_id, [
+        'headers' => [
+            'Authorization' => 'Basic ' . base64_encode( get_option('ltms_alegra_email','') . ':' . (
+                (str_starts_with(get_option('ltms_alegra_token',''), 'v1:') && class_exists('LTMS_Core_Security'))
+                    ? LTMS_Core_Security::decrypt(get_option('ltms_alegra_token',''))
+                    : get_option('ltms_alegra_token','')
+            )),
+            'Accept' => 'application/json',
+        ],
+        'timeout' => 20,
+    ]);
+    $diag3_code = wp_remote_retrieve_response_code($diag3_resp);
+    $diag3_body = json_decode( wp_remote_retrieve_body($diag3_resp), true );
+    echo "       [DIAG3] GET /contacts/$test_contact_id → HTTP $diag3_code | name=" . ($diag3_body['name']??'?') . "\n";
+
     try {
         // Idempotencia: usar exactamente el mismo nombre + email + identification del contacto creado.
-        // get_or_create_contact debe encontrarlo por nombre (Alegra soporta ?query=nombre)
-        // y devolver el mismo ID sin crear un duplicado.
         $same = $alegra->get_or_create_contact([
-            'name'           => $test_contact_name,          // mismo nombre exacto → find_by_name lo detecta
-            'identification' => $test_identification,         // misma identification
-            'email'          => $test_contact_email ?? '',    // mismo email → fallback
+            'name'           => $test_contact_name,
+            'identification' => $test_identification,
+            'email'          => $test_contact_email ?? '',
             'type'           => ['client'],
             'kindOfPerson'   => 'PERSON_ENTITY',
             'regime'         => 'SIMPLIFIED_REGIME',
@@ -207,6 +240,10 @@ if ( $test_contact_id ) {
         }
     } catch ( Throwable $e ) {
         qa_fail( $qa, 'get_or_create_contact()', $e->getMessage() );
+        // Si falla get_or_create, probar recuperar el contacto por ID directamente
+        if ( $diag3_code === 200 && !empty($diag3_body['id']) ) {
+            qa_warn( $qa, 'get_or_create_contact() — fallback GET /contacts/id', "Contacto ID=$test_contact_id existe en Alegra pero la búsqueda no lo encuentra — problema en search_contacts()" );
+        }
     }
 }
 
@@ -404,7 +441,33 @@ if ( $orders ) {
             }
             echo "       Pre-cacheado contacto Alegra ID=$found_id para email $billing_email\n";
         } else {
-            echo "       No encontrado por email $billing_email — se intentará crear\n";
+            echo "       No encontrado por email $billing_email — diagnóstico de creación directa:\n";
+
+            // Intentar crear el contacto directamente para ver el error exacto de Alegra
+            $pre_name = trim($test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name()) ?: 'Cliente Final';
+            $pre_payload = wp_json_encode([
+                'name'         => $pre_name,
+                'email'        => $billing_email,
+                'type'         => ['client'],
+                'kindOfPerson' => 'PERSON_ENTITY',
+                'regime'       => 'SIMPLIFIED_REGIME',
+            ]);
+            $pre_create = wp_remote_post('https://api.alegra.com/api/v1/contacts', [
+                'headers' => ['Authorization' => $pre_auth, 'Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                'body'    => $pre_payload,
+                'timeout' => 20,
+            ]);
+            $pre_create_code = wp_remote_retrieve_response_code($pre_create);
+            $pre_create_body = wp_remote_retrieve_body($pre_create);
+            $pre_create_dec  = json_decode($pre_create_body, true);
+            echo "       [DIAG-T07] POST /contacts → HTTP $pre_create_code\n";
+            echo "       [DIAG-T07] Payload: $pre_payload\n";
+            echo "       [DIAG-T07] Respuesta: " . ($pre_create_body ?: '(vacía)') . "\n";
+            if ( $pre_create_code === 200 && !empty($pre_create_dec['id']) ) {
+                $t07_contact_id = (int)$pre_create_dec['id'];
+                if ( $billing_cid ) update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $t07_contact_id );
+                echo "       [DIAG-T07] Contacto ID=$t07_contact_id cacheado → create_invoice_for_order usará este ID\n";
+            }
         }
     }
 
