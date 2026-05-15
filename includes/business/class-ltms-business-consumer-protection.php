@@ -39,6 +39,11 @@ class LTMS_Business_Consumer_Protection {
         // Verificar y liberar fondos retenidos — se ejecuta en el cron diario
         add_action( 'ltms_daily_cron', [ __CLASS__, 'release_eligible_holds' ] );
         add_action( 'ltms_release_vendor_hold', [ __CLASS__, 'release_single_hold' ], 10, 2 );
+
+        // M-202: extender hold cuando shipping provider confirma entrega
+        // (Uber, Aveonline, Heka disparan ltms_shipping_delivered desde sus webhook handlers).
+        add_action( 'ltms_shipping_delivered', [ __CLASS__, 'on_shipping_delivered' ], 10, 1 );
+        add_action( 'ltms_shipping_failed',    [ __CLASS__, 'on_shipping_failed' ],    10, 2 );
     }
 
     /**
@@ -109,6 +114,10 @@ class LTMS_Business_Consumer_Protection {
      * Libera todos los holds elegibles (fecha de liberación pasada).
      * Se ejecuta desde el cron diario.
      *
+     * M-202: si `ltms_payout_require_delivery` = 'yes' (default), solo libera holds
+     * de pedidos con entrega confirmada por shipping provider o productos digitales
+     * (sin shipping). El resto queda en hold hasta confirmación o decisión manual.
+     *
      * @return void
      */
     public static function release_eligible_holds(): void {
@@ -116,14 +125,126 @@ class LTMS_Business_Consumer_Protection {
         $table = $wpdb->prefix . 'lt_wallet_holds';
         $now   = gmdate( 'Y-m-d H:i:s' );
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $holds = $wpdb->get_results( $wpdb->prepare(
             "SELECT * FROM `{$table}` WHERE status = 'held' AND release_at <= %s LIMIT 100",
             $now
         ) );
 
+        $require_delivery = LTMS_Core_Config::get( 'ltms_payout_require_delivery', 'yes' ) === 'yes';
+
         foreach ( $holds as $hold ) {
+            if ( $require_delivery && ! self::is_order_delivered_or_no_shipping( (int) $hold->order_id ) ) {
+                // No liberar: el pedido no se ha entregado y el flag de protección está activo.
+                // El hold se libera cuando llegue el evento ltms_shipping_delivered o cuando admin lo apruebe manualmente.
+                continue;
+            }
             self::release_single_hold( (int) $hold->id, (int) $hold->vendor_id );
+        }
+    }
+
+    /**
+     * Detecta si un pedido ya fue entregado (shipping provider confirmó) o
+     * no requiere shipping (productos digitales/servicios).
+     *
+     * M-202: usado para gating de liberación de holds.
+     *
+     * @param int $order_id ID del pedido WooCommerce.
+     * @return bool
+     */
+    public static function is_order_delivered_or_no_shipping( int $order_id ): bool {
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            return false;
+        }
+
+        // Pedido sin shipping (todos los items virtuales/descargables) — libera sin esperar entrega.
+        if ( ! $order->needs_shipping_address() ) {
+            return true;
+        }
+
+        $delivered_statuses = [
+            'delivered',
+            'dropoff_complete',
+            'entregado',
+        ];
+
+        // Cualquier provider confirmó entrega.
+        $provider_status_meta = [
+            '_ltms_uber_delivery_status',
+            '_ltms_aveonline_status',
+            '_ltms_heka_status',
+            '_ltms_proships_status',
+        ];
+        foreach ( $provider_status_meta as $key ) {
+            $status = strtolower( (string) $order->get_meta( $key ) );
+            if ( $status !== '' && in_array( $status, $delivered_statuses, true ) ) {
+                return true;
+            }
+        }
+
+        // Marca explícita por listener (eventos ltms_shipping_delivered).
+        if ( $order->get_meta( '_ltms_delivered_at' ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Shipping provider confirmó entrega: actualiza release_at del hold para que el
+     * período Ley 1480 cuente DESDE la entrega real, no desde la fecha de pago.
+     *
+     * @param int $order_id ID del pedido.
+     * @return void
+     */
+    public static function on_shipping_delivered( int $order_id ): void {
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            return;
+        }
+
+        // Marca canónica para que is_order_delivered_or_no_shipping() la lea sin importar el provider.
+        $order->update_meta_data( '_ltms_delivered_at', gmdate( 'Y-m-d H:i:s' ) );
+        $order->save();
+
+        global $wpdb;
+        $table      = $wpdb->prefix . 'lt_wallet_holds';
+        $hold_days  = (int) LTMS_Core_Config::get( 'ltms_consumer_protection_days', self::DEFAULT_HOLD_DAYS );
+        $release_at = gmdate( 'Y-m-d H:i:s', strtotime( "+{$hold_days} weekdays" ) );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $wpdb->update(
+            $table,
+            [ 'release_at' => $release_at ],
+            [ 'order_id' => $order_id, 'status' => 'held' ],
+            [ '%s' ],
+            [ '%d', '%s' ]
+        );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::log(
+                'HOLD_DELIVERY_CONFIRMED',
+                sprintf( 'Pedido #%d entregado — hold release_at = %s', $order_id, $release_at )
+            );
+        }
+    }
+
+    /**
+     * Shipping provider reportó fallo/cancelación — congela el hold hasta revisión manual.
+     *
+     * @param int    $order_id ID del pedido.
+     * @param string $reason   Motivo del fallo (opcional).
+     * @return void
+     */
+    public static function on_shipping_failed( int $order_id, string $reason = 'shipping_failed' ): void {
+        self::freeze_hold_for_dispute( $order_id, sanitize_text_field( $reason ) );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::log(
+                'HOLD_FROZEN_SHIPPING_FAILED',
+                sprintf( 'Pedido #%d: shipping reportó fallo (%s) — hold congelado.', $order_id, $reason )
+            );
         }
     }
 

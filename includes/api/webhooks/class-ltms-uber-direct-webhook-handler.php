@@ -106,8 +106,13 @@ class LTMS_Uber_Direct_Webhook_Handler {
                 }
                 if ( in_array( $status, [ 'delivered', 'dropoff_complete' ], true ) ) {
                     $order->update_status( 'completed', __( 'Entregado por Uber Direct.', 'ltms' ) );
+                    // M-202: notifica al módulo Consumer_Protection para extender hold y marcar delivered_at.
+                    do_action( 'ltms_shipping_delivered', $order_id, 'uber_direct' );
                 } elseif ( in_array( $status, [ 'pickup_complete', 'en_route_to_dropoff' ], true ) ) {
                     $order->update_status( 'wc-shipped', __( 'En camino — Uber Direct.', 'ltms' ) );
+                } elseif ( in_array( $status, [ 'returned', 'canceled', 'cancelled', 'failed' ], true ) ) {
+                    // M-202: shipping fallido — congela el hold para revisión manual.
+                    do_action( 'ltms_shipping_failed', $order_id, 'uber_direct:' . $status );
                 }
                 $order->save();
                 break;

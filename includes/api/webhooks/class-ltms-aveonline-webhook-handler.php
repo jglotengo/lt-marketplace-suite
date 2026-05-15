@@ -27,9 +27,15 @@ class LTMS_Aveonline_Webhook_Handler {
             $order = wc_get_order( $order_id );
             if ( $order ) {
                 $order->update_meta_data( '_ltms_shipping_status', $status );
+                $order->update_meta_data( '_ltms_aveonline_status', strtolower( $status ) );
                 $order->add_order_note( sprintf( __( 'Aveonline tracking %s — estado: %s', 'ltms' ), $tracking, $status ) );
-                if ( 'DELIVERED' === strtoupper( $status ) ) {
+                $status_upper = strtoupper( $status );
+                if ( 'DELIVERED' === $status_upper ) {
                     $order->update_status( 'completed', __( 'Entregado por Aveonline.', 'ltms' ) );
+                    // M-202: hold release_at se actualiza al confirmar entrega.
+                    do_action( 'ltms_shipping_delivered', $order_id, 'aveonline' );
+                } elseif ( in_array( $status_upper, [ 'RETURNED', 'CANCELED', 'CANCELLED', 'FAILED' ], true ) ) {
+                    do_action( 'ltms_shipping_failed', $order_id, 'aveonline:' . strtolower( $status ) );
                 }
                 $order->save();
             }
