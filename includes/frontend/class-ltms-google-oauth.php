@@ -58,8 +58,20 @@ final class LTMS_Google_OAuth {
     // -------------------------------------------------------------------------
 
     public static function is_configured(): bool {
-        return ! empty( LTMS_Core_Config::get( 'ltms_google_client_id', '' ) ) &&
-               ! empty( LTMS_Core_Config::get( 'ltms_google_client_secret', '' ) );
+        $client_id = trim( LTMS_Core_Config::get( 'ltms_google_client_id', '' ) );
+        $secret    = trim( LTMS_Core_Config::get( 'ltms_google_client_secret', '' ) );
+        // M-58: 'GOOGLE_CLIENT_ID_PLACEHOLDER' es el valor por defecto del activador — no es una credencial real.
+        if ( empty( $client_id ) || 'GOOGLE_CLIENT_ID_PLACEHOLDER' === $client_id ) {
+            return false;
+        }
+        if ( empty( $secret ) ) {
+            return false;
+        }
+        // Debe terminar en .apps.googleusercontent.com para ser un Client ID real.
+        if ( ! str_ends_with( $client_id, '.apps.googleusercontent.com' ) ) {
+            return false;
+        }
+        return true;
     }
 
     private static function get_client_id(): string {

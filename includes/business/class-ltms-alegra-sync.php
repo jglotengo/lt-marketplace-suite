@@ -554,25 +554,25 @@ final class LTMS_Alegra_Sync {
         }
     }
 
-        private function maybe_send_invoice_email( int $alegra_invoice_id, \WC_Order $order ): void {
-        $email = $order->get_billing_email();
-        if ( ! $email ) {
-            return;
-        }
+    private function maybe_send_invoice_email( int $alegra_invoice_id, \WC_Order $order ): void {
+    $email = $order->get_billing_email();
+    if ( ! $email ) {
+        return;
+    }
 
-        try {
-            $client = LTMS_Api_Factory::get( 'alegra' );
-            $client->send_invoice_email( $alegra_invoice_id, [ $email ] );
+    try {
+        $client = LTMS_Api_Factory::get( 'alegra' );
+        $client->send_invoice_email( $alegra_invoice_id, [ $email ] );
 
-            $this->log_info(
-                'alegra_invoice_email_sent',
-                sprintf( 'Factura Alegra #%d enviada por email a %s', $alegra_invoice_id, $email )
-            );
-        } catch ( \Throwable $e ) {
-            $this->log_warning(
-                'alegra_invoice_email_failed',
-                sprintf( 'No se pudo enviar email de factura Alegra #%d: %s', $alegra_invoice_id, $e->getMessage() )
-            );
-        }
+        $this->log_info(
+            'alegra_invoice_email_sent',
+            sprintf( 'Factura Alegra #%d enviada por email a %s', $alegra_invoice_id, $email )
+        );
+    } catch ( \Throwable $e ) {
+        $this->log_warning(
+            'alegra_invoice_email_failed',
+            sprintf( 'No se pudo enviar email de factura Alegra #%d: %s', $alegra_invoice_id, $e->getMessage() )
+        );
+    }
     }
 }
