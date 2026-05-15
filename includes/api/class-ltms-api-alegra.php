@@ -94,14 +94,26 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException
      */
     public function create_contact( array $contact_data ): array {
+        // M-119: Alegra Colombia requiere nameObject (firstName+lastName) además de name.
+        // Separar el nombre completo en partes para nameObject.
+        $full_name  = sanitize_text_field( $contact_data['name'] ?? 'Consumidor Final' );
+        $name_parts = explode( ' ', $full_name, 2 );
+        $first_name = $name_parts[0] ?? $full_name;
+        $last_name  = $name_parts[1] ?? '';
+
         $payload = [
-            'name' => sanitize_text_field( $contact_data['name'] ?? 'Sin nombre' ),
-            // Alegra Colombia API v1 requiere 'type' como ARRAY: ['client'] o ['supplier'].
+            'name'         => $full_name,
+            'nameObject'   => [
+                'firstName'      => $first_name,
+                'secondName'     => null,
+                'lastName'       => $last_name ?: $first_name,
+                'secondLastName' => null,
+            ],
+            // Alegra Colombia API v1: type debe ser ARRAY ['client'] o ['supplier'].
             'type' => is_array( $contact_data['type'] ?? 'client' )
                 ? ( $contact_data['type'] ?? ['client'] )
                 : [ $contact_data['type'] ?? 'client' ],
-            // M-119: Alegra Colombia con facturación electrónica requiere kindOfPerson y regime.
-            // Sin estos campos la API retorna 905 "Ha ocurrido un error inesperado".
+            // Requerido para facturación electrónica Colombia.
             'kindOfPerson' => $contact_data['kindOfPerson'] ?? 'PERSON_ENTITY',
             'regime'       => $contact_data['regime']       ?? 'SIMPLIFIED_REGIME',
         ];
