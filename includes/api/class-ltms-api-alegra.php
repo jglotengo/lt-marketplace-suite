@@ -95,20 +95,22 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      */
     public function create_contact( array $contact_data ): array {
         // M-119: Alegra Colombia requiere nameObject (firstName+lastName) además de name.
-        // Separar el nombre completo en partes para nameObject.
         $full_name  = sanitize_text_field( $contact_data['name'] ?? 'Consumidor Final' );
         $name_parts = explode( ' ', $full_name, 2 );
         $first_name = $name_parts[0] ?? $full_name;
         $last_name  = $name_parts[1] ?? '';
 
+        // Usar nameObject del caller si ya viene construido; si no, construirlo aquí.
+        $name_object = $contact_data['nameObject'] ?? [
+            'firstName'      => $first_name,
+            'secondName'     => null,
+            'lastName'       => $last_name ?: $first_name,
+            'secondLastName' => null,
+        ];
+
         $payload = [
             'name'         => $full_name,
-            'nameObject'   => [
-                'firstName'      => $first_name,
-                'secondName'     => null,
-                'lastName'       => $last_name ?: $first_name,
-                'secondLastName' => null,
-            ],
+            'nameObject'   => $name_object,
             // Alegra Colombia API v1: type debe ser ARRAY ['client'] o ['supplier'].
             'type' => is_array( $contact_data['type'] ?? 'client' )
                 ? ( $contact_data['type'] ?? ['client'] )

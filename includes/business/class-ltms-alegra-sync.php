@@ -376,10 +376,23 @@ final class LTMS_Alegra_Sync {
         }
 
         // Construir datos del contacto desde el billing del pedido
+        $first_name = $order->get_billing_first_name() ?: 'Cliente';
+        $last_name  = $order->get_billing_last_name()  ?: 'Final';
+        $full_name  = trim( "$first_name $last_name" ) ?: $order->get_billing_company() ?: 'Cliente Final';
+
+        // Descomponer nombre en partes para nameObject (obligatorio en Alegra Colombia)
+        $name_words  = explode( ' ', $full_name );
+        $fn          = $name_words[0] ?? $full_name;
+        $ln          = count($name_words) > 1 ? implode( ' ', array_slice($name_words, 1) ) : $fn;
+
         $contact_data = [
-            'name'           => trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() )
-                                ?: $order->get_billing_company()
-                                ?: __( 'Cliente Final', 'ltms' ),
+            'name'           => $full_name,
+            'nameObject'     => [
+                'firstName'      => $fn,
+                'secondName'     => null,
+                'lastName'       => $ln,
+                'secondLastName' => null,
+            ],
             'email'          => $order->get_billing_email(),
             'phone'          => $order->get_billing_phone(),
             'identification' => $order->get_meta( '_billing_identification' )
