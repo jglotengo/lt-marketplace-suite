@@ -130,8 +130,9 @@ final class LTMS_Alegra_Sync {
                     $this->maybe_send_invoice_email( $invoice_id, $order );
                 }
 
-                // ── C. Registrar comisión de la plataforma como ingreso ──────
-                $this->register_platform_commission( $invoice_id, $order );
+                // ── C. M-201: la factura YA es de comisión al vendedor (no del total al comprador).
+                // register_platform_commission queda como legacy/dead-code; no llamar para evitar duplicar
+                // el ingreso en Alegra. Se mantiene la función para rollback si hace falta.
             }
         } catch ( \Throwable $e ) {
             $this->log_error(
@@ -328,26 +329,65 @@ final class LTMS_Alegra_Sync {
     // ── Lógica de negocio principal ───────────────────────────────
 
     /**
-     * Crea la factura en Alegra para un pedido WooCommerce.
+     * Crea la factura de COMISIÓN del marketplace para un pedido WooCommerce.
+     *
+     * Modelo legal (M-201): el marketplace emite factura electrónica DIAN únicamente
+     * por su comisión de intermediación, dirigida al VENDEDOR como cliente Alegra.
+     * El vendedor emite por separado su propia factura del producto al comprador final
+     * (modelo "cada vendedor factura propio" — fuera del scope LTMS).
+     *
+     * Si el pedido no tiene vendor_id o platform_fee > 0, no se crea factura.
+     *
+     * @param \WC_Order $order Pedido completado.
+     * @return array Respuesta de la API Alegra (con id, numberTemplate, status).
+     * @throws \RuntimeException
      */
     public function create_invoice_for_order( \WC_Order $order ): array {
         $client = LTMS_Api_Factory::get( 'alegra' );
 
-        $alegra_contact_id = $this->get_or_create_buyer_contact( $order, $client );
+        $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+        if ( ! $vendor_id ) {
+            // Fallback: extraer del primer item (mismo patrón que Order_Split).
+            foreach ( $order->get_items() as $item ) {
+                $pid       = $item->get_product_id();
+                $vendor_id = (int) get_post_meta( $pid, '_ltms_vendor_id', true );
+                if ( $vendor_id ) {
+                    break;
+                }
+            }
+        }
 
+        if ( ! $vendor_id ) {
+            throw new \RuntimeException(
+                sprintf( '[AlegraSync] Pedido #%d sin vendor_id — no se factura comisión.', $order->get_id() )
+            );
+        }
+
+        $commission = (float) $order->get_meta( '_ltms_platform_fee' );
+        if ( $commission <= 0 ) {
+            // Para órdenes registradas vía lt_commissions (camino actual), leer ahí.
+            global $wpdb;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $commission = (float) $wpdb->get_var( $wpdb->prepare(
+                "SELECT commission_amount FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1",
+                $order->get_id(), $vendor_id
+            ) );
+        }
+
+        if ( $commission <= 0 ) {
+            throw new \RuntimeException(
+                sprintf( '[AlegraSync] Pedido #%d sin platform_fee — no hay comisión para facturar.', $order->get_id() )
+            );
+        }
+
+        $alegra_contact_id = $this->get_or_create_vendor_contact( $vendor_id );
         if ( ! $alegra_contact_id ) {
             throw new \RuntimeException(
-                sprintf( '[AlegraSync] No se pudo obtener/crear contacto para pedido #%d', $order->get_id() )
+                sprintf( '[AlegraSync] No se pudo obtener/crear contacto Alegra para vendedor #%d', $vendor_id )
             );
         }
 
-        $invoice_items = $this->prepare_invoice_items( $order, $client );
-
-        if ( empty( $invoice_items ) ) {
-            throw new \RuntimeException(
-                sprintf( '[AlegraSync] Pedido #%d sin items válidos para factura', $order->get_id() )
-            );
-        }
+        $invoice_items = $this->prepare_commission_items( $order, $commission );
 
         $invoice_data = [
             'date'         => $order->get_date_paid()
@@ -357,28 +397,92 @@ final class LTMS_Alegra_Sync {
             'client_id'    => $alegra_contact_id,
             'items'        => $invoice_items,
             'observations' => sprintf(
-                __( 'Pedido WooCommerce #%s — Lo Tengo Marketplace', 'ltms' ),
-                $order->get_order_number()
+                /* translators: 1: WC order number, 2: vendor id */
+                __( 'Comisión marketplace pedido WC #%1$s (vendedor #%2$d) — Lo Tengo', 'ltms' ),
+                $order->get_order_number(),
+                $vendor_id
             ),
         ];
 
-        // Numeración configurada
         $template_id = (int) LTMS_Core_Config::get( 'ltms_alegra_default_number_template', 0 );
         if ( $template_id ) {
             $invoice_data['number_template_id'] = $template_id;
         }
 
-        // Moneda multi-currency
         $currency = $order->get_currency();
         if ( $currency && $currency !== 'COP' ) {
             $invoice_data['currency']      = $currency;
             $invoice_data['exchange_rate'] = (float) LTMS_Core_Config::get( 'ltms_alegra_exchange_rate', 1 );
         }
 
-        // AUDIT-FIX A7: incluir referencia externa (número de pedido WC)
-        $invoice_data['anotation'] = 'WC-' . $order->get_order_number();
+        $invoice_data['anotation'] = 'WC-' . $order->get_order_number() . '-COMM';
 
         return $client->create_invoice( $invoice_data );
+    }
+
+    /**
+     * Obtiene el contacto Alegra del vendedor, sincronizándolo si aún no existe.
+     *
+     * @param int $vendor_id ID del usuario vendedor.
+     * @return int Contact ID en Alegra (0 si falló).
+     */
+    private function get_or_create_vendor_contact( int $vendor_id ): int {
+        $cached = (int) get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true );
+        if ( $cached ) {
+            return $cached;
+        }
+        // No estaba sincronizado — crearlo on-demand.
+        return $this->sync_user_as_contact( $vendor_id, 'provider' );
+    }
+
+    /**
+     * Construye los items de la factura de comisión (M-201).
+     *
+     * Una sola línea: "Comisión marketplace pedido #X" con monto = platform_fee.
+     * IVA 19% sobre el servicio de intermediación (Colombia) — el comprador (vendedor)
+     * paga IVA al marketplace y lo descuenta como gasto en su declaración.
+     *
+     * @param \WC_Order $order      Pedido.
+     * @param float     $commission Monto de la comisión.
+     * @return array
+     */
+    private function prepare_commission_items( \WC_Order $order, float $commission ): array {
+        $country     = strtoupper( LTMS_Core_Config::get_country() );
+        $iva_rate    = (float) LTMS_Core_Config::get( 'ltms_iva_general', 0.19 );
+        $tax_map     = $country === 'MX' ? self::TAX_MAP_MX : self::TAX_MAP_CO;
+
+        $item_id = (int) LTMS_Core_Config::get( 'ltms_alegra_commission_item_id', 0 );
+
+        $line = [
+            'name'        => sprintf(
+                /* translators: %s: order number */
+                __( 'Comisión marketplace — pedido #%s', 'ltms' ),
+                $order->get_order_number()
+            ),
+            'description' => sprintf(
+                /* translators: 1: pedido, 2: total bruto */
+                __( 'Servicio de intermediación. Pedido bruto: %2$s.', 'ltms' ),
+                $order->get_order_number(),
+                wc_price( $order->get_total(), [ 'decimals' => 0 ] )
+            ),
+            'price'       => round( $commission, 2 ),
+            'quantity'    => 1,
+        ];
+
+        if ( $item_id ) {
+            $line['id'] = $item_id;
+        }
+
+        // IVA sobre la comisión (servicio gravado en CO; MX similar al 16%).
+        if ( $iva_rate > 0 ) {
+            $iva_key = (string) round( $iva_rate * 100 );
+            $iva_tax_id = $tax_map[ $iva_key ] ?? null;
+            if ( $iva_tax_id ) {
+                $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
+            }
+        }
+
+        return [ $line ];
     }
 
     /**
@@ -484,6 +588,10 @@ final class LTMS_Alegra_Sync {
 
     /**
      * Obtiene o crea el contacto Alegra del comprador.
+     *
+     * @deprecated M-201: el marketplace ya no factura al comprador. Modelo legal "cada vendedor
+     * factura propio" — la factura de comisión se emite al vendedor (ver get_or_create_vendor_contact).
+     * Esta función se mantiene como dead-code para rollback rápido en caso de revertir el cambio.
      */
     private function get_or_create_buyer_contact( \WC_Order $order, LTMS_Api_Alegra $client ): int {
         $customer_id = $order->get_customer_id();
@@ -541,6 +649,9 @@ final class LTMS_Alegra_Sync {
     /**
      * Prepara los items de la factura con IVA y retención correctos.
      * AUDIT-FIX A10: IVA mapeado por tasa real + envío como servicio con IVA.
+     *
+     * @deprecated M-201: factura del 100% del pedido descontinuada. La nueva factura de
+     * comisión usa prepare_commission_items(). Esta función queda como dead-code para rollback.
      */
     private function prepare_invoice_items( \WC_Order $order, LTMS_Api_Alegra $client ): array {
         $items   = [];
@@ -715,6 +826,10 @@ final class LTMS_Alegra_Sync {
     /**
      * Registra la comisión de la plataforma como ingreso separado en Alegra.
      * AUDIT-FIX A14: comisión del marketplace = ingreso real del negocio.
+     *
+     * @deprecated M-201: la comisión ahora ES la factura principal (emitida al vendedor),
+     * no un payment-in separado. Llamarla duplicaría el ingreso en Alegra. Mantenida
+     * como dead-code para rollback rápido si revertimos el cambio.
      */
     private function register_platform_commission( int $invoice_id, \WC_Order $order ): void {
         $commission_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_commission_account_id', 0 );
