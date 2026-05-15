@@ -66,9 +66,19 @@ function ltms_create_test_vendor(): int {
         'user_login' => "qa_vendor_{$ts}",
         'user_pass'  => wp_generate_password( 20 ),
         'user_email' => "qa_vendor_{$ts}@test-ltms.local",
-        'role'       => 'subscriber',
+        'role'       => 'ltms_vendor', // Usar rol real — subscriber es bloqueado por is_ltms_vendor()
     ] );
-    if ( is_wp_error( $uid ) ) return 0;
+    if ( is_wp_error( $uid ) ) {
+        // Fallback: si ltms_vendor no existe aún, crear con subscriber + meta
+        $uid2 = wp_insert_user( [
+            'user_login' => "qa_vendor_{$ts}b",
+            'user_pass'  => wp_generate_password( 20 ),
+            'user_email' => "qa_vendor_{$ts}b@test-ltms.local",
+            'role'       => 'subscriber',
+        ] );
+        if ( is_wp_error( $uid2 ) ) return 0;
+        $uid = $uid2;
+    }
     update_user_meta( $uid, 'ltms_is_vendor',  true );
     update_user_meta( $uid, 'ltms_store_name', 'QA Test Store' );
     update_user_meta( $uid, 'ltms_kyc_status', 'approved' );
@@ -597,7 +607,7 @@ ltms_test( 'LTMS_Referral_Tree::get_network_stats() existe', function () {
 // ─────────────────────────────────────────────────────────────────────────────
 ltms_group( '15 — Notificaciones: total_unread en respuesta AJAX (M-15)' );
 
-ltms_test( 'ltms_get_notifications devuelve total_unread', function () use ( $qa_vendor ) {
+ltms_test( 'ltms_get_notifications devuelve count (total_unread)', function () use ( $qa_vendor ) {
     if ( ! $qa_vendor ) return [ 'FAIL', 'Sin usuario de prueba' ];
     wp_set_current_user( $qa_vendor );
     $_POST    = [ 'action' => 'ltms_get_notifications', 'nonce' => wp_create_nonce( 'ltms_dashboard_nonce' ), 'since' => 0 ];
@@ -610,10 +620,12 @@ ltms_test( 'ltms_get_notifications devuelve total_unread', function () use ( $qa
     $_REQUEST = [];
     $data = json_decode( $output, true );
     if ( ! $data ) return [ 'WARN', "Output no es JSON: " . substr( $output, 0, 80 ) ];
-    $has = array_key_exists( 'total_unread', $data['data'] ?? [] );
+    // Handler devuelve 'count' (total_unread del badge) y 'new_count' (desde `since`)
+    $has = array_key_exists( 'count', $data['data'] ?? [] );
     return $has
-        ? [ 'PASS', "total_unread={$data['data']['total_unread']} ✓" ]
-        : [ 'WARN', 'total_unread ausente — M-15 puede no estar. Keys: ' . implode( ', ', array_keys( $data['data'] ?? [] ) ) ];
+        ? [ 'PASS', "count(total_unread)={$data['data']['count']} new_count={$data['data']['new_count']} ✓" ]
+        : [ 'FAIL', 'Faltan keys count/new_count. Keys: ' . implode( ', ', array_keys( $data['data'] ?? [] ) ) ];
+} );
 } );
 
 // ─────────────────────────────────────────────────────────────────────────────

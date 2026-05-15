@@ -627,14 +627,27 @@ final class LTMS_Alegra_Sync {
             'email'          => $order->get_billing_email(),
             'phone'          => $order->get_billing_phone(),
             'identification' => $identification,
-            'type'           => [ 'client' ],
             'kindOfPerson'   => 'PERSON_ENTITY',
             'regime'         => $identification ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME',
-            'address'        => [
-                'address' => $order->get_billing_address_1(),
-                'city'    => $order->get_billing_city(),
-            ],
         ];
+
+        // AUDIT-FIX: Alegra Colombia requiere código DANE para ciudad, no nombre en texto libre.
+        // Si la ciudad del pedido tiene código DANE, incluirla. Si no, omitir address
+        // para evitar el 400 "Ha ocurrido un error inesperado" por ciudad inválida.
+        $city_raw    = $order->get_billing_city();
+        $dane_code   = $city_raw ? LTMS_Business_DANE_Catalog::get_city_code( $city_raw ) : '';
+        $address_raw = $order->get_billing_address_1();
+        if ( $dane_code && $address_raw ) {
+            $contact_data['address'] = [
+                'address' => sanitize_text_field( $address_raw ),
+                'city'    => [ 'id' => $dane_code ],
+            ];
+        } elseif ( $address_raw ) {
+            // Sin código DANE — solo enviar dirección textual sin ciudad
+            $contact_data['address'] = [
+                'address' => sanitize_text_field( $address_raw ),
+            ];
+        }
 
         $contact    = $client->get_or_create_contact( $contact_data );
         $contact_id = (int) ( $contact['id'] ?? 0 );

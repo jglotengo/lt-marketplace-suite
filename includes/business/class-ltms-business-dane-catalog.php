@@ -149,4 +149,29 @@ final class LTMS_Business_Dane_Catalog {
 
         return is_array( $rows ) ? $rows : [];
     }
+
+    /**
+     * Busca el código DANE de un municipio dado su nombre (case-insensitive).
+     * Útil para mapear ciudades de pedidos WC a códigos DANE de Alegra Colombia.
+     *
+     * @param string $city_name Nombre del municipio (ej: 'Cali', 'BOGOTÁ').
+     * @return string Código DANE 5-dig o vacío si no existe.
+     */
+    public static function get_city_code( string $city_name ): string {
+        if ( ! $city_name ) {
+            return '';
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_co_dane_municipalities';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $code = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT code FROM `{$table}` WHERE LOWER(municipality_name) = LOWER(%s) AND is_active = 1 LIMIT 1",
+                trim( $city_name )
+            )
+        );
+
+        return (string) ( $code ?: '' );
+    }
 }
