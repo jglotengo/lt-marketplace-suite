@@ -174,6 +174,20 @@ final class LTMS_Core_Activator {
             // v2.0.0 — SEO
             'ltms_google_search_console_verify' => '',
             'ltms_google_client_id'             => 'GOOGLE_CLIENT_ID_PLACEHOLDER',
+            // ── Alegra Contabilidad ────────────────────────────────────────────────
+            'ltms_alegra_enabled'                 => 'no',
+            'ltms_alegra_email'                   => '',
+            'ltms_alegra_token'                   => '',
+            'ltms_alegra_default_number_template' => 0,
+            'ltms_alegra_bank_account_id'         => 0,
+            'ltms_alegra_commission_account_id'   => 0,    // Cuenta para comisiones de plataforma
+            'ltms_alegra_retefuente_tax_id'       => 0,    // ID impuesto retención fuente en Alegra
+            'ltms_alegra_shipping_tax_id'         => 1,    // ID impuesto para envíos (1=exento CO)
+            'ltms_alegra_invoice_on_processing'   => 'no',
+            'ltms_alegra_auto_payment'            => 'no',
+            'ltms_alegra_send_invoice_email'      => 'no',
+            'ltms_alegra_webhook_secret'          => '',
+            'ltms_alegra_exchange_rate'           => 1,    // Tasa de cambio para monedas no-COP
             'ltms_google_client_secret'         => '',  // Se guarda cifrado; ver ltms_google_client_secret_raw
             'ltms_sitemap_exclude_outofstock'   => true,
             'ltms_og_site_name'                 => '',
@@ -358,6 +372,7 @@ final class LTMS_Core_Activator {
             'ltms_update_tracking'       => [ 'recurrence' => 'every_30_minutes',  'time' => null ],
             'ltms_approve_payout_cron'   => [ 'recurrence' => 'daily',             'time' => '06:00:00' ],
             'ltms_daily_cron'            => [ 'recurrence' => 'daily',             'time' => '01:00:00' ], // M-46: consumer protection holds
+            'ltms_alegra_retry_failed'   => [ 'recurrence' => 'hourly',            'time' => null ],       // Reintentar facturas Alegra fallidas
         ];
 
         foreach ( $jobs as $hook => $config ) {

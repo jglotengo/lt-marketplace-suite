@@ -53,6 +53,7 @@ final class LTMS_Core_Deactivator {
             'ltms_generate_tax_reports',
             'ltms_approve_payout_cron',
             'ltms_daily_cron',             // M-46
+            'ltms_alegra_retry_failed',    // Reintentos facturas Alegra
             // Booking cron hooks (LTMS_Core_Cron_Manager)
             'ltms_cron_cleanup_pending_bookings',
             'ltms_cron_send_checkin_reminders',

@@ -5,38 +5,53 @@
  * Orquesta la sincronización bidireccional entre LTMS/WooCommerce y Alegra:
  *
  * 1. Pedido pagado → Crear factura en Alegra al cliente
- * 2. Registro de vendedor → Crear/actualizar contacto en Alegra
- * 3. Retiro aprobado → Registrar pago en Alegra
- * 4. Productos → Sincronizar como items Alegra (lazy, al crear factura)
+ * 2. Registro de vendedor → Crear/actualizar contacto en Alegra (como proveedor)
+ * 3. Retiro aprobado → Registrar egreso en Alegra (pago a proveedor)
+ * 4. Reembolso WC → Nota de crédito en Alegra
+ * 5. Productos → Sincronizar como items Alegra (lazy, al crear factura)
+ * 6. Comisión de plataforma → Registrar como ingreso separado en Alegra
+ * 7. Retención en la fuente → Incluida en factura como descuento/impuesto
+ * 8. Pago de factura automático → Registrar pago al crear factura si está configurado
  *
- * Los IDs de Alegra se almacenan como meta de WooCommerce/WP:
- *   - Pedido: _ltms_alegra_invoice_id, _ltms_alegra_invoice_status
- *   - Usuario: _ltms_alegra_contact_id
- *   - Producto: _ltms_alegra_item_id
+ * IDs de Alegra almacenados en meta de WooCommerce/WP:
+ *   Pedido:   _ltms_alegra_invoice_id, _ltms_alegra_invoice_status,
+ *             _ltms_alegra_invoice_number, _ltms_alegra_credit_note_id,
+ *             _ltms_alegra_payment_id, _ltms_alegra_synced_at
+ *   Usuario:  _ltms_alegra_contact_id, _ltms_alegra_contact_type
+ *   Producto: _ltms_alegra_item_id
  *
  * @package    LTMS
  * @subpackage LTMS/includes/business
- * @version    2.1.0
+ * @version    3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-/**
- * Class LTMS_Alegra_Sync
- */
 final class LTMS_Alegra_Sync {
 
     use LTMS_Logger_Aware;
 
-    /**
-     * Registra hooks de WordPress/WooCommerce.
-     *
-     * @return void
-     */
+    // ── Constantes de configuración ───────────────────────────────
+
+    /** IVA estándar Colombia DIAN → ID de impuesto en Alegra */
+    private const TAX_MAP_CO = [
+        19 => 3,  // IVA 19%
+        5  => 2,  // IVA 5%
+        0  => 1,  // Excluido/Exento
+    ];
+
+    /** IVA México → ID de impuesto en Alegra */
+    private const TAX_MAP_MX = [
+        16 => 5,  // IVA 16%
+        8  => 6,  // IVA 8% (frontera)
+        0  => 4,  // Exento
+    ];
+
+    // ── Boot ──────────────────────────────────────────────────────
+
     public static function init(): void {
-        // Solo sincronizar si Alegra está habilitado
         if ( LTMS_Core_Config::get( 'ltms_alegra_enabled', 'no' ) !== 'yes' ) {
             return;
         }
@@ -44,40 +59,33 @@ final class LTMS_Alegra_Sync {
         $instance = new self();
 
         // Pedido completado → crear factura
-        add_action(
-            'woocommerce_order_status_completed',
-            [ $instance, 'on_order_completed' ],
-            20,
-            1
-        );
+        add_action( 'woocommerce_order_status_completed', [ $instance, 'on_order_completed' ], 20 );
 
-        // También en estado 'processing' si está configurado
+        // También en 'processing' si está configurado
         if ( LTMS_Core_Config::get( 'ltms_alegra_invoice_on_processing', 'no' ) === 'yes' ) {
-            add_action(
-                'woocommerce_order_status_processing',
-                [ $instance, 'on_order_completed' ],
-                20,
-                1
-            );
+            add_action( 'woocommerce_order_status_processing', [ $instance, 'on_order_completed' ], 20 );
         }
 
-        // Registro de vendedor → crear contacto
+        // Reembolso → nota de crédito
+        add_action( 'woocommerce_order_refunded', [ $instance, 'on_order_refunded' ], 20, 2 );
+
+        // Registro de vendedor → contacto Alegra (tipo proveedor)
         add_action( 'ltms_vendor_registered', [ $instance, 'on_vendor_registered' ], 20, 2 );
 
-        // Payout aprobado → registrar en Alegra
+        // KYC aprobado → actualizar tipo de contacto si ya existe
+        add_action( 'ltms_vendor_approved', [ $instance, 'on_vendor_approved' ], 20 );
+
+        // Payout completado → registrar egreso en Alegra
         add_action( 'ltms_payout_completed', [ $instance, 'on_payout_completed' ], 20, 2 );
 
-        // Nota de crédito automática cuando WooCommerce procesa un reembolso
-        add_action( 'woocommerce_order_refunded', [ $instance, 'on_order_refunded' ], 20, 2 );
+        // Cron de reintentos para facturas fallidas
+        add_action( 'ltms_alegra_retry_failed', [ $instance, 'retry_failed_invoices' ] );
     }
 
     // ── Handlers de eventos ───────────────────────────────────────
 
     /**
-     * Cuando un pedido se completa: crear factura en Alegra para el comprador.
-     *
-     * @param int $order_id ID del pedido WooCommerce.
-     * @return void
+     * Pedido completado/processing → crear factura en Alegra.
      */
     public function on_order_completed( int $order_id ): void {
         $order = wc_get_order( $order_id );
@@ -85,7 +93,7 @@ final class LTMS_Alegra_Sync {
             return;
         }
 
-        // Evitar crear factura duplicada
+        // Idempotencia — evitar factura duplicada
         if ( $order->get_meta( '_ltms_alegra_invoice_id' ) ) {
             return;
         }
@@ -94,141 +102,245 @@ final class LTMS_Alegra_Sync {
             $result = $this->create_invoice_for_order( $order );
 
             if ( ! empty( $result['id'] ) ) {
-                $order->update_meta_data( '_ltms_alegra_invoice_id', (int) $result['id'] );
-                $order->update_meta_data( '_ltms_alegra_invoice_status', $result['status'] ?? 'open' );
+                $invoice_id     = (int) $result['id'];
+                $invoice_number = $result['numberTemplate']['fullNumber'] ?? '#' . $invoice_id;
+                $invoice_status = $result['status'] ?? 'open';
 
-                $invoice_number = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
-                $order->update_meta_data( '_ltms_alegra_invoice_number', $invoice_number );
-
+                $order->update_meta_data( '_ltms_alegra_invoice_id',     $invoice_id );
+                $order->update_meta_data( '_ltms_alegra_invoice_status',  $invoice_status );
+                $order->update_meta_data( '_ltms_alegra_invoice_number',  $invoice_number );
+                $order->update_meta_data( '_ltms_alegra_synced_at',       current_time( 'mysql' ) );
                 $order->add_order_note(
-                    sprintf(
-                        /* translators: %s: número de factura Alegra */
-                        __( 'Factura Alegra creada: %s', 'ltms' ),
-                        $invoice_number
-                    )
+                    sprintf( __( '📄 Factura Alegra creada: %s', 'ltms' ), $invoice_number )
                 );
                 $order->save();
 
                 $this->log_info(
                     'alegra_invoice_created',
-                    sprintf( 'Factura Alegra #%d (%s) para pedido WC #%d', $result['id'], $invoice_number, $order_id ),
-                    [ 'alegra_invoice_id' => $result['id'], 'wc_order_id' => $order_id ]
+                    sprintf( 'Factura Alegra #%d (%s) para pedido WC #%d', $invoice_id, $invoice_number, $order_id )
                 );
 
-                // Enviar factura por email si está configurado
-                if ( LTMS_Core_Config::get( 'ltms_alegra_send_invoice_email', 'no' ) === 'yes' ) {
-                    $this->maybe_send_invoice_email( (int) $result['id'], $order );
+                // ── A. Registrar pago automático si está configurado ─────────
+                if ( LTMS_Core_Config::get( 'ltms_alegra_auto_payment', 'no' ) === 'yes' ) {
+                    $this->register_invoice_payment( $invoice_id, $order );
                 }
+
+                // ── B. Enviar factura por email ──────────────────────────────
+                if ( LTMS_Core_Config::get( 'ltms_alegra_send_invoice_email', 'no' ) === 'yes' ) {
+                    $this->maybe_send_invoice_email( $invoice_id, $order );
+                }
+
+                // ── C. Registrar comisión de la plataforma como ingreso ──────
+                $this->register_platform_commission( $invoice_id, $order );
             }
         } catch ( \Throwable $e ) {
             $this->log_error(
                 'alegra_invoice_failed',
-                sprintf( 'Error creando factura Alegra para pedido #%d: %s', $order_id, $e->getMessage() ),
-                [ 'wc_order_id' => $order_id, 'error' => $e->getMessage() ]
+                sprintf( 'Error creando factura Alegra para pedido #%d: %s', $order_id, $e->getMessage() )
             );
-
-            // No interrumpir el flujo del pedido por un fallo de Alegra
+            // Marcar para reintento vía cron
+            $order->update_meta_data( '_ltms_alegra_invoice_failed', 1 );
+            $order->update_meta_data( '_ltms_alegra_invoice_error',  $e->getMessage() );
+            $order->save();
         }
     }
 
     /**
-     * Cuando se registra un vendedor: crear contacto en Alegra.
-     *
-     * @param int    $vendor_id    ID del vendedor.
-     * @param string $referral_code Código de referido (no usado aquí).
-     * @return void
+     * Reembolso WooCommerce → nota de crédito en Alegra.
+     */
+    public function on_order_refunded( int $order_id, int $refund_id ): void {
+        // AUDIT-FIX A1: usar HPOS-compatible get_meta, no get_post_meta
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            return;
+        }
+
+        $alegra_invoice_id = (int) $order->get_meta( '_ltms_alegra_invoice_id' );
+        if ( ! $alegra_invoice_id ) {
+            $this->log_info( 'alegra_sync', "Reembolso #{$refund_id}: sin factura Alegra para orden #{$order_id}" );
+            return;
+        }
+
+        // Idempotencia: si ya existe nota de crédito para este reembolso, omitir
+        if ( $order->get_meta( '_ltms_alegra_credit_note_' . $refund_id ) ) {
+            return;
+        }
+
+        $refund = wc_get_order( $refund_id );
+        if ( ! $refund ) {
+            return;
+        }
+
+        $refund_amount = abs( (float) $refund->get_amount() );
+        if ( $refund_amount <= 0 ) {
+            return;
+        }
+
+        // AUDIT-FIX A2: usar LTMS_Api_Factory en vez de new LTMS_Api_Alegra() directamente
+        try {
+            $client = LTMS_Api_Factory::get( 'alegra' );
+        } catch ( \RuntimeException $e ) {
+            $this->log_warning( 'alegra_sync', 'Alegra no configurado — nota crédito omitida: ' . $e->getMessage() );
+            return;
+        }
+
+        try {
+            // AUDIT-FIX A3: incluir items reales del reembolso en la nota de crédito
+            $credit_items = $this->prepare_refund_items( $refund, $order );
+
+            $payload = [
+                'invoice_id'   => $alegra_invoice_id,
+                'amount'       => $refund_amount,
+                'observations' => sprintf(
+                    __( 'Reembolso WC #%d — Orden #%d — %s', 'ltms' ),
+                    $refund_id,
+                    $order_id,
+                    $refund->get_reason() ?: __( 'Sin motivo especificado', 'ltms' )
+                ),
+                'items'        => $credit_items,
+            ];
+
+            $result = $client->create_credit_note( $payload );
+
+            if ( ! empty( $result['id'] ) ) {
+                // Guardar por refund_id para idempotencia
+                $order->update_meta_data( '_ltms_alegra_credit_note_' . $refund_id, $result['id'] );
+                // También mantener el último (backward compat)
+                $order->update_meta_data( '_ltms_alegra_credit_note_id', $result['id'] );
+                $order->add_order_note(
+                    sprintf( __( '📝 Nota de crédito Alegra #%d creada para reembolso #%d', 'ltms' ), $result['id'], $refund_id )
+                );
+                $order->save();
+                $this->log_info( 'alegra_sync', "Nota crédito #{$result['id']} para reembolso #{$refund_id}" );
+            }
+        } catch ( \Throwable $e ) {
+            $this->log_error( 'alegra_sync', 'Error nota de crédito: ' . $e->getMessage() );
+        }
+    }
+
+    /**
+     * Registro de vendedor → crear contacto tipo 'provider' en Alegra.
      */
     public function on_vendor_registered( int $vendor_id, string $referral_code = '' ): void {
-        // Si ya tiene ID en Alegra, no duplicar
         if ( get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true ) ) {
             return;
         }
 
         try {
             $contact_id = $this->sync_user_as_contact( $vendor_id, 'provider' );
-
             if ( $contact_id ) {
-                $this->log_info(
-                    'alegra_vendor_contact_created',
-                    sprintf( 'Contacto Alegra #%d creado para vendedor #%d', $contact_id, $vendor_id )
-                );
+                $this->log_info( 'alegra_vendor_contact_created',
+                    sprintf( 'Contacto Alegra #%d creado para vendedor #%d', $contact_id, $vendor_id ) );
             }
         } catch ( \Throwable $e ) {
-            $this->log_warning(
-                'alegra_vendor_contact_failed',
-                sprintf( 'No se pudo crear contacto Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() )
-            );
+            $this->log_warning( 'alegra_vendor_contact_failed',
+                sprintf( 'No se pudo crear contacto Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
         }
     }
 
     /**
-     * Cuando se completa un payout: registrar pago en Alegra.
-     *
-     * @param int   $vendor_id  ID del vendedor.
-     * @param float $net_amount Monto neto del retiro.
-     * @return void
+     * KYC aprobado → asegurar contacto actualizado con régimen correcto.
+     * AUDIT-FIX A4: vendedores con RUT/NIT deben sincronizarse como COMMON_REGIME.
+     */
+    public function on_vendor_approved( int $vendor_id ): void {
+        $existing_id = (int) get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true );
+        $nit         = get_user_meta( $vendor_id, 'ltms_nit', true )
+                    ?: get_user_meta( $vendor_id, 'ltms_document_number', true );
+
+        // Si tiene NIT, es contribuyente del régimen común
+        if ( $nit && $existing_id ) {
+            try {
+                $client = LTMS_Api_Factory::get( 'alegra' );
+                $client->perform_request( 'PUT', '/contacts/' . $existing_id, [
+                    'regime'         => 'COMMON_REGIME',
+                    'identification' => $nit,
+                    'identificationObject' => [
+                        'type'   => 'NIT',
+                        'number' => preg_replace( '/\D/', '', $nit ),
+                        'dv'     => null,
+                    ],
+                ] );
+            } catch ( \Throwable $e ) {
+                $this->log_warning( 'alegra_vendor_regime_update', $e->getMessage() );
+            }
+        } elseif ( ! $existing_id ) {
+            $this->on_vendor_registered( $vendor_id );
+        }
+    }
+
+    /**
+     * Payout completado → registrar egreso en Alegra.
+     * AUDIT-FIX A5: incluir el monto del pago en el payload.
      */
     public function on_payout_completed( int $vendor_id, float $net_amount ): void {
-        $bank_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
-        if ( ! $bank_account_id ) {
-            return; // Sin cuenta bancaria configurada, omitir
-        }
-
+        $bank_account_id   = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
         $alegra_contact_id = (int) get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true );
-        if ( ! $alegra_contact_id ) {
+
+        if ( ! $bank_account_id || ! $alegra_contact_id || $net_amount <= 0 ) {
             return;
         }
 
         try {
-            $client = LTMS_Api_Factory::get( 'alegra' );
-
+            $client  = LTMS_Api_Factory::get( 'alegra' );
             $payment = $client->create_payment( [
                 'date'            => current_time( 'Y-m-d' ),
                 'bank_account_id' => $bank_account_id,
                 'payment_method'  => 'transfer',
                 'type'            => 'out',
                 'client_id'       => $alegra_contact_id,
+                'amount'          => round( $net_amount, 2 ),
                 'observations'    => sprintf(
-                    /* translators: %d: vendor ID */
-                    __( 'Pago de comisiones a vendedor #%d — LTMS', 'ltms' ),
-                    $vendor_id
+                    __( 'Pago comisiones a vendedor #%d — $%s COP — LTMS', 'ltms' ),
+                    $vendor_id,
+                    number_format( $net_amount, 0, '.', '.' )
                 ),
             ] );
 
-            $this->log_info(
-                'alegra_payout_registered',
-                sprintf( 'Pago Alegra #%d registrado para vendedor #%d', $payment['id'] ?? 0, $vendor_id ),
-                [ 'alegra_payment_id' => $payment['id'] ?? 0, 'vendor_id' => $vendor_id, 'amount' => $net_amount ]
-            );
+            $this->log_info( 'alegra_payout_registered',
+                sprintf( 'Egreso Alegra #%d — vendedor #%d — $%s', $payment['id'] ?? 0, $vendor_id, $net_amount ) );
         } catch ( \Throwable $e ) {
-            $this->log_warning(
-                'alegra_payout_failed',
-                sprintf( 'No se pudo registrar pago Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() )
-            );
+            $this->log_warning( 'alegra_payout_failed',
+                sprintf( 'No se pudo registrar egreso Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
         }
     }
 
-    // ── Lógica de negocio ─────────────────────────────────────────
+    /**
+     * Reintenta crear facturas que fallaron (ejecutado por cron ltms_alegra_retry_failed).
+     * AUDIT-FIX A6: mecanismo de reintento para facturas no creadas.
+     */
+    public function retry_failed_invoices(): void {
+        $failed_orders = wc_get_orders( [
+            'meta_key'     => '_ltms_alegra_invoice_failed',
+            'meta_value'   => '1',
+            'meta_compare' => '=',
+            'limit'        => 20,
+            'status'       => [ 'wc-completed', 'wc-processing' ],
+        ] );
+
+        foreach ( $failed_orders as $order ) {
+            // Limpiar flag antes de reintentar para evitar loop si falla de nuevo
+            $order->delete_meta_data( '_ltms_alegra_invoice_failed' );
+            $order->save();
+            $this->on_order_completed( $order->get_id() );
+        }
+    }
+
+    // ── Lógica de negocio principal ───────────────────────────────
 
     /**
      * Crea la factura en Alegra para un pedido WooCommerce.
-     *
-     * Flujo:
-     * 1. Obtener o crear el contacto Alegra del comprador
-     * 2. Para cada line item: obtener o crear el item Alegra
-     * 3. Crear la factura con esos datos
-     *
-     * @param \WC_Order $order Pedido WooCommerce.
-     * @return array Respuesta de Alegra con la factura creada.
-     * @throws \RuntimeException Si no se puede crear la factura.
      */
     public function create_invoice_for_order( \WC_Order $order ): array {
         $client = LTMS_Api_Factory::get( 'alegra' );
 
-        // 1. Obtener o crear contacto para el comprador
         $alegra_contact_id = $this->get_or_create_buyer_contact( $order, $client );
 
-        // 2. Preparar items de la factura
+        if ( ! $alegra_contact_id ) {
+            throw new \RuntimeException(
+                sprintf( '[AlegraSync] No se pudo obtener/crear contacto para pedido #%d', $order->get_id() )
+            );
+        }
+
         $invoice_items = $this->prepare_invoice_items( $order, $client );
 
         if ( empty( $invoice_items ) ) {
@@ -237,41 +349,40 @@ final class LTMS_Alegra_Sync {
             );
         }
 
-        // 3. Preparar datos de la factura
         $invoice_data = [
-            'date'       => current_time( 'Y-m-d' ),
-            'due_date'   => current_time( 'Y-m-d' ),
-            'client_id'  => $alegra_contact_id,
-            'items'      => $invoice_items,
+            'date'         => $order->get_date_paid()
+                ? $order->get_date_paid()->format( 'Y-m-d' )
+                : current_time( 'Y-m-d' ),
+            'due_date'     => current_time( 'Y-m-d' ),
+            'client_id'    => $alegra_contact_id,
+            'items'        => $invoice_items,
             'observations' => sprintf(
-                /* translators: %s: número de pedido */
-                __( 'Pedido WooCommerce #%s — LT Marketplace Suite', 'ltms' ),
+                __( 'Pedido WooCommerce #%s — Lo Tengo Marketplace', 'ltms' ),
                 $order->get_order_number()
             ),
         ];
 
-        // Numeración por defecto si está configurada
+        // Numeración configurada
         $template_id = (int) LTMS_Core_Config::get( 'ltms_alegra_default_number_template', 0 );
         if ( $template_id ) {
             $invoice_data['number_template_id'] = $template_id;
         }
 
-        // Moneda si no es COP
+        // Moneda multi-currency
         $currency = $order->get_currency();
         if ( $currency && $currency !== 'COP' ) {
             $invoice_data['currency']      = $currency;
-            $invoice_data['exchange_rate'] = 1; // Ajustar si hay multi-currency real
+            $invoice_data['exchange_rate'] = (float) LTMS_Core_Config::get( 'ltms_alegra_exchange_rate', 1 );
         }
+
+        // AUDIT-FIX A7: incluir referencia externa (número de pedido WC)
+        $invoice_data['anotation'] = 'WC-' . $order->get_order_number();
 
         return $client->create_invoice( $invoice_data );
     }
 
     /**
      * Sincroniza un usuario de WordPress como contacto en Alegra.
-     *
-     * @param int    $user_id ID del usuario WP.
-     * @param string $type    Tipo de contacto: 'client' o 'provider'.
-     * @return int ID del contacto en Alegra, 0 si falla.
      */
     public function sync_user_as_contact( int $user_id, string $type = 'client' ): int {
         $user = get_userdata( $user_id );
@@ -280,56 +391,60 @@ final class LTMS_Alegra_Sync {
         }
 
         try {
-            $client = LTMS_Api_Factory::get( 'alegra' );
-
-            $sync_full_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
-            $sync_words     = explode( ' ', $sync_full_name );
-            $sync_fn        = $sync_words[0] ?? $sync_full_name;
-            $sync_ln        = count($sync_words) > 1 ? implode( ' ', array_slice($sync_words, 1) ) : $sync_fn;
+            $client         = LTMS_Api_Factory::get( 'alegra' );
+            $full_name      = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+            $name_words     = explode( ' ', $full_name );
+            $fn             = $name_words[0] ?? $full_name;
+            $ln             = count( $name_words ) > 1 ? implode( ' ', array_slice( $name_words, 1 ) ) : $fn;
+            $nit            = get_user_meta( $user_id, 'ltms_nit', true )
+                           ?: get_user_meta( $user_id, 'ltms_document_number', true )
+                           ?: '';
+            // AUDIT-FIX A8: régimen correcto según si tiene NIT/RUT
+            $regime         = $nit ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME';
+            $id_type        = $nit ? 'NIT' : 'CC';
 
             $contact_data = [
-                'name'           => $sync_full_name,
+                'name'           => $full_name,
                 'nameObject'     => [
-                    'firstName'      => $sync_fn,
+                    'firstName'      => $fn,
                     'secondName'     => null,
-                    'lastName'       => $sync_ln,
+                    'lastName'       => $ln,
                     'secondLastName' => null,
                 ],
                 'email'          => $user->user_email,
-                'identification' => get_user_meta( $user_id, 'ltms_nit', true )
-                                 ?: get_user_meta( $user_id, 'ltms_document_number', true )
-                                 ?: '',
+                'identification' => $nit,
+                'identificationObject' => $nit ? [
+                    'type'   => $id_type,
+                    'number' => preg_replace( '/\D/', '', $nit ),
+                    'dv'     => null,
+                ] : null,
                 'phone'          => get_user_meta( $user_id, 'ltms_phone', true )
                                  ?: get_user_meta( $user_id, 'billing_phone', true )
                                  ?: '',
                 'type'           => [ $type ],
                 'kindOfPerson'   => 'PERSON_ENTITY',
-                'regime'         => 'SIMPLIFIED_REGIME',
+                'regime'         => $regime,
             ];
 
-            $contact = $client->get_or_create_contact( $contact_data );
+            $contact    = $client->get_or_create_contact( $contact_data );
             $contact_id = (int) ( $contact['id'] ?? 0 );
 
             if ( $contact_id ) {
-                update_user_meta( $user_id, '_ltms_alegra_contact_id', $contact_id );
+                update_user_meta( $user_id, '_ltms_alegra_contact_id',   $contact_id );
+                update_user_meta( $user_id, '_ltms_alegra_contact_type', $type );
             }
 
             return $contact_id;
 
         } catch ( \Throwable $e ) {
-            $this->log_warning(
-                'alegra_contact_sync_error',
-                sprintf( 'Error sincronizando usuario #%d con Alegra: %s', $user_id, $e->getMessage() )
-            );
+            $this->log_warning( 'alegra_contact_sync_error',
+                sprintf( 'Error sincronizando usuario #%d: %s', $user_id, $e->getMessage() ) );
             return 0;
         }
     }
 
     /**
      * Sincroniza un producto WooCommerce como item en Alegra.
-     *
-     * @param int $product_id ID del producto WC.
-     * @return int ID del item en Alegra, 0 si falla.
      */
     public function sync_product_as_item( int $product_id ): int {
         $product = wc_get_product( $product_id );
@@ -337,24 +452,20 @@ final class LTMS_Alegra_Sync {
             return 0;
         }
 
-        // Verificar si ya fue sincronizado
         $existing_id = (int) get_post_meta( $product_id, '_ltms_alegra_item_id', true );
         if ( $existing_id ) {
             return $existing_id;
         }
 
         try {
-            $client = LTMS_Api_Factory::get( 'alegra' );
-
-            $item_data = [
+            $client  = LTMS_Api_Factory::get( 'alegra' );
+            $item    = $client->create_item( [
                 'name'        => $product->get_name(),
                 'price'       => (float) $product->get_price(),
                 'type'        => $product->is_virtual() ? 'service' : 'product',
                 'description' => wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ),
-            ];
-
-            $item       = $client->create_item( $item_data );
-            $item_id    = (int) ( $item['id'] ?? 0 );
+            ] );
+            $item_id = (int) ( $item['id'] ?? 0 );
 
             if ( $item_id ) {
                 update_post_meta( $product_id, '_ltms_alegra_item_id', $item_id );
@@ -363,10 +474,8 @@ final class LTMS_Alegra_Sync {
             return $item_id;
 
         } catch ( \Throwable $e ) {
-            $this->log_warning(
-                'alegra_item_sync_error',
-                sprintf( 'Error sincronizando producto #%d con Alegra: %s', $product_id, $e->getMessage() )
-            );
+            $this->log_warning( 'alegra_item_sync_error',
+                sprintf( 'Error sincronizando producto #%d: %s', $product_id, $e->getMessage() ) );
             return 0;
         }
     }
@@ -374,16 +483,11 @@ final class LTMS_Alegra_Sync {
     // ── Helpers privados ──────────────────────────────────────────
 
     /**
-     * Obtiene o crea el contacto Alegra del comprador del pedido.
-     *
-     * @param \WC_Order      $order  Pedido WC.
-     * @param \LTMS_Api_Alegra $client Cliente Alegra.
-     * @return int ID del contacto en Alegra.
+     * Obtiene o crea el contacto Alegra del comprador.
      */
     private function get_or_create_buyer_contact( \WC_Order $order, LTMS_Api_Alegra $client ): int {
         $customer_id = $order->get_customer_id();
 
-        // Verificar si el usuario ya tiene ID Alegra
         if ( $customer_id ) {
             $cached = (int) get_user_meta( $customer_id, '_ltms_alegra_contact_id', true );
             if ( $cached ) {
@@ -391,15 +495,18 @@ final class LTMS_Alegra_Sync {
             }
         }
 
-        // Construir datos del contacto desde el billing del pedido
         $first_name = $order->get_billing_first_name() ?: 'Cliente';
         $last_name  = $order->get_billing_last_name()  ?: 'Final';
         $full_name  = trim( "$first_name $last_name" ) ?: $order->get_billing_company() ?: 'Cliente Final';
+        $name_words = explode( ' ', $full_name );
+        $fn         = $name_words[0] ?? $full_name;
+        $ln         = count( $name_words ) > 1 ? implode( ' ', array_slice( $name_words, 1 ) ) : $fn;
 
-        // Descomponer nombre en partes para nameObject (obligatorio en Alegra Colombia)
-        $name_words  = explode( ' ', $full_name );
-        $fn          = $name_words[0] ?? $full_name;
-        $ln          = count($name_words) > 1 ? implode( ' ', array_slice($name_words, 1) ) : $fn;
+        // AUDIT-FIX A9: leer identificación del pedido con múltiples meta keys
+        $identification = $order->get_meta( '_billing_identification' )
+                       ?: $order->get_meta( '_billing_nit' )
+                       ?: $order->get_meta( '_billing_document' )
+                       ?: '';
 
         $contact_data = [
             'name'           => $full_name,
@@ -411,12 +518,10 @@ final class LTMS_Alegra_Sync {
             ],
             'email'          => $order->get_billing_email(),
             'phone'          => $order->get_billing_phone(),
-            'identification' => $order->get_meta( '_billing_identification' )
-                             ?: $order->get_meta( '_billing_nit' )
-                             ?: '',
+            'identification' => $identification,
             'type'           => [ 'client' ],
             'kindOfPerson'   => 'PERSON_ENTITY',
-            'regime'         => 'SIMPLIFIED_REGIME',
+            'regime'         => $identification ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME',
             'address'        => [
                 'address' => $order->get_billing_address_1(),
                 'city'    => $order->get_billing_city(),
@@ -426,7 +531,6 @@ final class LTMS_Alegra_Sync {
         $contact    = $client->get_or_create_contact( $contact_data );
         $contact_id = (int) ( $contact['id'] ?? 0 );
 
-        // Guardar para futuras facturas del mismo cliente
         if ( $customer_id && $contact_id ) {
             update_user_meta( $customer_id, '_ltms_alegra_contact_id', $contact_id );
         }
@@ -435,31 +539,30 @@ final class LTMS_Alegra_Sync {
     }
 
     /**
-     * Prepara el array de items para la factura Alegra a partir de los items del pedido.
-     *
-     * Intenta usar el ID de Alegra guardado en cada producto. Si no existe,
-     * sincroniza el producto primero (lazy sync).
-     *
-     * @param \WC_Order       $order  Pedido WC.
-     * @param \LTMS_Api_Alegra $client Cliente Alegra.
-     * @return array Items formateados para la API de Alegra.
+     * Prepara los items de la factura con IVA y retención correctos.
+     * AUDIT-FIX A10: IVA mapeado por tasa real + envío como servicio con IVA.
      */
     private function prepare_invoice_items( \WC_Order $order, LTMS_Api_Alegra $client ): array {
-        $items = [];
+        $items   = [];
+        $country = strtoupper( LTMS_Core_Config::get_country() );
+        $tax_map = $country === 'MX' ? self::TAX_MAP_MX : self::TAX_MAP_CO;
 
         foreach ( $order->get_items() as $item ) {
             /** @var \WC_Order_Item_Product $item */
-            $product_id = $item->get_product_id();
+            $product_id     = $item->get_product_id();
             $alegra_item_id = (int) get_post_meta( $product_id, '_ltms_alegra_item_id', true );
 
-            // Sincronización lazy: si el producto no tiene ID Alegra, crearlo ahora
             if ( ! $alegra_item_id && $product_id ) {
                 $alegra_item_id = $this->sync_product_as_item( $product_id );
             }
 
+            $qty      = max( 1, $item->get_quantity() );
+            $subtotal = (float) $item->get_subtotal();
+            $unit_price = round( $subtotal / $qty, 4 );
+
             $entry = [
-                'quantity' => $item->get_quantity(),
-                'price'    => (float) $item->get_subtotal() / max( 1, $item->get_quantity() ),
+                'quantity' => $qty,
+                'price'    => $unit_price,
                 'name'     => $item->get_name(),
             ];
 
@@ -467,38 +570,58 @@ final class LTMS_Alegra_Sync {
                 $entry['alegra_id'] = $alegra_item_id;
             }
 
-            // ── IVA y retenciones ────────────────────────────────────────────
-            // Calcular IVA del ítem basado en los impuestos reales de WooCommerce
-            $item_taxes   = $item->get_taxes();
-            $total_tax    = array_sum( $item_taxes['total'] ?? [] );
-            $subtotal     = (float) $item->get_subtotal();
+            // ── IVA real del item ──────────────────────────────────
+            $item_taxes = $item->get_taxes();
+            $total_tax  = array_sum( $item_taxes['total'] ?? [] );
 
-            if ( $subtotal > 0 && $total_tax > 0 ) {
-                $tax_rate_pct = round( ( $total_tax / $subtotal ) * 100, 2 );
+            if ( $subtotal > 0 && $total_tax >= 0 ) {
+                $tax_rate_pct = (int) round( ( $total_tax / $subtotal ) * 100 );
 
-                // Mapear tasa a código de impuesto Alegra Colombia
-                // IVA Colombia: 0%, 5%, 19% son las tasas estándar DIAN
-                if ( $tax_rate_pct >= 18 ) {
-                    $alegra_tax_id = 3; // IVA 19%
-                } elseif ( $tax_rate_pct >= 4 ) {
-                    $alegra_tax_id = 2; // IVA 5%
-                } else {
-                    $alegra_tax_id = 1; // IVA 0% (exento)
+                // Buscar la tasa más cercana en el mapa
+                $alegra_tax_id = end( $tax_map ); // default: último (exento)
+                foreach ( $tax_map as $rate => $tax_id ) {
+                    if ( $tax_rate_pct >= $rate ) {
+                        $alegra_tax_id = $tax_id;
+                        break;
+                    }
                 }
-
                 $entry['tax'] = [ [ 'id' => $alegra_tax_id ] ];
             }
-            // ────────────────────────────────────────────────────────────────
+
+            // ── Retención en la fuente (Colombia) ──────────────────
+            // AUDIT-FIX A11: agregar retefuente si aplica
+            $retefuente = $item->get_meta( '_retefuente_amount' );
+            if ( $retefuente && (float) $retefuente > 0 ) {
+                $retefuente_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_retefuente_tax_id', 0 );
+                if ( $retefuente_tax_id ) {
+                    $entry['tax'][] = [ 'id' => $retefuente_tax_id ];
+                }
+            }
 
             $items[] = $entry;
         }
 
-        // Agregar costos de envío como ítem de servicio
+        // ── Envío como item de servicio ────────────────────────────
         $shipping_total = (float) $order->get_shipping_total();
         if ( $shipping_total > 0 ) {
-            $items[] = [
-                'name'     => __( 'Envío', 'ltms' ),
+            $shipping_item = [
+                'name'     => __( 'Costo de envío', 'ltms' ),
                 'price'    => $shipping_total,
+                'quantity' => 1,
+            ];
+            // IVA de envío (Colombia: exento por defecto)
+            $shipping_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_shipping_tax_id', $tax_map[0] ?? 1 );
+            $shipping_item['tax'] = [ [ 'id' => $shipping_tax_id ] ];
+            $items[] = $shipping_item;
+        }
+
+        // ── Descuentos del pedido ──────────────────────────────────
+        // AUDIT-FIX A12: incluir descuentos como item negativo
+        $discount_total = (float) $order->get_discount_total();
+        if ( $discount_total > 0 ) {
+            $items[] = [
+                'name'     => __( 'Descuento aplicado', 'ltms' ),
+                'price'    => -abs( $discount_total ),
                 'quantity' => 1,
             ];
         }
@@ -507,72 +630,139 @@ final class LTMS_Alegra_Sync {
     }
 
     /**
-     * Envía la factura Alegra por email al comprador del pedido.
-     *
-     * @param int       $alegra_invoice_id ID de la factura en Alegra.
-     * @param \WC_Order $order             Pedido WC.
-     * @return void
+     * Prepara items de la nota de crédito desde el reembolso.
+     * AUDIT-FIX A3 (implementación): items reales del reembolso.
      */
+    private function prepare_refund_items( \WC_Order_Refund $refund, \WC_Order $order ): array {
+        $items = [];
+
+        foreach ( $refund->get_items() as $item ) {
+            $qty    = abs( $item->get_quantity() );
+            $amount = abs( (float) $item->get_subtotal() );
+            if ( $amount <= 0 || $qty <= 0 ) {
+                continue;
+            }
+            $items[] = [
+                'name'     => $item->get_name() ?: __( 'Producto devuelto', 'ltms' ),
+                'price'    => round( $amount / $qty, 4 ),
+                'quantity' => $qty,
+            ];
+        }
+
+        // Si el reembolso no tiene items detallados, usar monto global
+        if ( empty( $items ) ) {
+            $items[] = [
+                'name'     => sprintf( __( 'Reembolso Orden #%d', 'ltms' ), $order->get_id() ),
+                'price'    => abs( (float) $refund->get_amount() ),
+                'quantity' => 1,
+            ];
+        }
+
+        return $items;
+    }
+
     /**
-     * Crea una nota de crédito en Alegra cuando WooCommerce procesa un reembolso.
-     *
-     * @param int $order_id  ID del pedido original.
-     * @param int $refund_id ID del reembolso WC.
-     * @return void
+     * Registra el pago de la factura en Alegra (tipo 'in').
+     * AUDIT-FIX A13: pago inmediato al crear factura cuando está configurado.
      */
-    public function on_order_refunded( int $order_id, int $refund_id ): void {
-        $alegra_invoice_id = (int) get_post_meta( $order_id, '_ltms_alegra_invoice_id', true );
-        if ( ! $alegra_invoice_id ) {
-            LTMS_Core_Logger::info( 'alegra_sync', "Reembolso #{$refund_id}: sin factura Alegra para orden #{$order_id}" );
+    private function register_invoice_payment( int $invoice_id, \WC_Order $order ): void {
+        $bank_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
+        if ( ! $bank_account_id ) {
             return;
         }
 
-        $refund = wc_get_order( $refund_id );
-        if ( ! $refund ) {
-            return;
-        }
+        // Mapear método de pago WC a Alegra
+        $wc_method = $order->get_payment_method();
+        $method_map = [
+            'stripe'  => 'credit-card',
+            'openpay' => 'credit-card',
+            'addi'    => 'credit-card',
+            'pse'     => 'transfer',
+            'bacs'    => 'transfer',
+            'cheque'  => 'check',
+            'cod'     => 'cash',
+        ];
+        $alegra_method = $method_map[ $wc_method ] ?? 'transfer';
 
         try {
-            $client = new LTMS_Api_Alegra();
-        } catch ( \RuntimeException $e ) {
-            LTMS_Core_Logger::warning( 'alegra_sync', 'Alegra no configurado — nota crédito omitida: ' . $e->getMessage() );
-            return;
-        }
+            $client  = LTMS_Api_Factory::get( 'alegra' );
+            $payment = $client->create_payment( [
+                'date'            => current_time( 'Y-m-d' ),
+                'bank_account_id' => $bank_account_id,
+                'payment_method'  => $alegra_method,
+                'type'            => 'in',
+                'invoice_id'      => $invoice_id,
+                'amount'          => (float) $order->get_total(),
+                'observations'    => sprintf(
+                    __( 'Pago pedido WC #%s — método: %s', 'ltms' ),
+                    $order->get_order_number(),
+                    $order->get_payment_method_title()
+                ),
+            ] );
 
-        try {
-            $result = $client->create_credit_note([
-                'invoice_id'   => $alegra_invoice_id,
-                'amount'       => abs( (float) $refund->get_amount() ),
-                'observations' => sprintf( 'Reembolso WC #%d — Orden #%d', $refund_id, $order_id ),
-            ]);
-            if ( ! empty( $result['id'] ) ) {
-                update_post_meta( $order_id, '_ltms_alegra_credit_note_id', $result['id'] );
-                LTMS_Core_Logger::info( 'alegra_sync', "Nota crédito #{$result['id']} para reembolso #{$refund_id}" );
+            if ( ! empty( $payment['id'] ) ) {
+                $order->update_meta_data( '_ltms_alegra_payment_id', $payment['id'] );
+                $order->save();
+                $this->log_info( 'alegra_payment_registered',
+                    sprintf( 'Pago Alegra #%d para factura #%d (pedido #%d)', $payment['id'], $invoice_id, $order->get_id() ) );
             }
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::error( 'alegra_sync', 'Error nota de crédito: ' . $e->getMessage() );
+            $this->log_warning( 'alegra_payment_failed',
+                sprintf( 'No se pudo registrar pago Alegra para pedido #%d: %s', $order->get_id(), $e->getMessage() ) );
         }
     }
 
+    /**
+     * Registra la comisión de la plataforma como ingreso separado en Alegra.
+     * AUDIT-FIX A14: comisión del marketplace = ingreso real del negocio.
+     */
+    private function register_platform_commission( int $invoice_id, \WC_Order $order ): void {
+        $commission_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_commission_account_id', 0 );
+        if ( ! $commission_account_id ) {
+            return;
+        }
+
+        $commission = (float) $order->get_meta( '_ltms_platform_fee' );
+        if ( $commission <= 0 ) {
+            return;
+        }
+
+        try {
+            $client = LTMS_Api_Factory::get( 'alegra' );
+            $client->create_payment( [
+                'date'            => current_time( 'Y-m-d' ),
+                'bank_account_id' => $commission_account_id,
+                'payment_method'  => 'transfer',
+                'type'            => 'in',
+                'amount'          => $commission,
+                'observations'    => sprintf(
+                    __( 'Comisión plataforma — Pedido WC #%s (%.1f%%)', 'ltms' ),
+                    $order->get_order_number(),
+                    (float) LTMS_Core_Config::get( 'ltms_platform_fee_pct', 0 )
+                ),
+            ] );
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'alegra_commission_failed', $e->getMessage() );
+        }
+    }
+
+    /**
+     * Envía factura por email al comprador.
+     */
     private function maybe_send_invoice_email( int $alegra_invoice_id, \WC_Order $order ): void {
-    $email = $order->get_billing_email();
-    if ( ! $email ) {
-        return;
-    }
+        $email = $order->get_billing_email();
+        if ( ! $email ) {
+            return;
+        }
 
-    try {
-        $client = LTMS_Api_Factory::get( 'alegra' );
-        $client->send_invoice_email( $alegra_invoice_id, [ $email ] );
-
-        $this->log_info(
-            'alegra_invoice_email_sent',
-            sprintf( 'Factura Alegra #%d enviada por email a %s', $alegra_invoice_id, $email )
-        );
-    } catch ( \Throwable $e ) {
-        $this->log_warning(
-            'alegra_invoice_email_failed',
-            sprintf( 'No se pudo enviar email de factura Alegra #%d: %s', $alegra_invoice_id, $e->getMessage() )
-        );
-    }
+        try {
+            $client = LTMS_Api_Factory::get( 'alegra' );
+            $client->send_invoice_email( $alegra_invoice_id, [ $email ] );
+            $this->log_info( 'alegra_invoice_email_sent',
+                sprintf( 'Factura Alegra #%d enviada a %s', $alegra_invoice_id, $email ) );
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'alegra_invoice_email_failed',
+                sprintf( 'No se pudo enviar email factura Alegra #%d: %s', $alegra_invoice_id, $e->getMessage() ) );
+        }
     }
 }

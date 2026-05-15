@@ -539,16 +539,21 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @return array Respuesta de la API con el ID de la nota de crédito.
      */
     public function create_credit_note( array $data ): array {
+        // Usar items detallados si vienen; si no, item genérico con monto total
+        if ( ! empty( $data['items'] ) ) {
+            $items = $data['items'];
+        } else {
+            $items = [ [
+                'name'     => $data['observations'] ?? __( 'Nota de crédito', 'ltms' ),
+                'price'    => (float) ( $data['amount'] ?? 0 ),
+                'quantity' => 1,
+            ] ];
+        }
+
         $payload = [
             'date'    => current_time( 'Y-m-d' ),
             'invoice' => [ 'id' => (int) $data['invoice_id'] ],
-            'items'   => [
-                [
-                    'name'     => $data['observations'] ?? 'Nota de crédito',
-                    'price'    => (float) $data['amount'],
-                    'quantity' => 1,
-                ],
-            ],
+            'items'   => $items,
         ];
 
         if ( ! empty( $data['observations'] ) ) {
@@ -558,11 +563,44 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         return $this->perform_request( 'POST', '/credit-notes', $payload );
     }
 
-    /**
+    public function get_credit_note( int $id ): array {
+        return $this->perform_request( 'GET', '/credit-notes/' . $id );
+    }
+
+    public function list_credit_notes( int $start = 0, int $limit = 30, array $filters = [] ): array {
+        $params   = array_merge( $filters, [ 'start' => $start, 'limit' => min( $limit, 30 ) ] );
+        $endpoint = '/credit-notes?' . http_build_query( $params );
+        return $this->perform_request( 'GET', $endpoint );
+    }
+
+    public function register_webhook( string $event, string $url ): array {
         return $this->perform_request( 'POST', '/webhooks/subscriptions', [
             'event' => $event,
             'url'   => esc_url_raw( $url ),
         ] );
+    }
+
+    public function list_webhooks(): array {
+        return $this->perform_request( 'GET', '/webhooks/subscriptions' );
+    }
+
+    public function delete_webhook( int $subscription_id ): array {
+        return $this->perform_request( 'DELETE', '/webhooks/subscriptions/' . $subscription_id );
+    }
+
+    public function get_bank_accounts(): array {
+        $response = $this->perform_request( 'GET', '/bank-accounts?status=active&limit=50' );
+        return is_array( $response ) ? $response : [];
+    }
+
+    public function get_taxes(): array {
+        $response = $this->perform_request( 'GET', '/taxes?limit=100' );
+        return is_array( $response ) ? ( $response['data'] ?? $response ) : [];
+    }
+
+    public function get_categories(): array {
+        $response = $this->perform_request( 'GET', '/categories?limit=200' );
+        return is_array( $response ) ? ( $response['data'] ?? $response ) : [];
     }
 
     // ── HEALTH CHECK ───────────────────────────────────────────────
