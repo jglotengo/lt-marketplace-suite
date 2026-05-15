@@ -24,6 +24,19 @@ if ( function_exists( 'opcache_reset' ) ) {
     opcache_reset();
 }
 
+// Evitar timeout de SiteGround (max 30s por defecto para scripts CLI).
+// Con set_time_limit(0) el script puede correr indefinidamente.
+set_time_limit( 0 );
+// Guardar output a archivo para que no se pierda si la conexión SSH se corta.
+$ltms_log_path = '/tmp/ltms-integration-' . date('Ymd-Hi') . '.log';
+$ltms_log_fh   = fopen( $ltms_log_path, 'w' );
+// Función helper para imprimir y loggear simultáneamente.
+function ltms_out( string $line ): void {
+    global $ltms_log_fh;
+    echo $line;
+    if ( $ltms_log_fh ) fwrite( $ltms_log_fh, $line );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Framework de pruebas minimalista
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,6 +71,7 @@ function ltms_group( string $name ): void {
     global $ltms_group, $ltms_sep;
     $ltms_group = $name;
     echo "\n{$ltms_sep}\n GRUPO: {$name}\n{$ltms_sep}\n";
+    @ob_flush(); flush(); // Flush para que el output no se pierda si se corta la conexión
 }
 
 function ltms_create_test_vendor(): int {
@@ -827,3 +841,8 @@ echo "   wp --path=/home/customer/www/lo-tengo.com.co/public_html \\\n";
 echo "      eval-file wp-content/plugins/lt-marketplace-suite/bin/ltms-integration-tests.php \\\n";
 echo "      --allow-root 2>&1 | tee /tmp/ltms-qa-\$(date +%Y%m%d-%H%M).log\n";
 echo "{$ltms_sep}\n\n";
+
+if ( isset($ltms_log_fh) && $ltms_log_fh ) {
+    fclose( $ltms_log_fh );
+    echo "📄 Log guardado en: $ltms_log_path\n";
+}

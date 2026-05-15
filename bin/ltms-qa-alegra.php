@@ -6,6 +6,10 @@
  *    eval-file bin/ltms-qa-alegra.php --allow-root 2>/dev/null
  */
 
+// Forzar OPcache reset — garantiza que los archivos post git-pull se lean del disco.
+if ( function_exists( 'opcache_reset' ) ) { opcache_reset(); }
+set_time_limit( 0 );
+
 // ── Contadores (arrays para escapar scope de WP-CLI eval-file) ─────────────────
 $qa = [ 'pass' => 0, 'fail' => 0, 'warn' => 0, 'log' => [] ];
 
