@@ -144,7 +144,8 @@ echo "       [DIAG] Respuesta ID: " . ($diag_decoded['id'] ?? 'none') . " | erro
 
 // Si el DIAG creó el contacto exitosamente, reutilizarlo en vez de crear otro
 if ( $diag_code === 200 && !empty($diag_decoded['id']) ) {
-    $test_contact_id = (int) $diag_decoded['id'];
+    $test_contact_id    = (int) $diag_decoded['id'];
+    $test_contact_email = 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co'; // guardamos para deduplicación
     qa_ok( $qa, 'create_contact() — DIAG', "ID=$test_contact_id | " . ($diag_decoded['name']??'?') . " — HTTP 200 OK" );
 } else {
     // DIAG falló — intentar via método con email único diferente
@@ -179,9 +180,11 @@ if ( $test_contact_id ) {
     }
 
     try {
+        // Idempotencia: pasar email del contacto ya creado para que el fallback lo encuentre
         $same = $alegra->get_or_create_contact([
             'name'           => 'QA LTMS',
             'identification' => $test_identification,
+            'email'          => $test_contact_email ?? '',
         ]);
         if ( (int)($same['id']??0) === $test_contact_id ) {
             qa_ok( $qa, 'get_or_create_contact() idempotente', "Retornó ID=$test_contact_id existente" );

@@ -154,17 +154,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @return array|null Datos del contacto o null si no existe.
      */
     public function find_contact_by_identification( string $identification ): ?array {
-        $response = $this->perform_request( 'GET', '/contacts', [], [], false );
-        $contacts = $response['data'] ?? $response;
-        if ( ! is_array( $contacts ) ) {
-            return null;
-        }
-        foreach ( $contacts as $contact ) {
-            if ( ( $contact['identification'] ?? '' ) === $identification ) {
-                return $contact;
-            }
-        }
-        return null;
+        return $this->search_contacts( 'identification', $identification );
     }
 
     /**
@@ -174,23 +164,65 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         if ( ! $email ) {
             return null;
         }
-        $response = $this->perform_request( 'GET', '/contacts', [], [], false );
-        $contacts = $response['data'] ?? $response;
-        if ( ! is_array( $contacts ) ) {
-            return null;
-        }
-        $email_lower = strtolower( trim( $email ) );
-        foreach ( $contacts as $contact ) {
-            if ( strtolower( trim( $contact['email'] ?? '' ) ) === $email_lower ) {
-                return $contact;
+        return $this->search_contacts( 'email', strtolower( trim( $email ) ) );
+    }
+
+    /**
+     * Búsqueda paginada de contactos por campo.
+     * Alegra devuelve máx 30 por página — itera hasta encontrar o agotar páginas.
+     *
+     * @param string $field Campo a comparar ('identification' | 'email').
+     * @param string $value Valor buscado (ya normalizado).
+     * @return array|null El contacto encontrado o null.
+     */
+    private function search_contacts( string $field, string $value ): ?array {
+        $start = 0;
+        $limit = 30;
+        $max_pages = 20; // Máximo 600 contactos sin pagination token
+
+        for ( $page = 0; $page < $max_pages; $page++ ) {
+            try {
+                $endpoint_with_params = '/contacts?start=' . $start . '&limit=' . $limit;
+                $response = $this->perform_request(
+                    'GET',
+                    $endpoint_with_params,
+                    [],
+                    [],
+                    false
+                );
+            } catch ( \RuntimeException $e ) {
+                break; // Si falla la consulta, salir
             }
+
+            $contacts = $response['data'] ?? $response;
+            if ( ! is_array( $contacts ) || count( $contacts ) === 0 ) {
+                break; // Sin más resultados
+            }
+
+            foreach ( $contacts as $contact ) {
+                $contact_value = $field === 'email'
+                    ? strtolower( trim( $contact['email'] ?? '' ) )
+                    : (string) ( $contact[ $field ] ?? '' );
+
+                if ( $contact_value === $value ) {
+                    return $contact;
+                }
+            }
+
+            // Si la página vino incompleta, no hay más páginas
+            if ( count( $contacts ) < $limit ) {
+                break;
+            }
+
+            $start += $limit;
         }
+
         return null;
     }
 
     /**
-     * Obtiene o crea un contacto. Deduplica por identification y luego por email.
-     * Alegra retorna 905 si el email ya existe — evitar con búsqueda previa.
+     * Obtiene o crea un contacto. Deduplica por identification, luego por email.
+     * Captura error 905/400 de duplicado y hace fallback a búsqueda por email.
      */
     public function get_or_create_contact( array $contact_data ): array {
         $identification = $contact_data['identification'] ?? '';
@@ -209,7 +241,23 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             }
         }
 
-        return $this->create_contact( $contact_data );
+        try {
+            return $this->create_contact( $contact_data );
+        } catch ( \RuntimeException $e ) {
+            // Alegra retorna 400/905 si el email ya existe — fallback: buscar por email
+            if ( $email && (
+                str_contains( $e->getMessage(), '400' ) ||
+                str_contains( $e->getMessage(), '905' ) ||
+                str_contains( $e->getMessage(), 'existe' ) ||
+                str_contains( $e->getMessage(), 'exist' )
+            ) ) {
+                $fallback = $this->find_contact_by_email( $email );
+                if ( $fallback ) {
+                    return $fallback;
+                }
+            }
+            throw $e;
+        }
     }
 
     // ── ITEMS (PRODUCTOS) ──────────────────────────────────────────
