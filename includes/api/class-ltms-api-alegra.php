@@ -168,10 +168,14 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Búsqueda paginada de contactos por campo.
-     * Alegra devuelve máx 30 por página — itera hasta encontrar o agotar páginas.
+     * Busca contactos en Alegra Colombia.
      *
-     * @param string $field Campo a comparar ('identification' | 'email').
+     * La API de Alegra Colombia NO soporta filtros ?identification= ni ?email=
+     * directamente — solo ?name= funciona como búsqueda de texto libre.
+     * Para identificación y email, iteramos la respuesta filtrada por nombre
+     * o hacemos scan paginado como fallback.
+     *
+     * @param string $field Campo a comparar: 'identification' | 'email' | 'name'.
      * @param string $value Valor buscado (ya normalizado).
      * @return array|null El contacto encontrado o null.
      */
@@ -180,53 +184,57 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             return null;
         }
 
-        // Alegra Colombia soporta filtros directos en /contacts
-        // ?name=, ?identification=, ?email= reducen el scan a 1 request.
-        // Intentar primero con query param directo (más rápido y preciso).
-        try {
-            $query_field = $field === 'identification' ? 'identification' : $field;
-            $endpoint_filtered = '/contacts?' . http_build_query( [ $query_field => $value, 'limit' => 30 ] );
-            $response = $this->perform_request( 'GET', $endpoint_filtered, [], [], false );
+        $value_normalized = strtolower( trim( $value ) );
 
-            $contacts = $response['data'] ?? ( is_array( $response ) && isset( $response[0] ) ? $response : [] );
+        // Estrategia 1: usar ?query= (Alegra búsqueda full-text en nombre, email, identificación)
+        // Este parámetro está documentado en Alegra API v1 como búsqueda general.
+        $search_params = [ 'query' => $value, 'limit' => 30, 'start' => 0 ];
+        try {
+            $endpoint = '/contacts?' . http_build_query( $search_params );
+            $response = $this->perform_request( 'GET', $endpoint, [], [], false );
+            $contacts = is_array( $response ) ? ( $response['data'] ?? $response ) : [];
+
             if ( is_array( $contacts ) ) {
                 foreach ( $contacts as $contact ) {
-                    $contact_value = $field === 'email'
-                        ? strtolower( trim( $contact['email'] ?? '' ) )
-                        : (string) ( $contact[ $field ] ?? '' );
-                    if ( $contact_value === strtolower( trim( $value ) ) ) {
+                    $contact_val = match ( $field ) {
+                        'email'          => strtolower( trim( $contact['email'] ?? '' ) ),
+                        'identification' => (string) ( $contact['identification'] ?? $contact['identificationObject']['number'] ?? '' ),
+                        default          => strtolower( trim( $contact['name'] ?? '' ) ),
+                    };
+                    if ( $contact_val === $value_normalized ) {
                         return $contact;
                     }
                 }
             }
         } catch ( \RuntimeException $e ) {
-            // Fallback a paginación si el query param no funciona
+            // Continuar con fallback
         }
 
-        // Fallback: paginación completa (limitada a 3 páginas = 90 contactos por rendimiento)
-        $start    = 0;
-        $limit    = 30;
-        $max_pages = 3;
+        // Estrategia 2: paginación scan (hasta 5 páginas = 150 contactos)
+        $start     = 0;
+        $limit     = 30;
+        $max_pages = 5;
 
         for ( $page = 0; $page < $max_pages; $page++ ) {
             try {
-                $endpoint_with_params = '/contacts?start=' . $start . '&limit=' . $limit;
-                $response = $this->perform_request( 'GET', $endpoint_with_params, [], [], false );
+                $endpoint = '/contacts?start=' . $start . '&limit=' . $limit;
+                $response = $this->perform_request( 'GET', $endpoint, [], [], false );
             } catch ( \RuntimeException $e ) {
                 break;
             }
 
-            $contacts = $response['data'] ?? $response;
+            $contacts = is_array( $response ) ? ( $response['data'] ?? $response ) : [];
             if ( ! is_array( $contacts ) || count( $contacts ) === 0 ) {
                 break;
             }
 
             foreach ( $contacts as $contact ) {
-                $contact_value = $field === 'email'
-                    ? strtolower( trim( $contact['email'] ?? '' ) )
-                    : (string) ( $contact[ $field ] ?? '' );
-
-                if ( $contact_value === strtolower( trim( $value ) ) ) {
+                $contact_val = match ( $field ) {
+                    'email'          => strtolower( trim( $contact['email'] ?? '' ) ),
+                    'identification' => (string) ( $contact['identification'] ?? $contact['identificationObject']['number'] ?? '' ),
+                    default          => strtolower( trim( $contact['name'] ?? '' ) ),
+                };
+                if ( $contact_val === $value_normalized ) {
                     return $contact;
                 }
             }

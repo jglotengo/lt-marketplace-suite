@@ -180,16 +180,22 @@ if ( $test_contact_id ) {
     }
 
     try {
-        // Idempotencia: pasar email del contacto ya creado para que el fallback lo encuentre
+        // Idempotencia: usar el mismo nombre + identificación + email del contacto ya creado.
+        // get_or_create_contact debe detectar el duplicado y devolver el contacto existente.
+        // Si falla, muestra diagnóstico detallado.
         $same = $alegra->get_or_create_contact([
-            'name'           => 'QA LTMS',
-            'identification' => $test_identification,
-            'email'          => $test_contact_email ?? '',
+            'name'           => 'QA LTMS ' . date('His'),  // nombre diferente — prueba por email/id
+            'identification' => $test_identification,        // misma identification → debe encontrarlo
+            'email'          => $test_contact_email ?? '',   // mismo email → fallback
+            'kindOfPerson'   => 'PERSON_ENTITY',
+            'regime'         => 'SIMPLIFIED_REGIME',
         ]);
         if ( (int)($same['id']??0) === $test_contact_id ) {
-            qa_ok( $qa, 'get_or_create_contact() idempotente', "Retornó ID=$test_contact_id existente" );
+            qa_ok( $qa, 'get_or_create_contact() idempotente', "Retornó ID=$test_contact_id existente ✅" );
+        } elseif ( isset($same['id']) ) {
+            qa_warn( $qa, 'get_or_create_contact()', 'Retornó contacto diferente ID=' . $same['id'] . ' (esperado ' . $test_contact_id . ')' );
         } else {
-            qa_warn( $qa, 'get_or_create_contact()', 'Creó duplicado (ID=' . ($same['id']??'?') . ') en vez del existente' );
+            qa_fail( $qa, 'get_or_create_contact()', 'Sin ID en respuesta: ' . wp_json_encode($same) );
         }
     } catch ( Throwable $e ) {
         qa_fail( $qa, 'get_or_create_contact()', $e->getMessage() );
@@ -333,6 +339,30 @@ if ( $orders ) {
     echo "       Pedido #$oid | estado=" . $test_order->get_status() . " | total=" . number_format((float)$test_order->get_total(),0,',','.') . " | items=" . count($test_order->get_items()) . "\n";
     echo "       Billing: " . $test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name() . " <" . $test_order->get_billing_email() . ">\n";
 
+    // Pre-diagnóstico: ver si el contacto ya existe en Alegra y cachearlo
+    $billing_email  = $test_order->get_billing_email();
+    $billing_cid    = $test_order->get_customer_id();
+    $cached_contact = $billing_cid ? (int)get_user_meta($billing_cid, '_ltms_alegra_contact_id', true) : 0;
+    echo "       Cache _ltms_alegra_contact_id: " . ($cached_contact ?: 'no cacheado') . "\n";
+
+    if ( ! $cached_contact && $billing_email ) {
+        // Pre-buscar el contacto en Alegra y cachear para evitar el 400
+        try {
+            $contact_found = $alegra->find_contact_by_email( $billing_email );
+            if ( $contact_found && isset($contact_found['id']) ) {
+                $found_id = (int)$contact_found['id'];
+                if ( $billing_cid ) {
+                    update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $found_id );
+                }
+                echo "       Pre-cacheado contacto Alegra ID=$found_id para email $billing_email\n";
+            } else {
+                echo "       No encontrado por email $billing_email — se intentará crear\n";
+            }
+        } catch ( Throwable $e_pre ) {
+            echo "       Pre-búsqueda falló: " . $e_pre->getMessage() . "\n";
+        }
+    }
+
     try {
         $sync   = new LTMS_Alegra_Sync();
         $result = $sync->create_invoice_for_order( $test_order );
@@ -340,17 +370,15 @@ if ( $orders ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
             qa_ok( $qa, 'create_invoice_for_order()', "Factura $inv_num | pedido #$oid" );
             qa_ok( $qa, 'Respuesta tiene id+status+numberTemplate', "id={$result['id']} status=" . ($result['status']??'?') );
-            // NO guardamos el meta en el pedido real — solo prueba
             echo "       ⚠️  Factura creada en Alegra (ID={$result['id']}) — borrar si es de prueba\n";
         } else {
-            qa_fail( $qa, 'create_invoice_for_order()', 'Sin ID en respuesta' );
+            qa_fail( $qa, 'create_invoice_for_order()', 'Sin ID en respuesta: ' . wp_json_encode($result) );
         }
     } catch ( Throwable $e ) {
         qa_fail( $qa, 'create_invoice_for_order()', $e->getMessage() );
-        // Diagnóstico extra: mostrar datos del cliente del pedido
-        echo "       Diagnóstico — billing_email: " . $test_order->get_billing_email() . "\n";
-        echo "       Diagnóstico — billing_id: " . $test_order->get_meta('_billing_identification') . "\n";
-        echo "       Diagnóstico — customer_id: " . $test_order->get_customer_id() . "\n";
+        echo "       billing_email: $billing_email\n";
+        echo "       billing_id: " . $test_order->get_meta('_billing_identification') . "\n";
+        echo "       customer_id: $billing_cid\n";
     }
 } else {
     qa_warn( $qa, 'T-07 omitido', 'Sin pedidos completados/processing sin factura Alegra' );
