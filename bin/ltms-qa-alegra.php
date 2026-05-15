@@ -139,48 +139,30 @@ $diag_code = wp_remote_retrieve_response_code($diag_response);
 $diag_body = wp_remote_retrieve_body($diag_response);
 echo "       [DIAG] POST /contacts → HTTP $diag_code\n";
 echo "       [DIAG] Body enviado: $diag_payload\n";
-echo "       [DIAG] Respuesta: $diag_body\n";
+$diag_decoded = json_decode($diag_body, true);
+echo "       [DIAG] Respuesta ID: " . ($diag_decoded['id'] ?? 'none') . " | error: " . ($diag_decoded['message'] ?? '-') . "\n";
 
-try {
-    // Intento 1: nombre + tipo array + email (formato correcto Alegra API v1)
-    $contact = $alegra->create_contact([
-        'name'  => 'QA Test LTMS ' . date('His'),
-        'type'  => ['client'],
-        'email' => 'qa-ltms-' . date('His') . '@test.lo-tengo.com.co',
-    ]);
-    if ( ! empty( $contact['id'] ) ) {
-        $test_contact_id = (int) $contact['id'];
-        qa_ok( $qa, 'create_contact()', "ID=$test_contact_id | nombre=" . ( $contact['name'] ?? '?' ) );
-    } else {
-        // Intento 2: Con identification pero sin email
-        $contact2 = $alegra->create_contact([
-            'name'           => 'QA LTMS ' . date('His'),
-            'identification' => $test_identification,
-        ]);
-        if ( ! empty( $contact2['id'] ) ) {
-            $test_contact_id = (int) $contact2['id'];
-            qa_ok( $qa, 'create_contact()', "ID=$test_contact_id" );
-        } else {
-            qa_fail( $qa, 'create_contact()', 'Sin ID. Respuesta: ' . wp_json_encode( $contact2 ) );
-        }
-    }
-} catch ( Throwable $e ) {
-    // Intento 2: Con identification numérica, sin email
-    echo "       Primer intento falló: " . $e->getMessage() . "\n";
-    echo "       Reintentando sin email...\n";
+// Si el DIAG creó el contacto exitosamente, reutilizarlo en vez de crear otro
+if ( $diag_code === 200 && !empty($diag_decoded['id']) ) {
+    $test_contact_id = (int) $diag_decoded['id'];
+    qa_ok( $qa, 'create_contact() — DIAG', "ID=$test_contact_id | " . ($diag_decoded['name']??'?') . " — HTTP 200 OK" );
+} else {
+    // DIAG falló — intentar via método con email único diferente
     try {
-        $contact2 = $alegra->create_contact([
-            'name'           => 'QA LTMS ' . date('His'),
-            'identification' => $test_identification,
+        $ts2 = date('His') . rand(100,999);
+        $contact = $alegra->create_contact([
+            'name'  => 'QA LTMS ' . $ts2,
+            'type'  => ['client'],
+            'email' => 'qa-ltms-' . $ts2 . '@test.lo-tengo.com.co',
         ]);
-        if ( ! empty( $contact2['id'] ) ) {
-            $test_contact_id = (int) $contact2['id'];
-            qa_ok( $qa, 'create_contact() (sin email)', "ID=$test_contact_id" );
+        if ( ! empty( $contact['id'] ) ) {
+            $test_contact_id = (int) $contact['id'];
+            qa_ok( $qa, 'create_contact()', "ID=$test_contact_id | " . ($contact['name']??'?') );
         } else {
-            qa_fail( $qa, 'create_contact() payload mínimo', wp_json_encode( $contact2 ) );
+            qa_fail( $qa, 'create_contact()', 'Sin ID: ' . wp_json_encode($contact) );
         }
-    } catch ( Throwable $e2 ) {
-        qa_fail( $qa, 'create_contact()', $e2->getMessage() );
+    } catch ( Throwable $e ) {
+        qa_fail( $qa, 'create_contact()', $e->getMessage() );
     }
 }
 
