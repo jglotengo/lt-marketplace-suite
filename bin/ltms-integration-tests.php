@@ -2,22 +2,33 @@
 /**
  * LTMS Integration Test Suite — Pruebas End-to-End en Servidor
  *
- * Ejecutar via WP-CLI desde el servidor de staging:
+ * Ejecutar via PHP directamente (sin WP-CLI):
  *
- *   wp --path=/home/customer/www/lo-tengo.com.co/public_html \
- *      eval-file wp-content/plugins/lt-marketplace-suite/bin/ltms-integration-tests.php \
- *      --allow-root
+ *   php bin/ltms-integration-tests.php > /tmp/ltms-tests.log 2>&1 &
+ *   cat /tmp/ltms-tests.log
  *
- * O guardando en log:
- *   wp --path=... eval-file ... --allow-root 2>&1 | tee /tmp/ltms-qa-$(date +%Y%m%d-%H%M).log
+ * También funciona con WP-CLI (legacy):
+ *   wp --path=... eval-file bin/ltms-integration-tests.php --allow-root
  *
  * @package LTMS
- * @version 1.0.0
+ * @version 1.1.0
  */
 
-if ( ! defined( 'ABSPATH' ) && ! defined( 'WP_CLI' ) ) {
-    die( "Ejecutar via WP-CLI: wp eval-file ltms-integration-tests.php --allow-root\n" );
+// ── Cargar WordPress ────────────────────────────────────────────────────────
+// Soporta dos modos: php directo (carga wp-load) o WP-CLI eval-file (ABSPATH ya definido)
+if ( ! defined( 'ABSPATH' ) ) {
+    $wp_path = '/home/customer/www/lo-tengo.com.co/public_html';
+    if ( ! file_exists( $wp_path . '/wp-load.php' ) ) {
+        die( "ERROR: wp-load.php no encontrado en $wp_path\n" );
+    }
+    $_SERVER['HTTP_HOST']   = 'lo-tengo.com.co';
+    $_SERVER['REQUEST_URI'] = '/';
+    // Silenciar output de WP al cargar
+    ob_start();
+    require_once $wp_path . '/wp-load.php';
+    ob_end_clean();
 }
+
 
 // Forzar invalidación de OPcache para que las clases recién actualizadas se lean del disco.
 if ( function_exists( 'opcache_reset' ) ) {
@@ -639,7 +650,6 @@ ltms_test( 'ltms_get_notifications devuelve count (total_unread)', function () u
     return $has
         ? [ 'PASS', "count(total_unread)={$data['data']['count']} new_count={$data['data']['new_count']} ✓" ]
         : [ 'FAIL', 'Faltan keys count/new_count. Keys: ' . implode( ', ', array_keys( $data['data'] ?? [] ) ) ];
-} );
 } );
 
 // ─────────────────────────────────────────────────────────────────────────────

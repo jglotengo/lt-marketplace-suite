@@ -23,13 +23,13 @@ echo ""
 echo "======================================"
 echo "  Integration Tests"
 echo "======================================"
-wp --path="$WP_PATH" eval-file bin/ltms-integration-tests.php --allow-root 2>&1
+php bin/ltms-integration-tests.php 2>&1
 echo ""
 
 echo "======================================"
 echo "  QA Alegra"
 echo "======================================"
-wp --path="$WP_PATH" eval-file bin/ltms-qa-alegra.php --allow-root 2>&1
+php bin/ltms-qa-alegra.php 2>&1
 
 echo ""
 echo "======================================"

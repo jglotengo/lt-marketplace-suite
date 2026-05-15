@@ -1,10 +1,26 @@
 <?php
 /**
  * LTMS QA — Pruebas de integración Alegra
- * 
- * wp --path=/home/customer/www/lo-tengo.com.co/public_html \
- *    eval-file bin/ltms-qa-alegra.php --allow-root 2>/dev/null
+ *
+ * Ejecutar via PHP directamente (sin WP-CLI):
+ *   php bin/ltms-qa-alegra.php > /tmp/ltms-qa.log 2>&1 &
+ *   cat /tmp/ltms-qa.log
+ *
+ * También funciona con WP-CLI (legacy):
+ *   wp --path=/home/customer/www/lo-tengo.com.co/public_html \
+ *      eval-file bin/ltms-qa-alegra.php --allow-root
  */
+
+// ── Cargar WordPress ──────────────────────────────────────────────────────
+if ( ! defined( 'ABSPATH' ) ) {
+    $wp_path = '/home/customer/www/lo-tengo.com.co/public_html';
+    $_SERVER['HTTP_HOST']   = 'lo-tengo.com.co';
+    $_SERVER['REQUEST_URI'] = '/';
+    ob_start();
+    require_once $wp_path . '/wp-load.php';
+    ob_end_clean();
+}
+
 
 // Forzar OPcache reset — garantiza que los archivos post git-pull se lean del disco.
 if ( function_exists( 'opcache_reset' ) ) { opcache_reset(); }
@@ -241,7 +257,6 @@ if ( $test_contact_id ) {
     }
 
     try {
-<<<<<<< Updated upstream
         // Idempotencia: usar exactamente el mismo nombre + email + identification del contacto creado.
         $same = $alegra->get_or_create_contact([
             'name'           => $test_contact_name,
@@ -257,17 +272,6 @@ if ( $test_contact_id ) {
             qa_warn( $qa, 'get_or_create_contact()', 'Retornó contacto diferente ID=' . $same['id'] . ' (esperado ' . $test_contact_id . ')' );
         } else {
             qa_fail( $qa, 'get_or_create_contact()', 'Sin ID en respuesta: ' . wp_json_encode($same) );
-=======
-        // Buscar por email del contacto ya creado — verifica idempotencia por email
-        $same = $alegra->get_or_create_contact([
-            'name'  => 'QA LTMS',
-            'email' => 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co',
-        ]);
-        if ( (int)($same['id']??0) === $test_contact_id ) {
-            qa_ok( $qa, 'get_or_create_contact() idempotente por email', "Retornó ID=$test_contact_id existente" );
-        } else {
-            qa_warn( $qa, 'get_or_create_contact()', 'ID diferente: ' . ($same['id']??'?') . ' (esperado ' . $test_contact_id . ')' );
->>>>>>> Stashed changes
         }
     } catch ( Throwable $e ) {
         // Si el DIAG2 confirmó que ?query=nombre SÍ encuentra el contacto → OPcache sirvió clase vieja.

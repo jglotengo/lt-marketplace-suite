@@ -56,13 +56,34 @@ try {
 }
 
 // 4. Tabla de BD
-echo "\n--- Tablas BD ---\n";
+echo "\n--- Tablas BD (prefijo: {$prefix}) ---\n";
 global $wpdb;
-$prefix = $wpdb->prefix;
 $tables = ['wallet_transactions','wallet_holds','payout_requests','bookings','vendor_kyc'];
+$missing = 0;
 foreach ( $tables as $t ) {
-    $exists = $wpdb->get_var("SHOW TABLES LIKE '{$prefix}ltms_{$t}'");
-    echo ( $exists ? "✅" : "❌" ) . " {$prefix}ltms_{$t}\n";
+    $full = "{$prefix}ltms_{$t}";
+    $exists = $wpdb->get_var("SHOW TABLES LIKE '$full'");
+    echo ( $exists ? "✅" : "❌" ) . " $full\n";
+    if ( ! $exists ) $missing++;
+}
+
+if ( $missing > 0 ) {
+    echo "\n⚠️  $missing tabla(s) faltante(s). Ejecutando migraciones...\n";
+    if ( class_exists('LTMS_DB_Migrations') ) {
+        try {
+            LTMS_DB_Migrations::run_all();
+            echo "✅ Migraciones ejecutadas. Verificando...\n";
+            foreach ( $tables as $t ) {
+                $full   = "{$prefix}ltms_{$t}";
+                $exists = $wpdb->get_var("SHOW TABLES LIKE '$full'");
+                echo ( $exists ? "  ✅" : "  ❌" ) . " $full\n";
+            }
+        } catch ( Throwable $e ) {
+            echo "❌ Error en migraciones: " . $e->getMessage() . "\n";
+        }
+    } else {
+        echo "❌ LTMS_DB_Migrations no existe — correr: php bin/ltms-run-migrations.php\n";
+    }
 }
 
 echo "\n=== DONE ===\n";
