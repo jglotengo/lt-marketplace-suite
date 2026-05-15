@@ -36,9 +36,19 @@ get_header();
     while ( have_posts() ) :
         the_post();
         global $post;
-        // Hello Elementor no aplica do_shortcode en su cadena de filtros.
-        // Aplicamos wpautop + do_shortcode directamente sobre post_content.
-        echo do_shortcode( wpautop( $post->post_content ) );
+
+        // Remover filtros de Elementor que interfieren con the_content y ob_start
+        remove_all_filters( 'the_content' );
+        // Re-agregar solo do_shortcode
+        add_filter( 'the_content', 'do_shortcode', 11 );
+        add_filter( 'the_content', 'wpautop' );
+
+        // Garantizar que los shortcodes LTMS estén registrados
+        if ( class_exists( 'LTMS_Public_Auth_Handler' ) && ! shortcode_exists( 'ltms_vendor_register' ) ) {
+            LTMS_Public_Auth_Handler::init();
+        }
+
+        the_content();
     endwhile;
     ?>
 </main>
