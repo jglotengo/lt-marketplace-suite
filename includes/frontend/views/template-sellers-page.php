@@ -33,23 +33,28 @@ get_header();
 
 <main id="ltms-sellers-main" style="min-height:60vh;">
     <?php
-    while ( have_posts() ) :
+    if ( have_posts() ) :
         the_post();
         global $post;
+        $raw = get_post_field( 'post_content', $post->ID, 'raw' );
 
-        // Remover filtros de Elementor que interfieren con the_content y ob_start
-        remove_all_filters( 'the_content' );
-        // Re-agregar solo do_shortcode
-        add_filter( 'the_content', 'do_shortcode', 11 );
-        add_filter( 'the_content', 'wpautop' );
-
-        // Garantizar que los shortcodes LTMS estén registrados
-        if ( class_exists( 'LTMS_Public_Auth_Handler' ) && ! shortcode_exists( 'ltms_vendor_register' ) ) {
-            LTMS_Public_Auth_Handler::init();
+        // Instanciamos los handlers directamente y llamamos el método correcto,
+        // bypasando do_shortcode() que Elementor puede interferir.
+        if ( strpos( $raw, 'ltms_sellers_landing' ) !== false && class_exists( 'LTMS_Public_Auth_Handler' ) ) {
+            $h = new LTMS_Public_Auth_Handler();
+            echo $h->render_sellers_landing(); // phpcs:ignore
+        } elseif ( strpos( $raw, 'ltms_vendor_register' ) !== false && class_exists( 'LTMS_Public_Auth_Handler' ) ) {
+            $h = new LTMS_Public_Auth_Handler();
+            echo $h->render_register_form(); // phpcs:ignore
+        } elseif ( strpos( $raw, 'ltms_vendor_dashboard' ) !== false && class_exists( 'LTMS_Dashboard_Logic' ) ) {
+            $h = new LTMS_Dashboard_Logic();
+            echo $h->render_dashboard_shortcode(); // phpcs:ignore
+        } else {
+            // Para ltms_vendor_login y otros: usar el sistema de WP normal
+            // ya que el shortcode fue registrado pero el método puede estar en otra clase
+            echo do_shortcode( $raw ); // phpcs:ignore
         }
-
-        the_content();
-    endwhile;
+    endif;
     ?>
 </main>
 

@@ -117,6 +117,8 @@ final class LTMS_Public_Auth_Handler {
 
     /**
      * Renderiza el formulario de inicio de sesión para vendedores.
+     */
+    public function render_login_form( array $atts = [] ): string {
         // Solo bloquear si el user actual ya es vendor (no necesita login). Admins
         // y otros roles pueden ver el form (útil para QA, soporte, demo).
         if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
