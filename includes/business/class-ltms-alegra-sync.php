@@ -526,7 +526,8 @@ final class LTMS_Alegra_Sync {
                                  ?: get_user_meta( $user_id, 'billing_phone', true )
                                  ?: '',
                 'type'           => [ $type ],
-                'kindOfPerson'   => 'PERSON_ENTITY',
+                // AUDIT-FIX: NIT → empresa (LEGAL_ENTITY), CC/CE → persona natural
+                'kindOfPerson'   => $nit ? 'LEGAL_ENTITY' : 'PERSON_ENTITY',
                 'regime'         => $regime,
             ];
 
@@ -627,7 +628,8 @@ final class LTMS_Alegra_Sync {
             'email'          => $order->get_billing_email(),
             'phone'          => $order->get_billing_phone(),
             'identification' => $identification,
-            'kindOfPerson'   => 'PERSON_ENTITY',
+            // AUDIT-FIX: empresa (tiene company) → LEGAL_ENTITY; persona natural → PERSON_ENTITY
+            'kindOfPerson'   => ! empty( $order->get_billing_company() ) ? 'LEGAL_ENTITY' : 'PERSON_ENTITY',
             'regime'         => $identification ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME',
         ];
 
