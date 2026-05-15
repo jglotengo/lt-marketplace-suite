@@ -609,6 +609,8 @@ final class LTMS_DB_Migrations {
         ) {$charset}";
 
         // lt_co_reteica_rates — ReteICA Colombia por CIIU (editable)
+        // DEPRECATED desde v2.1.x: usar lt_co_reteica_rates_municipal (soporta municipio + CIIU completo).
+        // Se mantiene para back-compat de instalaciones que tengan datos manuales.
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_co_reteica_rates` (
             `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
             `ciiu_prefix`       CHAR(1)      NOT NULL,
@@ -616,6 +618,36 @@ final class LTMS_DB_Migrations {
             `rate_per_thousand` DECIMAL(8,4) NOT NULL,
             `valid_from`        DATE         NOT NULL,
             PRIMARY KEY (`id`)
+        ) {$charset}";
+
+        // lt_co_dane_municipalities — Catálogo DANE de municipios Colombia.
+        // Fuente de verdad para dropdowns (checkout, registro vendedor) y lookups fiscales.
+        // Códigos DANE de 5 dígitos: 2 departamento + 3 municipio.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_co_dane_municipalities` (
+            `code`              VARCHAR(8)   NOT NULL,
+            `department_code`   VARCHAR(2)   NOT NULL,
+            `department_name`   VARCHAR(80)  NOT NULL,
+            `municipality_name` VARCHAR(120) NOT NULL,
+            `is_active`         TINYINT(1)   NOT NULL DEFAULT 1,
+            PRIMARY KEY (`code`),
+            KEY `idx_active` (`is_active`),
+            KEY `idx_name` (`municipality_name`)
+        ) {$charset}";
+
+        // lt_co_reteica_rates_municipal — ReteICA por (municipio DANE + CIIU completo).
+        // Reemplaza a lt_co_reteica_rates. rate_per_thousand expresada en por mil (4.1400 = 0.414%).
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_co_reteica_rates_municipal` (
+            `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `municipality_code` VARCHAR(8)   NOT NULL,
+            `ciiu_code`         VARCHAR(10)  NOT NULL,
+            `description`       VARCHAR(200) DEFAULT NULL,
+            `rate_per_thousand` DECIMAL(8,4) NOT NULL,
+            `legal_reference`   VARCHAR(200) DEFAULT NULL,
+            `valid_from`        DATE         NOT NULL,
+            `valid_to`          DATE         DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_lookup` (`municipality_code`, `ciiu_code`, `valid_from`),
+            KEY `idx_municipality` (`municipality_code`)
         ) {$charset}";
 
         // ── v2.0.0 Tables — Módulo Booking ──────────────────────────
@@ -844,6 +876,10 @@ final class LTMS_DB_Migrations {
 
         // v2.0.0: Insert booking season seed data
         self::seed_booking_seasons();
+
+        // v2.1.x: Catálogo DANE + tarifas ReteICA municipales (cumplimiento territorialidad)
+        self::seed_dane_municipalities();
+        self::seed_reteica_municipal_rates();
     }
 
     /**
@@ -1061,6 +1097,166 @@ final class LTMS_DB_Migrations {
             KEY `idx_wp_user` (`wp_user_id`)
         ) {$charset}";
 
+    }
+
+    /**
+     * Inserta el catálogo DANE de municipios Colombia (capitales departamentales + ciudades principales).
+     * Solo inserta si la tabla está vacía. Datos públicos DANE — pueden expandirse vía admin.
+     *
+     * @return void
+     */
+    private static function seed_dane_municipalities(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_co_dane_municipalities';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+        if ( $count > 0 ) {
+            return;
+        }
+
+        // [code DANE 5-dig, dept_code, dept_name, municipality_name]
+        $seeds = [
+            [ '05001', '05', 'Antioquia',          'Medellín' ],
+            [ '05088', '05', 'Antioquia',          'Bello' ],
+            [ '05266', '05', 'Antioquia',          'Envigado' ],
+            [ '05360', '05', 'Antioquia',          'Itagüí' ],
+            [ '05631', '05', 'Antioquia',          'Sabaneta' ],
+            [ '08001', '08', 'Atlántico',          'Barranquilla' ],
+            [ '08758', '08', 'Atlántico',          'Soledad' ],
+            [ '11001', '11', 'Bogotá D.C.',        'Bogotá' ],
+            [ '13001', '13', 'Bolívar',            'Cartagena' ],
+            [ '15001', '15', 'Boyacá',             'Tunja' ],
+            [ '17001', '17', 'Caldas',             'Manizales' ],
+            [ '18001', '18', 'Caquetá',            'Florencia' ],
+            [ '19001', '19', 'Cauca',              'Popayán' ],
+            [ '20001', '20', 'Cesar',              'Valledupar' ],
+            [ '23001', '23', 'Córdoba',            'Montería' ],
+            [ '25175', '25', 'Cundinamarca',       'Chía' ],
+            [ '25430', '25', 'Cundinamarca',       'Madrid' ],
+            [ '25754', '25', 'Cundinamarca',       'Soacha' ],
+            [ '27001', '27', 'Chocó',              'Quibdó' ],
+            [ '41001', '41', 'Huila',              'Neiva' ],
+            [ '44001', '44', 'La Guajira',         'Riohacha' ],
+            [ '47001', '47', 'Magdalena',          'Santa Marta' ],
+            [ '50001', '50', 'Meta',               'Villavicencio' ],
+            [ '52001', '52', 'Nariño',             'Pasto' ],
+            [ '54001', '54', 'Norte de Santander', 'Cúcuta' ],
+            [ '63001', '63', 'Quindío',            'Armenia' ],
+            [ '66001', '66', 'Risaralda',          'Pereira' ],
+            [ '68001', '68', 'Santander',          'Bucaramanga' ],
+            [ '68276', '68', 'Santander',          'Floridablanca' ],
+            [ '70001', '70', 'Sucre',              'Sincelejo' ],
+            [ '73001', '73', 'Tolima',             'Ibagué' ],
+            [ '76001', '76', 'Valle del Cauca',    'Cali' ],
+            [ '76109', '76', 'Valle del Cauca',    'Buenaventura' ],
+            [ '76520', '76', 'Valle del Cauca',    'Palmira' ],
+            [ '76834', '76', 'Valle del Cauca',    'Tuluá' ],
+            [ '81001', '81', 'Arauca',             'Arauca' ],
+            [ '85001', '85', 'Casanare',           'Yopal' ],
+            [ '86001', '86', 'Putumayo',           'Mocoa' ],
+            [ '88001', '88', 'San Andrés',         'San Andrés' ],
+            [ '91001', '91', 'Amazonas',           'Leticia' ],
+            [ '94001', '94', 'Guainía',            'Inírida' ],
+            [ '95001', '95', 'Guaviare',           'San José del Guaviare' ],
+            [ '97001', '97', 'Vaupés',             'Mitú' ],
+            [ '99001', '99', 'Vichada',            'Puerto Carreño' ],
+        ];
+
+        foreach ( $seeds as $row ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->insert(
+                $table,
+                [
+                    'code'              => $row[0],
+                    'department_code'   => $row[1],
+                    'department_name'   => $row[2],
+                    'municipality_name' => $row[3],
+                    'is_active'         => 1,
+                ],
+                [ '%s', '%s', '%s', '%s', '%d' ]
+            );
+        }
+    }
+
+    /**
+     * Inserta tarifas ReteICA por municipio y CIIU. Solo si tabla vacía.
+     * IMPORTANTE: estos valores son referencia 2024-2025. Deben validarse con asesor tributario
+     * y actualizarse cuando los municipios modifiquen sus estatutos.
+     *
+     * @return void
+     */
+    private static function seed_reteica_municipal_rates(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_co_reteica_rates_municipal';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
+        if ( $count > 0 ) {
+            return;
+        }
+
+        $valid_from = '2024-01-01';
+
+        // [municipality_code, ciiu_code, rate_per_thousand, description, legal_reference]
+        $seeds = [
+            // Bogotá D.C. (11001) — Acuerdo 65/2002
+            [ '11001', '4711',  4.1400, 'Comercio al por menor',                  'Acuerdo 65/2002 Bogotá' ],
+            [ '11001', '4791',  4.1400, 'Comercio electrónico / por correo',      'Acuerdo 65/2002 Bogotá' ],
+            [ '11001', '5611',  9.6600, 'Expendio a la mesa de comidas',          'Acuerdo 65/2002 Bogotá' ],
+            [ '11001', '5510',  9.6600, 'Alojamiento en hoteles',                 'Acuerdo 65/2002 Bogotá' ],
+            [ '11001', '7990',  9.6600, 'Otros servicios de reserva turística',   'Acuerdo 65/2002 Bogotá' ],
+            [ '11001', '6201', 11.0400, 'Desarrollo de sistemas informáticos',    'Acuerdo 65/2002 Bogotá' ],
+
+            // Cali (76001) — Acuerdo 357/2013
+            [ '76001', '4711',  5.5000, 'Comercio al por menor',                  'Acuerdo 357/2013 Cali' ],
+            [ '76001', '4791',  5.5000, 'Comercio electrónico',                   'Acuerdo 357/2013 Cali' ],
+            [ '76001', '5611', 10.0000, 'Restaurantes',                           'Acuerdo 357/2013 Cali' ],
+            [ '76001', '5510', 10.0000, 'Hoteles',                                'Acuerdo 357/2013 Cali' ],
+            [ '76001', '7990', 10.0000, 'Turismo',                                'Acuerdo 357/2013 Cali' ],
+            [ '76001', '6201', 11.0000, 'Servicios informáticos',                 'Acuerdo 357/2013 Cali' ],
+
+            // Medellín (05001) — Acuerdo 67/2008
+            [ '05001', '4711',  3.0000, 'Comercio minorista',                     'Acuerdo 67/2008 Medellín' ],
+            [ '05001', '4791',  3.0000, 'Comercio electrónico',                   'Acuerdo 67/2008 Medellín' ],
+            [ '05001', '5611',  7.0000, 'Restaurantes',                           'Acuerdo 67/2008 Medellín' ],
+            [ '05001', '5510',  7.0000, 'Hoteles',                                'Acuerdo 67/2008 Medellín' ],
+            [ '05001', '7990',  7.0000, 'Turismo',                                'Acuerdo 67/2008 Medellín' ],
+            [ '05001', '6201',  7.0000, 'Servicios informáticos',                 'Acuerdo 67/2008 Medellín' ],
+
+            // Barranquilla (08001) — Estatuto Tributario Distrital
+            [ '08001', '4711',  6.0000, 'Comercio',                               'Estatuto Tributario Barranquilla' ],
+            [ '08001', '4791',  6.0000, 'Comercio electrónico',                   'Estatuto Tributario Barranquilla' ],
+            [ '08001', '5611', 10.0000, 'Restaurantes',                           'Estatuto Tributario Barranquilla' ],
+            [ '08001', '5510', 10.0000, 'Hoteles',                                'Estatuto Tributario Barranquilla' ],
+
+            // Cartagena (13001) — Acuerdo 41/2006
+            [ '13001', '4711',  7.0000, 'Comercio',                               'Acuerdo 41/2006 Cartagena' ],
+            [ '13001', '4791',  7.0000, 'Comercio electrónico',                   'Acuerdo 41/2006 Cartagena' ],
+            [ '13001', '5611', 10.0000, 'Restaurantes',                           'Acuerdo 41/2006 Cartagena' ],
+            [ '13001', '5510', 10.0000, 'Hoteles',                                'Acuerdo 41/2006 Cartagena' ],
+
+            // Bucaramanga (68001)
+            [ '68001', '4711',  4.0000, 'Comercio',                               'Estatuto Bucaramanga' ],
+            [ '68001', '4791',  4.0000, 'Comercio electrónico',                   'Estatuto Bucaramanga' ],
+            [ '68001', '5611',  7.0000, 'Restaurantes',                           'Estatuto Bucaramanga' ],
+        ];
+
+        foreach ( $seeds as $row ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->insert(
+                $table,
+                [
+                    'municipality_code' => $row[0],
+                    'ciiu_code'         => $row[1],
+                    'rate_per_thousand' => $row[2],
+                    'description'       => $row[3],
+                    'legal_reference'   => $row[4],
+                    'valid_from'        => $valid_from,
+                ],
+                [ '%s', '%s', '%f', '%s', '%s', '%s' ]
+            );
+        }
     }
 
     /**

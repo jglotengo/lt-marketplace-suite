@@ -669,6 +669,100 @@ ltms_test( 'Hook woocommerce_payment_complete tiene listeners LTMS', function ()
         : [ 'WARN', 'Sin listeners LTMS en woocommerce_payment_complete' ];
 } );
 
+ltms_group( '18 — ReteICA territorialidad municipal (M-200)' );
+
+ltms_test( 'Tabla lt_co_dane_municipalities existe', function () {
+    global $wpdb;
+    $t = $wpdb->prefix . 'lt_co_dane_municipalities';
+    $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) === $t;
+    return $exists ? [ 'PASS', 'tabla OK' ] : [ 'FAIL', "tabla {$t} no existe" ];
+} );
+
+ltms_test( 'Catálogo DANE poblado (>= 40 municipios)', function () {
+    global $wpdb;
+    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$wpdb->prefix}lt_co_dane_municipalities`" );
+    return $count >= 40 ? [ 'PASS', "{$count} municipios" ] : [ 'FAIL', "solo {$count} municipios (esperado >=40)" ];
+} );
+
+ltms_test( 'Bogotá (11001) y Cali (76001) en catálogo', function () {
+    global $wpdb;
+    $b = $wpdb->get_var( "SELECT municipality_name FROM `{$wpdb->prefix}lt_co_dane_municipalities` WHERE code='11001'" );
+    $c = $wpdb->get_var( "SELECT municipality_name FROM `{$wpdb->prefix}lt_co_dane_municipalities` WHERE code='76001'" );
+    return ( $b && $c ) ? [ 'PASS', "Bogotá={$b}, Cali={$c}" ] : [ 'FAIL', "Bogotá={$b}, Cali={$c}" ];
+} );
+
+ltms_test( 'Tabla lt_co_reteica_rates_municipal existe y poblada', function () {
+    global $wpdb;
+    $t = $wpdb->prefix . 'lt_co_reteica_rates_municipal';
+    if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) !== $t ) {
+        return [ 'FAIL', "tabla {$t} no existe" ];
+    }
+    $count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$t}`" );
+    return $count >= 25 ? [ 'PASS', "{$count} tarifas seeded" ] : [ 'FAIL', "solo {$count} tarifas (esperado >=25)" ];
+} );
+
+ltms_test( 'ReteICA Bogotá CIIU 4791 ≠ Cali CIIU 4791 (diferenciación municipal)', function () {
+    if ( ! class_exists( 'LTMS_Tax_Engine' ) ) return [ 'FAIL', 'Tax Engine no cargado' ];
+    $r_bog = LTMS_Tax_Engine::calculate( 1_000_000.0,
+        [ 'product_type' => 'physical' ],
+        [ 'tax_regime' => 'common', 'municipality_code' => '11001', 'ciiu_code' => '4791' ],
+        'CO'
+    );
+    $r_cal = LTMS_Tax_Engine::calculate( 1_000_000.0,
+        [ 'product_type' => 'physical' ],
+        [ 'tax_regime' => 'common', 'municipality_code' => '76001', 'ciiu_code' => '4791' ],
+        'CO'
+    );
+    if ( abs( $r_bog['reteica'] - $r_cal['reteica'] ) < 0.01 ) {
+        return [ 'FAIL', "Bog={$r_bog['reteica']} == Cali={$r_cal['reteica']} (sin diferenciación)" ];
+    }
+    return [ 'PASS', "Bog={$r_bog['reteica']} (4.14‰), Cali={$r_cal['reteica']} (5.5‰)" ];
+} );
+
+ltms_test( 'Regla híbrida: comprador Cali gran contribuyente → tarifa Cali', function () {
+    if ( ! class_exists( 'LTMS_Tax_Engine' ) ) return [ 'FAIL', 'Tax Engine no cargado' ];
+    $result = LTMS_Tax_Engine::calculate( 1_000_000.0,
+        [
+            'product_type'                => 'physical',
+            'buyer_is_gran_contribuyente' => true,
+            'buyer_municipality_code'     => '76001', // Cali
+        ],
+        [ 'tax_regime' => 'common', 'municipality_code' => '11001', 'ciiu_code' => '4791' ], // Vendor Bogotá
+        'CO'
+    );
+    return abs( $result['reteica'] - 5500.0 ) < 0.01
+        ? [ 'PASS', "Bog→Cali gran contrib: ReteICA={$result['reteica']} (5.5‰ Cali ✓)" ]
+        : [ 'FAIL', "ReteICA={$result['reteica']} (esperado 5500=5.5‰ Cali)" ];
+} );
+
+ltms_test( 'Regla híbrida: comprador Cali NO gran contribuyente → tarifa vendedor (Bogotá)', function () {
+    if ( ! class_exists( 'LTMS_Tax_Engine' ) ) return [ 'FAIL', 'Tax Engine no cargado' ];
+    $result = LTMS_Tax_Engine::calculate( 1_000_000.0,
+        [
+            'product_type'                => 'physical',
+            'buyer_is_gran_contribuyente' => false,
+            'buyer_municipality_code'     => '76001',
+        ],
+        [ 'tax_regime' => 'common', 'municipality_code' => '11001', 'ciiu_code' => '4791' ],
+        'CO'
+    );
+    return abs( $result['reteica'] - 4140.0 ) < 0.01
+        ? [ 'PASS', "B2C: usa tarifa Bogotá (4.14‰ = {$result['reteica']})" ]
+        : [ 'FAIL', "ReteICA={$result['reteica']} (esperado 4140; regla híbrida usa municipio incorrecto)" ];
+} );
+
+ltms_test( 'Fallback hardcoded cuando municipio desconocido (back-compat)', function () {
+    if ( ! class_exists( 'LTMS_Tax_Engine' ) ) return [ 'FAIL', 'Tax Engine no cargado' ];
+    $result = LTMS_Tax_Engine::calculate( 1_000_000.0,
+        [ 'product_type' => 'physical' ],
+        [ 'tax_regime' => 'common', 'municipality_code' => '99999', 'ciiu_code' => '5000' ],
+        'CO'
+    );
+    return abs( $result['reteica'] - 9660.0 ) < 0.01
+        ? [ 'PASS', "Fallback prefix '5' → {$result['reteica']} (0.966%)" ]
+        : [ 'FAIL', "ReteICA={$result['reteica']} (esperado 9660 desde fallback hardcoded)" ];
+} );
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CLEANUP
 // ─────────────────────────────────────────────────────────────────────────────

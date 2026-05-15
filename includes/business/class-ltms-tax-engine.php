@@ -178,6 +178,17 @@ final class LTMS_Tax_Engine {
 
         return '<table class="ltms-tax-breakdown">' . implode( '', $lines ) . '</table>';
     }
+    // ──────────────────────────────────────────────────────────────────────────
+    // Utilidades aritméticas legacy (instance methods).
+    //
+    // Estos métodos calculan retenciones con tarifas hardcoded. NO se usan en el
+    // flujo real de Order_Split (que pasa por la Strategy del país). Existen como
+    // utilidades puras testeables sin WP/DB — 22+ unit tests en TaxEngineTest los
+    // cubren. NO eliminar sin migrar los tests.
+    //
+    // Para nueva lógica, usar LTMS_Tax_Strategy_* (que sí consulta tablas).
+    // ──────────────────────────────────────────────────────────────────────────
+
     public function calculate_retefuente( float $base, string $tipo ): float {
         $tarifas = [
             'honorarios' => 0.11,

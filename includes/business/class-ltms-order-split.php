@@ -144,6 +144,9 @@ final class LTMS_Business_Order_Split {
             'buyer_regime'              => $order->get_meta( '_ltms_buyer_regime' ) ?: 'persona_natural',
             'buyer_is_gran_contribuyente' => (bool) $order->get_meta( '_ltms_buyer_is_gran_contribuyente' ),
             'municipality' => $order->get_billing_city(),
+            // M-200: territorialidad ReteICA — capturado por dropdown DANE en checkout (task #9).
+            // Si está vacío en pedidos previos al dropdown, el strategy hace fallback al municipio del vendedor.
+            'buyer_municipality_code' => (string) $order->get_meta( '_ltms_billing_municipality_code' ),
             'items'        => self::get_order_items_summary( $order ),
         ];
 
@@ -284,9 +287,54 @@ final class LTMS_Business_Order_Split {
             'nit'                     => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
             'is_gran_contribuyente'   => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),   // M-83: era 'is_gran_contrib'
             'ciiu_code'               => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',
-            'municipality_code'       => get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: 'bogota',        // M-82: era 'municipality', tax-strategy espera 'municipality_code'
+            'municipality_code'       => self::resolve_vendor_municipality_dane( $vendor_id ),                    // M-200: resuelve slug legacy → DANE para lookup ReteICA municipal
             'monthly_income'          => (float) get_user_meta( $vendor_id, 'ltms_monthly_income_avg', true ),
         ];
+    }
+
+    /**
+     * Resuelve el municipio del vendedor a código DANE (5 dígitos).
+     *
+     * Vendedores registrados antes del dropdown DANE (task #10) tienen ltms_municipality como slug
+     * ('bogota', 'cali', etc.). Mapeamos las ciudades top a su código DANE para que el lookup ReteICA
+     * municipal funcione mientras se completa la migración del dropdown.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return string Código DANE 5-dig o '' si no se puede resolver.
+     */
+    private static function resolve_vendor_municipality_dane( int $vendor_id ): string {
+        $value = (string) ( get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: '' );
+        if ( $value === '' ) {
+            return '';
+        }
+        // Si ya es código DANE (5 dígitos numéricos), usarlo directo.
+        if ( preg_match( '/^\d{5}$/', $value ) ) {
+            return $value;
+        }
+        // Slug legacy → DANE. Cobertura: capitales departamentales + área metropolitana principal.
+        $slug_to_dane = [
+            'bogota'        => '11001', 'bogotá'        => '11001',
+            'medellin'      => '05001', 'medellín'      => '05001',
+            'cali'          => '76001',
+            'barranquilla'  => '08001',
+            'cartagena'     => '13001',
+            'bucaramanga'   => '68001',
+            'pereira'       => '66001',
+            'manizales'     => '17001',
+            'cucuta'        => '54001', 'cúcuta'        => '54001',
+            'ibague'        => '73001', 'ibagué'        => '73001',
+            'villavicencio' => '50001',
+            'pasto'         => '52001',
+            'monteria'      => '23001', 'montería'      => '23001',
+            'neiva'         => '41001',
+            'armenia'       => '63001',
+            'santa marta'   => '47001', 'santamarta'    => '47001',
+            'valledupar'    => '20001',
+            'tunja'         => '15001',
+            'popayan'       => '19001', 'popayán'       => '19001',
+        ];
+        $key = strtolower( trim( $value ) );
+        return $slug_to_dane[ $key ] ?? '';
     }
 
     /**
