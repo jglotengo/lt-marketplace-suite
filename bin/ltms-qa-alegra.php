@@ -118,13 +118,16 @@ $diag_token = (str_starts_with($diag_token_raw, 'v1:') && class_exists('LTMS_Cor
 $diag_url   = 'https://api.alegra.com/api/v1/contacts';
 // M-119: Alegra CO requiere nameObject + kindOfPerson + regime
 $diag_ts = date('His');
+$diag_name    = 'QA LTMS ' . $diag_ts;
+$diag_email_addr = 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co';
 $diag_payload = wp_json_encode([
-    'name'         => 'QA LTMS ' . $diag_ts,
-    'nameObject'   => ['firstName' => 'QA', 'secondName' => null, 'lastName' => 'LTMS ' . $diag_ts, 'secondLastName' => null],
-    'type'         => ['client'],
-    'email'        => 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co',
-    'kindOfPerson' => 'PERSON_ENTITY',
-    'regime'       => 'SIMPLIFIED_REGIME',
+    'name'           => $diag_name,
+    'nameObject'     => ['firstName' => 'QA', 'secondName' => null, 'lastName' => 'LTMS ' . $diag_ts, 'secondLastName' => null],
+    'type'           => ['client'],
+    'email'          => $diag_email_addr,
+    'identification' => $test_identification,   // ← incluir para que find_by_identification lo detecte
+    'kindOfPerson'   => 'PERSON_ENTITY',
+    'regime'         => 'SIMPLIFIED_REGIME',
 ]);
 $diag_response = wp_remote_post($diag_url, [
     'headers' => [
@@ -145,7 +148,8 @@ echo "       [DIAG] Respuesta ID: " . ($diag_decoded['id'] ?? 'none') . " | erro
 // Si el DIAG creó el contacto exitosamente, reutilizarlo en vez de crear otro
 if ( $diag_code === 200 && !empty($diag_decoded['id']) ) {
     $test_contact_id    = (int) $diag_decoded['id'];
-    $test_contact_email = 'qa-ltms-' . $diag_ts . '@test.lo-tengo.com.co'; // guardamos para deduplicación
+    $test_contact_email = $diag_email_addr;   // guardamos para deduplicación
+    $test_contact_name  = $diag_name;
     qa_ok( $qa, 'create_contact() — DIAG', "ID=$test_contact_id | " . ($diag_decoded['name']??'?') . " — HTTP 200 OK" );
 } else {
     // DIAG falló — intentar via método con email único diferente

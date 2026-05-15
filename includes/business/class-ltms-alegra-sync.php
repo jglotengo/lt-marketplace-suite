@@ -386,6 +386,8 @@ final class LTMS_Alegra_Sync {
                              ?: $order->get_meta( '_billing_nit' )
                              ?: '',
             'type'           => [ 'client' ],
+            'kindOfPerson'   => 'PERSON_ENTITY',
+            'regime'         => 'SIMPLIFIED_REGIME',
             'address'        => [
                 'address' => $order->get_billing_address_1(),
                 'city'    => $order->get_billing_city(),

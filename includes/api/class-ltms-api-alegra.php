@@ -186,33 +186,40 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
 
         $value_normalized = strtolower( trim( $value ) );
 
-        // Estrategia 1: usar ?query= (Alegra búsqueda full-text en nombre, email, identificación)
-        // Este parámetro está documentado en Alegra API v1 como búsqueda general.
-        $search_params = [ 'query' => $value, 'limit' => 30, 'start' => 0 ];
-        try {
-            $endpoint = '/contacts?' . http_build_query( $search_params );
-            $response = $this->perform_request( 'GET', $endpoint, [], [], false );
-            $contacts = is_array( $response ) ? ( $response['data'] ?? $response ) : [];
+        // Estrategia 1: ?query= con el valor buscado (funciona bien para nombres y emails en Alegra Colombia)
+        $queries = [ $value ];
 
-            if ( is_array( $contacts ) ) {
-                foreach ( $contacts as $contact ) {
-                    $contact_val = match ( $field ) {
-                        'email'          => strtolower( trim( $contact['email'] ?? '' ) ),
-                        'identification' => (string) ( $contact['identification'] ?? $contact['identificationObject']['number'] ?? '' ),
-                        default          => strtolower( trim( $contact['name'] ?? '' ) ),
-                    };
-                    if ( $contact_val === $value_normalized ) {
-                        return $contact;
-                    }
-                }
-            }
-        } catch ( \RuntimeException $e ) {
-            // Continuar con fallback
+        // Para email: también probar con la parte local antes del @
+        if ( $field === 'email' && str_contains( $value, '@' ) ) {
+            $queries[] = explode( '@', $value )[0];
         }
 
-        // Estrategia 2: paginación scan (hasta 5 páginas = 150 contactos)
+        foreach ( $queries as $q ) {
+            try {
+                $endpoint = '/contacts?' . http_build_query( [ 'query' => $q, 'limit' => 50, 'start' => 0 ] );
+                $response = $this->perform_request( 'GET', $endpoint, [], [], false );
+                $contacts = is_array( $response ) ? ( $response['data'] ?? $response ) : [];
+
+                if ( is_array( $contacts ) ) {
+                    foreach ( $contacts as $contact ) {
+                        $contact_val = match ( $field ) {
+                            'email'          => strtolower( trim( $contact['email'] ?? '' ) ),
+                            'identification' => (string) ( $contact['identification'] ?? $contact['identificationObject']['number'] ?? '' ),
+                            default          => strtolower( trim( $contact['name'] ?? '' ) ),
+                        };
+                        if ( $contact_val === $value_normalized ) {
+                            return $contact;
+                        }
+                    }
+                }
+            } catch ( \RuntimeException $e ) {
+                // Continuar con siguiente query
+            }
+        }
+
+        // Estrategia 2: paginación scan (hasta 5 páginas = 250 contactos)
         $start     = 0;
-        $limit     = 30;
+        $limit     = 50;
         $max_pages = 5;
 
         for ( $page = 0; $page < $max_pages; $page++ ) {
@@ -249,8 +256,8 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Obtiene o crea un contacto. Deduplica por identification, luego por email.
-     * Captura error 905/400 de duplicado y hace fallback a búsqueda por email.
+     * Obtiene o crea un contacto. Deduplica por identification, email y nombre.
+     * Captura error 905/400 de duplicado y hace fallback a búsqueda exhaustiva.
      */
     public function get_or_create_contact( array $contact_data ): array {
         $identification = $contact_data['identification'] ?? '';
@@ -269,42 +276,57 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             }
         }
 
+        // Búsqueda por nombre antes de crear (Alegra filtra bien con ?query=nombre)
+        $name = $contact_data['name'] ?? '';
+        if ( $name ) {
+            $existing = $this->search_contacts( 'name', $name );
+            if ( $existing ) {
+                return $existing;
+            }
+        }
+
         try {
             return $this->create_contact( $contact_data );
         } catch ( \RuntimeException $e ) {
-            // Alegra retorna 400 "error inesperado" cuando el email ya existe.
-            // Intentar buscar por email, luego crear sin email como último recurso.
-            $is_dup = $email && (
-                str_contains( $e->getMessage(), '400' )  ||
-                str_contains( $e->getMessage(), '905' )  ||
-                str_contains( $e->getMessage(), 'existe' ) ||
-                str_contains( $e->getMessage(), 'exist' ) ||
-                str_contains( $e->getMessage(), 'inesperado' )
-            );
+            // Alegra retorna 400 "error inesperado" cuando email o identification ya existe.
+            $is_dup = str_contains( $e->getMessage(), '400' )  ||
+                      str_contains( $e->getMessage(), '905' )  ||
+                      str_contains( $e->getMessage(), 'existe' ) ||
+                      str_contains( $e->getMessage(), 'exist' ) ||
+                      str_contains( $e->getMessage(), 'inesperado' );
 
             if ( $is_dup ) {
-                // Intento: buscar por email (puede que ya exista en Alegra)
-                $fallback = $this->find_contact_by_email( $email );
-                if ( $fallback ) {
-                    return $fallback;
+                // Reintento: buscar por email
+                if ( $email ) {
+                    $fallback = $this->find_contact_by_email( $email );
+                    if ( $fallback ) {
+                        return $fallback;
+                    }
                 }
-
-                // Último recurso: crear sin email para evitar duplicado
-                $data_no_email = $contact_data;
-                unset( $data_no_email['email'] );
-                try {
-                    return $this->create_contact( $data_no_email );
-                } catch ( \RuntimeException $e2 ) {
-                    throw new \RuntimeException(
-                        $e->getMessage() . ' [sin-email: ' . $e2->getMessage() . ']',
-                        (int) $e->getCode()
-                    );
+                // Reintento: buscar por nombre
+                if ( $name ) {
+                    $fallback = $this->search_contacts( 'name', $name );
+                    if ( $fallback ) {
+                        return $fallback;
+                    }
+                }
+                // Último recurso: crear sin email
+                if ( $email ) {
+                    $data_no_email = $contact_data;
+                    unset( $data_no_email['email'] );
+                    try {
+                        return $this->create_contact( $data_no_email );
+                    } catch ( \RuntimeException $e2 ) {
+                        throw new \RuntimeException(
+                            $e->getMessage() . ' [sin-email: ' . $e2->getMessage() . ']',
+                            (int) $e->getCode()
+                        );
+                    }
                 }
             }
             throw $e;
         }
     }
-
     // ── ITEMS (PRODUCTOS) ──────────────────────────────────────────
 
     /**
