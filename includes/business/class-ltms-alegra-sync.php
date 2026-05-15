@@ -279,8 +279,19 @@ final class LTMS_Alegra_Sync {
         try {
             $client = LTMS_Api_Factory::get( 'alegra' );
 
+            $sync_full_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+            $sync_words     = explode( ' ', $sync_full_name );
+            $sync_fn        = $sync_words[0] ?? $sync_full_name;
+            $sync_ln        = count($sync_words) > 1 ? implode( ' ', array_slice($sync_words, 1) ) : $sync_fn;
+
             $contact_data = [
-                'name'           => trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name,
+                'name'           => $sync_full_name,
+                'nameObject'     => [
+                    'firstName'      => $sync_fn,
+                    'secondName'     => null,
+                    'lastName'       => $sync_ln,
+                    'secondLastName' => null,
+                ],
                 'email'          => $user->user_email,
                 'identification' => get_user_meta( $user_id, 'ltms_nit', true )
                                  ?: get_user_meta( $user_id, 'ltms_document_number', true )
@@ -289,6 +300,8 @@ final class LTMS_Alegra_Sync {
                                  ?: get_user_meta( $user_id, 'billing_phone', true )
                                  ?: '',
                 'type'           => [ $type ],
+                'kindOfPerson'   => 'PERSON_ENTITY',
+                'regime'         => 'SIMPLIFIED_REGIME',
             ];
 
             $contact = $client->get_or_create_contact( $contact_data );

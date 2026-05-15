@@ -466,9 +466,13 @@ if ( $orders ) {
             echo "       No encontrado por email $billing_email — diagnóstico de creación directa:\n";
 
             // Intentar crear el contacto directamente para ver el error exacto de Alegra
-            $pre_name = trim($test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name()) ?: 'Cliente Final';
+            $pre_name  = trim($test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name()) ?: 'Cliente Final';
+            $pre_words = explode(' ', $pre_name);
+            $pre_fn    = $pre_words[0] ?? $pre_name;
+            $pre_ln    = count($pre_words) > 1 ? implode(' ', array_slice($pre_words, 1)) : $pre_fn;
             $pre_payload = wp_json_encode([
                 'name'         => $pre_name,
+                'nameObject'   => ['firstName' => $pre_fn, 'secondName' => null, 'lastName' => $pre_ln, 'secondLastName' => null],
                 'email'        => $billing_email,
                 'type'         => ['client'],
                 'kindOfPerson' => 'PERSON_ENTITY',
