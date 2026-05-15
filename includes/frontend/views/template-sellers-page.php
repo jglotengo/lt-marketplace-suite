@@ -35,7 +35,16 @@ get_header();
     <?php
     while ( have_posts() ) :
         the_post();
-        the_content();
+        global $post;
+        // Elementor filtra the_content() y lo reemplaza con su canvas vacío
+        // cuando la página tiene _elementor_edit_mode=builder.
+        // Leemos post_content directamente y aplicamos do_shortcode manualmente.
+        $el_mode = get_post_meta( $post->ID, '_elementor_edit_mode', true );
+        if ( $el_mode === 'builder' ) {
+            echo do_shortcode( $post->post_content );
+        } else {
+            the_content();
+        }
     endwhile;
     ?>
 </main>
