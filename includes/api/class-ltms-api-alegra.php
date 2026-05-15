@@ -97,18 +97,29 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         $payload = [
             'name' => sanitize_text_field( $contact_data['name'] ?? 'Sin nombre' ),
             // Alegra Colombia API v1 requiere 'type' como ARRAY: ['client'] o ['supplier'].
-            // get_or_create_buyer_contact() ya envía ['client'] — respetar el valor del caller.
-            'type' => is_array( $contact_data['type'] ?? 'client' ) ? ( $contact_data['type'] ?? ['client'] ) : [ $contact_data['type'] ?? 'client' ],
+            'type' => is_array( $contact_data['type'] ?? 'client' )
+                ? ( $contact_data['type'] ?? ['client'] )
+                : [ $contact_data['type'] ?? 'client' ],
+            // M-119: Alegra Colombia con facturación electrónica requiere kindOfPerson y regime.
+            // Sin estos campos la API retorna 905 "Ha ocurrido un error inesperado".
+            'kindOfPerson' => $contact_data['kindOfPerson'] ?? 'PERSON_ENTITY',
+            'regime'       => $contact_data['regime']       ?? 'SIMPLIFIED_REGIME',
         ];
 
         if ( ! empty( $contact_data['identification'] ) ) {
-            $payload['identification'] = sanitize_text_field( $contact_data['identification'] );
+            $id = sanitize_text_field( $contact_data['identification'] );
+            $payload['identification'] = $id;
+            // identificationObject requerido para facturación electrónica CO
+            $payload['identificationObject'] = [
+                'type'   => $contact_data['identificationType'] ?? 'CC',
+                'number' => $id,
+                'dv'     => null,
+            ];
         }
         if ( ! empty( $contact_data['email'] ) ) {
             $payload['email'] = sanitize_email( $contact_data['email'] );
         }
         if ( ! empty( $contact_data['phone'] ) ) {
-            // Alegra Colombia acepta solo dígitos en phonePrimary (máx 10 dígitos)
             $phone = preg_replace( '/\D/', '', $contact_data['phone'] );
             if ( strlen( $phone ) >= 7 ) {
                 $payload['phonePrimary'] = substr( $phone, 0, 10 );
@@ -120,9 +131,6 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
                 'city'    => sanitize_text_field( $contact_data['address']['city'] ?? '' ),
             ];
         }
-
-        // Nota: ignoreRepeated NO es un campo válido de la API Alegra Colombia (causa 400).
-        // La deduplicación se maneja vía get_or_create_contact() + find_contact_by_identification().
 
         return $this->perform_request( 'POST', '/contacts', $payload );
     }
