@@ -119,7 +119,7 @@ $diag_url   = 'https://api.alegra.com/api/v1/contacts';
 $diag_payload = wp_json_encode([
     'name' => 'QA LTMS ' . date('His'),
     'type' => ['client'],  // Alegra API v1: ARRAY requerido
-    'email' => 'qa-ltms-test@lo-tengo.com.co',  // email ayuda a evitar 400
+    'email' => 'qa-ltms-' . date('His') . '@test.lo-tengo.com.co',
 ]);
 $diag_response = wp_remote_post($diag_url, [
     'headers' => [
@@ -229,20 +229,18 @@ try {
 if ( $test_item_id ) {
     try {
         $updated = $alegra->update_item( $test_item_id, [ 'price' => 175000 ] );
-        // Alegra devuelve el precio en prices[0].price o directamente en price
-        $new_price = (float)( 
-            $updated['price'] ?? 
-            $updated['prices'][0]['price'] ?? 
-            $updated['inventory']['unitCost'] ?? 
-            0 
-        );
-        // Comparar con margen de tolerancia (puede incluir impuestos)
+        // Alegra devuelve price como array de objetos: price[0]['price']
+        $price_field = $updated['price'] ?? null;
+        if ( is_array( $price_field ) ) {
+            $new_price = (float)( $price_field[0]['price'] ?? 0 );
+        } else {
+            $new_price = (float)( $price_field ?? $updated['prices'][0]['price'] ?? 0 );
+        }
         if ( $new_price >= 175000 ) {
             qa_ok( $qa, 'update_item() precio actualizado', number_format($new_price,0,',','.') . ' COP' );
         } else {
-            // Verificar que el item existe (update puede devolver estructura diferente)
-            qa_warn( $qa, 'update_item() precio en respuesta', 
-                "raw=" . wp_json_encode(array_intersect_key($updated, array_flip(['price','prices','id','name']))) 
+            qa_warn( $qa, 'update_item() precio en respuesta',
+                "raw=" . wp_json_encode(array_intersect_key($updated, array_flip(['price','prices','id','name'])))
             );
         }
     } catch ( Throwable $e ) {

@@ -135,7 +135,6 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      */
     public function find_contact_by_identification( string $identification ): ?array {
         $response = $this->perform_request( 'GET', '/contacts', [], [], false );
-        // Filtrar localmente — Alegra no soporta filtro por identification vía query param
         $contacts = $response['data'] ?? $response;
         if ( ! is_array( $contacts ) ) {
             return null;
@@ -149,17 +148,42 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Obtiene o crea un contacto en Alegra.
-     * Usa la identificación fiscal como clave de deduplicación.
-     *
-     * @param array $contact_data Datos del contacto.
-     * @return array Contacto Alegra (con al menos 'id').
+     * Busca contacto por email. Alegra rechaza (905) emails duplicados.
+     */
+    public function find_contact_by_email( string $email ): ?array {
+        if ( ! $email ) {
+            return null;
+        }
+        $response = $this->perform_request( 'GET', '/contacts', [], [], false );
+        $contacts = $response['data'] ?? $response;
+        if ( ! is_array( $contacts ) ) {
+            return null;
+        }
+        $email_lower = strtolower( trim( $email ) );
+        foreach ( $contacts as $contact ) {
+            if ( strtolower( trim( $contact['email'] ?? '' ) ) === $email_lower ) {
+                return $contact;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Obtiene o crea un contacto. Deduplica por identification y luego por email.
+     * Alegra retorna 905 si el email ya existe — evitar con búsqueda previa.
      */
     public function get_or_create_contact( array $contact_data ): array {
         $identification = $contact_data['identification'] ?? '';
-
         if ( $identification ) {
             $existing = $this->find_contact_by_identification( $identification );
+            if ( $existing ) {
+                return $existing;
+            }
+        }
+
+        $email = $contact_data['email'] ?? '';
+        if ( $email ) {
+            $existing = $this->find_contact_by_email( $email );
             if ( $existing ) {
                 return $existing;
             }
