@@ -23,6 +23,9 @@ add_action( 'wp_head', function() {
     if ( ! wp_style_is( 'ltms-frontend-extensions', 'enqueued' ) ) {
         wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
     }
+    if ( ! wp_style_is( 'ltms-login-register', 'enqueued' ) ) {
+        wp_enqueue_style( 'ltms-login-register', $url . 'css/ltms-login-register.css', [ 'ltms-dashboard' ], $ver );
+    }
 }, 5 );
 
 get_header();

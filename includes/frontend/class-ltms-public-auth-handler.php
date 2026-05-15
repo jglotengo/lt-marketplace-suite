@@ -72,8 +72,10 @@ final class LTMS_Public_Auth_Handler {
     }
 
     /**
-     * M-73: Sirve un template propio para /sellers/ cuando el tema (Hello Elementor)
-     * no llama the_content() y el shortcode no se renderiza.
+     * M-73: Sirve un template propio para páginas LTMS cuando el tema (Hello Elementor)
+     * no llama the_content() y los shortcodes no se renderizan.
+     *
+     * Aplica a: [ltms_sellers_landing], [ltms_vendor_register], [ltms_vendor_login]
      *
      * @param string $template Template seleccionado por WordPress.
      * @return string Template a usar.
@@ -83,9 +85,29 @@ final class LTMS_Public_Auth_Handler {
             return $template;
         }
         $post = get_queried_object();
-        if ( ! $post || ! has_shortcode( $post->post_content, 'ltms_sellers_landing' ) ) {
+        if ( ! $post ) {
             return $template;
         }
+
+        $ltms_shortcodes = [
+            'ltms_sellers_landing',
+            'ltms_vendor_register',
+            'ltms_vendor_login',
+            'ltms_vendor_dashboard',
+        ];
+
+        $needs_bypass = false;
+        foreach ( $ltms_shortcodes as $sc ) {
+            if ( has_shortcode( $post->post_content, $sc ) ) {
+                $needs_bypass = true;
+                break;
+            }
+        }
+
+        if ( ! $needs_bypass ) {
+            return $template;
+        }
+
         $custom = LTMS_PLUGIN_DIR . 'includes/frontend/views/template-sellers-page.php';
         if ( file_exists( $custom ) ) {
             return $custom;
