@@ -87,21 +87,7 @@ final class LTMS_Frontend_Assets {
             'logout_url'     => wp_logout_url( home_url() ),
         ] );
 
-        // Inyectar CSS de posicionamiento para forzar visibilidad del botón flotante
-        wp_add_inline_style( 'ltms-header-nav', '
-            #ltms-floating-access {
-                position: fixed;
-                top: 12px;
-                right: 16px;
-                z-index: 99999;
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-            @media (max-width: 600px) {
-                #ltms-floating-access { top: 8px; right: 8px; }
-            }
-        ' );
+        // CSS inline eliminado — los estilos del flotante están en ltms-header-nav.css (M-118)
     }
 
     /**

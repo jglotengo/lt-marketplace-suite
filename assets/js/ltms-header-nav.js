@@ -146,8 +146,8 @@
             return $('<li class="menu-item ltms-menu-item" style="list-style:none;display:flex;align-items:center;"></li>').append(html);
         }
 
-        if ($sellerEl.length) {
-            // Reemplazar links existentes del tema
+        if ($sellerEl.length && $sellerEl.is(':visible')) {
+            // Reemplazar SOLO si visible (no oculto en burger menu)
             var $liSeller = $sellerEl.closest('li.menu-item').length
                 ? $sellerEl.closest('li.menu-item')
                 : $sellerEl.closest('li, .menu-item').first();
@@ -162,7 +162,7 @@
                 );
             }
 
-            if ($clienteEl.length) {
+            if ($clienteEl.length && $clienteEl.is(':visible')) {
                 var $liCliente = $clienteEl.closest('li.menu-item').length
                     ? $clienteEl.closest('li.menu-item')
                     : $clienteEl.closest('li, .menu-item').first();
