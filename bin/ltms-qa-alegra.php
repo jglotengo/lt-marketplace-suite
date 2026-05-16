@@ -469,6 +469,10 @@ if ( $t07_order ) {
 
     try {
         $sync   = new LTMS_Alegra_Sync();
+        // Refrescar el objeto desde BD tras el mock save() para evitar caché stale en HPOS
+        if ( $t07_mock_injected ) {
+            $t07_order = wc_get_order( $t07_order->get_id() );
+        }
         $result = $sync->create_invoice_for_order( $t07_order );
         if ( ! empty( $result['id'] ) ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];

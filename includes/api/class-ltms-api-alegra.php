@@ -288,9 +288,14 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         }
 
         try {
-            return $this->create_contact( $contact_data );
+            $created = $this->create_contact( $contact_data );
+            // AUDIT-FIX: verificar que la respuesta tiene ID válido
+            if ( empty( $created['id'] ) ) {
+                throw new \RuntimeException( 'Alegra create_contact sin ID en respuesta' );
+            }
+            return $created;
         } catch ( \RuntimeException $e ) {
-            // Alegra retorna 400 "error inesperado" cuando email o identification ya existe.
+            // Alegra retorna 400/905 "error inesperado" cuando email o identification ya existe.
             $is_dup = str_contains( $e->getMessage(), '400' )  ||
                       str_contains( $e->getMessage(), '905' )  ||
                       str_contains( $e->getMessage(), 'existe' ) ||
@@ -298,21 +303,28 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
                       str_contains( $e->getMessage(), 'inesperado' );
 
             if ( $is_dup ) {
-                // Reintento: buscar por email
+                // Reintento 1: buscar por email
                 if ( $email ) {
                     $fallback = $this->find_contact_by_email( $email );
-                    if ( $fallback ) {
+                    if ( $fallback && ! empty( $fallback['id'] ) ) {
                         return $fallback;
                     }
                 }
-                // Reintento: buscar por nombre
+                // Reintento 2: buscar por nombre
                 if ( $name ) {
                     $fallback = $this->search_contacts( 'name', $name );
-                    if ( $fallback ) {
+                    if ( $fallback && ! empty( $fallback['id'] ) ) {
                         return $fallback;
                     }
                 }
-                // Último recurso: crear sin email
+                // Reintento 3: buscar por identification con GET /contacts?query=id
+                if ( $identification ) {
+                    $fallback = $this->find_contact_by_identification( $identification );
+                    if ( $fallback && ! empty( $fallback['id'] ) ) {
+                        return $fallback;
+                    }
+                }
+                // Último recurso: crear sin email para evitar duplicado de email
                 if ( $email ) {
                     $data_no_email = $contact_data;
                     unset( $data_no_email['email'] );
