@@ -110,6 +110,13 @@ final class LTMS_Alegra_Sync {
                 $order->update_meta_data( '_ltms_alegra_invoice_status',  $invoice_status );
                 $order->update_meta_data( '_ltms_alegra_invoice_number',  $invoice_number );
                 $order->update_meta_data( '_ltms_alegra_synced_at',       current_time( 'mysql' ) );
+                // M-63: guardar estado de timbre DIAN y CUFE para trazabilidad de facturación electrónica.
+                if ( ! empty( $result['stamp']['status'] ) ) {
+                    $order->update_meta_data( '_ltms_alegra_stamp_status', sanitize_text_field( $result['stamp']['status'] ) );
+                }
+                if ( ! empty( $result['stamp']['cufe'] ) ) {
+                    $order->update_meta_data( '_ltms_alegra_cufe', sanitize_text_field( $result['stamp']['cufe'] ) );
+                }
                 $order->add_order_note(
                     sprintf( __( '📄 Factura Alegra creada: %s', 'ltms' ), $invoice_number )
                 );
