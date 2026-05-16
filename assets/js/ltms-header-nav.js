@@ -204,4 +204,32 @@
         injectButtons();
     });
 
+    // En móvil, si los botones quedaron dentro del menú colapsado (ancho restringido),
+    // moverlos al .site-header directamente.
+    $(window).on('load resize', function() {
+        if (typeof ltmsHeaderNav === 'undefined') return;
+        var $btn = $('.ltms-nav-btn, .ltms-header-access--seller, .ltms-header-access--cliente').first();
+        if (!$btn.length) return;
+        var w = window.innerWidth || document.documentElement.clientWidth;
+        if (w <= 768) {
+            // Si el botón no es visible o tiene ancho ≤ 40px (solo ícono), moverlo al header
+            var btnRect = $btn[0].getBoundingClientRect();
+            if (btnRect.width <= 42 || btnRect.height === 0) {
+                // Mover todos los botones LTMS al site-header como bloque flotante
+                if (!$('#ltms-hello-access').length) {
+                    var $access = $('.ltms-header-access, .ltms-header-access--seller, .ltms-header-access--cliente');
+                    var $container = $('<div id="ltms-hello-access"></div>');
+                    var $combined = $('<div class="ltms-header-access"></div>');
+                    $combined.append(buildSellerBtn(ltmsHeaderNav.sellers_url));
+                    var cHTML = buildClienteBtn(ltmsHeaderNav.mi_cuenta_url);
+                    if (cHTML) $combined.append(cHTML);
+                    $container.append($combined);
+                    $access.each(function(){ $(this).closest('li.ltms-menu-item, li').hide(); });
+                    $('.site-header').first().append($container);
+                    initDropdowns();
+                }
+            }
+        }
+    });
+
 })(jQuery);

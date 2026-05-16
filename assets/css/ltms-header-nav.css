@@ -387,3 +387,23 @@ li.ltms-menu-item-access {
   padding: 7px 14px;
   font-size: 12px;
 }
+
+/* ── Mobile rescue: botones reubicados al .site-header ──────────── */
+#ltms-hello-access {
+  position: absolute;
+  top: 50%;
+  right: 80px; /* izquierda del burger menu */
+  transform: translateY(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+}
+
+/* Cuando hello-access está en el header, los li originales se ocultan */
+.site-header li.ltms-menu-item { display: none !important; }
+
+@media (max-width: 480px) {
+  #ltms-hello-access { right: 64px; }
+  #ltms-hello-access .ltms-nav-btn { padding: 6px 8px; font-size: 10px; }
+  #ltms-hello-access .ltms-btn-label { display: inline !important; font-size: 10px; }
+}
