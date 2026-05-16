@@ -288,3 +288,71 @@
     padding: 5px 8px;
   }
 }
+
+/* ── Hello Elementor: fix overflow en menu-item con dropdown ─── */
+li.ltms-menu-item,
+li.ltms-menu-item-seller,
+li.ltms-menu-item-cliente,
+li.ltms-menu-item-access {
+  overflow: visible !important;
+  position: relative;
+  z-index: 100000 !important;
+}
+
+/* Fix: asegurar que el dropdown no quede cortado por el header del tema */
+.elementor-nav-menu--main .ltms-user-dropdown-wrap,
+.elementor-nav-menu .ltms-user-dropdown-wrap {
+  overflow: visible !important;
+  z-index: 100001 !important;
+}
+
+/* Hello Elementor Access Block integrado en .site-header */
+#ltms-hello-access {
+  position: absolute;
+  top: 50%;
+  right: 70px; /* dejar espacio al burger */
+  transform: translateY(-50%);
+  z-index: 100000;
+}
+@media (max-width: 768px) {
+  #ltms-hello-access {
+    right: 60px;
+  }
+}
+@media (max-width: 480px) {
+  #ltms-hello-access {
+    right: 52px;
+  }
+}
+
+/* Fallback flotante mejorado: barra con contexto, no iconos sueltos */
+#ltms-floating-access {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99997;
+  pointer-events: none;
+  height: 0;
+}
+#ltms-floating-access .ltms-header-access {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  pointer-events: auto;
+  background: rgba(10,10,10,0.93);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 7px 12px;
+  border-radius: 50px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  gap: 8px;
+  display: flex;
+  align-items: center;
+}
+/* En fallback: mostrar labels cortos en mobile */
+#ltms-floating-access .ltms-btn-label { display: inline !important; }
+#ltms-floating-access .ltms-nav-btn {
+  padding: 7px 14px;
+  font-size: 12px;
+}

@@ -1,18 +1,19 @@
 /**
- * LTMS Header Nav — Botones Seller / Cliente
- * v2.0.0 — UX/UI mejorado: dropdown touch, z-index correcto, mobile fallback limpio.
+ * LTMS Header Nav v2.1.0
+ * Fix: detecta Hello Elementor mobile, fallback con barra completa no iconos sueltos.
+ * Fix: dropdown no tapado por botón VENDER (z-index correcto en menu items).
  */
 (function($) {
     'use strict';
 
     var ICONS = {
-        seller:    '<svg class="ltms-btn-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 5h4v2h-4V5zm10 15H4V9h16v11z"/><path d="M13 13h-2v-2H9l3-3 3 3h-2z"/></svg>',
-        cliente:   '<svg class="ltms-btn-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>',
-        dashboard: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8v-10h-8zm0-18v6h8V3z"/></svg>',
-        orders:    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>',
-        wallet:    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>',
-        logout:    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>',
-        account:   '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>'
+        seller:    '<svg class="ltms-btn-icon" viewBox="0 0 24 24"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 5h4v2h-4V5zm10 15H4V9h16v11z"/><path d="M13 13h-2v-2H9l3-3 3 3h-2z"/></svg>',
+        cliente:   '<svg class="ltms-btn-icon" viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>',
+        dashboard: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8v-10h-8zm0-18v6h8V3z"/></svg>',
+        orders:    '<svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>',
+        wallet:    '<svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>',
+        logout:    '<svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>',
+        account:   '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>'
     };
 
     function getInitials(name) {
@@ -23,164 +24,175 @@
     }
 
     function buildSellerBtn(url) {
-        var data = ltmsHeaderNav;
-        if (data.is_vendor) {
+        var d = ltmsHeaderNav;
+        if (d.is_vendor) {
             return '<div class="ltms-user-dropdown-wrap" id="ltms-vendor-chip-wrap">' +
                 '<button class="ltms-user-chip" type="button" aria-haspopup="true" aria-expanded="false">' +
-                    '<span class="ltms-avatar-initials">' + getInitials(data.display_name) + '</span>' +
-                    '<span class="ltms-chip-name">' + data.display_name + '</span>' +
+                    '<span class="ltms-avatar-initials">' + getInitials(d.display_name) + '</span>' +
+                    '<span class="ltms-chip-name">' + d.display_name + '</span>' +
                     '<svg class="ltms-chip-arrow" viewBox="0 0 24 24" width="12" height="12" style="fill:currentColor;margin-left:2px;transition:transform .2s"><path d="M7 10l5 5 5-5z"/></svg>' +
                 '</button>' +
                 '<div class="ltms-user-dropdown" role="menu">' +
-                    '<a href="' + data.dashboard_url + '" role="menuitem">' + ICONS.dashboard + ' Mi Panel</a>' +
-                    '<a href="' + data.orders_url + '" role="menuitem">' + ICONS.orders + ' Mis Pedidos</a>' +
-                    '<a href="' + data.wallet_url + '" role="menuitem">' + ICONS.wallet + ' Mi Billetera</a>' +
+                    '<a href="' + d.dashboard_url + '">' + ICONS.dashboard + ' Mi Panel</a>' +
+                    '<a href="' + d.orders_url + '">' + ICONS.orders + ' Mis Pedidos</a>' +
+                    '<a href="' + d.wallet_url + '">' + ICONS.wallet + ' Mi Billetera</a>' +
                     '<div class="ltms-dropdown-divider"></div>' +
-                    '<a href="' + data.logout_url + '" role="menuitem">' + ICONS.logout + ' Cerrar Sesión</a>' +
+                    '<a href="' + d.logout_url + '">' + ICONS.logout + ' Cerrar Sesión</a>' +
                 '</div>' +
             '</div>';
         }
-        return '<div class="ltms-nav-btn-wrap">' +
-            '<a href="' + url + '" class="ltms-nav-btn ltms-btn-seller">' +
-                ICONS.seller +
-                '<span class="ltms-btn-label">Vender</span>' +
-                '<span class="ltms-badge">GRATIS</span>' +
-            '</a>' +
-        '</div>';
+        return '<a href="' + url + '" class="ltms-nav-btn ltms-btn-seller">' +
+            ICONS.seller + '<span class="ltms-btn-label">Vender</span>' +
+            '<span class="ltms-badge">GRATIS</span>' +
+        '</a>';
     }
 
     function buildClienteBtn(url) {
-        var data = ltmsHeaderNav;
-        if (data.is_vendor) return ''; // vendor ya tiene su chip
-        if (data.is_logged_in) {
+        var d = ltmsHeaderNav;
+        if (d.is_vendor) return '';
+        if (d.is_logged_in) {
             return '<div class="ltms-user-dropdown-wrap" id="ltms-cliente-chip-wrap">' +
                 '<button class="ltms-user-chip" type="button" aria-haspopup="true" aria-expanded="false">' +
-                    '<span class="ltms-avatar-initials">' + getInitials(data.display_name) + '</span>' +
-                    '<span class="ltms-chip-name">' + data.display_name + '</span>' +
+                    '<span class="ltms-avatar-initials">' + getInitials(d.display_name) + '</span>' +
+                    '<span class="ltms-chip-name">' + d.display_name + '</span>' +
                     '<svg class="ltms-chip-arrow" viewBox="0 0 24 24" width="12" height="12" style="fill:currentColor;margin-left:2px;transition:transform .2s"><path d="M7 10l5 5 5-5z"/></svg>' +
                 '</button>' +
                 '<div class="ltms-user-dropdown" role="menu">' +
-                    '<a href="' + url + '" role="menuitem">' + ICONS.account + ' Mi Cuenta</a>' +
-                    '<a href="' + data.orders_url + '" role="menuitem">' + ICONS.orders + ' Mis Pedidos</a>' +
+                    '<a href="' + url + '">' + ICONS.account + ' Mi Cuenta</a>' +
+                    '<a href="' + d.orders_url + '">' + ICONS.orders + ' Mis Pedidos</a>' +
                     '<div class="ltms-dropdown-divider"></div>' +
-                    '<a href="' + data.logout_url + '" role="menuitem">' + ICONS.logout + ' Cerrar Sesión</a>' +
+                    '<a href="' + d.logout_url + '">' + ICONS.logout + ' Cerrar Sesión</a>' +
                 '</div>' +
             '</div>';
         }
-        return '<div class="ltms-nav-btn-wrap">' +
-            '<a href="' + url + '" class="ltms-nav-btn ltms-btn-cliente">' +
-                ICONS.cliente +
-                '<span class="ltms-btn-label">Mi Cuenta</span>' +
-            '</a>' +
-        '</div>';
+        return '<a href="' + url + '" class="ltms-nav-btn ltms-btn-cliente">' +
+            ICONS.cliente + '<span class="ltms-btn-label">Mi Cuenta</span>' +
+        '</a>';
     }
 
-    // ── Dropdown touch / click ─────────────────────────────────────────────────
     function initDropdowns() {
-        // Overlay para cerrar al clickear fuera
         var $overlay = $('<div id="ltms-dd-overlay"></div>').css({
-            position: 'fixed', inset: 0, zIndex: 99998, display: 'none'
+            position:'fixed', inset:0, zIndex:99998, display:'none'
         }).appendTo('body');
 
         function closeAll() {
-            $('.ltms-user-dropdown-wrap.is-open').each(function() {
-                $(this).removeClass('is-open')
-                    .find('.ltms-user-chip').attr('aria-expanded', 'false')
-                    .find('.ltms-chip-arrow').css('transform', '');
-            });
+            $('.ltms-user-dropdown-wrap.is-open').removeClass('is-open')
+                .find('.ltms-user-chip').attr('aria-expanded','false')
+                .find('.ltms-chip-arrow').css('transform','');
             $overlay.hide();
         }
 
-        $overlay.on('click touchstart', function(e) {
-            e.preventDefault();
-            closeAll();
-        });
+        $overlay.on('click touchstart', function(e) { e.preventDefault(); closeAll(); });
 
         $(document).on('click touchstart', '.ltms-user-chip', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             var $wrap = $(this).closest('.ltms-user-dropdown-wrap');
-            var isOpen = $wrap.hasClass('is-open');
+            var wasOpen = $wrap.hasClass('is-open');
             closeAll();
-            if (!isOpen) {
+            if (!wasOpen) {
                 $wrap.addClass('is-open')
-                    .find('.ltms-user-chip').attr('aria-expanded', 'true')
-                    .find('.ltms-chip-arrow').css('transform', 'rotate(180deg)');
+                    .find('.ltms-user-chip').attr('aria-expanded','true')
+                    .find('.ltms-chip-arrow').css('transform','rotate(180deg)');
                 $overlay.show();
             }
         });
 
-        // Cerrar con Escape
-        $(document).on('keydown', function(e) {
-            if (e.key === 'Escape') closeAll();
-        });
-
-        // Evitar que clicks dentro del dropdown cierren el overlay
-        $(document).on('click touchstart', '.ltms-user-dropdown', function(e) {
-            e.stopPropagation();
-        });
+        $(document).on('keydown', function(e) { if (e.key === 'Escape') closeAll(); });
+        $(document).on('click touchstart', '.ltms-user-dropdown', function(e) { e.stopPropagation(); });
     }
 
-    // ── Inyección de botones ───────────────────────────────────────────────────
     function injectButtons() {
         if ($('#ltms-floating-access').length || $('.ltms-header-access').length) return;
 
-        var data       = ltmsHeaderNav;
-        var sellerUrl  = data.sellers_url   || '/sellers/';
-        var clienteUrl = data.mi_cuenta_url || '/mi-cuenta/';
+        var d          = ltmsHeaderNav;
+        var sellerUrl  = d.sellers_url   || '/sellers/';
+        var clienteUrl = d.mi_cuenta_url || '/mi-cuenta/';
 
+        // Construir HTML de botones
         var $wrap = $('<div class="ltms-header-access" id="ltms-header-access"></div>');
         $wrap.append(buildSellerBtn(sellerUrl));
-        var clienteHTML = buildClienteBtn(clienteUrl);
-        if (clienteHTML) $wrap.append(clienteHTML);
+        var cHTML = buildClienteBtn(clienteUrl);
+        if (cHTML) $wrap.append(cHTML);
 
-        // Buscar botón VENDER existente en el tema
+        // Buscar elementos existentes del tema
         var $sellerEl = $('a').filter(function() {
             var href = ($(this).attr('href') || '').toLowerCase();
             var text = $(this).text().trim().toLowerCase();
             return href.includes('/sellers') || href.includes('/vender') ||
-                   text === 'seller' || text === 'vendedor' || text === 'vender';
+                   text === 'seller' || text === 'vendedor' || text === 'vender' ||
+                   text.includes('vender gratis');
         }).first();
 
-        // Buscar botón Mi Cuenta existente
         var $clienteEl = $('a').filter(function() {
             var href = ($(this).attr('href') || '').toLowerCase();
             var text = $(this).text().trim().toLowerCase();
-            return href.includes('mi-cuenta') || href.includes('my-account') ||
-                   text === 'mi cuenta' || text === 'my account';
+            return (href.includes('mi-cuenta') || href.includes('my-account') ||
+                    text === 'mi cuenta' || text === 'my account') &&
+                   !$(this).closest('#ltms-header-access, .ltms-header-access, #ltms-hello-access').length;
         }).first();
 
-        // Zonas del header conocidas
-        var $headerTarget = $(
+        // Zonas de header de temas conocidos
+        var $headerZone = $(
             '.site-header__actions, .header-actions, .header__right,' +
             '.nav-bar__actions, .header-end, .header-cta, .header__cta,' +
             '.masthead-actions, header .right, .header-tools'
         ).first();
 
+        // Hello Elementor: menú principal
+        var $helloMenu = $('.elementor-nav-menu--main > .elementor-nav-menu').first();
+        var $helloHeader = $('.site-header').first();
+
+        function wrapInLi(html) {
+            return $('<li class="menu-item ltms-menu-item" style="list-style:none;display:flex;align-items:center;"></li>').append(html);
+        }
+
         if ($sellerEl.length) {
-            var $sellerOnly = $('<div class="ltms-header-access ltms-header-access--seller" id="ltms-header-access-seller"></div>').append(buildSellerBtn(sellerUrl));
-            var $pSeller = $sellerEl.closest('li').length ? $sellerEl.closest('li') : $sellerEl.closest('.menu-item, [class*="btn"], div, span').first();
-            $pSeller.replaceWith($sellerOnly);
+            // Reemplazar links existentes del tema
+            var $liSeller = $sellerEl.closest('li.menu-item').length
+                ? $sellerEl.closest('li.menu-item')
+                : $sellerEl.closest('li, .menu-item').first();
+
+            if ($liSeller.length) {
+                $liSeller.replaceWith(wrapInLi(
+                    $('<div class="ltms-header-access ltms-header-access--seller"></div>').append(buildSellerBtn(sellerUrl))
+                ));
+            } else {
+                $sellerEl.replaceWith(
+                    $('<div class="ltms-header-access ltms-header-access--seller"></div>').append(buildSellerBtn(sellerUrl))
+                );
+            }
 
             if ($clienteEl.length) {
-                var clienteHTML2 = buildClienteBtn(clienteUrl);
-                if (clienteHTML2) {
-                    var $clienteOnly = $('<div class="ltms-header-access ltms-header-access--cliente" id="ltms-header-access-cliente"></div>').append(clienteHTML2);
-                    var $pCliente = $clienteEl.closest('li').length ? $clienteEl.closest('li') : $clienteEl.closest('.menu-item, [class*="btn"], div, span').first();
-                    $pCliente.replaceWith($clienteOnly);
-                } else {
-                    $clienteEl.closest('li, .menu-item, div, span').first().remove();
-                }
+                var $liCliente = $clienteEl.closest('li.menu-item').length
+                    ? $clienteEl.closest('li.menu-item')
+                    : $clienteEl.closest('li, .menu-item').first();
+                var $cWrap = $('<div class="ltms-header-access ltms-header-access--cliente"></div>').append(buildClienteBtn(clienteUrl));
+                if ($liCliente.length) $liCliente.replaceWith(wrapInLi($cWrap));
+                else $clienteEl.replaceWith($cWrap);
             }
+
+        } else if ($helloMenu.length) {
+            // Hello Elementor sin seller — agregar al final del menú
+            $helloMenu.append(wrapInLi($wrap));
+
         } else if ($clienteEl.length) {
-            var $pC = $clienteEl.closest('li').length ? $clienteEl.closest('li') : $clienteEl.closest('.menu-item, [class*="btn"], div, span').first();
-            $pC.replaceWith($wrap);
-        } else if ($headerTarget.length) {
-            $headerTarget.append($wrap);
+            var $liC2 = $clienteEl.closest('li.menu-item').length
+                ? $clienteEl.closest('li.menu-item')
+                : $clienteEl.closest('li, .menu-item').first();
+            if ($liC2.length) $liC2.replaceWith(wrapInLi($wrap));
+            else $clienteEl.replaceWith($wrap);
+
+        } else if ($headerZone.length) {
+            $headerZone.append($wrap);
+
+        } else if ($helloHeader.length) {
+            // Hello Elementor sin menú visible — insertar dentro del .site-header
+            $helloHeader.append($('<div id="ltms-hello-access"></div>').append($wrap));
+
         } else {
-            // Fallback: barra flotante en la parte superior
+            // Fallback: barra superior completa con contexto visual
             $('body').append(
-                $('<div id="ltms-floating-access" role="navigation" aria-label="Acceso vendedor"></div>').append($wrap)
+                $('<div id="ltms-floating-access" role="navigation" aria-label="Acceso vendedor/cuenta"></div>').append($wrap)
             );
         }
 
