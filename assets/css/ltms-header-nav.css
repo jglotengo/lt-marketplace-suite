@@ -255,22 +255,31 @@
 @media (max-width: 768px) {
   .ltms-header-access { gap: 6px; }
 
-  /* Botones en header normal */
+  /* Botones: compactos pero con texto siempre visible */
   .ltms-nav-btn {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 7px 10px;
+    font-size: 11px;
     gap: 5px;
+    white-space: nowrap;
   }
-  .ltms-nav-btn .ltms-btn-icon { width:17px; height:17px; }
-  .ltms-nav-btn.ltms-btn-seller,
-  .ltms-nav-btn.ltms-btn-cliente { padding: 8px 10px; }
+  .ltms-nav-btn .ltms-btn-icon { width:15px; height:15px; }
 
-  /* Chip: ocultar nombre, solo iniciales */
+  /* Ocultar badge GRATIS en móvil para ahorrar espacio */
+  .ltms-nav-btn .ltms-badge { display: none; }
+
+  /* Etiqueta SIEMPRE visible — nunca ocultar en mobile */
+  .ltms-nav-btn .ltms-btn-label {
+    display: inline !important;
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+
+  /* Chip logueado: ocultar nombre, solo iniciales */
   .ltms-user-chip .ltms-chip-name { display: none; }
   .ltms-user-chip { padding: 4px; border-radius: 50%; gap: 0; }
   .ltms-user-chip .ltms-avatar-initials { width:32px; height:32px; font-size:12px; }
 
-  /* Dropdown en mobile: aparece arriba o abajo según espacio */
+  /* Dropdown en mobile */
   .ltms-user-dropdown {
     right: 0;
     left: auto;
@@ -281,7 +290,19 @@
 }
 
 @media (max-width: 480px) {
-  .ltms-header-access { gap: 5px; }
+  .ltms-header-access { gap: 4px; }
+
+  .ltms-nav-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+  .ltms-nav-btn .ltms-btn-icon { width:14px; height:14px; }
+  .ltms-nav-btn .ltms-btn-label {
+    display: inline !important;
+    font-size: 10px;
+  }
+
   #ltms-floating-access .ltms-header-access {
     top: 8px;
     right: 8px;
@@ -314,14 +335,24 @@ li.ltms-menu-item-access {
   transform: translateY(-50%);
   z-index: 100000;
 }
+/* En hello-access: label siempre visible */
+#ltms-hello-access .ltms-btn-label { display: inline !important; }
+#ltms-hello-access .ltms-badge { display: none; } /* ocultar GRATIS para ahorrar espacio */
+
 @media (max-width: 768px) {
   #ltms-hello-access {
-    right: 60px;
+    right: 58px;
   }
 }
 @media (max-width: 480px) {
   #ltms-hello-access {
-    right: 52px;
+    right: 50px;
+  }
+  /* En pantallas muy pequeñas: reducir padding del botón al mínimo */
+  #ltms-hello-access .ltms-nav-btn {
+    padding: 5px 7px;
+    font-size: 10px;
+    gap: 3px;
   }
 }
 
