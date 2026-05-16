@@ -445,12 +445,16 @@ if ( ! $t07_order ) {
     $fallback_orders = wc_get_orders([ 'status' => ['completed','processing'], 'limit' => 5 ]);
     if ( $fallback_orders ) {
         $t07_order = $fallback_orders[0];
-        // Inyectar metas ficticios temporalmente
-        $t07_mock_vendor_id  = get_current_user_id() ?: 1;
+        // Usar el customer del pedido como vendor mock (ya puede tener contacto Alegra)
+        $t07_mock_vendor_id  = (int) $t07_order->get_customer_id() ?: ( get_current_user_id() ?: 1 );
         $t07_mock_commission = 15000.0; // COP
         $t07_order->update_meta_data( '_ltms_vendor_id', $t07_mock_vendor_id );
         $t07_order->update_meta_data( '_ltms_platform_fee', $t07_mock_commission );
+        // CRÍTICO: save() + limpiar caché HPOS para que create_invoice_for_order() lea valores frescos
         $t07_order->save();
+        clean_post_cache( $t07_order->get_id() );
+        wc_delete_shop_order_transients( $t07_order->get_id() );
+        $t07_order = wc_get_order( $t07_order->get_id() ); // releer objeto fresco
         $t07_mock_injected = true;
         echo "       [MOCK] Pedido #{$t07_order->get_id()} sin vendor — inyectando vendor_id=$t07_mock_vendor_id, platform_fee=$t07_mock_commission COP\n";
     }
