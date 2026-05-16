@@ -396,6 +396,11 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['observations'] = substr( sanitize_textarea_field( $invoice_data['observations'] ), 0, 500 );
         }
 
+        // M-65: anotation is a WC order reference tag used internally by Alegra (different from observations).
+        if ( ! empty( $invoice_data['anotation'] ) ) {
+            $payload['anotation'] = sanitize_text_field( substr( $invoice_data['anotation'], 0, 100 ) );
+        }
+
         if ( ! empty( $invoice_data['seller_id'] ) ) {
             $payload['seller'] = [ 'id' => (int) $invoice_data['seller_id'] ];
         }
