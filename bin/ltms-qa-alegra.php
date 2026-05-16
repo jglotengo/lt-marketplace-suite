@@ -412,72 +412,72 @@ if ( $test_contact_id && $test_item_id ) {
 // ── T-07: FACTURACIÓN DE COMISIÓN DESDE PEDIDO WC ─────────────────────────────
 qa_section( 'T-07 · Facturación de comisión marketplace → vendedor' );
 
-// El modelo actual: la factura Alegra es del marketplace AL VENDEDOR por comisión.
-// create_invoice_for_order() requiere _ltms_vendor_id y _ltms_platform_fee en el pedido.
+// Estrategia: crear un pedido WC real temporal para la prueba.
+// Esto evita por completo el problema de caché HPOS al parchear pedidos de producción.
+$t07_order         = null;
+$t07_order_created = false;
+$t07_vendor_id     = null;
 
-// 1. Buscar un pedido real que ya tenga vendor_id (sin factura Alegra)
-$t07_orders = wc_get_orders([
-    'status' => [ 'completed', 'processing' ],
-    'limit'  => 20,
-    'meta_query' => [
-        [
-            'key'     => '_ltms_alegra_invoice_id',
-            'compare' => 'NOT EXISTS',
-        ],
-        [
-            'key'     => '_ltms_vendor_id',
-            'compare' => 'EXISTS',
-        ],
-    ],
-]);
-
-$t07_order = null;
-foreach ( $t07_orders as $o ) {
-    if ( (int) $o->get_meta('_ltms_vendor_id') > 0 ) {
-        $t07_order = $o; break;
+// Usar el contacto Alegra ya cacheado en BD para el usuario 18 (o el admin)
+$t07_test_user_id  = 18;
+$t07_contact_cache = (int) get_user_meta( $t07_test_user_id, '_ltms_alegra_contact_id', true );
+if ( ! $t07_contact_cache ) {
+    // Buscar cualquier usuario con contacto Alegra cacheado
+    $users_with_contact = get_users([
+        'meta_key'     => '_ltms_alegra_contact_id',
+        'meta_compare' => '>',
+        'meta_value'   => '0',
+        'number'       => 1,
+        'fields'       => 'ID',
+    ]);
+    if ( $users_with_contact ) {
+        $t07_test_user_id  = (int) $users_with_contact[0];
+        $t07_contact_cache = (int) get_user_meta( $t07_test_user_id, '_ltms_alegra_contact_id', true );
     }
 }
 
-// 2. Si no hay pedido real con vendor, crear un contexto de prueba mock
-$t07_mock_injected = false;
-if ( ! $t07_order ) {
-    // Buscar cualquier pedido y simular el contexto
-    $fallback_orders = wc_get_orders([ 'status' => ['completed','processing'], 'limit' => 5 ]);
-    if ( $fallback_orders ) {
-        $t07_order = $fallback_orders[0];
-        // Usar el customer del pedido como vendor mock (ya puede tener contacto Alegra)
-        $t07_mock_vendor_id  = (int) $t07_order->get_customer_id() ?: ( get_current_user_id() ?: 1 );
-        $t07_mock_commission = 15000.0; // COP
-        $t07_order->update_meta_data( '_ltms_vendor_id', $t07_mock_vendor_id );
-        $t07_order->update_meta_data( '_ltms_platform_fee', $t07_mock_commission );
-        // CRÍTICO: save() + limpiar caché HPOS para que create_invoice_for_order() lea valores frescos
-        $t07_order->save();
-        clean_post_cache( $t07_order->get_id() );
-        wc_delete_shop_order_transients( $t07_order->get_id() );
-        $t07_order = wc_get_order( $t07_order->get_id() ); // releer objeto fresco
-        $t07_mock_injected = true;
-        echo "       [MOCK] Pedido #{$t07_order->get_id()} sin vendor — inyectando vendor_id=$t07_mock_vendor_id, platform_fee=$t07_mock_commission COP\n";
-    }
+// Obtener un producto de WooCommerce para el pedido
+$t07_product_id = 0;
+$products = wc_get_products([ 'status' => 'publish', 'limit' => 1 ]);
+if ( $products ) {
+    $t07_product_id = $products[0]->get_id();
 }
 
-if ( $t07_order ) {
-    $oid        = $t07_order->get_id();
-    $vendor_id  = (int) $t07_order->get_meta( '_ltms_vendor_id' );
-    $platform_fee = (float) $t07_order->get_meta( '_ltms_platform_fee' );
-    echo "       Pedido #$oid | estado=" . $t07_order->get_status() . " | total=" . number_format((float)$t07_order->get_total(),0,',','.') . " | vendor_id=$vendor_id\n";
-    echo "       Platform fee (comisión): $" . number_format($platform_fee, 0, ',', '.') . " COP\n";
-
-    // Asegurar que el vendedor tiene contacto en Alegra
-    $vendor_contact_id = (int) get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true );
-    echo "       Cache _ltms_alegra_contact_id vendedor: " . ($vendor_contact_id ?: 'no cacheado') . "\n";
-
+if ( $t07_product_id && class_exists( 'WC_Order' ) ) {
     try {
-        $sync   = new LTMS_Alegra_Sync();
-        // Refrescar el objeto desde BD tras el mock save() para evitar caché stale en HPOS
-        if ( $t07_mock_injected ) {
-            $t07_order = wc_get_order( $t07_order->get_id() );
+        // Crear pedido real temporal
+        $t07_order = wc_create_order([
+            'customer_id' => $t07_test_user_id,
+            'status'      => 'processing',
+        ]);
+        if ( is_wp_error( $t07_order ) ) {
+            throw new \RuntimeException( 'wc_create_order falló: ' . $t07_order->get_error_message() );
         }
+        // Agregar producto
+        $t07_order->add_product( wc_get_product( $t07_product_id ), 1 );
+        // Asignar datos de billing
+        $t07_user = get_userdata( $t07_test_user_id );
+        $t07_order->set_billing_email( $t07_user ? $t07_user->user_email : 'qa-t07@lo-tengo.com.co' );
+        $t07_order->set_billing_first_name( 'QA' );
+        $t07_order->set_billing_last_name( 'Vendor Test' );
+        // Asignar vendor y comisión directamente en el objeto nuevo (sin HPOS cache)
+        $t07_vendor_id      = $t07_test_user_id;
+        $t07_mock_commission = 15000.0;
+        $t07_order->update_meta_data( '_ltms_vendor_id',   $t07_vendor_id );
+        $t07_order->update_meta_data( '_ltms_platform_fee', $t07_mock_commission );
+        $t07_order->calculate_totals();
+        $t07_order->save();
+        $t07_order_created = true;
+
+        // Releer desde BD para tener objeto completamente limpio
+        $t07_order = wc_get_order( $t07_order->get_id() );
+        $oid = $t07_order->get_id();
+        echo "       [MOCK] Pedido #$oid creado | vendor_id=$t07_vendor_id | platform_fee=" . number_format($t07_mock_commission,0,',','.') . " COP\n";
+        echo "       Cache _ltms_alegra_contact_id vendedor: " . ($t07_contact_cache ?: 'no cacheado') . "\n";
+
+        $sync   = new LTMS_Alegra_Sync();
         $result = $sync->create_invoice_for_order( $t07_order );
+
         if ( ! empty( $result['id'] ) ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
             $status  = $result['status'] ?? '?';
@@ -488,21 +488,20 @@ if ( $t07_order ) {
         } else {
             qa_fail( $qa, 'create_invoice_for_order()', 'Sin ID en respuesta: ' . wp_json_encode($result) );
         }
-    } catch ( Throwable $e ) {
+    } catch ( \Throwable $e ) {
         qa_fail( $qa, 'create_invoice_for_order()', $e->getMessage() );
-        echo "       vendor_id: $vendor_id\n";
-        echo "       platform_fee: $platform_fee\n";
+        echo "       vendor_id: $t07_vendor_id\n";
+        echo "       contact_cache: $t07_contact_cache\n";
     } finally {
-        // Limpiar metas mock para no corromper el pedido real
-        if ( $t07_mock_injected ) {
-            $t07_order->delete_meta_data( '_ltms_vendor_id' );
-            $t07_order->delete_meta_data( '_ltms_platform_fee' );
-            $t07_order->save();
-            echo "       [MOCK] Metas temporales eliminados del pedido #$oid\n";
+        // Eliminar el pedido de prueba completamente
+        if ( $t07_order_created && $t07_order ) {
+            $oid_clean = $t07_order->get_id();
+            $t07_order->delete( true ); // forceDelete
+            echo "       [CLEANUP] Pedido de prueba #$oid_clean eliminado\n";
         }
     }
 } else {
-    qa_warn( $qa, 'T-07 omitido', 'Sin pedidos completados/processing disponibles' );
+    qa_warn( $qa, 'T-07 omitido', 'Sin productos publicados disponibles para crear pedido de prueba' );
 }
 
 // ── T-08: WEBHOOK HANDLER ─────────────────────────────────────────────────────
