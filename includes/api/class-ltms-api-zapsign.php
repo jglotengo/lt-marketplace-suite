@@ -264,15 +264,34 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             // Usar plantilla ZapSign — NO requiere PDF adicional
             $doc_data['template_id'] = $template_id;
         } elseif ( ! empty( $pdf_url ) ) {
-            $doc_data['pdf_url'] = $pdf_url;
+            // Preferir base64 si el PDF es local (evita bloqueo Cloudflare en url_pdf)
+            $local_path = $this->url_to_local_path( $pdf_url );
+            if ( $local_path && file_exists( $local_path ) ) {
+                $doc_data['pdf_base64'] = base64_encode( file_get_contents( $local_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+            } else {
+                $doc_data['pdf_url'] = $pdf_url;
+            }
         } else {
             // Fallback: intentar leer PDF desde Media Library o config
             $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
             $fallback_url  = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
+            if ( empty( $fallback_url ) ) {
+                $fallback_url = get_option( 'ltms_zapsign_contract_pdf_url', '' );
+            }
             if ( $attachment_id > 0 ) {
-                $doc_data['pdf_url'] = wp_get_attachment_url( $attachment_id );
+                $att_path = get_attached_file( $attachment_id );
+                if ( $att_path && file_exists( $att_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $att_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+                } else {
+                    $doc_data['pdf_url'] = wp_get_attachment_url( $attachment_id );
+                }
             } elseif ( ! empty( $fallback_url ) ) {
-                $doc_data['pdf_url'] = $fallback_url;
+                $local_path = $this->url_to_local_path( $fallback_url );
+                if ( $local_path && file_exists( $local_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $local_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+                } else {
+                    $doc_data['pdf_url'] = $fallback_url;
+                }
             } else {
                 throw new \RuntimeException( '[zapsign] send_vendor_contract: se requiere template_id, pdf_url, o configurar el PDF del contrato.' );
             }
@@ -327,6 +346,20 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
                 'message'   => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Convierte una URL del sitio a ruta local en disco.
+     * Retorna null si la URL es externa.
+     */
+    private function url_to_local_path( string $url ): ?string {
+        $site_url = rtrim( get_site_url(), '/' );
+        if ( strpos( $url, $site_url ) !== 0 ) {
+            return null; // URL externa
+        }
+        $relative = ltrim( substr( $url, strlen( $site_url ) ), '/' );
+        $abspath   = rtrim( ABSPATH, '/' );
+        return $abspath . '/' . $relative;
     }
 
     // ── Helpers privados ──────────────────────────────────────────
