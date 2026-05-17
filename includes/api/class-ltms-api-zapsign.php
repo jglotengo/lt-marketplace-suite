@@ -34,10 +34,16 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * Constructor.
      */
     public function __construct() {
-        // Bug fix: abstract client usa $this->api_url (no $this->base_url) para construir URLs
+        $this->provider_slug = 'zapsign';
+        // Must set api_url BEFORE parent::__construct() and verify AFTER
         $this->api_url   = self::API_BASE;
         $this->api_token = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_zapsign_api_token', '' ) );
         parent::__construct();
+
+        // Re-set api_url AFTER parent in case parent overrides it (defensive)
+        if ( empty( $this->api_url ) ) {
+            $this->api_url = self::API_BASE;
+        }
 
         // ZapSign usa Bearer token en Authorization header
         $this->default_headers['Authorization'] = 'Bearer ' . $this->api_token;

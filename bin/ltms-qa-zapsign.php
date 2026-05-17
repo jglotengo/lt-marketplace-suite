@@ -9,6 +9,23 @@ if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
 }
 
+// Invalidar OPcache para asegurar que se usa el código más reciente del disco
+if ( function_exists( 'opcache_reset' ) ) {
+    opcache_reset();
+} elseif ( function_exists( 'opcache_invalidate' ) ) {
+    $files_to_invalidate = [
+        __DIR__ . '/../includes/api/class-ltms-api-zapsign.php',
+        __DIR__ . '/../includes/api/webhooks/class-ltms-zapsign-webhook-handler.php',
+        __DIR__ . '/../includes/business/class-ltms-zapsign-kyc-listener.php',
+        __FILE__,
+    ];
+    foreach ( $files_to_invalidate as $f ) {
+        if ( file_exists( $f ) ) {
+            opcache_invalidate( $f, true );
+        }
+    }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 $qa    = [ 'pass' => 0, 'fail' => 0, 'warn' => 0, 'fails' => [] ];
 $docs_created = [];
@@ -88,6 +105,19 @@ try {
 // ── T-03: Health Check ────────────────────────────────────────────────────────
 qa_section( 'T-03 · Health Check — conectividad con API ZapSign' );
 if ( $zapsign ) {
+    // Diagnóstico de api_url via reflexión
+    try {
+        $rfl      = new ReflectionObject( $zapsign );
+        $prop_url = $rfl->getProperty( 'api_url' );
+        $prop_url->setAccessible( true );
+        $current_api_url = $prop_url->getValue( $zapsign );
+        echo "       [DIAG-T03] api_url='{$current_api_url}'\n";
+        if ( empty( $current_api_url ) ) {
+            echo "       [DIAG-T03] ⚠️  api_url está vacío — OPcache sirviendo versión vieja\n";
+        }
+    } catch ( Throwable $e ) {
+        echo "       [DIAG-T03] No se pudo leer api_url: {$e->getMessage()}\n";
+    }
     try {
         $health = $zapsign->health_check();
         if ( ! empty( $health['connected'] ) ) {
@@ -217,7 +247,24 @@ $mock1->set_body( wp_json_encode([
 ]) );
 $mock1->set_header( 'content-type', 'application/json' );
 // Enviar el token descifrado como x-zapsign-token (lo que ZapSign real envía)
-$decrypted_for_webhook = ( isset($decrypted) && $decrypted ) ? $decrypted : $zapsign_token;
+// Diagnóstico completo del token para webhook
+$raw_token_for_diag  = LTMS_Core_Config::get( 'ltms_zapsign_api_token', '' );
+$has_v1_prefix       = str_starts_with( $raw_token_for_diag, 'v1:' );
+$decrypted_for_diag  = $has_v1_prefix
+    ? LTMS_Core_Security::decrypt( $raw_token_for_diag )
+    : $raw_token_for_diag; // ya en texto plano si no tiene prefijo v1:
+$decrypted_for_webhook = $decrypted_for_diag ?: $zapsign_token;
+
+echo "       [DIAG-T07] raw_token prefix=v1:" . ($has_v1_prefix ? 'yes' : 'no') . " | raw_len=" . strlen($raw_token_for_diag) . "\n";
+echo "       [DIAG-T07] decrypted_len=" . strlen($decrypted_for_webhook) . " | first_20_chars=" . substr($decrypted_for_webhook, 0, 20) . "...\n";
+
+// También verificar qué calcula el handler internamente
+$webhook_secret_raw = LTMS_Core_Config::get( 'ltms_zapsign_webhook_secret', '' );
+$handler_expected = $webhook_secret_raw
+    ? ( str_starts_with( $webhook_secret_raw, 'v1:' ) ? LTMS_Core_Security::decrypt( $webhook_secret_raw ) : $webhook_secret_raw )
+    : $decrypted_for_diag;
+echo "       [DIAG-T07] handler_expected_len=" . strlen($handler_expected) . " | match=" . ( hash_equals( $handler_expected ?: '', $decrypted_for_webhook ?: '' ) ? 'yes' : 'no' ) . "\n";
+
 $mock1->set_header( 'x-zapsign-token', $decrypted_for_webhook );
 
 try {
