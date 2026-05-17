@@ -203,7 +203,8 @@ function ltms_load_autoloader(): void {
                 'ltms-logger'     => 'core/class-ltms-logger.php',
                 'ltms-security'   => 'core/class-ltms-security.php',
                 'ltms-firewall'   => 'core/class-ltms-firewall.php',
-                'ltms-affiliates' => 'business/class-ltms-affiliates.php',
+                'ltms-affiliates'   => 'business/class-ltms-affiliates.php',
+                'ltms-google-oauth' => 'frontend/class-ltms-google-oauth.php',
             ];
 
             if ( isset( $two_part_exceptions[ $class_file ] ) ) {
@@ -262,6 +263,8 @@ function ltms_load_autoloader(): void {
                 'ltms-core-config'              => 'core/class-ltms-config.php',
                 'ltms-core-logger'              => 'core/class-ltms-logger.php',
                 'ltms-core-security'            => 'core/class-ltms-security.php',
+                // Frontend — Google OAuth vive en frontend/ con nombre que incluye 'google-'
+                'ltms-google-oauth'             => 'frontend/class-ltms-google-oauth.php',
                 'ltms-core-firewall'            => 'core/class-ltms-firewall.php',
                 'ltms-core-activator'           => 'core/services/class-ltms-activator.php',
                 'ltms-core-deactivator'         => 'core/services/class-ltms-deactivator.php',
