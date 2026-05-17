@@ -134,10 +134,8 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             $payload['brand_logo'] = $document_data['brand_logo'];
         }
 
-        // folder_path solo si ZapSign lo soporta en el plan actual
-        if ( ! empty( $document_data['folder_path'] ) ) {
-            $payload['folder_path'] = $document_data['folder_path'];
-        }
+        // folder_path — incluir siempre con valor por defecto (ZapSign lo acepta en todos los planes)
+        $payload['folder_path'] = $document_data['folder_path'] ?? ( 'LTMS/Contratos/' . gmdate( 'Y' ) );
 
         // Fuente del PDF: URL o base64 — nunca ambos, nunca ninguno
         $pdf_url    = $document_data['pdf_url'] ?? '';
