@@ -152,9 +152,14 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         $response = $this->perform_request( 'POST', '/docs/', $payload );
 
         if ( empty( $response['token'] ) ) {
-            throw new \RuntimeException(
-                '[zapsign] Respuesta sin token: ' . wp_json_encode( $response )
-            );
+            return [
+                'success'   => false,
+                'doc_token' => '',
+                'sign_url'  => '',
+                'open_id'   => '',
+                'status'    => 'error',
+                'error'     => $response['error'] ?? wp_json_encode( $response ),
+            ];
         }
 
         return [
