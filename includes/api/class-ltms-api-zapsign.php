@@ -137,11 +137,15 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         // folder_path — incluir siempre con valor por defecto (ZapSign lo acepta en todos los planes)
         $payload['folder_path'] = $document_data['folder_path'] ?? ( 'LTMS/Contratos/' . gmdate( 'Y' ) );
 
-        // Fuente del PDF: URL o base64 — nunca ambos, nunca ninguno
-        $pdf_url    = $document_data['pdf_url'] ?? '';
-        $pdf_base64 = $document_data['pdf_base64'] ?? '';
+        // Fuente del PDF: template_id (preferido), url_pdf, o base64_pdf
+        $template_id = $document_data['template_id'] ?? '';
+        $pdf_url     = $document_data['pdf_url'] ?? '';
+        $pdf_base64  = $document_data['pdf_base64'] ?? '';
 
-        if ( ! empty( $pdf_url ) ) {
+        if ( ! empty( $template_id ) ) {
+            // Usar plantilla ZapSign — crea documento desde el modelo sin subir PDF
+            $payload['template_id'] = $template_id;
+        } elseif ( ! empty( $pdf_url ) ) {
             // Sanitizar URL sin depender de esc_url_raw (no disponible en contexto CLI/test)
             $clean_url = filter_var( $pdf_url, FILTER_SANITIZE_URL );
             if ( ! filter_var( $clean_url, FILTER_VALIDATE_URL ) ) {
@@ -228,31 +232,61 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
 
     /**
      * Crea un contrato de adhesión para un nuevo vendedor y lo envía para firma.
+     * Usa template_id si está configurado (preferido), o pdf_url como fallback.
      *
      * @param int    $vendor_id  ID del vendedor.
-     * @param string $pdf_url    URL del PDF del contrato generado.
+     * @param string $pdf_url    URL del PDF del contrato (fallback si no hay template).
      * @return array
      */
-    public function send_vendor_contract( int $vendor_id, string $pdf_url ): array {
+    public function send_vendor_contract( int $vendor_id, string $pdf_url = '' ): array {
         $user = get_userdata( $vendor_id );
         if ( ! $user ) {
             throw new \InvalidArgumentException( "Vendedor #$vendor_id no encontrado" );
         }
 
-        $result = $this->create_document([
-            'name'     => sprintf( 'Contrato Vendedor - %s - %s', $user->display_name, gmdate( 'Y' ) ),
-            'pdf_url'  => $pdf_url,
-            'signers'  => [[
-                'name'  => $user->display_name,
-                'email' => $user->user_email,
-                'phone' => get_user_meta( $vendor_id, 'billing_phone', true ),
-            ]],
-        ]);
+        // Leer template_id configurado (modo preferido — no requiere resubir PDF)
+        $template_id = LTMS_Core_Config::get( 'ltms_zapsign_vendor_template_id', '' );
+        if ( empty( $template_id ) ) {
+            $template_id = get_option( 'ltms_zapsign_vendor_template_id', '' );
+        }
 
-        if ( $result['success'] ) {
+        $doc_data = [
+            'name'    => sprintf( 'Contrato Vendedor - %s - %s', $user->display_name, gmdate( 'Y' ) ),
+            'signers' => [[
+                'name'        => $user->display_name,
+                'email'       => $user->user_email,
+                'phone'       => get_user_meta( $vendor_id, 'billing_phone', true ),
+                'external_id' => (string) $vendor_id,
+            ]],
+        ];
+
+        if ( ! empty( $template_id ) ) {
+            // Usar plantilla ZapSign — NO requiere PDF adicional
+            $doc_data['template_id'] = $template_id;
+        } elseif ( ! empty( $pdf_url ) ) {
+            $doc_data['pdf_url'] = $pdf_url;
+        } else {
+            // Fallback: intentar leer PDF desde Media Library o config
+            $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
+            $fallback_url  = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
+            if ( $attachment_id > 0 ) {
+                $doc_data['pdf_url'] = wp_get_attachment_url( $attachment_id );
+            } elseif ( ! empty( $fallback_url ) ) {
+                $doc_data['pdf_url'] = $fallback_url;
+            } else {
+                throw new \RuntimeException( '[zapsign] send_vendor_contract: se requiere template_id, pdf_url, o configurar el PDF del contrato.' );
+            }
+        }
+
+        $result = $this->create_document( $doc_data );
+
+        if ( ! empty( $result['doc_token'] ) ) {
             update_user_meta( $vendor_id, 'ltms_contract_token', $result['doc_token'] );
             update_user_meta( $vendor_id, 'ltms_contract_status', 'pending' );
-            update_user_meta( $vendor_id, 'ltms_contract_sent_at', LTMS_Utils::now_utc() );
+            update_user_meta( $vendor_id, 'ltms_contract_sent_at', gmdate( 'Y-m-d H:i:s' ) );
+            if ( ! empty( $result['sign_url'] ) ) {
+                update_user_meta( $vendor_id, 'ltms_contract_sign_url', $result['sign_url'] );
+            }
         }
 
         return $result;
@@ -262,43 +296,37 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * {@inheritdoc}
      */
     public function health_check(): array {
-        // En sandbox usamos GET /docs/?sandbox=true (no requiere plan de pago)
-        // En produccion usamos GET /users/ (requiere plan API)
-        if ( $this->sandbox ) {
-            $response = $this->perform_request( 'GET', '/docs/?sandbox=true' );
-            $connected = ! isset( $response['error'] );
+        try {
+            if ( $this->sandbox ) {
+                // En sandbox: listar documentos con ?sandbox=true
+                // Una lista vacía [] también es respuesta válida (200)
+                $response  = $this->perform_request( 'GET', '/docs/' );
+                // ZapSign devuelve array con 'results' o directamente un array
+                $connected = is_array( $response ) && ! isset( $response['code'] );
+                return [
+                    'connected' => $connected,
+                    'status'    => $connected ? 'ok' : 'error',
+                    'message'   => $connected ? 'ZapSign API conectada (sandbox)' : ( $response['detail'] ?? ( $response['message'] ?? 'Error sandbox' ) ),
+                    'sandbox'   => true,
+                ];
+            }
+
+            // Producción: GET /users/ requiere plan API
+            $response  = $this->perform_request( 'GET', '/users/' );
+            $connected = is_array( $response ) && ! isset( $response['code'] );
             return [
                 'connected' => $connected,
                 'status'    => $connected ? 'ok' : 'error',
-                'message'   => $connected ? 'ZapSign API conectada (sandbox)' : ( $response['detail'] ?? 'Error sandbox' ),
-                'sandbox'   => true,
+                'account'   => ! $connected ? null : ( $response[0]['email'] ?? ( $response['email'] ?? 'ZapSign' ) ),
+                'message'   => $connected ? 'ZapSign API conectada correctamente' : ( $response['detail'] ?? ( $response['message'] ?? 'Error desconocido' ) ),
             ];
-        }
-        $response = $this->perform_request( 'GET', '/users/' );
-
-        if ( is_wp_error( $response ) ) {
+        } catch ( \Throwable $e ) {
             return [
                 'connected' => false,
                 'status'    => 'error',
-                'message'   => $response->get_error_message(),
+                'message'   => $e->getMessage(),
             ];
         }
-
-        $code = (int) ( $response['http_code'] ?? $response['status'] ?? 0 );
-        if ( $code >= 200 && $code < 300 ) {
-            return [
-                'connected' => true,
-                'status'    => 'ok',
-                'account'   => $response['email'] ?? ( $response['name'] ?? 'ZapSign' ),
-                'message'   => 'ZapSign API conectada correctamente',
-            ];
-        }
-
-        return [
-            'connected' => false,
-            'status'    => 'error',
-            'message'   => '[zapsign] Health check HTTP ' . $code,
-        ];
     }
 
     // ── Helpers privados ──────────────────────────────────────────

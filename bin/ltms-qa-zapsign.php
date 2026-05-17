@@ -19,22 +19,26 @@ if ( ! defined( 'ABSPATH' ) ) {
     ob_end_clean();
 }
 
-// Invalidar OPcache para asegurar que se usa el código más reciente del disco
+// Invalidar OPcache — forzar recarga desde disco antes de instanciar clases
 if ( function_exists( 'opcache_reset' ) ) {
     opcache_reset();
-} elseif ( function_exists( 'opcache_invalidate' ) ) {
-    $files_to_invalidate = [
-        __DIR__ . '/../includes/api/class-ltms-api-zapsign.php',
-        __DIR__ . '/../includes/api/webhooks/class-ltms-zapsign-webhook-handler.php',
-        __DIR__ . '/../includes/business/class-ltms-zapsign-kyc-listener.php',
-        __FILE__,
-    ];
-    foreach ( $files_to_invalidate as $f ) {
-        if ( file_exists( $f ) ) {
-            opcache_invalidate( $f, true );
+}
+// Invalidación por archivo como segunda capa de seguridad
+$_zap_files = [
+    __DIR__ . '/../includes/api/class-ltms-api-zapsign.php',
+    __DIR__ . '/../includes/api/class-ltms-abstract-api-client.php',
+    __DIR__ . '/../includes/api/webhooks/class-ltms-zapsign-webhook-handler.php',
+    __DIR__ . '/../includes/business/class-ltms-zapsign-manager.php',
+    __FILE__,
+];
+if ( function_exists( 'opcache_invalidate' ) ) {
+    foreach ( $_zap_files as $_f ) {
+        if ( file_exists( $_f ) ) {
+            opcache_invalidate( $_f, true );
         }
     }
 }
+unset( $_zap_files, $_f );
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 $qa    = [ 'pass' => 0, 'fail' => 0, 'warn' => 0, 'fails' => [] ];
@@ -362,7 +366,7 @@ $checks = [
     [ 'ltms_zapsign_enabled',          'ZapSign activo' ],
     [ 'ltms_zapsign_api_token',        'Token API' ],
     [ 'ltms_kyc_zapsign_enabled',      'Auto-aprobación KYC' ],
-    [ 'ltms_zapsign_booking_template_id', 'Template ID reservas (opcional)' ],
+    [ 'ltms_zapsign_vendor_template_id', 'Template ID contrato vendedor' ],
 ];
 foreach ( $checks as $check ) {
     [ $key, $label ] = $check;
