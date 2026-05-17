@@ -314,7 +314,14 @@ final class LTMS_Core_Activator {
             'ltms_xcover_partner_code'        => '',
             'ltms_xcover_purchase_protection' => false,
             'ltms_xcover_parcel_protection'   => false,
-            'ltms_zapsign_api_token'          => '',
+            'ltms_zapsign_api_token'                  => '',
+            'ltms_zapsign_enabled'                    => 'no',
+            'ltms_kyc_zapsign_enabled'                => 'no',
+            'ltms_zapsign_sandbox'                    => '1',    // sandbox por defecto — apagar en producción
+            'ltms_zapsign_vendor_template_id'         => '526a9570-0160-42f9-999b-5b624527ba5e', // plantilla Contrato_Vendedor_LoTengo_v4.1
+            'ltms_zapsign_contract_pdf_url'           => '',
+            'ltms_zapsign_contract_attachment_id'     => '',
+            'ltms_zapsign_webhook_secret'             => '',
             'ltms_openpay_merchant_id'        => '',
             'ltms_openpay_public_key'         => '',
             'ltms_stripe_test_mode'           => true,

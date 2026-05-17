@@ -250,6 +250,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Alegra_Sync' ) ) {
             LTMS_Alegra_Sync::init();
         }
+
+        // ZapSign — Gestión completa de contratos de vendedores
+        if ( class_exists( 'LTMS_ZapSign_Manager' ) ) {
+            LTMS_ZapSign_Manager::init();
+        }
     }
 
     /**

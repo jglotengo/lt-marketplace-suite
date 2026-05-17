@@ -142,7 +142,12 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         $pdf_base64 = $document_data['pdf_base64'] ?? '';
 
         if ( ! empty( $pdf_url ) ) {
-            $payload['url_pdf'] = esc_url_raw( $pdf_url );
+            // Sanitizar URL sin depender de esc_url_raw (no disponible en contexto CLI/test)
+            $clean_url = filter_var( $pdf_url, FILTER_SANITIZE_URL );
+            if ( ! filter_var( $clean_url, FILTER_VALIDATE_URL ) ) {
+                throw new \RuntimeException( '[zapsign] pdf_url no es una URL válida: ' . $pdf_url );
+            }
+            $payload['url_pdf'] = $clean_url;
         } elseif ( ! empty( $pdf_base64 ) ) {
             $payload['base64_pdf'] = $pdf_base64;
         } else {
