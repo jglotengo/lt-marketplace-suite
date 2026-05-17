@@ -30,6 +30,8 @@ $tabs = [
     'alegra'      => __( 'Alegra Contabilidad', 'ltms' ),
     // v2.2.0 — Autenticación social (M-62)
     'google_oauth' => __( 'Google OAuth', 'ltms' ),
+    // v2.2.0 — Firma electrónica
+    'zapsign'     => __( 'ZapSign Firma', 'ltms' ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación
