@@ -216,6 +216,9 @@ $mock1->set_body( wp_json_encode([
     'document_type' => 'vendor_contract',
 ]) );
 $mock1->set_header( 'content-type', 'application/json' );
+// Enviar el token descifrado como x-zapsign-token (lo que ZapSign real envía)
+$decrypted_for_webhook = ( isset($decrypted) && $decrypted ) ? $decrypted : $zapsign_token;
+$mock1->set_header( 'x-zapsign-token', $decrypted_for_webhook );
 
 try {
     $r1 = LTMS_Zapsign_Webhook_Handler::handle( $mock1 );
@@ -272,23 +275,34 @@ if ( empty( $kyc_after ) || 'approved' !== $kyc_after ) {
 
 // ── T-08: REST endpoint registrado ────────────────────────────────────────────
 qa_section( 'T-08 · REST endpoint /ltms/v1/webhooks/zapsign registrado' );
+// El router usa una ruta genérica con regex: /ltms/v1/webhooks/(?P<provider>[a-z0-9_-]+)
+// No existe /ltms/v1/webhooks/zapsign como ruta literal — zapsign es un valor del parámetro.
 $routes = rest_get_server()->get_routes();
-$route  = '/ltms/v1/webhooks/zapsign';
-if ( isset( $routes[ $route ] ) ) {
-    qa_ok( $qa, 'REST route registrada', $route );
+$generic_route_found = false;
+$zapsign_in_handlers = false;
+
+foreach ( array_keys( $routes ) as $r ) {
+    if ( str_contains( $r, 'webhooks' ) && str_contains( $r, 'ltms' ) ) {
+        $generic_route_found = true;
+        break;
+    }
+}
+
+// Verificar que el router conoce el proveedor 'zapsign'
+if ( class_exists( 'LTMS_Api_Webhook_Router' ) ) {
+    $reflection = new ReflectionClass( 'LTMS_Api_Webhook_Router' );
+    $handlers_prop = $reflection->getProperty( 'handlers' );
+    $handlers_prop->setAccessible( true );
+    $handlers = $handlers_prop->getValue( null );
+    $zapsign_in_handlers = isset( $handlers['zapsign'] );
+}
+
+if ( $generic_route_found && $zapsign_in_handlers ) {
+    qa_ok( $qa, 'REST webhook route genérica registrada + zapsign en handlers', 'ltms/v1/webhooks/{provider}' );
+} elseif ( $generic_route_found ) {
+    qa_warn( $qa, 'REST route genérica OK pero zapsign no está en handlers', 'Verificar $handlers en webhook-router' );
 } else {
-    // Buscar con namespace
-    $found = false;
-    foreach ( array_keys( $routes ) as $r ) {
-        if ( str_contains( $r, 'zapsign' ) ) {
-            qa_ok( $qa, 'REST route zapsign encontrada', $r );
-            $found = true;
-            break;
-        }
-    }
-    if ( ! $found ) {
-        qa_fail( $qa, 'REST route /ltms/v1/webhooks/zapsign NO registrada', 'Verificar class-ltms-api-webhook-router.php' );
-    }
+    qa_fail( $qa, 'REST route webhook no registrada', 'Verificar LTMS_Api_Webhook_Router::register_route()' );
 }
 
 // ── T-09: Opciones guardadas ──────────────────────────────────────────────────

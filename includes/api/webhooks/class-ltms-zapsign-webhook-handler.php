@@ -18,10 +18,24 @@ class LTMS_Zapsign_Webhook_Handler {
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
         }
 
-        // Verificar token de seguridad ZapSign
-        $api_token    = LTMS_Core_Config::get( 'ltms_zapsign_api_token', '' );
-        $req_token    = $request->get_header( 'x-zapsign-token' ) ?: '';
-        if ( $api_token && ! hash_equals( $api_token, $req_token ) ) {
+        // Verificar token de seguridad ZapSign.
+        // ZapSign puede enviar el api_token O un webhook_secret separado en x-zapsign-token.
+        // La opción ltms_zapsign_webhook_secret tiene prioridad; si no está configurada,
+        // se usa el api_token descifrado como fallback.
+        $webhook_secret = LTMS_Core_Config::get( 'ltms_zapsign_webhook_secret', '' );
+        if ( $webhook_secret ) {
+            $expected_token = str_starts_with( $webhook_secret, 'v1:' ) && class_exists( 'LTMS_Core_Security' )
+                ? LTMS_Core_Security::decrypt( $webhook_secret )
+                : $webhook_secret;
+        } else {
+            $raw_api_token  = LTMS_Core_Config::get( 'ltms_zapsign_api_token', '' );
+            $expected_token = str_starts_with( $raw_api_token, 'v1:' ) && class_exists( 'LTMS_Core_Security' )
+                ? LTMS_Core_Security::decrypt( $raw_api_token )
+                : $raw_api_token;
+        }
+
+        $req_token = $request->get_header( 'x-zapsign-token' ) ?: '';
+        if ( $expected_token && ! hash_equals( $expected_token, $req_token ) ) {
             return new WP_REST_Response( [ 'error' => 'Invalid token' ], 401 );
         }
 
