@@ -80,7 +80,7 @@ class LTMS_Geo_Detector {
             if ( ! empty( $_GET['ltms_city'] ) ) {
                 $city = sanitize_text_field( wp_unslash( $_GET['ltms_city'] ) );
                 if ( WC()->session ) WC()->session->set( 'ltms_city', $city );
-                setcookie( 'ltms_city', $city, time() + MONTH_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+                setcookie( 'ltms_city', $city, [ 'expires' => time() + MONTH_IN_SECONDS, 'path' => COOKIEPATH, 'domain' => COOKIE_DOMAIN, 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Strict', ] );
                 return;
             }
             // phpcs:enable
@@ -90,7 +90,7 @@ class LTMS_Geo_Detector {
             }
             $location = self::get_visitor_location();
             if ( WC()->session ) WC()->session->set( 'ltms_city', $location['city'] );
-            setcookie( 'ltms_city', $location['city'], time() + MONTH_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            setcookie( 'ltms_city', $location['city'], [ 'expires' => time() + MONTH_IN_SECONDS, 'path' => COOKIEPATH, 'domain' => COOKIE_DOMAIN, 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Strict', ] );
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Geo: init_session_location failed — ' . $e->getMessage() );
         }

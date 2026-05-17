@@ -353,20 +353,28 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * Retorna null si la URL es externa.
      */
     private function url_to_local_path( string $url ): ?string {
-        $site_url = rtrim( get_site_url(), '/' );
+        // Usar constante LTMS_SITE_URL si está definida (unit tests) o get_site_url() (WP real).
+        // Esto evita "Call to undefined function get_site_url()" en entorno UNIT ONLY.
+        $site_url = rtrim(
+            ( defined( 'LTMS_SITE_URL' ) ? LTMS_SITE_URL : ( function_exists( 'get_site_url' ) ? get_site_url() : '' ) ),
+            '/'
+        );
+        if ( $site_url === '' ) {
+            return null;
+        }
         // M-ZAP-1: normalizar protocolo para que http:// y https:// coincidan
         $url_norm      = preg_replace( '#^https?://#', '/', $url );
         $site_url_norm = preg_replace( '#^https?://#', '/', $site_url );
         if ( strpos( $url_norm, $site_url_norm ) !== 0 ) {
             return null; // URL externa
         }
-        $url = $url; // usar la original para extraer el path
         if ( strpos( $url, $site_url ) !== 0 ) {
             // Reconectar con el protocolo correcto
             $url = $site_url . substr( $url_norm, strlen( $site_url_norm ) );
         }
         $relative = ltrim( substr( $url, strlen( $site_url ) ), '/' );
-        $abspath   = rtrim( ABSPATH, '/' );
+        // ABSPATH puede no estar definido en tests unitarios
+        $abspath = defined( 'ABSPATH' ) ? rtrim( ABSPATH, '/' ) : sys_get_temp_dir();
         return $abspath . '/' . $relative;
     }
 

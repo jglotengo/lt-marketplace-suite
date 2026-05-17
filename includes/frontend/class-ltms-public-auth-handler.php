@@ -342,9 +342,14 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_municipality', $data['municipality_code'] );
             }
             update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
-            // L-1: cifrar número de documento antes de almacenar (Ley 1581/2012)
-            update_user_meta( $user_id, 'ltms_document',      LTMS_Core_Security::encrypt( $data['document'] ) );
-            update_user_meta( $user_id, 'ltms_document_number', LTMS_Core_Security::encrypt( $data['document'] ) ); // alias cifrado
+            // L-1: cifrar documento con log de vault (Habeas Data — Ley 1581/2012).
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                update_user_meta( $user_id, 'ltms_document',
+                    LTMS_Legal_Compliance::encrypt_and_log( $data['document'], $user_id, 'ltms_document', 'registration' )
+                );
+            } else {
+                update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
+            }
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
             update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
@@ -354,13 +359,9 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_sagrilaft_accepted_at', LTMS_Utils::now_utc() );
             }
 
-            // L-2: Registrar evidencia de consentimiento con IP+timestamp (Ley 1581/2012 art. 9)
+            // L-6: guardar consentimiento explícito de datos (Ley 1581/2012 art. 9).
             if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::log_registration_consents( $user_id, [
-                    'terms'     => $data['terms_accepted'],
-                    'privacy'   => $data['terms_accepted'],
-                    'sagrilaft' => $data['sagrilaft_accepted'] ?? false,
-                ] );
+                LTMS_Legal_Compliance::save_consent( 'registration', $user_id, true );
             }
 
             // C-3: token de verificación de email (48h).

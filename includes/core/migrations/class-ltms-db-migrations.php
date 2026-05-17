@@ -1101,39 +1101,41 @@ final class LTMS_DB_Migrations {
             KEY `idx_wp_user` (`wp_user_id`)
         ) {$charset}";
 
-        // ── L-1: Vault Access Log — Habeas Data (Ley 1581/2012 art. 8) ──────────
-        // Registra cada acceso a documentos sensibles del vault KYC.
+        // L-2: Auditoría de acceso a datos sensibles (Habeas Data — Ley 1581/2012 art. 8 lit. g).
+        // Registra cada lectura/escritura de documentos cifrados (cédula, NIT, RUT).
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vault_access_log` (
             `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `user_id`     BIGINT UNSIGNED NOT NULL COMMENT 'Propietario del documento',
-            `accessor_id` BIGINT UNSIGNED NOT NULL COMMENT 'Quien accede (admin/sistema)',
-            `document`    VARCHAR(100) NOT NULL COMMENT 'Tipo de documento accedido',
-            `action`      ENUM('view','download','upload','delete','share') NOT NULL DEFAULT 'view',
-            `ip_address`  VARCHAR(45) NOT NULL DEFAULT '' COMMENT 'IP del acceso',
-            `user_agent`  VARCHAR(255) NOT NULL DEFAULT '',
-            `context`     VARCHAR(200) NOT NULL DEFAULT '' COMMENT 'Razón/módulo del acceso',
+            `user_id`     BIGINT UNSIGNED NOT NULL COMMENT 'Usuario cuyo dato fue accedido',
+            `actor_id`    BIGINT UNSIGNED DEFAULT NULL COMMENT 'Quien accedió (admin/cron=0)',
+            `action`      ENUM('read','write','decrypt','export','delete') NOT NULL,
+            `field_name`  VARCHAR(100) NOT NULL COMMENT 'Ej: ltms_document, ltms_nit',
+            `context`     VARCHAR(255) DEFAULT NULL COMMENT 'Contexto: kyc, payout, audit',
+            `ip_address`  VARCHAR(45) DEFAULT NULL,
+            `user_agent`  VARCHAR(300) DEFAULT NULL,
             `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            KEY `idx_user`     (`user_id`),
-            KEY `idx_accessor` (`accessor_id`),
-            KEY `idx_date`     (`created_at`)
+            KEY `idx_user`    (`user_id`),
+            KEY `idx_actor`   (`actor_id`),
+            KEY `idx_created` (`created_at`)
         ) {$charset}";
 
-        // ── L-2: Consent Log — Evidencia de consentimiento (Ley 1581/2012 art. 9) ─
-        // Registra términos, SAGRILAFT, política de privacidad, checkout consent.
-        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_consent_log` (
-            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `user_id`      BIGINT UNSIGNED NOT NULL,
-            `consent_type` VARCHAR(60) NOT NULL COMMENT 'terms|sagrilaft|privacy|checkout|kyc_data|marketing',
-            `accepted`     TINYINT(1) NOT NULL DEFAULT 1,
-            `ip_address`   VARCHAR(45) NOT NULL DEFAULT '',
-            `user_agent`   VARCHAR(255) NOT NULL DEFAULT '',
-            `version`      VARCHAR(20) NOT NULL DEFAULT '1.0' COMMENT 'Versión del documento aceptado',
-            `channel`      VARCHAR(60) NOT NULL DEFAULT 'web' COMMENT 'web|api|oauth|admin',
-            `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        // L-3: Consentimientos explícitos de datos personales (Ley 1581/2012 art. 9; SIC Res. 2019).
+        // Guarda el token de consentimiento, versión de política y timestamp para auditoría SIC.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_data_consents` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`         BIGINT UNSIGNED DEFAULT NULL COMMENT 'NULL = visitante anónimo',
+            `session_id`      VARCHAR(128) DEFAULT NULL,
+            `consent_type`    ENUM('registration','checkout','kyc','marketing','zapsign','cookies') NOT NULL,
+            `consent_given`   TINYINT(1) NOT NULL DEFAULT 1,
+            `policy_version`  VARCHAR(20) NOT NULL DEFAULT '1.0',
+            `ip_address`      VARCHAR(45) DEFAULT NULL,
+            `user_agent`      VARCHAR(300) DEFAULT NULL,
+            `page_url`        VARCHAR(500) DEFAULT NULL,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            KEY `idx_user_type` (`user_id`, `consent_type`),
-            KEY `idx_date`      (`created_at`)
+            KEY `idx_user`    (`user_id`),
+            KEY `idx_type`    (`consent_type`),
+            KEY `idx_created` (`created_at`)
         ) {$charset}";
 
     }
