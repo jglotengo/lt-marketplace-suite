@@ -38,10 +38,14 @@ class ZapsignApiTest extends TestCase
         Monkey\setUp();
 
         Functions\stubs([
-            'get_option'    => static fn(string $k, mixed $d = false): mixed => $d,
-            'update_option' => static fn(): bool => true,
-            'get_transient' => static fn(): mixed => false,
-            'set_transient' => static fn(): bool => true,
+            'get_option'          => static fn(string $k, mixed $d = false): mixed => $d,
+            'update_option'       => static fn(): bool => true,
+            'get_transient'       => static fn(): mixed => false,
+            'set_transient'       => static fn(): bool => true,
+            'esc_url_raw'         => static fn(string $url): string => $url,
+            'sanitize_text_field' => static fn(string $s): string => $s,
+            'sanitize_email'      => static fn(string $s): string => $s,
+            'wp_strip_all_tags'   => static fn(string $s): string => strip_tags($s),
         ]);
 
         \LTMS_Core_Config::flush_cache();
@@ -174,7 +178,7 @@ class ZapsignApiTest extends TestCase
 
         $body = json_decode($captured['body'] ?? '{}', true);
         $this->assertSame('JVBERi0xLjQ...', $body['base64_pdf']);
-        $this->assertNull($body['url_pdf']);
+        $this->assertNull($body['url_pdf'] ?? null); // url_pdf ausente o null cuando se usa base64
     }
 
     /**
@@ -204,7 +208,9 @@ class ZapsignApiTest extends TestCase
         $this->stub_response(['error' => 'invalid pdf']);
         Functions\when('get_bloginfo')->justReturn('Tienda');
 
-        $result = $client->create_document(['name' => 'Doc', 'pdf_url' => '', 'signers' => []]);
+        // Pasamos una url_pdf válida para que el código llegue al HTTP call;
+        // la API devuelve respuesta sin 'token', lo que debe resultar en success=false.
+        $result = $client->create_document(['name' => 'Doc', 'pdf_url' => 'https://x.com/f.pdf', 'signers' => []]);
         $this->assertFalse($result['success']);
         $this->assertSame('', $result['doc_token']);
     }

@@ -31,12 +31,30 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     private string $api_token;
 
     /**
+     * Modo sandbox (desarrollo sin plan de pago).
+     */
+    private bool $sandbox;
+
+    /**
      * Constructor.
      */
     public function __construct() {
-        $this->base_url  = self::API_BASE;
+        $this->provider_slug = 'zapsign';
+        // Must set api_url BEFORE parent::__construct() and verify AFTER
+        $this->api_url   = self::API_BASE;
         $this->api_token = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_zapsign_api_token', '' ) );
         parent::__construct();
+
+        // Re-set api_url AFTER parent in case parent overrides it (defensive)
+        if ( empty( $this->api_url ) ) {
+            $this->api_url = self::API_BASE;
+        }
+
+        // Modo sandbox: si no hay plan de pago, usar sandbox=true en dev
+        $this->sandbox = (bool) LTMS_Core_Config::get( 'ltms_zapsign_sandbox', false );
+
+        // ZapSign usa Bearer token en Authorization header
+        $this->default_headers['Authorization'] = 'Bearer ' . $this->api_token;
     }
 
     /**
@@ -47,6 +65,47 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Returns the canonical API base URL (always the constant, never empty).
+     * Used by health_check() and QA diagnostics to bypass OPcache stale bytecode.
+     */
+    public function get_api_base_url(): string {
+        return self::API_BASE;
+    }
+
+    /**
+     * Indica si el cliente esta en modo sandbox.
+     */
+    public function is_sandbox(): bool {
+        return $this->sandbox;
+    }
+
+    /**
+     * Override perform_request to ensure api_url is always set, even if OPcache
+     * served an old version of this class without the constructor assignment.
+     *
+     * {@inheritdoc}
+     */
+    protected function perform_request(
+        string $method,
+        string $endpoint,
+        array  $data    = [],
+        array  $headers = [],
+        bool   $retry   = true
+    ): array {
+        // M-66 definitive fix: always force api_url and Authorization header at call time.
+        // OPcache on some servers serves stale bytecode that skips the constructor assignment,
+        // leaving api_url empty. Using the constant here is immune to that.
+        $this->api_url = self::API_BASE;
+
+        // Also ensure auth token header is always present even if default_headers was empty.
+        if ( ! empty( $this->api_token ) && empty( $headers['Authorization'] ) ) {
+            $headers['Authorization'] = 'Bearer ' . $this->api_token;
+        }
+
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
+    }
+
+    /**
      * Crea un documento para firma y envía invitaciones a los firmantes.
      *
      * @param array $document_data Datos del documento y firmantes.
@@ -54,29 +113,61 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException
      */
     public function create_document( array $document_data ): array {
+        // ZapSign requiere exactamente uno de: url_pdf o base64_pdf.
+        // Campos nulos o vacíos en el payload causan HTTP 400.
         $payload = [
-            'name'        => $document_data['name'] ?? 'Contrato LTMS',
-            'url_pdf'     => $document_data['pdf_url'] ?? '',
-            'lang'        => $document_data['language'] ?? 'es',
-            'signers'     => $this->format_signers( $document_data['signers'] ?? [] ),
+            'name'                 => $document_data['name'] ?? 'Contrato LTMS',
+            'lang'                 => $document_data['language'] ?? 'es',
+            'signers'              => $this->format_signers( $document_data['signers'] ?? [] ),
             'send_automatic_email' => true,
-            'brand_logo'  => $document_data['brand_logo'] ?? '',
-            'brand_name'  => $document_data['brand_name'] ?? get_bloginfo( 'name' ),
-            'folder_path' => 'LTMS/Contratos/' . gmdate( 'Y' ),
+            'sandbox'              => $this->sandbox,
         ];
 
-        // Adjuntar PDF base64 si no hay URL
-        if ( empty( $payload['url_pdf'] ) && ! empty( $document_data['pdf_base64'] ) ) {
-            $payload['base64_pdf']   = $document_data['pdf_base64'];
-            $payload['url_pdf']      = null;
+        // brand_name solo si está configurado (campo opcional)
+        $brand = $document_data['brand_name'] ?? get_bloginfo( 'name' );
+        if ( ! empty( $brand ) ) {
+            $payload['brand_name'] = $brand;
+        }
+
+        // brand_logo solo si tiene valor (campo opcional)
+        if ( ! empty( $document_data['brand_logo'] ) ) {
+            $payload['brand_logo'] = $document_data['brand_logo'];
+        }
+
+        // folder_path — incluir siempre con valor por defecto (ZapSign lo acepta en todos los planes)
+        $payload['folder_path'] = $document_data['folder_path'] ?? ( 'LTMS/Contratos/' . gmdate( 'Y' ) );
+
+        // Fuente del PDF: URL o base64 — nunca ambos, nunca ninguno
+        $pdf_url    = $document_data['pdf_url'] ?? '';
+        $pdf_base64 = $document_data['pdf_base64'] ?? '';
+
+        if ( ! empty( $pdf_url ) ) {
+            $payload['url_pdf'] = esc_url_raw( $pdf_url );
+        } elseif ( ! empty( $pdf_base64 ) ) {
+            $payload['base64_pdf'] = $pdf_base64;
+        } else {
+            throw new \RuntimeException( '[zapsign] create_document requiere pdf_url o pdf_base64.' );
         }
 
         $response = $this->perform_request( 'POST', '/docs/', $payload );
 
+        if ( empty( $response['token'] ) ) {
+            return [
+                'success'   => false,
+                'doc_token' => '',
+                'sign_url'  => '',
+                'open_id'   => '',
+                'status'    => 'error',
+                'error'     => $response['error'] ?? wp_json_encode( $response ),
+            ];
+        }
+
         return [
-            'success'   => isset( $response['token'] ),
-            'doc_token' => $response['token'] ?? '',
+            'success'   => true,
+            'doc_token' => $response['token'],
             'sign_url'  => $response['signers'][0]['sign_url'] ?? '',
+            'open_id'   => $response['open_id'] ?? '',
+            'status'    => $response['status'] ?? 'pending',
         ];
     }
 
@@ -166,15 +257,43 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * {@inheritdoc}
      */
     public function health_check(): array {
-        try {
-            $response = $this->perform_request( 'GET', '/me/' );
+        // En sandbox usamos GET /docs/?sandbox=true (no requiere plan de pago)
+        // En produccion usamos GET /users/ (requiere plan API)
+        if ( $this->sandbox ) {
+            $response = $this->perform_request( 'GET', '/docs/?sandbox=true' );
+            $connected = ! isset( $response['error'] );
             return [
-                'status'  => isset( $response['id'] ) ? 'ok' : 'error',
-                'message' => 'ZapSign API conectado',
+                'connected' => $connected,
+                'status'    => $connected ? 'ok' : 'error',
+                'message'   => $connected ? 'ZapSign API conectada (sandbox)' : ( $response['detail'] ?? 'Error sandbox' ),
+                'sandbox'   => true,
             ];
-        } catch ( \Throwable $e ) {
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
         }
+        $response = $this->perform_request( 'GET', '/users/' );
+
+        if ( is_wp_error( $response ) ) {
+            return [
+                'connected' => false,
+                'status'    => 'error',
+                'message'   => $response->get_error_message(),
+            ];
+        }
+
+        $code = (int) ( $response['http_code'] ?? $response['status'] ?? 0 );
+        if ( $code >= 200 && $code < 300 ) {
+            return [
+                'connected' => true,
+                'status'    => 'ok',
+                'account'   => $response['email'] ?? ( $response['name'] ?? 'ZapSign' ),
+                'message'   => 'ZapSign API conectada correctamente',
+            ];
+        }
+
+        return [
+            'connected' => false,
+            'status'    => 'error',
+            'message'   => '[zapsign] Health check HTTP ' . $code,
+        ];
     }
 
     // ── Helpers privados ──────────────────────────────────────────

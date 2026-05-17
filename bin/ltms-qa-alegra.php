@@ -66,7 +66,7 @@ if ( function_exists('opcache_invalidate') ) {
 LTMS_Core_Config::flush_cache();
 LTMS_Api_Factory::reset( 'alegra' );
 
-echo "\n🔍 LTMS QA — Pruebas de integración Alegra\n";
+echo "\n🔍 LTMS QA — Pruebas de integración Alegra v2\n";
 echo "Fecha: " . date( 'Y-m-d H:i:s' ) . "\n";
 
 // ── T-01: AUTENTICACIÓN ────────────────────────────────────────────────────────
@@ -409,203 +409,105 @@ if ( $test_contact_id && $test_item_id ) {
     qa_warn( $qa, 'T-06 omitido', 'Requiere contacto e item de prueba (T-04 y T-05 deben pasar)' );
 }
 
-// ── T-07: FACTURACIÓN DESDE PEDIDO WC ─────────────────────────────────────────
-qa_section( 'T-07 · Facturación automática desde pedido WC' );
+// ── T-07: FACTURACIÓN DE COMISIÓN DESDE PEDIDO WC ─────────────────────────────
+qa_section( 'T-07 · Facturación de comisión marketplace → vendedor' );
 
-// Buscar primero pedidos con _ltms_vendor_id (comisión real del marketplace)
-$orders_with_vendor = wc_get_orders([
-    'status'     => [ 'completed', 'processing' ],
-    'limit'      => 10,
-    'meta_query' => [
-        'relation' => 'AND',
-        [ 'key' => '_ltms_alegra_invoice_id', 'compare' => 'NOT EXISTS' ],
-        [ 'key' => '_ltms_vendor_id',         'compare' => 'EXISTS'     ],
-    ],
-]);
+// Invalidar OPcache para asegurar que se carga la versión más reciente de LTMS_Alegra_Sync
+if ( function_exists( 'opcache_invalidate' ) ) {
+    $sync_file = dirname( __DIR__ ) . '/includes/business/class-ltms-alegra-sync.php';
+    opcache_invalidate( $sync_file, true );
+}
 
-// Si no hay pedido con vendor, inyectar contexto ficticio en el que sí exista
-$orders = $orders_with_vendor ?: wc_get_orders([
-    'status'     => [ 'completed', 'processing' ],
-    'limit'      => 5,
-    'meta_query' => [[ 'key' => '_ltms_alegra_invoice_id', 'compare' => 'NOT EXISTS' ]],
-]);
+// Estrategia: crear un pedido WC real temporal para la prueba.
+// Esto evita por completo el problema de caché HPOS al parchear pedidos de producción.
+$t07_order         = null;
+$t07_order_created = false;
+$t07_vendor_id     = null;
 
-if ( $orders ) {
-    $test_order = $orders[0];
-    $oid = $test_order->get_id();
-
-    // Si el pedido no tiene vendor_id, inyectar contexto ficticio para el test
-    $t07_mocked        = false;
-    $t07_mock_vendor   = 0;
-    $existing_vendor   = (int) $test_order->get_meta('_ltms_vendor_id');
-    $existing_fee      = (float) $test_order->get_meta('_ltms_platform_fee');
-
-    if ( ! $existing_vendor ) {
-        // Buscar un vendedor real con KYC aprobado
-        global $wpdb;
-        $t07_mock_vendor = (int) $wpdb->get_var("
-            SELECT u.ID FROM {$wpdb->users} u
-            INNER JOIN {$wpdb->usermeta} um ON u.ID = um.user_id AND um.meta_key='_ltms_kyc_status' AND um.meta_value='approved'
-            LIMIT 1
-        ");
-        if ( ! $t07_mock_vendor ) {
-            // Si no hay vendedor KYC, usar el usuario admin como contacto proveedor
-            $t07_mock_vendor = (int) $wpdb->get_var("SELECT ID FROM {$wpdb->users} WHERE user_login='admin' OR user_login LIKE '%jg%' LIMIT 1");
-        }
-        if ( $t07_mock_vendor ) {
-            $t07_mocked = true;
-            $test_order->update_meta_data('_ltms_vendor_id',    $t07_mock_vendor);
-            $test_order->update_meta_data('_ltms_platform_fee', 5000.0); // $5.000 COP comisión ficticia
-            $test_order->save();
-            echo "       [MOCK] Inyectado vendor_id=$t07_mock_vendor + platform_fee=5000 para test T-07\n";
-        } else {
-            echo "       [WARN] Sin vendedor disponible para mock — T-07 puede fallar\n";
-        }
+// Usar el contacto Alegra ya cacheado en BD para el usuario 18 (o el admin)
+$t07_test_user_id  = 18;
+$t07_contact_cache = (int) get_user_meta( $t07_test_user_id, '_ltms_alegra_contact_id', true );
+if ( ! $t07_contact_cache ) {
+    // Buscar cualquier usuario con contacto Alegra cacheado
+    $users_with_contact = get_users([
+        'meta_key'     => '_ltms_alegra_contact_id',
+        'meta_compare' => '>',
+        'meta_value'   => '0',
+        'number'       => 1,
+        'fields'       => 'ID',
+    ]);
+    if ( $users_with_contact ) {
+        $t07_test_user_id  = (int) $users_with_contact[0];
+        $t07_contact_cache = (int) get_user_meta( $t07_test_user_id, '_ltms_alegra_contact_id', true );
     }
+}
 
-    echo "       Pedido #$oid | estado=" . $test_order->get_status() . " | total=" . number_format((float)$test_order->get_total(),0,',','.') . " | items=" . count($test_order->get_items()) . "\n";
-    echo "       Billing: " . $test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name() . " <" . $test_order->get_billing_email() . ">\n";
-    echo "       vendor_id: " . $test_order->get_meta('_ltms_vendor_id') . " | platform_fee: " . $test_order->get_meta('_ltms_platform_fee') . "\n";
+// Obtener un producto de WooCommerce para el pedido
+$t07_product_id = 0;
+$products = wc_get_products([ 'status' => 'publish', 'limit' => 1 ]);
+if ( $products ) {
+    $t07_product_id = $products[0]->get_id();
+}
 
-
-    // Pre-diagnóstico: ver si el contacto ya existe en Alegra y cachearlo
-    // Usamos curl directo (igual que DIAG T-04) para evitar OPcache de clase vieja
-    $billing_email  = $test_order->get_billing_email();
-    $billing_cid    = $test_order->get_customer_id();
-    $cached_contact = $billing_cid ? (int)get_user_meta($billing_cid, '_ltms_alegra_contact_id', true) : 0;
-    echo "       Cache _ltms_alegra_contact_id: " . ($cached_contact ?: 'no cacheado') . "\n";
-
-    if ( ! $cached_contact && $billing_email ) {
-        // Buscar por query directo en Alegra (sin depender de método de clase)
-        $pre_email_raw = get_option('ltms_alegra_email','');
-        $pre_token_raw = get_option('ltms_alegra_token','');
-        $pre_token = (str_starts_with($pre_token_raw, 'v1:') && class_exists('LTMS_Core_Security'))
-            ? LTMS_Core_Security::decrypt($pre_token_raw) : $pre_token_raw;
-        $pre_auth = 'Basic ' . base64_encode($pre_email_raw . ':' . $pre_token);
-
-        // Estrategia 1: ?query=email
-        $pre_resp = wp_remote_get('https://api.alegra.com/api/v1/contacts?' . http_build_query(['query' => $billing_email, 'limit' => 50]), [
-            'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
-            'timeout' => 20,
-        ]);
-        $pre_contacts = json_decode(wp_remote_retrieve_body($pre_resp), true);
-        $pre_contacts = is_array($pre_contacts) ? ($pre_contacts['data'] ?? $pre_contacts) : [];
-
-        $found_contact = null;
-        $billing_email_lower = strtolower(trim($billing_email));
-        foreach ( (array)$pre_contacts as $pc ) {
-            if ( strtolower(trim($pc['email'] ?? '')) === $billing_email_lower ) {
-                $found_contact = $pc; break;
-            }
-        }
-
-        // Estrategia 2: scan paginado si no encontró
-        if ( ! $found_contact ) {
-            for ( $ps = 0; $ps < 3; $ps++ ) {
-                $pr = wp_remote_get('https://api.alegra.com/api/v1/contacts?start=' . ($ps*50) . '&limit=50', [
-                    'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
-                    'timeout' => 20,
-                ]);
-                $pcs = json_decode(wp_remote_retrieve_body($pr), true);
-                $pcs = is_array($pcs) ? ($pcs['data'] ?? $pcs) : [];
-                if ( ! is_array($pcs) || count($pcs) === 0 ) break;
-                foreach ( $pcs as $pc ) {
-                    if ( strtolower(trim($pc['email'] ?? '')) === $billing_email_lower ) {
-                        $found_contact = $pc; break 2;
-                    }
-                }
-                if ( count($pcs) < 50 ) break;
-            }
-        }
-
-        if ( $found_contact && isset($found_contact['id']) ) {
-            $found_id = (int)$found_contact['id'];
-            if ( $billing_cid ) {
-                update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $found_id );
-            }
-            echo "       Pre-cacheado contacto Alegra ID=$found_id para email $billing_email\n";
-        } else {
-            echo "       No encontrado por email $billing_email — diagnóstico de creación directa:\n";
-
-            // Intentar crear el contacto directamente para ver el error exacto de Alegra
-            $pre_name  = trim($test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name()) ?: 'Cliente Final';
-            $pre_words = explode(' ', $pre_name);
-            $pre_fn    = $pre_words[0] ?? $pre_name;
-            $pre_ln    = count($pre_words) > 1 ? implode(' ', array_slice($pre_words, 1)) : $pre_fn;
-            $pre_payload = wp_json_encode([
-                'name'         => $pre_name,
-                'nameObject'   => ['firstName' => $pre_fn, 'secondName' => null, 'lastName' => $pre_ln, 'secondLastName' => null],
-                'email'        => $billing_email,
-                'type'         => ['client'],
-                'kindOfPerson' => 'PERSON_ENTITY',
-                'regime'       => 'SIMPLIFIED_REGIME',
-            ]);
-            // Estrategia: primero buscar por email en Alegra; si no existe, crear.
-        // Esto evita el 400 cuando el contacto ya existe.
-        $pre_search = wp_remote_get('https://api.alegra.com/api/v1/contacts?start=0&limit=30', [
-                'headers' => ['Authorization' => $pre_auth, 'Accept' => 'application/json'],
-                'timeout' => 20,
-            ]);
-        $pre_search_list = json_decode(wp_remote_retrieve_body($pre_search), true) ?: [];
-        $found_contact = null;
-        foreach ($pre_search_list as $c) {
-            if ( strtolower(trim($c['email']??'')) === strtolower(trim($billing_email)) ) {
-                $found_contact = $c; break;
-            }
-        }
-        if ( $found_contact ) {
-            $t07_contact_id = (int)($found_contact['id']??0);
-            echo "       [DIAG-T07] Contacto existente encontrado por email → ID=$t07_contact_id\n";
-        } else {
-            $pre_create = wp_remote_post('https://api.alegra.com/api/v1/contacts', [
-                    'headers' => ['Authorization' => $pre_auth, 'Content-Type' => 'application/json', 'Accept' => 'application/json'],
-                    'body'    => $pre_payload,
-                    'timeout' => 20,
-                ]);
-            $pre_create_code = wp_remote_retrieve_response_code($pre_create);
-            $pre_create_body = wp_remote_retrieve_body($pre_create);
-            $pre_create_dec  = json_decode($pre_create_body, true);
-            echo "       [DIAG-T07] POST /contacts → HTTP $pre_create_code\n";
-            if ( $pre_create_code === 200 && !empty($pre_create_dec['id']) ) {
-                $t07_contact_id = (int)$pre_create_dec['id'];
-            } else {
-                echo "       [DIAG-T07] Create falló → " . ($pre_create_body ?: '(vacía)') . "\n";
-            }
-        }
-        if ( $t07_contact_id && $billing_cid ) {
-            update_user_meta( $billing_cid, '_ltms_alegra_contact_id', $t07_contact_id );
-            echo "       [DIAG-T07] Contacto ID=$t07_contact_id cacheado → create_invoice_for_order usará este ID\n";
-        }
-        }
-    }
-
+if ( $t07_product_id && class_exists( 'WC_Order' ) ) {
     try {
+        // Crear pedido real temporal
+        $t07_order = wc_create_order([
+            'customer_id' => $t07_test_user_id,
+            'status'      => 'processing',
+        ]);
+        if ( is_wp_error( $t07_order ) ) {
+            throw new \RuntimeException( 'wc_create_order falló: ' . $t07_order->get_error_message() );
+        }
+        // Agregar producto
+        $t07_order->add_product( wc_get_product( $t07_product_id ), 1 );
+        // Asignar datos de billing
+        $t07_user = get_userdata( $t07_test_user_id );
+        $t07_order->set_billing_email( $t07_user ? $t07_user->user_email : 'qa-t07@lo-tengo.com.co' );
+        $t07_order->set_billing_first_name( 'QA' );
+        $t07_order->set_billing_last_name( 'Vendor Test' );
+        // Asignar vendor y comisión directamente en el objeto nuevo (sin HPOS cache)
+        $t07_vendor_id      = $t07_test_user_id;
+        $t07_mock_commission = 15000.0;
+        $t07_order->update_meta_data( '_ltms_vendor_id',   $t07_vendor_id );
+        $t07_order->update_meta_data( '_ltms_platform_fee', $t07_mock_commission );
+        $t07_order->calculate_totals();
+        $t07_order->save();
+        $t07_order_created = true;
+
+        // Releer desde BD para tener objeto completamente limpio
+        $t07_order = wc_get_order( $t07_order->get_id() );
+        $oid = $t07_order->get_id();
+        echo "       [MOCK] Pedido #$oid creado | vendor_id=$t07_vendor_id | platform_fee=" . number_format($t07_mock_commission,0,',','.') . " COP\n";
+        echo "       Cache _ltms_alegra_contact_id vendedor: " . ($t07_contact_cache ?: 'no cacheado') . "\n";
+
         $sync   = new LTMS_Alegra_Sync();
-        $result = $sync->create_invoice_for_order( $test_order );
+        $result = $sync->create_invoice_for_order( $t07_order );
+
         if ( ! empty( $result['id'] ) ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
+            $status  = $result['status'] ?? '?';
             qa_ok( $qa, 'create_invoice_for_order()', "Factura $inv_num | pedido #$oid" );
-            qa_ok( $qa, 'Respuesta tiene id+status+numberTemplate', "id={$result['id']} status=" . ($result['status']??'?') );
-            echo "       ⚠️  Factura creada en Alegra (ID={$result['id']}) — borrar si es de prueba\n";
+            qa_ok( $qa, 'Respuesta tiene id+status+numberTemplate', "id={$result['id']} status=$status" );
+            echo "       ⚠️  Factura comisión creada en Alegra (ID={$result['id']}) — borrar si es de prueba\n";
+            $qa_data_created[] = "Factura ID={$result['id']}";
         } else {
             qa_fail( $qa, 'create_invoice_for_order()', 'Sin ID en respuesta: ' . wp_json_encode($result) );
         }
-    } catch ( Throwable $e ) {
+    } catch ( \Throwable $e ) {
         qa_fail( $qa, 'create_invoice_for_order()', $e->getMessage() );
-        echo "       vendor_id: " . $test_order->get_meta('_ltms_vendor_id') . "\n";
-        echo "       platform_fee: " . $test_order->get_meta('_ltms_platform_fee') . "\n";
-        echo "       customer_id: $billing_cid\n";
+        echo "       vendor_id: $t07_vendor_id\n";
+        echo "       contact_cache: $t07_contact_cache\n";
     } finally {
-        // Limpiar metas inyectados para el test — no dejar datos ficticios en el pedido real
-        if ( $t07_mocked ) {
-            $test_order->delete_meta_data('_ltms_vendor_id');
-            $test_order->delete_meta_data('_ltms_platform_fee');
-            $test_order->save();
-            echo "       [MOCK] Metas de prueba eliminados del pedido #$oid\n";
+        // Eliminar el pedido de prueba completamente
+        if ( $t07_order_created && $t07_order ) {
+            $oid_clean = $t07_order->get_id();
+            $t07_order->delete( true ); // forceDelete
+            echo "       [CLEANUP] Pedido de prueba #$oid_clean eliminado\n";
         }
     }
 } else {
-    qa_warn( $qa, 'T-07 omitido', 'Sin pedidos completados/processing sin factura Alegra' );
+    qa_warn( $qa, 'T-07 omitido', 'Sin productos publicados disponibles para crear pedido de prueba' );
 }
 
 // ── T-08: WEBHOOK HANDLER ─────────────────────────────────────────────────────

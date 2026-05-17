@@ -110,6 +110,13 @@ final class LTMS_Alegra_Sync {
                 $order->update_meta_data( '_ltms_alegra_invoice_status',  $invoice_status );
                 $order->update_meta_data( '_ltms_alegra_invoice_number',  $invoice_number );
                 $order->update_meta_data( '_ltms_alegra_synced_at',       current_time( 'mysql' ) );
+                // M-63: guardar estado de timbre DIAN y CUFE para trazabilidad de facturación electrónica.
+                if ( ! empty( $result['stamp']['status'] ) ) {
+                    $order->update_meta_data( '_ltms_alegra_stamp_status', sanitize_text_field( $result['stamp']['status'] ) );
+                }
+                if ( ! empty( $result['stamp']['cufe'] ) ) {
+                    $order->update_meta_data( '_ltms_alegra_cufe', sanitize_text_field( $result['stamp']['cufe'] ) );
+                }
                 $order->add_order_note(
                     sprintf( __( '📄 Factura Alegra creada: %s', 'ltms' ), $invoice_number )
                 );
@@ -345,9 +352,15 @@ final class LTMS_Alegra_Sync {
     public function create_invoice_for_order( \WC_Order $order ): array {
         $client = LTMS_Api_Factory::get( 'alegra' );
 
+        // ── Resolución del vendor_id ─────────────────────────────────────────
+        // Orden de prioridad:
+        //   1. Meta directa del pedido (_ltms_vendor_id)
+        //   2. Meta de los productos del pedido (primer item con vendor)
+        //   3. Releer desde BD si el objeto tiene caché stale (HPOS)
         $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+
         if ( ! $vendor_id ) {
-            // Fallback: extraer del primer item (mismo patrón que Order_Split).
+            // Fallback 1: extraer del primer item (mismo patrón que Order_Split).
             foreach ( $order->get_items() as $item ) {
                 $pid       = $item->get_product_id();
                 $vendor_id = (int) get_post_meta( $pid, '_ltms_vendor_id', true );
@@ -358,20 +371,41 @@ final class LTMS_Alegra_Sync {
         }
 
         if ( ! $vendor_id ) {
+            // Fallback 2: forzar relecture desde BD por si el objeto tiene caché stale.
+            $fresh_order = wc_get_order( $order->get_id() );
+            if ( $fresh_order ) {
+                $vendor_id = (int) $fresh_order->get_meta( '_ltms_vendor_id' );
+                if ( $vendor_id ) {
+                    $order = $fresh_order; // usar objeto fresco para todo lo que sigue
+                }
+            }
+        }
+
+        if ( ! $vendor_id ) {
             throw new \RuntimeException(
                 sprintf( '[AlegraSync] Pedido #%d sin vendor_id — no se factura comisión.', $order->get_id() )
             );
         }
 
+        // ── Resolución de la comisión ────────────────────────────────────────
         $commission = (float) $order->get_meta( '_ltms_platform_fee' );
+
         if ( $commission <= 0 ) {
-            // Para órdenes registradas vía lt_commissions (camino actual), leer ahí.
+            // Fallback 1: leer de lt_commissions (camino de producción normal).
             global $wpdb;
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $commission = (float) $wpdb->get_var( $wpdb->prepare(
                 "SELECT commission_amount FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1",
                 $order->get_id(), $vendor_id
             ) );
+        }
+
+        if ( $commission <= 0 ) {
+            // Fallback 2: calcular la comisión sobre el total del pedido según la tasa configurada.
+            $fee_pct    = (float) LTMS_Core_Config::get( 'ltms_platform_fee_pct', 0 );
+            $commission = $fee_pct > 0
+                ? round( (float) $order->get_total() * $fee_pct / 100, 2 )
+                : 0.0;
         }
 
         if ( $commission <= 0 ) {
@@ -526,7 +560,8 @@ final class LTMS_Alegra_Sync {
                                  ?: get_user_meta( $user_id, 'billing_phone', true )
                                  ?: '',
                 'type'           => [ $type ],
-                'kindOfPerson'   => 'PERSON_ENTITY',
+                // AUDIT-FIX: NIT → empresa (LEGAL_ENTITY), CC/CE → persona natural
+                'kindOfPerson'   => $nit ? 'LEGAL_ENTITY' : 'PERSON_ENTITY',
                 'regime'         => $regime,
             ];
 
@@ -627,7 +662,8 @@ final class LTMS_Alegra_Sync {
             'email'          => $order->get_billing_email(),
             'phone'          => $order->get_billing_phone(),
             'identification' => $identification,
-            'kindOfPerson'   => 'PERSON_ENTITY',
+            // AUDIT-FIX: empresa (tiene company) → LEGAL_ENTITY; persona natural → PERSON_ENTITY
+            'kindOfPerson'   => ! empty( $order->get_billing_company() ) ? 'LEGAL_ENTITY' : 'PERSON_ENTITY',
             'regime'         => $identification ? 'COMMON_REGIME' : 'SIMPLIFIED_REGIME',
         ];
 

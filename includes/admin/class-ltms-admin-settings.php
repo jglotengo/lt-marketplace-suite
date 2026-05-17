@@ -88,7 +88,8 @@ final class LTMS_Admin_Settings {
                 'ltms_aveonline_api_key', 'ltms_zapsign_api_token', 'ltms_tptc_api_key',
                 'ltms_xcover_api_key', 'ltms_backblaze_app_key',
                 'ltms_uber_direct_client_secret', 'ltms_heka_api_key',
-                'ltms_alegra_token', // v2.1.0
+                'ltms_alegra_token',          // v2.1.0
+                'ltms_google_client_secret',  // v2.2.0 (M-62)
             ];
 
             if ( in_array( $key, $encrypted_fields, true ) && ! empty( $value ) ) {
