@@ -51,6 +51,9 @@ final class LTMS_Google_OAuth {
 
         // Callback: Google redirige aquí con ?ltms_oauth=google&code=...
         add_action( 'init', [ $instance, 'handle_callback' ], 5 );
+
+        // M-219: mostrar botón Google en /mi-cuenta/ (WooCommerce login form).
+        add_action( 'woocommerce_login_form_start', [ $instance, 'render_wc_google_button' ] );
     }
 
     // -------------------------------------------------------------------------
@@ -410,5 +413,19 @@ final class LTMS_Google_OAuth {
         </script>
         <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Renderiza el botón Google en el formulario de login de WooCommerce (/mi-cuenta/).
+     * M-219: unifica el login con Google en todas las páginas del sitio.
+     */
+    public function render_wc_google_button(): void {
+        if ( is_user_logged_in() ) {
+            return;
+        }
+        echo '<div style="margin-bottom:16px;">';
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo self::render_google_button();
+        echo '</div>';
     }
 }
