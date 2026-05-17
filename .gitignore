@@ -81,3 +81,10 @@ coverage/
 test-results.xml
 
 *.bak
+# Archivos de backup y temporales del servidor
+*.bak
+*.bak2
+*.bak3
+*.min.css
+bin/ltms-run-diag.php
+/contrato-vendedor-test.pdf
