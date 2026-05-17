@@ -210,23 +210,32 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * {@inheritdoc}
      */
     public function health_check(): array {
-        try {
-            $response  = $this->perform_request( 'GET', '/me/' );
-            $connected = isset( $response['id'] );
-            return [
-                'connected'  => $connected,
-                'status'     => $connected ? 'ok' : 'error',
-                'account'    => $response['email'] ?? ( $response['name'] ?? '?' ),
-                'latency_ms' => null, // filled by perform_request timing if needed
-                'message'    => $connected ? 'ZapSign API conectado' : 'Respuesta inesperada de ZapSign',
-            ];
-        } catch ( \Throwable $e ) {
+        // ZapSign: GET /api/v1/users/ verifica token sin consumir cuota de documentos
+        $response = $this->perform_request( 'GET', '/users/' );
+
+        if ( is_wp_error( $response ) ) {
             return [
                 'connected' => false,
                 'status'    => 'error',
-                'message'   => $e->getMessage(),
+                'message'   => $response->get_error_message(),
             ];
         }
+
+        $code = (int) ( $response['http_code'] ?? $response['status'] ?? 0 );
+        if ( $code >= 200 && $code < 300 ) {
+            return [
+                'connected' => true,
+                'status'    => 'ok',
+                'account'   => $response['email'] ?? ( $response['name'] ?? 'ZapSign' ),
+                'message'   => 'ZapSign API conectada correctamente',
+            ];
+        }
+
+        return [
+            'connected' => false,
+            'status'    => 'error',
+            'message'   => '[zapsign] Health check HTTP ' . $code,
+        ];
     }
 
     // ── Helpers privados ──────────────────────────────────────────
