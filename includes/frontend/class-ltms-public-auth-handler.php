@@ -352,6 +352,15 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_sagrilaft_accepted_at', LTMS_Utils::now_utc() );
             }
 
+            // L-2: Registrar evidencia de consentimiento con IP+timestamp (Ley 1581/2012 art. 9)
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_registration_consents( $user_id, [
+                    'terms'     => $data['terms_accepted'],
+                    'privacy'   => $data['terms_accepted'],
+                    'sagrilaft' => $data['sagrilaft_accepted'] ?? false,
+                ] );
+            }
+
             // C-3: token de verificación de email (48h).
             $verify_token = wp_generate_password( 32, false );
             update_user_meta( $user_id, 'ltms_email_verify_token', $verify_token );

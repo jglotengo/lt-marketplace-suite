@@ -251,6 +251,11 @@ final class LTMS_Core_Kernel {
             LTMS_Alegra_Sync::init();
         }
 
+        // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::init();
+        }
+
         // ZapSign — Gestión completa de contratos de vendedores
         if ( class_exists( 'LTMS_ZapSign_Manager' ) ) {
             LTMS_ZapSign_Manager::init();

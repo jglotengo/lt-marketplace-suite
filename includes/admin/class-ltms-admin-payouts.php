@@ -124,6 +124,17 @@ final class LTMS_Admin_Payouts {
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
         update_user_meta( $vendor_id, 'ltms_kyc_approved_at', LTMS_Utils::now_utc() );
 
+        // L-1: Registrar acceso/revisión de documentos KYC en vault log (Ley 1581/2012 art. 8)
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::log_vault_access(
+                $vendor_id,
+                get_current_user_id(),
+                'kyc_documents',
+                'view',
+                'admin_approve_kyc'
+            );
+        }
+
         // M-45: disparar ltms_vendor_approved para que listeners (tourism compliance, kernel) procesen la aprobación.
         do_action( 'ltms_vendor_approved', $vendor_id );
 

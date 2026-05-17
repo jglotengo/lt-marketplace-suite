@@ -1101,6 +1101,41 @@ final class LTMS_DB_Migrations {
             KEY `idx_wp_user` (`wp_user_id`)
         ) {$charset}";
 
+        // ── L-1: Vault Access Log — Habeas Data (Ley 1581/2012 art. 8) ──────────
+        // Registra cada acceso a documentos sensibles del vault KYC.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vault_access_log` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`     BIGINT UNSIGNED NOT NULL COMMENT 'Propietario del documento',
+            `accessor_id` BIGINT UNSIGNED NOT NULL COMMENT 'Quien accede (admin/sistema)',
+            `document`    VARCHAR(100) NOT NULL COMMENT 'Tipo de documento accedido',
+            `action`      ENUM('view','download','upload','delete','share') NOT NULL DEFAULT 'view',
+            `ip_address`  VARCHAR(45) NOT NULL DEFAULT '' COMMENT 'IP del acceso',
+            `user_agent`  VARCHAR(255) NOT NULL DEFAULT '',
+            `context`     VARCHAR(200) NOT NULL DEFAULT '' COMMENT 'Razón/módulo del acceso',
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_user`     (`user_id`),
+            KEY `idx_accessor` (`accessor_id`),
+            KEY `idx_date`     (`created_at`)
+        ) {$charset}";
+
+        // ── L-2: Consent Log — Evidencia de consentimiento (Ley 1581/2012 art. 9) ─
+        // Registra términos, SAGRILAFT, política de privacidad, checkout consent.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_consent_log` (
+            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`      BIGINT UNSIGNED NOT NULL,
+            `consent_type` VARCHAR(60) NOT NULL COMMENT 'terms|sagrilaft|privacy|checkout|kyc_data|marketing',
+            `accepted`     TINYINT(1) NOT NULL DEFAULT 1,
+            `ip_address`   VARCHAR(45) NOT NULL DEFAULT '',
+            `user_agent`   VARCHAR(255) NOT NULL DEFAULT '',
+            `version`      VARCHAR(20) NOT NULL DEFAULT '1.0' COMMENT 'Versión del documento aceptado',
+            `channel`      VARCHAR(60) NOT NULL DEFAULT 'web' COMMENT 'web|api|oauth|admin',
+            `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_user_type` (`user_id`, `consent_type`),
+            KEY `idx_date`      (`created_at`)
+        ) {$charset}";
+
     }
 
     /**
