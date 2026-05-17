@@ -33,5 +33,11 @@ php bin/ltms-qa-alegra.php 2>&1
 
 echo ""
 echo "======================================"
+echo "  QA ZapSign"
+echo "======================================"
+php bin/ltms-qa-zapsign.php 2>&1
+
+echo ""
+echo "======================================"
 echo "  DONE — $(date)"
 echo "======================================"

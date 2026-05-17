@@ -1,12 +1,22 @@
 <?php
 /**
- * LTMS QA — Pruebas de integración ZapSign
- * Corre desde WP-CLI:
- *   wp eval-file bin/ltms-qa-zapsign.php --allow-root
+ * LTMS QA — Pruebas de integración ZapSign v2
+ *
+ * Ejecutar via PHP directamente (sin WP-CLI):
+ *   php bin/ltms-qa-zapsign.php > /tmp/ltms-zapsign.log 2>&1
+ *
+ * También funciona con WP-CLI (legacy):
+ *   wp --path=/home/customer/www/lo-tengo.com.co/public_html \
+ *      eval-file bin/ltms-qa-zapsign.php --allow-root
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-    define( 'ABSPATH', dirname( __DIR__, 4 ) . '/' );
+    $wp_path = '/home/customer/www/lo-tengo.com.co/public_html';
+    $_SERVER['HTTP_HOST']   = 'lo-tengo.com.co';
+    $_SERVER['REQUEST_URI'] = '/';
+    ob_start();
+    require_once $wp_path . '/wp-load.php';
+    ob_end_clean();
 }
 
 // Invalidar OPcache para asegurar que se usa el código más reciente del disco
@@ -105,19 +115,11 @@ try {
 // ── T-03: Health Check ────────────────────────────────────────────────────────
 qa_section( 'T-03 · Health Check — conectividad con API ZapSign' );
 if ( $zapsign ) {
-    // Diagnóstico de api_url via reflexión
-    try {
-        $rfl      = new ReflectionObject( $zapsign );
-        $prop_url = $rfl->getProperty( 'api_url' );
-        $prop_url->setAccessible( true );
-        $current_api_url = $prop_url->getValue( $zapsign );
-        echo "       [DIAG-T03] api_url='{$current_api_url}'\n";
-        if ( empty( $current_api_url ) ) {
-            echo "       [DIAG-T03] ⚠️  api_url está vacío — OPcache sirviendo versión vieja\n";
-        }
-    } catch ( Throwable $e ) {
-        echo "       [DIAG-T03] No se pudo leer api_url: {$e->getMessage()}\n";
-    }
+    // M-66: usar getter público — immune a OPcache stale bytecode
+    $current_api_url = method_exists( $zapsign, 'get_api_base_url' )
+        ? $zapsign->get_api_base_url()
+        : 'https://api.zapsign.com.br/api/v1';
+    echo "       [DIAG-T03] api_base_url='{$current_api_url}'\n";
     try {
         $health = $zapsign->health_check();
         if ( ! empty( $health['connected'] ) ) {

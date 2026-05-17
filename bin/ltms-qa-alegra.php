@@ -66,7 +66,7 @@ if ( function_exists('opcache_invalidate') ) {
 LTMS_Core_Config::flush_cache();
 LTMS_Api_Factory::reset( 'alegra' );
 
-echo "\n🔍 LTMS QA — Pruebas de integración Alegra\n";
+echo "\n🔍 LTMS QA — Pruebas de integración Alegra v2\n";
 echo "Fecha: " . date( 'Y-m-d H:i:s' ) . "\n";
 
 // ── T-01: AUTENTICACIÓN ────────────────────────────────────────────────────────

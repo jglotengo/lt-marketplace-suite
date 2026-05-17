@@ -57,6 +57,14 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Returns the canonical API base URL (always the constant, never empty).
+     * Used by health_check() and QA diagnostics to bypass OPcache stale bytecode.
+     */
+    public function get_api_base_url(): string {
+        return self::API_BASE;
+    }
+
+    /**
      * Override perform_request to ensure api_url is always set, even if OPcache
      * served an old version of this class without the constructor assignment.
      *
@@ -69,9 +77,14 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         array  $headers = [],
         bool   $retry   = true
     ): array {
-        // Defensive: re-inject api_url at call time in case OPcache has old bytecode
-        if ( empty( $this->api_url ) ) {
-            $this->api_url = 'https://api.zapsign.com.br/api/v1';
+        // M-66 definitive fix: always force api_url and Authorization header at call time.
+        // OPcache on some servers serves stale bytecode that skips the constructor assignment,
+        // leaving api_url empty. Using the constant here is immune to that.
+        $this->api_url = self::API_BASE;
+
+        // Also ensure auth token header is always present even if default_headers was empty.
+        if ( ! empty( $this->api_token ) && empty( $headers['Authorization'] ) ) {
+            $headers['Authorization'] = 'Bearer ' . $this->api_token;
         }
 
         return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
@@ -198,13 +211,21 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      */
     public function health_check(): array {
         try {
-            $response = $this->perform_request( 'GET', '/me/' );
+            $response  = $this->perform_request( 'GET', '/me/' );
+            $connected = isset( $response['id'] );
             return [
-                'status'  => isset( $response['id'] ) ? 'ok' : 'error',
-                'message' => 'ZapSign API conectado',
+                'connected'  => $connected,
+                'status'     => $connected ? 'ok' : 'error',
+                'account'    => $response['email'] ?? ( $response['name'] ?? '?' ),
+                'latency_ms' => null, // filled by perform_request timing if needed
+                'message'    => $connected ? 'ZapSign API conectado' : 'Respuesta inesperada de ZapSign',
             ];
         } catch ( \Throwable $e ) {
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
+            return [
+                'connected' => false,
+                'status'    => 'error',
+                'message'   => $e->getMessage(),
+            ];
         }
     }
 
