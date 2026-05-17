@@ -105,6 +105,10 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
         array  $headers = [],
         bool   $retry   = true
     ): array {
+        // M-OPCACHE: if subclass defines get_api_base_url(), use it as fallback when api_url is empty.
+        if ( empty( $this->api_url ) && method_exists( $this, 'get_api_base_url' ) ) {
+            $this->api_url = $this->get_api_base_url();
+        }
         $url     = rtrim( $this->api_url, '/' ) . '/' . ltrim( $endpoint, '/' );
         $method  = strtoupper( $method );
         $headers = array_merge( $this->default_headers, $headers );
