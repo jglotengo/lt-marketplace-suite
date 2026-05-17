@@ -31,6 +31,11 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     private string $api_token;
 
     /**
+     * Modo sandbox (desarrollo sin plan de pago).
+     */
+    private bool $sandbox;
+
+    /**
      * Constructor.
      */
     public function __construct() {
@@ -44,6 +49,9 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         if ( empty( $this->api_url ) ) {
             $this->api_url = self::API_BASE;
         }
+
+        // Modo sandbox: si no hay plan de pago, usar sandbox=true en dev
+        $this->sandbox = (bool) LTMS_Core_Config::get( 'ltms_zapsign_sandbox', false );
 
         // ZapSign usa Bearer token en Authorization header
         $this->default_headers['Authorization'] = 'Bearer ' . $this->api_token;
@@ -62,6 +70,13 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      */
     public function get_api_base_url(): string {
         return self::API_BASE;
+    }
+
+    /**
+     * Indica si el cliente esta en modo sandbox.
+     */
+    public function is_sandbox(): bool {
+        return $this->sandbox;
     }
 
     /**
@@ -107,6 +122,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             'brand_logo'  => $document_data['brand_logo'] ?? '',
             'brand_name'  => $document_data['brand_name'] ?? get_bloginfo( 'name' ),
             'folder_path' => 'LTMS/Contratos/' . gmdate( 'Y' ),
+            'sandbox'     => $this->sandbox,
         ];
 
         // Adjuntar PDF base64 si no hay URL
@@ -210,7 +226,18 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * {@inheritdoc}
      */
     public function health_check(): array {
-        // ZapSign: GET /api/v1/users/ verifica token sin consumir cuota de documentos
+        // En sandbox usamos GET /docs/?sandbox=true (no requiere plan de pago)
+        // En produccion usamos GET /users/ (requiere plan API)
+        if ( $this->sandbox ) {
+            $response = $this->perform_request( 'GET', '/docs/?sandbox=true' );
+            $connected = ! isset( $response['error'] );
+            return [
+                'connected' => $connected,
+                'status'    => $connected ? 'ok' : 'error',
+                'message'   => $connected ? 'ZapSign API conectada (sandbox)' : ( $response['detail'] ?? 'Error sandbox' ),
+                'sandbox'   => true,
+            ];
+        }
         $response = $this->perform_request( 'GET', '/users/' );
 
         if ( is_wp_error( $response ) ) {
