@@ -116,17 +116,40 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                        placeholder="<?php esc_attr_e( 'Ej: 12345678', 'ltms' ); ?>">
             </div>
 
-            <div class="ltms-form-group">
-                <label><?php esc_html_e( 'Foto del documento (frente)', 'ltms' ); ?></label>
-                <input type="file" id="ltms-kyc-file" accept="image/*,application/pdf" class="ltms-form-control"
-                       style="padding:8px;">
-                <span class="ltms-field-hint">
-                    <?php esc_html_e( 'Formatos aceptados: JPG, PNG, PDF. Tamaño máximo: 5 MB.', 'ltms' ); ?>
-                </span>
+            <!-- Documentos requeridos -->
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-bottom:20px;">
+                <p style="font-size:.85rem;color:#166534;margin:0;">
+                    <strong>📋 Documentos requeridos (SAGRILAFT / Ley 1480)</strong><br>
+                    La cédula o NIT son obligatorios para todos. El RUT aplica a régimen común y empresas. La Cámara de Comercio solo si eres persona jurídica.
+                </p>
             </div>
 
-            <div id="ltms-kyc-upload-status" style="display:none;font-size:.85rem;color:#6b7280;margin-bottom:12px;"></div>
-            <input type="hidden" id="ltms-kyc-file-path" value="">
+            <!-- Cédula / NIT (obligatorio) -->
+            <div class="ltms-form-group">
+                <label><?php esc_html_e( '📄 Cédula de Ciudadanía o NIT — frente y reverso (obligatorio)', 'ltms' ); ?></label>
+                <input type="file" id="ltms-kyc-file" name="kyc_doc" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
+                <span class="ltms-field-hint"><?php esc_html_e( 'Foto o escáner claro. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
+                <div id="ltms-kyc-upload-status" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
+                <input type="hidden" id="ltms-kyc-file-path" value="">
+            </div>
+
+            <!-- RUT -->
+            <div class="ltms-form-group">
+                <label><?php esc_html_e( '📄 RUT — Registro Único Tributario (obligatorio para régimen común y empresas)', 'ltms' ); ?></label>
+                <input type="file" id="ltms-kyc-file-rut" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
+                <span class="ltms-field-hint"><?php esc_html_e( 'Descárgalo actualizado en dian.gov.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
+                <div id="ltms-kyc-status-rut" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
+                <input type="hidden" id="ltms-kyc-path-rut" value="">
+            </div>
+
+            <!-- Cámara de Comercio -->
+            <div class="ltms-form-group">
+                <label><?php esc_html_e( '📄 Certificado de Existencia — Cámara de Comercio (solo personas jurídicas)', 'ltms' ); ?></label>
+                <input type="file" id="ltms-kyc-file-camara" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
+                <span class="ltms-field-hint"><?php esc_html_e( 'Vigencia no mayor a 90 días. Descárgalo en ccb.org.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
+                <div id="ltms-kyc-status-camara" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
+                <input type="hidden" id="ltms-kyc-path-camara" value="">
+            </div>
 
             <button type="button" id="ltms-kyc-submit-btn"
                     class="ltms-btn ltms-btn-primary" style="width:100%;justify-content:center;padding:12px;">
@@ -149,13 +172,13 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 if (type === 'success') setTimeout(function(){ $notice.hide(); }, 4000);
             }
 
-            // Paso 1: subir documento (usa ltms_upload_kyc_document)
-            function uploadDocument(callback) {
-                var file = $('#ltms-kyc-file')[0].files[0];
+            // Subir un documento individual a Backblaze B2 via vault
+            function uploadSingleDoc(inputId, statusId, pathId, label, callback) {
+                var file = $('#' + inputId)[0] && $('#' + inputId)[0].files[0];
                 if (!file) { callback(null); return; }
 
-                var $status = $('#ltms-kyc-upload-status');
-                $status.text('Subiendo documento...').show();
+                var $status = $('#' + statusId);
+                $status.text('Subiendo ' + label + '...').show();
 
                 var fd = new FormData();
                 fd.append('action', 'ltms_upload_kyc_document');
@@ -166,18 +189,29 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     processData: false, contentType: false,
                     success: function(r) {
                         if (r.success) {
-                            $status.text('Documento subido ✓');
-                            $('#ltms-kyc-file-path').val(r.data.file_path || '');
-                            callback(r.data.file_path || '');
+                            $status.text(label + ' subido ✓');
+                            $('#' + pathId).val(r.data.file_path || r.data.vault_url || '');
+                            callback(r.data.file_path || r.data.vault_url || '');
                         } else {
-                            $status.text('Error al subir: ' + (r.data || 'intente de nuevo'));
+                            $status.text('Error ' + label + ': ' + (r.data || 'intente de nuevo'));
                             callback(null);
                         }
                     },
                     error: function() {
-                        $status.text('Error de conexión al subir documento.');
+                        $status.text('Error de conexión al subir ' + label + '.');
                         callback(null);
                     }
+                });
+            }
+
+            // Subir todos los documentos en secuencia
+            function uploadDocument(callback) {
+                uploadSingleDoc('ltms-kyc-file', 'ltms-kyc-upload-status', 'ltms-kyc-file-path', 'Cédula/NIT', function(cedula) {
+                    uploadSingleDoc('ltms-kyc-file-rut', 'ltms-kyc-status-rut', 'ltms-kyc-path-rut', 'RUT', function(rut) {
+                        uploadSingleDoc('ltms-kyc-file-camara', 'ltms-kyc-status-camara', 'ltms-kyc-path-camara', 'Cámara de Comercio', function(camara) {
+                            callback(cedula, rut, camara);
+                        });
+                    });
                 });
             }
 
@@ -194,15 +228,18 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 
                 var $btn = $(this).prop('disabled', true).text('Procesando...');
 
-                uploadDocument(function(filePath) {
+                uploadDocument(function(cedulaPath, rutPath, camaraPath) {
+                    var filePath = cedulaPath || '';
                     $.ajax({ url: ajaxUrl, method: 'POST',
                         data: {
-                            action:          'ltms_submit_kyc',
-                            nonce:           nonce,
-                            full_name:       fullName,
-                            document_type:   docType,
-                            document_number: docNumber,
-                            file_path:       filePath || '',
+                            action:           'ltms_submit_kyc',
+                            nonce:            nonce,
+                            full_name:        fullName,
+                            document_type:    docType,
+                            document_number:  docNumber,
+                            file_path:        filePath,
+                            file_path_rut:    rutPath || '',
+                            file_path_camara: camaraPath || '',
                         },
                         success: function(r) {
                             $btn.prop('disabled', false).text('Enviar para Verificación');

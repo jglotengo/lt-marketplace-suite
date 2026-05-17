@@ -317,7 +317,9 @@ final class LTMS_Dashboard_Logic {
         $full_name       = sanitize_text_field( wp_unslash( $_POST['full_name']       ?? '' ) ); // phpcs:ignore
         $document_type   = sanitize_key(        $_POST['document_type']   ?? 'cc' );             // phpcs:ignore
         $document_number = sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ); // phpcs:ignore
-        $file_path       = sanitize_text_field( wp_unslash( $_POST['file_path']       ?? '' ) ); // phpcs:ignore
+        $file_path        = sanitize_text_field( wp_unslash( $_POST['file_path']        ?? '' ) ); // phpcs:ignore
+        $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
+        $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
 
         $allowed_types = [ 'cc', 'ce', 'nit', 'passport' ];
         if ( ! in_array( $document_type, $allowed_types, true ) ) {
@@ -360,6 +362,12 @@ final class LTMS_Dashboard_Logic {
         // Sync user meta so dashboard/settings show correct status immediately
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'pending' );
         update_user_meta( $vendor_id, 'ltms_full_name',   $full_name );
+
+        // M-120: guardar documentos adicionales (RUT, Cámara de Comercio) como user_meta
+        $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
+        $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
+        if ( $file_path_rut )    update_user_meta( $vendor_id, 'ltms_kyc_file_rut',    $file_path_rut );
+        if ( $file_path_camara ) update_user_meta( $vendor_id, 'ltms_kyc_file_camara', $file_path_camara );
 
         wp_send_json_success( [ 'message' => __( 'Solicitud enviada. Recibirás una respuesta en 1-2 días hábiles.', 'ltms' ) ] );
     }

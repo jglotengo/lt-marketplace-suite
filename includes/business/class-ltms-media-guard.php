@@ -66,11 +66,16 @@ class LTMS_Media_Guard {
     public static function handle_kyc_upload_ajax(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
-        if ( ! isset( $_FILES['ltms_kyc_file'] ) ) {
+        // M-119: el JS envía 'kyc_doc' — ajustar para aceptar ambos nombres
+        $file_key = 'kyc_doc';
+        if ( ! isset( $_FILES[ $file_key ] ) ) {
+            $file_key = 'ltms_kyc_file'; // retrocompatibilidad
+        }
+        if ( ! isset( $_FILES[ $file_key ] ) ) {
             wp_send_json_error( __( 'No se recibió ningún archivo.', 'ltms' ) );
         }
 
-        $upload_data = $_FILES['ltms_kyc_file']; // phpcs:ignore
+        $upload_data = $_FILES[ $file_key ]; // phpcs:ignore
         $result      = self::handle_kyc_upload( $upload_data );
 
         if ( is_wp_error( $result ) ) {
@@ -168,10 +173,13 @@ class LTMS_Media_Guard {
 
         LTMS_Core_Logger::info( 'KYC_UPLOAD_SUCCESS', sprintf( 'Vendor #%d uploaded KYC: %s', $vendor_id, $key ) );
 
+        // M-119: devolver file_path (alias de vault_url) para compatibilidad con el JS del frontend
+        $vault_url = site_url( 'ltms-vault/kyc/' . rawurlencode( $key ) );
         return [
-            'file_id'  => (int) $wpdb->insert_id,
-            'file_key' => $key,
-            'vault_url' => site_url( 'ltms-vault/kyc/' . rawurlencode( $key ) ),
+            'file_id'   => (int) $wpdb->insert_id,
+            'file_key'  => $key,
+            'file_path' => $vault_url,   // alias para el JS (usa r.data.file_path)
+            'vault_url' => $vault_url,
         ];
     }
 
