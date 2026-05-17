@@ -411,20 +411,62 @@ if ( $test_contact_id && $test_item_id ) {
 
 // ── T-07: FACTURACIÓN DESDE PEDIDO WC ─────────────────────────────────────────
 qa_section( 'T-07 · Facturación automática desde pedido WC' );
-$orders = wc_get_orders([
-    'status' => [ 'completed', 'processing' ],
-    'limit'  => 5,
-    'meta_query' => [[
-        'key'     => '_ltms_alegra_invoice_id',
-        'compare' => 'NOT EXISTS',
-    ]],
+
+// Buscar primero pedidos con _ltms_vendor_id (comisión real del marketplace)
+$orders_with_vendor = wc_get_orders([
+    'status'     => [ 'completed', 'processing' ],
+    'limit'      => 10,
+    'meta_query' => [
+        'relation' => 'AND',
+        [ 'key' => '_ltms_alegra_invoice_id', 'compare' => 'NOT EXISTS' ],
+        [ 'key' => '_ltms_vendor_id',         'compare' => 'EXISTS'     ],
+    ],
+]);
+
+// Si no hay pedido con vendor, inyectar contexto ficticio en el que sí exista
+$orders = $orders_with_vendor ?: wc_get_orders([
+    'status'     => [ 'completed', 'processing' ],
+    'limit'      => 5,
+    'meta_query' => [[ 'key' => '_ltms_alegra_invoice_id', 'compare' => 'NOT EXISTS' ]],
 ]);
 
 if ( $orders ) {
     $test_order = $orders[0];
     $oid = $test_order->get_id();
+
+    // Si el pedido no tiene vendor_id, inyectar contexto ficticio para el test
+    $t07_mocked        = false;
+    $t07_mock_vendor   = 0;
+    $existing_vendor   = (int) $test_order->get_meta('_ltms_vendor_id');
+    $existing_fee      = (float) $test_order->get_meta('_ltms_platform_fee');
+
+    if ( ! $existing_vendor ) {
+        // Buscar un vendedor real con KYC aprobado
+        global $wpdb;
+        $t07_mock_vendor = (int) $wpdb->get_var("
+            SELECT u.ID FROM {$wpdb->users} u
+            INNER JOIN {$wpdb->usermeta} um ON u.ID = um.user_id AND um.meta_key='_ltms_kyc_status' AND um.meta_value='approved'
+            LIMIT 1
+        ");
+        if ( ! $t07_mock_vendor ) {
+            // Si no hay vendedor KYC, usar el usuario admin como contacto proveedor
+            $t07_mock_vendor = (int) $wpdb->get_var("SELECT ID FROM {$wpdb->users} WHERE user_login='admin' OR user_login LIKE '%jg%' LIMIT 1");
+        }
+        if ( $t07_mock_vendor ) {
+            $t07_mocked = true;
+            $test_order->update_meta_data('_ltms_vendor_id',    $t07_mock_vendor);
+            $test_order->update_meta_data('_ltms_platform_fee', 5000.0); // $5.000 COP comisión ficticia
+            $test_order->save();
+            echo "       [MOCK] Inyectado vendor_id=$t07_mock_vendor + platform_fee=5000 para test T-07\n";
+        } else {
+            echo "       [WARN] Sin vendedor disponible para mock — T-07 puede fallar\n";
+        }
+    }
+
     echo "       Pedido #$oid | estado=" . $test_order->get_status() . " | total=" . number_format((float)$test_order->get_total(),0,',','.') . " | items=" . count($test_order->get_items()) . "\n";
     echo "       Billing: " . $test_order->get_billing_first_name() . ' ' . $test_order->get_billing_last_name() . " <" . $test_order->get_billing_email() . ">\n";
+    echo "       vendor_id: " . $test_order->get_meta('_ltms_vendor_id') . " | platform_fee: " . $test_order->get_meta('_ltms_platform_fee') . "\n";
+
 
     // Pre-diagnóstico: ver si el contacto ya existe en Alegra y cachearlo
     // Usamos curl directo (igual que DIAG T-04) para evitar OPcache de clase vieja
@@ -550,9 +592,17 @@ if ( $orders ) {
         }
     } catch ( Throwable $e ) {
         qa_fail( $qa, 'create_invoice_for_order()', $e->getMessage() );
-        echo "       billing_email: $billing_email\n";
-        echo "       billing_id: " . $test_order->get_meta('_billing_identification') . "\n";
+        echo "       vendor_id: " . $test_order->get_meta('_ltms_vendor_id') . "\n";
+        echo "       platform_fee: " . $test_order->get_meta('_ltms_platform_fee') . "\n";
         echo "       customer_id: $billing_cid\n";
+    } finally {
+        // Limpiar metas inyectados para el test — no dejar datos ficticios en el pedido real
+        if ( $t07_mocked ) {
+            $test_order->delete_meta_data('_ltms_vendor_id');
+            $test_order->delete_meta_data('_ltms_platform_fee');
+            $test_order->save();
+            echo "       [MOCK] Metas de prueba eliminados del pedido #$oid\n";
+        }
     }
 } else {
     qa_warn( $qa, 'T-07 omitido', 'Sin pedidos completados/processing sin factura Alegra' );
