@@ -342,7 +342,9 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_municipality', $data['municipality_code'] );
             }
             update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
-            update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
+            // L-1: cifrar número de documento antes de almacenar (Ley 1581/2012)
+            update_user_meta( $user_id, 'ltms_document',      LTMS_Core_Security::encrypt( $data['document'] ) );
+            update_user_meta( $user_id, 'ltms_document_number', LTMS_Core_Security::encrypt( $data['document'] ) ); // alias cifrado
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
             update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );

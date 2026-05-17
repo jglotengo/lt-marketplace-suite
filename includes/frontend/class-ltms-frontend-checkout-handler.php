@@ -70,6 +70,10 @@ final class LTMS_Frontend_Checkout_Handler {
      * @return void
      */
     public static function init(): void {
+        // L-3: consentimiento de datos personales en checkout (Ley 1581/2012)
+        add_action( 'woocommerce_review_order_before_submit',  [ __CLASS__, 'add_privacy_consent_field' ] );
+        add_action( 'woocommerce_checkout_process',            [ __CLASS__, 'validate_privacy_consent' ] );
+        add_action( 'woocommerce_checkout_order_created',      [ __CLASS__, 'save_privacy_consent' ] );
         $instance = new self();
 
         // Proceso de pago — solo usuarios logueados
@@ -654,4 +658,42 @@ final class LTMS_Frontend_Checkout_Handler {
         }
         return $items;
     }
-}
+    /**
+     * L-3: Campo de consentimiento de datos en checkout.
+     */
+    public static function add_privacy_consent_field(): void {
+        $privacy_url = get_privacy_policy_url() ?: get_permalink( get_option( 'ltms_privacy_page_id' ) ) ?: '#';
+        $checked     = WC()->session ? WC()->session->get( 'ltms_privacy_consent', false ) : false;
+        echo '<p class="form-row ltms-checkout-consent">';
+        echo '<label class="woocommerce-form__label woocommerce-form__label-for-checkbox checkbox">';
+        echo '<input type="checkbox" class="woocommerce-form__input woocommerce-form__input-checkbox input-checkbox" ';
+        echo 'name="ltms_privacy_consent" id="ltms-privacy-consent" value="1"' . checked( $checked, true, false ) . ' required>';
+        echo '<span>' . wp_kses_post( sprintf(
+            __( 'He leído y acepto la <a href="%s" target="_blank">Política de Tratamiento de Datos Personales</a>. Autorizo el uso de mis datos para gestión del pedido conforme a la Ley 1581/2012. *', 'ltms' ),
+            esc_url( $privacy_url )
+        ) ) . '</span>';
+        echo '</label></p>';
+    }
+
+    /**
+     * L-3: Validar consentimiento en checkout.
+     */
+    public static function validate_privacy_consent(): void {
+        if ( empty( $_POST['ltms_privacy_consent'] ) ) { // phpcs:ignore
+            wc_add_notice( __( 'Debes aceptar la Política de Tratamiento de Datos Personales para continuar.', 'ltms' ), 'error' );
+        }
+    }
+
+    /**
+     * L-3: Guardar consentimiento con timestamp y versión.
+     */
+    public static function save_privacy_consent( \WC_Order $order ): void {
+        if ( ! empty( $_POST['ltms_privacy_consent'] ) ) { // phpcs:ignore
+            $order->update_meta_data( '_ltms_privacy_consent', '1' );
+            $order->update_meta_data( '_ltms_privacy_consent_date', gmdate( 'Y-m-d H:i:s' ) );
+            $order->update_meta_data( '_ltms_privacy_consent_ip', sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
+            $order->save();
+        }
+    }
+
+} // end class LTMS_Frontend_Checkout_Handler

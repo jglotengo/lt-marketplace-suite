@@ -31,7 +31,19 @@ class LTMS_Coupon_Attribution_Listener {
         }
         // Cookie dura 30 días (primer clic gana)
         if ( ! isset( $_COOKIE['ltms_referral'] ) ) {
-            setcookie( 'ltms_referral', $ref, time() + ( 30 * DAY_IN_SECONDS ), COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+            // L-5: cookie con SameSite=Lax para protección CSRF (PHP 7.3+)
+            if ( PHP_VERSION_ID >= 70300 ) {
+                setcookie( 'ltms_referral', $ref, [
+                    'expires'  => time() + ( 30 * DAY_IN_SECONDS ),
+                    'path'     => COOKIEPATH,
+                    'domain'   => COOKIE_DOMAIN,
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ] );
+            } else {
+                setcookie( 'ltms_referral', $ref, time() + ( 30 * DAY_IN_SECONDS ), COOKIEPATH . '; SameSite=Lax', COOKIE_DOMAIN, is_ssl(), true );
+            }
             $_COOKIE['ltms_referral'] = $ref;
         }
     }

@@ -167,7 +167,14 @@ final class LTMS_ZapSign_Manager {
                 'data'        => [
                     [ 'de' => 'vendedor_nombre',    'para' => $user->display_name ],
                     [ 'de' => 'vendedor_email',     'para' => $user->user_email ],
-                    [ 'de' => 'vendedor_documento', 'para' => get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '' ],
+                    // L-7: enmascarar documento antes de enviar a ZapSign (solo últimos 4 dígitos)
+                    [ 'de' => 'vendedor_documento', 'para' => (function( $num ) {
+                        $raw = get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '';
+                        if ( class_exists( 'LTMS_Core_Security' ) && ! empty( $raw ) ) {
+                            try { $raw = LTMS_Core_Security::decrypt( $raw ); } catch ( \Throwable $e ) {}
+                        }
+                        return strlen( $raw ) > 4 ? str_repeat( '*', strlen( $raw ) - 4 ) . substr( $raw, -4 ) : $raw;
+                    })( get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '' ) ],
                     [ 'de' => 'vendedor_ciudad',    'para' => get_user_meta( $vendor_id, 'billing_city', true ) ?: '' ],
                     [ 'de' => 'vendedor_tienda',    'para' => get_user_meta( $vendor_id, 'ltms_store_name', true ) ?: '' ],
                     [ 'de' => 'fecha_contrato',     'para' => gmdate( 'd/m/Y' ) ],

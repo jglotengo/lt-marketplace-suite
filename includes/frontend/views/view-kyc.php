@@ -151,6 +151,23 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 <input type="hidden" id="ltms-kyc-path-camara" value="">
             </div>
 
+            <!-- L-6: Consentimiento Habeas Data / Ley 1581 antes del envío -->
+            <div class="ltms-form-group" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:16px;">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.875rem;color:#78350f;">
+                    <input type="checkbox" id="ltms-kyc-consent" value="1" required style="margin-top:3px;flex-shrink:0;">
+                    <span>
+                        <?php
+                        $privacy_url = get_privacy_policy_url() ?: get_permalink( get_option( 'ltms_privacy_page_id' ) ) ?: '#';
+                        echo wp_kses_post( sprintf(
+                            __( '<strong>Autorización de Tratamiento de Datos Personales (Ley 1581/2012):</strong> Autorizo a <strong>%s</strong> para recopilar, almacenar, usar y tratar mis datos personales e información de identidad con fines de verificación (KYC), cumplimiento de SAGRILAFT, prevención de fraude y gestión de la plataforma. Los documentos se almacenan cifrados en servidores seguros. Conozco mis derechos de acceso, rectificación, cancelación y oposición según la <a href="%s" target="_blank">Política de Privacidad</a>. *', 'ltms' ),
+                            get_bloginfo( 'name' ),
+                            esc_url( $privacy_url )
+                        ) );
+                        ?>
+                    </span>
+                </label>
+            </div>
+
             <button type="button" id="ltms-kyc-submit-btn"
                     class="ltms-btn ltms-btn-primary" style="width:100%;justify-content:center;padding:12px;">
                 <?php esc_html_e( 'Enviar para Verificación', 'ltms' ); ?>
@@ -226,6 +243,12 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     return;
                 }
 
+                // L-6: validar consentimiento de datos personales
+                if (!$('#ltms-kyc-consent').is(':checked')) {
+                    showNotice('Debes aceptar la autorización de tratamiento de datos para continuar.', 'error');
+                    return;
+                }
+
                 var $btn = $(this).prop('disabled', true).text('Procesando...');
 
                 uploadDocument(function(cedulaPath, rutPath, camaraPath) {
@@ -240,6 +263,8 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                             file_path:        filePath,
                             file_path_rut:    rutPath || '',
                             file_path_camara: camaraPath || '',
+                            privacy_consent:  '1',
+                            consent_ts:       new Date().toISOString(),
                         },
                         success: function(r) {
                             $btn.prop('disabled', false).text('Enviar para Verificación');

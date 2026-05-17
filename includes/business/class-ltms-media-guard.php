@@ -55,6 +55,17 @@ class LTMS_Media_Guard {
             $bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' );
             $signed_url_ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
             $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $key ), $signed_url_ttl );
+
+            // L-2: Registro de acceso a documentos sensibles (trazabilidad Habeas Data)
+            LTMS_Core_Logger::info( 'VAULT_ACCESS_GRANTED', sprintf(
+                'User #%d accessed vault document: %s/%s — IP: %s — UA: %s',
+                $user_id,
+                $entity,
+                $key,
+                sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ), // phpcs:ignore
+                sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 100 ) ) // phpcs:ignore
+            ) );
+
             wp_redirect( esc_url_raw( $url ) );
             exit;
         } catch ( \Throwable $e ) {

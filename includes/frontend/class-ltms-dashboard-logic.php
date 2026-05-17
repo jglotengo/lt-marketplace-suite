@@ -369,16 +369,13 @@ final class LTMS_Dashboard_Logic {
         if ( $file_path_rut )    update_user_meta( $vendor_id, 'ltms_kyc_file_rut',    $file_path_rut );
         if ( $file_path_camara ) update_user_meta( $vendor_id, 'ltms_kyc_file_camara', $file_path_camara );
 
-        // L-6 + L-8: Registrar consentimiento KYC y log de vault (Ley 1581/2012 art. 9)
-        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-            LTMS_Legal_Compliance::log_kyc_consent( $vendor_id );
-            LTMS_Legal_Compliance::log_vault_access(
-                $vendor_id,
-                $vendor_id,
-                'kyc_submission',
-                'upload',
-                'ajax_submit_kyc'
-            );
+        // L-8: registrar consentimiento de Habeas Data con timestamp e IP (trazabilidad legal)
+        $privacy_consent = sanitize_text_field( wp_unslash( $_POST['privacy_consent'] ?? '' ) ); // phpcs:ignore
+        if ( '1' === $privacy_consent ) {
+            update_user_meta( $vendor_id, 'ltms_kyc_consent',      '1' );
+            update_user_meta( $vendor_id, 'ltms_kyc_consent_date', gmdate( 'Y-m-d H:i:s' ) );
+            update_user_meta( $vendor_id, 'ltms_kyc_consent_ip',   sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
+            update_user_meta( $vendor_id, 'ltms_kyc_consent_ver',  '1581-2012-v1' ); // versión de la política aceptada
         }
 
         wp_send_json_success( [ 'message' => __( 'Solicitud enviada. Recibirás una respuesta en 1-2 días hábiles.', 'ltms' ) ] );

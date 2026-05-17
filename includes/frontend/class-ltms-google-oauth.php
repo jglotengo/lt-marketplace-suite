@@ -332,7 +332,8 @@ final class LTMS_Google_OAuth {
 
         do_action( 'ltms_vendor_registered', $user_id );
 
-        $this->log_info( 'google_oauth_register', "Nuevo vendor #$user_id registrado vía Google OAuth: $email" );
+        // L-4: no loguear email en texto plano (Ley 1581/2012)
+        $this->log_info( 'google_oauth_register', sprintf( 'Nuevo vendor #%d registrado vía Google OAuth — dominio: %s', $user_id, substr( strrchr( $email, '@' ), 1 ) ) );
 
         return $user_id;
     }

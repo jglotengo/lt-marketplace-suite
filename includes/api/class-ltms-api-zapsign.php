@@ -354,8 +354,16 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      */
     private function url_to_local_path( string $url ): ?string {
         $site_url = rtrim( get_site_url(), '/' );
-        if ( strpos( $url, $site_url ) !== 0 ) {
+        // M-ZAP-1: normalizar protocolo para que http:// y https:// coincidan
+        $url_norm      = preg_replace( '#^https?://#', '/', $url );
+        $site_url_norm = preg_replace( '#^https?://#', '/', $site_url );
+        if ( strpos( $url_norm, $site_url_norm ) !== 0 ) {
             return null; // URL externa
+        }
+        $url = $url; // usar la original para extraer el path
+        if ( strpos( $url, $site_url ) !== 0 ) {
+            // Reconectar con el protocolo correcto
+            $url = $site_url . substr( $url_norm, strlen( $site_url_norm ) );
         }
         $relative = ltrim( substr( $url, strlen( $site_url ) ), '/' );
         $abspath   = rtrim( ABSPATH, '/' );
