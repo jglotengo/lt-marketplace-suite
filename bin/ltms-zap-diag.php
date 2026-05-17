@@ -5,6 +5,12 @@
  */
 if ( ! defined( 'ABSPATH' ) ) die;
 
+// Forzar invalidación de OPcache para las clases API (evita bytecode stale)
+if ( function_exists( 'opcache_invalidate' ) ) {
+    opcache_invalidate( LTMS_PLUGIN_DIR . 'includes/api/class-ltms-abstract-api-client.php', true );
+    opcache_invalidate( LTMS_PLUGIN_DIR . 'includes/api/class-ltms-api-zapsign.php', true );
+}
+
 $ok   = fn( $msg ) => print "  ✅ $msg\n";
 $fail = fn( $msg ) => print "  ❌ $msg\n";
 $info = fn( $msg ) => print "  ℹ️  $msg\n";
