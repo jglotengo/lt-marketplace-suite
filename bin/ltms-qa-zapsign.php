@@ -142,19 +142,20 @@ if ( $zapsign ) {
     try {
         $doc = $zapsign->create_document([
             'name'     => 'QA Test Contract LTMS ' . date('His'),
-            'url_pdf'  => 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/pdfs/table.pdf',
+            'pdf_url'  => 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/pdfs/table.pdf',
             'signers'  => [[
                 'name'        => 'QA Vendedor LTMS',
                 'email'       => 'qa-vendor@lo-tengo.com.co',
                 'external_id' => '999999',
             ]],
         ]);
-        if ( ! empty( $doc['token'] ) ) {
-            $test_doc_token = $doc['token'];
+        // create_document() retorna 'doc_token' (no 'token' directo)
+        if ( ! empty( $doc['doc_token'] ) ) {
+            $test_doc_token = $doc['doc_token'];
             $docs_created[] = $test_doc_token;
             qa_ok( $qa, 'create_document()', "token=" . substr( $test_doc_token, 0, 16 ) . '... | status=' . ( $doc['status'] ?? '?' ) );
         } else {
-            qa_fail( $qa, 'create_document()', 'Sin token en respuesta: ' . wp_json_encode( $doc ) );
+            qa_fail( $qa, 'create_document()', 'Sin doc_token en respuesta: ' . wp_json_encode( $doc ) );
         }
     } catch ( Throwable $e ) {
         qa_fail( $qa, 'create_document()', $e->getMessage() );

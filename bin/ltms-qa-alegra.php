@@ -412,6 +412,12 @@ if ( $test_contact_id && $test_item_id ) {
 // ── T-07: FACTURACIÓN DE COMISIÓN DESDE PEDIDO WC ─────────────────────────────
 qa_section( 'T-07 · Facturación de comisión marketplace → vendedor' );
 
+// Invalidar OPcache para asegurar que se carga la versión más reciente de LTMS_Alegra_Sync
+if ( function_exists( 'opcache_invalidate' ) ) {
+    $sync_file = dirname( __DIR__ ) . '/includes/business/class-ltms-alegra-sync.php';
+    opcache_invalidate( $sync_file, true );
+}
+
 // Estrategia: crear un pedido WC real temporal para la prueba.
 // Esto evita por completo el problema de caché HPOS al parchear pedidos de producción.
 $t07_order         = null;

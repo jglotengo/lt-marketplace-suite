@@ -113,30 +113,58 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException
      */
     public function create_document( array $document_data ): array {
+        // ZapSign requiere exactamente uno de: url_pdf o base64_pdf.
+        // Campos nulos o vacíos en el payload causan HTTP 400.
         $payload = [
-            'name'        => $document_data['name'] ?? 'Contrato LTMS',
-            'url_pdf'     => $document_data['pdf_url'] ?? '',
-            'lang'        => $document_data['language'] ?? 'es',
-            'signers'     => $this->format_signers( $document_data['signers'] ?? [] ),
+            'name'                 => $document_data['name'] ?? 'Contrato LTMS',
+            'lang'                 => $document_data['language'] ?? 'es',
+            'signers'              => $this->format_signers( $document_data['signers'] ?? [] ),
             'send_automatic_email' => true,
-            'brand_logo'  => $document_data['brand_logo'] ?? '',
-            'brand_name'  => $document_data['brand_name'] ?? get_bloginfo( 'name' ),
-            'folder_path' => 'LTMS/Contratos/' . gmdate( 'Y' ),
-            'sandbox'     => $this->sandbox,
+            'sandbox'              => $this->sandbox,
         ];
 
-        // Adjuntar PDF base64 si no hay URL
-        if ( empty( $payload['url_pdf'] ) && ! empty( $document_data['pdf_base64'] ) ) {
-            $payload['base64_pdf']   = $document_data['pdf_base64'];
-            $payload['url_pdf']      = null;
+        // brand_name solo si está configurado (campo opcional)
+        $brand = $document_data['brand_name'] ?? get_bloginfo( 'name' );
+        if ( ! empty( $brand ) ) {
+            $payload['brand_name'] = $brand;
+        }
+
+        // brand_logo solo si tiene valor (campo opcional)
+        if ( ! empty( $document_data['brand_logo'] ) ) {
+            $payload['brand_logo'] = $document_data['brand_logo'];
+        }
+
+        // folder_path solo si ZapSign lo soporta en el plan actual
+        if ( ! empty( $document_data['folder_path'] ) ) {
+            $payload['folder_path'] = $document_data['folder_path'];
+        }
+
+        // Fuente del PDF: URL o base64 — nunca ambos, nunca ninguno
+        $pdf_url    = $document_data['pdf_url'] ?? '';
+        $pdf_base64 = $document_data['pdf_base64'] ?? '';
+
+        if ( ! empty( $pdf_url ) ) {
+            $payload['url_pdf'] = esc_url_raw( $pdf_url );
+        } elseif ( ! empty( $pdf_base64 ) ) {
+            $payload['base64_pdf'] = $pdf_base64;
+        } else {
+            throw new \RuntimeException( '[zapsign] create_document requiere pdf_url o pdf_base64.' );
         }
 
         $response = $this->perform_request( 'POST', '/docs/', $payload );
 
+        if ( empty( $response['token'] ) ) {
+            throw new \RuntimeException(
+                '[zapsign] Respuesta sin token: ' . wp_json_encode( $response )
+            );
+        }
+
         return [
-            'success'   => isset( $response['token'] ),
-            'doc_token' => $response['token'] ?? '',
+            'success'   => true,
+            'doc_token' => $response['token'],
             'sign_url'  => $response['signers'][0]['sign_url'] ?? '',
+            'open_id'   => $response['open_id'] ?? '',
+            'status'    => $response['status'] ?? 'pending',
         ];
     }
 

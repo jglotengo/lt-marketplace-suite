@@ -292,11 +292,25 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
      * @return string
      */
     protected function extract_error_message( array $response, int $status_code ): string {
-        $possible_keys = [ 'message', 'error_message', 'error', 'description', 'detail', 'msg', 'errorMessage' ];
+        $possible_keys = [ 'message', 'error_message', 'error', 'description', 'detail', 'msg', 'errorMessage', 'non_field_errors' ];
 
         foreach ( $possible_keys as $key ) {
-            if ( isset( $response[ $key ] ) && is_string( $response[ $key ] ) ) {
-                return $response[ $key ];
+            if ( isset( $response[ $key ] ) ) {
+                if ( is_string( $response[ $key ] ) ) {
+                    return $response[ $key ];
+                }
+                if ( is_array( $response[ $key ] ) ) {
+                    return implode( ' | ', $response[ $key ] );
+                }
+            }
+        }
+
+        // Si el body tiene contenido significativo, incluirlo en el mensaje de error
+        // para facilitar el diagnóstico (especialmente en HTTP 400 de APIs como ZapSign)
+        if ( ! empty( $response ) ) {
+            $raw = wp_json_encode( $response );
+            if ( $raw && strlen( $raw ) < 500 ) {
+                return "HTTP Error {$status_code}: {$raw}";
             }
         }
 
