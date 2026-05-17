@@ -301,6 +301,7 @@ $mock3->set_body( wp_json_encode([
     'signer'     => [ 'external_id' => '123' ],
 ]) );
 $mock3->set_header( 'content-type', 'application/json' );
+$mock3->set_header( 'x-zapsign-token', $decrypted_for_webhook ); // Token válido — evento desconocido debe dar 200
 try {
     $r3 = LTMS_Zapsign_Webhook_Handler::handle( $mock3 );
     if ( 200 === $r3->get_status() ) {

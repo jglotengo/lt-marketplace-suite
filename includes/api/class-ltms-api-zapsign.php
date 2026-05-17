@@ -57,6 +57,27 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Override perform_request to ensure api_url is always set, even if OPcache
+     * served an old version of this class without the constructor assignment.
+     *
+     * {@inheritdoc}
+     */
+    protected function perform_request(
+        string $method,
+        string $endpoint,
+        array  $data    = [],
+        array  $headers = [],
+        bool   $retry   = true
+    ): array {
+        // Defensive: re-inject api_url at call time in case OPcache has old bytecode
+        if ( empty( $this->api_url ) ) {
+            $this->api_url = 'https://api.zapsign.com.br/api/v1';
+        }
+
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
+    }
+
+    /**
      * Crea un documento para firma y envía invitaciones a los firmantes.
      *
      * @param array $document_data Datos del documento y firmantes.
