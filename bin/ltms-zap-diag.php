@@ -86,7 +86,8 @@ if ( $tmpl && $token_len > 0 ) {
         $vendor_id = (int) email_exists('test-seller@prueba.com');
         if ( $vendor_id ) {
             try {
-                $result = $zap->send_vendor_contract( $vendor_id, get_userdata($vendor_id)->user_email, 'Test Seller QA' );
+                $pdf_url = get_option("ltms_zapsign_contract_pdf_url", "https://www.w3.org/WAI/WCAG21/Techniques/pdf/pdfs/table.pdf");
+    $result = $zap->send_vendor_contract( $vendor_id, $pdf_url );
                 if ( ! empty($result['doc_token']) || ! empty($result['token']) ) {
                     $tok = $result['doc_token'] ?? $result['token'];
                     $ok("send_vendor_contract() — doc_token=" . substr($tok,0,16) . '...');
