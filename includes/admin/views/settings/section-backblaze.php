@@ -4,8 +4,9 @@ $fields = [
     'ltms_backblaze_enabled'     => [ 'label' => 'Backblaze B2 Activo',    'type' => 'checkbox' ],
     'ltms_backblaze_key_id'      => [ 'label' => 'Key ID',                 'type' => 'text' ],
     'ltms_backblaze_app_key'     => [ 'label' => 'Application Key',        'type' => 'password' ],
-    'ltms_backblaze_bucket_name' => [ 'label' => 'Bucket Name',            'type' => 'text' ],
-    'ltms_backblaze_bucket_id'   => [ 'label' => 'Bucket ID',              'type' => 'text' ],
+    'ltms_backblaze_bucket_name'     => [ 'label' => 'Bucket KYC (documentos de identidad)',  'type' => 'text', 'placeholder' => 'lotengo-kyc-docs' ],
+    'ltms_backblaze_bucket_id'       => [ 'label' => 'Bucket ID (KYC)',                       'type' => 'text', 'placeholder' => 'f45d874aa95c34a69fee0219' ],
+    'ltms_backblaze_contratos_bucket'=> [ 'label' => 'Bucket Contratos (ZapSign PDF)',         'type' => 'text', 'placeholder' => 'lotengo-contratos' ],
 ];
 ?>
 <div class="ltms-settings-section">

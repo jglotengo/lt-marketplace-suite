@@ -206,6 +206,24 @@ final class LTMS_ZapSign_Manager {
      * Genera la URL pública del PDF del contrato para enviarlo a ZapSign.
      * Usa el adjunto de WordPress si existe, o genera HTML on-the-fly.
      */
+    /**
+     * Sube un PDF de contrato al bucket lotengo-contratos en Backblaze B2.
+     * Retorna la URL pública temporal del archivo.
+     */
+    private function upload_contract_to_b2( string $pdf_path ): string {
+        try {
+            $b2     = LTMS_Api_Factory::get( 'backblaze' );
+            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' );
+            $key    = 'contratos/' . gmdate( 'Y/m' ) . '/' . wp_generate_uuid4() . '.pdf';
+            $b2->upload_file( $bucket, $key, $pdf_path, 'application/pdf' );
+            // Retornar URL firmada de 7 días (suficiente para que ZapSign descargue)
+            return $b2->get_signed_url( $bucket, $key, 7 * DAY_IN_SECONDS );
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::warning( 'B2_CONTRACT_UPLOAD_FAIL', $e->getMessage() );
+            return '';
+        }
+    }
+
     private function generate_contract_pdf_url( int $vendor_id ): string {
         // 1. PDF cargado en media library
         $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );

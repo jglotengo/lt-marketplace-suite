@@ -52,7 +52,8 @@ class LTMS_Media_Guard {
         // Generate signed URL and redirect
         try {
             $b2     = LTMS_Api_Factory::get( 'backblaze' );
-            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' );
+            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
+                ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' );
             $signed_url_ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
             $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $key ), $signed_url_ttl );
 
@@ -149,7 +150,8 @@ class LTMS_Media_Guard {
         $key     = sprintf( 'kyc/%d/%s.%s', $vendor_id, wp_generate_uuid4(), strtolower( $ext ) );
         $content = file_get_contents( $file['tmp_name'] ); // phpcs:ignore
         $hash    = hash( 'sha256', $content );
-        $bucket  = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' );
+        $bucket  = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
+            ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' );
 
         try {
             $b2     = LTMS_Api_Factory::get( 'backblaze' );

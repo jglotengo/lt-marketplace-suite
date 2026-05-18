@@ -74,7 +74,9 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         $this->api_url        = rtrim( $endpoint, '/' );
         $this->key_id         = LTMS_Core_Config::get( 'ltms_backblaze_key_id', '' );
         $this->default_bucket = LTMS_Core_Config::get( 'ltms_backblaze_default_bucket', '' );
-        $this->private_bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' );
+        // B2-FIX: ltms_backblaze_bucket_name (UI) es alias de ltms_backblaze_private_bucket (código)
+        $this->private_bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
+            ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', '' );
 
         $encrypted_app_key = LTMS_Core_Config::get( 'ltms_backblaze_app_key', '' );
         $this->app_key     = ! empty( $encrypted_app_key )

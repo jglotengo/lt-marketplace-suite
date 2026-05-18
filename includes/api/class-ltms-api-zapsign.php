@@ -260,61 +260,44 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             ]],
         ];
 
-        // Resolver fuente del PDF en orden de prioridad:
-        // 1. template_id (requiere plan API de ZapSign — falla con HTTP 402 sin plan)
-        // 2. pdf_url pasado como argumento
-        // 3. attachment_id o fallback_url configurados en WordPress
-        // M-67: si template_id da 402, hacer auto-fallback a pdf_url para no bloquear el flujo.
-        $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
-        $fallback_url  = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
-        $resolved_pdf  = '';
-
-        if ( ! empty( $pdf_url ) ) {
-            $resolved_pdf = $pdf_url;
-        } elseif ( $attachment_id > 0 ) {
-            $resolved_pdf = wp_get_attachment_url( $attachment_id );
-        } elseif ( ! empty( $fallback_url ) ) {
-            $resolved_pdf = $fallback_url;
-        }
-
         if ( ! empty( $template_id ) ) {
-            // Intentar con template primero
+            // Usar plantilla ZapSign — NO requiere PDF adicional
             $doc_data['template_id'] = $template_id;
-            try {
-                $result = $this->create_document( $doc_data );
-            } catch ( \RuntimeException $e ) {
-                // M-67: RuntimeException code = HTTP status (set by abstract client).
-                // ZapSign HTTP 402 = plan de API requerido para templates.
-                $is_plan_error = $e->getCode() === 402
-                    || str_contains( $e->getMessage(), '402' )
-                    || str_contains( $e->getMessage(), 'plano' )
-                    || str_contains( $e->getMessage(), 'plan' )
-                    || str_contains( $e->getMessage(), 'obrig' ); // "obrigatório" en portugués
-
-                if ( $is_plan_error ) {
-                    unset( $doc_data['template_id'] );
-                    if ( ! empty( $resolved_pdf ) ) {
-                        // Fallback automático: enviar PDF directamente sin template
-                        LTMS_Core_Logger::warning( 'ZAPSIGN_TEMPLATE_FALLBACK',
-                            'HTTP 402 usando template — fallback a pdf_url: ' . $resolved_pdf );
-                        $doc_data['pdf_url'] = $resolved_pdf;
-                        $result = $this->create_document( $doc_data );
-                    } else {
-                        throw new \RuntimeException(
-                            '[zapsign] HTTP 402 — ZapSign requiere plan de API para templates. ' .
-                            'Configura una URL de PDF del contrato en LT Marketplace → Configuración → ZapSign (campo "URL del PDF del Contrato").'
-                        );
-                    }
-                } else {
-                    throw $e;
-                }
+        } elseif ( ! empty( $pdf_url ) ) {
+            // Preferir base64 si el PDF es local (evita bloqueo Cloudflare en url_pdf)
+            $local_path = $this->url_to_local_path( $pdf_url );
+            if ( $local_path && file_exists( $local_path ) ) {
+                $doc_data['pdf_base64'] = base64_encode( file_get_contents( $local_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+            } else {
+                $doc_data['pdf_url'] = $pdf_url;
             }
-        } elseif ( ! empty( $resolved_pdf ) ) {
-            $doc_data['pdf_url'] = $resolved_pdf;
-            $result = $this->create_document( $doc_data );
         } else {
-            throw new \RuntimeException( '[zapsign] send_vendor_contract: configura template_id o ltms_zapsign_contract_pdf_url en LT Marketplace → ZapSign.' );
+            // Fallback: intentar leer PDF desde Media Library o config
+            $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
+            $fallback_url  = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
+            if ( empty( $fallback_url ) ) {
+                $fallback_url = get_option( 'ltms_zapsign_contract_pdf_url', '' );
+            }
+            if ( $attachment_id > 0 ) {
+                $att_path = get_attached_file( $attachment_id );
+                if ( $att_path && file_exists( $att_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $att_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+                } else {
+                    $doc_data['pdf_url'] = wp_get_attachment_url( $attachment_id );
+                }
+            } elseif ( ! empty( $fallback_url ) ) {
+                $local_path = $this->url_to_local_path( $fallback_url );
+                if ( $local_path && file_exists( $local_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $local_path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+                } else {
+                    $doc_data['pdf_url'] = $fallback_url;
+                }
+            } else {
+                throw new \RuntimeException( '[zapsign] send_vendor_contract: se requiere template_id, pdf_url, o configurar el PDF del contrato.' );
+            }
         }
+
+        $result = $this->create_document( $doc_data );
 
         if ( ! empty( $result['doc_token'] ) ) {
             update_user_meta( $vendor_id, 'ltms_contract_token', $result['doc_token'] );
@@ -363,6 +346,39 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
                 'message'   => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Convierte una URL del sitio a ruta local en disco.
+     * Retorna null si la URL es externa.
+     */
+    private function url_to_local_path( string $url ): ?string {
+        // M-ZAP-1 + M-ZAP-2: convertir URL del sitio a ruta absoluta en disco.
+        // Usa ABSPATH directamente para evitar problemas con get_site_url() en CLI.
+        $abspath = rtrim( ABSPATH, '/' );
+
+        // Extraer el path relativo eliminando cualquier origen (http/https + host)
+        $parsed   = wp_parse_url( $url );
+        $url_path = $parsed['path'] ?? '';
+        if ( empty( $url_path ) || '/' === $url_path ) {
+            return null;
+        }
+
+        // Verificar que pertenece al sitio actual
+        $site_host = wp_parse_url( get_option( 'siteurl', '' ), PHP_URL_HOST );
+        $url_host  = $parsed['host'] ?? '';
+        if ( $url_host && $site_host && $url_host !== $site_host ) {
+            return null; // URL de otro dominio
+        }
+
+        // Eliminar subdirectorio de instalación de WordPress si existe
+        $wp_subdir = wp_parse_url( get_option( 'siteurl', '' ), PHP_URL_PATH ) ?: '';
+        if ( $wp_subdir && strpos( $url_path, $wp_subdir ) === 0 ) {
+            $url_path = substr( $url_path, strlen( $wp_subdir ) );
+        }
+
+        $local = $abspath . '/' . ltrim( $url_path, '/' );
+        return file_exists( $local ) ? $local : null;
     }
 
     // ── Helpers privados ──────────────────────────────────────────

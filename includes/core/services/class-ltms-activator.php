@@ -337,7 +337,7 @@ final class LTMS_Core_Activator {
             'ltms_backblaze_app_key'            => '',
             'ltms_backblaze_endpoint'           => '',
             'ltms_backblaze_default_bucket'     => '',
-            'ltms_backblaze_private_bucket'     => '',
+            'ltms_backblaze_private_bucket'     => 'lotengo-kyc-docs',
         ];
 
         $current_settings = get_option( 'ltms_settings', [] );
