@@ -354,25 +354,27 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      */
     private function url_to_local_path( string $url ): ?string {
         // M-ZAP-1 + M-ZAP-2: convertir URL del sitio a ruta absoluta en disco.
-        // Usa ABSPATH directamente para evitar problemas con get_site_url() en CLI.
-        $abspath = rtrim( ABSPATH, '/' );
+        // Usa parse_url() nativa de PHP en vez de wp_parse_url() para evitar
+        // "MissingFunctionExpectations" en entorno UNIT ONLY (Brain\Monkey).
+        $abspath = defined( 'ABSPATH' ) ? rtrim( ABSPATH, '/' ) : sys_get_temp_dir();
 
-        // Extraer el path relativo eliminando cualquier origen (http/https + host)
-        $parsed   = wp_parse_url( $url );
+        $parsed   = parse_url( $url );
         $url_path = $parsed['path'] ?? '';
         if ( empty( $url_path ) || '/' === $url_path ) {
             return null;
         }
 
         // Verificar que pertenece al sitio actual
-        $site_host = wp_parse_url( get_option( 'siteurl', '' ), PHP_URL_HOST );
+        $siteurl   = function_exists( 'get_option' ) ? get_option( 'siteurl', '' ) : '';
+        $site_parsed = parse_url( $siteurl );
+        $site_host = $site_parsed['host'] ?? '';
         $url_host  = $parsed['host'] ?? '';
         if ( $url_host && $site_host && $url_host !== $site_host ) {
             return null; // URL de otro dominio
         }
 
         // Eliminar subdirectorio de instalación de WordPress si existe
-        $wp_subdir = wp_parse_url( get_option( 'siteurl', '' ), PHP_URL_PATH ) ?: '';
+        $wp_subdir = $site_parsed['path'] ?? '';
         if ( $wp_subdir && strpos( $url_path, $wp_subdir ) === 0 ) {
             $url_path = substr( $url_path, strlen( $wp_subdir ) );
         }
