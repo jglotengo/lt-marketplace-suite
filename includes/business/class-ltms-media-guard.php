@@ -148,7 +148,8 @@ class LTMS_Media_Guard {
         // Generate unique key
         $ext     = pathinfo( sanitize_file_name( $file['name'] ), PATHINFO_EXTENSION );
         $key     = sprintf( 'kyc/%d/%s.%s', $vendor_id, wp_generate_uuid4(), strtolower( $ext ) );
-        $content = file_get_contents( $file['tmp_name'] ); // phpcs:ignore
+        $tmp_path = $file['tmp_name'];
+        $content  = file_get_contents( $tmp_path ); // phpcs:ignore
         $hash    = hash( 'sha256', $content );
         $bucket  = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
             ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' );
@@ -163,6 +164,11 @@ class LTMS_Media_Guard {
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'KYC_UPLOAD_B2_FAILED', $e->getMessage() );
             return new \WP_Error( 'upload_failed', __( 'Error al subir el archivo. Por favor intenta de nuevo.', 'ltms' ) );
+        }
+
+        // FIX-3: limpiar archivo temporal del servidor una vez subido a B2
+        if ( isset( $tmp_path ) && file_exists( $tmp_path ) ) {
+            @unlink( $tmp_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
         }
 
         // Record in lt_media_files

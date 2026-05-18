@@ -276,6 +276,7 @@ function ltms_load_autoloader(): void {
                 'ltms-tax-engine'               => 'business/class-ltms-tax-engine.php',
                 'ltms-referral-tree'            => 'business/class-ltms-referral-tree.php',
                 'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
+                'ltms-retention-cron'           => 'core/class-ltms-retention-cron.php',
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
@@ -391,6 +392,9 @@ function ltms_on_activation(): void {
 function ltms_on_deactivation(): void {
     if ( class_exists( 'LTMS_Core_Deactivator' ) ) {
         LTMS_Core_Deactivator::deactivate();
+    if ( class_exists( 'LTMS_Retention_Cron' ) ) {
+        LTMS_Retention_Cron::deactivate();
+    }
     }
     flush_rewrite_rules();
 }
@@ -432,6 +436,10 @@ function ltms_run(): void {
     //    Se ejecuta en init@1 (antes de admin_menu) en cada request hasta que
     //    las caps estén todas guardadas en la BD.
     add_action( 'init', 'ltms_direct_ensure_caps', 1 );
+    // SAGRILAFT Retention Cron — barrido diario de datos KYC
+    if ( class_exists( 'LTMS_Retention_Cron' ) ) {
+        LTMS_Retention_Cron::init();
+    }
     //
     // 1b. Filtro dinámico de caps: WordPress cachea $allcaps del usuario ANTES
     //     de que init@1 agregue las caps al rol en la BD. Si el cache aún no
