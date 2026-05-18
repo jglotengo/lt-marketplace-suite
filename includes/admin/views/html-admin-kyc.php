@@ -67,7 +67,6 @@ foreach ( $tabs as $s => $tab ) :
     <thead>
         <tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;">
             <th style="padding:12px 14px;font-size:12px;color:#6b7280;text-transform:uppercase;">Vendedor</th>
-            <th style="padding:12px 14px;font-size:12px;color:#6b7280;text-transform:uppercase;">Email</th>
             <th style="padding:12px 14px;font-size:12px;color:#6b7280;text-transform:uppercase;">Doc.</th>
             <th style="padding:12px 14px;font-size:12px;color:#6b7280;text-transform:uppercase;">Enviado</th>
             <th style="padding:12px 14px;font-size:12px;color:#6b7280;text-transform:uppercase;">Estado</th>
@@ -84,9 +83,9 @@ foreach ( $tabs as $s => $tab ) :
     <tr style="background:<?php echo $i%2===0?'#fff':'#fafafa'; ?>;border-bottom:1px solid #f3f4f6;">
         <td style="padding:12px 14px;">
             <div style="font-weight:600;color:#111827;"><?php echo esc_html($kyc['display_name']?:'—'); ?></div>
-            <div style="font-size:11px;color:#9ca3af;">ID <?php echo esc_html($vid); ?> · KYC #<?php echo esc_html($kyc['id']); ?></div>
+            <div style="font-size:11px;color:#6b7280;"><?php echo esc_html($kyc['user_email']?:''); ?></div>
+            <div style="font-size:10px;color:#9ca3af;">ID <?php echo esc_html($vid); ?> · KYC #<?php echo esc_html($kyc['id']); ?></div>
         </td>
-        <td style="padding:12px 14px;font-size:13px;"><?php echo esc_html($kyc['user_email']?:'—'); ?></td>
         <td style="padding:12px 14px;">
             <span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:600;"><?php echo esc_html($doc_type); ?></span>
         </td>
