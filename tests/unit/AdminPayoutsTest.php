@@ -191,7 +191,7 @@ class AdminPayoutsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertContains('wp_ajax_ltms_export_payouts', $actions);
     }
 
-    public function test_init_registers_eight_hooks(): void
+    public function test_init_registers_nine_hooks(): void
     {
         $count = 0;
         Functions\when('add_action')->alias(
@@ -200,7 +200,7 @@ class AdminPayoutsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
         \LTMS_Admin_Payouts::init();
 
-        $this->assertSame(8, $count); // A-5: ltms_quick_approve_kyc hook added
+        $this->assertSame(9, $count); // b8c6c23: ltms_get_kyc_details hook added (KYC modal)
     }
 
     // ── SECCIÓN 2: ajax_approve_payout() ─────────────────────────────────────
