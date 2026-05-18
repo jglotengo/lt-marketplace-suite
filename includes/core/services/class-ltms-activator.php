@@ -320,6 +320,7 @@ final class LTMS_Core_Activator {
             'ltms_zapsign_sandbox'                    => '1',    // sandbox por defecto — apagar en producción
             'ltms_zapsign_vendor_template_id'         => '526a9570-0160-42f9-999b-5b624527ba5e', // plantilla Contrato_Vendedor_LoTengo_v4.1
             'ltms_zapsign_contract_pdf_url'           => '',
+            'ltms_zapsign_auto_approve_kyc'           => 'yes',  // M-67: activado por defecto
             'ltms_zapsign_contract_attachment_id'     => '',
             'ltms_zapsign_webhook_secret'             => '',
             'ltms_openpay_merchant_id'        => '',
