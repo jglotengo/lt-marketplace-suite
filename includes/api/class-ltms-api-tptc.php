@@ -39,7 +39,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
      * Constructor.
      */
     public function __construct() {
-        $this->base_url   = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
+        $this->api_url   = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
         $this->api_key    = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_tptc_api_key', '' ) );
         $this->program_id = LTMS_Core_Config::get( 'ltms_tptc_program_id', '' );
         parent::__construct();

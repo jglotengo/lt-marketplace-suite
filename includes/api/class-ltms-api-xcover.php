@@ -39,7 +39,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * Constructor.
      */
     public function __construct() {
-        $this->base_url     = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
+        $this->api_url     = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
         $this->partner_code = LTMS_Core_Config::get( 'ltms_xcover_partner_code', '' );
         $this->api_key      = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_xcover_api_key', '' ) );
         parent::__construct();
