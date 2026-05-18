@@ -526,6 +526,12 @@ if ( $ltms_unit_only ) {
     }
     if ( ! function_exists( 'wp_mkdir_p' ) ) {
         function wp_mkdir_p( string $dir ): bool { return is_dir( $dir ) || mkdir( $dir, 0755, true ); }
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+    function wp_parse_url( string $url, int $component = -1 ) {
+        return parse_url( $url, $component );
+    }
+}
     }
 
     // ── Autoloader mínimo ──────────────────────────────────────────────────────
