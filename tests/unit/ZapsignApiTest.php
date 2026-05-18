@@ -46,6 +46,7 @@ class ZapsignApiTest extends TestCase
             'sanitize_text_field' => static fn(string $s): string => $s,
             'sanitize_email'      => static fn(string $s): string => $s,
             'wp_strip_all_tags'   => static fn(string $s): string => strip_tags($s),
+        'wp_parse_url'       => 'parse_url',
         ]);
 
         \LTMS_Core_Config::flush_cache();
@@ -77,7 +78,6 @@ class ZapsignApiTest extends TestCase
         Functions\when('is_wp_error')->justReturn(false);
         Functions\when('wp_remote_retrieve_response_code')->justReturn($code);
         Functions\when('wp_remote_retrieve_body')->justReturn(json_encode($body));
-        Functions\when('wp_json_encode')->alias(static fn(mixed $v): string => json_encode($v));
     }
 
     // ── Section 1: Constructor ─────────────────────────────────────────────────
@@ -132,7 +132,6 @@ class ZapsignApiTest extends TestCase
             }
         );
         Functions\when('is_wp_error')->justReturn(true);
-        Functions\when('wp_json_encode')->alias(static fn(mixed $v): string => json_encode($v));
         Functions\when('get_bloginfo')->justReturn('Mi Tienda');
 
         try {
@@ -165,7 +164,6 @@ class ZapsignApiTest extends TestCase
             }
         );
         Functions\when('is_wp_error')->justReturn(true);
-        Functions\when('wp_json_encode')->alias(static fn(mixed $v): string => json_encode($v));
         Functions\when('get_bloginfo')->justReturn('Mi Tienda');
 
         try {
