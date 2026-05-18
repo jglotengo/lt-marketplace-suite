@@ -277,6 +277,7 @@ function ltms_load_autoloader(): void {
                 'ltms-referral-tree'            => 'business/class-ltms-referral-tree.php',
                 'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
                 'ltms-retention-cron'           => 'core/class-ltms-retention-cron.php',
+                'ltms-gdpr-eraser'              => 'core/class-ltms-gdpr-eraser.php',
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
@@ -439,6 +440,9 @@ function ltms_run(): void {
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
     if ( class_exists( 'LTMS_Retention_Cron' ) ) {
         LTMS_Retention_Cron::init();
+    if ( class_exists( 'LTMS_GDPR_Eraser' ) ) {
+        LTMS_GDPR_Eraser::init();
+    }
     }
     //
     // 1b. Filtro dinámico de caps: WordPress cachea $allcaps del usuario ANTES
