@@ -281,6 +281,8 @@ function ltms_load_autoloader(): void {
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
                 // M-14: handler de checkout AJAX (ltms_process_checkout + ltms_get_pse_banks)
                 'ltms-frontend-checkout-handler'    => 'frontend/class-ltms-frontend-checkout-handler.php',
+                // L-1 to L-8: Cumplimiento legal (Ley 1581/2012, Ley 1480/2011, SAGRILAFT)
+                'ltms-legal-compliance'                 => 'business/class-ltms-legal-compliance.php',
                 // M-20: handler de checkout México (OXXO, SPEI, MSI)
                 'ltms-frontend-checkout-mexico-handler' => 'frontend/class-ltms-frontend-checkout-mexico-handler.php',
                 // M-114: handler AJAX para módulo de domiciliarios

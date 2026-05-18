@@ -378,6 +378,27 @@ final class LTMS_Dashboard_Logic {
             update_user_meta( $vendor_id, 'ltms_kyc_consent_ver',  '1581-2012-v1' ); // versión de la política aceptada
         }
 
+
+        // L-1/L-6/L-8 FIX: Log de vault (Habeas Data) + consentimiento KYC.
+        // Ley 1581/2012, arts. 9 y 15 — trazabilidad de acceso a datos sensibles y
+        // registro del consentimiento explícito de tratamiento de datos personales.
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            $vendor_id_for_log = $vendor_id ?? get_current_user_id();
+            LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'cedula', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+            if ( ! empty( $file_path_rut ) ) {
+                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'rut', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+            }
+            if ( ! empty( $file_path_camara ) ) {
+                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'camara_comercio', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+            }
+            LTMS_Legal_Compliance::log_consent(
+                $vendor_id_for_log,
+                LTMS_Legal_Compliance::PURPOSE_KYC,
+                'KYC submission — vendor dashboard — ' . LTMS_Utils::now_utc(),
+                true
+            );
+        }
+
         wp_send_json_success( [ 'message' => __( 'Solicitud enviada. Recibirás una respuesta en 1-2 días hábiles.', 'ltms' ) ] );
     }
 

@@ -159,6 +159,17 @@ final class LTMS_Frontend_Checkout_Handler {
         $payment_method = sanitize_key( $_POST['payment_method'] ?? '' );
         $order_id       = absint( $_POST['order_id'] ?? 0 );
 
+        // L-3 FIX: Registrar consentimiento explícito del checkout.
+        // Ley 1480/2011, art. 51 — confirmación de compra con términos claros.
+        // Ley 1581/2012 — tratamiento de datos del comprador requiere consentimiento registrado.
+        if ( class_exists( 'LTMS_Legal_Compliance' ) && $order_id ) {
+            LTMS_Legal_Compliance::save_checkout_consent(
+                get_current_user_id(),
+                $order_id,
+                ! empty( $_POST['terms_consent'] ) // phpcs:ignore
+            );
+        }
+
         if ( empty( $payment_method ) ) {
             wp_send_json_error( __( 'Método de pago no especificado.', 'ltms' ), 400 );
         }

@@ -375,6 +375,17 @@ final class LTMS_Public_Auth_Handler {
             // Disparar listeners (Affiliates genera ltms_referral_code, Alegra crea contacto).
             do_action( 'ltms_vendor_registered', $user_id, $data['referral_code'] ?? '' );
 
+            // L-2 FIX: Registrar consentimiento de tratamiento de datos en el registro.
+            // Ley 1581/2012, art. 9 — el consentimiento debe quedar registrado con IP y timestamp.
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_consent(
+                    $user_id,
+                    LTMS_Legal_Compliance::PURPOSE_REGISTRATION,
+                    'Vendor registration — ' . sanitize_email( $data['email'] ?? '' ),
+                    true
+                );
+            }
+
             // C-2: enviar email de bienvenida con link de verificación.
             $this->send_welcome_email( $user_id, $verify_token );
 
@@ -398,6 +409,11 @@ final class LTMS_Public_Auth_Handler {
         // Login automático.
         wp_set_current_user( $user_id );
         wp_set_auth_cookie( $user_id, false );
+        // L-5 FIX: Registrar acceso de autenticación para trazabilidad.
+        // Ley 1581/2012 — el titular puede solicitar historial de accesos a sus datos.
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::log_oauth_access( $user_id, 'native_login' );
+        }
 
         // Limpiar contador en éxito para no penalizar a usuarios legítimos en la misma red.
         delete_transient( $throttle_key );
