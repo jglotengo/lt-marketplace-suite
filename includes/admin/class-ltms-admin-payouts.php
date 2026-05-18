@@ -37,6 +37,7 @@ final class LTMS_Admin_Payouts {
         add_action( 'wp_ajax_ltms_approve_kyc',       [ $instance, 'ajax_approve_kyc' ] );
         add_action( 'wp_ajax_ltms_quick_approve_kyc', [ $instance, 'ajax_quick_approve_kyc' ] ); // A-5
         add_action( 'wp_ajax_ltms_reject_kyc',      [ $instance, 'ajax_reject_kyc' ] );
+        add_action( 'wp_ajax_ltms_get_kyc_details', [ $instance, 'ajax_get_kyc_details' ] ); // Modal docs
         add_action( 'wp_ajax_ltms_freeze_wallet',   [ $instance, 'ajax_freeze_wallet' ] );
         add_action( 'wp_ajax_ltms_unfreeze_wallet', [ $instance, 'ajax_unfreeze_wallet' ] );
         add_action( 'wp_ajax_ltms_export_payouts',  [ $instance, 'ajax_export_payouts' ] );
@@ -399,6 +400,96 @@ final class LTMS_Admin_Payouts {
             'csv'      => base64_encode( $csv ), // phpcs:ignore
             'filename' => 'ltms-retiros-' . gmdate( 'Y-m-d' ) . '.csv',
             'count'    => count( $payouts ),
+        ]);
+    }
+
+    /**
+     * AJAX: Devuelve los detalles completos de un registro KYC para el modal de admin.
+     * Incluye URLs de documentos (cédula, RUT, Cámara) y datos del vendedor.
+     * L-1: Registra acceso en vault log (Ley 1581/2012 art. 8).
+     */
+    public function ajax_get_kyc_details(): void {
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( [ 'message' => 'Sin permisos.' ], 403 );
+        }
+
+        $kyc_id = (int) ( $_POST['kyc_id'] ?? 0 );
+        if ( ! $kyc_id ) {
+            wp_send_json_error( [ 'message' => 'kyc_id requerido.' ] );
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_vendor_kyc';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $kyc = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT k.*, u.display_name, u.user_email, u.user_registered
+                 FROM `{$table}` k
+                 LEFT JOIN `{$wpdb->users}` u ON u.ID = k.vendor_id
+                 WHERE k.id = %d",
+                $kyc_id
+            ),
+            ARRAY_A
+        );
+
+        if ( ! $kyc ) {
+            wp_send_json_error( [ 'message' => 'KYC no encontrado.' ] );
+        }
+
+        $vendor_id = (int) $kyc['vendor_id'];
+
+        // L-1: Vault access log
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::log_vault_access(
+                $vendor_id,
+                get_current_user_id(),
+                'kyc_documents_modal',
+                'view',
+                'admin_kyc_modal'
+            );
+        }
+
+        // Construir URLs de documentos — intentar desde BD primero, luego user_meta
+        $doc_url_cedula  = $kyc['file_path']       ?: get_user_meta( $vendor_id, 'ltms_kyc_file_cedula',  true );
+        $doc_url_rut     = $kyc['rut_path']         ?: get_user_meta( $vendor_id, 'ltms_kyc_file_rut',    true );
+        $doc_url_camara  = $kyc['camara_path']      ?: get_user_meta( $vendor_id, 'ltms_kyc_file_camara', true );
+        $doc_url_selfie  = $kyc['selfie_path']      ?: get_user_meta( $vendor_id, 'ltms_kyc_selfie_url',  true );
+
+        // Datos de perfil del vendedor
+        $store_name      = get_user_meta( $vendor_id, 'ltms_store_name',     true );
+        $phone           = get_user_meta( $vendor_id, 'ltms_phone',          true );
+        $city            = get_user_meta( $vendor_id, 'ltms_city',           true );
+        $doc_type        = get_user_meta( $vendor_id, 'ltms_document_type',  true );
+        $doc_masked      = class_exists( 'LTMS_Legal_Compliance' )
+            ? LTMS_Legal_Compliance::get_masked_document( $vendor_id )
+            : '****';
+        $kyc_consent_at  = get_user_meta( $vendor_id, 'ltms_kyc_consent_at',  true );
+        $kyc_consent_ip  = get_user_meta( $vendor_id, 'ltms_kyc_consent_ip',  true );
+
+        wp_send_json_success([
+            'kyc_id'        => $kyc_id,
+            'vendor_id'     => $vendor_id,
+            'display_name'  => $kyc['display_name'],
+            'email'         => $kyc['user_email'],
+            'store_name'    => $store_name,
+            'phone'         => $phone,
+            'city'          => $city,
+            'doc_type'      => strtoupper( $doc_type ?: 'CC' ),
+            'doc_masked'    => $doc_masked,
+            'status'        => $kyc['status'],
+            'submitted_at'  => $kyc['submitted_at'],
+            'notes'         => $kyc['notes'] ?? '',
+            'rejection_reason' => $kyc['rejection_reason'] ?? '',
+            'kyc_consent_at'=> $kyc_consent_at,
+            'kyc_consent_ip'=> $kyc_consent_ip,
+            'docs' => [
+                'cedula'  => $doc_url_cedula  ? esc_url( $doc_url_cedula )  : '',
+                'rut'     => $doc_url_rut     ? esc_url( $doc_url_rut )     : '',
+                'camara'  => $doc_url_camara  ? esc_url( $doc_url_camara )  : '',
+                'selfie'  => $doc_url_selfie  ? esc_url( $doc_url_selfie )  : '',
+            ],
         ]);
     }
 
