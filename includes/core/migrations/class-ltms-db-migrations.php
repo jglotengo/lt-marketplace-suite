@@ -1103,6 +1103,22 @@ final class LTMS_DB_Migrations {
 
         // L-2: Auditoría de acceso a datos sensibles (Habeas Data — Ley 1581/2012 art. 8 lit. g).
         // Registra cada lectura/escritura de documentos cifrados (cédula, NIT, RUT).
+        // lt_consent_log — Auditoría de consentimientos (Ley 1581/2012 Habeas Data)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_consent_log` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `purpose`    VARCHAR(64)     NOT NULL DEFAULT 'register',
+            `policy_ver` VARCHAR(16)     NOT NULL DEFAULT '2.0',
+            `ip_hash`    VARCHAR(64)     NOT NULL DEFAULT '',
+            `channel`    VARCHAR(32)     NOT NULL DEFAULT 'web',
+            `user_agent` VARCHAR(255)    NOT NULL DEFAULT '',
+            `meta_json`  TEXT,
+            `created_at` DATETIME        NOT NULL,
+            PRIMARY KEY  (`id`),
+            KEY          `idx_user_purpose` (`user_id`, `purpose`),
+            KEY          `idx_created_at`   (`created_at`)
+        ) {$charset_collate};";
+
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vault_access_log` (
             `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `user_id`     BIGINT UNSIGNED NOT NULL COMMENT 'Usuario cuyo dato fue accedido',
