@@ -42,6 +42,7 @@ class BackblazeApiTest extends TestCase
             'update_option' => static fn(): bool => true,
             'get_transient' => static fn(): mixed => false,
             'set_transient' => static fn(): bool => true,
+        'wp_parse_url'   => 'parse_url',
         ]);
 
         // Reset LTMS_Core_Config overrides between tests
