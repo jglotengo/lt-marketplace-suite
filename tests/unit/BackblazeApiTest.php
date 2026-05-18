@@ -36,11 +36,6 @@ class BackblazeApiTest extends TestCase
         parent::setUp();
         Monkey\setUp();
 
-        // wp_parse_url delegates to native parse_url
-        Functions\when('wp_parse_url')->alias(
-            static fn(string $url, int $component = -1): mixed => parse_url($url, $component)
-        );
-
         // Core WP functions needed by LTMS_Core_Config and API clients
         Functions\stubs([
             'get_option'    => static fn(string $k, mixed $d = false): mixed => $d,
