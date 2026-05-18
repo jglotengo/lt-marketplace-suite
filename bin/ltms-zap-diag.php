@@ -57,7 +57,12 @@ if ( is_wp_error($resp) ) {
 
 // 4. Verificar que el template existe en ZapSign
 if ( $tmpl ) {
-    $resp2 = wp_remote_get("https://api.zapsign.com.br/api/v1/templates/{$tmpl}/", [
+    // En sandbox los templates dan 402 — pasar sandbox=true como query param
+    $tmpl_url = "https://api.zapsign.com.br/api/v1/templates/{$tmpl}/";
+    if ( get_option('ltms_zapsign_sandbox') === 'yes' ) {
+        $tmpl_url .= '?sandbox=true';
+    }
+    $resp2 = wp_remote_get($tmpl_url, [
         'headers' => ['Authorization' => "Bearer {$token}"],
         'timeout' => 15,
     ]);

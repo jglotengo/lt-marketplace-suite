@@ -260,9 +260,29 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             ]],
         ];
 
-        if ( ! empty( $template_id ) ) {
-            // Usar plantilla ZapSign — NO requiere PDF adicional
+        if ( ! empty( $template_id ) && ! $this->sandbox ) {
+            // Usar plantilla ZapSign — NO requiere PDF adicional.
+            // En sandbox los templates no están disponibles (HTTP 402); usar base64 como fallback.
             $doc_data['template_id'] = $template_id;
+        } elseif ( ! empty( $template_id ) && $this->sandbox ) {
+            // Sandbox: template no disponible — intentar base64 desde Media Library o config.
+            $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
+            $fallback_url  = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' ) ?: get_option( 'ltms_zapsign_contract_pdf_url', '' );
+            if ( $attachment_id > 0 ) {
+                $att_path = get_attached_file( $attachment_id );
+                if ( $att_path && file_exists( $att_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $att_path ) ); // phpcs:ignore
+                }
+            } elseif ( ! empty( $fallback_url ) ) {
+                $local_path = $this->url_to_local_path( $fallback_url );
+                if ( $local_path && file_exists( $local_path ) ) {
+                    $doc_data['pdf_base64'] = base64_encode( file_get_contents( $local_path ) ); // phpcs:ignore
+                }
+            }
+            if ( empty( $doc_data['pdf_base64'] ) ) {
+                // Sin PDF configurado y en sandbox: usar template igualmente (puede fallar con 402)
+                $doc_data['template_id'] = $template_id;
+            }
         } elseif ( ! empty( $pdf_url ) ) {
             // Preferir base64 si el PDF es local (evita bloqueo Cloudflare en url_pdf)
             $local_path = $this->url_to_local_path( $pdf_url );
