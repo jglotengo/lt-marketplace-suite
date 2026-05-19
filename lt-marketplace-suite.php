@@ -469,7 +469,7 @@ function ltms_run(): void {
     // GDPR — Borrar datos personales bajo Herramientas
     add_action( 'admin_menu', static function() {
         if ( current_user_can( 'erase_others_personal_data' ) ) {
-            // WP registra Borrar datos personales nativamente cuando el usuario tiene erase_others_personal_data
+            add_submenu_page( 'tools.php', __( 'Borrar datos personales', 'ltms' ), __( 'Borrar datos personales', 'ltms' ), 'erase_others_personal_data', 'erase-personal-data', static function() { wp_redirect( admin_url( 'erase-personal-data.php' ) ); exit; } );
         }
     }, 100 );
     }
