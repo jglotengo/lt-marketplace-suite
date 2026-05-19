@@ -121,6 +121,8 @@ final class LTMS_Roles {
         'ltms_freeze_wallets',
         'ltms_generate_legal_evidence',
         'ltms_export_customer_db',        // Exportar base de datos de clientes
+        'erase_others_personal_data',  // GDPR — Borrar datos personales
+        'export_others_personal_data', // GDPR — Exportar datos personales
     ];
 
     /**
