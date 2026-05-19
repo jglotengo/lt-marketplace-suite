@@ -466,15 +466,6 @@ function ltms_run(): void {
     //    manage_options para que siempre sea visible al administrador.
     if ( is_admin() ) {
         add_action( 'admin_menu', 'ltms_emergency_menu_fallback', 99 );
-    // GDPR — Borrar datos personales bajo Herramientas
-    add_action( 'admin_menu', static function() {
-        if ( current_user_can( 'erase_others_personal_data' ) ) {
-            add_submenu_page( 'tools.php', __( 'Borrar datos personales', 'ltms' ), __( 'Borrar datos personales', 'ltms' ), 'erase_others_personal_data', 'erase-personal-data', static function() { wp_redirect( admin_url( 'erase-personal-data.php' ) ); exit; } );
-        }
-    }, 100 );
-    }
-
-    if ( ! ltms_check_requirements() ) {
         // Sin WooCommerce: registrar menú mínimo para que el plugin sea visible.
         if ( is_admin() ) {
             add_action( 'admin_menu', function() {
