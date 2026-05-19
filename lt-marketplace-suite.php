@@ -453,7 +453,7 @@ function ltms_run(): void {
     add_filter( 'user_has_cap', static function ( array $allcaps, array $caps, array $args ): array {
         if ( ! empty( $allcaps['manage_options'] ) ) {
             foreach ( $caps as $cap ) {
-                if ( str_starts_with( (string) $cap, 'ltms_' ) ) {
+                if ( str_starts_with( (string) $cap, 'ltms_' ) || in_array( $cap, [ 'erase_others_personal_data', 'export_others_personal_data' ], true ) ) {
                     $allcaps[ $cap ] = true;
                 }
             }
