@@ -529,6 +529,10 @@ if ( $ltms_unit_only ) {
 
     }
 
+    if ( ! function_exists( 'wp_parse_url' ) ) {
+        function wp_parse_url( string $url, int $component = -1 ) { return parse_url( $url, $component ); }
+    }
+
     // ── Autoloader mínimo ──────────────────────────────────────────────────────
     if ( ! function_exists( 'ltms_load_autoloader' ) ) {
         function ltms_load_autoloader(): void {
