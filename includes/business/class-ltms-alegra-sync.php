@@ -503,6 +503,24 @@ final class LTMS_Alegra_Sync {
             'quantity'    => 1,
         ];
 
+        if ( ! $item_id ) {
+            // Auto-crear ítem de comisión en Alegra si no está configurado
+            try {
+                $alegra_client = LTMS_Api_Factory::get( 'alegra' );
+                $new_item = $alegra_client->create_item( [
+                    'name'  => __( 'Comisión Marketplace Lo Tengo', 'ltms' ),
+                    'price' => round( $commission, 2 ),
+                    'type'  => 'service',
+                ] );
+                $item_id = (int) ( $new_item['id'] ?? 0 );
+                if ( $item_id ) {
+                    LTMS_Core_Config::set( 'ltms_alegra_commission_item_id', $item_id );
+                }
+            } catch ( \Throwable $e ) {
+                // No fatal — Alegra puede rechazar el item sin id en algunos planes
+                LTMS_Core_Logger::error( 'ALEGRA_ITEM_AUTOCREATE', $e->getMessage() );
+            }
+        }
         if ( $item_id ) {
             $line['id'] = $item_id;
         }
