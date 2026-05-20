@@ -681,10 +681,13 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
                 'price'    => (float) ( $item['price']    ?? 0 ),
             ];
 
-            if ( ! empty( $item['alegra_id'] ) ) {
-                $entry['id'] = (int) $item['alegra_id'];
+            // M-68: aceptar tanto 'id' (clave canónica de prepare_commission_items)
+            // como 'alegra_id' (alias legacy) para mantener compatibilidad.
+            $resolved_id = (int) ( $item['id'] ?? $item['alegra_id'] ?? 0 );
+            if ( $resolved_id > 0 ) {
+                $entry['id'] = $resolved_id;
             } elseif ( ! empty( $item['name'] ) ) {
-                // Si no hay ID de Alegra, enviar el nombre directamente
+                // Fallback: enviar nombre si no hay ID (Alegra crea el item inline)
                 $entry['name'] = substr( sanitize_text_field( $item['name'] ), 0, 150 );
             }
 
