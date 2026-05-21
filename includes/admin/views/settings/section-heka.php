@@ -4,6 +4,10 @@ $fields = [
     'ltms_heka_enabled'          => [ 'label' => 'Heka Entrega Activo',    'type' => 'checkbox' ],
     'ltms_heka_api_key'          => [ 'label' => 'API Key',                'type' => 'password' ],
     'ltms_heka_sender_city'      => [ 'label' => 'Ciudad de origen',       'type' => 'text', 'default' => 'Bogotá' ],
+    'ltms_heka_email'             => [ 'label' => 'Email de la cuenta',       'type' => 'text' ],
+    'ltms_heka_password'          => [ 'label' => 'Contraseña de la cuenta',  'type' => 'password' ],
+    'ltms_heka_channel'           => [ 'label' => 'Canal (channel)',           'type' => 'text', 'default' => 'web' ],
+    'ltms_heka_account_id'        => [ 'label' => 'Account ID (distributor)', 'type' => 'text' ],
 ];
 ?>
 <div class="ltms-settings-section">
