@@ -56,7 +56,7 @@ class LTMS_Shipping_Method_Aveonline extends WC_Shipping_Method {
                 $rates     = $aveonline->get_rates( [
                     'origin_city'      => LTMS_Core_Config::get( 'ltms_store_city', 'Bogotá' ),
                     'destination_city' => $dest['city'] ?? 'Bogotá',
-                    'weight'           => max( 0.1, (float) $weight ),
+                    'weight_kg'        => max( 0.1, (float) $weight ),
                     'declared_value'   => max( 0, (float) $value ),
                 ] );
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -77,12 +77,22 @@ class LTMS_Shipping_Method_Aveonline extends WC_Shipping_Method {
             return;
         }
 
-        // Add each rate option returned by Aveonline
+        // Aveonline v2 retorna array 'cotizaciones' con la estructura del endpoint cotizar2.
+        // Cada elemento tiene: codTransportadora, nombreTransportadora, total, diasentrega, etc.
         foreach ( $rates as $rate ) {
+            $cost = (float) ( $rate['total'] ?? $rate['valorTotal'] ?? $rate['price'] ?? 0 );
+            if ( $cost <= 0 ) {
+                continue;
+            }
+            $transportadora = $rate['nombreTransportadora'] ?? $rate['service_name'] ?? __( 'Estándar', 'ltms' );
+            $dias           = (int) ( $rate['diasentrega'] ?? $rate['estimated_days'] ?? 0 );
+            $label          = $dias > 0
+                ? sprintf( '%s — %s (%d %s)', $this->title, $transportadora, $dias, __( 'días', 'ltms' ) )
+                : sprintf( '%s — %s', $this->title, $transportadora );
             $this->add_rate( [
-                'id'    => $this->get_rate_id() . '_' . ( $rate['service_code'] ?? uniqid() ),
-                'label' => sprintf( '%s - %s', $this->title, $rate['service_name'] ?? __( 'Estándar', 'ltms' ) ),
-                'cost'  => (float) ( $rate['price'] ?? $rate['total'] ?? 0 ),
+                'id'    => $this->get_rate_id() . '_' . ( $rate['codTransportadora'] ?? $rate['service_code'] ?? sanitize_key( $transportadora ) ),
+                'label' => $label,
+                'cost'  => $cost,
             ] );
         }
     }

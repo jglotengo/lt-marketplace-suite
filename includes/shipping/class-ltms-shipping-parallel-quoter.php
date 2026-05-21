@@ -118,16 +118,41 @@ class LTMS_Shipping_Parallel_Quoter {
 		$requests = [];
 
 		// Aveonline — Colombia only
+		// API v2: autenticación por token JWT en el body (POST), no por query param.
 		if ( $country === 'CO' ) {
-			$ak = LTMS_Core_Config::get( 'ltms_aveonline_api_key' );
-			if ( $ak && ! empty( $dest['city'] ) ) {
-				$requests['aveonline'] = self::build_curl_opts(
-					'https://api.aveonline.co/v1/rates?' . http_build_query( [
-						'destination_city' => $dest['city'],
-						'weight'           => $weight,
-						'api_key'          => $ak,
-					] ),
-					[ 'Accept: application/json' ]
+			$token      = get_transient( 'ltms_aveonline_jwt' );
+			$idempresa  = (int) LTMS_Core_Config::get( 'ltms_aveonline_idempresa', 0 );
+			$idagente   = (string) LTMS_Core_Config::get( 'ltms_aveonline_idagente', '' );
+			$origin     = LTMS_Core_Config::get( 'ltms_store_city', 'Bogotá' );
+			if ( $token && $idempresa && ! empty( $dest['city'] ) ) {
+				$body = wp_json_encode( [
+					'tipo'           => 'cotizar2',
+					'token'          => $token,
+					'idempresa'      => $idempresa,
+					'origen'         => $origin,
+					'destino'        => $dest['city'],
+					'valorrecaudo'   => 0,
+					'unidades'       => 1,
+					'productos'      => [[
+						'alto'           => '15',
+						'largo'          => '30',
+						'ancho'          => '20',
+						'peso'           => (string) $weight,
+						'unidades'       => 1,
+						'nombre'         => 'Producto',
+						'valorDeclarado' => '10000',
+					]],
+					'valorMinimo'    => 0,
+					'idasumecosto'   => 0,
+					'contraentrega'  => 0,
+					'idtransportador'=> '',
+					'plugin'         => 'apiave',
+					'idagente'       => $idagente,
+				] );
+				$requests['aveonline'] = self::build_curl_opts_post(
+					'https://app.aveonline.co/api/nal/v1.0/generarGuiaTransporteNacional.php',
+					[ 'Content-Type: application/json', 'Accept: application/json' ],
+					$body
 				);
 			}
 		}
@@ -174,6 +199,19 @@ class LTMS_Shipping_Parallel_Quoter {
 		];
 	}
 
+
+	private static function build_curl_opts_post( string $url, array $headers, string $body ): array {
+		return [
+			CURLOPT_URL            => $url,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_TIMEOUT        => 3,
+			CURLOPT_CONNECTTIMEOUT => 2,
+			CURLOPT_HTTPHEADER     => $headers,
+			CURLOPT_SSL_VERIFYPEER => true,
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => $body,
+		];
+	}
 	private static function parse_response( string $name, string $body, int $http_code ): ?array {
 		if ( $http_code < 200 || $http_code >= 300 ) {
 			return null;
@@ -184,10 +222,32 @@ class LTMS_Shipping_Parallel_Quoter {
 		}
 		switch ( $name ) {
 			case 'aveonline':
-				$cost = (float) ( $data['price'] ?? $data['total'] ?? 0 );
-				$days = (int) ( $data['delivery_time'] ?? $data['days'] ?? 5 );
-				return $cost > 0 ? [ 'provider' => 'aveonline', 'cost' => $cost, 'estimated_days' => $days,
-					'label' => 'Aveonline (' . $days . ' días)', 'badges' => [] ] : null;
+				// API v2 devuelve array 'cotizaciones'; elegimos la más barata sin error.
+				$cotizaciones = $data['cotizaciones'] ?? [];
+				$best_cost    = PHP_INT_MAX;
+				$best_days    = 5;
+				$best_name    = 'Aveonline';
+				foreach ( $cotizaciones as $c ) {
+					if ( ( $c['numbererror'] ?? '-0-' ) !== '-0-' ) {
+						continue; // tiene error de cobertura
+					}
+					$c_cost = (float) ( $c['total'] ?? $c['valorTotal'] ?? 0 );
+					if ( $c_cost > 0 && $c_cost < $best_cost ) {
+						$best_cost = $c_cost;
+						$best_days = (int) ( $c['diasentrega'] ?? 5 );
+						$best_name = $c['nombreTransportadora'] ?? 'Aveonline';
+					}
+				}
+				if ( $best_cost === PHP_INT_MAX || $best_cost <= 0 ) {
+					return null;
+				}
+				return [
+					'provider'       => 'aveonline',
+					'cost'           => $best_cost,
+					'estimated_days' => $best_days,
+					'label'          => sprintf( 'Aveonline / %s (%d días)', $best_name, $best_days ),
+					'badges'         => [],
+				];
 
 			case 'heka':
 				$cost = (float) ( $data['total_price'] ?? $data['price'] ?? 0 );
