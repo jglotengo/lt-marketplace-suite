@@ -228,7 +228,8 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_aveonline_price_key(): void
     {
-        $body   = json_encode(['price' => 15000, 'delivery_time' => 2]);
+        // API v2: cotizaciones[] con total y diasentrega
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 15000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertIsArray($result);
         $this->assertSame('aveonline', $result['provider']);
@@ -238,7 +239,8 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_aveonline_total_fallback(): void
     {
-        $body   = json_encode(['total' => 12000, 'days' => 3]);
+        // valorTotal como fallback de total
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'valorTotal' => 12000, 'diasentrega' => 3, 'nombreTransportadora' => 'TCC']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertIsArray($result);
         $this->assertSame(12000.0, $result['cost']);
@@ -247,13 +249,13 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_aveonline_null_when_zero_cost(): void
     {
-        $body = json_encode(['price' => 0, 'delivery_time' => 2]);
+        $body = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 0, 'diasentrega' => 2]]]);
         $this->assertNull($this->callStatic('parse_response', 'aveonline', $body, 200));
     }
 
     public function test_parse_response_aveonline_has_label(): void
     {
-        $body   = json_encode(['price' => 15000, 'delivery_time' => 2]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 15000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertArrayHasKey('label', $result);
         $this->assertStringContainsString('2', $result['label']);
@@ -261,7 +263,7 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_aveonline_has_badges_array(): void
     {
-        $body   = json_encode(['price' => 15000, 'delivery_time' => 2]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 15000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertArrayHasKey('badges', $result);
         $this->assertIsArray($result['badges']);
@@ -269,21 +271,22 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_aveonline_label_contains_dias(): void
     {
-        $body   = json_encode(['price' => 15000, 'delivery_time' => 3]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 15000, 'diasentrega' => 3, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertStringContainsString('días', $result['label']);
     }
 
     public function test_parse_response_aveonline_days_fallback_default_5(): void
     {
-        $body   = json_encode(['price' => 8000]);
+        // Sin diasentrega → default 5
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 8000, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertSame(5, $result['estimated_days']);
     }
 
     public function test_parse_response_aveonline_has_all_required_keys(): void
     {
-        $body   = json_encode(['price' => 15000, 'delivery_time' => 2]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 15000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         foreach (['provider', 'cost', 'estimated_days', 'label', 'badges'] as $key) {
             $this->assertArrayHasKey($key, $result);
@@ -395,19 +398,19 @@ class ShippingParallelQuoterTest extends TestCase
 
     public function test_parse_response_null_on_199_boundary(): void
     {
-        $this->assertNull($this->callStatic('parse_response', 'aveonline', '{"price":1000}', 199));
+        $this->assertNull($this->callStatic('parse_response', 'aveonline', '{"cotizaciones":[{"numbererror":"-0-","total":1000}]}', 199));
     }
 
     public function test_parse_response_accepts_200_boundary(): void
     {
-        $body   = json_encode(['price' => 5000, 'delivery_time' => 2]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 5000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertIsArray($result);
     }
 
     public function test_parse_response_accepts_299_boundary(): void
     {
-        $body   = json_encode(['price' => 5000, 'delivery_time' => 2]);
+        $body   = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 5000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 299);
         $this->assertIsArray($result);
     }
@@ -717,7 +720,8 @@ class ShippingParallelQuoterTest extends TestCase
     // ════════════════════════════════════════════════════════════════════════
 
     public function test_parse_response_aveonline_delivery_time_key_used(): void {
-        $body = json_encode(['price' => 10_000, 'delivery_time' => 2]);
+        // API v2: diasentrega como campo canónico de días
+        $body = json_encode(['cotizaciones' => [['numbererror' => '-0-', 'total' => 10_000, 'diasentrega' => 2, 'nombreTransportadora' => 'ENVIA']]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
         $this->assertSame(2, $result['estimated_days']);
     }
@@ -749,10 +753,14 @@ class ShippingParallelQuoterTest extends TestCase
     }
 
     public function test_parse_response_aveonline_missing_price_uses_total(): void {
-        // price ausente → ?? fallback a total
-        $body = json_encode(['total' => 12_000]);
+        // API v2: elegir la más barata entre cotizaciones con numbererror='-0-'
+        $body = json_encode(['cotizaciones' => [
+            ['numbererror' => '-0-', 'total' => 12_000, 'diasentrega' => 3, 'nombreTransportadora' => 'TCC'],
+            ['numbererror' => '-0-', 'valorTotal' => 9_000, 'diasentrega' => 4, 'nombreTransportadora' => 'ENVIA'],
+        ]]);
         $result = $this->callStatic('parse_response', 'aveonline', $body, 200);
-        $this->assertSame(12000.0, $result['cost']);
+        // Debe elegir la más barata: 9000
+        $this->assertSame(9000.0, $result['cost']);
     }
 
     // ════════════════════════════════════════════════════════════════════════

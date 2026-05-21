@@ -414,8 +414,9 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
     public function test_sanitize_encrypts_aveonline_api_key(): void
     {
-        $result = $this->settings->sanitize_settings(['ltms_aveonline_api_key' => 'ave-key-123']);
-        $this->assertStringStartsWith('v1:', $result['ltms_aveonline_api_key']);
+        // v2: el campo cifrado es ltms_aveonline_clave (contraseña), no api_key
+        $result = $this->settings->sanitize_settings(['ltms_aveonline_clave' => 'ave-pass-123']);
+        $this->assertStringStartsWith('v1:', $result['ltms_aveonline_clave']);
     }
 
     public function test_sanitize_encrypts_zapsign_api_token(): void
