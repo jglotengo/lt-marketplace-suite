@@ -11,7 +11,7 @@
  *
  * @package    LTMS
  * @subpackage LTMS/includes/api
- * @version    1.5.0
+ * @version    1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,18 +57,32 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      * Crea una guía de envío.
      *
      * @param array $shipment_data Datos del envío.
-     * @return array{success: bool, tracking_number: string, label_url: string, cost: float}
+     * @return array{success: bool, tracking_number: string, label_url: string, cost: float, shipment_id: string}
+     * @throws \InvalidArgumentException Si faltan origin o destination, o no son arrays.
      */
     public function create_shipment( array $shipment_data ): array {
+        if ( ! isset( $shipment_data['origin'] ) ) {
+            throw new \InvalidArgumentException( 'El campo origin es obligatorio.' );
+        }
+        if ( ! is_array( $shipment_data['origin'] ) ) {
+            throw new \InvalidArgumentException( 'El campo origin debe ser un array.' );
+        }
+        if ( ! isset( $shipment_data['destination'] ) ) {
+            throw new \InvalidArgumentException( 'El campo destination es obligatorio.' );
+        }
+        if ( ! is_array( $shipment_data['destination'] ) ) {
+            throw new \InvalidArgumentException( 'El campo destination debe ser un array.' );
+        }
+
         $payload = [
-            'account_id'  => $this->account_id,
-            'reference'   => $shipment_data['reference'] ?? LTMS_Utils::generate_reference( 'AVE' ),
-            'shipper'     => $this->format_address( $shipment_data['origin'] ),
-            'consignee'   => $this->format_address( $shipment_data['destination'] ),
-            'packages'    => $this->format_packages( $shipment_data['packages'] ?? [] ),
-            'service'     => $shipment_data['service'] ?? 'express',
+            'account_id'     => $this->account_id,
+            'reference'      => $shipment_data['reference'] ?? LTMS_Utils::generate_reference( 'AVE' ),
+            'shipper'        => $this->format_address( $shipment_data['origin'] ),
+            'consignee'      => $this->format_address( $shipment_data['destination'] ),
+            'packages'       => $this->format_packages( $shipment_data['packages'] ?? [] ),
+            'service'        => $shipment_data['service'] ?? 'express',
             'declared_value' => (float) ( $shipment_data['declared_value'] ?? 0 ),
-            'description' => $shipment_data['description'] ?? '',
+            'description'    => $shipment_data['description'] ?? '',
         ];
 
         $response = $this->perform_request( 'POST', '/shipments', $payload );
@@ -86,7 +100,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      * Consulta el estado de un envío.
      *
      * @param string $tracking_number Número de guía.
-     * @return array{status: string, events: array, estimated_delivery: string}
+     * @return array{status: string, events: array, estimated_delivery: string, current_location: string}
      */
     public function track_shipment( string $tracking_number ): array {
         $response = $this->perform_request( 'GET', '/tracking/' . urlencode( $tracking_number ) );
@@ -102,14 +116,25 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     /**
      * Calcula tarifas de envío para origen-destino y paquete.
      *
+     * Acepta weight_kg (canónico) o weight (alias). Si ninguno está presente usa 1.0.
+     *
      * @param array $rate_query Datos para cotización.
      * @return array Lista de opciones de servicio con tarifas.
      */
     public function get_rates( array $rate_query ): array {
+        // weight_kg toma precedencia sobre el alias weight
+        if ( isset( $rate_query['weight_kg'] ) ) {
+            $weight = (float) $rate_query['weight_kg'];
+        } elseif ( isset( $rate_query['weight'] ) ) {
+            $weight = (float) $rate_query['weight'];
+        } else {
+            $weight = 1.0;
+        }
+
         $payload = [
             'origin'      => $rate_query['origin_city'] ?? '',
             'destination' => $rate_query['destination_city'] ?? '',
-            'weight'      => (float) ( $rate_query['weight_kg'] ?? 1 ),
+            'weight'      => $weight,
             'dimensions'  => [
                 'length' => (float) ( $rate_query['length_cm'] ?? 30 ),
                 'width'  => (float) ( $rate_query['width_cm'] ?? 20 ),
@@ -139,8 +164,13 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      *
      * @param string $shipment_id ID del envío.
      * @return bool
+     * @throws \InvalidArgumentException Si shipment_id está vacío o solo contiene espacios.
      */
     public function cancel_shipment( string $shipment_id ): bool {
+        if ( trim( $shipment_id ) === '' ) {
+            throw new \InvalidArgumentException( 'El shipment_id no puede estar vacío.' );
+        }
+
         $response = $this->perform_request( 'DELETE', '/shipments/' . $shipment_id );
         return isset( $response['cancelled'] ) && $response['cancelled'] === true;
     }
@@ -160,6 +190,35 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         }
     }
 
+    /**
+     * Crea una guía de devolución para un envío existente.
+     *
+     * @param string $shipment_id          ID del envío original.
+     * @param string $reason               Motivo de la devolución. Default: 'customer_request'.
+     * @param array  $additional_data      Datos adicionales opcionales.
+     * @return array{success: bool, tracking_number: string, label_url: string, return_id: string}
+     * @throws \InvalidArgumentException Si shipment_id está vacío.
+     */
+    public function create_return( string $shipment_id, string $reason = 'customer_request', array $additional_data = [] ): array {
+        if ( trim( $shipment_id ) === '' ) {
+            throw new \InvalidArgumentException( 'El shipment_id no puede estar vacío.' );
+        }
+
+        $payload = array_merge( $additional_data, [
+            'original_shipment_id' => $shipment_id,
+            'reason'               => $reason,
+        ]);
+
+        $response = $this->perform_request( 'POST', '/returns', $payload );
+
+        return [
+            'success'         => isset( $response['tracking_number'] ),
+            'tracking_number' => $response['tracking_number'] ?? '',
+            'label_url'       => $response['label_url'] ?? '',
+            'return_id'       => $response['id'] ?? '',
+        ];
+    }
+
     // ── Helpers privados ──────────────────────────────────────────
 
     /**
@@ -167,8 +226,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      */
     protected function get_default_headers(): array {
         return array_merge( parent::get_default_headers(), [
-            'X-Api-Key'     => $this->api_key,
-            'X-Account-Id'  => $this->account_id,
+            'X-Api-Key'    => $this->api_key,
+            'X-Account-Id' => $this->account_id,
         ]);
     }
 
@@ -179,10 +238,13 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      * @return array
      */
     private function format_address( array $address ): array {
+        $raw_email = $address['email'] ?? '';
+        $email     = is_email( $raw_email ) ? $raw_email : '';
+
         return [
             'name'     => $address['name'] ?? '',
             'phone'    => LTMS_Utils::format_phone_e164( $address['phone'] ?? '' ),
-            'email'    => $address['email'] ?? '',
+            'email'    => $email,
             'address'  => $address['address'] ?? '',
             'city'     => $address['city'] ?? '',
             'state'    => $address['state'] ?? '',
@@ -200,10 +262,10 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     private function format_packages( array $packages ): array {
         if ( empty( $packages ) ) {
             return [[
-                'weight'  => 1.0,
-                'length'  => 30,
-                'width'   => 20,
-                'height'  => 15,
+                'weight'   => 1.0,
+                'length'   => 30,
+                'width'    => 20,
+                'height'   => 15,
                 'quantity' => 1,
             ]];
         }
