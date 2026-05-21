@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.0.1
+ * Version:           2.1.3
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -17,7 +17,7 @@
  * Requires Plugins:     woocommerce
  *
  * @package LTMS
- * @version 2.0.0
+ * @version 2.1.3
  */
 
 // ============================================================
@@ -37,7 +37,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION',          '2.1.2' );
+define( 'LTMS_VERSION',          '2.1.3' );
 define( 'LTMS_DB_VERSION',       '2.0.0' );
 define( 'LTMS_MIN_PHP',          '8.1' );
 define( 'LTMS_MIN_WP',           '6.0' );
@@ -464,28 +464,10 @@ function ltms_run(): void {
     // 2. Menú de emergencia: si el Kernel falló y LTMS_Admin no registró el
     //    menú principal, este fallback lo registra en admin_menu@99 con
     //    manage_options para que siempre sea visible al administrador.
+    //    IMPORTANTE: NO hay return aquí — el Kernel debe arrancar siempre,
+    //    incluso en el admin. El fallback solo actúa si el menú real no existe.
     if ( is_admin() ) {
         add_action( 'admin_menu', 'ltms_emergency_menu_fallback', 99 );
-        // Sin WooCommerce: registrar menú mínimo para que el plugin sea visible.
-        if ( is_admin() ) {
-            add_action( 'admin_menu', function() {
-                add_menu_page(
-                    'LT Marketplace Suite',
-                    'LT Marketplace',
-                    'manage_options',
-                    'ltms-dashboard',
-                    function() {
-                        echo '<div class="wrap"><h1>LT Marketplace Suite v' . esc_html( LTMS_VERSION ) . '</h1>';
-                        echo '<div class="notice notice-error inline"><p>' .
-                             esc_html__( 'LT Marketplace Suite requiere WooCommerce activo para funcionar correctamente. Por favor instala y activa WooCommerce.', 'ltms' ) .
-                             '</p></div></div>';
-                    },
-                    'dashicons-store',
-                    30
-                );
-            }, 5 );
-        }
-        return;
     }
 
     // Cargar traducciones antes de cualquier otra cosa
