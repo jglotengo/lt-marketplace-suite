@@ -25,6 +25,7 @@ $tabs = [
     'backblaze'   => __( 'Backblaze B2', 'ltms' ),
     'uber_direct' => __( 'Uber Direct', 'ltms' ),
     'heka'        => __( 'Heka Entrega', 'ltms' ),
+    'aveonline'   => __( 'Aveonline', 'ltms' ),
     'xcover'      => __( 'Seguros XCover', 'ltms' ),
     // v2.1.0 — Contabilidad
     'alegra'      => __( 'Alegra Contabilidad', 'ltms' ),
@@ -197,6 +198,17 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
         'heka' => [
             [ 'key' => 'ltms_heka_api_key',    'label' => __( 'Heka API Key 🔐', 'ltms' ),   'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256.', 'ltms' ) ],
             [ 'key' => 'ltms_heka_account_id', 'label' => __( 'Heka Account ID', 'ltms' ),   'type' => 'text' ],
+        ],
+        'aveonline' => [
+            [ 'key' => 'ltms_aveonline_enabled',          'label' => __( 'Habilitar Aveonline', 'ltms' ),              'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_aveonline_usuario',          'label' => __( 'Usuario Aveonline', 'ltms' ),                'type' => 'text',     'desc' => __( 'Usuario de ingreso a la plataforma Aveonline.', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_clave',            'label' => __( 'Contraseña 🔐', 'ltms' ),                   'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256. Dejar vacío para no cambiar.', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_idempresa',        'label' => __( 'ID Empresa (idempresa)', 'ltms' ),           'type' => 'text',     'desc' => __( 'Número de ID de la empresa dentro de Aveonline. Se obtiene al autenticarse.', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_idagente',         'label' => __( 'ID Agente (idagente)', 'ltms' ),             'type' => 'text',     'desc' => __( 'Agente logístico asociado a la cuenta.', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_idtransportador',  'label' => __( 'Transportadora por defecto', 'ltms' ),      'type' => 'text',     'desc' => __( 'Código de la transportadora (ej: 29 = ENVIA). Vacío = cotizar todas.', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_codigo',           'label' => __( 'Código de guía (codigo)', 'ltms' ),         'type' => 'text',     'desc' => __( 'Usuario secundario para generación de guías (campo codigo).', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_clave_guia',       'label' => __( 'Clave de guía 🔐 (dsclavex)', 'ltms' ),     'type' => 'password', 'desc' => __( 'Contraseña secundaria para generación de guías. Se guarda cifrado.', 'ltms' ) ],
+            [ 'key' => 'ltms_store_city',                 'label' => __( 'Ciudad de origen (bodega)', 'ltms' ),       'type' => 'text',     'default' => 'Bogotá', 'desc' => __( 'Ciudad desde donde se despachan los paquetes. Ej: MEDELLIN(ANTIOQUIA)', 'ltms' ) ],
         ],
         'xcover' => [
             [ 'key' => 'ltms_xcover_api_key',               'label' => __( 'XCover API Key 🔐', 'ltms' ),               'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256.', 'ltms' ) ],
