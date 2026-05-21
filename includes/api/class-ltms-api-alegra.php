@@ -397,7 +397,18 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             'date'    => $invoice_data['date']     ?? current_time( 'Y-m-d' ),
             'dueDate' => $invoice_data['due_date'] ?? current_time( 'Y-m-d' ),
             'client'  => [ 'id' => (int) $invoice_data['client_id'] ],
-            'items'   => $this->format_invoice_items( $invoice_data['items'] ?? [] ),
+            'items'   => array_map( function( $item ) {
+                $qty   = isset( $item['quantity'] ) ? (int) $item['quantity'] : 1;
+                $price = isset( $item['price'] ) ? (float) $item['price'] : 0.0;
+                $rid   = 0;
+                if ( isset( $item['id'] ) && (int) $item['id'] > 0 ) { $rid = (int) $item['id']; }
+                elseif ( isset( $item['alegra_id'] ) && (int) $item['alegra_id'] > 0 ) { $rid = (int) $item['alegra_id']; }
+                $e = array( 'quantity' => $qty, 'price' => $price );
+                if ( $rid > 0 ) { $e['id'] = $rid; }
+                elseif ( ! empty( $item['name'] ) ) { $e['name'] = substr( sanitize_text_field( $item['name'] ), 0, 150 ); }
+                if ( ! empty( $item['tax'] ) ) { $e['tax'] = is_array( $item['tax'] ) ? $item['tax'] : array( $item['tax'] ); }
+                return $e;
+            }, $invoice_data['items'] ?? [] ),
         ];
 
         if ( ! empty( $invoice_data['number_template_id'] ) ) {
@@ -674,30 +685,26 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      */
     private function format_invoice_items( array $items ): array {
         $formatted = [];
-
         foreach ( $items as $item ) {
-            $entry = [
-                'quantity' => (int) ( $item['quantity'] ?? 1 ),
-                'price'    => (float) ( $item['price']    ?? 0 ),
-            ];
-
-            // M-68: aceptar tanto 'id' (clave canónica de prepare_commission_items)
-            // como 'alegra_id' (alias legacy) para mantener compatibilidad.
-            $resolved_id = (int) ( $item['id'] ?? $item['alegra_id'] ?? 0 );
-            if ( $resolved_id > 0 ) {
-                $entry['id'] = $resolved_id;
+            $qty   = isset( $item['quantity'] ) ? (int) $item['quantity'] : 1;
+            $price = isset( $item['price'] ) ? (float) $item['price'] : 0.0;
+            $rid   = 0;
+            if ( isset( $item['id'] ) && (int) $item['id'] > 0 ) {
+                $rid = (int) $item['id'];
+            } elseif ( isset( $item['alegra_id'] ) && (int) $item['alegra_id'] > 0 ) {
+                $rid = (int) $item['alegra_id'];
+            }
+            $entry = array( 'quantity' => $qty, 'price' => $price );
+            if ( $rid > 0 ) {
+                $entry['id'] = $rid;
             } elseif ( ! empty( $item['name'] ) ) {
-                // Fallback: enviar nombre si no hay ID (Alegra crea el item inline)
                 $entry['name'] = substr( sanitize_text_field( $item['name'] ), 0, 150 );
             }
-
             if ( ! empty( $item['tax'] ) ) {
-                $entry['tax'] = is_array( $item['tax'] ) ? $item['tax'] : [ $item['tax'] ];
+                $entry['tax'] = is_array( $item['tax'] ) ? $item['tax'] : array( $item['tax'] );
             }
-
             $formatted[] = $entry;
         }
-
         return $formatted;
     }
 }

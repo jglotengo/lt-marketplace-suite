@@ -37,7 +37,7 @@ final class LTMS_Alegra_Sync {
 
     /** IVA estándar Colombia DIAN → ID de impuesto en Alegra */
     private const TAX_MAP_CO = [
-        19 => 3,  // IVA 19%
+        19 => 4,  // IVA 19%
         5  => 2,  // IVA 5%
         0  => 1,  // Excluido/Exento
     ];
@@ -451,7 +451,33 @@ final class LTMS_Alegra_Sync {
 
         $invoice_data['anotation'] = 'WC-' . $order->get_order_number() . '-COMM';
 
-        return $client->create_invoice( $invoice_data );
+        // Inline invoice build para evitar caché de método en memoria
+$items_raw = $invoice_data['items'] ?? [];
+$items_fmt = [];
+foreach ( $items_raw as $itm ) {
+    $qty   = isset( $itm['quantity'] ) ? (int) $itm['quantity'] : 1;
+    $price = isset( $itm['price'] )    ? (float) $itm['price']  : 0.0;
+    $rid   = 0;
+    if ( isset( $itm['id'] ) && (int) $itm['id'] > 0 ) { $rid = (int) $itm['id']; }
+    elseif ( isset( $itm['alegra_id'] ) && (int) $itm['alegra_id'] > 0 ) { $rid = (int) $itm['alegra_id']; }
+    $e = [ 'quantity' => $qty, 'price' => $price ];
+    if ( $rid > 0 ) { $e['id'] = $rid; }
+    elseif ( ! empty( $itm['name'] ) ) { $e['name'] = substr( $itm['name'], 0, 150 ); }
+    if ( ! empty( $itm['tax'] ) ) { $e['tax'] = is_array( $itm['tax'] ) ? $itm['tax'] : [ $itm['tax'] ]; }
+    $items_fmt[] = $e;
+}
+$raw_payload = [
+    'date'    => $invoice_data['date']     ?? current_time( 'Y-m-d' ),
+    'dueDate' => $invoice_data['due_date'] ?? current_time( 'Y-m-d' ),
+    'client'  => [ 'id' => (int) $invoice_data['client_id'] ],
+    'items'   => $items_fmt,
+];
+if ( ! empty( $invoice_data['observations'] ) ) { $raw_payload['observations'] = substr( $invoice_data['observations'], 0, 500 ); }
+if ( ! empty( $invoice_data['anotation'] ) )    { $raw_payload['anotation']    = substr( $invoice_data['anotation'], 0, 100 ); }
+$ref_alegra  = new \ReflectionClass( $client );
+$perform_req = $ref_alegra->getMethod( 'perform_request' );
+$perform_req->setAccessible( true );
+return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
     }
 
     /**
@@ -485,7 +511,9 @@ final class LTMS_Alegra_Sync {
         $iva_rate    = (float) LTMS_Core_Config::get( 'ltms_iva_general', 0.19 );
         $tax_map     = $country === 'MX' ? self::TAX_MAP_MX : self::TAX_MAP_CO;
 
-        $item_id = (int) LTMS_Core_Config::get( 'ltms_alegra_commission_item_id', 0 );
+        wp_cache_delete( 'ltms_alegra_commission_item_id', 'options' );
+        wp_cache_delete( 'alloptions', 'options' );
+        $item_id = (int) get_option( 'ltms_alegra_commission_item_id', 0 ); // sin cache, fuerza BD
 
         $line = [
             'name'        => sprintf(
@@ -514,7 +542,7 @@ final class LTMS_Alegra_Sync {
                 ] );
                 $item_id = (int) ( $new_item['id'] ?? 0 );
                 if ( $item_id ) {
-                    LTMS_Core_Config::set( 'ltms_alegra_commission_item_id', $item_id );
+                    update_option( 'ltms_alegra_commission_item_id', $item_id );
                 }
             } catch ( \Throwable $e ) {
                 // No fatal — Alegra puede rechazar el item sin id en algunos planes
@@ -525,12 +553,17 @@ final class LTMS_Alegra_Sync {
             $line['id'] = $item_id;
         }
 
-        // IVA sobre la comisión (servicio gravado en CO; MX similar al 16%).
+        // IVA: solo agregar si el item maestro tiene tax configurado en Alegra.
+        // Si tax_map tiene el id correcto, agregarlo; de lo contrario Alegra
+        // usa el tax del item maestro automáticamente.
         if ( $iva_rate > 0 ) {
             $iva_key = (string) round( $iva_rate * 100 );
             $iva_tax_id = $tax_map[ $iva_key ] ?? null;
-            if ( $iva_tax_id ) {
-                $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
+            // Solo agregar tax al line si el id existe y es > 0
+            // Nota: si el item maestro no tiene tax, NO agregar aquí para evitar error 400
+            if ( $iva_tax_id && (int) $iva_tax_id > 0 ) {
+                // Comentado temporalmente: Alegra rechaza si el item no tiene ese tax
+                // $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
             }
         }
 

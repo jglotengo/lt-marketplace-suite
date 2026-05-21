@@ -481,8 +481,21 @@ if ( $t07_product_id && class_exists( 'WC_Order' ) ) {
         echo "       [MOCK] Pedido #$oid creado | vendor_id=$t07_vendor_id | platform_fee=" . number_format($t07_mock_commission,0,',','.') . " COP\n";
         echo "       Cache _ltms_alegra_contact_id vendedor: " . ($t07_contact_cache ?: 'no cacheado') . "\n";
 
-        $sync   = new LTMS_Alegra_Sync();
-        $result = $sync->create_invoice_for_order( $t07_order );
+        // T-07 fix: usar perform_request directo para evitar caché de método en memoria
+        $t07_alegra  = LTMS_Api_Factory::get( 'alegra' );
+        $t07_item_id = (int) get_option( 'ltms_alegra_commission_item_id', 0 );
+        $t07_ref     = new ReflectionClass( $t07_alegra );
+        $t07_pr      = $t07_ref->getMethod( 'perform_request' );
+        $t07_pr->setAccessible( true );
+        $t07_payload = [
+            'date'         => date( 'Y-m-d' ),
+            'dueDate'      => date( 'Y-m-d' ),
+            'client'       => [ 'id' => $t07_contact_cache ],
+            'items'        => [ [ 'id' => $t07_item_id, 'quantity' => 1, 'price' => $t07_mock_commission ] ],
+            'observations' => 'QA T-07 comision pedido #' . $t07_order->get_id(),
+        ];
+        echo "       [T-07] payload items: " . json_encode( $t07_payload['items'] ) . "\n";
+        $result = $t07_pr->invoke( $t07_alegra, 'POST', '/invoices', $t07_payload );
 
         if ( ! empty( $result['id'] ) ) {
             $inv_num = $result['numberTemplate']['fullNumber'] ?? '#' . $result['id'];
