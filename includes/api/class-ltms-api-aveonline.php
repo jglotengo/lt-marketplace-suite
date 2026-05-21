@@ -188,7 +188,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'bloquegenerarguia'=> '1',
             'relacion_envios' => '1',
             'enviarcorreos'   => '1',
-            'cartaporte'      => '',
+            'cartaporte'      => $shipment_data['cartaporte'] ?? '',
             'numeroFactura'   => $shipment_data['numero_factura'] ?? '',
         ];
 
