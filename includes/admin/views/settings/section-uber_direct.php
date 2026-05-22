@@ -1,11 +1,11 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 $fields = [
-    'ltms_uber_enabled'          => [ 'label' => 'Uber Direct Activo',     'type' => 'checkbox' ],
-    'ltms_uber_client_id'        => [ 'label' => 'Client ID',              'type' => 'text' ],
-    'ltms_uber_client_secret'    => [ 'label' => 'Client Secret',          'type' => 'password' ],
-    'ltms_uber_customer_id'      => [ 'label' => 'Customer ID',            'type' => 'text' ],
-    'ltms_uber_sandbox'          => [ 'label' => 'Modo Sandbox',           'type' => 'checkbox' ],
+    'ltms_uber_direct_enabled'          => [ 'label' => 'Uber Direct Activo',     'type' => 'checkbox' ],
+    'ltms_uber_direct_client_id'        => [ 'label' => 'Client ID',              'type' => 'text' ],
+    'ltms_uber_direct_client_secret'    => [ 'label' => 'Client Secret',          'type' => 'password' ],
+    'ltms_uber_direct_customer_id'      => [ 'label' => 'Customer ID',            'type' => 'text' ],
+    'ltms_uber_direct_sandbox'          => [ 'label' => 'Modo Sandbox',           'type' => 'checkbox' ],
 ];
 ?>
 <div class="ltms-settings-section">
