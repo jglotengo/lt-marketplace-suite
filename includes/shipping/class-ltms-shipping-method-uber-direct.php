@@ -71,7 +71,7 @@ class LTMS_Shipping_Method_Uber_Direct extends WC_Shipping_Method {
             }
         }
 
-        $price = $quote['fee'] ?? $quote['currency_code'] ?? 0;
+        $price = 0; // Uber devuelve fee en centavos; se convierte abajo
         // Try to extract numeric price from quote
         if ( isset( $quote['fee'] ) ) {
             $price = (float) $quote['fee'] / 100; // Uber returns cents
