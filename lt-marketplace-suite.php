@@ -314,6 +314,7 @@ function ltms_load_autoloader(): void {
                 // API gateways v1.7.4
                 'ltms-api-gateway-openpay'          => 'api/gateways/class-ltms-api-gateways.php',
                 'ltms-api-gateway-addi'             => 'api/gateways/class-ltms-api-gateways.php',
+                'ltms-api-gateway-pse'               => 'api/gateways/class-ltms-api-gateways.php',
                 // Business listeners v1.7.4
                 'ltms-tptc-listener'                => 'business/listeners/class-ltms-tptc-listener.php',
                 'ltms-coupon-attribution-listener'  => 'business/listeners/class-ltms-coupon-attribution-listener.php',
