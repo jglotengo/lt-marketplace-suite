@@ -165,7 +165,7 @@ function ltms_load_autoloader(): void {
         }
     }
 
-    // Eager load gateways que no siguen la convención de nombre de archivo
+    // Eager load del archivo de gateways (clases con nombres no convencionales)
     $gateways_file = LTMS_INCLUDES_DIR . 'api/gateways/class-ltms-api-gateways.php';
     if ( file_exists( $gateways_file ) ) {
         require_once $gateways_file;
