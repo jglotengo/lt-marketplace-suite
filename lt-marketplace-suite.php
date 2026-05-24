@@ -165,6 +165,12 @@ function ltms_load_autoloader(): void {
         }
     }
 
+    // Eager load gateways que no siguen la convención de nombre de archivo
+    $gateways_file = LTMS_INCLUDES_DIR . 'api/gateways/class-ltms-api-gateways.php';
+    if ( file_exists( $gateways_file ) ) {
+        require_once $gateways_file;
+    }
+
     // Fallback: Autoloader manual basado en convención de nombres LTMS_*
     spl_autoload_register( function( string $class_name ): void {
         // Solo procesar clases LTMS_*
@@ -315,6 +321,7 @@ function ltms_load_autoloader(): void {
                 'ltms-api-gateway-openpay'          => 'api/gateways/class-ltms-api-gateways.php',
                 'ltms-api-gateway-addi'             => 'api/gateways/class-ltms-api-gateways.php',
                 'ltms-api-gateway-pse'               => 'api/gateways/class-ltms-api-gateways.php',
+                'ltms-api-gateway-openpay-mx'         => 'api/gateways/class-ltms-api-gateways.php',
                 // Business listeners v1.7.4
                 'ltms-tptc-listener'                => 'business/listeners/class-ltms-tptc-listener.php',
                 'ltms-coupon-attribution-listener'  => 'business/listeners/class-ltms-coupon-attribution-listener.php',
