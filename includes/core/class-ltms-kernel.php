@@ -364,6 +364,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Gateway_Stripe' ) ) {
             $gateways[] = 'LTMS_Gateway_Stripe';
         }
+        // v1.7.4 — PSE gateway (Openpay CO débito bancario)
+        if ( class_exists( 'LTMS_Api_Gateway_PSE' ) ) {
+            $gateways[] = 'LTMS_Api_Gateway_PSE';
+        }
         return $gateways;
     }
 
