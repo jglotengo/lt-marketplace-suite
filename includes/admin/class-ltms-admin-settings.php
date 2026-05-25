@@ -36,6 +36,16 @@ final class LTMS_Admin_Settings {
         $instance = new self();
         add_action( 'admin_init', [ $instance, 'register_settings' ] );
         add_action( 'wp_ajax_ltms_save_settings_section', [ $instance, 'ajax_save_section' ] );
+
+        // E-03 / E-04 FIX: aplicar from_name y from_address guardados en Emails al envío real de wp_mail.
+        add_filter( 'wp_mail_from', static function ( string $from ): string {
+            $custom = get_option( 'ltms_email_from_address', '' );
+            return ( $custom && is_email( $custom ) ) ? $custom : $from;
+        } );
+        add_filter( 'wp_mail_from_name', static function ( string $name ): string {
+            $custom = get_option( 'ltms_email_from_name', '' );
+            return ( '' !== trim( $custom ) ) ? $custom : $name;
+        } );
         add_action( 'wp_ajax_ltms_test_api_connection', [ $instance, 'ajax_test_api_connection' ] );
         add_action( 'wp_ajax_ltms_get_chart_data', [ $instance, 'ajax_get_chart_data' ] );
         add_action( 'wp_ajax_ltms_fix_admin_caps', [ $instance, 'ajax_fix_admin_caps' ] );
@@ -152,6 +162,12 @@ final class LTMS_Admin_Settings {
                 } else {
                     $sanitized[ $key ] = ''; // JSON inválido → vaciar para usar defaults
                 }
+                continue;
+            }
+
+            // E-02 FIX: ltms_email_from_address debe ser un email válido.
+            if ( $key === 'ltms_email_from_address' ) {
+                $sanitized[ $key ] = is_email( $value ) ? sanitize_email( $value ) : get_option( 'admin_email', '' );
                 continue;
             }
 
