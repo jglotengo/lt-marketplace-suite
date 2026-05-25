@@ -178,3 +178,11 @@ class LTMS_Api_Gateway_Openpay_MX extends WC_Payment_Gateway {
         wp_localize_script( 'ltms-openpay-mx', 'ltmsOpenpayMX', [ 'merchant_id' => $merchant_id, 'public_key' => $public_key, 'sandbox' => $sandbox, 'method' => $this->get_option( 'payment_method', 'card' ) ] );
     }
 }
+
+// Auto-registro en WooCommerce
+add_filter( 'woocommerce_payment_gateways', static function( array $gateways ): array {
+    if ( ! in_array( 'LTMS_Api_Gateway_Openpay_MX', $gateways, true ) ) {
+        $gateways[] = 'LTMS_Api_Gateway_Openpay_MX';
+    }
+    return $gateways;
+} );
