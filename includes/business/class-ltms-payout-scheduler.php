@@ -227,6 +227,36 @@ final class LTMS_Payout_Scheduler {
                 sprintf( 'Retiro #%d aprobado y procesado por admin #%d', $payout_id, $admin_id )
             );
 
+            // E-12 FIX: enviar email al vendedor si ltms_email_payout_approved está activo.
+            if ( get_option( 'ltms_email_payout_approved', 'yes' ) === 'yes' ) {
+                $vendor_user = get_userdata( (int) $payout['vendor_id'] );
+                if ( $vendor_user && $vendor_user->user_email ) {
+                    $p_subject = sprintf(
+                        /* translators: %s: monto */
+                        __( '[Lo Tengo] Tu retiro de %s fue aprobado', 'ltms' ),
+                        number_format( (float) $payout['amount'], 2, '.', ',' )
+                    );
+                    $p_body = sprintf(
+                        /* translators: 1: nombre, 2: monto, 3: referencia gateway, 4: URL panel */
+                        __( "Hola %1\$s,
+
+Tu solicitud de retiro por %2\$s ha sido aprobada y procesada.
+
+Referencia: %3\$s
+
+Revisa el estado en tu panel:
+%4\$s
+
+Gracias por ser parte de Lo Tengo.", 'ltms' ),
+                        $vendor_user->display_name,
+                        number_format( (float) $payout['amount'], 2, '.', ',' ),
+                        $payment_result['reference'] ?? 'N/A',
+                        home_url( '/panel-vendedor/billetera/' )
+                    );
+                    wp_mail( $vendor_user->user_email, $p_subject, $p_body );
+                }
+            }
+
             return [ 'success' => true, 'message' => __( 'Retiro aprobado y procesado exitosamente.', 'ltms' ) ];
         }
 
