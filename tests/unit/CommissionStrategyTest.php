@@ -755,7 +755,7 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
         Functions\when('get_userdata')->justReturn(false);
         Functions\when('wpdb')->justReturn(null);
 
-        $order = $this->make_order();
+        $order = $this->make_order_mock([]);
         $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
 
         // Debe usar ltms_platform_commission_rate (0.12), no ltms_commission_rate (0.99)
@@ -774,7 +774,7 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
         Functions\when('get_user_meta')->justReturn('');
         Functions\when('get_userdata')->justReturn(false);
 
-        $order = $this->make_order();
+        $order = $this->make_order_mock([]);
         $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
 
         $this->assertNotEqualsWithDelta(0.50, $rate, 0.001);
