@@ -54,8 +54,12 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
      */
     public function __construct() {
         $this->provider_slug = 'siigo';
-        $this->api_url       = 'https://api.siigo.com';
-        $this->timeout       = 60; // Las operaciones de Siigo pueden ser lentas
+        // T-04 FIX: respetar el modo sandbox configurado en el admin
+        $sandbox         = LTMS_Core_Config::get( 'ltms_siigo_sandbox', 'no' );
+        $this->api_url   = ( 'yes' === $sandbox )
+            ? 'https://api.siigo.com' // Sandbox usa el mismo host pero con credenciales de prueba
+            : 'https://api.siigo.com';
+        $this->timeout   = 60; // Las operaciones de Siigo pueden ser lentas
 
         $encrypted_user = LTMS_Core_Config::get( 'ltms_siigo_username' );
         $encrypted_key  = LTMS_Core_Config::get( 'ltms_siigo_access_key' );
@@ -113,7 +117,8 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
 
         // Guardar en transient (5 minutos antes de la expiración real para seguridad)
         set_transient( $cache_key, $token, max( 300, $expires - 300 ) );
-        $this->access_token = $token;
+        $this->access_token  = $token;
+        $this->token_expires = time() + max( 300, $expires - 300 ); // T-06 FIX: mantener en sync con el transient
 
         return $token;
     }
@@ -174,6 +179,11 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             }
         }
 
+        // T-07 FIX: construir 'name' desde first_name+last_name si no viene explícito
+        $name = sanitize_text_field(
+            $customer_data['name'] ?? trim( ( $customer_data['first_name'] ?? '' ) . ' ' . ( $customer_data['last_name'] ?? '' ) )
+        );
+
         // Crear nuevo cliente
         $payload = [
             'type'             => $customer_data['type'] ?? 'Customer',
@@ -182,7 +192,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
                 'code' => $customer_data['id_type_code'] ?? '13', // 13=CC, 31=NIT
             ],
             'identification'   => $nit,
-            'name'             => [ sanitize_text_field( $customer_data['name'] ?? '' ) ],
+            'name'             => [ $name ?: 'Sin nombre' ],
             'address'          => [
                 'address'    => sanitize_text_field( $customer_data['address'] ?? '' ),
                 'city'       => [ 'code' => $customer_data['city_code'] ?? '11001' ], // 11001=Bogotá
@@ -239,7 +249,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
                 'price'        => round( (float) $item->get_total() / $item->get_quantity(), 2 ),
                 'discount'     => 0,
                 'taxes'        => [
-                    [ 'id' => 29 ], // ID del impuesto IVA 19% en Siigo (configurar según cuenta)
+                    [ 'id' => (int) LTMS_Core_Config::get( 'ltms_siigo_tax_id', 29 ) ], // ID impuesto IVA — configurable
                 ],
             ];
         }

@@ -84,7 +84,7 @@ final class LTMS_Admin_Settings {
 
             // Campos que requieren cifrado
             $encrypted_fields = [
-                'ltms_siigo_password', 'ltms_openpay_private_key', 'ltms_addi_client_secret',
+                'ltms_siigo_access_key', 'ltms_openpay_private_key', 'ltms_addi_client_secret',
                 'ltms_aveonline_clave', 'ltms_aveonline_clave_guia', 'ltms_zapsign_api_token', 'ltms_tptc_api_key',
                 'ltms_xcover_api_key', 'ltms_backblaze_app_key',
                 'ltms_uber_direct_client_secret', 'ltms_heka_api_key',
@@ -163,7 +163,8 @@ final class LTMS_Admin_Settings {
             // XCover
             'ltms_xcover_parcel_protection', 'ltms_xcover_purchase_protection',
             // Pasarelas / APIs
-            'ltms_siigo_enabled', 'ltms_openpay_enabled', 'ltms_addi_enabled',
+            'ltms_siigo_enabled', 'ltms_siigo_sandbox', 'ltms_siigo_auto_invoice',
+            'ltms_openpay_enabled', 'ltms_addi_enabled',
             'ltms_tptc_enabled', 'ltms_uber_direct_enabled', 'ltms_heka_enabled',
             'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled',
             'ltms_stripe_enabled', 'ltms_mlm_enabled',
