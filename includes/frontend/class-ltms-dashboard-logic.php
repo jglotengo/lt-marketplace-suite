@@ -384,12 +384,14 @@ final class LTMS_Dashboard_Logic {
         // registro del consentimiento explícito de tratamiento de datos personales.
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             $vendor_id_for_log = $vendor_id ?? get_current_user_id();
-            LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'cedula', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+            // K-03 FIX: firma correcta = log_vault_access(user_id, accessor_id, document, action, context).
+            // Antes: (vendor_id, 'cedula', VAULT_OP_UPLOAD, vendor_id) → 2° arg era string, no int.
+            LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, $vendor_id_for_log, 'cedula', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, 'kyc_submit' );
             if ( ! empty( $file_path_rut ) ) {
-                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'rut', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, $vendor_id_for_log, 'rut', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, 'kyc_submit' );
             }
             if ( ! empty( $file_path_camara ) ) {
-                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, 'camara_comercio', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, $vendor_id_for_log );
+                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, $vendor_id_for_log, 'camara_comercio', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, 'kyc_submit' );
             }
             LTMS_Legal_Compliance::log_consent(
                 $vendor_id_for_log,

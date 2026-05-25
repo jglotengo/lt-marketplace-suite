@@ -28,6 +28,14 @@ class LTMS_Legal_Compliance {
     const SAGRILAFT_VERSION = '2.0';
     const KYC_VERSION      = '1.0';
 
+    // K-02 FIX: constantes de operación para log_vault_access() — evitan strings mágicos
+    // y el Fatal Error que ocurría al referenciar LTMS_Legal_Compliance::VAULT_OP_UPLOAD.
+    const VAULT_OP_VIEW     = 'view';
+    const VAULT_OP_DOWNLOAD = 'download';
+    const VAULT_OP_UPLOAD   = 'upload';
+    const VAULT_OP_DELETE   = 'delete';
+    const VAULT_OP_SHARE    = 'share';
+
     private static bool $initialized = false;
 
     // ── Boot ────────────────────────────────────────────────────────────────────

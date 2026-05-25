@@ -5,7 +5,8 @@ $fields = [
     'ltms_kyc_auto_approve'      => [ 'label' => 'Auto-aprobación KYC',         'type' => 'checkbox', 'desc' => 'Aprobar KYC automáticamente (solo para pruebas)' ],
     'ltms_sagrilaft_enabled'     => [ 'label' => 'SAGRILAFT/SIPLAFT Activo',    'type' => 'checkbox', 'desc' => 'Habilitar cumplimiento normativo colombiano' ],
     'ltms_kyc_max_file_size_mb'  => [ 'label' => 'Tamaño Máximo Documento (MB)', 'type' => 'number', 'default' => '5' ],
-    'ltms_payout_kyc_required'   => [ 'label' => 'KYC requerido para retiros', 'type' => 'checkbox', 'desc' => 'Bloquear retiros hasta que KYC sea aprobado' ],
+    // K-01 FIX: clave corregida — payout-scheduler lee ltms_kyc_required_for_payout, no ltms_payout_kyc_required.
+    'ltms_kyc_required_for_payout' => [ 'label' => 'KYC requerido para retiros', 'type' => 'checkbox', 'desc' => 'Bloquear retiros hasta que KYC sea aprobado' ],
 ];
 ?>
 <div class="ltms-settings-section">

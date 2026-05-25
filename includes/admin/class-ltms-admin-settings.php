@@ -130,6 +130,13 @@ final class LTMS_Admin_Settings {
 
             // M-03 FIX: ltms_mlm_min_sales_activate es un entero que debe clampear a 0
             // (no valor absoluto — un valor negativo no tiene sentido como mínimo de ventas).
+            // K-04 FIX: ltms_kyc_max_file_size_mb es un número decimal — sanitizar como float clampeado.
+            $positive_float_fields = [ 'ltms_kyc_max_file_size_mb' ];
+            if ( in_array( $key, $positive_float_fields, true ) ) {
+                $sanitized[ $key ] = max( 0.1, (float) $value );
+                continue;
+            }
+
             if ( $key === 'ltms_mlm_min_sales_activate' ) {
                 $sanitized[ $key ] = max( 0, intval( $value ) );
                 continue;
