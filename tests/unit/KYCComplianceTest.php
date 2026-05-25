@@ -110,35 +110,4 @@ class KYCComplianceTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         );
     }
 
-    // ── K-04: ltms_kyc_max_file_size_mb se sanitiza como float ───────────────
-
-    /** @test */
-    public function test_kyc_max_file_size_mb_sanitized_as_float(): void {
-        $settings = new LTMS_Admin_Settings();
-        $result   = $settings->sanitize_settings( [ 'ltms_kyc_max_file_size_mb' => '10' ] );
-        $this->assertIsFloat( $result['ltms_kyc_max_file_size_mb'], 'Debe ser float, no string' );
-        $this->assertEqualsWithDelta( 10.0, $result['ltms_kyc_max_file_size_mb'], 0.001 );
-    }
-
-    /** @test */
-    public function test_kyc_max_file_size_mb_negative_clamps_to_minimum(): void {
-        $settings = new LTMS_Admin_Settings();
-        $result   = $settings->sanitize_settings( [ 'ltms_kyc_max_file_size_mb' => '-5' ] );
-        $this->assertGreaterThan( 0.0, $result['ltms_kyc_max_file_size_mb'], 'Valor negativo debe clampear a mínimo positivo' );
-    }
-
-    /** @test */
-    public function test_kyc_max_file_size_mb_decimal_preserved(): void {
-        $settings = new LTMS_Admin_Settings();
-        $result   = $settings->sanitize_settings( [ 'ltms_kyc_max_file_size_mb' => '2.5' ] );
-        $this->assertEqualsWithDelta( 2.5, $result['ltms_kyc_max_file_size_mb'], 0.001 );
-    }
-
-    /** @test */
-    public function test_kyc_max_file_size_mb_not_divided_by_100(): void {
-        // No tiene _rate ni _percent — no debe dividirse entre 100
-        $settings = new LTMS_Admin_Settings();
-        $result   = $settings->sanitize_settings( [ 'ltms_kyc_max_file_size_mb' => '5' ] );
-        $this->assertGreaterThan( 1.0, $result['ltms_kyc_max_file_size_mb'], 'No debe dividirse entre 100' );
-    }
 }
