@@ -191,6 +191,14 @@ final class LTMS_Admin_Settings {
         }
         update_option( 'ltms_settings', $ltms_settings, true );
 
+        // Sincronizar credenciales Openpay CO hacia woocommerce_ltms_openpay_settings
+        $wc_op = get_option( 'woocommerce_ltms_openpay_settings', [] );
+        foreach ( [ 'merchant_id' => 'ltms_openpay_merchant_id', 'public_key' => 'ltms_openpay_public_key', 'private_key' => 'ltms_openpay_private_key' ] as $wc_key => $opt_key ) {
+            $v = get_option( $opt_key, '' );
+            if ( ! empty( $v ) ) { $wc_op[ $wc_key ] = $v; }
+        }
+        update_option( 'woocommerce_ltms_openpay_settings', $wc_op );
+
         // Invalidar caché de config
         if ( class_exists( 'LTMS_Core_Config' ) ) {
             LTMS_Core_Config::flush_cache();
