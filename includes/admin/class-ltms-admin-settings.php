@@ -122,12 +122,15 @@ final class LTMS_Admin_Settings {
                 continue;
             }
 
-            // Campos numéricos enteros
-            // M-03 FIX: ltms_mlm_min_sales_activate es un entero (no _amount/_limit).
-            // Se usa max(0, intval()) en lugar de absint() para que valores negativos
-            // queden en 0 (absint haría abs(-3)=3, que es incorrecto aquí).
-            $integer_fields = [ 'ltms_mlm_min_sales_activate' ];
-            if ( strpos( $key, '_amount' ) !== false || strpos( $key, '_limit' ) !== false || in_array( $key, $integer_fields, true ) ) {
+            // Campos numéricos enteros con valor absoluto (_amount, _limit)
+            if ( strpos( $key, '_amount' ) !== false || strpos( $key, '_limit' ) !== false ) {
+                $sanitized[ $key ] = absint( $value );
+                continue;
+            }
+
+            // M-03 FIX: ltms_mlm_min_sales_activate es un entero que debe clampear a 0
+            // (no valor absoluto — un valor negativo no tiene sentido como mínimo de ventas).
+            if ( $key === 'ltms_mlm_min_sales_activate' ) {
                 $sanitized[ $key ] = max( 0, intval( $value ) );
                 continue;
             }
