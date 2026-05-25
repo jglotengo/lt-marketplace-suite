@@ -368,10 +368,8 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Api_Gateway_PSE' ) ) {
             $gateways[] = 'LTMS_Api_Gateway_PSE';
         }
-        // v1.7.5 — Openpay MX gateway
-        if ( class_exists( 'LTMS_Api_Gateway_Openpay_MX' ) ) {
-            $gateways[] = 'LTMS_Api_Gateway_Openpay_MX';
-        }
+        // v1.7.5 — Openpay MX gateway (registrado directamente; autoloader resuelve la clase)
+        $gateways[] = 'LTMS_Api_Gateway_Openpay_MX';
         return $gateways;
     }
 
