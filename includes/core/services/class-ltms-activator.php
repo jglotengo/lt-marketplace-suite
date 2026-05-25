@@ -228,7 +228,13 @@ final class LTMS_Core_Activator {
             'ltms_category_commission_rates'  => '',
             'ltms_volume_tiers_enabled'       => false,
             'ltms_custom_commission_rate'     => '',
-            'ltms_mlm_enabled'                => false,
+            // M-04 FIX: ltms_mlm_enabled debe ser 'no' (string), no false (boolean PHP).
+            // La vista guarda 'yes'/'no' y la lógica compara === 'yes'.
+            // Se agregan los defaults para todos los campos MLM que el activador no tenía.
+            'ltms_mlm_enabled'                => 'no',
+            'ltms_mlm_levels'                 => '2',
+            'ltms_referral_rates'             => '[0.05,0.02,0.01]',
+            'ltms_mlm_min_sales_activate'     => 1,
             'ltms_mlm_referral_rate'          => '0.02',
             'ltms_referral_rates'             => '[0.05,0.02]', // 5% nivel 1, 2% nivel 2
 

@@ -587,4 +587,60 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertEqualsWithDelta(0.0, $result['ltms_platform_commission_rate'], 0.001);
     }
 
+    // ── M-03: ltms_mlm_min_sales_activate se sanitiza como entero ──
+
+    /** @test */
+    public function test_mlm_min_sales_activate_sanitized_as_integer(): void
+    {
+        $result = $this->settings->sanitize_settings(['ltms_mlm_min_sales_activate' => '5']);
+        $this->assertSame(5, $result['ltms_mlm_min_sales_activate'], 'Debe ser int, no string');
+    }
+
+    /** @test */
+    public function test_mlm_min_sales_activate_negative_clamps_to_zero(): void
+    {
+        $result = $this->settings->sanitize_settings(['ltms_mlm_min_sales_activate' => '-3']);
+        $this->assertSame(0, $result['ltms_mlm_min_sales_activate']);
+    }
+
+    /** @test */
+    public function test_mlm_min_sales_activate_float_truncated(): void
+    {
+        $result = $this->settings->sanitize_settings(['ltms_mlm_min_sales_activate' => '2.9']);
+        $this->assertSame(2, $result['ltms_mlm_min_sales_activate']);
+    }
+
+    /** @test */
+    public function test_mlm_min_sales_activate_not_treated_as_percentage(): void
+    {
+        // No tiene sufijo _rate — no debe dividirse entre 100
+        $result = $this->settings->sanitize_settings(['ltms_mlm_min_sales_activate' => '10']);
+        $this->assertSame(10, $result['ltms_mlm_min_sales_activate'], 'No debe dividirse entre 100');
+    }
+
+    // ── M-04: ltms_mlm_enabled por defecto es 'no' (no false PHP) ──
+
+    /** @test */
+    public function test_mlm_enabled_yes_sanitized_correctly(): void
+    {
+        $result = $this->settings->sanitize_settings(['ltms_mlm_enabled' => 'yes']);
+        $this->assertSame('yes', $result['ltms_mlm_enabled']);
+    }
+
+    /** @test */
+    public function test_mlm_enabled_missing_from_post_is_no(): void
+    {
+        // Cuando checkbox no está marcado, no viene en POST — sanitize recibe vacío
+        $result = $this->settings->sanitize_settings(['ltms_mlm_enabled' => '']);
+        $this->assertSame('no', $result['ltms_mlm_enabled'], 'Checkbox sin marcar debe guardarse como no');
+    }
+
+    /** @test */
+    public function test_mlm_enabled_false_boolean_treated_as_no(): void
+    {
+        // Defecto del activador era false (PHP bool) — debe resolverse como 'no'
+        $result = $this->settings->sanitize_settings(['ltms_mlm_enabled' => false]);
+        $this->assertSame('no', $result['ltms_mlm_enabled']);
+    }
+
 }

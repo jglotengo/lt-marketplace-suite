@@ -320,9 +320,21 @@ final class LTMS_Referral_Tree {
         if ( $configured ) {
             $decoded = json_decode( $configured, true );
             if ( is_array( $decoded ) && ! empty( $decoded ) ) {
-                return array_map( 'floatval', $decoded );
+                $rates = array_map( 'floatval', $decoded );
             }
         }
-        return self::DEFAULT_RATES;
+
+        if ( empty( $rates ) ) {
+            $rates = self::DEFAULT_RATES;
+        }
+
+        // M-02 FIX: respetar ltms_mlm_levels — truncar el array al número de niveles configurados.
+        // Si el admin configuró "2 niveles", no pagar nivel 3 aunque esté en el array.
+        $max_levels = (int) LTMS_Core_Config::get( 'ltms_mlm_levels', count( $rates ) );
+        if ( $max_levels > 0 ) {
+            $rates = array_slice( $rates, 0, $max_levels );
+        }
+
+        return $rates;
     }
 }
