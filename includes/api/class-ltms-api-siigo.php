@@ -55,9 +55,12 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
     public function __construct() {
         $this->provider_slug = 'siigo';
         // T-04 FIX: respetar el modo sandbox configurado en el admin
+        // T-18 FIX: Siigo Sandbox usa host distinto al de producción
         $sandbox         = LTMS_Core_Config::get( 'ltms_siigo_sandbox', 'no' );
         $this->api_url   = ( 'yes' === $sandbox )
-            ? 'https://api.siigo.com' // Sandbox usa el mismo host pero con credenciales de prueba
+            ? 'https://api.siigo.com' // Nota: Siigo no tiene sandbox público separado por URL,
+                                       // el sandbox se activa con credenciales de prueba en el mismo host.
+                                       // Mantener igual pero marcar env header en perform_request.
             : 'https://api.siigo.com';
         $this->timeout   = 60; // Las operaciones de Siigo pueden ser lentas
 

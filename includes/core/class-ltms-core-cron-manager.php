@@ -518,13 +518,32 @@ class LTMS_Core_Cron_Manager {
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
 
+        // T-16 FIX: Idempotencia — si el pedido ya tiene factura Siigo, no volver a emitir.
+        // Esto previene facturas duplicadas en Siigo/DIAN cuando el job se reintenta.
+        $existing_invoice_id = $order->get_meta( '_ltms_siigo_invoice_id', true );
+        if ( ! empty( $existing_invoice_id ) ) {
+            LTMS_Core_Logger::info(
+                'SIIGO_INVOICE_ALREADY_EXISTS',
+                "Pedido #{$order_id} ya tiene factura Siigo: {$existing_invoice_id}. Saltando.",
+                [ 'order_id' => $order_id, 'invoice_id' => $existing_invoice_id ]
+            );
+            return;
+        }
+
         try {
             $siigo    = LTMS_Api_Factory::get( 'siigo' );
+
+            // T-17 FIX: pasar todos los campos de billing necesarios para crear cliente en Siigo.
+            // Sin identification (NIT/CC), Siigo rechaza la creación del cliente con error 422.
+            // Sin address y city_code, el cliente se crea sin datos fiscales.
             $customer = $siigo->get_or_create_customer( [
-                'email'      => $order->get_billing_email(),
-                'first_name' => $order->get_billing_first_name(),
-                'last_name'  => $order->get_billing_last_name(),
-                'phone'      => $order->get_billing_phone(),
+                'email'          => $order->get_billing_email(),
+                'first_name'     => $order->get_billing_first_name(),
+                'last_name'      => $order->get_billing_last_name(),
+                'phone'          => $order->get_billing_phone(),
+                'identification' => $order->get_meta( '_billing_cedula', true ) ?: $order->get_meta( '_billing_nit', true ) ?: '',
+                'address'        => trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() ),
+                'city_code'      => $order->get_meta( '_billing_siigo_city_code', true ) ?: '11001', // 11001 = Bogotá por defecto
             ] );
 
             // M-96: pasar el tax_breakdown guardado en metadata de la comisión
