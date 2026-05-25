@@ -2,7 +2,19 @@
 class LTMS_Addi_Webhook_Handler {
 
     public static function init(): void {
-        // El router ya gestiona /webhooks/addi; este método es por compatibilidad con el kernel.
+        add_action( 'rest_api_init', [ __CLASS__, 'register_route' ] );
+    }
+
+    public static function register_route(): void {
+        register_rest_route(
+            'ltms/v1',
+            '/webhooks/addi',
+            [
+                'methods'             => 'POST',
+                'callback'            => [ __CLASS__, 'handle' ],
+                'permission_callback' => '__return_true',
+            ]
+        );
     }
 
     /**

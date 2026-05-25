@@ -307,6 +307,32 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      *
      * @return array{status: string, message: string, latency_ms?: int}
      */
+    /**
+     * Obtiene la lista de bancos disponibles para PSE (Colombia).
+     * Cachea el resultado 6 horas en un transient de WordPress.
+     *
+     * @return array Lista de bancos [ ['name' => ..., 'code' => ...] ]
+     */
+    public function get_pse_banks(): array {
+        $cache_key = 'ltms_pse_banks_' . strtolower( $this->country );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && ! empty( $cached ) ) {
+            return $cached;
+        }
+
+        try {
+            $result = $this->perform_request( 'GET', "/{$this->merchant_id}/pse/banks", [], [], false );
+            if ( ! empty( $result ) && is_array( $result ) ) {
+                set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+                return $result;
+            }
+        } catch ( \Throwable $e ) {
+            // Silencioso — retornar lista vacía
+        }
+
+        return [];
+    }
+
     public function health_check(): array {
         $start = microtime( true );
 
