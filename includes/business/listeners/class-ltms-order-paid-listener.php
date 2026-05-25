@@ -216,6 +216,34 @@ final class LTMS_Order_Paid_Listener {
                 'is_read'    => 0,
                 'created_at' => LTMS_Utils::now_utc(),
             ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]);
+
+            // E-11 FIX: respetar el flag ltms_email_new_order para notificación por email al vendedor.
+            if ( get_option( 'ltms_email_new_order', 'yes' ) === 'yes' ) {
+                $vendor_user = get_userdata( $vendor_id );
+                if ( $vendor_user && $vendor_user->user_email ) {
+                    $email_subject = sprintf(
+                        /* translators: %s: número de pedido */
+                        __( '[Lo Tengo] Nuevo pedido #%s recibido', 'ltms' ),
+                        $order->get_order_number()
+                    );
+                    $email_body = sprintf(
+                        /* translators: 1: nombre, 2: número de pedido, 3: total, 4: URL panel */
+                        __( "Hola %1\$s,
+
+Tienes un nuevo pedido #%2\$s por %3\$s.
+
+Revísalo en tu panel de vendedor:
+%4\$s
+
+Gracias por vender en Lo Tengo.", 'ltms' ),
+                        $vendor_user->display_name,
+                        $order->get_order_number(),
+                        LTMS_Utils::format_money( (float) $order->get_total() ),
+                        home_url( '/panel-vendedor/pedidos/' )
+                    );
+                    wp_mail( $vendor_user->user_email, $email_subject, $email_body );
+                }
+            }
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::warning(
                 'NOTIFICATION_FAILED',
