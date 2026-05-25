@@ -738,5 +738,46 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
 
         return $order;
     }
-}
+    // ── C-01: get_rate() lee ltms_platform_commission_rate (no ltms_commission_rate) ──
 
+    /**
+     * @test
+     * Verifica que get_rate() lee ltms_platform_commission_rate, no ltms_commission_rate.
+     * Bug C-01 — la vista guardaba con la clave incorrecta.
+     */
+    public function test_get_rate_reads_platform_commission_rate_key(): void
+    {
+        \LTMS_Core_Config::set('ltms_platform_commission_rate', 0.12);
+        // La clave incorrecta NO debe afectar el resultado
+        \LTMS_Core_Config::set('ltms_commission_rate', 0.99);
+
+        Functions\when('get_user_meta')->justReturn('');
+        Functions\when('get_userdata')->justReturn(false);
+        Functions\when('wpdb')->justReturn(null);
+
+        $order = $this->make_order();
+        $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
+
+        // Debe usar ltms_platform_commission_rate (0.12), no ltms_commission_rate (0.99)
+        $this->assertEqualsWithDelta(0.12, $rate, 0.001);
+    }
+
+    /**
+     * @test
+     */
+    public function test_get_rate_wrong_key_does_not_override_platform_rate(): void
+    {
+        \LTMS_Core_Config::set('ltms_platform_commission_rate', 0.10);
+        // Si ltms_commission_rate (incorrecto) existiera en la BD, no debe usarse
+        \LTMS_Core_Config::set('ltms_commission_rate', 0.50);
+
+        Functions\when('get_user_meta')->justReturn('');
+        Functions\when('get_userdata')->justReturn(false);
+
+        $order = $this->make_order();
+        $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
+
+        $this->assertNotEqualsWithDelta(0.50, $rate, 0.001);
+    }
+
+}

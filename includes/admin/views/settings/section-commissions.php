@@ -1,14 +1,21 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 $fields = [
-    'ltms_commission_rate'        => [ 'label' => 'Comisión de la Plataforma (%)', 'type' => 'number', 'default' => '10', 'desc' => 'Porcentaje que retiene la plataforma por cada venta.' ],
-    'ltms_min_payout_amount'      => [ 'label' => 'Monto Mínimo de Retiro (COP)', 'type' => 'number', 'default' => '50000' ],
-    'ltms_payout_schedule'        => [ 'label' => 'Frecuencia de Pagos',           'type' => 'select', 'default' => 'weekly', 'options' => [ 'daily' => 'Diario', 'weekly' => 'Semanal', 'biweekly' => 'Quincenal', 'monthly' => 'Mensual', 'manual' => 'Manual (solo admin)' ] ],
-    'ltms_mlm_enabled'            => [ 'label' => 'Red de Afiliados (MLM)',         'type' => 'checkbox', 'desc' => 'Activar sistema de comisiones por referido' ],
-    'ltms_mlm_l1_rate'            => [ 'label' => 'Comisión Nivel 1 (%)',           'type' => 'number', 'default' => '5' ],
-    'ltms_mlm_l2_rate'            => [ 'label' => 'Comisión Nivel 2 (%)',           'type' => 'number', 'default' => '2' ],
-    'ltms_redi_enabled'           => [ 'label' => 'ReDi (Reventa Distribuida)',     'type' => 'checkbox', 'desc' => 'Permitir que vendedores adopten productos de otros' ],
-    'ltms_redi_default_rate'      => [ 'label' => 'Comisión ReDi por Defecto (%)', 'type' => 'number', 'default' => '15' ],
+    // C-01 FIX: La clave correcta que lee el código de producción es ltms_platform_commission_rate.
+    // Anteriormente la vista guardaba ltms_commission_rate, que nunca era leída.
+    'ltms_platform_commission_rate' => [ 'label' => 'Comisión de la Plataforma (%)', 'type' => 'number', 'default' => '10', 'desc' => 'Porcentaje que retiene la plataforma por cada venta. El código espera un valor como porcentaje (ej: 10 = 10%).' ],
+    'ltms_min_payout_amount'        => [ 'label' => 'Monto Mínimo de Retiro (COP)', 'type' => 'number', 'default' => '50000' ],
+    // C-04 NOTE: ltms_payout_schedule se guarda pero el cron usa wp_schedule_event con intervalos fijos.
+    // Esta opción es informativa — el cron actual no la lee. Se mantiene para roadmap futuro.
+    'ltms_payout_schedule'          => [ 'label' => 'Frecuencia de Pagos (referencial)', 'type' => 'select', 'default' => 'weekly', 'options' => [ 'daily' => 'Diario', 'weekly' => 'Semanal', 'biweekly' => 'Quincenal', 'monthly' => 'Mensual', 'manual' => 'Manual (solo admin)' ], 'desc' => 'El procesamiento automático de retiros ocurre diariamente por cron.' ],
+    'ltms_mlm_enabled'              => [ 'label' => 'Red de Afiliados (MLM)',         'type' => 'checkbox', 'desc' => 'Activar sistema de comisiones por referido' ],
+    // C-02 FIX: LTMS_Referral_Tree lee ltms_referral_rates (JSON array), no ltms_mlm_l1/l2_rate.
+    // Se reemplaza el campo de texto por textarea JSON compatible con get_referral_rates().
+    'ltms_referral_rates'           => [ 'label' => 'Tasas MLM por Nivel (JSON)', 'type' => 'textarea', 'default' => '[0.05,0.02]', 'desc' => 'Array JSON de tasas decimales por nivel. Ej: [0.05,0.02] = 5% nivel 1, 2% nivel 2. La plataforma retiene el resto.' ],
+    'ltms_redi_enabled'             => [ 'label' => 'ReDi (Reventa Distribuida)',     'type' => 'checkbox', 'desc' => 'Permitir que vendedores adopten productos de otros' ],
+    // C-03 NOTE: La tasa ReDi se configura por producto en _ltms_redi_rate, no globalmente.
+    // Este campo es el default sugerido al crear un acuerdo ReDi, leído por LTMS_Business_Redi_Manager.
+    'ltms_redi_default_rate'        => [ 'label' => 'Tasa ReDi por Defecto (%)',     'type' => 'number', 'default' => '15', 'desc' => 'Tasa sugerida al crear un acuerdo ReDi. Se guarda por producto en _ltms_redi_rate.' ],
 ];
 ?>
 <div class="ltms-settings-section">
@@ -28,6 +35,9 @@ $fields = [
             </select>
         <?php elseif ( $field['type'] === 'checkbox' ) : ?>
             <label><input type="checkbox" name="<?php echo esc_attr($key); ?>" value="yes" <?php checked($value,'yes'); ?>> <?php echo esc_html($field['desc']??''); ?></label>
+        <?php elseif ( $field['type'] === 'textarea' ) : ?>
+            <textarea name="<?php echo esc_attr($key); ?>" class="regular-text" rows="2"><?php echo esc_textarea($value); ?></textarea>
+            <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>
         <?php else : ?>
             <input type="number" step="0.01" min="0" name="<?php echo esc_attr($key); ?>" value="<?php echo esc_attr($value); ?>" class="small-text">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>

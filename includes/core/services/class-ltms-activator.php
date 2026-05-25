@@ -230,7 +230,7 @@ final class LTMS_Core_Activator {
             'ltms_custom_commission_rate'     => '',
             'ltms_mlm_enabled'                => false,
             'ltms_mlm_referral_rate'          => '0.02',
-            'ltms_referral_rates'             => '',
+            'ltms_referral_rates'             => '[0.05,0.02]', // 5% nivel 1, 2% nivel 2
 
             // v2.0.0 — Seguridad / WAF / 2FA
             'ltms_2fa_required_auditors'         => 'no',

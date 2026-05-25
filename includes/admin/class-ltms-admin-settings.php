@@ -105,7 +105,8 @@ final class LTMS_Admin_Settings {
             // A-6 FIX: Campos de porcentaje — el UI muestra el valor como porcentaje (0-100).
             // Solo dividir entre 100 si el valor es > 1, lo que indica que el usuario
             // lo ingresó como porcentaje. Si ya es ≤ 1, ya está en formato decimal correcto.
-            if ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false ) {
+            // C-02b FIX: ltms_referral_rates es JSON array, NO un float — excluir del conversor.
+            if ( $key !== 'ltms_referral_rates' && ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false ) ) {
                 $float_val = (float) $value;
                 if ( $float_val > 1 ) {
                     $sanitized[ $key ] = max( 0, min( 1, $float_val / 100 ) );
@@ -124,6 +125,19 @@ final class LTMS_Admin_Settings {
             // Campos numéricos
             if ( strpos( $key, '_amount' ) !== false || strpos( $key, '_limit' ) !== false ) {
                 $sanitized[ $key ] = absint( $value );
+                continue;
+            }
+
+            // C-02b FIX: ltms_referral_rates es JSON array — validar y sanitizar como JSON.
+            if ( $key === 'ltms_referral_rates' ) {
+                $decoded = json_decode( $value, true );
+                if ( is_array( $decoded ) ) {
+                    // Solo números decimales entre 0 y 1
+                    $clean = array_map( static fn( $v ) => max( 0.0, min( 1.0, (float) $v ) ), $decoded );
+                    $sanitized[ $key ] = wp_json_encode( $clean );
+                } else {
+                    $sanitized[ $key ] = ''; // JSON inválido → vaciar para usar defaults
+                }
                 continue;
             }
 
