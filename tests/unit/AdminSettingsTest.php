@@ -69,10 +69,10 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
     // ── SECCIÓN 1: Campos cifrados ────────────────────────────────────────────
 
-    public function test_sanitize_encrypts_siigo_password(): void
+    public function test_sanitize_encrypts_siigo_access_key(): void
     {
-        $result = $this->settings->sanitize_settings(['ltms_siigo_password' => 'secret123']);
-        $this->assertStringStartsWith('v1:', $result['ltms_siigo_password']);
+        $result = $this->settings->sanitize_settings(['ltms_siigo_access_key' => 'secret123']);
+        $this->assertStringStartsWith('v1:', $result['ltms_siigo_access_key']);
     }
 
     public function test_sanitize_encrypts_openpay_private_key(): void
@@ -96,8 +96,8 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
     public function test_sanitize_preserves_already_encrypted_field(): void
     {
         $already = 'v1:' . base64_encode('already-encrypted');
-        $result  = $this->settings->sanitize_settings(['ltms_siigo_password' => $already]);
-        $this->assertSame($already, $result['ltms_siigo_password']);
+        $result  = $this->settings->sanitize_settings(['ltms_siigo_access_key' => $already]);
+        $this->assertSame($already, $result['ltms_siigo_access_key']);
     }
 
     public function test_sanitize_skips_empty_encrypted_field(): void
@@ -105,9 +105,9 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         // When an encrypted field is empty, the class falls through to sanitize_text_field
         // and returns the key with an empty string value (sanitize_text_field('') = '').
         Functions\when('sanitize_text_field')->alias(static fn(string $v): string => trim(strip_tags($v)));
-        $result = $this->settings->sanitize_settings(['ltms_siigo_password' => '']);
-        $this->assertArrayHasKey('ltms_siigo_password', $result);
-        $this->assertSame('', $result['ltms_siigo_password']);
+        $result = $this->settings->sanitize_settings(['ltms_siigo_access_key' => '']);
+        $this->assertArrayHasKey('ltms_siigo_access_key', $result);
+        $this->assertSame('', $result['ltms_siigo_access_key']);
     }
 
     public function test_sanitize_encrypts_xcover_api_key(): void
@@ -264,7 +264,7 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('sanitize_text_field')->alias(static fn(string $v): string => trim(strip_tags($v)));
 
         $input = [
-            'ltms_siigo_password' => 'secret',
+            'ltms_siigo_access_key' => 'secret',
             'commission_rate'     => '10',
             'kyc_enabled'         => 'yes',
             'min_payout_amount'   => '50000',
@@ -273,7 +273,7 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
         $result = $this->settings->sanitize_settings($input);
 
-        $this->assertStringStartsWith('v1:', $result['ltms_siigo_password']);
+        $this->assertStringStartsWith('v1:', $result['ltms_siigo_access_key']);
         $this->assertEqualsWithDelta(0.10, $result['commission_rate'], 0.001);
         $this->assertSame('yes', $result['kyc_enabled']);
         $this->assertSame(50000, $result['min_payout_amount']);
