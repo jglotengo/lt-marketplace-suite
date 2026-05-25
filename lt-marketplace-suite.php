@@ -165,6 +165,18 @@ function ltms_load_autoloader(): void {
         }
     }
 
+    // Eager load de gateways (archivos que no siguen convención de nombre)
+    foreach ( [
+        'api/gateways/class-ltms-api-gateways.php',
+        'api/gateways/class-ltms-api-gateway-openpay-mx.php',
+    ] as $_ltms_gw_file ) {
+        $_ltms_gw_path = LTMS_INCLUDES_DIR . $_ltms_gw_file;
+        if ( file_exists( $_ltms_gw_path ) ) {
+            require_once $_ltms_gw_path;
+        }
+    }
+    unset( $_ltms_gw_file, $_ltms_gw_path );
+
     // Fallback: Autoloader manual basado en convención de nombres LTMS_*
     spl_autoload_register( function( string $class_name ): void {
         // Solo procesar clases LTMS_*
