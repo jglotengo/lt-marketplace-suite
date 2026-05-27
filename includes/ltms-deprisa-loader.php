@@ -28,11 +28,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 $ltms_deprisa_base = plugin_dir_path( __FILE__ );
 
-require_once $ltms_deprisa_base . 'includes/api/class-ltms-api-deprisa.php';
-require_once $ltms_deprisa_base . 'includes/business/class-ltms-deprisa-shipping.php';
-require_once $ltms_deprisa_base . 'includes/settings/class-ltms-settings-deprisa.php';
-require_once $ltms_deprisa_base . 'includes/admin/class-ltms-deprisa-order-metabox.php';
-require_once $ltms_deprisa_base . 'includes/shipping/class-ltms-deprisa-shipping-method.php';
+require_once $ltms_deprisa_base . 'api/class-ltms-api-deprisa.php';
+require_once $ltms_deprisa_base . 'business/class-ltms-deprisa-shipping.php';
+require_once $ltms_deprisa_base . 'settings/class-ltms-settings-deprisa.php';
+require_once $ltms_deprisa_base . 'admin/class-ltms-deprisa-order-metabox.php';
+require_once $ltms_deprisa_base . 'shipping/class-ltms-deprisa-shipping-method.php';
 
 /* ======================================================================
    2. PANEL DE AJUSTES — pestaña Deprisa en LTMS Settings
