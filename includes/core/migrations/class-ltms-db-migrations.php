@@ -1624,6 +1624,10 @@ final class LTMS_DB_Migrations {
         $commission_cols = [
             'vendor_rfc'          => "VARCHAR(13)   DEFAULT NULL COMMENT 'RFC vendedor al momento de la transacción'",
             'vendor_curp'         => "CHAR(18)      DEFAULT NULL COMMENT 'CURP vendedor (PF residentes MX)'",
+            'customer_rfc'        => "VARCHAR(13)   DEFAULT NULL COMMENT 'RFC del receptor/comprador cuando solicita CFDI (Art.30-B frac.I inc.b)'",
+            'payment_method_vendor'   => "VARCHAR(30)   DEFAULT NULL COMMENT 'Método de pago del oferente (Art.30-B frac.II f-iv)'",
+            'payment_method_buyer'    => "VARCHAR(30)   DEFAULT NULL COMMENT 'Método de pago del adquiriente (Art.30-B frac.II f-iv)'",
+            'payment_method_platform' => "VARCHAR(30)   DEFAULT NULL COMMENT 'Método de pago de la plataforma intermediaria (Art.30-B frac.II f-iv)'",
             'vendor_clabe'        => "CHAR(18)      DEFAULT NULL COMMENT 'CLABE interbancaria de depósito'",
             'isr_rate'            => "DECIMAL(8,6)  NOT NULL DEFAULT 0.000000 COMMENT 'Tasa ISR aplicada'",
             'is_import'           => "TINYINT(1)    NOT NULL DEFAULT 0 COMMENT 'Flag: importación (Art.30-B frac.II inc.h)'",

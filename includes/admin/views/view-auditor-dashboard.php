@@ -24,17 +24,24 @@ $date_to   = isset( $_GET['date_to'] )   ? sanitize_text_field( $_GET['date_to']
 $country   = isset( $_GET['country'] )   ? sanitize_text_field( $_GET['country'] )   : '';
 $event_level = isset( $_GET['level'] )   ? sanitize_text_field( $_GET['level'] )     : '';
 
-// Resumen fiscal
+// Resumen fiscal — incluye campos SAT (Art. 30-B CFF) y DIAN (Exógena)
 $fiscal_summary = $wpdb->get_row( $wpdb->prepare(
     "SELECT
         COUNT(*) AS total_transactions,
-        SUM(gross_amount)    AS total_gross,
-        SUM(commission_amount) AS total_platform_fee,
-        SUM(vendor_amount)   AS total_vendor_net,
-        SUM(tax_withholding) AS total_rete_fuente,
-        SUM(iva_amount)      AS total_iva_fee,
-        0                    AS total_rete_ica,
-        0                    AS total_impoconsumo
+        SUM(gross_amount)                               AS total_gross,
+        SUM(commission_amount)                          AS total_platform_fee,
+        SUM(vendor_amount)                              AS total_vendor_net,
+        SUM(COALESCE(retefuente_amount, tax_withholding, 0)) AS total_rete_fuente,
+        SUM(iva_amount)                                 AS total_iva_fee,
+        SUM(COALESCE(reteiva_amount, 0))                AS total_reteiva,
+        SUM(COALESCE(reteica_amount, 0))                AS total_rete_ica,
+        SUM(COALESCE(impoconsumo_amount, 0))            AS total_impoconsumo,
+        SUM(COALESCE(isr_amount, 0))                    AS total_isr,
+        SUM(COALESCE(ieps_amount, 0))                   AS total_ieps,
+        SUM(COALESCE(aranceles_amount, 0))              AS total_aranceles,
+        SUM(CASE WHEN is_hospedaje = 1 THEN 1 ELSE 0 END) AS total_hospedaje_ops,
+        SUM(CASE WHEN is_import    = 1 THEN 1 ELSE 0 END) AS total_import_ops,
+        COUNT(DISTINCT vendor_id)                       AS total_vendors_active
      FROM {$wpdb->prefix}lt_commissions
      WHERE created_at BETWEEN %s AND %s
      " . ( $country ? "AND country_code = %s" : '' ),
@@ -42,6 +49,26 @@ $fiscal_summary = $wpdb->get_row( $wpdb->prepare(
     $date_to . ' 23:59:59',
     ...( $country ? [ $country ] : [] )
 ), ARRAY_A );
+
+// Log de accesos SAT (lt_sat_online_access) — últimos 20
+$sat_access_log = $wpdb->get_results( $wpdb->prepare(
+    "SELECT auditor_rfc, auditor_name, access_type, filter_period, filter_vendor, rows_returned, ip_address, accessed_at
+      FROM {$wpdb->prefix}lt_sat_online_access
+      WHERE accessed_at BETWEEN %s AND %s
+      ORDER BY accessed_at DESC LIMIT 20",
+    $date_from . ' 00:00:00',
+    $date_to . ' 23:59:59'
+), ARRAY_A ) ?: [];
+
+// Log de accesos DIAN (lt_dian_online_access) — últimos 20
+$dian_access_log = $wpdb->get_results( $wpdb->prepare(
+    "SELECT auditor_nit, auditor_name, access_type, filter_from, filter_vendor, rows_returned, ip_address, accessed_at
+      FROM {$wpdb->prefix}lt_dian_online_access
+      WHERE accessed_at BETWEEN %s AND %s
+      ORDER BY accessed_at DESC LIMIT 20",
+    $date_from . ' 00:00:00',
+    $date_to . ' 23:59:59'
+), ARRAY_A ) ?: [];
 
 // Últimos eventos de seguridad
 $security_events_query = "
@@ -146,10 +173,13 @@ $large_payouts = $wpdb->get_results( $wpdb->prepare(
                 <th><?php esc_html_e( 'Bruto Vendedor', 'ltms' ); ?></th>
                 <th><?php esc_html_e( 'Fee Plataforma', 'ltms' ); ?></th>
                 <th><?php esc_html_e( 'Neto Vendedor', 'ltms' ); ?></th>
-                <th><?php esc_html_e( 'ReteFuente', 'ltms' ); ?></th>
-                <th><?php esc_html_e( 'IVA Fee', 'ltms' ); ?></th>
-                <th><?php esc_html_e( 'ReteICA', 'ltms' ); ?></th>
-                <th><?php esc_html_e( 'Impoconsumo', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'ReteFuente / ISR', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'IVA', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'ReteIVA', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'ReteICA / IEPS', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Aranceles', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Ops. Hospedaje', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Ops. Importación', 'ltms' ); ?></th>
             </tr>
         </thead>
         <tbody>
@@ -160,11 +190,81 @@ $large_payouts = $wpdb->get_results( $wpdb->prepare(
                 <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_vendor_net'] ?? 0 ), 2 ) ); ?></td>
                 <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_rete_fuente'] ?? 0 ), 2 ) ); ?></td>
                 <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_iva_fee'] ?? 0 ), 2 ) ); ?></td>
-                <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_rete_ica'] ?? 0 ), 2 ) ); ?></td>
-                <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_impoconsumo'] ?? 0 ), 2 ) ); ?></td>
+                <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_reteiva'] ?? 0 ), 2 ) ); ?></td>
+                <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_rete_ica'] ?? 0 ) + (float) ( $fiscal_summary['total_ieps'] ?? 0 ), 2 ) ); ?></td>
+                <td><?php echo esc_html( number_format( (float) ( $fiscal_summary['total_aranceles'] ?? 0 ), 2 ) ); ?></td>
+                <td><?php echo esc_html( (int) ( $fiscal_summary['total_hospedaje_ops'] ?? 0 ) ); ?></td>
+                <td><?php echo esc_html( (int) ( $fiscal_summary['total_import_ops'] ?? 0 ) ); ?></td>
             </tr>
         </tbody>
     </table>
+
+    <!-- ── Log de Accesos SAT (ficha 168/CFF) ─────────────────────── -->
+    <?php if ( ! empty( $sat_access_log ) ) : ?>
+    <h2><?php esc_html_e( '🇲🇽 Log de Accesos SAT — Art. 30-B CFF (Ficha 168/CFF)', 'ltms' ); ?></h2>
+    <p class="description"><?php esc_html_e( 'Registro inmutable de cada consulta del auditor SAT al sistema de acceso en línea.', 'ltms' ); ?></p>
+    <table class="widefat striped">
+        <thead>
+            <tr>
+                <th><?php esc_html_e( 'RFC Auditor', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Nombre', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Tipo acceso', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Período', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'RFC filtrado', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Filas', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'IP', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Fecha/hora', 'ltms' ); ?></th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ( $sat_access_log as $log ) : ?>
+            <tr>
+                <td><?php echo esc_html( $log['auditor_rfc'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['auditor_name'] ?: '—' ); ?></td>
+                <td><code><?php echo esc_html( $log['access_type'] ); ?></code></td>
+                <td><?php echo esc_html( $log['filter_period'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['filter_vendor'] ?: 'todos' ); ?></td>
+                <td><?php echo esc_html( $log['rows_returned'] ); ?></td>
+                <td><?php echo esc_html( $log['ip_address'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['accessed_at'] ); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <!-- ── Log de Accesos DIAN (Exógena CO) ──────────────────────── -->
+    <?php if ( ! empty( $dian_access_log ) ) : ?>
+    <h2><?php esc_html_e( '🇨🇴 Log de Accesos DIAN — Exógena Colombia', 'ltms' ); ?></h2>
+    <table class="widefat striped">
+        <thead>
+            <tr>
+                <th><?php esc_html_e( 'NIT Auditor', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Nombre', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Tipo acceso', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Desde', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'NIT filtrado', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Filas', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'IP', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Fecha/hora', 'ltms' ); ?></th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ( $dian_access_log as $log ) : ?>
+            <tr>
+                <td><?php echo esc_html( $log['auditor_nit'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['auditor_name'] ?: '—' ); ?></td>
+                <td><code><?php echo esc_html( $log['access_type'] ); ?></code></td>
+                <td><?php echo esc_html( $log['filter_from'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['filter_vendor'] ?: 'todos' ); ?></td>
+                <td><?php echo esc_html( $log['rows_returned'] ); ?></td>
+                <td><?php echo esc_html( $log['ip_address'] ?: '—' ); ?></td>
+                <td><?php echo esc_html( $log['accessed_at'] ); ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
 
     <!-- ── Alertas SAGRILAFT ──────────────────────────────────────── -->
     <?php if ( ! empty( $large_payouts ) ) : ?>

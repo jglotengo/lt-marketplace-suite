@@ -123,7 +123,11 @@ class LTMS_Admin_SAT_Report {
                     COALESCE(k.domicilio_fiscal_mx, k.address_fiscal, '') AS domicilio_fiscal,
                     COALESCE(k.full_name, '')              AS vendor_name,
                     COALESCE(c.sat_cfdi_folio, c.cfdi_folio, '') AS cfdi_folio,
-                    COALESCE(c.payment_method, '')         AS payment_method,
+                    COALESCE(c.customer_rfc, '')           AS customer_rfc,
+                    COALESCE(c.payment_method, c.payment_method_buyer, '') AS payment_method,
+                    COALESCE(c.payment_method_vendor, '')   AS payment_method_vendor,
+                    COALESCE(c.payment_method_buyer, c.payment_method, '') AS payment_method_buyer,
+                    COALESCE(c.payment_method_platform, '') AS payment_method_platform,
                     c.created_at
                 FROM `{$c}` c
                 LEFT JOIN `{$k}` k ON k.vendor_id = c.vendor_id
@@ -181,6 +185,7 @@ class LTMS_Admin_SAT_Report {
                     'vendor_clabe'   => $row['vendor_clabe'],
                     'domicilio'      => $row['domicilio_fiscal'],
                     'transactions'   => 0,
+                    'has_customer_rfc' => false,
                     'gross'          => 0.0,
                     'iva'            => 0.0,
                     'isr_retenido'   => 0.0,
@@ -202,6 +207,7 @@ class LTMS_Admin_SAT_Report {
             $by_vendor[ $vid ]['aranceles']    += $row['aranceles_amount'];
             $by_vendor[ $vid ]['net_received'] += $row['vendor_amount'];
             if ( $row['is_hospedaje'] ) $by_vendor[ $vid ]['has_hospedaje'] = true;
+            if ( $row['customer_rfc'] !== '' ) $by_vendor[ $vid ]['has_customer_rfc'] = true;
             if ( $row['is_import'] )    $by_vendor[ $vid ]['has_import']    = true;
         }
         unset( $row );
