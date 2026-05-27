@@ -18,7 +18,22 @@ class LTMS_Admin_SAT_Report {
     }
 
     /**
-     * AJAX: genera el reporte SAT México (DIOT / CFDI resumen).
+     * AJAX: genera el reporte SAT México (Art. 30-B CFF / ficha 168/CFF).
+     *
+     * Retorna por cada transacción:
+     *  - Tipo de servicio/operación (fracción I inciso a)
+     *  - RFC del receptor cuando solicita comprobante (frac. I inc. b)
+     *  - Precio sin IVA, IVA trasladado, precio final (frac. I inc. c-e)
+     *  - Folio CFDI / UUID (frac. I inc. f)
+     *  - Método de pago (frac. I inc. g)
+     *  Para intermediarios también:
+     *  - RFC, CURP, domicilio fiscal del oferente (frac. II inc. a-d)
+     *  - CLABE de depósito (frac. II inc. e)
+     *  - Montos ISR, IVA, IEPS retenidos (frac. II inc. f)
+     *  - Dirección inmueble si es hospedaje (frac. II inc. g)
+     *  - Flag importación + aranceles (frac. II inc. h)
+     *
+     * Registra acceso en lt_sat_online_access.
      *
      * @return void
      */
@@ -28,18 +43,214 @@ class LTMS_Admin_SAT_Report {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
         }
 
-        $period = sanitize_text_field( $_POST['period'] ?? gmdate( 'Y-m' ) ); // YYYY-MM
+        $period     = sanitize_text_field( $_POST['period'] ?? gmdate( 'Y-m' ) ); // YYYY-MM
+        $vendor_rfc = sanitize_text_field( $_POST['vendor_rfc'] ?? '' );
 
-        $data = $this->get_period_data( $period );
+        $data = $this->get_sat_art30b_data( $period, $vendor_rfc );
+
+        // Registrar en log de acceso SAT (ficha 168/CFF).
+        $this->log_sat_access( 'query_transactions', [
+            'filter_from'   => $period . '-01',
+            'filter_to'     => $period . '-31',
+            'filter_period' => $period,
+            'filter_vendor' => $vendor_rfc ?: null,
+            'rows_returned' => count( $data['transactions'] ),
+        ] );
 
         wp_send_json_success( [
-            'period'         => $period,
-            'total_sales'    => $data['total_sales'],
-            'total_tax'      => $data['total_tax'],
-            'total_vendors'  => $data['total_vendors'],
-            'records'        => count( $data['records'] ),
-            'download_token' => $this->store_report_data( $data, 'sat_' . $period ),
+            'period'               => $period,
+            'total_gross'          => $data['totals']['gross'],
+            'total_iva'            => $data['totals']['iva'],
+            'total_isr_retenido'   => $data['totals']['isr'],
+            'total_iva_retenido'   => $data['totals']['reteiva'],
+            'total_ieps'           => $data['totals']['ieps'],
+            'total_aranceles'      => $data['totals']['aranceles'],
+            'total_net_to_vendors' => $data['totals']['net_to_vendors'],
+            'vendor_count'         => count( $data['by_vendor'] ),
+            'transaction_count'    => count( $data['transactions'] ),
+            'by_vendor'            => $data['by_vendor'],
+            'download_token'       => $this->store_report_data( $data, 'sat_art30b_' . $period ),
         ] );
+    }
+
+    /**
+     * Construye el dataset SAT Art. 30-B CFF completo.
+     *
+     * @param string $period     YYYY-MM
+     * @param string $vendor_rfc RFC del vendedor para filtrar (vacío = todos).
+     * @return array{totals: array, by_vendor: array, transactions: array}
+     */
+    private function get_sat_art30b_data( string $period, string $vendor_rfc ): array {
+        global $wpdb;
+        $c = $wpdb->prefix . 'lt_commissions';
+        $k = $wpdb->prefix . 'lt_vendor_kyc';
+
+        $where  = "WHERE c.country_code = %s AND c.status IN ('paid','approved') AND DATE_FORMAT(c.created_at, '%%Y-%%m') = %s";
+        $params = [ 'MX', $period ];
+
+        if ( $vendor_rfc !== '' ) {
+            $where   .= ' AND (c.vendor_rfc = %s OR k.rfc_mx = %s OR k.rfc = %s)';
+            $params[] = $vendor_rfc;
+            $params[] = $vendor_rfc;
+            $params[] = $vendor_rfc;
+        }
+
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT
+                    c.id,
+                    c.order_id,
+                    c.vendor_id,
+                    c.gross_amount,
+                    c.commission_amount        AS platform_fee,
+                    c.vendor_amount,
+                    c.iva_amount,
+                    COALESCE(c.isr_amount, 0)  AS isr_amount,
+                    COALESCE(c.isr_rate, 0)    AS isr_rate,
+                    COALESCE(c.ieps_amount, 0) AS ieps_amount,
+                    COALESCE(c.ieps_rate, 0)   AS ieps_rate,
+                    COALESCE(c.reteiva_amount, 0) AS reteiva_amount,
+                    COALESCE(c.reteiva_rate, 0)   AS reteiva_rate,
+                    COALESCE(c.aranceles_amount, 0) AS aranceles_amount,
+                    COALESCE(c.is_import, 0)        AS is_import,
+                    COALESCE(c.is_hospedaje, 0)     AS is_hospedaje,
+                    COALESCE(c.property_address_mx, '')  AS property_address_mx,
+                    COALESCE(c.vendor_rfc, k.rfc_mx, k.rfc, '')  AS vendor_rfc,
+                    COALESCE(c.vendor_curp, k.curp_mx, '')        AS vendor_curp,
+                    COALESCE(c.vendor_clabe, k.clabe_mx, '')      AS vendor_clabe,
+                    COALESCE(k.fiscal_regime_mx, k.tax_regime, '') AS vendor_regime,
+                    COALESCE(k.domicilio_fiscal_mx, k.address_fiscal, '') AS domicilio_fiscal,
+                    COALESCE(k.full_name, '')              AS vendor_name,
+                    COALESCE(c.sat_cfdi_folio, c.cfdi_folio, '') AS cfdi_folio,
+                    COALESCE(c.payment_method, '')         AS payment_method,
+                    c.created_at
+                FROM `{$c}` c
+                LEFT JOIN `{$k}` k ON k.vendor_id = c.vendor_id
+                {$where}
+                ORDER BY c.created_at ASC",
+                ...$params
+            ),
+            ARRAY_A
+        );
+        // phpcs:enable
+
+        if ( empty( $rows ) ) {
+            return [
+                'totals'       => array_fill_keys( [ 'gross', 'iva', 'isr', 'reteiva', 'ieps', 'aranceles', 'net_to_vendors' ], 0.0 ),
+                'by_vendor'    => [],
+                'transactions' => [],
+            ];
+        }
+
+        $totals = [
+            'gross'         => 0.0,
+            'iva'           => 0.0,
+            'isr'           => 0.0,
+            'reteiva'       => 0.0,
+            'ieps'          => 0.0,
+            'aranceles'     => 0.0,
+            'net_to_vendors'=> 0.0,
+        ];
+        $by_vendor = [];
+        $numeric   = [ 'gross_amount', 'platform_fee', 'vendor_amount', 'iva_amount', 'isr_amount', 'isr_rate', 'ieps_amount', 'ieps_rate', 'reteiva_amount', 'reteiva_rate', 'aranceles_amount' ];
+
+        foreach ( $rows as &$row ) {
+            foreach ( $numeric as $f ) {
+                $row[ $f ] = (float) $row[ $f ];
+            }
+            $row['is_import']   = (bool) $row['is_import'];
+            $row['is_hospedaje'] = (bool) $row['is_hospedaje'];
+
+            $totals['gross']          += $row['gross_amount'];
+            $totals['iva']            += $row['iva_amount'];
+            $totals['isr']            += $row['isr_amount'];
+            $totals['reteiva']        += $row['reteiva_amount'];
+            $totals['ieps']           += $row['ieps_amount'];
+            $totals['aranceles']      += $row['aranceles_amount'];
+            $totals['net_to_vendors'] += $row['vendor_amount'];
+
+            $vid = $row['vendor_id'];
+            if ( ! isset( $by_vendor[ $vid ] ) ) {
+                $by_vendor[ $vid ] = [
+                    'vendor_id'      => $vid,
+                    'vendor_rfc'     => $row['vendor_rfc'],
+                    'vendor_curp'    => $row['vendor_curp'],
+                    'vendor_name'    => $row['vendor_name'],
+                    'vendor_regime'  => $row['vendor_regime'],
+                    'vendor_clabe'   => $row['vendor_clabe'],
+                    'domicilio'      => $row['domicilio_fiscal'],
+                    'transactions'   => 0,
+                    'gross'          => 0.0,
+                    'iva'            => 0.0,
+                    'isr_retenido'   => 0.0,
+                    'iva_retenido'   => 0.0,
+                    'ieps'           => 0.0,
+                    'aranceles'      => 0.0,
+                    'net_received'   => 0.0,
+                    'has_hospedaje'  => false,
+                    'has_import'     => false,
+                ];
+            }
+
+            $by_vendor[ $vid ]['transactions']++;
+            $by_vendor[ $vid ]['gross']        += $row['gross_amount'];
+            $by_vendor[ $vid ]['iva']          += $row['iva_amount'];
+            $by_vendor[ $vid ]['isr_retenido'] += $row['isr_amount'];
+            $by_vendor[ $vid ]['iva_retenido'] += $row['reteiva_amount'];
+            $by_vendor[ $vid ]['ieps']         += $row['ieps_amount'];
+            $by_vendor[ $vid ]['aranceles']    += $row['aranceles_amount'];
+            $by_vendor[ $vid ]['net_received'] += $row['vendor_amount'];
+            if ( $row['is_hospedaje'] ) $by_vendor[ $vid ]['has_hospedaje'] = true;
+            if ( $row['is_import'] )    $by_vendor[ $vid ]['has_import']    = true;
+        }
+        unset( $row );
+
+        foreach ( $totals as &$t ) { $t = round( $t, 2 ); }
+        unset( $t );
+
+        $vnum = [ 'gross', 'iva', 'isr_retenido', 'iva_retenido', 'ieps', 'aranceles', 'net_received' ];
+        foreach ( $by_vendor as &$v ) {
+            foreach ( $vnum as $f ) { $v[ $f ] = round( $v[ $f ], 2 ); }
+        }
+        unset( $v );
+
+        return [
+            'totals'       => $totals,
+            'by_vendor'    => array_values( $by_vendor ),
+            'transactions' => $rows,
+        ];
+    }
+
+    /**
+     * Registra un acceso del auditor SAT en lt_sat_online_access.
+     *
+     * @param string $access_type Tipo de acción.
+     * @param array  $context     Contexto adicional.
+     * @return void
+     */
+    private function log_sat_access( string $access_type, array $context ): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_sat_online_access';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $wpdb->insert(
+            $table,
+            [
+                'session_token' => hash( 'sha256', ( $_COOKIE['ltms_sat_session'] ?? '' ) . wp_salt() ),
+                'auditor_name'  => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_NAME'] ?? '' ),
+                'auditor_rfc'   => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_RFC'] ?? '' ),
+                'access_type'   => $access_type,
+                'filter_from'   => $context['filter_from'] ?? null,
+                'filter_to'     => $context['filter_to'] ?? null,
+                'filter_vendor' => $context['filter_vendor'] ?? null,
+                'filter_period' => $context['filter_period'] ?? null,
+                'rows_returned' => (int) ( $context['rows_returned'] ?? 0 ),
+                'ip_address'    => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ),
+                'user_agent'    => substr( sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ?? '' ), 0, 500 ),
+            ],
+            [ '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' ]
+        );
     }
 
     /**

@@ -387,6 +387,105 @@ $v = static function( string $key, float $default ) : float {
 	</form>
 
 	<hr>
+
+	<!-- ── Reporte SAT Art. 30-B CFF ───────────────────────────────── -->
+	<h2><?php esc_html_e( '📊 Reporte SAT — Art. 30-B CFF (Acceso en línea)', 'ltms' ); ?></h2>
+	<p class="description">
+		<?php esc_html_e( 'Genera el reporte de transacciones con todos los campos requeridos por el Art. 30-B CFF y la ficha 168/CFF para acceso en línea del auditor SAT.', 'ltms' ); ?>
+	</p>
+
+	<table class="form-table" style="max-width:600px;">
+		<tr>
+			<th><label for="ltms-sat-period"><?php esc_html_e( 'Período (YYYY-MM)', 'ltms' ); ?></label></th>
+			<td>
+				<input type="month" id="ltms-sat-period" name="sat_period"
+					   value="<?php echo esc_attr( gmdate( 'Y-m' ) ); ?>" class="regular-text">
+			</td>
+		</tr>
+		<tr>
+			<th><label for="ltms-sat-rfc"><?php esc_html_e( 'Filtrar por RFC vendedor', 'ltms' ); ?></label></th>
+			<td>
+				<input type="text" id="ltms-sat-rfc" maxlength="13" placeholder="<?php esc_attr_e( 'Opcional — 12 o 13 caracteres', 'ltms' ); ?>" class="regular-text">
+			</td>
+		</tr>
+	</table>
+
+	<p>
+		<button type="button" id="ltms-btn-sat-report" class="button button-primary">
+			<?php esc_html_e( '📥 Generar reporte SAT (JSON)', 'ltms' ); ?>
+		</button>
+		<span id="ltms-sat-status" style="margin-left:12px;display:none;color:#666;"></span>
+	</p>
+
+	<div id="ltms-sat-summary" style="display:none;background:#fff;border:1px solid #ccd0d4;padding:16px 20px;max-width:680px;margin-top:12px;">
+		<h3 style="margin-top:0;"><?php esc_html_e( 'Resumen del período', 'ltms' ); ?></h3>
+		<table class="widefat fixed striped" style="max-width:100%;">
+			<tr><th><?php esc_html_e( 'Ventas brutas', 'ltms' ); ?></th><td id="ltms-sat-gross">—</td></tr>
+			<tr><th><?php esc_html_e( 'IVA trasladado', 'ltms' ); ?></th><td id="ltms-sat-iva">—</td></tr>
+			<tr><th><?php esc_html_e( 'ISR retenido', 'ltms' ); ?></th><td id="ltms-sat-isr">—</td></tr>
+			<tr><th><?php esc_html_e( 'Retención IVA PM', 'ltms' ); ?></th><td id="ltms-sat-reteiva">—</td></tr>
+			<tr><th><?php esc_html_e( 'IEPS', 'ltms' ); ?></th><td id="ltms-sat-ieps">—</td></tr>
+			<tr><th><?php esc_html_e( 'Aranceles', 'ltms' ); ?></th><td id="ltms-sat-aranceles">—</td></tr>
+			<tr><th><?php esc_html_e( 'Neto pagado a vendedores', 'ltms' ); ?></th><td id="ltms-sat-net">—</td></tr>
+			<tr><th><?php esc_html_e( 'Transacciones', 'ltms' ); ?></th><td id="ltms-sat-txcount">—</td></tr>
+			<tr><th><?php esc_html_e( 'Vendedores', 'ltms' ); ?></th><td id="ltms-sat-vendors">—</td></tr>
+		</table>
+		<p style="margin-top:12px;">
+			<button type="button" id="ltms-btn-sat-download" class="button">
+				<?php esc_html_e( '⬇ Descargar JSON (exógena SAT)', 'ltms' ); ?>
+			</button>
+		</p>
+	</div>
+
+	<script>
+	(function($){
+		var satData = null;
+		$('#ltms-btn-sat-report').on('click', function(){
+			var period = $('#ltms-sat-period').val();
+			var rfc    = $('#ltms-sat-rfc').val().trim().toUpperCase();
+			if ( ! period ) { alert('<?php esc_attr_e( "Selecciona un período.", "ltms" ); ?>'); return; }
+			$('#ltms-sat-status').text('<?php esc_attr_e( "Generando...", "ltms" ); ?>').show();
+			$('#ltms-sat-summary').hide();
+			$.post(ajaxurl, {
+				action: 'ltms_generate_sat_report',
+				nonce: '<?php echo esc_js( wp_create_nonce( "ltms_admin_nonce" ) ); ?>',
+				period: period,
+				vendor_rfc: rfc
+			}, function(res){
+				$('#ltms-sat-status').hide();
+				if ( ! res.success ) { alert(res.data || 'Error'); return; }
+				var d = res.data;
+				satData = d;
+				var fmt = function(n){ return '$' + parseFloat(n).toLocaleString('es-MX', {minimumFractionDigits:2}); };
+				$('#ltms-sat-gross').text(fmt(d.total_gross));
+				$('#ltms-sat-iva').text(fmt(d.total_iva));
+				$('#ltms-sat-isr').text(fmt(d.total_isr_retenido));
+				$('#ltms-sat-reteiva').text(fmt(d.total_iva_retenido));
+				$('#ltms-sat-ieps').text(fmt(d.total_ieps));
+				$('#ltms-sat-aranceles').text(fmt(d.total_aranceles));
+				$('#ltms-sat-net').text(fmt(d.total_net_to_vendors));
+				$('#ltms-sat-txcount').text(d.transaction_count);
+				$('#ltms-sat-vendors').text(d.vendor_count);
+				$('#ltms-sat-summary').show();
+			}).fail(function(){ $('#ltms-sat-status').text('Error de conexión.'); });
+		});
+
+		$('#ltms-btn-sat-download').on('click', function(){
+			if ( ! satData ) return;
+			var blob = new Blob([JSON.stringify(satData, null, 2)], {type:'application/json'});
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = 'sat_art30b_' + $('#ltms-sat-period').val() + '.json';
+			a.click();
+		});
+	})(jQuery);
+	</script>
+
+	<hr>
+	<p class="description">
+		<strong><?php esc_html_e( 'Base normativa MX:', 'ltms' ); ?></strong>
+		LIVA Art. 1-A BIS y 18-B · LISR Art. 113-A · LIEPS Art. 2 · CFF Art. 30-B · RMF 2025 Regla 12.2.10 · Ficha 168/CFF
+	</p>
 	<p class="description">
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-tax-history&country=MX' ) ); ?>">
 			<?php esc_html_e( 'Ver historial de cambios — México →', 'ltms' ); ?>

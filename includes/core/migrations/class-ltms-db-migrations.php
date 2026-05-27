@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.1.0';
+    private const CURRENT_VERSION = '2.2.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -42,6 +42,10 @@ final class LTMS_DB_Migrations {
         self::create_indexes();
 
         // Migraciones de actualización de esquema (no cubiertas por dbDelta)
+        if ( version_compare( $installed_version, '2.2.0', '<' ) ) {
+            self::migrate_2_2_0_fiscal_sat_mexico();
+        }
+
         if ( version_compare( $installed_version, '2.1.0', '<' ) ) {
             self::migrate_2_1_0_fiscal_dian();
         }
@@ -1594,6 +1598,140 @@ final class LTMS_DB_Migrations {
                 "ALTER TABLE `{$table}`
                  MODIFY COLUMN `wallet_id` BIGINT UNSIGNED DEFAULT NULL"
             );
+        }
+        // phpcs:enable
+    }
+
+    /**
+     * Migración v2.2.0 — Cumplimiento Art. 30-B CFF (SAT México)
+     *
+     * lt_commissions: vendor_rfc, vendor_curp, vendor_clabe, isr_rate,
+     *                 is_import, aranceles_amount, is_hospedaje, property_address_mx,
+     *                 ieps_rate, sat_cfdi_folio
+     * lt_vendor_kyc:  rfc_mx, curp_mx, fiscal_regime_mx, clabe_mx, domicilio_fiscal_mx
+     * Nueva tabla:    lt_sat_online_access (log auditor SAT, ficha 168/CFF)
+     * Siembra:        tramos ISR Art. 113-A 2025 si la tabla está vacía
+     *
+     * @return void
+     */
+    private static function migrate_2_2_0_fiscal_sat_mexico(): void {
+        global $wpdb;
+        $c = $wpdb->prefix . 'lt_commissions';
+        $k = $wpdb->prefix . 'lt_vendor_kyc';
+        $s = $wpdb->prefix . 'lt_sat_online_access';
+
+        // ── 1. lt_commissions — campos SAT México ────────────────────────────
+        $commission_cols = [
+            'vendor_rfc'          => "VARCHAR(13)   DEFAULT NULL COMMENT 'RFC vendedor al momento de la transacción'",
+            'vendor_curp'         => "CHAR(18)      DEFAULT NULL COMMENT 'CURP vendedor (PF residentes MX)'",
+            'vendor_clabe'        => "CHAR(18)      DEFAULT NULL COMMENT 'CLABE interbancaria de depósito'",
+            'isr_rate'            => "DECIMAL(8,6)  NOT NULL DEFAULT 0.000000 COMMENT 'Tasa ISR aplicada'",
+            'is_import'           => "TINYINT(1)    NOT NULL DEFAULT 0 COMMENT 'Flag: importación (Art.30-B frac.II inc.h)'",
+            'aranceles_amount'    => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Aranceles en importación'",
+            'is_hospedaje'        => "TINYINT(1)    NOT NULL DEFAULT 0 COMMENT 'Flag: servicio de hospedaje (Art.30-B frac.II inc.g)'",
+            'property_address_mx'=> "VARCHAR(500)  DEFAULT NULL COMMENT 'Dirección completa del inmueble (hospedaje)'",
+            'ieps_rate'           => "DECIMAL(8,6)  NOT NULL DEFAULT 0.000000 COMMENT 'Tasa IEPS aplicada'",
+            'sat_cfdi_folio'      => "VARCHAR(36)   DEFAULT NULL COMMENT 'UUID CFDI 4.0 emitido al comprador'",
+        ];
+
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $existing_cols = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME,
+                $c
+            )
+        );
+
+        foreach ( $commission_cols as $col => $definition ) {
+            if ( ! in_array( $col, $existing_cols, true ) ) {
+                $wpdb->query( "ALTER TABLE `{$c}` ADD COLUMN `{$col}` {$definition}" );
+            }
+        }
+
+        // ── 2. lt_vendor_kyc — campos RFC/CURP/CLABE México ─────────────────
+        $kyc_cols = [
+            'rfc_mx'              => "VARCHAR(13)  DEFAULT NULL COMMENT 'RFC SAT'",
+            'curp_mx'             => "CHAR(18)     DEFAULT NULL COMMENT 'CURP (18 dígitos, solo PF residentes MX)'",
+            'fiscal_regime_mx'    => "VARCHAR(50)  DEFAULT NULL COMMENT 'Régimen SAT: resico, pf_actividad, pm, arrendamiento'",
+            'clabe_mx'            => "CHAR(18)     DEFAULT NULL COMMENT 'CLABE interbancaria para pagos MX'",
+            'domicilio_fiscal_mx' => "VARCHAR(500) DEFAULT NULL COMMENT 'Domicilio fiscal completo'",
+        ];
+
+        $existing_kyc = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME,
+                $k
+            )
+        );
+
+        foreach ( $kyc_cols as $col => $definition ) {
+            if ( ! in_array( $col, $existing_kyc, true ) ) {
+                $wpdb->query( "ALTER TABLE `{$k}` ADD COLUMN `{$col}` {$definition}" );
+            }
+        }
+
+        // ── 3. Nueva tabla: lt_sat_online_access ─────────────────────────────
+        $charset = $wpdb->get_charset_collate();
+        $table_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME,
+                $s
+            )
+        );
+
+        if ( ! $table_exists ) {
+            $wpdb->query(
+                "CREATE TABLE `{$s}` (
+                    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `session_token` CHAR(64)        NOT NULL COMMENT 'SHA-256 del token de sesión SAT',
+                    `auditor_name`  VARCHAR(255)    DEFAULT NULL,
+                    `auditor_rfc`   VARCHAR(13)     DEFAULT NULL COMMENT 'RFC del auditor SAT',
+                    `access_type`   VARCHAR(100)    NOT NULL COMMENT 'query_transactions|export_csv|view_vendor|view_summary',
+                    `filter_from`   DATE            DEFAULT NULL,
+                    `filter_to`     DATE            DEFAULT NULL,
+                    `filter_vendor` VARCHAR(13)     DEFAULT NULL COMMENT 'RFC filtrado',
+                    `filter_period` VARCHAR(7)      DEFAULT NULL COMMENT 'YYYY-MM',
+                    `rows_returned` INT UNSIGNED    NOT NULL DEFAULT 0,
+                    `ip_address`    VARCHAR(45)     DEFAULT NULL,
+                    `user_agent`    VARCHAR(500)    DEFAULT NULL,
+                    `accessed_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_session`  (`session_token`),
+                    KEY `idx_accessed` (`accessed_at`),
+                    KEY `idx_auditor`  (`auditor_rfc`)
+                ) {$charset}"
+            );
+        }
+
+        // ── 4. Sembrar tramos ISR Art. 113-A 2025 si la tabla está vacía ─────
+        $t = $wpdb->prefix . 'lt_mx_isr_tramos';
+        $tramo_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$t}`" );
+
+        if ( 0 === $tramo_count ) {
+            $tramos = [
+                [ 0.00,       25000.00,    0.02, '2025-01-01' ],
+                [ 25000.01,  100000.00,    0.05, '2025-01-01' ],
+                [ 100000.01, 300000.00,    0.10, '2025-01-01' ],
+                [ 300000.01, 999999999.00, 0.17, '2025-01-01' ],
+            ];
+            foreach ( $tramos as $tr ) {
+                $wpdb->insert(
+                    $t,
+                    [
+                        'min_amount' => $tr[0],
+                        'max_amount' => $tr[1],
+                        'rate'       => $tr[2],
+                        'valid_from' => $tr[3],
+                    ],
+                    [ '%f', '%f', '%f', '%s' ]
+                );
+            }
         }
         // phpcs:enable
     }
