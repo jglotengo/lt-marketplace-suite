@@ -430,7 +430,7 @@ function ltms_on_deactivation(): void {
 function ltms_run(): void {
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
-    require_once LTMS_INCLUDES_DIR . 'ltms-deprisa-loader.php'; // v1.8.0 — Deprisa
+    require_once LTMS_PLUGIN_DIR . 'includes/deprisa/ltms-deprisa-loader.php'; // v1.9.0 — multi-origen
 
     // Mostrar en admin cualquier fatal PHP capturado del request anterior.
     $ltms_fatal_file = LTMS_PLUGIN_DIR . 'ltms-fatal-debug.txt';
