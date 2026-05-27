@@ -1,0 +1,36 @@
+.ltms-auditor-panel{max-width:1400px}
+.ltms-auditor-panel h1{font-size:1.6rem;margin-bottom:4px}
+.ltms-auditor-panel>.description{margin-bottom:20px;color:#555;font-size:13px}
+.ltms-audit-filters{background:#fff;border:1px solid #dcdcdc;border-radius:4px;padding:16px 20px 4px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.ltms-audit-filters .form-table th{padding:8px 12px 8px 0;font-weight:600;color:#3c434a;white-space:nowrap;width:auto}
+.ltms-audit-filters .form-table td{padding:8px 20px 8px 0}
+.ltms-audit-filters input[type="date"],.ltms-audit-filters select{min-width:150px;border-radius:3px}
+.ltms-auditor-panel .widefat{margin-bottom:28px;border-collapse:collapse;width:100%;font-size:13px}
+.ltms-auditor-panel .widefat thead th{background:#f0f0f1;font-weight:600;color:#2c3338;padding:10px 12px;border-bottom:2px solid #c3c4c7;white-space:nowrap}
+.ltms-auditor-panel .widefat tbody td{padding:9px 12px;border-bottom:1px solid #f0f0f1;vertical-align:middle}
+.ltms-audit-summary-wrap{overflow-x:auto;margin-bottom:28px}
+.ltms-audit-summary td{font-family:'Courier New',monospace;font-size:13px;text-align:right}
+.ltms-audit-summary td:first-child{text-align:center;font-family:inherit;font-weight:600;font-size:15px}
+.ltms-auditor-panel h2{font-size:1.1rem;margin:28px 0 10px;padding-bottom:6px;border-bottom:2px solid #e0e0e0;color:#2c3338;display:flex;align-items:center;gap:8px}
+.ltms-alert-heading{color:#b32d2e!important;border-bottom-color:#f6c5c5!important}
+.ltms-badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1.5}
+.ltms-badge-danger{background:#fce8e8;color:#b32d2e;border:1px solid #f5c6c6}
+.ltms-badge-warning{background:#fef3cd;color:#856404;border:1px solid #fde68a}
+.ltms-badge-secondary{background:#e9ecef;color:#495057;border:1px solid #ced4da}
+.ltms-badge-info{background:#e0f0ff;color:#0a58ca;border:1px solid #b6d4fe}
+.ltms-status-badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:11px;font-weight:600;text-transform:capitalize}
+.ltms-status-pending{background:#fff8e1;color:#9a6700;border:1px solid #f6e05e}
+.ltms-status-under_review{background:#e8f4fd;color:#0369a1;border:1px solid #93c5fd}
+.ltms-status-approved{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.ltms-status-rejected{background:#fff1f2;color:#9f1239;border:1px solid #fda4af}
+.ltms-status-completed{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.ltms-auditor-panel>.description:last-child{background:#f6f7f7;border:1px solid #dcdcdc;border-radius:3px;padding:10px 14px;color:#646970;font-size:12px}
+/* ── Layout fix: secciones en bloque separado ── */
+.ltms-auditor-panel { display:block !important; width:100% !important; }
+.ltms-auditor-panel > * { display:block !important; width:100% !important; clear:both !important; }
+.ltms-auditor-panel .widefat { table-layout:auto !important; }
+.ltms-auditor-panel table { width:100% !important; margin-bottom:28px !important; }
+/* Scroll horizontal para tabla fiscal de 8 columnas */
+.ltms-audit-summary { display:block; overflow-x:auto; white-space:nowrap; }
+/* Ocultar notice de LTMS bienvenida */
+.ltms-welcome-notice, #ltms-welcome-notice { display:none !important; }
