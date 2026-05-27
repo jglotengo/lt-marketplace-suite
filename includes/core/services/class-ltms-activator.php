@@ -286,7 +286,7 @@ final class LTMS_Core_Activator {
             'ltms_retefuente_min_servicios_uvt' => 4,
             'ltms_reteiva_rate'                 => '0.15',
             'ltms_sagrilaft_uvt_threshold'      => 10000,
-            'ltms_uvt_valor'                    => '47065',
+            'ltms_uvt_valor'                    => '52752', // UVT 2026 — Resolución DIAN 000187/2025
 
             // v2.0.0 — Impuestos MX
             'ltms_mx_iva_general'      => '0.16',

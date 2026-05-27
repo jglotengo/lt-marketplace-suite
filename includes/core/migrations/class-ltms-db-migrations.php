@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.0.1';
+    private const CURRENT_VERSION = '2.1.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -42,6 +42,10 @@ final class LTMS_DB_Migrations {
         self::create_indexes();
 
         // Migraciones de actualización de esquema (no cubiertas por dbDelta)
+        if ( version_compare( $installed_version, '2.1.0', '<' ) ) {
+            self::migrate_2_1_0_fiscal_dian();
+        }
+
         if ( version_compare( $installed_version, '2.0.1', '<' ) ) {
             self::migrate_2_0_1_payout_schema();
         }
@@ -1439,6 +1443,133 @@ final class LTMS_DB_Migrations {
      *
      * @return void
      */
+    /**
+     * v2.1.0 — Módulo Fiscal DIAN / Acceso en Línea (Colombia)
+     *
+     * 1. lt_commissions: agrega columnas de desglose fiscal detallado.
+     * 2. lt_vendor_kyc:  agrega campos tributarios y bancarios requeridos
+     *    por el art. 30-B CFF (MX) y el equivalente colombiano (Exógena DIAN).
+     * 3. Nueva tabla lt_dian_online_access: log de accesos del auditor fiscal.
+     * 4. Actualiza UVT 2026 ($52.752).
+     *
+     * Idempotente: cada ALTER se guarda solo si la columna no existe.
+     */
+    private static function migrate_2_1_0_fiscal_dian(): void {
+        global $wpdb;
+
+        $helper = static function ( string $table, string $column ): bool {
+            global $wpdb;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+            return (bool) $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COUNT(*) FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                    DB_NAME, $table, $column
+                )
+            );
+        };
+
+        // ── 1. lt_commissions: columnas de desglose fiscal ───────────────────
+        $c = $wpdb->prefix . 'lt_commissions';
+
+        $commission_cols = [
+            'retefuente_amount' => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'ReteFuente aplicada al vendedor'",
+            'retefuente_rate'   => "DECIMAL(8,6) NOT NULL DEFAULT 0.000000 COMMENT 'Tasa ReteFuente aplicada'",
+            'reteiva_amount'    => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'ReteIVA aplicada'",
+            'reteiva_rate'      => "DECIMAL(8,6) NOT NULL DEFAULT 0.000000",
+            'reteica_amount'    => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'ReteICA aplicada'",
+            'reteica_rate'      => "DECIMAL(8,6) NOT NULL DEFAULT 0.000000",
+            'isr_amount'        => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'ISR retención MX'",
+            'isr_rate'          => "DECIMAL(8,6) NOT NULL DEFAULT 0.000000",
+            'ieps_amount'       => "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'IEPS MX'",
+            'impoconsumo_amount'=> "DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Impoconsumo CO'",
+            'vendor_nit'        => "VARCHAR(30) DEFAULT NULL COMMENT 'NIT/RUT/RFC del vendedor al momento de la transacción'",
+            'vendor_regime'     => "VARCHAR(50) DEFAULT NULL COMMENT 'Régimen tributario del vendedor'",
+            'vendor_ciiu'       => "VARCHAR(10) DEFAULT NULL COMMENT 'Código CIIU del vendedor'",
+            'vendor_municipality'=> "VARCHAR(10) DEFAULT NULL COMMENT 'Código DANE del municipio'",
+            'cfdi_folio'        => "VARCHAR(50) DEFAULT NULL COMMENT 'Folio CFDI (México) o factura electrónica CO'",
+            'payment_method'    => "VARCHAR(30) DEFAULT NULL COMMENT 'Método de pago (PSE, tarjeta, efectivo, etc.)'",
+        ];
+
+        foreach ( $commission_cols as $col => $definition ) {
+            if ( ! $helper( $c, $col ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( "ALTER TABLE `{$c}` ADD COLUMN `{$col}` {$definition}" );
+            }
+        }
+
+        // ── 2. lt_vendor_kyc: campos tributarios y bancarios ─────────────────
+        $k = $wpdb->prefix . 'lt_vendor_kyc';
+
+        $kyc_cols = [
+            'tax_regime'        => "VARCHAR(50) DEFAULT NULL COMMENT 'Régimen tributario (common, simplified, gran_contribuyente, resico…)'",
+            'ciiu_code'         => "VARCHAR(10) DEFAULT NULL COMMENT 'Código de actividad económica CIIU/SCIAN'",
+            'municipality_code' => "VARCHAR(10) DEFAULT NULL COMMENT 'Código DANE del municipio fiscal'",
+            'bank_name'         => "VARCHAR(100) DEFAULT NULL COMMENT 'Entidad financiera para depósitos'",
+            'bank_account_type' => "ENUM('ahorros','corriente','clabe','otro') DEFAULT NULL",
+            'bank_account_number'=> "VARCHAR(50) DEFAULT NULL COMMENT 'CLABE/cuenta cifrada AES-256'",
+            'address_fiscal'    => "VARCHAR(500) DEFAULT NULL COMMENT 'Domicilio fiscal declarado'",
+            'is_sagrilaft_flag' => "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 si superó umbral SAGRILAFT'",
+            'sagrilaft_flagged_at'=> "DATETIME DEFAULT NULL",
+        ];
+
+        foreach ( $kyc_cols as $col => $definition ) {
+            if ( ! $helper( $k, $col ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( "ALTER TABLE `{$k}` ADD COLUMN `{$col}` {$definition}" );
+            }
+        }
+
+        // ── 3. Nueva tabla: lt_dian_online_access ────────────────────────────
+        // Registra cada acceso del auditor DIAN/SAT al portal de acceso en línea.
+        $a = $wpdb->prefix . 'lt_dian_online_access';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query(
+            "CREATE TABLE IF NOT EXISTS `{$a}` (
+                `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `session_token` CHAR(64) NOT NULL COMMENT 'Token de sesión hasheado',
+                `auditor_name`  VARCHAR(255) DEFAULT NULL,
+                `auditor_nit`   VARCHAR(50)  DEFAULT NULL COMMENT 'NIT de la autoridad fiscal',
+                `access_type`   ENUM('login','query_transactions','query_vendor','export','logout') NOT NULL,
+                `filter_from`   DATE DEFAULT NULL,
+                `filter_to`     DATE DEFAULT NULL,
+                `filter_vendor` VARCHAR(50) DEFAULT NULL,
+                `rows_returned` INT UNSIGNED DEFAULT 0,
+                `ip_address`    VARCHAR(45) DEFAULT NULL,
+                `user_agent`    VARCHAR(500) DEFAULT NULL,
+                `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_session` (`session_token`),
+                KEY `idx_access_type` (`access_type`),
+                KEY `idx_created_at` (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+              COMMENT='Registro de accesos fiscales en línea (Art. 30-B CFF / DIAN Colombia)';"
+        );
+
+        // ── 4. UVT 2026 ──────────────────────────────────────────────────────
+        // Solo actualiza si el valor anterior era el de 2025 ($49.799) o 2024 ($47.065).
+        // No sobreescribe si el admin ya lo actualizó manualmente.
+        $current_uvt = (float) get_option( 'ltms_uvt_valor', 0 );
+        if ( $current_uvt > 0 && $current_uvt < 52000 ) {
+            update_option( 'ltms_uvt_valor', 52752.0 );
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->insert(
+                $wpdb->prefix . 'lt_tax_rates_history',
+                [
+                    'country'          => 'CO',
+                    'rate_key'         => 'ltms_uvt_valor',
+                    'old_value'        => $current_uvt,
+                    'new_value'        => 52752.0,
+                    'decree_reference' => 'Resolución DIAN 000187/2025 — UVT 2026',
+                    'changed_by'       => 0, // 0 = sistema automático
+                    'valid_from'       => '2026-01-01',
+                ],
+                [ '%s', '%s', '%f', '%f', '%s', '%d', '%s' ]
+            );
+        }
+    }
+
     private static function migrate_2_0_1_payout_schema(): void {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';

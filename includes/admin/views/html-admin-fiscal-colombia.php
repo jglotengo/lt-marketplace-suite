@@ -108,7 +108,7 @@ $v = static function( string $key, float $default ) : float {
 				<td>
 					<input type="number" id="ltms-uvt-valor" name="ltms_uvt_valor" step="1"
 						   value="<?php echo esc_attr( $v( 'ltms_uvt_valor', 49799.0 ) ); ?>" class="regular-text">
-					<p class="description"><?php esc_html_e( 'UVT 2025 = $49.799 (Decreto 2229/2024)', 'ltms' ); ?></p>
+					<p class="description"><?php esc_html_e( 'UVT 2026 = $52.752 (Resolución DIAN 000187/2025)', 'ltms' ); ?></p>
 				</td>
 			</tr>
 			<tr>
