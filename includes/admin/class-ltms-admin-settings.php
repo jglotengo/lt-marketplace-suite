@@ -210,7 +210,7 @@ final class LTMS_Admin_Settings {
             'ltms_siigo_enabled', 'ltms_siigo_sandbox', 'ltms_siigo_auto_invoice',
             'ltms_openpay_enabled', 'ltms_addi_enabled',
             'ltms_tptc_enabled', 'ltms_uber_direct_enabled', 'ltms_heka_enabled',
-            'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled',
+            'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled', 'ltms_deprisa_enabled',
             'ltms_stripe_enabled', 'ltms_mlm_enabled',
             // KYC / Compliance
             'ltms_kyc_zapsign_enabled', 'ltms_kyc_require_document',
@@ -276,7 +276,7 @@ final class LTMS_Admin_Settings {
         }
 
         $provider = sanitize_key( $_POST['provider'] ?? '' ); // phpcs:ignore
-        $allowed  = [ 'siigo', 'openpay', 'addi', 'aveonline', 'zapsign', 'tptc', 'xcover', 'backblaze', 'uber', 'heka', 'alegra' ];
+        $allowed  = [ 'siigo', 'openpay', 'addi', 'aveonline', 'zapsign', 'tptc', 'xcover', 'backblaze', 'uber', 'heka', 'alegra', 'deprisa' ];
 
         if ( ! in_array( $provider, $allowed, true ) ) {
             wp_send_json_error( __( 'Proveedor no válido.', 'ltms' ) );

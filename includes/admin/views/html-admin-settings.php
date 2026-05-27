@@ -33,6 +33,7 @@ $tabs = [
     'google_oauth' => __( 'Google OAuth', 'ltms' ),
     // v2.2.0 — Firma electrónica
     'zapsign'     => __( 'ZapSign Firma', 'ltms' ),
+    'deprisa'     => __( 'Deprisa', 'ltms' ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación

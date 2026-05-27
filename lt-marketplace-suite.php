@@ -349,6 +349,11 @@ function ltms_load_autoloader(): void {
                 // v2.1.0 — Alegra (subdir 'alegra/' no existe; archivo en business/ y api/webhooks/)
                 'ltms-alegra-sync'              => 'business/class-ltms-alegra-sync.php',
                 'ltms-alegra-webhook-handler'   => 'api/webhooks/class-ltms-alegra-webhook-handler.php',
+                'ltms-api-deprisa'              => 'api/class-ltms-api-deprisa.php',
+                'ltms-deprisa-shipping'         => 'business/class-ltms-deprisa-shipping.php',
+                'ltms-settings-deprisa'            => 'settings/class-ltms-settings-deprisa.php',
+                'ltms-deprisa-order-metabox'       => 'admin/class-ltms-deprisa-order-metabox.php',
+                'ltms-deprisa-shipping-method'     => 'shipping/class-ltms-deprisa-shipping-method.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
@@ -425,6 +430,7 @@ function ltms_on_deactivation(): void {
 function ltms_run(): void {
     // Autoloader SIEMPRE primero — necesario incluso para mostrar avisos admin.
     ltms_load_autoloader();
+    require_once LTMS_INCLUDES_DIR . 'ltms-deprisa-loader.php'; // v1.8.0 — Deprisa
 
     // Mostrar en admin cualquier fatal PHP capturado del request anterior.
     $ltms_fatal_file = LTMS_PLUGIN_DIR . 'ltms-fatal-debug.txt';
