@@ -290,6 +290,8 @@ function ltms_load_autoloader(): void {
                 'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
                 'ltms-retention-cron'           => 'core/class-ltms-retention-cron.php',
                 'ltms-gdpr-eraser'              => 'core/class-ltms-gdpr-eraser.php',
+                'ltms-forensic-log'             => 'core/class-ltms-forensic-log.php',
+                'ltms-auditor-export'           => 'admin/class-ltms-auditor-export.php',
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
@@ -719,3 +721,5 @@ function ltms_emergency_dashboard_page(): void {
     echo '</div>';
 }
 
+require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-commission-writer.php';
+require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-backfill-kyc.php';
