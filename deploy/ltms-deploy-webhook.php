@@ -3,24 +3,18 @@
  * LTMS Deploy Webhook
  * Coloca este archivo en: /home/customer/www/lo-tengo.com.co/public_html/ltms-deploy-webhook.php
  * NO subir a wp-content — debe estar en la raíz de public_html
- *
- * Token se genera con: openssl rand -hex 32
  */
 
-// ── Configuración ────────────────────────────────────────────────────────────
-define( 'DEPLOY_TOKEN',   'ltms_deploy_2026_s3cur3_t0k3n_x9z' ); // Cambiar en producción
+define( 'DEPLOY_TOKEN',   'ltms_deploy_2026_s3cur3_t0k3n_x9z' );
 define( 'PLUGIN_PATH',    __DIR__ . '/wp-content/plugins/lt-marketplace-suite' );
 define( 'LOG_FILE',       __DIR__ . '/ltms-deploy.log' );
-define( 'MAX_LOG_LINES',  200 );
+define( 'MAX_LOG_LINES',  500 );
 
-// ── Seguridad ─────────────────────────────────────────────────────────────────
 header( 'Content-Type: text/plain; charset=utf-8' );
-// Prevent SiteGround from caching this response or redirecting to CAPTCHA
 header( 'Cache-Control: no-store, no-cache, must-revalidate' );
 header( 'X-Robots-Tag: noindex' );
 
-// Accept token via GET param or X-Deploy-Token header (bypass bot detection)
-$token = $_GET['token'] 
+$token = $_GET['token']
     ?? ($_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '')
     ?? '';
 
@@ -30,34 +24,83 @@ if ( empty( $token ) || ! hash_equals( DEPLOY_TOKEN, $token ) ) {
     exit;
 }
 
-// Solo GET o POST
 if ( ! in_array( $_SERVER['REQUEST_METHOD'], [ 'GET', 'POST' ], true ) ) {
     http_response_code( 405 );
     exit( "Method not allowed\n" );
 }
 
-// ── Ejecutar git pull ─────────────────────────────────────────────────────────
+$ts = date( 'Y-m-d H:i:s' );
+echo "[{$ts}] Deploy webhook triggered\n";
+echo "PHP: " . PHP_VERSION . "\n";
+echo "PLUGIN_PATH: " . PLUGIN_PATH . "\n";
+echo "Path exists: " . ( is_dir( PLUGIN_PATH ) ? 'YES' : 'NO' ) . "\n";
+echo "Has .git: " . ( is_dir( PLUGIN_PATH . '/.git' ) ? 'YES' : 'NO' ) . "\n\n";
+
+// ── Diagnóstico de archivos clave ─────────────────────────────────────────────
+$key_files = [
+    'assets/css/ltms-auditor.css',
+    'includes/admin/views/view-auditor-dashboard.php',
+    'includes/admin/class-ltms-admin.php',
+    'includes/roles/class-ltms-external-auditor-role.php',
+];
+
+foreach ( $key_files as $f ) {
+    $full = PLUGIN_PATH . '/' . $f;
+    if ( file_exists( $full ) ) {
+        echo "FILE {$f}\n";
+        echo "  size: " . filesize( $full ) . " bytes  |  modified: " . date( 'Y-m-d H:i:s', filemtime( $full ) ) . "\n";
+    } else {
+        echo "MISSING {$f}\n";
+    }
+}
+echo "\n";
+
+// ── git reset --hard ──────────────────────────────────────────────────────────
 if ( ! is_dir( PLUGIN_PATH . '/.git' ) ) {
+    // No git repo: copy files directly from this deploy package if available
     http_response_code( 500 );
-    echo "Error: plugin directory not found or not a git repo\n";
+    echo "ERROR: PLUGIN_PATH is not a git repository.\n";
+    echo "Manual deploy needed: upload files via SFTP.\n";
     exit;
 }
 
-$cmd    = 'cd ' . escapeshellarg( PLUGIN_PATH ) . ' && git fetch origin 2>&1 && git reset --hard origin/main 2>&1 && git log --oneline -1 2>&1';
+echo "--- Running git fetch + reset ---\n";
+$cmd    = 'cd ' . escapeshellarg( PLUGIN_PATH )
+    . ' && git fetch origin 2>&1'
+    . ' && git reset --hard origin/main 2>&1'
+    . ' && git log --oneline -3 2>&1';
 $output = shell_exec( $cmd );
-$ts     = date( 'Y-m-d H:i:s' );
+echo $output . "\n";
 
-// ── Log ───────────────────────────────────────────────────────────────────────
+// ── Flush OPcache ─────────────────────────────────────────────────────────────
+echo "--- OPcache ---\n";
+if ( function_exists( 'opcache_reset' ) ) {
+    $reset = opcache_reset();
+    echo "opcache_reset(): " . ( $reset ? "OK" : "FAILED" ) . "\n";
+} else {
+    echo "opcache_reset not available (OPcache disabled or CLI mode)\n";
+}
+
+// ── Verificar archivos post-deploy ────────────────────────────────────────────
+echo "\n--- Post-deploy file check ---\n";
+foreach ( $key_files as $f ) {
+    $full = PLUGIN_PATH . '/' . $f;
+    if ( file_exists( $full ) ) {
+        $content = file_get_contents( $full );
+        // Check for v2.3.0 markers
+        $has_v230 = ( strpos( $content, 'v2.3.0' ) !== false || strpos( $content, 'ltms-page-header' ) !== false || strpos( $content, 'ltms-kpi-grid' ) !== false );
+        echo "  {$f}: " . filesize( $full ) . "b | v2.3.0=" . ( $has_v230 ? 'YES ✓' : 'NO ✗' ) . "\n";
+    }
+}
+
+echo "\n--- Log ---\n";
 $log_line = "[{$ts}] Deploy triggered from " . ( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) . "\n" . $output . "\n---\n";
 file_put_contents( LOG_FILE, $log_line, FILE_APPEND | LOCK_EX );
 
-// Rotar log si crece mucho
+// Rotar log
 $lines = file( LOG_FILE );
 if ( $lines && count( $lines ) > MAX_LOG_LINES ) {
-    $trimmed = array_slice( $lines, -MAX_LOG_LINES );
-    file_put_contents( LOG_FILE, implode( '', $trimmed ), LOCK_EX );
+    file_put_contents( LOG_FILE, implode( '', array_slice( $lines, -MAX_LOG_LINES ) ), LOCK_EX );
 }
 
-// ── Respuesta ─────────────────────────────────────────────────────────────────
 echo "Deploy OK [{$ts}]\n";
-echo $output;
