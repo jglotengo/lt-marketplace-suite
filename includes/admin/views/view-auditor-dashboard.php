@@ -3,7 +3,7 @@
  * Vista: Panel del Auditor Externo
  *
  * @package    LTMS\Admin\Views
- * @version    2.3.0
+ * @version    2.3.1
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,40 +16,39 @@ LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard_view' );
 
 global $wpdb;
 
-// ── Filtros ──────────────────────────────────────────────────────────────────
+// ── Filtros ───────────────────────────────────────────────────────────────────
 $date_from   = isset( $_GET['date_from'] ) ? sanitize_text_field( $_GET['date_from'] ) : date( 'Y-m-01' );
 $date_to     = isset( $_GET['date_to'] )   ? sanitize_text_field( $_GET['date_to'] )   : date( 'Y-m-d' );
 $country     = isset( $_GET['country'] )   ? sanitize_text_field( $_GET['country'] )   : '';
 $event_level = isset( $_GET['level'] )     ? sanitize_text_field( $_GET['level'] )     : '';
+$dt_from     = $date_from . ' 00:00:00';
+$dt_to       = $date_to   . ' 23:59:59';
 
-$dt_from = $date_from . ' 00:00:00';
-$dt_to   = $date_to   . ' 23:59:59';
-
-// ── Resumen fiscal ───────────────────────────────────────────────────────────
+// ── Resumen fiscal ─────────────────────────────────────────────────────────
 $country_sql = $country ? "AND country_code = '" . esc_sql( $country ) . "'" : '';
-$fiscal      = $wpdb->get_row( $wpdb->prepare(
+$fiscal = $wpdb->get_row( $wpdb->prepare(
     "SELECT
-        COUNT(*)                                            AS total_tx,
-        SUM(gross_amount)                                   AS gross,
-        SUM(commission_amount)                              AS platform_fee,
-        SUM(vendor_amount)                                  AS vendor_net,
-        SUM(COALESCE(retefuente_amount, tax_withholding,0)) AS rete_fuente,
-        SUM(COALESCE(isr_amount,0))                         AS isr,
-        SUM(iva_amount)                                     AS iva,
-        SUM(COALESCE(reteiva_amount,0))                     AS reteiva,
-        SUM(COALESCE(reteica_amount,0))                     AS reteica,
-        SUM(COALESCE(ieps_amount,0))                        AS ieps,
-        SUM(COALESCE(aranceles_amount,0))                   AS aranceles,
-        SUM(CASE WHEN is_hospedaje=1 THEN 1 ELSE 0 END)    AS hospedaje_ops,
-        SUM(CASE WHEN is_import=1    THEN 1 ELSE 0 END)    AS import_ops,
-        COUNT(DISTINCT vendor_id)                           AS vendors_active
+        COUNT(*)                                             AS total_tx,
+        SUM(gross_amount)                                    AS gross,
+        SUM(commission_amount)                               AS platform_fee,
+        SUM(vendor_amount)                                   AS vendor_net,
+        SUM(COALESCE(retefuente_amount, tax_withholding, 0)) AS rete_fuente,
+        SUM(COALESCE(isr_amount, 0))                         AS isr,
+        SUM(iva_amount)                                      AS iva,
+        SUM(COALESCE(reteiva_amount, 0))                     AS reteiva,
+        SUM(COALESCE(reteica_amount, 0))                     AS reteica,
+        SUM(COALESCE(ieps_amount, 0))                        AS ieps,
+        SUM(COALESCE(aranceles_amount, 0))                   AS aranceles,
+        SUM(CASE WHEN is_hospedaje = 1 THEN 1 ELSE 0 END)   AS hospedaje_ops,
+        SUM(CASE WHEN is_import = 1    THEN 1 ELSE 0 END)   AS import_ops,
+        COUNT(DISTINCT vendor_id)                            AS vendors_active
      FROM {$wpdb->prefix}lt_commissions
      WHERE created_at BETWEEN %s AND %s $country_sql",
     $dt_from, $dt_to
 ), ARRAY_A );
 $f = $fiscal ?? [];
 
-// ── SAT access log ───────────────────────────────────────────────────────────
+// ── SAT log ────────────────────────────────────────────────────────────────
 $sat_log = $wpdb->get_results( $wpdb->prepare(
     "SELECT auditor_rfc, auditor_name, access_type, filter_period, filter_vendor, rows_returned, ip_address, accessed_at
      FROM {$wpdb->prefix}lt_sat_online_access
@@ -57,7 +56,7 @@ $sat_log = $wpdb->get_results( $wpdb->prepare(
     $dt_from, $dt_to
 ), ARRAY_A ) ?: [];
 
-// ── DIAN access log ──────────────────────────────────────────────────────────
+// ── DIAN log ───────────────────────────────────────────────────────────────
 $dian_log = $wpdb->get_results( $wpdb->prepare(
     "SELECT auditor_nit, auditor_name, access_type, filter_from, filter_vendor, rows_returned, ip_address, accessed_at
      FROM {$wpdb->prefix}lt_dian_online_access
@@ -65,7 +64,7 @@ $dian_log = $wpdb->get_results( $wpdb->prepare(
     $dt_from, $dt_to
 ), ARRAY_A ) ?: [];
 
-// ── Eventos de seguridad ─────────────────────────────────────────────────────
+// ── Eventos seguridad ──────────────────────────────────────────────────────
 $sec_q      = "SELECT severity AS level, event_type, user_id, ip_address, created_at,
                CONCAT(request_method,' ',request_uri) AS summary
                FROM {$wpdb->prefix}lt_security_events
@@ -75,7 +74,7 @@ if ( $event_level ) { $sec_q .= ' AND severity = %s'; $sec_params[] = $event_lev
 $sec_q           .= ' ORDER BY created_at DESC LIMIT 50';
 $security_events  = $wpdb->get_results( $wpdb->prepare( $sec_q, ...$sec_params ), ARRAY_A ) ?: [];
 
-// ── KYC pendiente ────────────────────────────────────────────────────────────
+// ── KYC pendiente ──────────────────────────────────────────────────────────
 $kyc_pending = $wpdb->get_results( $wpdb->prepare(
     "SELECT k.*, u.display_name, u.user_email,
             um.meta_value AS document_type
@@ -88,7 +87,7 @@ $kyc_pending = $wpdb->get_results( $wpdb->prepare(
     $dt_from, $dt_to
 ), ARRAY_A ) ?: [];
 
-// ── SAGRILAFT ────────────────────────────────────────────────────────────────
+// ── SAGRILAFT ─────────────────────────────────────────────────────────────
 $sagrilaft_uvt   = (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 49799.0 );
 $sagrilaft_uvts  = (float) LTMS_Core_Config::get( 'ltms_sagrilaft_uvt_threshold', 10000.0 );
 $sagrilaft_floor = $sagrilaft_uvt * $sagrilaft_uvts;
@@ -100,9 +99,9 @@ $large_payouts   = $wpdb->get_results( $wpdb->prepare(
     $sagrilaft_floor, $dt_from, $dt_to
 ), ARRAY_A ) ?: [];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function ltms_money( $v ) { return number_format( (float) ( $v ?? 0 ), 2 ); }
-function ltms_int( $v )   { return number_format( (int)   ( $v ?? 0 ) ); }
+// ── Helpers ───────────────────────────────────────────────────────────────
+function ltms_money( $v ) { return number_format( (float)( $v ?? 0 ), 2 ); }
+function ltms_int( $v )   { return number_format( (int)  ( $v ?? 0 ) ); }
 function ltms_level_badge( $level ) {
     $map = [ 'critical' => 'danger', 'high' => 'warning', 'medium' => 'secondary', 'low' => 'info' ];
     $cls = $map[ strtolower( $level ) ] ?? 'info';
@@ -114,33 +113,30 @@ $auditor_label = esc_html( $current_user->display_name );
 ?>
 <div class="wrap ltms-auditor-panel">
 
-    <!-- ══ ENCABEZADO ═══════════════════════════════════════════════════════ -->
+    <!-- ══ HEADER ══════════════════════════════════════════════════════════ -->
     <div class="ltms-page-header">
         <div>
-            <h1>Panel Auditor LTMS</h1>
+            <h1><?php esc_html_e( 'Panel Auditor LTMS', 'ltms' ); ?></h1>
             <div class="ltms-header-meta">
                 <?php esc_html_e( 'Acceso de solo lectura · Registro de transacciones, KYC y eventos de seguridad', 'ltms' ); ?><br>
-                <strong><?php echo $auditor_label; ?></strong>
-                &nbsp;·&nbsp; <?php echo esc_html( date( 'd/m/Y H:i', current_time( 'timestamp' ) ) ); ?>
+                <strong><?php echo $auditor_label; ?></strong> &nbsp;·&nbsp; <?php echo esc_html( date_i18n( 'd/m/Y H:i', current_time( 'timestamp' ) ) ); ?>
             </div>
         </div>
-        <span class="ltms-readonly-badge"><?php esc_html_e( 'Solo lectura · Sesión registrada', 'ltms' ); ?></span>
+        <span class="ltms-readonly-badge">🔒 <?php esc_html_e( 'Solo lectura · Sesión registrada', 'ltms' ); ?></span>
     </div>
 
     <!-- ══ FILTROS ══════════════════════════════════════════════════════════ -->
-    <form method="get" class="ltms-filter-bar">
+    <form method="get" action="" class="ltms-filter-bar">
         <input type="hidden" name="page" value="ltms-auditor">
 
         <div class="ltms-filter-group">
             <label for="lf-from"><?php esc_html_e( 'Desde', 'ltms' ); ?></label>
             <input type="date" id="lf-from" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
         </div>
-
         <div class="ltms-filter-group">
             <label for="lf-to"><?php esc_html_e( 'Hasta', 'ltms' ); ?></label>
             <input type="date" id="lf-to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
         </div>
-
         <div class="ltms-filter-group">
             <label for="lf-country"><?php esc_html_e( 'País', 'ltms' ); ?></label>
             <select id="lf-country" name="country">
@@ -149,7 +145,6 @@ $auditor_label = esc_html( $current_user->display_name );
                 <option value="MX" <?php selected( $country, 'MX' ); ?>>🇲🇽 México</option>
             </select>
         </div>
-
         <div class="ltms-filter-group">
             <label for="lf-level"><?php esc_html_e( 'Nivel de evento', 'ltms' ); ?></label>
             <select id="lf-level" name="level">
@@ -161,7 +156,7 @@ $auditor_label = esc_html( $current_user->display_name );
             </select>
         </div>
 
-        <?php submit_button( __( 'Filtrar', 'ltms' ), 'secondary', 'filter', false, [ 'class' => 'button' ] ); ?>
+        <button type="submit" class="button button-secondary"><?php esc_html_e( 'Filtrar', 'ltms' ); ?></button>
     </form>
 
     <!-- ══ KPI CARDS ════════════════════════════════════════════════════════ -->
@@ -221,9 +216,7 @@ $auditor_label = esc_html( $current_user->display_name );
         </div>
     </div>
 
-    <?php
-    // ══ KYC PENDIENTE ══════════════════════════════════════════════════════
-    ?>
+    <!-- ══ KYC PENDIENTE ════════════════════════════════════════════════════ -->
     <div class="ltms-section-header">
         <span class="ltms-section-icon">📋</span>
         <h2><?php esc_html_e( 'KYC Pendiente de Revisión', 'ltms' ); ?></h2>
@@ -245,12 +238,12 @@ $auditor_label = esc_html( $current_user->display_name );
         <thead><tr>
             <th><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
             <th><?php esc_html_e( 'Email', 'ltms' ); ?></th>
-            <th><?php esc_html_e( 'Tipo documento', 'ltms' ); ?></th>
+            <th><?php esc_html_e( 'Tipo doc.', 'ltms' ); ?></th>
             <th><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
             <th><?php esc_html_e( 'Enviado', 'ltms' ); ?></th>
         </tr></thead>
         <tbody>
-            <?php foreach ( $kyc_pending as $kyc ) : ?>
+        <?php foreach ( $kyc_pending as $kyc ) : ?>
             <tr>
                 <td><strong><?php echo esc_html( $kyc['display_name'] ); ?></strong></td>
                 <td><?php echo esc_html( $kyc['user_email'] ); ?></td>
@@ -258,28 +251,25 @@ $auditor_label = esc_html( $current_user->display_name );
                 <td><span class="ltms-status-badge ltms-status-<?php echo esc_attr( $kyc['status'] ); ?>"><?php echo esc_html( $kyc['status'] ); ?></span></td>
                 <td><?php echo esc_html( $kyc['submitted_at'] ); ?></td>
             </tr>
-            <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
     </table>
     </div>
     <?php endif; ?>
 
-    <?php
-    // ══ SAGRILAFT ══════════════════════════════════════════════════════════
-    if ( ! empty( $large_payouts ) ) :
-    ?>
-    <div class="ltms-section-header ltms-alert-section">
+    <?php if ( ! empty( $large_payouts ) ) : ?>
+    <!-- ══ SAGRILAFT ══════════════════════════════════════════════════════ -->
+    <div class="ltms-section-header">
         <span class="ltms-section-icon">⚠️</span>
-        <h2><?php esc_html_e( 'Retiros de Alto Valor — Alertas SAGRILAFT', 'ltms' ); ?></h2>
+        <h2 style="color:#b91c1c"><?php esc_html_e( 'Alertas SAGRILAFT — Retiros de Alto Valor', 'ltms' ); ?></h2>
         <span class="ltms-badge ltms-badge-danger"><?php echo count( $large_payouts ); ?></span>
-        <span class="ltms-section-desc"><?php echo esc_html( sprintf( __( 'Umbral: $%s COP (%s UVT)', 'ltms' ), number_format( $sagrilaft_floor, 0, ',', '.' ), number_format( $sagrilaft_uvts, 0 ) ) ); ?></span>
+        <span class="ltms-section-desc"><?php printf( __( 'Umbral: $%s COP (%s UVT)', 'ltms' ), number_format( $sagrilaft_floor, 0, ',', '.' ), number_format( $sagrilaft_uvts, 0 ) ); ?></span>
     </div>
-    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#e11d48 0%,#fecaca 60%)">
+    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#e11d48 0%,transparent 70%)">
     <div class="ltms-table-wrap">
     <table class="widefat striped">
         <thead><tr>
-            <th>ID</th>
-            <th><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
+            <th>ID</th><th><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
             <th><?php esc_html_e( 'Email', 'ltms' ); ?></th>
             <th class="ltms-num"><?php esc_html_e( 'Monto', 'ltms' ); ?></th>
             <th><?php esc_html_e( 'Método', 'ltms' ); ?></th>
@@ -287,38 +277,33 @@ $auditor_label = esc_html( $current_user->display_name );
             <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
         </tr></thead>
         <tbody>
-            <?php foreach ( $large_payouts as $p ) : ?>
+        <?php foreach ( $large_payouts as $p ) : ?>
             <tr class="ltms-row-alert">
                 <td>#<?php echo esc_html( $p['id'] ); ?></td>
                 <td><strong><?php echo esc_html( $p['display_name'] ); ?></strong></td>
                 <td><?php echo esc_html( $p['user_email'] ); ?></td>
-                <td class="ltms-num"><strong><?php echo esc_html( ltms_money( $p['amount'] ) ); ?></strong></td>
+                <td class="ltms-num"><strong><?php echo ltms_money( $p['amount'] ); ?></strong></td>
                 <td><?php echo esc_html( $p['method'] ?? '—' ); ?></td>
                 <td><span class="ltms-status-badge ltms-status-<?php echo esc_attr( $p['status'] ); ?>"><?php echo esc_html( $p['status'] ); ?></span></td>
                 <td><?php echo esc_html( $p['created_at'] ); ?></td>
             </tr>
-            <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
     </table>
     </div>
     <?php endif; ?>
 
-    <?php
-    // ══ LOG SAT ════════════════════════════════════════════════════════════
-    ?>
+    <!-- ══ LOG SAT — Ficha 168/CFF ══════════════════════════════════════════ -->
     <div class="ltms-section-header">
         <span class="ltms-section-icon">🇲🇽</span>
-        <h2><?php esc_html_e( 'Log de Accesos SAT — Art. 30-B CFF (Ficha 168/CFF)', 'ltms' ); ?></h2>
-        <?php if ( ! empty( $sat_log ) ) : ?><span class="ltms-badge ltms-badge-info"><?php echo count( $sat_log ); ?></span><?php endif; ?>
-        <span class="ltms-section-desc"><?php esc_html_e( 'Registro inmutable de cada consulta del auditor SAT', 'ltms' ); ?></span>
+        <h2><?php esc_html_e( 'Log de Accesos SAT — Art. 30-B CFF', 'ltms' ); ?></h2>
+        <?php if ( $sat_log ) : ?><span class="ltms-badge ltms-badge-info"><?php echo count( $sat_log ); ?></span><?php endif; ?>
+        <span class="ltms-section-desc"><?php esc_html_e( 'Registro inmutable · Ficha 168/CFF', 'ltms' ); ?></span>
     </div>
-    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#006847 0%,#e2e8f0 60%)">
+    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#006847 0%,transparent 70%)">
 
     <?php if ( empty( $sat_log ) ) : ?>
-        <div class="ltms-empty-state">
-            <div class="ltms-empty-icon">📭</div>
-            <p><?php esc_html_e( 'No hay accesos SAT registrados en este período.', 'ltms' ); ?></p>
-        </div>
+        <div class="ltms-empty-state"><div class="ltms-empty-icon">📭</div><p><?php esc_html_e( 'No hay accesos SAT registrados en este período.', 'ltms' ); ?></p></div>
     <?php else : ?>
     <div class="ltms-table-wrap">
     <table class="widefat striped">
@@ -333,7 +318,7 @@ $auditor_label = esc_html( $current_user->display_name );
             <th><?php esc_html_e( 'Fecha / hora', 'ltms' ); ?></th>
         </tr></thead>
         <tbody>
-            <?php foreach ( $sat_log as $log ) : ?>
+        <?php foreach ( $sat_log as $log ) : ?>
             <tr>
                 <td><code><?php echo esc_html( $log['auditor_rfc'] ?: '—' ); ?></code></td>
                 <td><?php echo esc_html( $log['auditor_name'] ?: '—' ); ?></td>
@@ -344,28 +329,23 @@ $auditor_label = esc_html( $current_user->display_name );
                 <td><code><?php echo esc_html( $log['ip_address'] ?: '—' ); ?></code></td>
                 <td><?php echo esc_html( $log['accessed_at'] ); ?></td>
             </tr>
-            <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
     </table>
     </div>
     <?php endif; ?>
 
-    <?php
-    // ══ LOG DIAN ═══════════════════════════════════════════════════════════
-    ?>
+    <!-- ══ LOG DIAN ═════════════════════════════════════════════════════════ -->
     <div class="ltms-section-header">
         <span class="ltms-section-icon">🇨🇴</span>
         <h2><?php esc_html_e( 'Log de Accesos DIAN — Información Exógena', 'ltms' ); ?></h2>
-        <?php if ( ! empty( $dian_log ) ) : ?><span class="ltms-badge ltms-badge-info"><?php echo count( $dian_log ); ?></span><?php endif; ?>
-        <span class="ltms-section-desc"><?php esc_html_e( 'Registro inmutable de cada consulta del auditor DIAN', 'ltms' ); ?></span>
+        <?php if ( $dian_log ) : ?><span class="ltms-badge ltms-badge-info"><?php echo count( $dian_log ); ?></span><?php endif; ?>
+        <span class="ltms-section-desc"><?php esc_html_e( 'Registro inmutable · E.T. Art. 437-2', 'ltms' ); ?></span>
     </div>
-    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#003087 0%,#e2e8f0 60%)">
+    <hr class="ltms-section-divider" style="background:linear-gradient(90deg,#003087 0%,transparent 70%)">
 
     <?php if ( empty( $dian_log ) ) : ?>
-        <div class="ltms-empty-state">
-            <div class="ltms-empty-icon">📭</div>
-            <p><?php esc_html_e( 'No hay accesos DIAN registrados en este período.', 'ltms' ); ?></p>
-        </div>
+        <div class="ltms-empty-state"><div class="ltms-empty-icon">📭</div><p><?php esc_html_e( 'No hay accesos DIAN registrados en este período.', 'ltms' ); ?></p></div>
     <?php else : ?>
     <div class="ltms-table-wrap">
     <table class="widefat striped">
@@ -380,7 +360,7 @@ $auditor_label = esc_html( $current_user->display_name );
             <th><?php esc_html_e( 'Fecha / hora', 'ltms' ); ?></th>
         </tr></thead>
         <tbody>
-            <?php foreach ( $dian_log as $log ) : ?>
+        <?php foreach ( $dian_log as $log ) : ?>
             <tr>
                 <td><code><?php echo esc_html( $log['auditor_nit'] ?: '—' ); ?></code></td>
                 <td><?php echo esc_html( $log['auditor_name'] ?: '—' ); ?></td>
@@ -391,28 +371,23 @@ $auditor_label = esc_html( $current_user->display_name );
                 <td><code><?php echo esc_html( $log['ip_address'] ?: '—' ); ?></code></td>
                 <td><?php echo esc_html( $log['accessed_at'] ); ?></td>
             </tr>
-            <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
     </table>
     </div>
     <?php endif; ?>
 
-    <?php
-    // ══ EVENTOS DE SEGURIDAD ═══════════════════════════════════════════════
-    ?>
+    <!-- ══ EVENTOS DE SEGURIDAD ═════════════════════════════════════════════ -->
     <div class="ltms-section-header">
         <span class="ltms-section-icon">🛡️</span>
         <h2><?php esc_html_e( 'Registro de Eventos de Seguridad', 'ltms' ); ?></h2>
-        <?php if ( ! empty( $security_events ) ) : ?><span class="ltms-badge ltms-badge-secondary"><?php echo count( $security_events ); ?></span><?php endif; ?>
+        <?php if ( $security_events ) : ?><span class="ltms-badge ltms-badge-secondary"><?php echo count( $security_events ); ?></span><?php endif; ?>
         <span class="ltms-section-desc"><?php esc_html_e( 'Log forense inmutable · últimos 50 eventos', 'ltms' ); ?></span>
     </div>
     <hr class="ltms-section-divider">
 
     <?php if ( empty( $security_events ) ) : ?>
-        <div class="ltms-empty-state">
-            <div class="ltms-empty-icon">✅</div>
-            <p><?php esc_html_e( 'No hay eventos de seguridad en este período.', 'ltms' ); ?></p>
-        </div>
+        <div class="ltms-empty-state"><div class="ltms-empty-icon">✅</div><p><?php esc_html_e( 'No hay eventos de seguridad en este período.', 'ltms' ); ?></p></div>
     <?php else : ?>
     <div class="ltms-table-wrap">
     <table class="widefat striped">
@@ -425,24 +400,32 @@ $auditor_label = esc_html( $current_user->display_name );
             <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
         </tr></thead>
         <tbody>
-            <?php foreach ( $security_events as $ev ) : ?>
+        <?php foreach ( $security_events as $ev ) : ?>
             <tr>
                 <td><?php echo ltms_level_badge( $ev['level'] ); ?></td>
                 <td><?php echo esc_html( $ev['event_type'] ); ?></td>
                 <td><?php $ud = $ev['user_id'] ? get_userdata( (int) $ev['user_id'] ) : false; echo esc_html( $ud ? $ud->user_login : '—' ); ?></td>
                 <td><code><?php echo esc_html( LTMS_Data_Masking::mask_ip( $ev['ip_address'] ) ); ?></code></td>
-                <td><?php echo esc_html( wp_trim_words( $ev['summary'] ?? '', 15 ) ); ?></td>
+                <td><?php echo esc_html( wp_trim_words( $ev['summary'] ?? '', 12 ) ); ?></td>
                 <td><?php echo esc_html( $ev['created_at'] ); ?></td>
             </tr>
-            <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
     </table>
     </div>
     <?php endif; ?>
 
-    <!-- ══ FOOTER ═══════════════════════════════════════════════════════════ -->
+    <!-- ══ BASE NORMATIVA ═══════════════════════════════════════════════════ -->
+    <div class="ltms-norma-footer">
+        <strong>📜 Base normativa:</strong>
+        LIVA Art. 1-A BIS y 18-B &nbsp;·&nbsp; LISR Art. 113-A &nbsp;·&nbsp; LIEPS Art. 2 &nbsp;·&nbsp;
+        CFF Art. 30-B &nbsp;·&nbsp; RMF 2025 Regla 12.2.10 &nbsp;·&nbsp; Ficha 168/CFF &nbsp;·&nbsp;
+        E.T. Art. 437-2 (CO) &nbsp;·&nbsp; Res. DIAN 42/2020
+    </div>
+
+    <!-- ══ FOOTER ════════════════════════════════════════════════════════════ -->
     <div class="ltms-panel-footer">
         <?php esc_html_e( 'Esta vista es de solo lectura. Todos los accesos son registrados en el log forense inmutable.', 'ltms' ); ?>
     </div>
 
-</div><!-- .ltms-auditor-panel -->
+</div><!-- .wrap.ltms-auditor-panel -->
