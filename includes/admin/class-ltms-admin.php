@@ -269,6 +269,11 @@ final class LTMS_Admin {
         wp_enqueue_style( 'ltms-admin', $url . 'css/ltms-admin.css', [], $ver );
         wp_enqueue_style( 'ltms-admin-enterprise', $url . 'css/ltms-admin-enterprise.css', [], $ver );
 
+        // CSS exclusivo del Panel Auditor (toplevel_page_ltms-auditor)
+        if ( str_contains( $hook_suffix, 'ltms-auditor' ) ) {
+            wp_enqueue_style( 'ltms-auditor', $url . 'css/ltms-auditor.css', [ 'ltms-admin' ], $ver );
+        }
+
         $chartjs_version = '4.4.4';
         $chartjs_sri     = defined( 'LTMS_CHARTJS_SRI' )
             ? LTMS_CHARTJS_SRI

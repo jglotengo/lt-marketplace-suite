@@ -384,26 +384,7 @@
     border-radius: 4px !important;
 }
 
-/* ── Auditor panel (vista de auditoría) ── */
-.ltms-auditor-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-.ltms-audit-summary {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 16px;
-}
-.ltms-audit-filters {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    align-items: center;
-}
+/* ── Auditor panel — estilos movidos a ltms-auditor.css ── */
 
 /* ── Estado de guardado (settings form) ── */
 .ltms-save-status {

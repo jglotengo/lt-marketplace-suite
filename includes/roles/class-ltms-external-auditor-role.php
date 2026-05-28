@@ -62,11 +62,16 @@ final class LTMS_External_Auditor_Role {
      * @return void
      */
     public static function init(): void {
-        // Registrar logging automático de acceso del auditor
         add_action( 'admin_init', [ __CLASS__, 'log_auditor_page_access' ] );
-
-        // Forzar 2FA para auditores externos (si está habilitado)
         add_action( 'wp_login', [ __CLASS__, 'enforce_2fa_for_auditors' ], 10, 2 );
+        add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_auditor_assets' ] );
+    }
+
+    public static function enqueue_auditor_assets( string $hook_suffix ): void {
+        if ( strpos( $hook_suffix, 'ltms-auditor' ) === false ) {
+            return;
+        }
+        wp_enqueue_style( 'ltms-auditor', LTMS_ASSETS_URL . 'css/ltms-auditor.css', [], LTMS_VERSION );
     }
 
     /**
