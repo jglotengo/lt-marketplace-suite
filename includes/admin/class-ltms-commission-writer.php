@@ -243,6 +243,10 @@ class LTMS_Commission_Writer {
             'wc_payment_gateway'     => 'pasarela_generica',
             'mercadopago'            => 'mercado_pago',
             'payu'                   => 'payu',
+            'wc_openpay_gateway'      => 'tarjeta_openpay',
+            'openpay_pse'            => 'pse_openpay',
+            'openpay_card'           => 'tarjeta_openpay',
+            'openpay_store'          => 'efectivo_openpay',
         ];
 
         $raw = strtolower( trim( $raw ) );
