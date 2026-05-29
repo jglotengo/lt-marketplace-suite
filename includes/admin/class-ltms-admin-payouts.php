@@ -144,6 +144,21 @@ final class LTMS_Admin_Payouts {
             sprintf( 'KYC #%d del vendedor #%d aprobado por admin #%d', $kyc_id, $vendor_id, get_current_user_id() )
         );
 
+        // E-14 FIX: email al vendedor cuando se aprueba KYC
+        if ( get_option( 'ltms_email_kyc_approved', 'yes' ) === 'yes' ) {
+            $vendor_user = get_userdata( $vendor_id );
+            if ( $vendor_user && $vendor_user->user_email ) {
+                $k_subject = __( '[Lo Tengo] ¡Tu identidad fue verificada exitosamente!', 'ltms' );
+                $k_body    = sprintf(
+                    /* translators: 1: nombre, 2: URL panel */
+                    __( 'Hola %1$s,\n\n¡Buenas noticias! Tu verificación de identidad (KYC) fue aprobada.\n\nYa puedes acceder a todas las funcionalidades de tu panel de vendedor, incluyendo solicitudes de retiro.\n\nIngresa a tu panel:\n%2$s', 'ltms' ),
+                    $vendor_user->display_name,
+                    home_url( '/panel-vendedor/' )
+                );
+                wp_mail( $vendor_user->user_email, $k_subject, $k_body );
+            }
+        }
+
         wp_send_json_success([
             'message' => sprintf(
                 /* translators: %d: ID del vendedor */

@@ -312,6 +312,30 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
             sprintf( 'Retiro #%d rechazado por admin #%d. Motivo: %s', $payout_id, $admin_id, $reason )
         );
 
+        // E-13 FIX: email al vendedor cuando se rechaza retiro
+        if ( get_option( 'ltms_email_payout_rejected', 'yes' ) === 'yes' ) {
+            $vendor_user = get_userdata( (int) $payout['vendor_id'] );
+            if ( $vendor_user && $vendor_user->user_email ) {
+                $p_subject = __( '[Lo Tengo] Tu solicitud de retiro fue rechazada', 'ltms' );
+                $p_body    = sprintf(
+                    __( 'Hola %1$s,
+
+Tu solicitud de retiro por %2$s COP fue rechazada.
+
+Motivo: %3$s
+
+Puedes enviar una nueva solicitud desde tu panel.
+
+%4$s', 'ltms' ),
+                    $vendor_user->display_name,
+                    number_format( (float) $payout['amount'], 0, ',', '.' ),
+                    $reason,
+                    home_url( '/panel-vendedor/' )
+                );
+                wp_mail( $vendor_user->user_email, $p_subject, $p_body );
+            }
+        }
+
         return [ 'success' => true, 'message' => __( 'Solicitud de retiro rechazada.', 'ltms' ) ];
     }
 
