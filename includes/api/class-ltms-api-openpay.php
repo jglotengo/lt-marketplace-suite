@@ -360,6 +360,79 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         }
     }
 
+
+    /**
+     * Crea un desembolso (payout) a la cuenta bancaria de un vendedor.
+     *
+     * Openpay soporta payouts a cuentas CLABE (MX) y cuentas bancarias CO.
+     * Endpoint: POST /{merchant_id}/payouts
+     *
+     * @param float  $amount         Monto a desembolsar.
+     * @param string $bank_account   Número de cuenta / CLABE del vendedor.
+     * @param string $bank_code      Código del banco (CO: NIT banco, MX: no requerido para CLABE).
+     * @param string $holder_name    Nombre del titular de la cuenta.
+     * @param string $description    Descripción del pago.
+     * @param string $order_id       Referencia interna (payout_id).
+     * @return array{id: string, status: string, amount: float}
+     * @throws \RuntimeException Si el desembolso falla.
+     */
+    public function create_disbursement(
+        float  $amount,
+        string $bank_account,
+        string $bank_code,
+        string $holder_name,
+        string $description,
+        string $order_id
+    ): array {
+        $currency = $this->country === 'MX' ? 'MXN' : 'COP';
+
+        $payload = [
+            'method'      => 'bank_account',
+            'amount'      => $this->format_amount( $amount ),
+            'currency'    => $currency,
+            'description' => substr( sanitize_text_field( $description ), 0, 250 ),
+            'order_id'    => $order_id,
+            'bank_account' => [
+                'clabe'        => $bank_account, // CLABE en MX, cuenta en CO
+                'bank_code'    => $bank_code,
+                'holder_name'  => sanitize_text_field( $holder_name ),
+            ],
+        ];
+
+        $response = $this->perform_request(
+            'POST',
+            "/{$this->merchant_id}/payouts",
+            $payload
+        );
+
+        if ( empty( $response['id'] ) ) {
+            throw new \RuntimeException(
+                sprintf( 'Openpay disbursement falló para orden %s: %s',
+                    $order_id,
+                    $response['description'] ?? 'Error desconocido'
+                )
+            );
+        }
+
+        LTMS_Core_Logger::info(
+            'OPENPAY_DISBURSEMENT',
+            sprintf( 'Desembolso Openpay #%s — %s %s — vendedor: %s',
+                $response['id'],
+                $currency,
+                $amount,
+                $holder_name
+            ),
+            [ 'openpay_id' => $response['id'], 'order_id' => $order_id, 'amount' => $amount ]
+        );
+
+        return [
+            'id'     => $response['id'],
+            'status' => $response['status'] ?? 'in_progress',
+            'amount' => (float) ( $response['amount'] ?? $amount ),
+            'raw'    => $response,
+        ];
+    }
+
     /**
      * Alias para compatibilidad con WC_Payment_Gateway::process_payment().
      * Acepta array de parámetros y delega a create_charge().

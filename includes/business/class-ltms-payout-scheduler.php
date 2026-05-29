@@ -368,27 +368,115 @@ Puedes enviar una nueva solicitud desde tu panel.
      * @return array{success: bool, message: string, reference: string}
      */
     private static function execute_payout_payment( array $payout ): array {
-        $method = $payout['method'] ?? 'bank_transfer';
+        $method    = $payout['method'] ?? 'bank_transfer';
+        $vendor_id = (int) $payout['vendor_id'];
+        $amount    = (float) $payout['net_amount'] ?: (float) $payout['amount'];
+        $payout_id = (int) $payout['id'];
 
         try {
-            if ( $method === 'openpay' ) {
+            if ( $method === 'openpay' || $method === 'nequi' ) {
+                // Leer datos bancarios del vendedor registrados en user_meta
+                $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account', true )
+                             ?: get_user_meta( $vendor_id, 'ltms_clabe', true );
+                $bank_code    = get_user_meta( $vendor_id, 'ltms_bank_code', true ) ?: '';
+                $holder_name  = get_user_meta( $vendor_id, 'ltms_bank_holder', true );
+
+                if ( empty( $bank_account ) ) {
+                    return [
+                        'success'   => false,
+                        'reference' => '',
+                        'message'   => sprintf(
+                            'Vendedor #%d no tiene cuenta bancaria registrada para disbursement Openpay.',
+                            $vendor_id
+                        ),
+                    ];
+                }
+
+                // Usar display_name si no hay holder registrado
+                if ( empty( $holder_name ) ) {
+                    $user        = get_userdata( $vendor_id );
+                    $holder_name = $user ? $user->display_name : 'Vendedor #' . $vendor_id;
+                }
+
                 $client = LTMS_Api_Factory::get( 'openpay' );
-                // Para transferencias bancarias por Openpay
+                $result = $client->create_disbursement(
+                    $amount,
+                    $bank_account,
+                    $bank_code,
+                    $holder_name,
+                    sprintf( 'Retiro #%d — Lo Tengo', $payout_id ),
+                    'PAY-' . $payout_id
+                );
+
                 return [
                     'success'   => true,
-                    'reference' => LTMS_Utils::generate_reference( 'OPP' ),
-                    'message'   => 'OK',
+                    'reference' => $result['id'] ?? LTMS_Utils::generate_reference( 'OPP' ),
+                    'message'   => 'Desembolso Openpay procesado: ' . ( $result['status'] ?? 'in_progress' ),
                 ];
             }
 
-            // Por defecto: pago manual (banco directo)
+            if ( $method === 'bank_transfer' ) {
+                // Pago manual: registrar referencia y notificar al equipo de finanzas
+                $reference = LTMS_Utils::generate_reference( 'MAN' );
+
+                // Notificar al admin para ejecutar transferencia manual
+                $admin_email = (string) get_option( 'admin_email' );
+                if ( $admin_email ) {
+                    $vendor_user = get_userdata( $vendor_id );
+                    $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account', true ) ?: 'No registrada';
+                    $bank_name    = get_user_meta( $vendor_id, 'ltms_bank_name', true ) ?: '';
+
+                    wp_mail(
+                        $admin_email,
+                        sprintf( '[LTMS] Retiro #%d pendiente de transferencia manual', $payout_id ),
+                        sprintf(
+                            "Retiro #%d aprobado requiere transferencia manual.
+
+" .
+                            "Vendedor: %s (#%d)
+" .
+                            "Monto neto: $%s COP
+" .
+                            "Banco: %s
+" .
+                            "Cuenta: %s
+" .
+                            "Referencia: %s
+
+" .
+                            "Accede al panel: %s",
+                            $payout_id,
+                            $vendor_user ? $vendor_user->display_name : '#' . $vendor_id,
+                            $vendor_id,
+                            number_format( $amount, 0, ',', '.' ),
+                            $bank_name,
+                            $bank_account,
+                            $reference,
+                            admin_url( 'admin.php?page=ltms-payouts' )
+                        )
+                    );
+                }
+
+                return [
+                    'success'   => true,
+                    'reference' => $reference,
+                    'message'   => 'Transferencia manual registrada — pendiente de ejecución por finanzas.',
+                ];
+            }
+
+            // Método no reconocido — registrar como manual
             return [
                 'success'   => true,
                 'reference' => LTMS_Utils::generate_reference( 'MAN' ),
-                'message'   => 'Pago manual registrado',
+                'message'   => sprintf( 'Método %s no automatizado — registrado para revisión manual.', $method ),
             ];
 
         } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::error(
+                'PAYOUT_EXECUTE_FAILED',
+                sprintf( 'Error ejecutando payout #%d vía %s: %s', $payout_id, $method, $e->getMessage() ),
+                [ 'payout_id' => $payout_id, 'vendor_id' => $vendor_id, 'method' => $method ]
+            );
             return [
                 'success'   => false,
                 'reference' => '',
