@@ -12,10 +12,10 @@
  *   - arrendamiento → ISR 10% (mismo método)
  *
  * SECCIÓN ISR pf_actividad con fallback de tramos art.113-A
- *   - pf_actividad tramo 1 (≤25,000): 2%
- *   - pf_actividad tramo 2 (≤100,000): 6%
- *   - pf_actividad tramo 3 (≤300,000): 10%
- *   - pf_actividad tramo 4 (>300,000): 17%
+ *   - pf_actividad tramo 1 (<=5,000): 1.1%
+ *   - pf_actividad tramo 2 (<=15,000): 2%
+ *   - pf_actividad tramo 3 (<=21,000): 3%
+ *   - pf_actividad tramo 4 (>21,000): 5%
  *
  * SECCIÓN should_apply_withholding → regímenes que NO aplican
  *   - régimen vacío '' → false (no está en la lista)
