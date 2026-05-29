@@ -718,6 +718,8 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_reject_succeeds_on_pending_payout(): void {
         Functions\when( '__' )->returnArg();
+        Functions\when( 'get_option' )->justReturn( 'no' );
+        Functions\when( 'get_userdata' )->justReturn( false );
         $payout = [
             'id' => 5, 'vendor_id' => 20, 'amount' => '150000.00',
             'status' => 'pending', 'method' => 'bank_transfer', 'bank_account_id' => 'acct_2',
@@ -755,6 +757,8 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_reject_with_empty_reason_does_not_throw(): void {
         Functions\when( '__' )->returnArg();
+        Functions\when( 'get_option' )->justReturn( 'no' );
+        Functions\when( 'get_userdata' )->justReturn( false );
         $payout = [
             'id' => 6, 'vendor_id' => 20, 'amount' => '50000.00',
             'status' => 'pending', 'method' => 'nequi', 'bank_account_id' => 'acct_3',
