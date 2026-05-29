@@ -121,7 +121,7 @@ class LTMS_Auditor_Panel {
         ];
 
         require_once __DIR__ . '/class-ltms-auditor-export.php';
-        $result = LTMS_Auditor_Export::generate_csv( $args );
+        $result = LTMS_Fiscal_Exporter::generate_csv( $args );
 
         if ( isset($result['error']) ) {
             wp_die( esc_html($result['error']), 404 );
