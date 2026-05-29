@@ -36,6 +36,8 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
         // Restaurar wpdb al stub base entre tests
         $GLOBALS['wpdb'] = $this->make_base_wpdb();
+        // M-210: get_post_field disponible en todos los tests (fallback vendor lookup)
+        Functions\when( 'get_post_field' )->justReturn( 0 );
     }
 
     protected function tearDown(): void {
