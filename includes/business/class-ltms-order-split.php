@@ -265,6 +265,11 @@ final class LTMS_Business_Order_Split {
             if ( $vendor_id > 0 ) {
                 return $vendor_id;
             }
+            // Fallback M-210: usar post_author del producto cuando _ltms_vendor_id no está seteado
+            $author_id = (int) get_post_field( 'post_author', $product_id );
+            if ( $author_id > 0 ) {
+                return $author_id;
+            }
         }
         return 0;
     }
