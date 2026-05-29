@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class LTMS_Fiscal_Exporter {
+class LTMS_Auditor_Export {
 
     public static function generate_csv( array $args ): array {
         global $wpdb;
@@ -203,6 +203,3 @@ class LTMS_Fiscal_Exporter {
         return [ 'file' => $file, 'rows' => count( $rows ) ];
     }
 }
-
-// Alias de compatibilidad — clase vieja sigue disponible vía autoloader
-if ( ! class_exists('LTMS_Auditor_Export_30B') ) class_alias('LTMS_Fiscal_Exporter','LTMS_Auditor_Export_30B');
