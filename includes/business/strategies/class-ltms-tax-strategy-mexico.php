@@ -101,10 +101,11 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
         }
 
         // Fallback: Art. 113-A LISR — tramos vigentes 2025
-        if ( $monthly_income <= 25000 )  return 0.02;
-        if ( $monthly_income <= 100000 ) return 0.06;
-        if ( $monthly_income <= 300000 ) return 0.10;
-        return 0.17;
+        if ( $monthly_income <=  5000 )  return 0.0110;
+        if ( $monthly_income <= 15000 )  return 0.0200;
+        if ( $monthly_income <= 21000 )  return 0.0300;
+        
+        return 0.0500;
     }
 
     /**
