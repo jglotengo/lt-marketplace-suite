@@ -1266,13 +1266,12 @@ final class LTMS_DB_Migrations {
             $wpdb->insert(
                 $table,
                 [
-                    'code'              => $row[0],
-                    'department_code'   => $row[1],
-                    'department_name'   => $row[2],
-                    'municipality_name' => $row[3],
-                    'is_active'         => 1,
+                    'dane_code'  => $row[0],
+                    'name'       => $row[3],
+                    'department' => $row[2],
+                    'is_active'  => 1,
                 ],
-                [ '%s', '%s', '%s', '%s', '%d' ]
+                [ '%s', '%s', '%s', '%d' ]
             );
         }
     }
