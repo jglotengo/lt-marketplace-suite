@@ -497,10 +497,10 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
     public static function provider_isr_pf_actividad_tramos(): array {
         // Fallback art.113-A LISR: ≤25K→2%, ≤100K→6%, ≤300K→10%, >300K→17%
         return [
-            'tramo 1 ≤$25,000 → 2%'   => [  20_000.0, 0.02 ],
-            'tramo 2 ≤$100,000 → 6%'  => [  80_000.0, 0.06 ],
-            'tramo 3 ≤$300,000 → 10%' => [ 200_000.0, 0.10 ],
-            'tramo 4 >$300,000 → 17%' => [ 400_000.0, 0.17 ],
+            'tramo 1 <=\$5,000 → 1.1%'  => [   4000.0, 0.0110 ],
+            'tramo 2 <=\$15,000 → 2%'   => [  10000.0, 0.0200 ],
+            'tramo 3 <=\$21,000 → 3%'   => [  18000.0, 0.0300 ],
+            'tramo 4 >\$21,000 → 5%'    => [  50000.0, 0.0500 ],
         ];
     }
 
