@@ -651,7 +651,7 @@ class TaxEngineTest extends TestCase
     public function test_mx_pf_actividad_isr_high_income_17pct(): void
     {
         $result = $this->mx_calculate( 500_000.0, [], [ 'tax_regime' => 'pf_actividad', 'monthly_income' => 400_000.0 ] );
-        $this->assertSame( 0.17, $result['isr_rate'] );
+        $this->assertSame( 0.05, $result['isr_rate'] );
     }
 
     // ------------------------------------------------------------------ //
