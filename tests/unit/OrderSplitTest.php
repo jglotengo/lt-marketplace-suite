@@ -740,6 +740,8 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_extract_vendor_from_items_returns_zero_when_no_vendor_meta(): void {
         \Brain\Monkey\Functions\when( 'get_post_meta' )->justReturn( '' );
+        // M-210: get_post_field también debe retornar 0 para que el fallback no encuentre vendor
+        \Brain\Monkey\Functions\when( 'get_post_field' )->justReturn( 0 );
         $order = $this->make_order_with_items( [ 1, 2, 3 ] );
         $ref = new \ReflectionMethod( 'LTMS_Business_Order_Split', 'extract_vendor_from_items' );
         $ref->setAccessible( true );
