@@ -292,6 +292,7 @@ function ltms_load_autoloader(): void {
                 'ltms-gdpr-eraser'              => 'core/class-ltms-gdpr-eraser.php',
                 'ltms-forensic-log'             => 'core/class-ltms-forensic-log.php',
                 'ltms-auditor-export'           => 'admin/class-ltms-auditor-export.php',
+                'ltms-auditor-panel'            => 'admin/class-ltms-auditor-panel.php',
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
@@ -462,6 +463,7 @@ function ltms_run(): void {
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
     if ( class_exists( 'LTMS_Retention_Cron' ) ) {
         LTMS_Retention_Cron::init();
+        if ( class_exists( 'LTMS_Auditor_Panel' ) ) LTMS_Auditor_Panel::init();
     if ( class_exists( 'LTMS_GDPR_Eraser' ) ) {
         LTMS_GDPR_Eraser::init();
     }
