@@ -1162,6 +1162,41 @@ final class LTMS_DB_Migrations {
             KEY `idx_created` (`created_at`)
         ) {$charset}";
 
+        // M-210: tabla de retenciones de Consumer Protection (Ley 1480)
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_wallet_holds` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`   BIGINT UNSIGNED NOT NULL,
+            `wallet_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `order_id`    BIGINT UNSIGNED NOT NULL,
+            `amount`      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `status`      ENUM('pending','released','cancelled') NOT NULL DEFAULT 'pending',
+            `release_at`  DATETIME NOT NULL,
+            `released_at` DATETIME DEFAULT NULL,
+            `description` VARCHAR(500) DEFAULT NULL,
+            `metadata`    LONGTEXT DEFAULT NULL,
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `vendor_id` (`vendor_id`),
+            KEY `order_id` (`order_id`),
+            KEY `status_release` (`status`, `release_at`)
+        ) {$charset}";
+
+        // M-210: tabla de tasas de comisión por volumen y país
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_commission_tiers` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `country`    CHAR(2)      NOT NULL DEFAULT 'CO',
+            `tier_name`  VARCHAR(50)  NOT NULL DEFAULT 'base',
+            `min_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `max_amount` DECIMAL(15,2) NOT NULL DEFAULT 999999999.00,
+            `rate`       DECIMAL(5,4) NOT NULL DEFAULT 0.1000,
+            `is_active`  TINYINT(1)   NOT NULL DEFAULT 1,
+            `sort_order` INT(11)      NOT NULL DEFAULT 10,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `country_active` (`country`, `is_active`)
+        ) {$charset}";
+
     }
 
     /**
