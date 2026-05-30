@@ -17,19 +17,7 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     protected function setUp(): void {
         parent::setUp();
-
-        if ( ! class_exists( 'LTMS_Core_Config', false ) ) {
-            eval( 'class LTMS_Core_Config {
-                private static array $data = [];
-                public static function set( string $k, mixed $v ): void { self::$data[$k] = $v; }
-                public static function get( string $k, mixed $d = null ): mixed {
-                    return self::$data[$k] ?? $d;
-                }
-                public static function reset(): void { self::$data = []; }
-            }' );
-        }
-
-        \LTMS_Core_Config::reset();
+        LTMS_Core_Config::flush_cache();
 
         $ref = new \ReflectionProperty( \LTMS_Shipping_Mode::class, 'initialized' );
         $ref->setAccessible( true );
@@ -37,7 +25,7 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
     protected function tearDown(): void {
-        \LTMS_Core_Config::reset();
+        LTMS_Core_Config::flush_cache();
         parent::tearDown();
     }
 
@@ -91,27 +79,27 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     public function test_get_mode_ignores_invalid_meta(): void {
         $this->require_class();
         Functions\when( 'get_user_meta' )->justReturn( 'invalid_mode' );
-        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
         $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
     public function test_get_mode_falls_back_to_global_option(): void {
         $this->require_class();
         Functions\when( 'get_user_meta' )->justReturn( '' );
-        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'free_absorbed' );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'free_absorbed' );
         $this->assertSame( 'free_absorbed', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
     public function test_get_mode_vendor_id_zero_uses_global(): void {
         $this->require_class();
-        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
         $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::get_mode_for_vendor( 0 ) );
     }
 
     public function test_get_mode_invalid_global_returns_flat(): void {
         $this->require_class();
         Functions\when( 'get_user_meta' )->justReturn( '' );
-        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'bogus' );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'bogus' );
         $this->assertSame( 'flat', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
@@ -149,17 +137,12 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_calculate_flat_returns_global_flat_rate(): void {
         $this->require_class();
-        Functions\when( 'get_user_meta' )->justReturn( 'flat' );
-        Functions\when( 'update_user_meta' )->justReturn( true );
-        \LTMS_Core_Config::set( 'ltms_flat_shipping_rate', 15000 );
-
-        // get_user_meta para _ltms_flat_shipping_rate devuelve ''
+        LTMS_Core_Config::set( 'ltms_flat_shipping_rate', 15000 );
         Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
-            if ( $key === '_ltms_shipping_mode'    ) return 'flat';
+            if ( $key === '_ltms_shipping_mode'      ) return 'flat';
             if ( $key === '_ltms_flat_shipping_rate' ) return '';
             return '';
         } );
-
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 50000.0, [] );
         $this->assertSame( 15000.0, $cost );
     }
@@ -171,7 +154,6 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             if ( $key === '_ltms_flat_shipping_rate' ) return '8000';
             return '';
         } );
-
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 2, 0.0, [] );
         $this->assertSame( 8000.0, $cost );
     }
@@ -197,19 +179,19 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     public function test_calculate_hybrid_empty_package_returns_zero(): void {
         $this->require_class();
         Functions\when( 'get_user_meta' )->justReturn( 'hybrid' );
-        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '1,2' );
+        LTMS_Core_Config::set( 'ltms_shipping_free_categories', '1,2' );
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, [ 'contents' => [] ] );
         $this->assertSame( 0.0, $cost );
     }
 
     public function test_calculate_hybrid_no_free_cats_returns_flat(): void {
         $this->require_class();
+        LTMS_Core_Config::set( 'ltms_shipping_free_categories', '' );
         Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
             if ( $key === '_ltms_shipping_mode'      ) return 'hybrid';
             if ( $key === '_ltms_flat_shipping_rate' ) return '5000';
             return '';
         } );
-        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '' );
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, [ 'contents' => [ ['product_id' => 10] ] ] );
         $this->assertSame( 5000.0, $cost );
     }
@@ -217,9 +199,8 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     public function test_calculate_hybrid_all_products_in_free_cats_returns_zero(): void {
         $this->require_class();
         Functions\when( 'get_user_meta' )->justReturn( 'hybrid' );
-        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
+        LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
         Functions\when( 'wc_get_product_term_ids' )->justReturn( [ 5, 7 ] );
-
         $package = [ 'contents' => [ ['product_id' => 10], ['product_id' => 11] ] ];
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, $package );
         $this->assertSame( 0.0, $cost );
@@ -227,14 +208,13 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_calculate_hybrid_product_not_in_free_cats_returns_flat(): void {
         $this->require_class();
+        LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
         Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
             if ( $key === '_ltms_shipping_mode'      ) return 'hybrid';
             if ( $key === '_ltms_flat_shipping_rate' ) return '12000';
             return '';
         } );
-        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
-        Functions\when( 'wc_get_product_term_ids' )->justReturn( [ 99 ] ); // no intersecta
-
+        Functions\when( 'wc_get_product_term_ids' )->justReturn( [ 99 ] );
         $package = [ 'contents' => [ ['product_id' => 10] ] ];
         $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, $package );
         $this->assertSame( 12000.0, $cost );
@@ -266,7 +246,6 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             }
         );
         Functions\when( 'sanitize_key' )->alias( fn( $v ) => $v );
-
         \LTMS_Shipping_Mode::save_vendor_mode_from_post( 7, [ 'ltms_shipping_mode' => 'hybrid' ] );
         $this->assertSame( [ 7, '_ltms_shipping_mode', 'hybrid' ], $called_with );
     }
@@ -276,7 +255,6 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $called = false;
         Functions\when( 'update_user_meta' )->alias( function() use ( &$called ) { $called = true; return true; } );
         Functions\when( 'sanitize_key' )->alias( fn( $v ) => $v );
-
         \LTMS_Shipping_Mode::save_vendor_mode_from_post( 7, [] );
         $this->assertFalse( $called );
     }
