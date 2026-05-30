@@ -282,6 +282,10 @@ function ltms_load_autoloader(): void {
                 'ltms-core-deactivator'         => 'core/services/class-ltms-deactivator.php',
                 // Business — archivo no incluye 'business-'
                 'ltms-business-wallet'          => 'business/class-ltms-wallet.php',
+                // F-05: Depósitos manuales (PSE/Nequi/Transferencia)
+                'ltms-deposit'                          => 'business/class-ltms-deposit.php',
+                'ltms-admin-deposits'                   => 'admin/class-ltms-admin-deposits.php',
+                'ltms-frontend-deposit-handler'         => 'frontend/class-ltms-frontend-deposit-handler.php',
                 'ltms-business-order-split'     => 'business/class-ltms-order-split.php',
                 // Business — subdir derivado de la clase no existe; archivo en business/
                 'ltms-commission-strategy'      => 'business/class-ltms-commission-strategy.php',

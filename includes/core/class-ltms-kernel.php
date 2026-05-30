@@ -171,6 +171,14 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Wallet::init();
         }
 
+        // F-05: Depósitos manuales de recarga de wallet
+        if ( class_exists( 'LTMS_Deposit' ) ) {
+            LTMS_Deposit::init();
+        }
+        if ( class_exists( 'LTMS_Frontend_Deposit_Handler' ) ) {
+            LTMS_Frontend_Deposit_Handler::init();
+        }
+
         // Motor de comisiones
         if ( class_exists( 'LTMS_Commission_Strategy' ) ) {
             LTMS_Commission_Strategy::init();
@@ -479,6 +487,10 @@ final class LTMS_Core_Kernel {
         }
         if ( class_exists( 'LTMS_Admin_Payouts' ) ) {
             LTMS_Admin_Payouts::init();
+        }
+        // F-05: Panel admin depósitos manuales
+        if ( class_exists( 'LTMS_Admin_Deposits' ) ) {
+            LTMS_Admin_Deposits::init();
         }
         if ( class_exists( 'LTMS_Admin_Marketing_Manager' ) ) {
             LTMS_Admin_Marketing_Manager::init();

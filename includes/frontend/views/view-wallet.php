@@ -18,9 +18,14 @@ $available    = max( 0, $balance - $held );
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Billetera', 'ltms' ); ?></h2>
-        <button type="button" class="ltms-btn ltms-btn-primary" data-ltms-modal-open="ltms-modal-payout">
-            💸 <?php esc_html_e( 'Solicitar Retiro', 'ltms' ); ?>
-        </button>
+        <div style="display:flex;gap:10px;">
+            <button type="button" class="ltms-btn ltms-btn-secondary" data-ltms-modal-open="ltms-modal-deposit">
+                💳 <?php esc_html_e( 'Depositar', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-primary" data-ltms-modal-open="ltms-modal-payout">
+                💸 <?php esc_html_e( 'Solicitar Retiro', 'ltms' ); ?>
+            </button>
+        </div>
     </div>
 
     <!-- Widget de Balance -->
@@ -62,6 +67,39 @@ $available    = max( 0, $balance - $held );
     </div>
 
 </div>
+
+    <!-- Depósitos Manuales pendientes -->
+    <?php
+    $my_deposits = LTMS_Deposit::get_by_vendor( $vendor_id, 'pending', 5, 0 );
+    if ( ! empty( $my_deposits ) ) :
+    ?>
+    <div class="ltms-card" style="margin-top:20px;">
+        <div class="ltms-card-header">⏳ <?php esc_html_e( 'Depósitos Pendientes', 'ltms' ); ?></div>
+        <div class="ltms-card-body" style="padding:0;">
+            <table class="ltms-dtable" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
+                        <th><?php esc_html_e( 'Monto', 'ltms' ); ?></th>
+                        <th><?php esc_html_e( 'Método', 'ltms' ); ?></th>
+                        <th><?php esc_html_e( 'Referencia', 'ltms' ); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ( $my_deposits as $dep ) : ?>
+                    <tr>
+                        <td><?php echo esc_html( substr( $dep['created_at'], 0, 10 ) ); ?></td>
+                        <td><strong><?php echo esc_html( LTMS_Utils::format_money( (float) $dep['amount'] ) ); ?></strong></td>
+                        <td><?php echo esc_html( strtoupper( $dep['method'] ) ); ?></td>
+                        <td><?php echo esc_html( $dep['reference'] ?: '—' ); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
 
 <!-- Modal de Retiro -->
 <div class="ltms-modal" id="ltms-modal-payout">
@@ -108,3 +146,166 @@ $available    = max( 0, $balance - $held );
         </button>
     </div>
 </div>
+
+<!-- Modal de Depósito Manual -->
+<div class="ltms-modal" id="ltms-modal-deposit">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:480px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="margin:0;font-size:1.1rem;">💳 <?php esc_html_e( 'Depositar en Billetera', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+        </div>
+
+        <div class="ltms-deposit-error" style="display:none;color:#e74c3c;font-size:0.875rem;margin-bottom:12px;padding:10px;background:#fdf0ef;border-radius:6px;"></div>
+        <div class="ltms-deposit-success" style="display:none;color:#27ae60;font-size:0.875rem;margin-bottom:12px;padding:10px;background:#eafaf1;border-radius:6px;"></div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Monto a depositar (COP)', 'ltms' ); ?></label>
+            <input type="number" id="ltms-deposit-amount" min="<?php echo esc_attr( get_option('ltms_min_deposit_amount', 10000) ); ?>" step="1000"
+                   placeholder="Ej: 100000"
+                   style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
+            <small style="color:#9ca3af;font-size:0.75rem;">
+                Mínimo: <?php echo esc_html( LTMS_Utils::format_money( (float) get_option('ltms_min_deposit_amount', 10000) ) ); ?>
+            </small>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Método de pago', 'ltms' ); ?></label>
+            <select id="ltms-deposit-method" style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;">
+                <option value="pse">PSE - Pago Seguro en Línea</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia Bancaria</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Número de referencia / comprobante', 'ltms' ); ?></label>
+            <input type="text" id="ltms-deposit-reference"
+                   placeholder="Ej: TXN-20260529-001"
+                   style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Subir comprobante (JPG, PNG, PDF)', 'ltms' ); ?></label>
+            <input type="file" id="ltms-deposit-receipt" accept=".jpg,.jpeg,.png,.webp,.pdf"
+                   style="width:100%;padding:8px;border:1.5px dashed #d1d5db;border-radius:8px;">
+            <div id="ltms-deposit-receipt-status" style="font-size:0.8rem;color:#6b7280;margin-top:4px;"></div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Notas adicionales (opcional)', 'ltms' ); ?></label>
+            <textarea id="ltms-deposit-notes" rows="2"
+                      placeholder="Cualquier información adicional para el equipo..."
+                      style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;resize:vertical;font-size:0.9rem;"></textarea>
+        </div>
+
+        <!-- Info bancaria para transferencias -->
+        <div style="background:#f0f9ff;border-radius:8px;padding:14px;margin-bottom:20px;font-size:0.82rem;color:#0369a1;">
+            <strong>Datos bancarios Lo Tengo:</strong><br>
+            Banco: <?php echo esc_html( get_option('ltms_bank_name', 'Bancolombia') ); ?><br>
+            Cuenta: <?php echo esc_html( get_option('ltms_bank_account', 'xxx-xxx-xxx') ); ?><br>
+            Titular: Lo Tengo Colombia S.A.S.<br>
+            NIT: <?php echo esc_html( get_option('ltms_company_nit', '900.xxx.xxx-x') ); ?>
+        </div>
+
+        <button type="button" id="ltms-deposit-submit"
+                class="ltms-btn ltms-btn-primary" style="width:100%;justify-content:center;padding:12px;">
+            <?php esc_html_e( 'Enviar Solicitud de Depósito', 'ltms' ); ?>
+        </button>
+
+        <p style="font-size:0.75rem;color:#9ca3af;text-align:center;margin-top:12px;">
+            <?php esc_html_e( 'Tu depósito será revisado y aprobado en menos de 24 horas hábiles.', 'ltms' ); ?>
+        </p>
+    </div>
+</div>
+
+<script>
+(function($) {
+    'use strict';
+
+    var depositReceiptUrl = '';
+
+    // Subir comprobante al seleccionar archivo
+    $('#ltms-deposit-receipt').on('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        var statusEl = $('#ltms-deposit-receipt-status');
+        statusEl.text('Subiendo comprobante...');
+
+        var formData = new FormData();
+        formData.append('action', 'ltms_upload_receipt');
+        formData.append('nonce', ltms_vars.frontend_nonce);
+        formData.append('receipt', file);
+
+        $.ajax({
+            url: ltms_vars.ajax_url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    depositReceiptUrl = res.data.url;
+                    statusEl.css('color', '#27ae60').text('✅ Comprobante subido correctamente.');
+                } else {
+                    statusEl.css('color', '#e74c3c').text('❌ Error: ' + (res.data || 'No se pudo subir el archivo.'));
+                }
+            },
+            error: function() {
+                statusEl.css('color', '#e74c3c').text('❌ Error de conexión al subir el comprobante.');
+            }
+        });
+    });
+
+    // Enviar solicitud de depósito
+    $('#ltms-deposit-submit').on('click', function() {
+        var amount    = parseFloat($('#ltms-deposit-amount').val());
+        var method    = $('#ltms-deposit-method').val();
+        var reference = $('#ltms-deposit-reference').val().trim();
+        var notes     = $('#ltms-deposit-notes').val().trim();
+        var errEl     = $('.ltms-deposit-error');
+        var okEl      = $('.ltms-deposit-success');
+        var btn       = $(this);
+
+        errEl.hide();
+        okEl.hide();
+
+        if (!amount || amount <= 0) {
+            errEl.text('Ingresa un monto válido.').show();
+            return;
+        }
+
+        btn.prop('disabled', true).text('Enviando...');
+
+        $.post(ltms_vars.ajax_url, {
+            action:      'ltms_create_deposit',
+            nonce:       ltms_vars.frontend_nonce,
+            amount:      amount,
+            method:      method,
+            reference:   reference,
+            receipt_url: depositReceiptUrl,
+            notes:       notes,
+        }, function(res) {
+            if (res.success) {
+                okEl.text(res.data.message).show();
+                // Limpiar formulario
+                $('#ltms-deposit-amount, #ltms-deposit-reference, #ltms-deposit-notes').val('');
+                $('#ltms-deposit-receipt').val('');
+                $('#ltms-deposit-receipt-status').text('');
+                depositReceiptUrl = '';
+                btn.text('✅ Solicitud enviada');
+                // Recargar la vista tras 3s
+                setTimeout(function() { location.reload(); }, 3000);
+            } else {
+                errEl.text(res.data || 'Error desconocido.').show();
+                btn.prop('disabled', false).text('Enviar Solicitud de Depósito');
+            }
+        }).fail(function() {
+            errEl.text('Error de conexión.').show();
+            btn.prop('disabled', false).text('Enviar Solicitud de Depósito');
+        });
+    });
+})(jQuery);
+</script>
+
