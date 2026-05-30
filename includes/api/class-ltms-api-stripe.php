@@ -75,18 +75,33 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         float  $amount,
         string $currency,
         string $customer_email,
-        array  $metadata = []
+        array  $metadata = [],
+        string $payment_method_id = ''
     ): array {
         try {
             $stripe_amount = $this->convert_amount_to_stripe_units( $amount, $currency );
 
-            $intent = \Stripe\PaymentIntent::create( [
-                'amount'               => $stripe_amount,
-                'currency'             => strtolower( $currency ),
-                'receipt_email'        => sanitize_email( $customer_email ),
-                'metadata'             => $this->sanitize_metadata( $metadata ),
-                'automatic_payment_methods' => [ 'enabled' => true ],
-            ] );
+            $params = [
+                'amount'        => $stripe_amount,
+                'currency'      => strtolower( $currency ),
+                'receipt_email' => sanitize_email( $customer_email ),
+                'metadata'      => $this->sanitize_metadata( $metadata ),
+            ];
+
+            if ( ! empty( $payment_method_id ) ) {
+                // M-40 FIX: Adjuntar el PaymentMethod y confirmar en una sola llamada API.
+                // Mueve el PI de 'requires_payment_method' → 'succeeded' (o
+                // 'requires_action' si necesita 3DS) sin llamada extra de confirm().
+                $params['payment_method']       = $payment_method_id;
+                $params['confirm']              = true;
+                $params['return_url']           = wc_get_checkout_url();
+                $params['payment_method_types'] = [ 'card' ];
+            } else {
+                // Fallback sin payment_method (ej. Apple Pay desde frontend).
+                $params['automatic_payment_methods'] = [ 'enabled' => true ];
+            }
+
+            $intent = \Stripe\PaymentIntent::create( $params );
 
             return [
                 'success' => true,

@@ -82,7 +82,7 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
                 'type'        => 'checkbox',
                 'label'       => __( 'Activar modo de pruebas (sandbox)', 'ltms' ),
                 'description' => __( 'En modo sandbox se usan las claves de prueba de Stripe.', 'ltms' ),
-                'default'     => 'yes',
+                'default'     => 'no',
                 'desc_tip'    => true,
             ],
             // ── Claves de SANDBOX ───────────────────────────────────────────
@@ -232,7 +232,8 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
             'plugin'     => 'ltms',
         ];
 
-        $result = $stripe->create_payment_intent( $amount, $currency, $order->get_billing_email(), $metadata );
+        // M-40 FIX: Pasar payment_method_id para confirmar en una sola llamada.
+        $result = $stripe->create_payment_intent( $amount, $currency, $order->get_billing_email(), $metadata, $payment_method_id );
 
         if ( ! $result['success'] ) {
             $error = $result['error'] ?? __( 'Error desconocido al crear el pago.', 'ltms' );
@@ -247,28 +248,64 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
 
         $intent    = $result['data'];
         $intent_id = $intent['id'] ?? '';
+        $pi_status = $intent['status'] ?? '';
 
         // Guardar el ID del PaymentIntent en el pedido para webhooks y reembolsos.
         $order->update_meta_data( '_ltms_stripe_payment_intent_id', $intent_id );
         $order->update_meta_data( '_ltms_stripe_payment_method_id', $payment_method_id );
         $order->save();
 
-        // M-40: NO llamar payment_complete() aquí. El PaymentIntent recién creado
-        // está en estado 'requires_confirmation'. La confirmación real llega via
-        // webhook payment_intent.succeeded, que es quien llama payment_complete() y
-        // reduce stock. Llamarlo aquí causaría doble ejecución y marcaría pedidos
-        // como pagados antes de que Stripe haya cobrado realmente.
+        // Vaciar el carrito ahora — el stock se reduce cuando el webhook confirme.
+        WC()->cart->empty_cart();
+
+        // Caso 1: Pago requiere autenticación 3DS — redirigir al next_action URL.
+        if ( $pi_status === 'requires_action' || $pi_status === 'requires_source_action' ) {
+            $next_action_url = $intent['next_action']['redirect_to_url']['url']
+                ?? $intent['next_action']['use_stripe_sdk']['stripe_js'] ?? '';
+
+            if ( ! empty( $next_action_url ) ) {
+                $order->update_status(
+                    'on-hold',
+                    sprintf(
+                        /* translators: %s: PaymentIntent ID */
+                        __( 'Autenticación 3DS requerida por Stripe. PaymentIntent: %s', 'ltms' ),
+                        $intent_id
+                    )
+                );
+                return [
+                    'result'   => 'success',
+                    'redirect' => $next_action_url,
+                ];
+            }
+        }
+
+        // Caso 2: Pago confirmado inmediatamente (sin 3DS) — el webhook también
+        // llegará pero payment_complete() es idempotente via is_paid() guard.
+        if ( $pi_status === 'succeeded' ) {
+            $order->payment_complete( $intent_id );
+            $order->add_order_note(
+                sprintf(
+                    /* translators: %s: PaymentIntent ID */
+                    __( 'Pago Stripe confirmado al crear el PaymentIntent. PI: %s', 'ltms' ),
+                    $intent_id
+                )
+            );
+            return [
+                'result'   => 'success',
+                'redirect' => $order->get_checkout_order_received_url(),
+            ];
+        }
+
+        // Caso 3: Cualquier otro estado (requires_capture, processing, etc.) → on-hold.
         $order->update_status(
             'on-hold',
             sprintf(
-                /* translators: %s: Stripe PaymentIntent ID */
-                __( 'Pago iniciado vía Stripe. En espera de confirmación. PaymentIntent: %s', 'ltms' ),
-                $intent_id
+                /* translators: 1: PaymentIntent ID, 2: status */
+                __( 'Pago iniciado vía Stripe. Estado: %2$s. PaymentIntent: %1$s', 'ltms' ),
+                $intent_id,
+                $pi_status
             )
         );
-
-        // Vaciar el carrito. Stock se reduce cuando el webhook confirme el pago.
-        WC()->cart->empty_cart();
 
         return [
             'result'   => 'success',
