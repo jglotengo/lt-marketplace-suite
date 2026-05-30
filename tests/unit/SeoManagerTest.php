@@ -53,7 +53,13 @@ class SeoManagerTest extends TestCase {
 
     public function test_inject_search_console_outputs_meta_when_key_set(): void {
         \LTMS_Core_Config::flush_cache();
-        \LTMS_Core_Config::set( 'ltms_google_search_console_verify', 'abc123XYZ' );
+        // Mockear get_option para que LTMS_Core_Config::get funcione sin WP
+        Monkey\Functions\when( 'get_option' )
+            ->alias( static fn( $key, $default = null ) =>
+                $key === 'ltms_settings'
+                    ? [ 'ltms_google_search_console_verify' => 'abc123XYZ' ]
+                    : $default
+            );
         Monkey\Functions\when( 'esc_attr' )->returnArg();
 
         ob_start();
