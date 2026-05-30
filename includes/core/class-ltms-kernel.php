@@ -203,6 +203,7 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Payout_Scheduler' ) ) {
             LTMS_Payout_Scheduler::init();
         if ( class_exists( 'LTMS_Accounting' ) ) { LTMS_Accounting::init(); }
+        if ( class_exists( 'LTMS_Shipping_Mode' ) ) { LTMS_Shipping_Mode::init(); }
         }
 
         // Protección al consumidor / vesting
@@ -488,6 +489,7 @@ final class LTMS_Core_Kernel {
         }
         if ( class_exists( 'LTMS_Admin_Payouts' ) ) {
         if ( class_exists( 'LTMS_Admin_Accounting' ) ) { LTMS_Admin_Accounting::init(); }
+        if ( class_exists( 'LTMS_Admin_Shipping' ) ) { LTMS_Admin_Shipping::init(); }
             LTMS_Admin_Payouts::init();
         }
         // F-05: Panel admin depósitos manuales
