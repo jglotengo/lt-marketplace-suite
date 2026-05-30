@@ -19,9 +19,6 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         parent::setUp();
         LTMS_Core_Config::flush_cache();
 
-        $ref = new \ReflectionProperty( \LTMS_Shipping_Mode::class, 'initialized' );
-        $ref->setAccessible( true );
-        $ref->setValue( null, false );
     }
 
     protected function tearDown(): void {
