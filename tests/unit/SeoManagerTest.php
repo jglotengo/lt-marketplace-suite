@@ -15,7 +15,7 @@ class SeoManagerTest extends TestCase {
     protected function setUp(): void {
         parent::setUp();
         Monkey\setUp();
-        Monkey\Functions\stubs( [ 'error_log' => null ] );
+        Monkey\Functions\stubs( [ 'error_log' => null, 'get_option' => '' ] );
     }
 
     protected function tearDown(): void {
