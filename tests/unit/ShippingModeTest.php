@@ -27,11 +27,7 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
     protected function require_class( string $class_name = 'LTMS_Shipping_Mode' ): void {
-        static $loaded = false;
-        if ( ! $loaded ) {
-            require_once dirname( __DIR__, 2 ) . '/includes/shipping/class-ltms-shipping-mode.php';
-            $loaded = true;
-        }
+        // autoloader carga la clase
     }
 
     // ── SECCIÓN 1: Constantes ─────────────────────────────────────────────
