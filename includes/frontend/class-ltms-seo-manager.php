@@ -63,6 +63,7 @@ class LTMS_SEO_Manager {
             'image'       => [ $image_url ],
             'sku'         => $product->get_sku() ?: (string) $product->get_id(),
             'brand'       => [ '@type' => 'Brand', 'name' => $store_name ],
+            'aggregateRating' => self::build_aggregate_rating( $product ),
             'offers'      => [
                 '@type'           => 'Offer',
                 'url'             => get_permalink( $product->get_id() ),
@@ -167,4 +168,20 @@ class LTMS_SEO_Manager {
         }
         return $title;
     }
+    private static function build_aggregate_rating( \WC_Product $product ): ?array {
+        $count = $product->get_review_count();
+        $avg   = (float) $product->get_average_rating();
+        if ( $count < 1 || $avg <= 0 ) {
+            return null;
+        }
+        return [
+            '@type'       => 'AggregateRating',
+            'ratingValue' => round( $avg, 1 ),
+            'reviewCount' => $count,
+            'bestRating'  => 5,
+            'worstRating' => 1,
+        ];
+    }
+
+
 }
