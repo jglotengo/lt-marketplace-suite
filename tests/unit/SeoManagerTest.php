@@ -52,20 +52,22 @@ class SeoManagerTest extends TestCase {
     // ── inject_search_console ─────────────────────────────────────────────
 
     public function test_inject_search_console_outputs_meta_when_key_set(): void {
-        Monkey\Functions\when( 'LTMS_Core_Config::get' )
-            ->alias( fn( $k, $d = '' ) => $k === 'ltms_google_search_console_verify' ? 'abc123XYZ' : $d );
+        \LTMS_Core_Config::flush_cache();
+        \LTMS_Core_Config::set( 'ltms_google_search_console_verify', 'abc123XYZ' );
         Monkey\Functions\when( 'esc_attr' )->returnArg();
 
         ob_start();
         \LTMS_SEO_Manager::inject_search_console();
         $output = ob_get_clean();
 
+        \LTMS_Core_Config::flush_cache();
         $this->assertStringContainsString( 'google-site-verification', $output );
         $this->assertStringContainsString( 'abc123XYZ', $output );
     }
 
     public function test_inject_search_console_outputs_nothing_when_key_empty(): void {
-        Monkey\Functions\when( 'LTMS_Core_Config::get' )->justReturn( '' );
+        \LTMS_Core_Config::flush_cache();
+        // Sin set → get retorna default '' → no debe outputear nada
 
         ob_start();
         \LTMS_SEO_Manager::inject_search_console();
