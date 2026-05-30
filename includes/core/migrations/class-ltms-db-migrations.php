@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.3.0';
+    private const CURRENT_VERSION = '2.2.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -42,10 +42,6 @@ final class LTMS_DB_Migrations {
         self::create_indexes();
 
         // Migraciones de actualización de esquema (no cubiertas por dbDelta)
-        if ( version_compare( $installed_version, '2.3.0', '<' ) ) {
-            self::migrate_2_3_0_manual_deposits();
-        }
-
         if ( version_compare( $installed_version, '2.2.0', '<' ) ) {
             self::migrate_2_2_0_fiscal_sat_mexico();
         }
@@ -1763,56 +1759,31 @@ final class LTMS_DB_Migrations {
         }
         // phpcs:enable
     }
-    /**
-     * v2.3.0 — Tabla lt_manual_deposits para depósitos manuales (PSE/Nequi/Transferencia).
-     *
-     * @return void
-     */
-    private static function migrate_2_3_0_manual_deposits(): void {
+    private static function run_v2_4_0(): void {
         global $wpdb;
-        // phpcs:disable WordPress.DB.DirectDatabaseQuery
-        $table   = $wpdb->prefix . 'lt_manual_deposits';
         $charset = $wpdb->get_charset_collate();
-
-        $exists = (int) $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
-                DB_NAME,
-                $table
-            )
-        );
-
-        if ( ! $exists ) {
-            $wpdb->query(
-                "CREATE TABLE `{$table}` (
-                    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `vendor_id`     BIGINT UNSIGNED NOT NULL,
-                    `amount`        DECIMAL(15,2)   NOT NULL,
-                    `currency`      CHAR(3)         NOT NULL DEFAULT 'COP',
-                    `method`        ENUM('pse','nequi','transferencia') NOT NULL,
-                    `reference`     VARCHAR(200)    DEFAULT NULL COMMENT 'Número de referencia/transacción del banco',
-                    `receipt_url`   VARCHAR(1000)   DEFAULT NULL COMMENT 'URL del comprobante subido',
-                    `notes`         TEXT            DEFAULT NULL COMMENT 'Notas del vendedor',
-                    `status`        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-                    `approved_by`   BIGINT UNSIGNED DEFAULT NULL,
-                    `approved_at`   DATETIME        DEFAULT NULL,
-                    `rejected_by`   BIGINT UNSIGNED DEFAULT NULL,
-                    `rejected_at`   DATETIME        DEFAULT NULL,
-                    `reject_reason` VARCHAR(1000)   DEFAULT NULL,
-                    `admin_notes`   TEXT            DEFAULT NULL,
-                    `wallet_tx_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT 'ID de la transacción en lt_wallet_transactions',
-                    `ip_address`    VARCHAR(45)     DEFAULT NULL,
-                    `created_by`    BIGINT UNSIGNED DEFAULT NULL,
-                    `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    KEY `idx_vendor_id`  (`vendor_id`),
-                    KEY `idx_status`     (`status`),
-                    KEY `idx_created_at` (`created_at`)
-                ) {$charset}"
-            );
-        }
-        // phpcs:enable
+        $table   = $wpdb->prefix . 'lt_accounting_entries';
+        $sql = "CREATE TABLE IF NOT EXISTS `{$table}` (
+            `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `account_code` VARCHAR(10)     NOT NULL,
+            `entry_type`   ENUM('debit','credit') NOT NULL,
+            `amount`       DECIMAL(15,2)   NOT NULL DEFAULT 0.00,
+            `currency`     CHAR(3)         NOT NULL DEFAULT 'COP',
+            `description`  VARCHAR(500)    NOT NULL DEFAULT '',
+            `vendor_id`    BIGINT UNSIGNED NULL,
+            `source_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `source_type`  VARCHAR(50)     NOT NULL DEFAULT '',
+            `created_by`   BIGINT UNSIGNED NULL,
+            `created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_account_code` (`account_code`),
+            KEY `idx_source`       (`source_type`, `source_id`),
+            KEY `idx_vendor`       (`vendor_id`),
+            KEY `idx_created_at`   (`created_at`)
+        ) {$charset};";
+        require_once ABSPATH . "wp-admin/includes/upgrade.php";
+        dbDelta( $sql );
+        LTMS_Core_Logger::info( "DB_MIGRATION", "v2.4.0: lt_accounting_entries OK." );
     }
 
 }

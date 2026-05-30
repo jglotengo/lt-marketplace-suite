@@ -202,6 +202,7 @@ final class LTMS_Core_Kernel {
         // Scheduler de pagos
         if ( class_exists( 'LTMS_Payout_Scheduler' ) ) {
             LTMS_Payout_Scheduler::init();
+        if ( class_exists( 'LTMS_Accounting' ) ) { LTMS_Accounting::init(); }
         }
 
         // Protección al consumidor / vesting
@@ -486,6 +487,7 @@ final class LTMS_Core_Kernel {
             LTMS_Admin_Settings::init();
         }
         if ( class_exists( 'LTMS_Admin_Payouts' ) ) {
+        if ( class_exists( 'LTMS_Admin_Accounting' ) ) { LTMS_Admin_Accounting::init(); }
             LTMS_Admin_Payouts::init();
         }
         // F-05: Panel admin depósitos manuales

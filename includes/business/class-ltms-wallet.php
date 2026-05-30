@@ -392,6 +392,9 @@ final class LTMS_Business_Wallet {
 
             $wpdb->query( 'COMMIT' );
 
+            // F-06: Hook contable post-COMMIT.
+            do_action( 'ltms_wallet_tx_committed', $tx_id, $vendor_id, $type, $amount, $currency ?? 'COP' );
+
             LTMS_Core_Logger::info(
                 'WALLET_TRANSACTION',
                 sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
