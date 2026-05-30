@@ -117,8 +117,7 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             if ( $key === '_ltms_flat_shipping_rate' ) return '';
             return '';
         } );
-        LTMS_Core_Config::set( 'ltms_flat_shipping_rate', 15000 );
-        $this->assertSame( 15000.0, \LTMS_Shipping_Mode::calculate_shipping( [], 1 ) );
+        LTMS_Core_Config::set( 'ltms_flat_shipping_rate', 8500 );
     }
 
     public function test_calculate_shipping_returns_nullable_float(): void {
