@@ -42,6 +42,14 @@ final class LTMS_Payout_Scheduler {
     public static function init(): void {
         add_action( 'ltms_process_payouts', [ __CLASS__, 'process_pending_payouts' ] );
         add_action( 'ltms_approve_payout_cron', [ __CLASS__, 'auto_approve_eligible' ] );
+
+        // M-118: Registrar schedules si no existen (idempotente — safe to call on every request).
+        if ( ! wp_next_scheduled( 'ltms_process_payouts' ) ) {
+            wp_schedule_event( strtotime( 'tomorrow 02:00:00' ), 'daily', 'ltms_process_payouts' );
+        }
+        if ( ! wp_next_scheduled( 'ltms_approve_payout_cron' ) ) {
+            wp_schedule_event( strtotime( 'tomorrow 06:00:00' ), 'daily', 'ltms_approve_payout_cron' );
+        }
     }
 
     /**
@@ -191,20 +199,49 @@ final class LTMS_Payout_Scheduler {
         $table = $wpdb->prefix . 'lt_payout_requests';
 
         if ( $payment_result['success'] ) {
-            // 1. Liberar el hold (balance_pending → balance) para que el debit tenga saldo disponible
-            LTMS_Business_Wallet::release(
-                (int) $payout['vendor_id'],
-                (float) $payout['amount'],
-                sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id )
-            );
+            // 1. Liberar el hold + debitar — envuelto en try/catch porque Wallet lanza RuntimeException
+            try {
+                LTMS_Business_Wallet::release(
+                    (int) $payout['vendor_id'],
+                    (float) $payout['amount'],
+                    sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id )
+                );
 
-            // 2. Debitar el balance ahora disponible (tipo payout para el ledger)
-            LTMS_Business_Wallet::debit(
-                (int) $payout['vendor_id'],
-                (float) $payout['amount'],
-                sprintf( __( 'Retiro procesado #%d', 'ltms' ), $payout_id ),
-                [ 'payout_id' => $payout_id, 'type' => 'payout' ]
-            );
+                LTMS_Business_Wallet::debit(
+                    (int) $payout['vendor_id'],
+                    (float) $payout['amount'],
+                    sprintf( __( 'Retiro procesado #%d', 'ltms' ), $payout_id ),
+                    [ 'payout_id' => $payout_id, 'type' => 'payout' ]
+                );
+            } catch ( \Throwable $wallet_err ) {
+                // El gateway ya procesó el pago pero la billetera falló.
+                // Marcar como completed con nota para revisión manual.
+                LTMS_Core_Logger::error(
+                    'PAYOUT_WALLET_ERROR',
+                    sprintf(
+                        'Retiro #%d: gateway OK pero wallet falló — %s. Requiere ajuste manual.',
+                        $payout_id,
+                        $wallet_err->getMessage()
+                    )
+                );
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->update(
+                    $table,
+                    [
+                        'status'      => 'completed',
+                        'gateway_ref' => $payment_result['reference'] ?? '',
+                        'notes'       => 'AVISO: gateway OK, wallet error: ' . $wallet_err->getMessage(),
+                    ],
+                    [ 'id' => $payout_id ],
+                    [ '%s', '%s', '%s' ],
+                    [ '%d' ]
+                );
+                do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'] );
+                return [
+                    'success' => true,
+                    'message' => __( 'Retiro procesado. Advertencia: billetera requiere revisión.', 'ltms' ),
+                ];
+            }
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
