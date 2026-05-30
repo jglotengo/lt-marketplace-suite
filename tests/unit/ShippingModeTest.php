@@ -41,11 +41,13 @@ class ShippingModeTest extends TestCase
     //  Default
     // ------------------------------------------------------------------ //
 
-    public function test_default_config_returns_null(): void
+    public function test_default_config_returns_flat_rate(): void
     {
+        // Sin config → modo default es flat → retorna tarifa plana
         Monkey\Functions\when( 'get_option' )->justReturn( null );
+        Monkey\Functions\when( 'get_user_meta' )->justReturn( '' );
         $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
+        $this->assertIsFloat( $result );
     }
 
     public function test_returns_null_or_float_never_other_type(): void
@@ -125,11 +127,13 @@ class ShippingModeTest extends TestCase
     //  mode = 'flat' → null
     // ------------------------------------------------------------------ //
 
-    public function test_flat_mode_returns_null(): void
+    public function test_flat_mode_returns_flat_rate(): void
     {
         $this->stubMode( 'flat' );
+        Monkey\Functions\when( 'get_user_meta' )->justReturn( '' );
         $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
+        $this->assertIsFloat( $result );
+        $this->assertGreaterThan( 0.0, $result );
     }
 
     // ------------------------------------------------------------------ //
@@ -216,10 +220,15 @@ class ShippingModeTest extends TestCase
     {
         $ref    = new \ReflectionMethod( 'LTMS_Shipping_Mode', 'calculate_shipping' );
         $params = $ref->getParameters();
-        $this->assertCount( 1, $params );
+        // F-08: firma extendida a ($package, $vendor_id = 0)
+        $this->assertGreaterThanOrEqual( 1, count( $params ) );
         $type = $params[0]->getType();
         $this->assertNotNull( $type );
         $this->assertSame( 'array', $type->getName() );
+        // Segundo parámetro es opcional
+        if ( count( $params ) >= 2 ) {
+            $this->assertTrue( $params[1]->isOptional() );
+        }
     }
 
     public function test_class_is_not_final(): void
