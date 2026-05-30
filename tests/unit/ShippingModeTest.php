@@ -1,342 +1,324 @@
 <?php
+/**
+ * ShippingModeTest — Tests unitarios para LTMS_Shipping_Mode
+ *
+ * @package LTMS\Tests\Unit
+ */
 
 declare( strict_types=1 );
 
-namespace LTMS\Tests\Unit;
-
-use Brain\Monkey;
-use PHPUnit\Framework\TestCase;
+use Brain\Monkey\Functions;
+require_once __DIR__ . '/class-ltms-unit-test-case.php';
 
 /**
- * Unit tests for LTMS_Shipping_Mode::calculate_shipping() — versión extendida.
+ * @covers LTMS_Shipping_Mode
  */
-class ShippingModeTest extends TestCase
-{
-    protected function setUp(): void
-    {
+class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
+
+    protected function setUp(): void {
         parent::setUp();
-        Monkey\setUp();
-        \LTMS_Core_Config::flush_cache();
-        Monkey\Functions\stubs( [ 'error_log' => null ] );
+
+        if ( ! class_exists( 'LTMS_Core_Config', false ) ) {
+            eval( 'class LTMS_Core_Config {
+                private static array $data = [];
+                public static function set( string $k, mixed $v ): void { self::$data[$k] = $v; }
+                public static function get( string $k, mixed $d = null ): mixed {
+                    return self::$data[$k] ?? $d;
+                }
+                public static function reset(): void { self::$data = []; }
+            }' );
+        }
+
+        \LTMS_Core_Config::reset();
+
+        $ref = new \ReflectionProperty( \LTMS_Shipping_Mode::class, 'initialized' );
+        $ref->setAccessible( true );
+        $ref->setValue( null, false );
     }
 
-    protected function tearDown(): void
-    {
-        \LTMS_Core_Config::flush_cache();
-        Monkey\tearDown();
+    protected function tearDown(): void {
+        \LTMS_Core_Config::reset();
         parent::tearDown();
     }
 
-    private function stubMode( string $mode ): void
-    {
-        Monkey\Functions\when( 'get_option' )
-            ->alias( static fn( $key, $default = null ) =>
-                $key === 'ltms_settings'
-                    ? [ 'ltms_shipping_mode' => $mode ]
-                    : $default
-            );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  Default
-    // ------------------------------------------------------------------ //
-
-    public function test_default_config_returns_flat_rate(): void
-    {
-        // Sin config → modo default es flat → retorna tarifa plana
-        Monkey\Functions\when( 'get_option' )->justReturn( null );
-        Monkey\Functions\when( 'get_user_meta' )->justReturn( '' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertIsFloat( $result );
-    }
-
-    public function test_returns_null_or_float_never_other_type(): void
-    {
-        Monkey\Functions\when( 'get_option' )->justReturn( null );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertTrue( $result === null || is_float( $result ) );
-    }
-
-    public function test_does_not_throw_with_empty_package(): void
-    {
-        Monkey\Functions\when( 'get_option' )->justReturn( null );
-        \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertTrue( true );
-    }
-
-    public function test_does_not_throw_with_full_package(): void
-    {
-        Monkey\Functions\when( 'get_option' )->justReturn( null );
-        $package = [
-            'contents'      => [ [ 'product_id' => 1, 'quantity' => 2 ] ],
-            'contents_cost' => 150000,
-            'destination'   => [ 'country' => 'CO', 'state' => 'VAC', 'city' => 'Cali' ],
-        ];
-        $result = \LTMS_Shipping_Mode::calculate_shipping( $package );
-        $this->assertTrue( $result === null || is_float( $result ) );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  mode = 'free' → 0.0
-    // ------------------------------------------------------------------ //
-
-    public function test_free_mode_returns_zero_float(): void
-    {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertSame( 0.0, $result );
-    }
-
-    public function test_free_mode_returns_float_not_int(): void
-    {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertIsFloat( $result );
-    }
-
-    public function test_free_mode_ignores_package_contents(): void
-    {
-        $this->stubMode( 'free' );
-        $package = [
-            'contents'      => [ 'item1', 'item2' ],
-            'contents_cost' => 999999,
-            'destination'   => [ 'country' => 'CO' ],
-        ];
-        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( $package ) );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  mode = 'quoted' → null
-    // ------------------------------------------------------------------ //
-
-    public function test_quoted_mode_returns_null(): void
-    {
-        $this->stubMode( 'quoted' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_quoted_mode_ignores_package_destination(): void
-    {
-        $this->stubMode( 'quoted' );
-        $package = [ 'destination' => [ 'country' => 'MX', 'city' => 'CDMX' ] ];
-        $this->assertNull( \LTMS_Shipping_Mode::calculate_shipping( $package ) );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  mode = 'flat' → null
-    // ------------------------------------------------------------------ //
-
-    public function test_flat_mode_returns_flat_rate(): void
-    {
-        $this->stubMode( 'flat' );
-        Monkey\Functions\when( 'get_user_meta' )->justReturn( '' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertIsFloat( $result );
-        $this->assertGreaterThan( 0.0, $result );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  modos desconocidos / edge cases → null
-    // ------------------------------------------------------------------ //
-
-    public function test_unknown_mode_returns_null(): void
-    {
-        $this->stubMode( 'carrier_api' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_empty_mode_string_returns_null(): void
-    {
-        $this->stubMode( '' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_uppercase_FREE_mode_returns_null(): void
-    {
-        // Comparación estricta '=== "free"' → 'FREE' no coincide → retorna null
-        $this->stubMode( 'FREE' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_uppercase_QUOTED_mode_returns_null(): void
-    {
-        // '=== "quoted"' → 'QUOTED' no coincide → retorna null
-        $this->stubMode( 'QUOTED' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_mixed_case_Free_mode_returns_null(): void
-    {
-        $this->stubMode( 'Free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_mode_with_whitespace_returns_null(): void
-    {
-        $this->stubMode( ' free ' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    public function test_numeric_mode_returns_null(): void
-    {
-        $this->stubMode( '0' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNull( $result );
-    }
-
-    // ------------------------------------------------------------------ //
-    //  Reflexión — estructura y visibilidad de la clase
-    // ------------------------------------------------------------------ //
-
-    public function test_class_exists(): void
-    {
-        $this->assertTrue( class_exists( 'LTMS_Shipping_Mode' ) );
-    }
-
-    public function test_calculate_shipping_is_public_static(): void
-    {
-        $ref = new \ReflectionMethod( 'LTMS_Shipping_Mode', 'calculate_shipping' );
-        $this->assertTrue( $ref->isPublic() );
-        $this->assertTrue( $ref->isStatic() );
-    }
-
-    public function test_calculate_shipping_return_type_is_nullable_float(): void
-    {
-        $ref = new \ReflectionMethod( 'LTMS_Shipping_Mode', 'calculate_shipping' );
-        $rt  = $ref->getReturnType();
-        $this->assertNotNull( $rt );
-        $this->assertTrue( $rt->allowsNull() );
-        $this->assertSame( 'float', $rt->getName() );
-    }
-
-    public function test_calculate_shipping_accepts_array_param(): void
-    {
-        $ref    = new \ReflectionMethod( 'LTMS_Shipping_Mode', 'calculate_shipping' );
-        $params = $ref->getParameters();
-        // F-08: firma extendida a ($package, $vendor_id = 0)
-        $this->assertGreaterThanOrEqual( 1, count( $params ) );
-        $type = $params[0]->getType();
-        $this->assertNotNull( $type );
-        $this->assertSame( 'array', $type->getName() );
-        // Segundo parámetro es opcional
-        if ( count( $params ) >= 2 ) {
-            $this->assertTrue( $params[1]->isOptional() );
+    private function require_class(): void {
+        static $loaded = false;
+        if ( ! $loaded ) {
+            require_once dirname( __DIR__, 2 ) . '/includes/shipping/class-ltms-shipping-mode.php';
+            $loaded = true;
         }
     }
 
-    public function test_class_is_not_final(): void
-    {
-        $ref = new \ReflectionClass( 'LTMS_Shipping_Mode' );
-        $this->assertFalse( $ref->isFinal() );
+    // ── SECCIÓN 1: Constantes ─────────────────────────────────────────────
+
+    public function test_mode_flat_constant(): void {
+        $this->require_class();
+        $this->assertSame( 'flat', \LTMS_Shipping_Mode::MODE_FLAT );
     }
 
-    public function test_free_mode_result_is_not_null(): void
-    {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertNotNull( $result );
+    public function test_mode_free_absorbed_constant(): void {
+        $this->require_class();
+        $this->assertSame( 'free_absorbed', \LTMS_Shipping_Mode::MODE_FREE_ABSORBED );
     }
 
-    public function test_free_mode_result_equals_zero(): void
-    {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertEqualsWithDelta( 0.0, $result, 0.0001 );
+    public function test_mode_hybrid_constant(): void {
+        $this->require_class();
+        $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::MODE_HYBRID );
     }
 
-    // ------------------------------------------------------------------ //
-    //  Package con campos nulos / malformados
-    // ------------------------------------------------------------------ //
-
-    public function test_null_destination_does_not_throw(): void {
-        Monkey\Functions\when( 'get_option' )->justReturn( null );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [ 'destination' => null ] );
-        $this->assertTrue( $result === null || is_float( $result ) );
+    public function test_valid_modes_contains_all_three(): void {
+        $this->require_class();
+        $this->assertCount( 3, \LTMS_Shipping_Mode::VALID_MODES );
+        $this->assertContains( 'flat',          \LTMS_Shipping_Mode::VALID_MODES );
+        $this->assertContains( 'free_absorbed', \LTMS_Shipping_Mode::VALID_MODES );
+        $this->assertContains( 'hybrid',        \LTMS_Shipping_Mode::VALID_MODES );
     }
 
-    public function test_contents_cost_zero_does_not_change_result(): void {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [ 'contents_cost' => 0 ] );
-        $this->assertSame( 0.0, $result );
+    // ── SECCIÓN 2: get_mode_for_vendor ────────────────────────────────────
+
+    public function test_get_mode_returns_flat_by_default(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        $this->assertSame( 'flat', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
-    public function test_negative_contents_cost_does_not_throw(): void {
-        $this->stubMode( 'free' );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [ 'contents_cost' => -100 ] );
-        $this->assertSame( 0.0, $result );
+    public function test_get_mode_returns_vendor_meta_when_set(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'free_absorbed' );
+        $this->assertSame( 'free_absorbed', \LTMS_Shipping_Mode::get_mode_for_vendor( 5 ) );
     }
 
-    public function test_free_mode_large_package_still_zero(): void {
-        $this->stubMode( 'free' );
-        $package = [
-            'contents'      => array_fill( 0, 50, [ 'product_id' => 1, 'quantity' => 10 ] ),
-            'contents_cost' => 99_999_999,
-            'destination'   => [ 'country' => 'CO', 'state' => 'VAC', 'city' => 'Cali' ],
-        ];
-        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( $package ) );
+    public function test_get_mode_ignores_invalid_meta(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'invalid_mode' );
+        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
+        $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
-    public function test_quoted_large_package_still_null(): void {
-        $this->stubMode( 'quoted' );
-        $package = [
-            'contents'      => array_fill( 0, 50, [ 'product_id' => 1, 'quantity' => 10 ] ),
-            'contents_cost' => 99_999_999,
-            'destination'   => [ 'country' => 'CO', 'state' => 'VAC', 'city' => 'Cali' ],
-        ];
-        $this->assertNull( \LTMS_Shipping_Mode::calculate_shipping( $package ) );
+    public function test_get_mode_falls_back_to_global_option(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'free_absorbed' );
+        $this->assertSame( 'free_absorbed', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
-    // ------------------------------------------------------------------ //
-    //  Invariante de tipo en todos los modos
-    // ------------------------------------------------------------------ //
-
-    /**
-     * @dataProvider provider_all_modes
-     */
-    public function test_return_is_always_null_or_float( string $mode ): void {
-        $this->stubMode( $mode );
-        $result = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertTrue( $result === null || is_float( $result ),
-            "Mode '{$mode}' returned unexpected type: " . gettype( $result ) );
+    public function test_get_mode_vendor_id_zero_uses_global(): void {
+        $this->require_class();
+        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'hybrid' );
+        $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::get_mode_for_vendor( 0 ) );
     }
 
-    public static function provider_all_modes(): array {
-        return [
-            'free'       => [ 'free' ],
-            'quoted'     => [ 'quoted' ],
-            'flat'       => [ 'flat' ],
-            'unknown'    => [ 'carrier_api' ],
-            'empty'      => [ '' ],
-            'numeric'    => [ '1' ],
-            'FREE upper' => [ 'FREE' ],
-        ];
+    public function test_get_mode_invalid_global_returns_flat(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        \LTMS_Core_Config::set( 'ltms_shipping_mode', 'bogus' );
+        $this->assertSame( 'flat', \LTMS_Shipping_Mode::get_mode_for_vendor( 1 ) );
     }
 
-    // ------------------------------------------------------------------ //
-    //  Idempotencia — misma llamada, mismo resultado
-    // ------------------------------------------------------------------ //
+    // ── SECCIÓN 3: set_mode_for_vendor ────────────────────────────────────
 
-    public function test_free_mode_idempotent(): void {
-        $this->stubMode( 'free' );
-        $package = [ 'destination' => [ 'country' => 'CO' ] ];
-        $r1 = \LTMS_Shipping_Mode::calculate_shipping( $package );
-        $r2 = \LTMS_Shipping_Mode::calculate_shipping( $package );
-        $this->assertSame( $r1, $r2 );
+    public function test_set_mode_returns_false_for_vendor_zero(): void {
+        $this->require_class();
+        $this->assertFalse( \LTMS_Shipping_Mode::set_mode_for_vendor( 0, 'flat' ) );
     }
 
-    public function test_flat_mode_idempotent(): void {
-        $this->stubMode( 'flat' );
-        $r1 = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $r2 = \LTMS_Shipping_Mode::calculate_shipping( [] );
-        $this->assertSame( $r1, $r2 );
+    public function test_set_mode_returns_false_for_invalid_mode(): void {
+        $this->require_class();
+        $this->assertFalse( \LTMS_Shipping_Mode::set_mode_for_vendor( 1, 'invalid' ) );
     }
 
+    public function test_set_mode_returns_true_for_valid(): void {
+        $this->require_class();
+        Functions\when( 'update_user_meta' )->justReturn( true );
+        $this->assertTrue( \LTMS_Shipping_Mode::set_mode_for_vendor( 1, 'flat' ) );
+    }
+
+    public function test_set_mode_free_absorbed_valid(): void {
+        $this->require_class();
+        Functions\when( 'update_user_meta' )->justReturn( 1 );
+        $this->assertTrue( \LTMS_Shipping_Mode::set_mode_for_vendor( 3, 'free_absorbed' ) );
+    }
+
+    public function test_set_mode_hybrid_valid(): void {
+        $this->require_class();
+        Functions\when( 'update_user_meta' )->justReturn( 1 );
+        $this->assertTrue( \LTMS_Shipping_Mode::set_mode_for_vendor( 3, 'hybrid' ) );
+    }
+
+    // ── SECCIÓN 4: calculate_shipping — modo flat ─────────────────────────
+
+    public function test_calculate_flat_returns_global_flat_rate(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'flat' );
+        Functions\when( 'update_user_meta' )->justReturn( true );
+        \LTMS_Core_Config::set( 'ltms_flat_shipping_rate', 15000 );
+
+        // get_user_meta para _ltms_flat_shipping_rate devuelve ''
+        Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
+            if ( $key === '_ltms_shipping_mode'    ) return 'flat';
+            if ( $key === '_ltms_flat_shipping_rate' ) return '';
+            return '';
+        } );
+
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 50000.0, [] );
+        $this->assertSame( 15000.0, $cost );
+    }
+
+    public function test_calculate_flat_uses_vendor_meta_rate(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
+            if ( $key === '_ltms_shipping_mode'      ) return 'flat';
+            if ( $key === '_ltms_flat_shipping_rate' ) return '8000';
+            return '';
+        } );
+
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 2, 0.0, [] );
+        $this->assertSame( 8000.0, $cost );
+    }
+
+    // ── SECCIÓN 5: calculate_shipping — modo free_absorbed ────────────────
+
+    public function test_calculate_free_absorbed_returns_zero(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'free_absorbed' );
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 100000.0, [] );
+        $this->assertSame( 0.0, $cost );
+    }
+
+    public function test_calculate_free_absorbed_always_zero_regardless_total(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'free_absorbed' );
+        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, [] ) );
+        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( 1, 999999.0, [] ) );
+    }
+
+    // ── SECCIÓN 6: calculate_shipping — modo hybrid ───────────────────────
+
+    public function test_calculate_hybrid_empty_package_returns_zero(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'hybrid' );
+        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '1,2' );
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, [ 'contents' => [] ] );
+        $this->assertSame( 0.0, $cost );
+    }
+
+    public function test_calculate_hybrid_no_free_cats_returns_flat(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
+            if ( $key === '_ltms_shipping_mode'      ) return 'hybrid';
+            if ( $key === '_ltms_flat_shipping_rate' ) return '5000';
+            return '';
+        } );
+        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '' );
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, [ 'contents' => [ ['product_id' => 10] ] ] );
+        $this->assertSame( 5000.0, $cost );
+    }
+
+    public function test_calculate_hybrid_all_products_in_free_cats_returns_zero(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'hybrid' );
+        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
+        Functions\when( 'wc_get_product_term_ids' )->justReturn( [ 5, 7 ] );
+
+        $package = [ 'contents' => [ ['product_id' => 10], ['product_id' => 11] ] ];
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, $package );
+        $this->assertSame( 0.0, $cost );
+    }
+
+    public function test_calculate_hybrid_product_not_in_free_cats_returns_flat(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->alias( function( $uid, $key ) {
+            if ( $key === '_ltms_shipping_mode'      ) return 'hybrid';
+            if ( $key === '_ltms_flat_shipping_rate' ) return '12000';
+            return '';
+        } );
+        \LTMS_Core_Config::set( 'ltms_shipping_free_categories', '5,6' );
+        Functions\when( 'wc_get_product_term_ids' )->justReturn( [ 99 ] ); // no intersecta
+
+        $package = [ 'contents' => [ ['product_id' => 10] ] ];
+        $cost = \LTMS_Shipping_Mode::calculate_shipping( 1, 0.0, $package );
+        $this->assertSame( 12000.0, $cost );
+    }
+
+    // ── SECCIÓN 7: is_free_for_customer ──────────────────────────────────
+
+    public function test_is_free_for_customer_free_absorbed_true(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'free_absorbed' );
+        $this->assertTrue( \LTMS_Shipping_Mode::is_free_for_customer( 1 ) );
+    }
+
+    public function test_is_free_for_customer_flat_false(): void {
+        $this->require_class();
+        Functions\when( 'get_user_meta' )->justReturn( 'flat' );
+        $this->assertFalse( \LTMS_Shipping_Mode::is_free_for_customer( 1 ) );
+    }
+
+    // ── SECCIÓN 8: save_vendor_mode_from_post ─────────────────────────────
+
+    public function test_save_vendor_mode_from_post_valid(): void {
+        $this->require_class();
+        $called_with = null;
+        Functions\when( 'update_user_meta' )->alias(
+            function( $uid, $key, $val ) use ( &$called_with ) {
+                $called_with = [ $uid, $key, $val ];
+                return true;
+            }
+        );
+        Functions\when( 'sanitize_key' )->alias( fn( $v ) => $v );
+
+        \LTMS_Shipping_Mode::save_vendor_mode_from_post( 7, [ 'ltms_shipping_mode' => 'hybrid' ] );
+        $this->assertSame( [ 7, '_ltms_shipping_mode', 'hybrid' ], $called_with );
+    }
+
+    public function test_save_vendor_mode_from_post_empty_does_nothing(): void {
+        $this->require_class();
+        $called = false;
+        Functions\when( 'update_user_meta' )->alias( function() use ( &$called ) { $called = true; return true; } );
+        Functions\when( 'sanitize_key' )->alias( fn( $v ) => $v );
+
+        \LTMS_Shipping_Mode::save_vendor_mode_from_post( 7, [] );
+        $this->assertFalse( $called );
+    }
+
+    // ── SECCIÓN 9: Reflexión ─────────────────────────────────────────────
+
+    public function test_class_is_not_final(): void {
+        $this->require_class();
+        $this->assertFalse( ( new \ReflectionClass( \LTMS_Shipping_Mode::class ) )->isFinal() );
+    }
+
+    public function test_init_is_public_static(): void {
+        $this->require_class();
+        $m = new \ReflectionMethod( \LTMS_Shipping_Mode::class, 'init' );
+        $this->assertTrue( $m->isPublic() );
+        $this->assertTrue( $m->isStatic() );
+    }
+
+    public function test_get_mode_is_public_static(): void {
+        $this->require_class();
+        $m = new \ReflectionMethod( \LTMS_Shipping_Mode::class, 'get_mode_for_vendor' );
+        $this->assertTrue( $m->isPublic() );
+        $this->assertTrue( $m->isStatic() );
+    }
+
+    public function test_set_mode_is_public_static(): void {
+        $this->require_class();
+        $m = new \ReflectionMethod( \LTMS_Shipping_Mode::class, 'set_mode_for_vendor' );
+        $this->assertTrue( $m->isPublic() );
+        $this->assertTrue( $m->isStatic() );
+    }
+
+    public function test_calculate_shipping_is_public_static(): void {
+        $this->require_class();
+        $m = new \ReflectionMethod( \LTMS_Shipping_Mode::class, 'calculate_shipping' );
+        $this->assertTrue( $m->isPublic() );
+        $this->assertTrue( $m->isStatic() );
+    }
+
+    public function test_calculate_shipping_returns_float(): void {
+        $this->require_class();
+        $rt = ( new \ReflectionMethod( \LTMS_Shipping_Mode::class, 'calculate_shipping' ) )->getReturnType();
+        $this->assertSame( 'float', (string) $rt );
+    }
 }
-
