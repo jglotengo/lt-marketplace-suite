@@ -230,7 +230,7 @@ class LTMS_Products_Ajax {
 
         // ── 1. Validar tipo MIME ──────────────────────────────────────────────
         $allowed_mimes = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ];
-        $finfo         = new info( FILEINFO_MIME_TYPE );
+        $finfo         = new finfo( FILEINFO_MIME_TYPE );
         $real_mime     = $finfo->file( $file['tmp_name'] );
         if ( ! in_array( $real_mime, $allowed_mimes, true ) ) {
             wp_send_json_error( sprintf( 'Tipo de archivo no permitido: %s', esc_html( $real_mime ) ), 415 );
