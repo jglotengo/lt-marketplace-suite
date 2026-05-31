@@ -44,7 +44,7 @@ final class LTMS_Deposit {
      */
     private static function table(): string {
         global $wpdb;
-        return $wpdb->prefix . 'lt_manual_deposits';
+        return $wpdb->prefix . 'lt_deposits';
     }
 
     /**

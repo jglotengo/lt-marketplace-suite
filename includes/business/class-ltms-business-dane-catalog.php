@@ -140,10 +140,10 @@ final class LTMS_Business_Dane_Catalog {
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $rows = $wpdb->get_results(
-            "SELECT code, department_code, department_name, municipality_name
+            "SELECT dane_code AS code, department AS department_code, department AS department_name, name AS municipality_name
                FROM `{$table}`
               WHERE is_active = 1
-              ORDER BY municipality_name ASC",
+              ORDER BY name ASC",
             ARRAY_A
         );
 
@@ -167,7 +167,7 @@ final class LTMS_Business_Dane_Catalog {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $code = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT code FROM `{$table}` WHERE LOWER(municipality_name) = LOWER(%s) AND is_active = 1 LIMIT 1",
+                "SELECT dane_code FROM `{$table}` WHERE LOWER(name) = LOWER(%s) AND is_active = 1 LIMIT 1",
                 trim( $city_name )
             )
         );
