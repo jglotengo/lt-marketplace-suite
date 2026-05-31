@@ -413,12 +413,14 @@ final class LTMS_Admin {
     }
 
     public function render_settings(): void {
-        // Asegurar que la función helper esté disponible antes de incluir la vista.
-        // Esto evita el error de SiteGround cuando include carga el archivo dos veces.
-        if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) {
-            require_once LTMS_INCLUDES_DIR . 'admin/views/html-admin-settings.php';
+        try {
+            if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) {
+                require_once LTMS_INCLUDES_DIR . 'admin/views/html-admin-settings.php';
+            }
+            $this->render_view( 'html-admin-settings' );
+        } catch ( \Throwable $e ) {
+            echo '<div style="background:red;color:white;padding:10px;">LTMS Settings Error: ' . esc_html( $e->getMessage() ) . ' in ' . esc_html( $e->getFile() ) . ':' . esc_html( $e->getLine() ) . '</div>';
         }
-        $this->render_view( 'html-admin-settings' );
     }
 
     public function render_auditor_dashboard(): void {
