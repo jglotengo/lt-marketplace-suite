@@ -171,7 +171,7 @@ class LTMS_Admin_Marketing_Manager {
 
         try {
             $b2     = new LTMS_Api_Backblaze();
-            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_default_bucket', 'lotengo-contratos' );
+            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_marketing_bucket', 'lotengo-marketing' );
             $ext    = pathinfo( $file['name'], PATHINFO_EXTENSION );
             $key    = 'marketing/' . $type . '/' . gmdate( 'Y/m' ) . '/' . wp_generate_uuid4() . '.' . strtolower( $ext );
 
@@ -245,7 +245,7 @@ class LTMS_Admin_Marketing_Manager {
         // Intentar eliminar de B2
         try {
             $b2     = new LTMS_Api_Backblaze();
-            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_default_bucket', 'lotengo-contratos' );
+            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_marketing_bucket', 'lotengo-marketing' );
             $url    = $banner['file_url'];
             $base   = LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '' );
             if ( $base && strpos( $url, $base ) === 0 ) {
