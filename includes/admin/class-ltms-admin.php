@@ -375,6 +375,7 @@ final class LTMS_Admin {
     // ── Callbacks de renderizado de páginas ───────────────────────
 
     public function render_dashboard(): void {
+        echo '<div style="background:#e8f5e9;border:2px solid #4caf50;padding:10px;margin:10px;">DEBUG: render_dashboard() called ✅</div>';
         LTMS_Data_Masking::log_auditor_access( 'admin_dashboard' );
         $this->render_view( 'html-admin-dashboard' );
     }
