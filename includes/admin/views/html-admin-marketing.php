@@ -101,7 +101,7 @@ if ( $mlm_enabled ) {
                 <span style="font-size:12px;color:#888;">
                     <?php printf( esc_html__( '%d materiales · %d descargas totales', 'ltms' ), $total, $total_downloads ); ?>
                 </span>
-                <a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-settings&tab=marketing' ) ); ?>"
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-settings&tab=mlm' ) ); ?>"
                    class="ltms-btn ltms-btn-primary ltms-btn-sm">
                     + <?php esc_html_e( 'Subir material', 'ltms' ); ?>
                 </a>
@@ -128,7 +128,7 @@ if ( $mlm_enabled ) {
         <div style="text-align:center;padding:48px;color:#9ca3af;">
             <div style="font-size:48px;margin-bottom:12px;">🖼</div>
             <p style="margin:0;"><?php esc_html_e( 'No hay banners configurados.', 'ltms' ); ?></p>
-            <a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-settings&tab=marketing' ) ); ?>"
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-settings&tab=mlm' ) ); ?>"
                class="ltms-btn ltms-btn-primary" style="margin-top:12px;display:inline-block;">
                 + <?php esc_html_e( 'Subir primer material', 'ltms' ); ?>
             </a>
