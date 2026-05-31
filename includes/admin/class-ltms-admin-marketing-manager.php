@@ -119,7 +119,7 @@ class LTMS_Admin_Marketing_Manager {
             'amount'      => $coupon->get_amount(),
             'type'        => $coupon->get_discount_type(),
         ] );
-    
+    }
     /**
      * AJAX: Sube un banner/material a Backblaze B2 y registra en lt_marketing_banners.
      *
