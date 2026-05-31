@@ -375,8 +375,17 @@ final class LTMS_Admin {
     // ── Callbacks de renderizado de páginas ───────────────────────
 
     public function render_dashboard(): void {
-LTMS_Data_Masking::log_auditor_access( 'admin_dashboard' );
-        $this->render_view( 'html-admin-dashboard' );
+        try {
+            LTMS_Data_Masking::log_auditor_access( 'admin_dashboard' );
+        } catch ( \Throwable $e ) {
+            error_log( 'LTMS render_dashboard masking error: ' . $e->getMessage() );
+        }
+        try {
+            $this->render_view( 'html-admin-dashboard' );
+        } catch ( \Throwable $e ) {
+            echo '<div style="background:red;color:white;padding:10px;">LTMS Dashboard Error: ' . esc_html( $e->getMessage() ) . ' in ' . esc_html( $e->getFile() ) . ':' . esc_html( $e->getLine() ) . '</div>';
+            error_log( 'LTMS render_dashboard error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
+        }
     }
 
     public function render_vendors(): void {
