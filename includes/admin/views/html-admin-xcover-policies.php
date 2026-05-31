@@ -1,179 +1,264 @@
-<?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
-<div class="wrap">
-	<h1><?php esc_html_e( 'Pólizas de Seguro XCover', 'ltms' ); ?></h1>
+<?php
+/**
+ * Vista: Admin XCover Policies - Polizas de Seguro
+ *
+ * @package LTMS
+ * @version 2.0.0
+ */
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-	<?php
-	// Filter values from GET (sanitized).
-	$filter_status    = isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-	$filter_date_from = isset( $_GET['date_from'] ) ? sanitize_text_field( wp_unslash( $_GET['date_from'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-	$filter_date_to   = isset( $_GET['date_to'] ) ? sanitize_text_field( wp_unslash( $_GET['date_to'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+global $wpdb;
+$table = $wpdb->prefix . 'lt_insurance_policies';
 
-	$allowed_statuses = [ '', 'active', 'cancelled', 'claimed', 'expired' ];
-	if ( ! in_array( $filter_status, $allowed_statuses, true ) ) {
-		$filter_status = '';
-	}
-	?>
+// Filtros
+$filter_status = sanitize_key(        $_GET['status']    ?? '' ); // phpcs:ignore
+$date_from     = sanitize_text_field( $_GET['date_from'] ?? '' ); // phpcs:ignore
+$date_to       = sanitize_text_field( $_GET['date_to']   ?? '' ); // phpcs:ignore
+$search        = sanitize_text_field( $_GET['s']         ?? '' ); // phpcs:ignore
+$page_num      = max( 1, (int) ( $_GET['paged'] ?? 1 ) );         // phpcs:ignore
+$per_page      = 30;
+$base_url      = admin_url( 'admin.php?page=ltms-xcover-policies' );
 
-	<form method="GET" action="" style="margin-bottom:16px;">
-		<input type="hidden" name="page" value="<?php echo esc_attr( $_GET['page'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification ?>">
-		<label for="ltms-xcover-status"><?php esc_html_e( 'Estado:', 'ltms' ); ?></label>
-		<select id="ltms-xcover-status" name="status" style="margin:0 8px 0 4px;">
-			<option value="" <?php selected( $filter_status, '' ); ?>><?php esc_html_e( 'Todos', 'ltms' ); ?></option>
-			<option value="active" <?php selected( $filter_status, 'active' ); ?>><?php esc_html_e( 'Activa', 'ltms' ); ?></option>
-			<option value="cancelled" <?php selected( $filter_status, 'cancelled' ); ?>><?php esc_html_e( 'Cancelada', 'ltms' ); ?></option>
-			<option value="claimed" <?php selected( $filter_status, 'claimed' ); ?>><?php esc_html_e( 'Reclamada', 'ltms' ); ?></option>
-			<option value="expired" <?php selected( $filter_status, 'expired' ); ?>><?php esc_html_e( 'Expirada', 'ltms' ); ?></option>
-		</select>
+$allowed_statuses = [ '', 'active', 'cancelled', 'claimed', 'expired' ];
+if ( ! in_array( $filter_status, $allowed_statuses, true ) ) $filter_status = '';
 
-		<label for="ltms-xcover-date-from"><?php esc_html_e( 'Desde:', 'ltms' ); ?></label>
-		<input
-			type="date"
-			id="ltms-xcover-date-from"
-			name="date_from"
-			value="<?php echo esc_attr( $filter_date_from ); ?>"
-			style="margin:0 8px 0 4px;"
-		>
+// Verificar tabla
+$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ); // phpcs:ignore
 
-		<label for="ltms-xcover-date-to"><?php esc_html_e( 'Hasta:', 'ltms' ); ?></label>
-		<input
-			type="date"
-			id="ltms-xcover-date-to"
-			name="date_to"
-			value="<?php echo esc_attr( $filter_date_to ); ?>"
-			style="margin:0 8px 0 4px;"
-		>
+$status_labels = [
+    'active'    => [ 'label' => 'ACTIVA',     'class' => 'ltms-badge-success' ],
+    'cancelled' => [ 'label' => 'CANCELADA',  'class' => 'ltms-badge-danger'  ],
+    'claimed'   => [ 'label' => 'RECLAMADA',  'class' => 'ltms-badge-warning' ],
+    'expired'   => [ 'label' => 'EXPIRADA',   'class' => 'ltms-badge-pending' ],
+];
 
-		<button type="submit" class="button"><?php esc_html_e( 'Buscar', 'ltms' ); ?></button>
-	</form>
+$policies = [];
+$total    = 0;
+$stats    = [ 'total' => 0, 'active' => 0, 'claimed' => 0, 'prima_total' => 0 ];
 
-	<?php
-	global $wpdb;
-	$table_name = $wpdb->prefix . 'lt_insurance_policies';
+if ( $table_exists ) {
+    // WHERE dinámico
+    $where_parts = [];
+    $where_vals  = [];
+    if ( $filter_status ) { $where_parts[] = 'p.status = %s';               $where_vals[] = $filter_status; }
+    if ( $date_from )     { $where_parts[] = 'DATE(p.created_at) >= %s';    $where_vals[] = $date_from; }
+    if ( $date_to )       { $where_parts[] = 'DATE(p.created_at) <= %s';    $where_vals[] = $date_to; }
+    if ( $search )        { $where_parts[] = 'p.xcover_policy_id LIKE %s';  $where_vals[] = '%' . $wpdb->esc_like( $search ) . '%'; }
+    $where_sql = $where_parts ? 'WHERE ' . implode( ' AND ', $where_parts ) : '';
 
-	// Check if table exists.
-	$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ); // phpcs:ignore WordPress.DB
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+    $total = (int) $wpdb->get_var(
+        $where_vals
+            ? $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}` p {$where_sql}", ...$where_vals )
+            : "SELECT COUNT(*) FROM `{$table}` p"
+    );
 
-	if ( ! $table_exists ) :
-	?>
-		<div class="notice notice-warning">
-			<p><?php esc_html_e( 'La tabla de pólizas de seguro aún no ha sido creada. Ejecute las migraciones de base de datos.', 'ltms' ); ?></p>
-		</div>
-	<?php else : ?>
-		<?php
-		$where_clauses = [];
-		$where_values  = [];
+    $offset   = ( $page_num - 1 ) * $per_page;
+    $policies = $wpdb->get_results(
+        $where_vals
+            ? $wpdb->prepare( "SELECT p.* FROM `{$table}` p {$where_sql} ORDER BY p.created_at DESC LIMIT %d OFFSET %d", ...array_merge( $where_vals, [ $per_page, $offset ] ) )
+            : $wpdb->prepare( "SELECT p.* FROM `{$table}` p ORDER BY p.created_at DESC LIMIT %d OFFSET %d", $per_page, $offset ),
+        ARRAY_A
+    );
 
-		if ( $filter_status !== '' ) {
-			$where_clauses[] = 'status = %s';
-			$where_values[]  = $filter_status;
-		}
-		if ( $filter_date_from !== '' ) {
-			$where_clauses[] = 'DATE(created_at) >= %s';
-			$where_values[]  = $filter_date_from;
-		}
-		if ( $filter_date_to !== '' ) {
-			$where_clauses[] = 'DATE(created_at) <= %s';
-			$where_values[]  = $filter_date_to;
-		}
+    // Stats globales (sin filtros)
+    $raw = $wpdb->get_row( "SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status='claimed' THEN 1 ELSE 0 END) as claimed,
+        SUM(COALESCE(premium_amount,0)) as prima_total
+        FROM `{$table}`", ARRAY_A );
+    if ( $raw ) $stats = $raw;
+    // phpcs:enable
+}
 
-		$where_sql = '';
-		if ( ! empty( $where_clauses ) ) {
-			$where_sql = 'WHERE ' . implode( ' AND ', $where_clauses );
-		}
+$total_pages = max( 1, (int) ceil( $total / $per_page ) );
+$has_filters = $filter_status || $date_from || $date_to || $search;
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$sql = "SELECT * FROM `{$table_name}` {$where_sql} ORDER BY created_at DESC LIMIT %d";
+// Export CSV
+if ( isset( $_GET['export_csv'] ) && $table_exists ) { // phpcs:ignore
+    header( 'Content-Type: text/csv; charset=UTF-8' );
+    header( 'Content-Disposition: attachment; filename="polizas-xcover-' . gmdate( 'Ymd' ) . '.csv"' );
+    echo "\xEF\xBB\xBF"; // BOM UTF-8
+    $all = $wpdb->get_results( "SELECT * FROM `{$table}` ORDER BY created_at DESC", ARRAY_A ); // phpcs:ignore
+    if ( $all ) {
+        echo implode( ',', array_keys( $all[0] ) ) . "\n";
+        foreach ( $all as $row ) {
+            echo implode( ',', array_map( function( $v ) { return '"' . str_replace( '"', '""', $v ) . '"'; }, $row ) ) . "\n";
+        }
+    }
+    exit;
+}
+?>
+<div class="wrap ltms-admin-wrap">
 
-		if ( ! empty( $where_values ) ) {
-			$policies = $wpdb->get_results(
-				$wpdb->prepare( $sql, array_merge( $where_values, [ 50 ] ) )
-			);
-		} else {
-			$policies = $wpdb->get_results( $wpdb->prepare( $sql, 50 ) );
-		}
-		// phpcs:enable
+    <div class="ltms-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <h1>&#x1F6E1;&#xFE0F; <?php esc_html_e( 'Polizas de Seguro XCover', 'ltms' ); ?></h1>
+        <?php if ( $table_exists ) : ?>
+        <a href="<?php echo esc_url( add_query_arg( 'export_csv', '1', $base_url ) ); ?>"
+           class="ltms-btn ltms-btn-outline ltms-btn-sm">
+            &#x2B07; <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
+        </a>
+        <?php endif; ?>
+    </div>
 
-		$status_labels = [
-			'active'    => [ 'label' => __( 'Activa', 'ltms' ),    'color' => '#27ae60' ],
-			'cancelled' => [ 'label' => __( 'Cancelada', 'ltms' ), 'color' => '#e74c3c' ],
-			'claimed'   => [ 'label' => __( 'Reclamada', 'ltms' ), 'color' => '#e67e22' ],
-			'expired'   => [ 'label' => __( 'Expirada', 'ltms' ),  'color' => '#95a5a6' ],
-		];
-		?>
+    <?php if ( ! $table_exists ) : ?>
+    <div class="notice notice-warning inline" style="margin:16px 0;">
+        <p><?php esc_html_e( 'La tabla de polizas aun no existe. Ejecuta las migraciones del plugin.', 'ltms' ); ?></p>
+    </div>
+    <?php else : ?>
 
-		<?php if ( empty( $policies ) ) : ?>
-			<p><?php esc_html_e( 'No se encontraron pólizas con los filtros seleccionados.', 'ltms' ); ?></p>
-		<?php else : ?>
-			<table class="wp-list-table widefat fixed striped posts">
-				<thead>
-					<tr>
-						<th scope="col" style="width:50px;"><?php esc_html_e( 'ID', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( '# Pedido', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( '# Póliza', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Prima', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Tipo', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'URL Certificado', 'ltms' ); ?></th>
-						<th scope="col"><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $policies as $policy ) : ?>
-						<?php
-						$order_id    = isset( $policy->order_id ) ? (int) $policy->order_id : 0;
-						$vendor_id   = isset( $policy->vendor_id ) ? (int) $policy->vendor_id : 0;
-						$vendor_data = $vendor_id ? get_userdata( $vendor_id ) : false;
-						$vendor_name = $vendor_data ? $vendor_data->display_name : esc_html__( 'N/D', 'ltms' );
-						$status_key  = isset( $policy->status ) ? $policy->status : '';
-						$status_info = isset( $status_labels[ $status_key ] ) ? $status_labels[ $status_key ] : [ 'label' => esc_html( $status_key ), 'color' => '#7f8c8d' ];
-						$prima       = isset( $policy->premium_amount ) ? number_format( (float) $policy->premium_amount, 2 ) : '0.00';
-						$cert_url    = isset( $policy->certificate_url ) ? $policy->certificate_url : '';
-						$created_at  = isset( $policy->created_at ) ? esc_html( $policy->created_at ) : '';
-						$policy_type = isset( $policy->policy_type ) ? esc_html( $policy->policy_type ) : esc_html__( 'N/D', 'ltms' );
-						$policy_num  = isset( $policy->xcover_policy_id ) ? esc_html( $policy->xcover_policy_id ) : esc_html__( 'N/D', 'ltms' );
-						$edit_url    = $order_id ? esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ) : '';
-						?>
-						<tr>
-							<td><?php echo esc_html( $policy->id ); ?></td>
-							<td>
-								<?php if ( $edit_url ) : ?>
-									<a href="<?php echo esc_url( $edit_url ); ?>">#<?php echo esc_html( $order_id ); ?></a>
-								<?php else : ?>
-									<?php esc_html_e( 'N/D', 'ltms' ); ?>
-								<?php endif; ?>
-							</td>
-							<td><?php echo esc_html( $vendor_name ); ?></td>
-							<td><?php echo esc_html( $policy_num ); ?></td>
-							<td><?php echo esc_html( $prima ); ?></td>
-							<td><?php echo esc_html( $policy_type ); ?></td>
-							<td>
-								<span style="
-									display:inline-block;
-									padding:2px 8px;
-									border-radius:3px;
-									background-color:<?php echo esc_attr( $status_info['color'] ); ?>;
-									color:#fff;
-									font-size:12px;
-									font-weight:600;
-								">
-									<?php echo esc_html( $status_info['label'] ); ?>
-								</span>
-							</td>
-							<td>
-								<?php if ( $cert_url ) : ?>
-									<a href="<?php echo esc_url( $cert_url ); ?>" target="_blank" rel="noopener noreferrer">
-										<?php esc_html_e( 'Ver', 'ltms' ); ?>
-									</a>
-								<?php else : ?>
-									<?php esc_html_e( 'N/D', 'ltms' ); ?>
-								<?php endif; ?>
-							</td>
-							<td><?php echo esc_html( $created_at ); ?></td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		<?php endif; ?>
-	<?php endif; ?>
+    <!-- Stats -->
+    <div class="ltms-stats-grid" style="margin-bottom:20px;">
+        <div class="ltms-stat-card">
+            <span class="ltms-stat-label"><?php esc_html_e( 'Total polizas', 'ltms' ); ?></span>
+            <span class="ltms-stat-value"><?php echo esc_html( number_format( (int) $stats['total'] ) ); ?></span>
+        </div>
+        <div class="ltms-stat-card">
+            <span class="ltms-stat-label"><?php esc_html_e( 'Activas', 'ltms' ); ?></span>
+            <span class="ltms-stat-value" style="color:#16a34a;"><?php echo esc_html( number_format( (int) $stats['active'] ) ); ?></span>
+        </div>
+        <div class="ltms-stat-card">
+            <span class="ltms-stat-label"><?php esc_html_e( 'Reclamadas', 'ltms' ); ?></span>
+            <span class="ltms-stat-value" style="color:#f59e0b;"><?php echo esc_html( number_format( (int) $stats['claimed'] ) ); ?></span>
+        </div>
+        <div class="ltms-stat-card">
+            <span class="ltms-stat-label"><?php esc_html_e( 'Prima total cobrada', 'ltms' ); ?></span>
+            <span class="ltms-stat-value" style="color:#2563eb;">
+                $<?php echo esc_html( number_format( (float) $stats['prima_total'], 2 ) ); ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="hidden" name="page" value="ltms-xcover-policies">
+
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;">
+            <option value=""><?php esc_html_e( 'Todos los estados', 'ltms' ); ?></option>
+            <option value="active"    <?php selected( $filter_status, 'active' ); ?>><?php esc_html_e( 'Activa', 'ltms' ); ?></option>
+            <option value="cancelled" <?php selected( $filter_status, 'cancelled' ); ?>><?php esc_html_e( 'Cancelada', 'ltms' ); ?></option>
+            <option value="claimed"   <?php selected( $filter_status, 'claimed' ); ?>><?php esc_html_e( 'Reclamada', 'ltms' ); ?></option>
+            <option value="expired"   <?php selected( $filter_status, 'expired' ); ?>><?php esc_html_e( 'Expirada', 'ltms' ); ?></option>
+        </select>
+
+        <input type="text" name="s" value="<?php echo esc_attr( $search ); ?>"
+               placeholder="<?php esc_attr_e( 'N. poliza o pedido...', 'ltms' ); ?>"
+               style="padding:7px 12px;border:1px solid #ddd;border-radius:4px;width:180px;">
+
+        <input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>"
+               style="padding:7px;border:1px solid #ddd;border-radius:4px;">
+        <span style="color:#888;">—</span>
+        <input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>"
+               style="padding:7px;border:1px solid #ddd;border-radius:4px;">
+
+        <button type="submit" class="ltms-btn ltms-btn-primary ltms-btn-sm">
+            &#x1F50D; <?php esc_html_e( 'Filtrar', 'ltms' ); ?>
+        </button>
+        <?php if ( $has_filters ) : ?>
+        <a href="<?php echo esc_url( $base_url ); ?>" class="ltms-btn ltms-btn-outline ltms-btn-sm">
+            &#x2715; <?php esc_html_e( 'Limpiar', 'ltms' ); ?>
+        </a>
+        <?php endif; ?>
+        <span style="font-size:12px;color:#888;margin-left:auto;">
+            <?php printf( esc_html__( '%d polizas', 'ltms' ), $total ); ?>
+        </span>
+    </form>
+
+    <div class="ltms-table-wrap">
+
+        <?php if ( $total_pages > 1 ) : ?>
+        <div style="display:flex;justify-content:flex-end;gap:4px;padding:8px 0;flex-wrap:wrap;">
+            <?php for ( $p = 1; $p <= $total_pages; $p++ ) : ?>
+            <a href="<?php echo esc_url( add_query_arg( [ 'page' => 'ltms-xcover-policies', 'paged' => $p, 'status' => $filter_status, 's' => $search, 'date_from' => $date_from, 'date_to' => $date_to ], admin_url( 'admin.php' ) ) ); ?>"
+               class="ltms-btn ltms-btn-sm <?php echo $p === $page_num ? 'ltms-btn-primary' : 'ltms-btn-outline'; ?>"
+               style="min-width:30px;text-align:center;"><?php echo esc_html( $p ); ?></a>
+            <?php endfor; ?>
+        </div>
+        <?php endif; ?>
+
+        <table class="ltms-table">
+            <thead>
+                <tr>
+                    <th><?php esc_html_e( 'ID', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( '# Pedido', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'No. Poliza', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Tipo', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Prima', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Certificado', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ( empty( $policies ) ) : ?>
+                <tr>
+                    <td colspan="9" style="text-align:center;padding:40px;color:#888;">
+                        <?php esc_html_e( 'No se encontraron polizas con los filtros seleccionados.', 'ltms' ); ?>
+                    </td>
+                </tr>
+                <?php else : ?>
+                <?php foreach ( $policies as $policy ) :
+                    $order_id    = (int) ( $policy['order_id']  ?? 0 );
+                    $vendor_id   = (int) ( $policy['vendor_id'] ?? 0 );
+                    $vendor_data = $vendor_id ? get_userdata( $vendor_id ) : false;
+                    $vendor_name = $vendor_data ? $vendor_data->display_name : '—';
+                    $status_key  = $policy['status'] ?? '';
+                    $status_info = $status_labels[ $status_key ] ?? [ 'label' => strtoupper( $status_key ), 'class' => 'ltms-badge-pending' ];
+                    $prima       = number_format( (float) ( $policy['premium_amount'] ?? 0 ), 2 );
+                    $cert_url    = $policy['certificate_url'] ?? '';
+                    $policy_num  = $policy['xcover_policy_id'] ?? '—';
+                    $policy_type = $policy['policy_type'] ?? '—';
+                    $created_at  = $policy['created_at'] ?? '';
+                ?>
+                <tr>
+                    <td style="font-size:12px;color:#888;"><?php echo esc_html( $policy['id'] ?? '' ); ?></td>
+                    <td>
+                        <?php if ( $order_id ) : ?>
+                        <a href="<?php echo esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ); ?>" style="font-weight:600;">
+                            #<?php echo esc_html( $order_id ); ?>
+                        </a>
+                        <?php else : ?>—<?php endif; ?>
+                    </td>
+                    <td><?php echo esc_html( $vendor_name ); ?></td>
+                    <td style="font-family:monospace;font-size:11px;"><?php echo esc_html( $policy_num ); ?></td>
+                    <td style="font-size:12px;"><?php echo esc_html( $policy_type ); ?></td>
+                    <td><strong>$<?php echo esc_html( $prima ); ?></strong></td>
+                    <td>
+                        <span class="ltms-badge <?php echo esc_attr( $status_info['class'] ); ?>">
+                            <?php echo esc_html( $status_info['label'] ); ?>
+                        </span>
+                    </td>
+                    <td>
+                        <?php if ( $cert_url ) : ?>
+                        <a href="<?php echo esc_url( $cert_url ); ?>" target="_blank" rel="noopener noreferrer"
+                           class="ltms-btn ltms-btn-outline ltms-btn-sm">
+                            &#x1F4C4; <?php esc_html_e( 'Ver', 'ltms' ); ?>
+                        </a>
+                        <?php else : ?><span style="color:#ccc;">—</span><?php endif; ?>
+                    </td>
+                    <td style="white-space:nowrap;font-size:12px;">
+                        <?php echo esc_html( $created_at ? gmdate( 'd/m/Y H:i', strtotime( $created_at ) ) : '—' ); ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+
+        <?php if ( $total_pages > 1 ) : ?>
+        <div style="display:flex;justify-content:center;gap:6px;padding:16px;flex-wrap:wrap;">
+            <?php for ( $p = 1; $p <= $total_pages; $p++ ) : ?>
+            <a href="<?php echo esc_url( add_query_arg( [ 'page' => 'ltms-xcover-policies', 'paged' => $p, 'status' => $filter_status, 's' => $search, 'date_from' => $date_from, 'date_to' => $date_to ], admin_url( 'admin.php' ) ) ); ?>"
+               class="ltms-btn ltms-btn-sm <?php echo $p === $page_num ? 'ltms-btn-primary' : 'ltms-btn-outline'; ?>"
+               style="min-width:32px;text-align:center;"><?php echo esc_html( $p ); ?></a>
+            <?php endfor; ?>
+        </div>
+        <?php endif; ?>
+
+    </div>
+
+    <?php endif; ?>
+
 </div>
