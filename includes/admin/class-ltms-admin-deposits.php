@@ -287,14 +287,14 @@ final class LTMS_Admin_Deposits {
         ( function( $ ) {
             // Aprobar
             $( document ).on( 'click', '.ltms-approve-deposit', function() {
-                if ( ! confirm( '<?php echo esc_js( __( '¿Confirmar aprobación? Se acreditará el monto en la billetera del vendedor.', 'ltms' ) ); ?>' ) ) return;
-                var $btn  = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( 'Procesando...', 'ltms' ) ); ?>' );
+                if ( ! confirm( '<?php echo esc_js( __( "¿Confirmar aprobación? Se acreditará el monto en la billetera del vendedor.", "ltms" ) ); ?>' ) ) return;
+                var $btn  = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( "Procesando...", "ltms" ) ); ?>' );
                 var id    = $btn.data( 'id' );
                 var nonce = $btn.data( 'nonce' );
-                var notes = prompt( '<?php echo esc_js( __( 'Notas del admin (opcional):', 'ltms' ) ); ?>' ) || '';
+                var notes = prompt( '<?php echo esc_js( __( "Notas del admin (opcional):", "ltms" ) ); ?>' ) || '';
                 $.post( ajaxurl, { action: 'ltms_approve_deposit', deposit_id: id, admin_notes: notes, nonce: nonce }, function( res ) {
                     if ( res.success ) { alert( '✅ ' + res.data.message ); location.reload(); }
-                    else { alert( '❌ ' + ( res.data || '<?php echo esc_js( __( 'Error desconocido', 'ltms' ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✓ <?php echo esc_js( __( 'Aprobar', 'ltms' ) ); ?>' ); }
+                    else { alert( '❌ ' + ( res.data || '<?php echo esc_js( __( "Error desconocido", "ltms" ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✓ <?php echo esc_js( __( "Aprobar", "ltms" ) ); ?>' ); }
                 } );
             } );
 
@@ -314,11 +314,11 @@ final class LTMS_Admin_Deposits {
                 var id     = $( '#ltms-reject-deposit-id' ).val();
                 var reason = $( '#ltms-reject-reason' ).val().trim();
                 var nonce  = $( '.ltms-reject-deposit[data-id="' + id + '"]' ).data( 'nonce' );
-                if ( ! reason ) { alert( '<?php echo esc_js( __( 'Debes indicar el motivo.', 'ltms' ) ); ?>' ); return; }
-                var $btn = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( 'Rechazando...', 'ltms' ) ); ?>' );
+                if ( ! reason ) { alert( '<?php echo esc_js( __( "Debes indicar el motivo.", "ltms" ) ); ?>' ); return; }
+                var $btn = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( "Rechazando...", "ltms" ) ); ?>' );
                 $.post( ajaxurl, { action: 'ltms_reject_deposit', deposit_id: id, reason: reason, nonce: nonce }, function( res ) {
-                    if ( res.success ) { alert( '<?php echo esc_js( __( 'Depósito rechazado.', 'ltms' ) ); ?>' ); location.reload(); }
-                    else { alert( '<?php echo esc_js( __( 'Error:', 'ltms' ) ); ?> ' + ( res.data || '<?php echo esc_js( __( 'Error desconocido', 'ltms' ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✗ <?php echo esc_js( __( 'Confirmar rechazo', 'ltms' ) ); ?>' ); }
+                    if ( res.success ) { alert( '<?php echo esc_js( __( "Depósito rechazado.", "ltms" ) ); ?>' ); location.reload(); }
+                    else { alert( '<?php echo esc_js( __( "Error:", "ltms" ) ); ?> ' + ( res.data || '<?php echo esc_js( __( "Error desconocido", "ltms" ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✗ <?php echo esc_js( __( "Confirmar rechazo", "ltms" ) ); ?>' ); }
                 } );
             } );
         } )( jQuery );
