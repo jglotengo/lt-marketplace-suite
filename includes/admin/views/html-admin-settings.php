@@ -13,27 +13,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 $active_tab = sanitize_key( $_GET['tab'] ?? 'general' ); // phpcs:ignore
 
 $tabs = [
-    'general'     => __( 'General', 'ltms' ),
-    'commissions' => __( 'Comisiones', 'ltms' ),
-    'payments'    => __( 'Pagos / Pasarelas', 'ltms' ),
-    'siigo'       => __( 'Siigo ERP', 'ltms' ),
-    'kyc'         => __( 'KYC / Compliance', 'ltms' ),
-    'mlm'         => __( 'Marketing / MLM', 'ltms' ),
-    'security'    => __( 'Seguridad', 'ltms' ),
-    'emails'      => __( 'Emails', 'ltms' ),
+    'general'     => __( "General", "ltms" ),
+    'commissions' => __( "Comisiones", "ltms" ),
+    'payments'    => __( "Pagos / Pasarelas", "ltms" ),
+    'siigo'       => __( "Siigo ERP", "ltms" ),
+    'kyc'         => __( "KYC / Compliance", "ltms" ),
+    'mlm'         => __( "Marketing / MLM", "ltms" ),
+    'security'    => __( "Seguridad", "ltms" ),
+    'emails'      => __( "Emails", "ltms" ),
     // v1.6.0 — Módulos Enterprise
-    'backblaze'   => __( 'Backblaze B2', 'ltms' ),
-    'uber_direct' => __( 'Uber Direct', 'ltms' ),
-    'heka'        => __( 'Heka Entrega', 'ltms' ),
-    'aveonline'   => __( 'Aveonline', 'ltms' ),
-    'xcover'      => __( 'Seguros XCover', 'ltms' ),
+    'backblaze'   => __( "Backblaze B2", "ltms" ),
+    'uber_direct' => __( "Uber Direct", "ltms" ),
+    'heka'        => __( "Heka Entrega", "ltms" ),
+    'aveonline'   => __( "Aveonline", "ltms" ),
+    'xcover'      => __( "Seguros XCover", "ltms" ),
     // v2.1.0 — Contabilidad
-    'alegra'      => __( 'Alegra Contabilidad', 'ltms' ),
+    'alegra'      => __( "Alegra Contabilidad", "ltms" ),
     // v2.2.0 — Autenticación social (M-62)
-    'google_oauth' => __( 'Google OAuth', 'ltms' ),
+    'google_oauth' => __( "Google OAuth", "ltms" ),
     // v2.2.0 — Firma electrónica
-    'zapsign'     => __( 'ZapSign Firma', 'ltms' ),
-    'deprisa'     => __( 'Deprisa', 'ltms' ),
+    'zapsign'     => __( "ZapSign Firma", "ltms" ),
+    'deprisa'     => __( "Deprisa", "ltms" ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación
@@ -94,7 +94,7 @@ jQuery(function($) {
         var $btn = $('#ltms-save-settings');
         var $status = $('.ltms-save-status');
 
-        $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Guardando...', 'ltms' ) ); ?>');
+        $btn.prop('disabled', true).text('<?php echo esc_js( __( "Guardando...", "ltms" ) ); ?>');
 
         var data = {};
         $(this).find('input, select, textarea').each(function() {
@@ -113,12 +113,12 @@ jQuery(function($) {
             section: '<?php echo esc_js( $active_tab ); ?>',
             data: data
         }, function(response) {
-            $btn.prop('disabled', false).text('💾 <?php echo esc_js( __( 'Guardar Cambios', 'ltms' ) ); ?>');
+            $btn.prop('disabled', false).text('💾 <?php echo esc_js( __( "Guardar Cambios", "ltms" ) ); ?>');
             if (response.success) {
                 $status.text('✓ ' + response.data.message).show().delay(3000).fadeOut();
                 LTMS.Admin.showNotice('success', response.data.message);
             } else {
-                LTMS.Admin.showNotice('error', response.data || '<?php echo esc_js( __( 'Error al guardar.', 'ltms' ) ); ?>');
+                LTMS.Admin.showNotice('error', response.data || '<?php echo esc_js( __( "Error al guardar.", "ltms" ) ); ?>');
             }
         });
     });
@@ -136,109 +136,109 @@ if ( ! function_exists( 'ltms_render_generic_settings_section' ) ) :
 function ltms_render_generic_settings_section( string $tab, array $tab_labels = [] ): void {
     $fields_map = [
         'general' => [
-            [ 'key' => 'ltms_platform_name',    'label' => __( 'Nombre de la Plataforma', 'ltms' ),   'type' => 'text',   'default' => get_bloginfo( 'name' ) ?? '' ],
-            [ 'key' => 'ltms_country',           'label' => __( 'País Principal', 'ltms' ),            'type' => 'select', 'options' => [ 'CO' => 'Colombia', 'MX' => 'México' ] ],
-            [ 'key' => 'ltms_environment',       'label' => __( 'Entorno', 'ltms' ),                   'type' => 'select', 'options' => [ 'sandbox' => 'Sandbox (Pruebas)', 'production' => 'Producción' ] ],
-            [ 'key' => 'ltms_currency',          'label' => __( 'Moneda', 'ltms' ),                    'type' => 'select', 'options' => [ 'COP' => 'COP (Peso Colombiano)', 'MXN' => 'MXN (Peso Mexicano)' ] ],
+            [ 'key' => 'ltms_platform_name',    'label' => __( "Nombre de la Plataforma", "ltms" ),   'type' => 'text',   'default' => get_bloginfo( 'name' ) ?? '' ],
+            [ 'key' => 'ltms_country',           'label' => __( "País Principal", "ltms" ),            'type' => 'select', 'options' => [ 'CO' => 'Colombia', 'MX' => 'México' ] ],
+            [ 'key' => 'ltms_environment',       'label' => __( "Entorno", "ltms" ),                   'type' => 'select', 'options' => [ 'sandbox' => 'Sandbox (Pruebas)', 'production' => 'Producción' ] ],
+            [ 'key' => 'ltms_currency',          'label' => __( "Moneda", "ltms" ),                    'type' => 'select', 'options' => [ 'COP' => 'COP (Peso Colombiano)', 'MXN' => 'MXN (Peso Mexicano)' ] ],
         ],
         'commissions' => [
-            [ 'key' => 'ltms_platform_commission_rate', 'label' => __( 'Comisión Base Plataforma (%)', 'ltms' ), 'type' => 'number', 'default' => '10', 'attrs' => 'min="0" max="100" step="0.1"' ],
-            [ 'key' => 'ltms_premium_commission_rate',  'label' => __( 'Comisión Vendedor Premium (%)', 'ltms' ), 'type' => 'number', 'default' => '8', 'attrs' => 'min="0" max="100" step="0.1"' ],
-            [ 'key' => 'ltms_volume_tiers_enabled',     'label' => __( 'Tiers de Volumen', 'ltms' ),            'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_platform_commission_rate', 'label' => __( "Comisión Base Plataforma (%)", "ltms" ), 'type' => 'number', 'default' => '10', 'attrs' => 'min="0" max="100" step="0.1"' ],
+            [ 'key' => 'ltms_premium_commission_rate',  'label' => __( "Comisión Vendedor Premium (%)", "ltms" ), 'type' => 'number', 'default' => '8', 'attrs' => 'min="0" max="100" step="0.1"' ],
+            [ 'key' => 'ltms_volume_tiers_enabled',     'label' => __( "Tiers de Volumen", "ltms" ),            'type' => 'checkbox', 'default' => 'no' ],
         ],
         'payments' => [
-            [ 'key' => 'ltms_openpay_enabled',      'label' => __( 'Openpay Activo', 'ltms' ),           'type' => 'checkbox' ],
-            [ 'key' => 'ltms_openpay_merchant_id',  'label' => __( 'Openpay Merchant ID', 'ltms' ),      'type' => 'text' ],
-            [ 'key' => 'ltms_openpay_public_key',   'label' => __( 'Openpay Public Key', 'ltms' ),       'type' => 'text' ],
-            [ 'key' => 'ltms_openpay_private_key',  'label' => __( 'Openpay Private Key (cifrado)', 'ltms' ), 'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256', 'ltms' ) ],
-            [ 'key' => 'ltms_pse_enabled',          'label' => __( 'PSE (Solo Colombia)', 'ltms' ),      'type' => 'checkbox', 'default' => 'yes' ],
-            [ 'key' => 'ltms_addi_enabled',         'label' => __( 'Addi BNPL Activo', 'ltms' ),         'type' => 'checkbox' ],
+            [ 'key' => 'ltms_openpay_enabled',      'label' => __( "Openpay Activo", "ltms" ),           'type' => 'checkbox' ],
+            [ 'key' => 'ltms_openpay_merchant_id',  'label' => __( "Openpay Merchant ID", "ltms" ),      'type' => 'text' ],
+            [ 'key' => 'ltms_openpay_public_key',   'label' => __( "Openpay Public Key", "ltms" ),       'type' => 'text' ],
+            [ 'key' => 'ltms_openpay_private_key',  'label' => __( "Openpay Private Key (cifrado)", "ltms" ), 'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256", "ltms" ) ],
+            [ 'key' => 'ltms_pse_enabled',          'label' => __( "PSE (Solo Colombia)", "ltms" ),      'type' => 'checkbox', 'default' => 'yes' ],
+            [ 'key' => 'ltms_addi_enabled',         'label' => __( "Addi BNPL Activo", "ltms" ),         'type' => 'checkbox' ],
         ],
         'siigo' => [
-            [ 'key' => 'ltms_siigo_enabled',    'label' => __( 'Siigo Activo', 'ltms' ),             'type' => 'checkbox' ],
-            [ 'key' => 'ltms_siigo_username',   'label' => __( 'Siigo Usuario', 'ltms' ),            'type' => 'text' ],
-            [ 'key' => 'ltms_siigo_password',   'label' => __( 'Siigo Contraseña (cifrado)', 'ltms' ), 'type' => 'password', 'desc' => __( 'Se guarda cifrado', 'ltms' ) ],
-            [ 'key' => 'ltms_siigo_partner_id', 'label' => __( 'Partner Token', 'ltms' ),            'type' => 'text' ],
+            [ 'key' => 'ltms_siigo_enabled',    'label' => __( "Siigo Activo", "ltms" ),             'type' => 'checkbox' ],
+            [ 'key' => 'ltms_siigo_username',   'label' => __( "Siigo Usuario", "ltms" ),            'type' => 'text' ],
+            [ 'key' => 'ltms_siigo_password',   'label' => __( "Siigo Contraseña (cifrado)", "ltms" ), 'type' => 'password', 'desc' => __( "Se guarda cifrado", "ltms" ) ],
+            [ 'key' => 'ltms_siigo_partner_id', 'label' => __( "Partner Token", "ltms" ),            'type' => 'text' ],
         ],
         'kyc' => [
-            [ 'key' => 'ltms_kyc_required_for_payout', 'label' => __( 'KYC Requerido para Retiros', 'ltms' ), 'type' => 'checkbox', 'default' => 'yes' ],
-            [ 'key' => 'ltms_kyc_auto_approve',        'label' => __( 'Aprobación Automática', 'ltms' ),      'type' => 'checkbox', 'default' => 'no' ],
-            [ 'key' => 'ltms_min_payout_amount',       'label' => __( 'Monto Mínimo Retiro', 'ltms' ),        'type' => 'number', 'default' => '50000' ],
+            [ 'key' => 'ltms_kyc_required_for_payout', 'label' => __( "KYC Requerido para Retiros", "ltms" ), 'type' => 'checkbox', 'default' => 'yes' ],
+            [ 'key' => 'ltms_kyc_auto_approve',        'label' => __( "Aprobación Automática", "ltms" ),      'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_min_payout_amount',       'label' => __( "Monto Mínimo Retiro", "ltms" ),        'type' => 'number', 'default' => '50000' ],
         ],
         'mlm' => [
-            [ 'key' => 'ltms_mlm_enabled',     'label' => __( 'Red de Referidos Activa', 'ltms' ),  'type' => 'checkbox' ],
-            [ 'key' => 'ltms_tptc_enabled',    'label' => __( 'TPTC Sincronización', 'ltms' ),      'type' => 'checkbox' ],
-            [ 'key' => 'ltms_tptc_api_key',    'label' => __( 'TPTC API Key (cifrado)', 'ltms' ),   'type' => 'password' ],
-            [ 'key' => 'ltms_tptc_program_id', 'label' => __( 'TPTC Program ID', 'ltms' ),          'type' => 'text' ],
-            [ 'key' => 'ltms_referral_rates',  'label' => __( 'Tasas por Nivel (JSON)', 'ltms' ),   'type' => 'textarea', 'default' => '[0.40, 0.20, 0.10]', 'desc' => __( 'Array JSON: [nivel1, nivel2, nivel3]', 'ltms' ) ],
+            [ 'key' => 'ltms_mlm_enabled',     'label' => __( "Red de Referidos Activa", "ltms" ),  'type' => 'checkbox' ],
+            [ 'key' => 'ltms_tptc_enabled',    'label' => __( "TPTC Sincronización", "ltms" ),      'type' => 'checkbox' ],
+            [ 'key' => 'ltms_tptc_api_key',    'label' => __( "TPTC API Key (cifrado)", "ltms" ),   'type' => 'password' ],
+            [ 'key' => 'ltms_tptc_program_id', 'label' => __( "TPTC Program ID", "ltms" ),          'type' => 'text' ],
+            [ 'key' => 'ltms_referral_rates',  'label' => __( "Tasas por Nivel (JSON)", "ltms" ),   'type' => 'textarea', 'default' => '[0.40, 0.20, 0.10]', 'desc' => __( "Array JSON: [nivel1, nivel2, nivel3]", "ltms" ) ],
         ],
         'security' => [
-            [ 'key' => 'ltms_waf_enabled',         'label' => __( 'WAF Activo', 'ltms' ),             'type' => 'checkbox', 'default' => 'yes' ],
-            [ 'key' => 'ltms_waf_block_threshold',  'label' => __( 'Umbral de Bloqueo WAF', 'ltms' ), 'type' => 'number', 'default' => '10' ],
-            [ 'key' => 'ltms_rate_limit_enabled',   'label' => __( 'Rate Limiting API', 'ltms' ),     'type' => 'checkbox', 'default' => 'yes' ],
+            [ 'key' => 'ltms_waf_enabled',         'label' => __( "WAF Activo", "ltms" ),             'type' => 'checkbox', 'default' => 'yes' ],
+            [ 'key' => 'ltms_waf_block_threshold',  'label' => __( "Umbral de Bloqueo WAF", "ltms" ), 'type' => 'number', 'default' => '10' ],
+            [ 'key' => 'ltms_rate_limit_enabled',   'label' => __( "Rate Limiting API", "ltms" ),     'type' => 'checkbox', 'default' => 'yes' ],
         ],
         'emails' => [
-            [ 'key' => 'ltms_email_from_name',    'label' => __( 'Nombre Remitente', 'ltms' ),   'type' => 'text',  'default' => get_bloginfo( 'name' ) ?? '' ],
-            [ 'key' => 'ltms_email_from_address', 'label' => __( 'Email Remitente', 'ltms' ),    'type' => 'email', 'default' => get_option( 'admin_email' ) ?? '' ],
-            [ 'key' => 'ltms_email_header_color', 'label' => __( 'Color Header Email', 'ltms' ), 'type' => 'text',  'default' => '#1a5276' ],
+            [ 'key' => 'ltms_email_from_name',    'label' => __( "Nombre Remitente", "ltms" ),   'type' => 'text',  'default' => get_bloginfo( 'name' ) ?? '' ],
+            [ 'key' => 'ltms_email_from_address', 'label' => __( "Email Remitente", "ltms" ),    'type' => 'email', 'default' => get_option( 'admin_email' ) ?? '' ],
+            [ 'key' => 'ltms_email_header_color', 'label' => __( "Color Header Email", "ltms" ), 'type' => 'text',  'default' => '#1a5276' ],
         ],
         // v1.6.0 — Enterprise Module Settings
         'backblaze' => [
-            [ 'key' => 'ltms_backblaze_endpoint',       'label' => __( 'Endpoint S3 (URL base)', 'ltms' ),         'type' => 'text',     'default' => 'https://s3.us-west-004.backblazeb2.com', 'desc' => __( 'Ej: https://s3.us-west-004.backblazeb2.com', 'ltms' ) ],
-            [ 'key' => 'ltms_backblaze_key_id',         'label' => __( 'Key ID', 'ltms' ),                         'type' => 'text' ],
-            [ 'key' => 'ltms_backblaze_app_key',        'label' => __( 'Application Key 🔐', 'ltms' ),             'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256. Dejar vacío para no cambiar.', 'ltms' ) ],
-            [ 'key' => 'ltms_backblaze_default_bucket', 'label' => __( 'Bucket Público (defecto)', 'ltms' ),       'type' => 'text' ],
-            [ 'key' => 'ltms_backblaze_private_bucket', 'label' => __( 'Bucket Privado (KYC/Facturas)', 'ltms' ),  'type' => 'text' ],
+            [ 'key' => 'ltms_backblaze_endpoint',       'label' => __( "Endpoint S3 (URL base)", "ltms" ),         'type' => 'text',     'default' => 'https://s3.us-west-004.backblazeb2.com', 'desc' => __( "Ej: https://s3.us-west-004.backblazeb2.com", "ltms" ) ],
+            [ 'key' => 'ltms_backblaze_key_id',         'label' => __( "Key ID", "ltms" ),                         'type' => 'text' ],
+            [ 'key' => 'ltms_backblaze_app_key',        'label' => __( "Application Key 🔐", "ltms" ),             'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256. Dejar vacío para no cambiar.", "ltms" ) ],
+            [ 'key' => 'ltms_backblaze_default_bucket', 'label' => __( "Bucket Público (defecto)", "ltms" ),       'type' => 'text' ],
+            [ 'key' => 'ltms_backblaze_private_bucket', 'label' => __( "Bucket Privado (KYC/Facturas)", "ltms" ),  'type' => 'text' ],
         ],
         'uber_direct' => [
-            [ 'key' => 'ltms_uber_direct_client_id',      'label' => __( 'Uber Direct Client ID', 'ltms' ),           'type' => 'text' ],
-            [ 'key' => 'ltms_uber_direct_client_secret',  'label' => __( 'Client Secret 🔐', 'ltms' ),                'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256.', 'ltms' ) ],
-            [ 'key' => 'ltms_uber_direct_customer_id',    'label' => __( 'Customer ID', 'ltms' ),                     'type' => 'text' ],
-            [ 'key' => 'ltms_uber_direct_webhook_secret', 'label' => __( 'Webhook Secret (HMAC)', 'ltms' ),           'type' => 'text',     'desc' => __( 'Para validar firmas de webhooks Uber.', 'ltms' ) ],
+            [ 'key' => 'ltms_uber_direct_client_id',      'label' => __( "Uber Direct Client ID", "ltms" ),           'type' => 'text' ],
+            [ 'key' => 'ltms_uber_direct_client_secret',  'label' => __( "Client Secret 🔐", "ltms" ),                'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256.", "ltms" ) ],
+            [ 'key' => 'ltms_uber_direct_customer_id',    'label' => __( "Customer ID", "ltms" ),                     'type' => 'text' ],
+            [ 'key' => 'ltms_uber_direct_webhook_secret', 'label' => __( "Webhook Secret (HMAC)", "ltms" ),           'type' => 'text',     'desc' => __( "Para validar firmas de webhooks Uber.", "ltms" ) ],
         ],
         'heka' => [
-            [ 'key' => 'ltms_heka_api_key',    'label' => __( 'Heka API Key 🔐', 'ltms' ),   'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256.', 'ltms' ) ],
-            [ 'key' => 'ltms_heka_account_id', 'label' => __( 'Heka Account ID', 'ltms' ),   'type' => 'text' ],
+            [ 'key' => 'ltms_heka_api_key',    'label' => __( "Heka API Key 🔐", "ltms" ),   'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256.", "ltms" ) ],
+            [ 'key' => 'ltms_heka_account_id', 'label' => __( "Heka Account ID", "ltms" ),   'type' => 'text' ],
         ],
         'aveonline' => [
-            [ 'key' => 'ltms_aveonline_enabled',          'label' => __( 'Habilitar Aveonline', 'ltms' ),              'type' => 'checkbox', 'default' => 'no' ],
-            [ 'key' => 'ltms_aveonline_usuario',          'label' => __( 'Usuario Aveonline', 'ltms' ),                'type' => 'text',     'desc' => __( 'Usuario de ingreso a la plataforma Aveonline.', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_clave',            'label' => __( 'Contraseña 🔐', 'ltms' ),                   'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256. Dejar vacío para no cambiar.', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_idempresa',        'label' => __( 'ID Empresa (idempresa)', 'ltms' ),           'type' => 'text',     'desc' => __( 'Número de ID de la empresa dentro de Aveonline. Se obtiene al autenticarse.', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_idagente',         'label' => __( 'ID Agente (idagente)', 'ltms' ),             'type' => 'text',     'desc' => __( 'Agente logístico asociado a la cuenta.', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_idtransportador',  'label' => __( 'Transportadora por defecto', 'ltms' ),      'type' => 'text',     'desc' => __( 'Código de la transportadora (ej: 29 = ENVIA). Vacío = cotizar todas.', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_codigo',           'label' => __( 'Código de guía (codigo)', 'ltms' ),         'type' => 'text',     'desc' => __( 'Usuario secundario para generación de guías (campo codigo).', 'ltms' ) ],
-            [ 'key' => 'ltms_aveonline_clave_guia',       'label' => __( 'Clave de guía 🔐 (dsclavex)', 'ltms' ),     'type' => 'password', 'desc' => __( 'Contraseña secundaria para generación de guías. Se guarda cifrado.', 'ltms' ) ],
-            [ 'key' => 'ltms_store_city',                 'label' => __( 'Ciudad de origen (bodega)', 'ltms' ),       'type' => 'text',     'default' => 'Bogotá', 'desc' => __( 'Ciudad desde donde se despachan los paquetes. Ej: MEDELLIN(ANTIOQUIA)', 'ltms' ) ],
+            [ 'key' => 'ltms_aveonline_enabled',          'label' => __( "Habilitar Aveonline", "ltms" ),              'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_aveonline_usuario',          'label' => __( "Usuario Aveonline", "ltms" ),                'type' => 'text',     'desc' => __( "Usuario de ingreso a la plataforma Aveonline.", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_clave',            'label' => __( "Contraseña 🔐", "ltms" ),                   'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256. Dejar vacío para no cambiar.", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_idempresa',        'label' => __( "ID Empresa (idempresa)", "ltms" ),           'type' => 'text',     'desc' => __( "Número de ID de la empresa dentro de Aveonline. Se obtiene al autenticarse.", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_idagente',         'label' => __( "ID Agente (idagente)", "ltms" ),             'type' => 'text',     'desc' => __( "Agente logístico asociado a la cuenta.", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_idtransportador',  'label' => __( "Transportadora por defecto", "ltms" ),      'type' => 'text',     'desc' => __( "Código de la transportadora (ej: 29 = ENVIA). Vacío = cotizar todas.", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_codigo',           'label' => __( "Código de guía (codigo)", "ltms" ),         'type' => 'text',     'desc' => __( "Usuario secundario para generación de guías (campo codigo).", "ltms" ) ],
+            [ 'key' => 'ltms_aveonline_clave_guia',       'label' => __( "Clave de guía 🔐 (dsclavex)", "ltms" ),     'type' => 'password', 'desc' => __( "Contraseña secundaria para generación de guías. Se guarda cifrado.", "ltms" ) ],
+            [ 'key' => 'ltms_store_city',                 'label' => __( "Ciudad de origen (bodega)", "ltms" ),       'type' => 'text',     'default' => 'Bogotá', 'desc' => __( "Ciudad desde donde se despachan los paquetes. Ej: MEDELLIN(ANTIOQUIA)", "ltms" ) ],
         ],
         'xcover' => [
-            [ 'key' => 'ltms_xcover_api_key',               'label' => __( 'XCover API Key 🔐', 'ltms' ),               'type' => 'password', 'desc' => __( 'Se guarda cifrado con AES-256.', 'ltms' ) ],
-            [ 'key' => 'ltms_xcover_partner_code',          'label' => __( 'XCover Partner Code', 'ltms' ),             'type' => 'text' ],
-            [ 'key' => 'ltms_xcover_parcel_protection',     'label' => __( 'Protección del Paquete', 'ltms' ),          'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Muestra opción de seguro de paquete en checkout.', 'ltms' ) ],
-            [ 'key' => 'ltms_xcover_purchase_protection',   'label' => __( 'Protección de Compra', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Muestra opción de protección de compra en checkout.', 'ltms' ) ],
+            [ 'key' => 'ltms_xcover_api_key',               'label' => __( "XCover API Key 🔐", "ltms" ),               'type' => 'password', 'desc' => __( "Se guarda cifrado con AES-256.", "ltms" ) ],
+            [ 'key' => 'ltms_xcover_partner_code',          'label' => __( "XCover Partner Code", "ltms" ),             'type' => 'text' ],
+            [ 'key' => 'ltms_xcover_parcel_protection',     'label' => __( "Protección del Paquete", "ltms" ),          'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Muestra opción de seguro de paquete en checkout.", "ltms" ) ],
+            [ 'key' => 'ltms_xcover_purchase_protection',   'label' => __( "Protección de Compra", "ltms" ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Muestra opción de protección de compra en checkout.", "ltms" ) ],
         ],
         // v2.1.0 — Alegra Contabilidad
         'alegra' => [
-            [ 'key' => 'ltms_alegra_enabled',                'label' => __( 'Alegra Activo', 'ltms' ),                       'type' => 'checkbox', 'default' => 'no' ],
-            [ 'key' => 'ltms_alegra_email',                  'label' => __( 'Email de la cuenta Alegra', 'ltms' ),           'type' => 'email',    'desc' => __( 'El mismo email con el que accedes a app.alegra.com.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_token',                  'label' => __( 'Token de API Alegra 🔐', 'ltms' ),              'type' => 'password', 'desc' => __( 'Ajustes → API en Alegra. Se guarda cifrado con AES-256.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_default_number_template','label' => __( 'ID Numeración de Facturas', 'ltms' ),           'type' => 'number',   'desc' => __( 'ID de la plantilla de numeración en Alegra (ej: 1). Déjalo en 0 para usar la numeración por defecto.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_bank_account_id',        'label' => __( 'ID Cuenta Bancaria Alegra', 'ltms' ),           'type' => 'number',   'desc' => __( 'ID de la cuenta bancaria en Alegra para registrar pagos de retiros.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_invoice_on_processing',  'label' => __( 'Crear factura en "En proceso"', 'ltms' ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Por defecto, la factura se crea cuando el pedido llega a "Completado".', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( 'Enviar factura por email', 'ltms' ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Alegra envía automáticamente la factura al email del comprador.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_auto_payment',           'label' => __( 'Registrar pago automáticamente', 'ltms' ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( 'Registra el pago en Alegra al crear la factura. Requiere ID Cuenta Bancaria.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_commission_account_id',  'label' => __( 'ID Cuenta Comisiones Plataforma', 'ltms' ),      'type' => 'number',   'desc' => __( 'ID de cuenta bancaria en Alegra donde se registran las comisiones del marketplace. Déjalo en 0 para omitir.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_retefuente_tax_id',      'label' => __( 'ID Impuesto Retención en la Fuente', 'ltms' ),   'type' => 'number',   'desc' => __( 'ID del impuesto de retefuente en Alegra (Configuración → Impuestos). Déjalo en 0 si no aplica.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_shipping_tax_id',        'label' => __( 'ID Impuesto para Envíos', 'ltms' ),              'type' => 'number',   'desc' => __( 'ID del impuesto a aplicar en el ítem de envío. Default: 1 (exento en Colombia).', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_exchange_rate',          'label' => __( 'Tasa de cambio (moneda extranjera)', 'ltms' ),   'type' => 'number',   'desc' => __( 'Tasa de cambio a usar cuando el pedido no es en COP/MXN. Default: 1.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( 'Webhook Secret (token)', 'ltms' ),              'type' => 'text',     'desc' => __( 'Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.', 'ltms' ) ],
-            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( 'URL del Webhook (solo lectura)', 'ltms' ),      'type' => 'text',     'default' => function_exists( 'home_url' ) ? home_url( '/wp-json/ltms/v1/webhooks/alegra' ) : '', 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( 'Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.', 'ltms' ) ],
+            [ 'key' => 'ltms_alegra_enabled',                'label' => __( "Alegra Activo", "ltms" ),                       'type' => 'checkbox', 'default' => 'no' ],
+            [ 'key' => 'ltms_alegra_email',                  'label' => __( "Email de la cuenta Alegra", "ltms" ),           'type' => 'email',    'desc' => __( "El mismo email con el que accedes a app.alegra.com.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_token',                  'label' => __( "Token de API Alegra 🔐", "ltms" ),              'type' => 'password', 'desc' => __( "Ajustes → API en Alegra. Se guarda cifrado con AES-256.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_default_number_template','label' => __( "ID Numeración de Facturas", "ltms" ),           'type' => 'number',   'desc' => __( "ID de la plantilla de numeración en Alegra (ej: 1). Déjalo en 0 para usar la numeración por defecto.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_bank_account_id',        'label' => __( "ID Cuenta Bancaria Alegra", "ltms" ),           'type' => 'number',   'desc' => __( "ID de la cuenta bancaria en Alegra para registrar pagos de retiros.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_invoice_on_processing',  'label' => __( "Crear factura en "En proceso"", "ltms" ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Por defecto, la factura se crea cuando el pedido llega a "Completado".", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( "Enviar factura por email", "ltms" ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Alegra envía automáticamente la factura al email del comprador.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_auto_payment',           'label' => __( "Registrar pago automáticamente", "ltms" ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Registra el pago en Alegra al crear la factura. Requiere ID Cuenta Bancaria.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_commission_account_id',  'label' => __( "ID Cuenta Comisiones Plataforma", "ltms" ),      'type' => 'number',   'desc' => __( "ID de cuenta bancaria en Alegra donde se registran las comisiones del marketplace. Déjalo en 0 para omitir.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_retefuente_tax_id',      'label' => __( "ID Impuesto Retención en la Fuente", "ltms" ),   'type' => 'number',   'desc' => __( "ID del impuesto de retefuente en Alegra (Configuración → Impuestos). Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_shipping_tax_id',        'label' => __( "ID Impuesto para Envíos", "ltms" ),              'type' => 'number',   'desc' => __( "ID del impuesto a aplicar en el ítem de envío. Default: 1 (exento en Colombia).", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_exchange_rate',          'label' => __( "Tasa de cambio (moneda extranjera)", "ltms" ),   'type' => 'number',   'desc' => __( "Tasa de cambio a usar cuando el pedido no es en COP/MXN. Default: 1.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( "Webhook Secret (token)", "ltms" ),              'type' => 'text',     'desc' => __( "Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( "URL del Webhook (solo lectura)", "ltms" ),      'type' => 'text',     'default' => function_exists( 'home_url' ) ? home_url( '/wp-json/ltms/v1/webhooks/alegra' ) : '', 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( "Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.", "ltms" ) ],
         ],
     ];
 
     $fields = $fields_map[ $tab ] ?? [];
     if ( empty( $fields ) ) {
-        echo '<div class="ltms-form-section"><p>' . esc_html__( 'No hay configuraciones para esta sección.', 'ltms' ) . '</p></div>';
+        echo '<div class="ltms-form-section"><p>' . esc_html__( "No hay configuraciones para esta sección.", "ltms" ) . '</p></div>';
         return;
     }
 
@@ -259,7 +259,7 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
         // No mostrar contraseñas cifradas en texto plano
         if ( ( $field['type'] ?? '' ) === 'password' && strpos( $value, 'v1:' ) === 0 ) {
             $value = '';
-            $field['placeholder'] = __( '(guardado — dejar vacío para mantener)', 'ltms' );
+            $field['placeholder'] = __( "(guardado — dejar vacío para mantener)", "ltms" );
         }
 
         echo '<div class="ltms-form-row">';
