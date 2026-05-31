@@ -260,7 +260,7 @@ class LTMS_Admin_Shipping {
 
             // Calculadora de flete
             $( '#ltms-calc-estimate' ).on( 'click', function() {
-                var $btn = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( 'Calculando...', 'ltms' ) ); ?>' );
+                var $btn = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( "Calculando...", "ltms" ) ); ?>' );
                 $.ajax( {
                     url:         api + '/estimate',
                     method:      'POST',
@@ -284,7 +284,7 @@ class LTMS_Admin_Shipping {
                         $( '#ltms-estimate-result' ).show();
                     },
                     complete: function() {
-                        $btn.prop( 'disabled', false ).text( '<?php echo esc_js( __( '📊 Calcular estimado', 'ltms' ) ); ?>' );
+                        $btn.prop( 'disabled', false ).text( '<?php echo esc_js( __( "📊 Calcular estimado", "ltms" ) ); ?>' );
                     }
                 } );
             } );
