@@ -143,15 +143,51 @@ $pending_kyc = (int) $wpdb->get_var(
             </thead>
             <tbody>
                 <?php
-                $integrations = [
-                    [ 'key' => 'ltms_siigo_enabled',  'name' => 'Siigo ERP',    'provider' => 'siigo' ],
-                    [ 'key' => 'ltms_openpay_enabled', 'name' => 'Openpay',      'provider' => 'openpay' ],
-                    [ 'key' => 'ltms_addi_enabled',    'name' => 'Addi BNPL',    'provider' => 'addi' ],
-                    [ 'key' => 'ltms_mlm_enabled',     'name' => 'TPTC Red MLM', 'provider' => 'tptc' ],
-                    [ 'key' => 'ltms_xcover_enabled',  'name' => 'XCover Seguros', 'provider' => 'xcover' ],
+                // Todas las integraciones sincronizadas con pestañas de Configuración LTMS
+                $integration_groups = [
+                    '💳 Pasarelas de Pago' => [
+                        [ 'key' => 'ltms_stripe_enabled',       'name' => 'Stripe',          'provider' => 'stripe',      'tab' => 'payments' ],
+                        [ 'key' => 'ltms_openpay_enabled',      'name' => 'Openpay CO',      'provider' => 'openpay',     'tab' => 'payments' ],
+                        [ 'key' => 'ltms_openpay_mx_enabled',   'name' => 'Openpay MX',      'provider' => 'openpay',     'tab' => 'payments' ],
+                        [ 'key' => 'ltms_addi_enabled',         'name' => 'Addi BNPL',       'provider' => 'addi',        'tab' => 'payments' ],
+                    ],
+                    '🚚 Logística' => [
+                        [ 'key' => 'ltms_aveonline_enabled',    'name' => 'Aveonline',       'provider' => 'aveonline',   'tab' => 'aveonline' ],
+                        [ 'key' => 'ltms_heka_enabled',         'name' => 'Heka Entrega',    'provider' => 'heka',        'tab' => 'heka' ],
+                        [ 'key' => 'ltms_uber_direct_enabled',  'name' => 'Uber Direct',     'provider' => 'uber',        'tab' => 'uber_direct' ],
+                        [ 'key' => 'ltms_deprisa_enabled',      'name' => 'Deprisa',         'provider' => 'deprisa',     'tab' => 'deprisa' ],
+                    ],
+                    '🧾 Contabilidad / Fiscal' => [
+                        [ 'key' => 'ltms_alegra_enabled',       'name' => 'Alegra',          'provider' => 'alegra',      'tab' => 'alegra' ],
+                        [ 'key' => 'ltms_siigo_enabled',        'name' => 'Siigo ERP',       'provider' => 'siigo',       'tab' => 'siigo' ],
+                    ],
+                    '🛡️ Seguros & Firma' => [
+                        [ 'key' => 'ltms_xcover_enabled',       'name' => 'XCover Seguros',  'provider' => 'xcover',      'tab' => 'xcover' ],
+                        [ 'key' => 'ltms_zapsign_enabled',      'name' => 'ZapSign Firma',   'provider' => 'zapsign',     'tab' => 'zapsign' ],
+                    ],
+                    '☁️ Almacenamiento' => [
+                        [ 'key' => 'ltms_backblaze_enabled',    'name' => 'Backblaze B2',    'provider' => 'backblaze',   'tab' => 'backblaze' ],
+                    ],
+                    '🔐 Autenticación' => [
+                        [ 'key' => 'ltms_google_client_id',     'name' => 'Google OAuth',    'provider' => 'google_oauth','tab' => 'google_oauth', 'check_fn' => 'notempty' ],
+                    ],
+                    '📣 Marketing' => [
+                        [ 'key' => 'ltms_mlm_enabled',          'name' => 'TPTC Red MLM',    'provider' => 'tptc',        'tab' => 'mlm' ],
+                    ],
                 ];
-                foreach ( $integrations as $intg ) :
-                    $enabled = LTMS_Core_Config::get( $intg['key'], 'no' ) === 'yes';
+
+                foreach ( $integration_groups as $group_name => $integrations ) :
+                    echo '<tr><td colspan="4" style="background:#f0f0f0;font-weight:600;padding:6px 10px;">'
+                        . esc_html( $group_name ) . '</td></tr>';
+                    foreach ( $integrations as $intg ) :
+                        // Google OAuth se activa si tiene client_id configurado, no por checkbox
+                        if ( isset( $intg['check_fn'] ) && $intg['check_fn'] === 'notempty' ) {
+                            $val     = LTMS_Core_Config::get( $intg['key'], '' );
+                            $enabled = ! empty( $val ) && $val !== 'GOOGLE_CLIENT_ID_PLACEHOLDER';
+                        } else {
+                            $enabled = LTMS_Core_Config::get( $intg['key'], 'no' ) === 'yes';
+                        }
+                        $settings_url = admin_url( 'admin.php?page=ltms-settings&tab=' . ( $intg['tab'] ?? 'general' ) );
                 ?>
                 <tr>
                     <td><strong><?php echo esc_html( $intg['name'] ); ?></strong></td>
@@ -173,13 +209,14 @@ $pending_kyc = (int) $wpdb->get_var(
                                 <?php esc_html_e( 'Probar conexión', 'ltms' ); ?>
                             </button>
                         <?php else : ?>
-                            <a href="<?php echo esc_url( admin_url( 'admin.php?page=ltms-settings' ) ); ?>" class="ltms-btn ltms-btn-outline ltms-btn-sm">
+                            <a href="<?php echo esc_url( $settings_url ); ?>" class="ltms-btn ltms-btn-outline ltms-btn-sm">
                                 <?php esc_html_e( 'Configurar', 'ltms' ); ?>
                             </a>
                         <?php endif; ?>
                     </td>
                 </tr>
-                <?php endforeach; ?>
+                <?php endforeach; // integraciones del grupo
+                endforeach; // grupos
             </tbody>
         </table>
     </div>
