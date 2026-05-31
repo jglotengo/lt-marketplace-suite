@@ -165,10 +165,10 @@ jQuery( function( $ ) {
     $( '.ltms-approve-rnt' ).on( 'click', function() {
         var approved = $( this ).data( 'approved' );
         var msg = approved
-            ? '<?php echo esc_js( __( '¿Aprobar este RNT?', 'ltms' ) ); ?>'
-            : '<?php echo esc_js( __( '¿Rechazar este RNT?', 'ltms' ) ); ?>';
+            ? '<?php echo esc_js( __( "¿Aprobar este RNT?", "ltms" ) ); ?>'
+            : '<?php echo esc_js( __( "¿Rechazar este RNT?", "ltms" ) ); ?>';
         if ( ! confirm( msg ) ) return;
-        var notes = approved ? '' : ( prompt( '<?php echo esc_js( __( 'Motivo del rechazo (opcional):', 'ltms' ) ); ?>' ) || '' );
+        var notes = approved ? '' : ( prompt( '<?php echo esc_js( __( "Motivo del rechazo (opcional):", "ltms" ) ); ?>' ) || '' );
         var $btn = $( this ).prop( 'disabled', true );
         $.post( ajaxurl, {
             action:    'ltms_admin_verify_rnt',
