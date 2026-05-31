@@ -216,7 +216,7 @@ $pending_kyc = (int) $wpdb->get_var(
                     </td>
                 </tr>
                 <?php endforeach; // integraciones del grupo
-                endforeach; // grupos
+                endforeach; // grupos ?>
             </tbody>
         </table>
     </div>
