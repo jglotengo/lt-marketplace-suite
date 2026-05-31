@@ -3,7 +3,7 @@
  * Admin View: Dashboard de Salud de Proveedores
  *
  * @package LTMS
- * @version 1.7.0
+ * @version 1.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,7 +12,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$providers  = [ 'stripe', 'openpay', 'addi', 'aveonline', 'heka', 'uber', 'alegra' ];
+/**
+ * Mapa completo de proveedores: slug => etiqueta visible
+ * Sincronizado con todas las pestañas de Configuración LTMS.
+ */
+$provider_map = [
+	// Pasarelas de pago
+	'stripe'      => [ 'label' => 'STRIPE',       'group' => '💳 Pasarelas de Pago' ],
+	'openpay'     => [ 'label' => 'OPENPAY',      'group' => '💳 Pasarelas de Pago' ],
+	'addi'        => [ 'label' => 'ADDI',         'group' => '💳 Pasarelas de Pago' ],
+	// Logística
+	'aveonline'   => [ 'label' => 'AVEONLINE',    'group' => '🚚 Logística' ],
+	'heka'        => [ 'label' => 'HEKA',         'group' => '🚚 Logística' ],
+	'uber'        => [ 'label' => 'UBER DIRECT',  'group' => '🚚 Logística' ],
+	'deprisa'     => [ 'label' => 'DEPRISA',      'group' => '🚚 Logística' ],
+	// Contabilidad / Fiscal
+	'alegra'      => [ 'label' => 'ALEGRA',       'group' => '🧾 Contabilidad / Fiscal' ],
+	'siigo'       => [ 'label' => 'SIIGO ERP',    'group' => '🧾 Contabilidad / Fiscal' ],
+	// Seguros & Firma
+	'xcover'      => [ 'label' => 'XCOVER',       'group' => '🛡️ Seguros & Firma' ],
+	'zapsign'     => [ 'label' => 'ZAPSIGN',      'group' => '🛡️ Seguros & Firma' ],
+	// Almacenamiento
+	'backblaze'   => [ 'label' => 'BACKBLAZE B2', 'group' => '☁️ Almacenamiento' ],
+	// Autenticación
+	'google_oauth' => [ 'label' => 'GOOGLE OAUTH', 'group' => '🔐 Autenticación' ],
+];
+
+$providers  = array_keys( $provider_map );
 $since_24h  = gmdate( 'Y-m-d H:i:s', time() - 86400 );
 $since_1h   = gmdate( 'Y-m-d H:i:s', time() - 3600 );
 
@@ -24,10 +50,6 @@ if ( isset( $_POST['ltms_reset_provider'] ) ) {
 	echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( sprintf( 'Circuit breaker de %s reseteado.', strtoupper( $p ) ) ) . '</p></div>';
 }
 
-/**
- * A-4 FIX: Envolver en function_exists para evitar "already declared" si el view
- * se carga más de una vez (double-include en algunos setups de WordPress).
- */
 if ( ! function_exists( 'ltms_provider_stats' ) ) :
 function ltms_provider_stats( string $provider, string $since ): array {
 	global $wpdb;
@@ -47,13 +69,24 @@ function ltms_provider_stats( string $provider, string $since ): array {
 	return $row ?: [ 'total' => 0, 'successes' => 0, 'avg_latency' => 0 ];
 }
 endif;
+
+// Agrupar proveedores por grupo
+$groups = [];
+foreach ( $provider_map as $slug => $info ) {
+	$groups[ $info['group'] ][] = $slug;
+}
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( '🩺 Dashboard de Salud de Proveedores', 'ltms' ); ?></h1>
-	<p><?php esc_html_e( 'Monitoreo en tiempo real de pasarelas de pago y proveedores logísticos (últimas 24 horas).', 'ltms' ); ?></p>
+	<p><?php esc_html_e( 'Monitoreo en tiempo real de todas las integraciones activas (últimas 24 horas).', 'ltms' ); ?></p>
 
-	<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;">
-	<?php foreach ( $providers as $provider ) :
+	<?php foreach ( $groups as $group_label => $group_slugs ) : ?>
+	<h2 style="margin-top:28px;margin-bottom:10px;border-bottom:1px solid #ddd;padding-bottom:6px;">
+		<?php echo esc_html( $group_label ); ?>
+	</h2>
+	<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
+	<?php foreach ( $group_slugs as $provider ) :
+		$info      = $provider_map[ $provider ];
 		$stats_24h = ltms_provider_stats( $provider, $since_24h );
 		$total     = (int) ( $stats_24h['total'] ?? 0 );
 		$has_data  = $total > 0;
@@ -65,23 +98,22 @@ endif;
 		$status    = $is_down ? '⛔ Down (Circuit Breaker)' : '✅ Activo';
 		$alert     = ( ! $is_down && $has_data && $uptime < 95 );
 	?>
-	<div class="card" style="min-width:280px;max-width:340px;padding:16px;">
+	<div class="card" style="min-width:260px;max-width:320px;padding:16px;">
 		<?php if ( $alert ) : ?>
 		<div class="notice notice-warning inline"><p><?php esc_html_e( '⚠️ Uptime por debajo del 95%', 'ltms' ); ?></p></div>
 		<?php endif; ?>
-		<h3 style="margin-top:0;"><?php echo esc_html( $dot . ' ' . strtoupper( $provider ) ); ?></h3>
+		<h3 style="margin-top:0;"><?php echo esc_html( $dot . ' ' . $info['label'] ); ?></h3>
 		<table class="widefat striped" style="width:100%;">
 			<tr><td><strong><?php esc_html_e( 'Uptime 24h', 'ltms' ); ?></strong></td><td><?php echo $has_data ? esc_html( $uptime . '%' ) : '<em style="color:#888">Sin datos aún</em>'; // phpcs:ignore ?></td></tr>
 			<tr><td><strong><?php esc_html_e( 'Latencia prom.', 'ltms' ); ?></strong></td><td><?php echo $has_data ? esc_html( $avg_lat . ' ms' ) : '<em style="color:#888">—</em>'; // phpcs:ignore ?></td></tr>
 			<tr><td><strong><?php esc_html_e( 'Llamadas 24h', 'ltms' ); ?></strong></td><td><?php echo esc_html( (string) $total ); ?></td></tr>
 			<tr><td><strong><?php esc_html_e( 'Estado', 'ltms' ); ?></strong></td><td><?php echo esc_html( $status ); ?></td></tr>
 		</table>
-		<!-- Botón de prueba de conexión — registra en lt_provider_health y actualiza stats -->
 		<button type="button"
 			class="button button-secondary ltms-test-provider-btn"
 			data-provider="<?php echo esc_attr( $provider ); ?>"
 			style="margin-top:10px;width:100%;">
-			🔌 <?php echo esc_html( sprintf( __( 'Probar %s', 'ltms' ), strtoupper( $provider ) ) ); ?>
+			🔌 <?php echo esc_html( sprintf( __( 'Probar %s', 'ltms' ), $info['label'] ) ); ?>
 		</button>
 		<span class="ltms-test-result-<?php echo esc_attr( $provider ); ?>" style="display:none;font-size:12px;margin-top:6px;display:block;"></span>
 		<?php if ( $is_down ) : ?>
@@ -94,6 +126,7 @@ endif;
 	</div>
 	<?php endforeach; ?>
 	</div>
+	<?php endforeach; ?>
 
 	<script>
 	jQuery(function($) {
