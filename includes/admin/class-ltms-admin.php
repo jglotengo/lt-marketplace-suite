@@ -481,7 +481,7 @@ final class LTMS_Admin {
         $view_path = LTMS_INCLUDES_DIR . 'admin/views/' . $view_name . '.php';
 
         if ( file_exists( $view_path ) ) {
-            include_once $view_path;
+            include $view_path;
         } else {
             echo '<div class="wrap"><h1>LTMS</h1><p>' .
                 sprintf(
