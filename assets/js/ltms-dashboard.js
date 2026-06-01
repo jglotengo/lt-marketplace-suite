@@ -1158,7 +1158,7 @@
                 }
                 analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>';
                 analyticsHtml += '<span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span></div>';
-                jQuery('#ltms-view-settings').append(analyticsHtml);
+                document.getElementById('ltms-view-settings') && (document.getElementById('ltms-view-settings').insertAdjacentHTML('beforeend', analyticsHtml));
             }
 
             // Handler: guardar configuración básica (products-ajax)
