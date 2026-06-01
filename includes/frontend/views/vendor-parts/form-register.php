@@ -67,6 +67,15 @@ $country = LTMS_Core_Config::get_country();
                 <input type="email" id="ltms-reg-email" name="email" class="ltms-form-control" required placeholder="<?php esc_attr_e( 'tu@email.com', 'ltms' ); ?>">
             </div>
 
+            <!-- M-MX-1: Selector de país del vendedor. Controla documentos, placeholder tel, y moneda de wallet. -->
+            <div class="ltms-form-group">
+                <label for="ltms-reg-vendor-country"><?php esc_html_e( '¿En qué país vendes?', 'ltms' ); ?> *</label>
+                <select id="ltms-reg-vendor-country" name="vendor_country" class="ltms-form-control" required>
+                    <option value="CO" <?php selected( $country, 'CO' ); ?>>🇨🇴 Colombia</option>
+                    <option value="MX">🇲🇽 México</option>
+                </select>
+            </div>
+
             <div class="ltms-form-group">
                 <label for="ltms-reg-phone"><?php esc_html_e( 'Teléfono', 'ltms' ); ?></label>
                 <input type="tel" id="ltms-reg-phone" name="phone" class="ltms-form-control" placeholder="<?php echo 'CO' === $country ? '+57 300 000 0000' : '+52 55 0000 0000'; ?>">
@@ -213,7 +222,46 @@ $country = LTMS_Core_Config::get_country();
             </div>
         </div>
 
-    </form>
+    
+<script>
+(function() {
+    var sel    = document.getElementById('ltms-reg-vendor-country');
+    var phone  = document.getElementById('ltms-reg-phone');
+    var docSel = document.getElementById('ltms-reg-document-type');
+
+    var docOpts = {
+        CO: [
+            {v:'', l:'Seleccionar...'},
+            {v:'CC', l:'Cédula de Ciudadanía'},
+            {v:'CE', l:'Cédula de Extranjería'},
+            {v:'NIT', l:'NIT'},
+            {v:'PAS', l:'Pasaporte'}
+        ],
+        MX: [
+            {v:'', l:'Seleccionar...'},
+            {v:'RFC', l:'RFC'},
+            {v:'CURP', l:'CURP'},
+            {v:'PAS', l:'Pasaporte'}
+        ]
+    };
+
+    function updateCountry(country) {
+        if (phone) phone.placeholder = country === 'MX' ? '+52 55 0000 0000' : '+57 300 000 0000';
+        if (docSel) {
+            var opts = docOpts[country] || docOpts.CO;
+            docSel.innerHTML = opts.map(function(o){
+                return '<option value="'+o.v+'">'+o.l+'</option>';
+            }).join('');
+        }
+    }
+
+    if (sel) {
+        sel.addEventListener('change', function(){ updateCountry(this.value); });
+        updateCountry(sel.value);
+    }
+})();
+</script>
+</form>
 
     <?php if ( class_exists( 'LTMS_Google_OAuth' ) && LTMS_Google_OAuth::is_configured() ) : ?>
     <div class="ltms-oauth-divider">

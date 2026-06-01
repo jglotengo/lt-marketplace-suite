@@ -54,7 +54,7 @@ final class LTMS_Business_Wallet {
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wallet = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM `{$table}` WHERE vendor_id = %d LIMIT 1", $vendor_id ),
+            $wpdb->prepare( "SELECT * FROM `{$table}` WHERE vendor_id = %d AND currency = %s LIMIT 1", $vendor_id, $currency ),
             ARRAY_A
         );
 

@@ -275,6 +275,10 @@ final class LTMS_Public_Auth_Handler {
             'referral_code'      => strtoupper( sanitize_text_field( wp_unslash( $_POST['referral_code'] ?? '' ) ) ), // phpcs:ignore
             'terms_accepted'     => ! empty( $_POST['accept_terms'] ), // phpcs:ignore
             'sagrilaft_accepted' => ! empty( $_POST['accept_sagrilaft'] ), // phpcs:ignore
+            // M-MX-1: país declarado por el vendedor (CO o MX).
+            'vendor_country'     => strtoupper( sanitize_text_field( wp_unslash( $_POST['vendor_country'] ?? '' ) ) ), // phpcs:ignore
+            // M-MX-1: país del vendedor — CO o MX según selección en el form.
+            'vendor_country'     => strtoupper( sanitize_text_field( wp_unslash( $_POST['vendor_country'] ?? '' ) ) ), // phpcs:ignore
         ];
 
         // M-10: errors estructurados por campo.
@@ -351,6 +355,11 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
             }
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
+            // M-MX-1: guardar país del vendedor para routing fiscal y wallet.
+            $vendor_country = in_array( $data['vendor_country'], [ 'CO', 'MX' ], true )
+                ? $data['vendor_country']
+                : LTMS_Core_Config::get_country();
+            update_user_meta( $user_id, 'ltms_country', $vendor_country );
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
             update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
             update_user_meta( $user_id, 'ltms_email_verified', 0 );
@@ -369,8 +378,9 @@ final class LTMS_Public_Auth_Handler {
             update_user_meta( $user_id, 'ltms_email_verify_token', $verify_token );
             update_user_meta( $user_id, 'ltms_email_verify_expires', time() + self::EMAIL_VERIFY_TTL );
 
-            // Crear billetera inicial.
-            LTMS_Business_Wallet::get_or_create( $user_id );
+            // Crear billetera inicial con la moneda del país del vendedor.
+            $wallet_currency = ( $vendor_country === 'MX' ) ? 'MXN' : 'COP';
+            LTMS_Business_Wallet::get_or_create( $user_id, $wallet_currency );
 
             // Disparar listeners (Affiliates genera ltms_referral_code, Alegra crea contacto).
             do_action( 'ltms_vendor_registered', $user_id, $data['referral_code'] ?? '' );
@@ -552,7 +562,10 @@ final class LTMS_Public_Auth_Handler {
      */
     private function validate_registration( array $data ): array {
         $errors  = [];
-        $country = LTMS_Core_Config::get_country();
+        // M-MX-1: usar el país declarado por el vendor (si es válido), no el global del sitio.
+        $country = in_array( $data['vendor_country'] ?? '', [ 'CO', 'MX' ], true )
+            ? $data['vendor_country']
+            : LTMS_Core_Config::get_country();
 
         if ( empty( $data['first_name'] ) ) {
             $errors[] = [ 'field' => 'first_name', 'message' => __( 'El nombre es requerido.', 'ltms' ) ];
