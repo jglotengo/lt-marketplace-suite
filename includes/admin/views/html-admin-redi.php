@@ -208,8 +208,8 @@ function ltms_redi_page_url( string $tab, int $p, string $s, string $st ): strin
             ?>
             <tr id="ltms-redi-row-<?php echo esc_attr( $row['id'] ); ?>">
                 <td style="font-size:12px;color:#888;"><?php echo esc_html( $row['id'] ); ?></td>
-                <td><?php echo esc_html( $origin_data ? $origin_data->display_name : $origin_id ?: '—' ); ?></td>
-                <td><?php echo esc_html( $resell_data ? $resell_data->display_name : $reseller_id ?: '—' ); ?></td>
+                <td><?php echo esc_html( $origin_data ? $origin_data->display_name : ( $origin_id ?: '—' ) ); ?></td>
+                <td><?php echo esc_html( $resell_data ? $resell_data->display_name : ( $reseller_id ?: '—' ) ); ?></td>
                 <td style="font-size:12px;">
                     <?php if ( $product_id ) : ?>
                     <a href="<?php echo esc_url( admin_url( 'post.php?post=' . $product_id . '&action=edit' ) ); ?>">
