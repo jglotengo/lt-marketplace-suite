@@ -1140,27 +1140,26 @@
                     <div class="ltms-form-group"><label>Envío gratis desde (COP)</label><input type="number" class="ltms-form-control" id="ltms-dz-free" min="0" value="${store.delivery_zone&&store.delivery_zone.free_from||0}"></div>
                     <button type="button" class="ltms-btn ltms-btn-primary ltms-save-zone-btn">💾 Guardar Zona</button>
                     <span class="ltms-zone-msg" style="margin-left:10px;display:none;"></span>
-                </div>
-                \${(data.vendor_ga4_enabled || data.vendor_pixel_enabled) ? `
-                <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-                    <h4 style="margin-bottom:8px;">📊 Analytics &amp; Tracking de Mi Tienda</h4>
-                    <p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el tráfico hacia tus productos.</p>
-                    \${data.vendor_ga4_enabled ? `
-                    <div class="ltms-form-group">
-                        <label>Google Analytics 4 — Measurement ID</label>
-                        <input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="\${data.vendor_ga4_id||''}" placeholder="G-XXXXXXXXXX">
-                        <small style="color:#9ca3af;">Encuéntralo en Google Analytics → Admin → Flujos de datos.</small>
-                    </div>` : ''}
-                    \${data.vendor_pixel_enabled ? `
-                    <div class="ltms-form-group">
-                        <label>Meta Pixel ID (Facebook / Instagram)</label>
-                        <input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="\${data.vendor_pixel_id||''}" placeholder="123456789012345">
-                        <small style="color:#9ca3af;">Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.</small>
-                    </div>` : ''}
-                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>
-                    <span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span>
-                </div>` : ''}
-                `);
+                </div>`);
+            // Analytics card (appended separately to avoid nested backtick issues)
+            if (data.vendor_ga4_enabled || data.vendor_pixel_enabled) {
+                let analyticsHtml = '<div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">';
+                analyticsHtml += '<h4 style="margin-bottom:8px;">📊 Analytics & Tracking de Mi Tienda</h4>';
+                analyticsHtml += '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el tráfico hacia tus productos. Solo se activan en las páginas de tus productos.</p>';
+                if (data.vendor_ga4_enabled) {
+                    analyticsHtml += '<div class="ltms-form-group"><label>Google Analytics 4 — Measurement ID</label>';
+                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="' + this.escapeHtml(data.vendor_ga4_id||'') + '" placeholder="G-XXXXXXXXXX">';
+                    analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Google Analytics → Admin → Flujos de datos.</small></div>';
+                }
+                if (data.vendor_pixel_enabled) {
+                    analyticsHtml += '<div class="ltms-form-group"><label>Meta Pixel ID (Facebook / Instagram)</label>';
+                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="' + this.escapeHtml(data.vendor_pixel_id||'') + '" placeholder="123456789012345">';
+                    analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.</small></div>';
+                }
+                analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>';
+                analyticsHtml += '<span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span></div>';
+                $('#ltms-view-settings').append(analyticsHtml);
+            }
 
             // Handler: guardar configuración básica (products-ajax)
             $(document).off('click','.ltms-save-settings-btn').on('click','.ltms-save-settings-btn', function() {
