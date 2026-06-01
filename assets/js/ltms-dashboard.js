@@ -1140,7 +1140,27 @@
                     <div class="ltms-form-group"><label>Envío gratis desde (COP)</label><input type="number" class="ltms-form-control" id="ltms-dz-free" min="0" value="${store.delivery_zone&&store.delivery_zone.free_from||0}"></div>
                     <button type="button" class="ltms-btn ltms-btn-primary ltms-save-zone-btn">💾 Guardar Zona</button>
                     <span class="ltms-zone-msg" style="margin-left:10px;display:none;"></span>
-                </div>`);
+                </div>
+                \${(data.vendor_ga4_enabled || data.vendor_pixel_enabled) ? `
+                <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+                    <h4 style="margin-bottom:8px;">📊 Analytics &amp; Tracking de Mi Tienda</h4>
+                    <p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el tráfico hacia tus productos.</p>
+                    \${data.vendor_ga4_enabled ? `
+                    <div class="ltms-form-group">
+                        <label>Google Analytics 4 — Measurement ID</label>
+                        <input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="\${data.vendor_ga4_id||''}" placeholder="G-XXXXXXXXXX">
+                        <small style="color:#9ca3af;">Encuéntralo en Google Analytics → Admin → Flujos de datos.</small>
+                    </div>` : ''}
+                    \${data.vendor_pixel_enabled ? `
+                    <div class="ltms-form-group">
+                        <label>Meta Pixel ID (Facebook / Instagram)</label>
+                        <input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="\${data.vendor_pixel_id||''}" placeholder="123456789012345">
+                        <small style="color:#9ca3af;">Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.</small>
+                    </div>` : ''}
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>
+                    <span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span>
+                </div>` : ''}
+                `);
 
             // Handler: guardar configuración básica (products-ajax)
             $(document).off('click','.ltms-save-settings-btn').on('click','.ltms-save-settings-btn', function() {
@@ -1213,6 +1233,23 @@
                         setTimeout(()=>m.hide(),3000);
                     },
                     error(){ btn.prop('disabled',false).text('💾 Guardar Zona'); }
+                });
+            });
+
+            // Handler: guardar analytics del vendedor
+            $(document).off('click','.ltms-save-analytics-btn').on('click','.ltms-save-analytics-btn', function() {
+                const btn=$(this); btn.prop('disabled',true).text('Guardando...');
+                const settings = {};
+                if ($('#ltms-vendor-ga4').length) settings['ltms_vendor_ga4_id'] = $('#ltms-vendor-ga4').val();
+                if ($('#ltms-vendor-pixel').length) settings['ltms_vendor_pixel_id'] = $('#ltms-vendor-pixel').val();
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
+                    data:{ action:'ltms_save_vendor_settings', nonce:ltmsDashboard.nonce, settings:settings },
+                    success(r){ btn.prop('disabled',false).text('💾 Guardar Analytics');
+                        const m=$('.ltms-analytics-msg');
+                        m.text(r.success?'✅ Guardado':'❌ Error').css('color',r.success?'#10b981':'#ef4444').show();
+                        setTimeout(()=>m.hide(),3000);
+                    },
+                    error(){ btn.prop('disabled',false).text('💾 Guardar Analytics'); }
                 });
             });
         },

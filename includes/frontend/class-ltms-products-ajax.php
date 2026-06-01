@@ -71,7 +71,15 @@ class LTMS_Products_Ajax {
             'store_categories' => get_user_meta( $user_id, 'ltms_store_categories',  true ),
             'delivery_zone'    => $dz_raw ? json_decode( $dz_raw, true ) : [ 'cities' => [], 'radius_km' => 0, 'free_from' => 0 ],
         ];
-        wp_send_json_success( [ 'kyc_status' => $kyc_status, 'store' => $store ] );
+        wp_send_json_success( [
+            'kyc_status'           => $kyc_status,
+            'store'                => $store,
+            // v2.3.0 — Analytics por vendedor
+            'vendor_ga4_enabled'   => get_option( 'ltms_vendor_ga4_enabled',   'yes' ) === 'yes',
+            'vendor_pixel_enabled' => get_option( 'ltms_vendor_pixel_enabled', 'yes' ) === 'yes',
+            'vendor_ga4_id'        => get_user_meta( $user_id, 'ltms_vendor_ga4_id',   true ),
+            'vendor_pixel_id'      => get_user_meta( $user_id, 'ltms_vendor_pixel_id', true ),
+        ] );
     }
 
     public function save_vendor_settings() {
