@@ -1142,18 +1142,18 @@
                     <span class="ltms-zone-msg" style="margin-left:10px;display:none;"></span>
                 </div>`);
             // Analytics card (appended separately to avoid nested backtick issues)
-            if (data.vendor_ga4_enabled || data.vendor_pixel_enabled) {
+            if (data.store.vendor_ga4_enabled || data.store.vendor_pixel_enabled) {
                 let analyticsHtml = '<div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">';
                 analyticsHtml += '<h4 style="margin-bottom:8px;">📊 Analytics & Tracking de Mi Tienda</h4>';
                 analyticsHtml += '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el tráfico hacia tus productos. Solo se activan en las páginas de tus productos.</p>';
-                if (data.vendor_ga4_enabled) {
+                if (data.store.vendor_ga4_enabled) {
                     analyticsHtml += '<div class="ltms-form-group"><label>Google Analytics 4 — Measurement ID</label>';
-                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="' + this.escapeHtml(data.vendor_ga4_id||'') + '" placeholder="G-XXXXXXXXXX">';
+                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="' + this.escapeHtml(data.store.vendor_ga4_id||'') + '" placeholder="G-XXXXXXXXXX">';
                     analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Google Analytics → Admin → Flujos de datos.</small></div>';
                 }
-                if (data.vendor_pixel_enabled) {
+                if (data.store.vendor_pixel_enabled) {
                     analyticsHtml += '<div class="ltms-form-group"><label>Meta Pixel ID (Facebook / Instagram)</label>';
-                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="' + this.escapeHtml(data.vendor_pixel_id||'') + '" placeholder="123456789012345">';
+                    analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="' + this.escapeHtml(data.store.vendor_pixel_id||'') + '" placeholder="123456789012345">';
                     analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.</small></div>';
                 }
                 analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>';
