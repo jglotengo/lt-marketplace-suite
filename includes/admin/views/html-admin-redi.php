@@ -281,8 +281,8 @@ function ltms_redi_page_url( string $tab, int $p, string $s, string $st ): strin
                     <a href="<?php echo esc_url( admin_url( 'post.php?post=' . $order_id . '&action=edit' ) ); ?>" style="font-weight:600;">#<?php echo esc_html( $order_id ); ?></a>
                     <?php else : ?>—<?php endif; ?>
                 </td>
-                <td><?php echo esc_html( $origin_d ? $origin_d->display_name : $origin_id ?: '—' ); ?></td>
-                <td><?php echo esc_html( $resell_d ? $resell_d->display_name : $reseller_id ?: '—' ); ?></td>
+                <td><?php echo esc_html( $origin_d ? $origin_d->display_name : ( $origin_id ?: '—' ) ); ?></td>
+                <td><?php echo esc_html( $resell_d ? $resell_d->display_name : ( $reseller_id ?: '—' ) ); ?></td>
                 <td>$<?php echo esc_html( number_format( (float) ( $row['gross_amount']         ?? 0 ), 2 ) ); ?></td>
                 <td>$<?php echo esc_html( number_format( (float) ( $row['platform_fee']         ?? 0 ), 2 ) ); ?></td>
                 <td><strong>$<?php echo esc_html( number_format( (float) ( $row['reseller_commission'] ?? 0 ), 2 ) ); ?></strong></td>
