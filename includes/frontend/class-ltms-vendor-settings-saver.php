@@ -37,6 +37,8 @@ class LTMS_Vendor_Settings_Saver {
             'ltms_store_phone'       => 'text_field',
             'ltms_store_schedule'    => 'textarea_field',
             'ltms_store_categories'  => 'text_field',
+            'ltms_vendor_ga4_id'     => 'text_field',
+            'ltms_vendor_pixel_id'   => 'text_field',
         ];
 
         foreach ( $fields as $key => $sanitizer ) {
@@ -157,7 +159,11 @@ class LTMS_Vendor_Settings_Saver {
                 'store_categories'  => get_user_meta( $vendor_id, 'ltms_store_categories',  true ),
                 'store_banner_url'  => get_user_meta( $vendor_id, 'ltms_store_banner_url',  true ),
                 // Zona de despacho
-                'delivery_zone'     => $zone,
+                'delivery_zone'        => $zone,
+            'vendor_ga4_enabled'   => get_option( 'ltms_vendor_ga4_enabled', 'yes' ) === 'yes',
+            'vendor_pixel_enabled' => get_option( 'ltms_vendor_pixel_enabled', 'yes' ) === 'yes',
+            'vendor_ga4_id'        => get_user_meta( $vendor_id, 'ltms_vendor_ga4_id',    true ),
+            'vendor_pixel_id'      => get_user_meta( $vendor_id, 'ltms_vendor_pixel_id',  true ),
             ],
         ] );
     }
