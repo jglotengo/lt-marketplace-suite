@@ -34,6 +34,8 @@ $tabs = [
     // v2.2.0 — Firma electrónica
     'zapsign'     => __( "ZapSign Firma", "ltms" ),
     'deprisa'     => __( "Deprisa", "ltms" ),
+    // v2.3.0 — Analytics & Tracking
+    'analytics'   => __( "Analytics / Tracking", "ltms" ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación

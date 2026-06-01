@@ -86,12 +86,34 @@ class LTMS_Analytics_Manager {
 
     public static function inject_vendor_pixels(): void {
         try {
-            if ( ! is_singular( 'product' ) ) return;
-            $vendor_id  = (int) get_post_field( 'post_author', get_the_ID() );
-            $vendor_ga4 = $vendor_id ? get_user_meta( $vendor_id, 'ltms_vendor_ga4_id', true ) : '';
-            if ( $vendor_ga4 ) {
-                echo '<script async src="https://www.googletagmanager.com/gtag/js?id=' . esc_attr( $vendor_ga4 ) . '"></script>' . "\n";
-                echo "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','" . esc_js( $vendor_ga4 ) . "');</script>\n";
+            // Inyectar en: producto individual, archivo de tienda o categoría con productos del vendedor.
+            $vendor_id = 0;
+
+            if ( is_singular( 'product' ) ) {
+                $vendor_id = (int) get_post_field( 'post_author', get_the_ID() );
+            } elseif ( is_shop() || is_product_category() || is_product_tag() ) {
+                // No hay un solo vendedor — skip para páginas de catálogo general.
+                return;
+            }
+
+            if ( ! $vendor_id ) return;
+
+            // GA4 del vendedor
+            if ( get_option( 'ltms_vendor_ga4_enabled', 'yes' ) === 'yes' ) {
+                $vendor_ga4 = get_user_meta( $vendor_id, 'ltms_vendor_ga4_id', true );
+                if ( $vendor_ga4 ) {
+                    echo '<script async src="https://www.googletagmanager.com/gtag/js?id=' . esc_attr( $vendor_ga4 ) . '"></script>' . "\n";
+                    echo "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','" . esc_js( $vendor_ga4 ) . "');</script>\n";
+                }
+            }
+
+            // Meta Pixel del vendedor
+            if ( get_option( 'ltms_vendor_pixel_enabled', 'yes' ) === 'yes' ) {
+                $vendor_pixel = get_user_meta( $vendor_id, 'ltms_vendor_pixel_id', true );
+                if ( $vendor_pixel ) {
+                    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    echo "<!-- Meta Pixel Vendedor -->\n<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','" . esc_js( $vendor_pixel ) . "');fbq('track','PageView');</script>\n<!-- End Meta Pixel Vendedor -->\n";
+                }
             }
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Analytics: vendor pixels failed — ' . $e->getMessage() );

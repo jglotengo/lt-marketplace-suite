@@ -16,6 +16,11 @@ $phone        = get_user_meta( $vendor_id, 'ltms_store_phone', true ) ?: get_use
 $bank_name    = get_user_meta( $vendor_id, 'ltms_bank_name', true );
 $kyc_status   = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) ?: 'pending';
 $referral_code = get_user_meta( $vendor_id, 'ltms_referral_code', true );
+// v2.3.0 — Analytics por vendedor
+$vendor_ga4_id    = get_user_meta( $vendor_id, 'ltms_vendor_ga4_id',    true );
+$vendor_pixel_id  = get_user_meta( $vendor_id, 'ltms_vendor_pixel_id',  true );
+$platform_ga4_on  = get_option( 'ltms_vendor_ga4_enabled',   'yes' ) === 'yes';
+$platform_pix_on  = get_option( 'ltms_vendor_pixel_enabled', 'yes' ) === 'yes';
 
 $kyc_badges = [
     'pending'  => [ 'class' => 'ltms-badge-warning',  'label' => __( 'Pendiente', 'ltms' ) ],
@@ -196,6 +201,49 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
         </div>
     </div>
 
+<?php if ( $platform_ga4_on || $platform_pix_on ) : ?>
+    <div class="ltms-card" style="margin-bottom:20px;">
+        <div class="ltms-card-header">📊 <?php esc_html_e( 'Analytics & Tracking de Mi Tienda', 'ltms' ); ?></div>
+        <div class="ltms-card-body">
+            <p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">
+                <?php esc_html_e( 'Configura tu propio pixel para medir el tráfico hacia tus productos. Tus píxeles se activan solo en las páginas de tus productos.', 'ltms' ); ?>
+            </p>
+            <?php if ( $platform_ga4_on ) : ?>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Google Analytics 4 — Measurement ID', 'ltms' ); ?>
+                </label>
+                <input type="text" name="ltms_vendor_ga4_id"
+                       value="<?php echo esc_attr( $vendor_ga4_id ); ?>"
+                       placeholder="G-XXXXXXXXXX"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
+                    <?php esc_html_e( 'Encuéntralo en Google Analytics → Admin → Flujos de datos.', 'ltms' ); ?>
+                </p>
+            </div>
+            <?php endif; ?>
+            <?php if ( $platform_pix_on ) : ?>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Meta Pixel ID (Facebook / Instagram)', 'ltms' ); ?>
+                </label>
+                <input type="text" name="ltms_vendor_pixel_id"
+                       value="<?php echo esc_attr( $vendor_pixel_id ); ?>"
+                       placeholder="123456789012345"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
+                    <?php esc_html_e( 'Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.', 'ltms' ); ?>
+                </p>
+            </div>
+            <?php endif; ?>
+            <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-save-analytics-btn">
+                💾 <?php esc_html_e( 'Guardar Analytics', 'ltms' ); ?>
+            </button>
+            <span id="ltms-analytics-notice" style="display:none;margin-left:12px;font-size:0.85rem;"></span>
+        </div>
+    </div>
+<?php endif; ?>
+
 </div>
 
 <script>
@@ -218,6 +266,30 @@ jQuery('#ltms-save-settings-btn').on('click', function() {
             }
             setTimeout(function() { $notice.fadeOut(); }, 4000);
         }
+    });
+});
+
+// v2.3.0 — Guardar solo campos de analytics
+jQuery('#ltms-save-analytics-btn').on('click', function() {
+    var settings = {};
+    jQuery('[name="ltms_vendor_ga4_id"], [name="ltms_vendor_pixel_id"]').each(function() {
+        settings[jQuery(this).attr('name')] = jQuery(this).val();
+    });
+    var $btn    = jQuery(this).prop('disabled', true).text('Guardando…');
+    var $notice = jQuery('#ltms-analytics-notice');
+    jQuery.ajax({
+        url: ltmsDashboard.ajax_url,
+        method: 'POST',
+        data: { action: 'ltms_save_vendor_settings', nonce: ltmsDashboard.nonce, settings: settings },
+        success: function(response) {
+            if (response.success) {
+                $notice.css('color','#16a34a').text('✅ Guardado').show();
+            } else {
+                $notice.css('color','#dc2626').text('❌ Error al guardar').show();
+            }
+            setTimeout(function() { $notice.fadeOut(); }, 3000);
+        },
+        complete: function() { $btn.prop('disabled', false).text('💾 Guardar Analytics'); }
     });
 });
 </script>

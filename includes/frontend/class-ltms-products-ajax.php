@@ -99,6 +99,8 @@ class LTMS_Products_Ajax {
                 'ltms_bank_name', 'ltms_bank_account_type', 'ltms_payment_method',
                 'ltms_shipping_policy', 'ltms_return_policy',
                 'ltms_tax_regime', 'ltms_nit', 'ltms_ciiu_code', 'ltms_municipality',
+                // v2.3.0 — Analytics por vendedor
+                'ltms_vendor_ga4_id', 'ltms_vendor_pixel_id',
             ];
             foreach ( $allowed as $field ) {
                 if ( isset( $_POST['settings'][ $field ] ) ) { // phpcs:ignore

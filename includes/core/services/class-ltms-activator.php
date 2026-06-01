@@ -197,6 +197,9 @@ final class LTMS_Core_Activator {
             'ltms_google_tag_manager_id'        => '',
             'ltms_ga4_measurement_id'           => '',
             'ltms_meta_pixel_id'                => '',
+            // v2.3.0 — vendor pixel toggles
+            'ltms_vendor_ga4_enabled'           => 'yes',
+            'ltms_vendor_pixel_enabled'         => 'yes',
 
             // v2.0.0 — Geo
             'ltms_geo_detection_enabled'        => true,
