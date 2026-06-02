@@ -63,22 +63,24 @@ final class LTMS_Business_Wallet {
         }
 
         // Crear nueva billetera
+        $country_code = ( $currency === 'MXN' ) ? 'MX' : 'CO';
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $result = $wpdb->insert(
             $table,
             [
-                'vendor_id'  => $vendor_id,
-                'balance'    => 0.00,
+                'vendor_id'       => $vendor_id,
+                'balance'         => 0.00,
                 'balance_pending' => 0.00,
-                'balance_reserved' => 0.00,
-                'currency'   => $currency,
-                'is_frozen'  => 0,
-                'total_earned'   => 0.00,
+                'balance_reserved'=> 0.00,
+                'currency'        => $currency,
+                'country_code'    => $country_code,
+                'is_frozen'       => 0,
+                'total_earned'    => 0.00,
                 'total_withdrawn' => 0.00,
-                'created_at' => LTMS_Utils::now_utc(),
-                'updated_at' => LTMS_Utils::now_utc(),
+                'created_at'      => LTMS_Utils::now_utc(),
+                'updated_at'      => LTMS_Utils::now_utc(),
             ],
-            [ '%d', '%f', '%f', '%f', '%s', '%d', '%f', '%f', '%s', '%s' ]
+            [ '%d', '%f', '%f', '%f', '%s', '%s', '%d', '%f', '%f', '%s', '%s' ]
         );
 
         if ( ! $result ) {
