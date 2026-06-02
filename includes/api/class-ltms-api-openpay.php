@@ -47,9 +47,10 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      *
      * @throws \RuntimeException Si las credenciales no están configuradas.
      */
-    public function __construct() {
+    public function __construct( ?string $country_override = null ) {
         $this->provider_slug = 'openpay';
-        $this->country       = LTMS_Core_Config::get_country();
+        $this->country       = $country_override
+                             ?? LTMS_Core_Config::get_country();
         $this->timeout       = 45; // Openpay puede tomar hasta 30s
 
         $environment = LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
