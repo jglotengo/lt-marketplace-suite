@@ -473,8 +473,11 @@ final class LTMS_Frontend_Assets {
      * @return void
      */
     private function localize_checkout_script( string $country ): void {
-        $merchant_id = LTMS_Core_Config::get( 'ltms_openpay_merchant_id', '' );
-        $public_key  = LTMS_Core_Config::get( 'ltms_openpay_public_key', '' );
+        // M-MX-2: buscar keys por país primero, luego fallback genérico
+        $merchant_id = LTMS_Core_Config::get( "ltms_openpay__merchant_id" )
+                    ?: LTMS_Core_Config::get( 'ltms_openpay_merchant_id', '' );
+        $public_key  = LTMS_Core_Config::get( "ltms_openpay__public_key" )
+                    ?: LTMS_Core_Config::get( 'ltms_openpay_public_key', '' );
         $is_sandbox  = LTMS_ENVIRONMENT !== 'production';
 
         // M-23: ltms-checkout-mexico.js necesita order_total y order_id para OXXO/SPEI/MSI
@@ -485,6 +488,21 @@ final class LTMS_Frontend_Assets {
         $order_id = absint( get_query_var( 'order-pay' ) );
         if ( ! $order_id && function_exists( 'WC' ) && WC()->session ) {
             $order_id = absint( WC()->session->get( 'order_awaiting_payment' ) );
+        }
+
+        // M-MX-2: pasar los mismos datos al script de checkout MX
+        if ( $country === 'MX' ) {
+            wp_localize_script( 'ltms-checkout-mexico', 'ltmsCheckout', [
+                'ajax_url'    => admin_url( 'admin-ajax.php' ),
+                'nonce'       => wp_create_nonce( 'ltms_checkout_nonce' ),
+                'merchant_id' => esc_attr( $merchant_id ),
+                'public_key'  => esc_attr( $public_key ),
+                'is_sandbox'  => $is_sandbox,
+                'country'     => $country,
+                'currency'    => 'MXN',
+                'order_total' => $cart_total,
+                'order_id'    => $order_id,
+            ]);
         }
 
         wp_localize_script( 'ltms-checkout', 'ltmsCheckout', [
