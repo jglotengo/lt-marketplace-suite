@@ -1759,6 +1759,44 @@ final class LTMS_DB_Migrations {
         }
         // phpcs:enable
     }
+    private static function run_v2_4_1(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+
+        // Tablas de auditoría fiscal SAT (MX) y DIAN (CO)
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}lt_sat_online_access` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `auditor_rfc`   VARCHAR(13)  NOT NULL DEFAULT '',
+            `auditor_name`  VARCHAR(200) NOT NULL DEFAULT '',
+            `access_type`   VARCHAR(50)  NOT NULL DEFAULT '',
+            `filter_period` VARCHAR(20)  DEFAULT NULL,
+            `filter_vendor` VARCHAR(200) DEFAULT NULL,
+            `rows_returned` INT          NOT NULL DEFAULT 0,
+            `ip_address`    VARCHAR(45)  DEFAULT NULL,
+            `accessed_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_accessed_at` (`accessed_at`),
+            KEY `idx_auditor_rfc` (`auditor_rfc`)
+        ) {$charset}" );
+
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}lt_dian_online_access` (
+            `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `auditor_nit`   VARCHAR(20)  NOT NULL DEFAULT '',
+            `auditor_name`  VARCHAR(200) NOT NULL DEFAULT '',
+            `access_type`   VARCHAR(50)  NOT NULL DEFAULT '',
+            `filter_from`   DATE         DEFAULT NULL,
+            `filter_vendor` VARCHAR(200) DEFAULT NULL,
+            `rows_returned` INT          NOT NULL DEFAULT 0,
+            `ip_address`    VARCHAR(45)  DEFAULT NULL,
+            `accessed_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_accessed_at` (`accessed_at`),
+            KEY `idx_auditor_nit` (`auditor_nit`)
+        ) {$charset}" );
+
+        LTMS_Core_Logger::info( "DB_MIGRATION", "v2.4.1: lt_sat_online_access + lt_dian_online_access OK." );
+    }
+
     private static function run_v2_4_0(): void {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();

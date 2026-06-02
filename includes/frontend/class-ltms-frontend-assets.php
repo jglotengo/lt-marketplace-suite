@@ -474,9 +474,9 @@ final class LTMS_Frontend_Assets {
      */
     private function localize_checkout_script( string $country ): void {
         // M-MX-2: buscar keys por país primero, luego fallback genérico
-        $merchant_id = LTMS_Core_Config::get( "ltms_openpay__merchant_id" )
+        $merchant_id = LTMS_Core_Config::get( "ltms_openpay_{$country}_merchant_id" )
                     ?: LTMS_Core_Config::get( 'ltms_openpay_merchant_id', '' );
-        $public_key  = LTMS_Core_Config::get( "ltms_openpay__public_key" )
+        $public_key  = LTMS_Core_Config::get( "ltms_openpay_{$country}_public_key" )
                     ?: LTMS_Core_Config::get( 'ltms_openpay_public_key', '' );
         $is_sandbox  = LTMS_ENVIRONMENT !== 'production';
 
