@@ -12,7 +12,12 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 global $wpdb;
-$user_id   = get_current_user_id();
+$user_id      = get_current_user_id();
+$vendor_country = strtoupper( (string) get_user_meta( $user_id, 'ltms_country', true ) );
+if ( ! in_array( $vendor_country, [ 'CO', 'MX' ], true ) ) {
+    $vendor_country = LTMS_Core_Config::get_country();
+}
+$is_mx = ( 'MX' === $vendor_country );
 $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
 
 // Buscar solicitud KYC más reciente del vendedor
@@ -103,10 +108,16 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             <div class="ltms-form-group">
                 <label><?php esc_html_e( 'Tipo de documento', 'ltms' ); ?></label>
                 <select id="ltms-kyc-doc-type" class="ltms-form-control">
-                    <option value="cc"><?php esc_html_e( 'Cédula de Ciudadanía (CC)', 'ltms' ); ?></option>
-                    <option value="ce"><?php esc_html_e( 'Cédula de Extranjería (CE)', 'ltms' ); ?></option>
-                    <option value="nit"><?php esc_html_e( 'NIT (Empresa)', 'ltms' ); ?></option>
-                    <option value="passport"><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
+                    <?php if ( $is_mx ) : ?>
+                        <option value="rfc"><?php esc_html_e( 'RFC', 'ltms' ); ?></option>
+                        <option value="curp"><?php esc_html_e( 'CURP', 'ltms' ); ?></option>
+                        <option value="passport"><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
+                    <?php else : ?>
+                        <option value="cc"><?php esc_html_e( 'Cédula de Ciudadanía (CC)', 'ltms' ); ?></option>
+                        <option value="ce"><?php esc_html_e( 'Cédula de Extranjería (CE)', 'ltms' ); ?></option>
+                        <option value="nit"><?php esc_html_e( 'NIT (Empresa)', 'ltms' ); ?></option>
+                        <option value="passport"><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
+                    <?php endif; ?>
                 </select>
             </div>
 
@@ -119,14 +130,21 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             <!-- Documentos requeridos -->
             <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-bottom:20px;">
                 <p style="font-size:.85rem;color:#166534;margin:0;">
-                    <strong>📋 Documentos requeridos (SAGRILAFT / Ley 1480)</strong><br>
-                    La cédula o NIT son obligatorios para todos. El RUT aplica a régimen común y empresas. La Cámara de Comercio solo si eres persona jurídica.
+                    <?php if ( $is_mx ) : ?>
+                        <strong>📋 Documentos requeridos (SAT / Art. 113-A LISR)</strong><br>
+                        La identificación oficial (INE/Pasaporte) es obligatoria. La Constancia de Situación Fiscal es requerida para personas físicas con actividad empresarial y personas morales. El Acta Constitutiva solo si eres persona moral.
+                    <?php else : ?>
+                        <strong>📋 Documentos requeridos (SAGRILAFT / Ley 1480)</strong><br>
+                        La cédula o NIT son obligatorios para todos. El RUT aplica a régimen común y empresas. La Cámara de Comercio solo si eres persona jurídica.
+                    <?php endif; ?>
                 </p>
             </div>
 
             <!-- Cédula / NIT (obligatorio) -->
             <div class="ltms-form-group">
-                <label><?php esc_html_e( '📄 Cédula de Ciudadanía o NIT — frente y reverso (obligatorio)', 'ltms' ); ?></label>
+                <label><?php echo $is_mx
+    ? esc_html__( '📄 Identificación Oficial — INE/IFE o Pasaporte, frente y reverso (obligatorio)', 'ltms' )
+    : esc_html__( '📄 Cédula de Ciudadanía o NIT — frente y reverso (obligatorio)', 'ltms' ); ?></label>
                 <input type="file" id="ltms-kyc-file" name="kyc_doc" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
                 <span class="ltms-field-hint"><?php esc_html_e( 'Foto o escáner claro. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
                 <div id="ltms-kyc-upload-status" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
@@ -135,18 +153,26 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 
             <!-- RUT -->
             <div class="ltms-form-group">
-                <label><?php esc_html_e( '📄 RUT — Registro Único Tributario (obligatorio para régimen común y empresas)', 'ltms' ); ?></label>
+                <label><?php echo $is_mx
+    ? esc_html__( '📄 Constancia de Situación Fiscal (obligatoria para actividad empresarial y personas morales)', 'ltms' )
+    : esc_html__( '📄 RUT — Registro Único Tributario (obligatorio para régimen común y empresas)', 'ltms' ); ?></label>
                 <input type="file" id="ltms-kyc-file-rut" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
-                <span class="ltms-field-hint"><?php esc_html_e( 'Descárgalo actualizado en dian.gov.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
+                <span class="ltms-field-hint"><?php echo $is_mx
+    ? esc_html__( 'Descárgala del portal del SAT en sat.gob.mx. JPG, PNG o PDF. Máx 10 MB.', 'ltms' )
+    : esc_html__( 'Descárgalo actualizado en dian.gov.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
                 <div id="ltms-kyc-status-rut" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
                 <input type="hidden" id="ltms-kyc-path-rut" value="">
             </div>
 
             <!-- Cámara de Comercio -->
             <div class="ltms-form-group">
-                <label><?php esc_html_e( '📄 Certificado de Existencia — Cámara de Comercio (solo personas jurídicas)', 'ltms' ); ?></label>
+                <label><?php echo $is_mx
+    ? esc_html__( '📄 Acta Constitutiva — solo personas morales', 'ltms' )
+    : esc_html__( '📄 Certificado de Existencia — Cámara de Comercio (solo personas jurídicas)', 'ltms' ); ?></label>
                 <input type="file" id="ltms-kyc-file-camara" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
-                <span class="ltms-field-hint"><?php esc_html_e( 'Vigencia no mayor a 90 días. Descárgalo en ccb.org.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
+                <span class="ltms-field-hint"><?php echo $is_mx
+    ? esc_html__( 'Notariada y apostillada si aplica. JPG, PNG o PDF. Máx 10 MB.', 'ltms' )
+    : esc_html__( 'Vigencia no mayor a 90 días. Descárgalo en ccb.org.co. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
                 <div id="ltms-kyc-status-camara" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
                 <input type="hidden" id="ltms-kyc-path-camara" value="">
             </div>
