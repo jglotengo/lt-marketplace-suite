@@ -252,7 +252,9 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 uploadSingleDoc('ltms-kyc-file', 'ltms-kyc-upload-status', 'ltms-kyc-file-path', 'Cédula/NIT', function(cedula) {
                     uploadSingleDoc('ltms-kyc-file-rut', 'ltms-kyc-status-rut', 'ltms-kyc-path-rut', 'RUT', function(rut) {
                         uploadSingleDoc('ltms-kyc-file-camara', 'ltms-kyc-status-camara', 'ltms-kyc-path-camara', 'Cámara de Comercio', function(camara) {
-                            callback(cedula, rut, camara);
+                            uploadSingleDoc('ltms-kyc-file-banco', 'ltms-kyc-status-banco', 'ltms-kyc-path-banco', 'Certificación Bancaria', function(banco) {
+                                callback(cedula, rut, camara, banco);
+                            });
                         });
                     });
                 });
@@ -269,6 +271,17 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     return;
                 }
 
+                // Validar campos obligatorios de certificación bancaria
+                var repLegalName  = $.trim($('#ltms-kyc-rep-legal-name').val());
+                var bankName      = $.trim($('#ltms-kyc-bank-name').val());
+                var accountNumber = $.trim($('#ltms-kyc-account-number').val());
+                var bancoFile     = $('#ltms-kyc-file-banco')[0] && $('#ltms-kyc-file-banco')[0].files[0];
+
+                if (!repLegalName || !bankName || !accountNumber || !bancoFile) {
+                    showNotice('La certificación bancaria es obligatoria: nombre del representante legal, entidad, número de cuenta y archivo del certificado.', 'error');
+                    return;
+                }
+
                 // L-6: validar consentimiento de datos personales
                 if (!$('#ltms-kyc-consent').is(':checked')) {
                     showNotice('Debes aceptar la autorización de tratamiento de datos para continuar.', 'error');
@@ -277,20 +290,29 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 
                 var $btn = $(this).prop('disabled', true).text('Procesando...');
 
-                uploadDocument(function(cedulaPath, rutPath, camaraPath) {
+                uploadDocument(function(cedulaPath, rutPath, camaraPath, bancoPath) {
+                    if (!bancoPath) {
+                        $btn.prop('disabled', false).text('Enviar para Verificación');
+                        showNotice('Error al subir la certificación bancaria. Verifica el archivo e intenta de nuevo.', 'error');
+                        return;
+                    }
                     var filePath = cedulaPath || '';
                     $.ajax({ url: ajaxUrl, method: 'POST',
                         data: {
-                            action:           'ltms_submit_kyc',
-                            nonce:            nonce,
-                            full_name:        fullName,
-                            document_type:    docType,
-                            document_number:  docNumber,
-                            file_path:        filePath,
-                            file_path_rut:    rutPath || '',
-                            file_path_camara: camaraPath || '',
-                            privacy_consent:  '1',
-                            consent_ts:       new Date().toISOString(),
+                            action:              'ltms_submit_kyc',
+                            nonce:               nonce,
+                            full_name:           fullName,
+                            document_type:       docType,
+                            document_number:     docNumber,
+                            file_path:           filePath,
+                            file_path_rut:       rutPath || '',
+                            file_path_camara:    camaraPath || '',
+                            file_path_banco:     bancoPath || '',
+                            bank_rep_legal_name: repLegalName,
+                            bank_name:           bankName,
+                            bank_account_number: accountNumber,
+                            privacy_consent:     '1',
+                            consent_ts:          new Date().toISOString(),
                         },
                         success: function(r) {
                             $btn.prop('disabled', false).text('Enviar para Verificación');
