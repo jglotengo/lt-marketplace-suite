@@ -50,6 +50,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_mark_notification_read', [ $instance, 'ajax_mark_notification_read' ] );
         add_action( 'wp_ajax_ltms_get_analytics_data',    [ $instance, 'ajax_get_analytics_data' ] );
         add_action( 'wp_ajax_ltms_submit_kyc',            [ $instance, 'ajax_submit_kyc' ] );
+        add_action( 'wp_ajax_ltms_upload_kyc_document',   [ $instance, 'ajax_upload_kyc_document' ] );
 
         // v1.6.0 — Nuevos módulos enterprise
         add_action( 'wp_ajax_ltms_get_insurance_data',    [ $instance, 'ajax_get_insurance_data' ] );
@@ -302,6 +303,116 @@ final class LTMS_Dashboard_Logic {
      *
      * @return void
      */
+    /**
+     * AJAX: Sube un documento KYC a Backblaze B2 (bucket lotengo-kyc-docs, privado).
+     *
+     * El JS llama a este endpoint ANTES de ltms_submit_kyc para obtener las rutas
+     * de los archivos en el vault. Valida tipo/tamaño, sube con firma AWS Sig V4
+     * y devuelve la ruta en el bucket para que el frontend la adjunte al submit.
+     *
+     * Bucket:  lotengo-kyc-docs (privado, endpoint s3.us-east-005.backblazeb2.com)
+     * Key:     kyc/{vendor_id}/{timestamp}_{original_sanitized_name}
+     * Acceso:  sólo vía URL pre-firmada (1 hora) — nunca URL pública directa.
+     *
+     * @return void  Responde con wp_send_json_success/error.
+     */
+    public function ajax_upload_kyc_document(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $vendor_id = get_current_user_id();
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) {
+            wp_send_json_error( __( 'Acceso denegado.', 'ltms' ), 403 );
+        }
+
+        // ── Validar archivo recibido ──────────────────────────────────────────
+        if ( empty( $_FILES['kyc_doc'] ) || UPLOAD_ERR_OK !== $_FILES['kyc_doc']['error'] ) { // phpcs:ignore
+            $upload_err = $_FILES['kyc_doc']['error'] ?? -1; // phpcs:ignore
+            $err_map = [
+                UPLOAD_ERR_INI_SIZE   => 'El archivo supera el límite del servidor.',
+                UPLOAD_ERR_FORM_SIZE  => 'El archivo supera el límite del formulario.',
+                UPLOAD_ERR_NO_FILE    => 'No se recibió ningún archivo.',
+            ];
+            wp_send_json_error( $err_map[ $upload_err ] ?? 'Error al recibir el archivo (código ' . $upload_err . ').' );
+        }
+
+        $tmp_path  = $_FILES['kyc_doc']['tmp_name']; // phpcs:ignore
+        $orig_name = sanitize_file_name( $_FILES['kyc_doc']['name'] ); // phpcs:ignore
+        $file_size = (int) $_FILES['kyc_doc']['size']; // phpcs:ignore
+
+        // Máx 10 MB
+        if ( $file_size > 10 * 1024 * 1024 ) {
+            wp_send_json_error( __( 'El archivo supera el límite de 10 MB.', 'ltms' ) );
+        }
+
+        // Tipos permitidos: imagen o PDF
+        $allowed_mimes = [ 'image/jpeg', 'image/png', 'image/webp', 'application/pdf' ];
+        $mime          = mime_content_type( $tmp_path );
+        if ( ! in_array( $mime, $allowed_mimes, true ) ) {
+            wp_send_json_error( __( 'Tipo de archivo no permitido. Solo JPG, PNG, WEBP o PDF.', 'ltms' ) );
+        }
+
+        // ── Leer contenido binario ────────────────────────────────────────────
+        $content = file_get_contents( $tmp_path ); // phpcs:ignore
+        if ( false === $content ) {
+            wp_send_json_error( __( 'No se pudo leer el archivo temporal.', 'ltms' ) );
+        }
+
+        // ── Construir clave en el bucket ──────────────────────────────────────
+        $ext       = pathinfo( $orig_name, PATHINFO_EXTENSION );
+        $safe_name = preg_replace( '/[^a-zA-Z0-9_\-]/', '_', pathinfo( $orig_name, PATHINFO_FILENAME ) );
+        $key       = sprintf( 'kyc/%d/%d_%s.%s', $vendor_id, time(), $safe_name, $ext );
+
+        // ── Subir a Backblaze B2 ──────────────────────────────────────────────
+        try {
+            $b2 = new LTMS_Api_Backblaze();
+
+            // Bucket KYC privado — lotengo-kyc-docs
+            $kyc_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket', 'lotengo-kyc-docs' );
+
+            $result = $b2->upload_file(
+                $kyc_bucket,
+                $key,
+                $content,
+                $mime,
+                [
+                    'vendor-id'   => (string) $vendor_id,
+                    'doc-type'    => 'kyc',
+                    'upload-date' => gmdate( 'Y-m-d' ),
+                ]
+            );
+
+            // Log vault de acceso
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_vault_access(
+                    $vendor_id,
+                    $vendor_id,
+                    'kyc_document_upload',
+                    LTMS_Legal_Compliance::VAULT_OP_UPLOAD,
+                    'ajax_upload_kyc_document'
+                );
+            }
+
+            wp_send_json_success( [
+                'file_path' => $result['Key'],
+                'vault_url' => $result['Location'],
+                'bucket'    => $result['Bucket'],
+                'mime'      => $mime,
+                'size'      => $file_size,
+            ] );
+
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::error(
+                'KYC_UPLOAD_FAILED',
+                sprintf( 'Error subiendo doc KYC para vendor #%d: %s', $vendor_id, $e->getMessage() ),
+                [ 'vendor_id' => $vendor_id, 'key' => $key ]
+            );
+            wp_send_json_error(
+                __( 'Error al almacenar el documento. Por favor intenta de nuevo.', 'ltms' ) .
+                ( defined( 'WP_DEBUG' ) && WP_DEBUG ? ' (' . $e->getMessage() . ')' : '' )
+            );
+        }
+    }
+
     public function ajax_submit_kyc(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
