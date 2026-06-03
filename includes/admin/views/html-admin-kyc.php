@@ -82,6 +82,29 @@ $total_kyc = array_sum( $count_map );
             <p style="margin:0;"><?php esc_html_e( 'No hay registros en este estado.', 'ltms' ); ?></p>
         </div>
     <?php else : ?>
+        <?php
+        // Helper: genera URL pre-firmada (1 h) para una key de B2, o devuelve la URL tal cual si ya es http.
+        // Los docs KYC están en bucket privado lotengo-kyc-docs; nunca exponer URL directa.
+        $kyc_bucket   = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
+                            LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
+        $b2_client    = null;
+        $b2_available = LTMS_Core_Config::get( 'ltms_backblaze_enabled', 'no' ) === 'yes';
+        if ( $b2_available ) {
+            try { $b2_client = new LTMS_Api_Backblaze(); } catch ( \Throwable $e ) { $b2_client = null; }
+        }
+        $make_signed_url = static function( string $key ) use ( $b2_client, $kyc_bucket ): string {
+            if ( empty( $key ) ) return '';
+            // Si ya es una URL completa (http/https) devolverla tal cual
+            if ( str_starts_with( $key, 'http' ) ) return $key;
+            // Generar URL pre-firmada — TTL 3600 s (1 hora)
+            if ( $b2_client ) {
+                try { return $b2_client->get_signed_url( $kyc_bucket, $key, 3600 ); } catch ( \Throwable $e ) {}
+            }
+            // Fallback: construir URL con endpoint público (solo si bucket fuera público)
+            $endpoint = rtrim( LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '' ), '/' );
+            return $endpoint ? $endpoint . '/' . $kyc_bucket . '/' . ltrim( $key, '/' ) : '#';
+        };
+        ?>
         <table class="ltms-table">
             <thead>
                 <tr>
@@ -107,11 +130,16 @@ $total_kyc = array_sum( $count_map );
                     'approved' => 'Aprobado',
                     'rejected' => 'Rechazado',
                 ];
-                $badge_class = $status_badges[ $kyc['status'] ] ?? 'ltms-badge-pending';
+                $badge_class  = $status_badges[ $kyc['status'] ] ?? 'ltms-badge-pending';
                 $status_label = $status_labels[ $kyc['status'] ] ?? strtoupper( $kyc['status'] );
+
+                // Generar URLs pre-firmadas para documentos del modal (B2 privado)
                 $docs = [];
-                foreach ( [ 'doc_front_url', 'doc_back_url', 'selfie_url', 'extra_doc_url' ] as $field ) {
-                    if ( ! empty( $kyc[ $field ] ) ) $docs[] = $kyc[ $field ];
+                foreach ( [ 'doc_front_url', 'doc_back_url', 'selfie_url', 'extra_doc_url', 'file_path' ] as $field ) {
+                    if ( ! empty( $kyc[ $field ] ) ) {
+                        $signed = $make_signed_url( $kyc[ $field ] );
+                        if ( $signed ) $docs[] = $signed;
+                    }
                 }
             ?>
             <tr id="ltms-kyc-row-<?php echo esc_attr( $kyc['id'] ); ?>">
@@ -123,13 +151,14 @@ $total_kyc = array_sum( $count_map );
                 <td><code><?php echo esc_html( $doc_type ); ?></code></td>
                 <td style="font-size:11px;">
                     <?php
-                    $banco_file  = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_file_banco', true );
+                    $banco_key   = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_file_banco', true );
                     $rep_legal   = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_rep_legal', true );
                     $bank_name_m = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_name', true );
                     $acct_num    = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_account', true );
-                    if ( $banco_file ) : ?>
+                    $banco_url   = $banco_key ? $make_signed_url( $banco_key ) : '';
+                    if ( $banco_url ) : ?>
                         <span style="color:#16a34a;font-weight:600;">✓</span>
-                        <a href="<?php echo esc_url( $banco_file ); ?>" target="_blank"
+                        <a href="<?php echo esc_url( $banco_url ); ?>" target="_blank"
                            style="font-size:11px;color:#2563eb;display:block;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                            <?php esc_html_e( 'Ver certificado', 'ltms' ); ?>
                         </a>
@@ -137,7 +166,7 @@ $total_kyc = array_sum( $count_map );
                             <small style="color:#374151;display:block;"><strong><?php esc_html_e( 'Rep. Legal:', 'ltms' ); ?></strong> <?php echo esc_html( $rep_legal ); ?></small>
                         <?php endif; ?>
                         <?php if ( $bank_name_m ) : ?>
-                            <small style="color:#6b7280;display:block;"><?php echo esc_html( $bank_name_m ); ?><?php echo $acct_num ? ' · ' . esc_html( substr( $acct_num, -4 ) ) . '****' : ''; ?></small>
+                            <small style="color:#6b7280;display:block;"><?php echo esc_html( $bank_name_m ); ?><?php echo $acct_num ? ' · ****' . esc_html( substr( $acct_num, -4 ) ) : ''; ?></small>
                         <?php endif; ?>
                     <?php else : ?>
                         <span style="color:#dc2626;font-weight:600;">⚠ <?php esc_html_e( 'Pendiente', 'ltms' ); ?></span>
