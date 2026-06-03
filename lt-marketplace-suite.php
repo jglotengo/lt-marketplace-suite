@@ -20,6 +20,8 @@
  * @version 2.1.4
  */
 
+require_once __DIR__ . '/ltms-boot-patch.php';
+
 // ============================================================
 // SEGURIDAD: Bloqueo de acceso directo (Abortamos si no es WP)
 // ============================================================
