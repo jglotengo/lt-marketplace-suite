@@ -320,6 +320,11 @@ final class LTMS_Dashboard_Logic {
         $file_path        = sanitize_text_field( wp_unslash( $_POST['file_path']        ?? '' ) ); // phpcs:ignore
         $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
         $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
+        // KYC-BANCO-1: Certificación bancaria — representante legal
+        $file_path_banco     = sanitize_text_field( wp_unslash( $_POST['file_path_banco']     ?? '' ) ); // phpcs:ignore
+        $bank_rep_legal_name = sanitize_text_field( wp_unslash( $_POST['bank_rep_legal_name'] ?? '' ) ); // phpcs:ignore
+        $bank_name           = sanitize_text_field( wp_unslash( $_POST['bank_name']           ?? '' ) ); // phpcs:ignore
+        $bank_account_number = sanitize_text_field( wp_unslash( $_POST['bank_account_number'] ?? '' ) ); // phpcs:ignore
 
         $allowed_types = [ 'cc', 'ce', 'nit', 'passport' ];
         if ( ! in_array( $document_type, $allowed_types, true ) ) {
@@ -328,6 +333,11 @@ final class LTMS_Dashboard_Logic {
 
         if ( empty( $full_name ) || empty( $document_number ) ) {
             wp_send_json_error( __( 'El nombre completo y número de documento son obligatorios.', 'ltms' ) );
+        }
+
+        // KYC-BANCO-1: Validar datos bancarios obligatorios (certificación representante legal)
+        if ( empty( $bank_rep_legal_name ) || empty( $bank_name ) || empty( $bank_account_number ) || empty( $file_path_banco ) ) {
+            wp_send_json_error( __( 'La certificación bancaria es obligatoria: nombre del representante legal, entidad bancaria, número de cuenta y archivo del certificado.', 'ltms' ) );
         }
 
         // Block re-submission if already approved or pending
@@ -368,6 +378,13 @@ final class LTMS_Dashboard_Logic {
         $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
         if ( $file_path_rut )    update_user_meta( $vendor_id, 'ltms_kyc_file_rut',    $file_path_rut );
         if ( $file_path_camara ) update_user_meta( $vendor_id, 'ltms_kyc_file_camara', $file_path_camara );
+        // KYC-BANCO-1: guardar certificación bancaria y datos del representante legal
+        if ( $file_path_banco )     update_user_meta( $vendor_id, 'ltms_kyc_file_banco',         $file_path_banco );
+        if ( $bank_rep_legal_name ) update_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal',     $bank_rep_legal_name );
+        if ( $bank_name )           update_user_meta( $vendor_id, 'ltms_kyc_bank_name',          $bank_name );
+        if ( $bank_account_number ) update_user_meta( $vendor_id, 'ltms_kyc_bank_account',       $bank_account_number );
+        // Snapshot de titularidad: debe coincidir con el representante legal al momento del KYC
+        update_user_meta( $vendor_id, 'ltms_kyc_bank_verified_at', current_time( 'mysql', true ) );
 
         // L-8: registrar consentimiento de Habeas Data con timestamp e IP (trazabilidad legal)
         $privacy_consent = sanitize_text_field( wp_unslash( $_POST['privacy_consent'] ?? '' ) ); // phpcs:ignore
@@ -392,6 +409,9 @@ final class LTMS_Dashboard_Logic {
             }
             if ( ! empty( $file_path_camara ) ) {
                 LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, $vendor_id_for_log, 'camara_comercio', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, 'kyc_submit' );
+            }
+            if ( ! empty( $file_path_banco ) ) {
+                LTMS_Legal_Compliance::log_vault_access( $vendor_id_for_log, $vendor_id_for_log, 'certificacion_bancaria', LTMS_Legal_Compliance::VAULT_OP_UPLOAD, 'kyc_submit' );
             }
             LTMS_Legal_Compliance::log_consent(
                 $vendor_id_for_log,
