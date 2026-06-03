@@ -603,7 +603,31 @@ Puedes enviar una nueva solicitud desde tu panel.
         }
 
         $status = get_user_meta( $vendor_id, 'ltms_kyc_status', true );
-        return $status === 'approved';
+        if ( $status !== 'approved' ) {
+            return false;
+        }
+
+        // Validar que la certificación bancaria esté presente y corresponda al rep. legal.
+        // Sin este archivo el desembolso queda bloqueado independientemente del estado KYC general.
+        $file_banco     = get_user_meta( $vendor_id, 'ltms_kyc_file_banco', true );
+        $bank_rep_legal = get_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal', true );
+        $bank_account   = get_user_meta( $vendor_id, 'ltms_kyc_bank_account', true );
+
+        if ( empty( $file_banco ) || empty( $bank_rep_legal ) || empty( $bank_account ) ) {
+            LTMS_Logger::warning(
+                sprintf(
+                    'Payout bloqueado para vendedor #%d: certificación bancaria incompleta (file_banco=%s, rep_legal=%s, account=%s)',
+                    $vendor_id,
+                    empty( $file_banco ) ? 'FALTA' : 'ok',
+                    empty( $bank_rep_legal ) ? 'FALTA' : 'ok',
+                    empty( $bank_account ) ? 'FALTA' : 'ok'
+                ),
+                [ 'vendor_id' => $vendor_id, 'check' => 'kyc_bank_cert' ]
+            );
+            return false;
+        }
+
+        return true;
     }
 
     /**
