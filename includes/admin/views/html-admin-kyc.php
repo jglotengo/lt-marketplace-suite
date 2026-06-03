@@ -87,6 +87,7 @@ $total_kyc = array_sum( $count_map );
                 <tr>
                     <th><?php esc_html_e( 'Vendedor', 'ltms' ); ?></th>
                     <th><?php esc_html_e( 'Doc.', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Certificación Bancaria', 'ltms' ); ?></th>
                     <th><?php esc_html_e( 'Enviado', 'ltms' ); ?></th>
                     <th><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
                     <th><?php esc_html_e( 'Acciones', 'ltms' ); ?></th>
@@ -120,6 +121,28 @@ $total_kyc = array_sum( $count_map );
                     <small style="color:#9ca3af;">ID <?php echo esc_html( $kyc['vendor_id'] ); ?> &middot; KYC #<?php echo esc_html( $kyc['id'] ); ?></small>
                 </td>
                 <td><code><?php echo esc_html( $doc_type ); ?></code></td>
+                <td style="font-size:11px;">
+                    <?php
+                    $banco_file  = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_file_banco', true );
+                    $rep_legal   = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_rep_legal', true );
+                    $bank_name_m = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_name', true );
+                    $acct_num    = get_user_meta( (int) $kyc['vendor_id'], 'ltms_kyc_bank_account', true );
+                    if ( $banco_file ) : ?>
+                        <span style="color:#16a34a;font-weight:600;">✓</span>
+                        <a href="<?php echo esc_url( $banco_file ); ?>" target="_blank"
+                           style="font-size:11px;color:#2563eb;display:block;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                           <?php esc_html_e( 'Ver certificado', 'ltms' ); ?>
+                        </a>
+                        <?php if ( $rep_legal ) : ?>
+                            <small style="color:#374151;display:block;"><strong><?php esc_html_e( 'Rep. Legal:', 'ltms' ); ?></strong> <?php echo esc_html( $rep_legal ); ?></small>
+                        <?php endif; ?>
+                        <?php if ( $bank_name_m ) : ?>
+                            <small style="color:#6b7280;display:block;"><?php echo esc_html( $bank_name_m ); ?><?php echo $acct_num ? ' · ' . esc_html( substr( $acct_num, -4 ) ) . '****' : ''; ?></small>
+                        <?php endif; ?>
+                    <?php else : ?>
+                        <span style="color:#dc2626;font-weight:600;">⚠ <?php esc_html_e( 'Pendiente', 'ltms' ); ?></span>
+                    <?php endif; ?>
+                </td>
                 <td style="white-space:nowrap;font-size:12px;"><?php echo esc_html( $submitted ); ?></td>
                 <td><span class="ltms-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $status_label ); ?></span></td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
