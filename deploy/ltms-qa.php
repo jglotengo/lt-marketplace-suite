@@ -6,27 +6,101 @@ error_reporting(0);
 define('SHORTINIT', true);
 require_once __DIR__ . '/wp-load.php';
 global $wpdb;
-$tbl = $wpdb->prefix . 'lt_vendor_kyc';
-echo "=== LTMS KYC QA DIAGNOSTIC ===\n";
-echo "PHP: " . PHP_VERSION . "\n\n";
-echo "=== 1. DB TABLE: {$tbl} ===\n";
-$cols = $wpdb->get_results("DESCRIBE `{$tbl}`");
-if ($cols) { foreach ($cols as $c) echo "  {$c->Field} ({$c->Type})\n"; }
-else { echo "  ERROR: tabla no existe — " . $wpdb->last_error . "\n"; }
-$cnt = (int)$wpdb->get_var("SELECT COUNT(*) FROM `{$tbl}`");
-echo "  Total: {$cnt}\n\n";
-echo "=== 2. WP OPTIONS (Backblaze) ===\n";
-foreach (['ltms_backblaze_endpoint','ltms_backblaze_key_id','ltms_backblaze_kyc_bucket','ltms_backblaze_app_key'] as $k) {
-    $v = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name=%s", $k));
-    $masked = ($v && (strpos($k,'key')!==false||strpos($k,'app')!==false)) ? substr($v,0,8).'...' : ($v ?: '(VACIO)');
-    echo "  {$k}: {$masked}\n";
+
+echo "=== LTMS KYC FIX + B2 TEST ===\n\n";
+
+// Fix 1: Set missing kyc bucket
+$current = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_kyc_bucket'");
+echo "ltms_backblaze_kyc_bucket actual: " . ($current ?: '(VACIO)') . "\n";
+
+if (empty($current)) {
+    $wpdb->replace($wpdb->options, ['option_name'=>'ltms_backblaze_kyc_bucket','option_value'=>'lotengo-kyc-docs','autoload'=>'yes']);
+    echo "  -> FIXED: seteado a 'lotengo-kyc-docs'\n";
+} else {
+    echo "  -> OK (ya tenia valor)\n";
 }
-echo "\n=== 3. KYC USER META ===\n";
-$rows = $wpdb->get_results("SELECT u.ID, u.user_login, MAX(CASE WHEN m.meta_key='ltms_kyc_status' THEN m.meta_value END) as kyc_status, MAX(CASE WHEN m.meta_key='ltms_kyc_file_path' THEN m.meta_value END) as file_path, MAX(CASE WHEN m.meta_key='ltms_kyc_file_banco' THEN m.meta_value END) as file_banco, MAX(CASE WHEN m.meta_key='ltms_kyc_bank_name' THEN m.meta_value END) as bank_name FROM {$wpdb->users} u JOIN {$wpdb->usermeta} m ON m.user_id=u.ID WHERE m.meta_key IN ('ltms_kyc_status','ltms_kyc_file_path','ltms_kyc_file_banco','ltms_kyc_bank_name') GROUP BY u.ID ORDER BY u.ID DESC LIMIT 5");
-if ($rows) { foreach ($rows as $r) { echo "  vendor={$r->ID} ({$r->user_login}) status={$r->kyc_status}\n    cedula=" . ($r->file_path?:'none') . "\n    banco=" . ($r->file_banco?:'none') . "\n"; } }
-else { echo "  (sin vendors KYC)\n"; }
-echo "\n=== 4. KYC TABLE ROWS ===\n";
-$kyc = $wpdb->get_results("SELECT id,vendor_id,status,document_type,file_path,submitted_at FROM `{$tbl}` ORDER BY id DESC LIMIT 5");
-if ($kyc) { foreach ($kyc as $r) { echo "  ID={$r->id} vendor={$r->vendor_id} status={$r->status}\n    file={$r->file_path}\n    at={$r->submitted_at}\n"; } }
-else { echo "  (tabla vacia)\n"; }
-echo "\n=== QA COMPLETE ===\n";
+
+// Fix 2: Set private bucket if missing
+$priv = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_private_bucket'");
+if (empty($priv)) {
+    $wpdb->replace($wpdb->options, ['option_name'=>'ltms_backblaze_private_bucket','option_value'=>'lotengo-kyc-docs','autoload'=>'yes']);
+    echo "ltms_backblaze_private_bucket -> FIXED: 'lotengo-kyc-docs'\n";
+}
+
+// Fix 3: Set default bucket if missing  
+$def = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_default_bucket'");
+if (empty($def)) {
+    $wpdb->replace($wpdb->options, ['option_name'=>'ltms_backblaze_default_bucket','option_value'=>'lotengo-contratos','autoload'=>'yes']);
+    echo "ltms_backblaze_default_bucket -> FIXED: 'lotengo-contratos'\n";
+}
+
+echo "\n=== B2 DIRECT UPLOAD TEST (S3 API) ===\n";
+
+$endpoint = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_endpoint'");
+$key_id   = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_key_id'");
+$app_key  = $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name='ltms_backblaze_app_key'");
+$bucket   = 'lotengo-kyc-docs';
+$region   = 'us-east-005';
+
+echo "Endpoint: {$endpoint}\n";
+echo "Key ID: " . substr($key_id,0,10) . "...\n";
+echo "Bucket: {$bucket}\n\n";
+
+// Test B2 via S3-compatible API with AWS Signature V4
+$object_key = 'kyc/qa-test/' . time() . '_test.png';
+$png_data = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+$content_type = 'image/png';
+$date_time = gmdate('Ymd\THis\Z');
+$date_stamp = gmdate('Ymd');
+$host = parse_url($endpoint, PHP_URL_HOST);
+
+// AWS Sig V4
+$canonical_uri = '/' . $bucket . '/' . $object_key;
+$canonical_headers = "content-type:{$content_type}\nhost:{$host}\nx-amz-date:{$date_time}\n";
+$signed_headers = 'content-type;host;x-amz-date';
+$payload_hash = hash('sha256', $png_data);
+$canonical_request = "PUT\n{$canonical_uri}\n\n{$canonical_headers}\n{$signed_headers}\n{$payload_hash}";
+$credential_scope = "{$date_stamp}/{$region}/s3/aws4_request";
+$string_to_sign = "AWS4-HMAC-SHA256\n{$date_time}\n{$credential_scope}\n" . hash('sha256', $canonical_request);
+$signing_key = hash_hmac('sha256', 'aws4_request',
+    hash_hmac('sha256', 's3',
+        hash_hmac('sha256', $region,
+            hash_hmac('sha256', $date_stamp, 'AWS4' . $app_key, true), true), true), true);
+$signature = hash_hmac('sha256', $string_to_sign, $signing_key);
+$auth = "AWS4-HMAC-SHA256 Credential={$key_id}/{$credential_scope},SignedHeaders={$signed_headers},Signature={$signature}";
+
+$url = $endpoint . '/' . $bucket . '/' . $object_key;
+$ctx = stream_context_create(['http'=>[
+    'method'=>'PUT',
+    'header'=>"Authorization: {$auth}\r\nContent-Type: {$content_type}\r\nx-amz-date: {$date_time}\r\nContent-Length: " . strlen($png_data),
+    'content'=>$png_data,
+    'timeout'=>20,
+    'ignore_errors'=>true,
+]]);
+$resp = @file_get_contents($url, false, $ctx);
+$code = 0;
+if (isset($http_response_header[0])) {
+    preg_match('/HTTP\/\S+ (\d+)/', $http_response_header[0], $m);
+    $code = (int)($m[1]??0);
+}
+echo "PUT {$object_key}\n";
+echo "HTTP: {$code}\n";
+if ($code >= 200 && $code < 300) {
+    echo "UPLOAD OK ✓\n";
+    // Cleanup
+    $date_time2 = gmdate('Ymd\THis\Z');
+    $date_stamp2 = gmdate('Ymd');
+    $del_cr = "DELETE\n{$canonical_uri}\n\nhost:{$host}\nx-amz-date:{$date_time2}\n\nhost;x-amz-date\n" . hash('sha256','');
+    $del_sts = "AWS4-HMAC-SHA256\n{$date_time2}\n{$date_stamp2}/{$region}/s3/aws4_request\n" . hash('sha256',$del_cr);
+    $del_sk = hash_hmac('sha256','aws4_request',hash_hmac('sha256','s3',hash_hmac('sha256',$region,hash_hmac('sha256',$date_stamp2,'AWS4'.$app_key,true),true),true),true);
+    $del_sig = hash_hmac('sha256',$del_sts,$del_sk);
+    $del_auth = "AWS4-HMAC-SHA256 Credential={$key_id}/{$date_stamp2}/{$region}/s3/aws4_request,SignedHeaders=host;x-amz-date,Signature={$del_sig}";
+    $del_ctx = stream_context_create(['http'=>['method'=>'DELETE','header'=>"Authorization: {$del_auth}\r\nx-amz-date: {$date_time2}"]]);
+    @file_get_contents($url, false, $del_ctx);
+    echo "Cleanup OK ✓\n";
+} else {
+    echo "UPLOAD FAILED\n";
+    echo "Response: " . substr($resp,0,300) . "\n";
+}
+
+echo "\n=== DONE ===\n";
