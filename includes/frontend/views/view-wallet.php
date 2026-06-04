@@ -13,6 +13,11 @@ $wallet       = LTMS_Business_Wallet::get_or_create( $vendor_id );
 $balance      = (float) $wallet['balance'];
 $held         = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
 $available    = max( 0, $balance - $held );
+$saved_bank        = get_user_meta( $vendor_id, 'ltms_bank_name',           true );
+$saved_bank_acc    = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
+$saved_bank_type   = get_user_meta( $vendor_id, 'ltms_bank_account_type',   true ) ?: 'ahorros';
+$saved_bank_holder = get_user_meta( $vendor_id, 'ltms_bank_account_holder', true );
+$has_bank_data     = ! empty( $saved_bank_acc );
 ?>
 <div class="ltms-view-pad">
 
@@ -135,9 +140,23 @@ $available    = max( 0, $balance - $held );
 
         <div style="margin-bottom:20px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Cuenta bancaria', 'ltms' ); ?></label>
+            <?php if ( $has_bank_data ) : ?>
+            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.82rem;color:#166534;">
+                <strong><?php echo esc_html( $saved_bank ); ?></strong>
+                · <?php echo esc_html( ucfirst( $saved_bank_type ) ); ?>
+                · <?php echo esc_html( $saved_bank_acc ); ?>
+                <?php if ( $saved_bank_holder ) : ?> · <?php echo esc_html( $saved_bank_holder ); ?><?php endif; ?>
+                <br><span style="font-size:0.75rem;color:#4ade80;">✓ <?php esc_html_e( 'Cuenta guardada en Configuración', 'ltms' ); ?></span>
+            </div>
+            <input type="hidden" id="ltms-payout-account" value="<?php echo esc_attr( $saved_bank_acc ); ?>">
+            <?php else : ?>
             <input type="text" id="ltms-payout-account"
                    placeholder="<?php esc_attr_e( 'Número de cuenta', 'ltms' ); ?>"
                    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
+            <p style="font-size:0.75rem;color:#f59e0b;margin-top:6px;">
+                ⚠️ <a href="#" onclick="LTMS.Dashboard.navigate('settings');return false;" style="color:#f59e0b;"><?php esc_html_e( 'Configura tu cuenta bancaria en Configuración para agilizar tus retiros.', 'ltms' ); ?></a>
+            </p>
+            <?php endif; ?>
         </div>
 
         <button type="button" onclick="LTMS.Dashboard.submitPayoutRequest()"
