@@ -104,7 +104,7 @@ class LTMS_Products_Ajax {
         if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) { // phpcs:ignore
             // M-101: campos fiscales agregados a la lista de permitidos
             $allowed = [
-                'ltms_bank_name', 'ltms_bank_account_type', 'ltms_payment_method',
+                'ltms_bank_name', 'ltms_bank_account_type', 'ltms_bank_account_holder', 'ltms_payment_method',
                 'ltms_shipping_policy', 'ltms_return_policy',
                 'ltms_tax_regime', 'ltms_nit', 'ltms_ciiu_code', 'ltms_municipality',
                 // v2.3.0 — Analytics por vendedor

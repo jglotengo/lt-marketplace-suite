@@ -1175,8 +1175,17 @@
                 const btn=$(this); btn.prop('disabled',true).text('Guardando...');
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
                     data:{ action:'ltms_save_vendor_settings', nonce:ltmsDashboard.nonce,
-                        store_name:$('[name="store_name"]').val(), store_phone:$('[name="store_phone"]').val(),
-                        store_description:$('[name="store_description"]').val(), bank_info:$('[name="bank_info"]').val() },
+                        store_name:$('[name="store_name"]').val(),
+                        store_phone:$('[name="store_phone"]').val(),
+                        store_description:$('[name="store_description"]').val(),
+                        bank_info:$('[name="bank_info"]').val(),
+                        settings:{
+                            ltms_bank_name:$('[name="ltms_bank_name"]').val()||'',
+                            ltms_bank_account_type:$('[name="ltms_bank_account_type"]').val()||'',
+                            ltms_bank_account_number:$('[name="ltms_bank_account_number"]').val()||'',
+                            ltms_bank_account_holder:$('[name="ltms_bank_account_holder"]').val()||'',
+                        }
+                    },
                     success(r) { btn.prop('disabled',false).text('💾 Guardar Cambios');
                         const m=$('.ltms-settings-msg');
                         m.text(r.success?'✓ Guardado':'Error al guardar').css('color',r.success?'#10b981':'#ef4444').show();
