@@ -345,28 +345,36 @@
          * Abre el modal de solicitud de retiro.
          */
         openPayoutModal() {
-            // M-201 FIX: el modal vive en view-wallet.php, no en view-home.php.
-            // Si no está en el DOM, navegar a Billetera primero y abrir tras cargar.
+            // M-201 FIX v2: cargar billetera para tener datos frescos,
+            // luego abrir el modal con loadWalletView callback o directo.
+            const self = this;
+            const openModal = () => {
+                const balance = parseFloat(ltmsDashboard.wallet_balance) || 0;
+                const $modal = $('#ltms-modal-payout');
+                if ($modal.length === 0) return;
+                $('#ltms-payout-amount').attr('max', balance);
+                $('#ltms-payout-balance-display').text(self.formatMoney(balance));
+                // Usar LTMS.Modal si está disponible, sino mostrar directamente
+                if (typeof LTMS.Modal !== 'undefined' && typeof LTMS.Modal.open === 'function') {
+                    LTMS.Modal.open('ltms-modal-payout');
+                } else {
+                    $modal.addClass('ltms-modal-open');
+                    $('body').addClass('ltms-modal-body-lock');
+                }
+            };
+            // Si el modal no está en el DOM, navegar a wallet primero
             if ($('#ltms-modal-payout').length === 0) {
                 this.loadView('wallet');
-                // Esperar a que view-wallet.php se inyecte en el DOM
-                const waitForModal = setInterval(() => {
+                const wait = setInterval(() => {
                     if ($('#ltms-modal-payout').length > 0) {
-                        clearInterval(waitForModal);
-                        const balance = parseFloat(ltmsDashboard.wallet_balance) || 0;
-                        $('#ltms-payout-amount').attr('max', balance);
-                        $('#ltms-payout-balance-display').text(this.formatMoney(balance));
-                        LTMS.Modal.open('ltms-modal-payout');
+                        clearInterval(wait);
+                        openModal();
                     }
                 }, 100);
-                // Timeout de seguridad: no esperar más de 5s
-                setTimeout(() => clearInterval(waitForModal), 5000);
-                return;
+                setTimeout(() => clearInterval(wait), 5000);
+            } else {
+                openModal();
             }
-            const balance = parseFloat(ltmsDashboard.wallet_balance) || 0;
-            $('#ltms-payout-amount').attr('max', balance);
-            $('#ltms-payout-balance-display').text(this.formatMoney(balance));
-            LTMS.Modal.open('ltms-modal-payout');
         },
 
         /**
