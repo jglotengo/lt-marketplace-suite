@@ -58,6 +58,14 @@ $products  = wc_get_products([
                     <span class="ltms-badge <?php echo $product->get_status() === 'publish' ? 'ltms-badge-success' : 'ltms-badge-warning'; ?>" style="font-size:0.7rem;">
                         <?php echo esc_html( $product->get_status() === 'publish' ? __( 'Publicado', 'ltms' ) : __( 'Borrador', 'ltms' ) ); ?>
                     </span>
+                    <?php
+                    $ltms_tipo = get_post_meta( $product->get_id(), '_ltms_product_type', true ) ?: 'product';
+                    $ltms_tipo_label = $ltms_tipo === 'service' ? __( 'Servicio', 'ltms' ) : __( 'Producto', 'ltms' );
+                    $ltms_tipo_icon  = $ltms_tipo === 'service' ? '🔧' : '📦';
+                    ?>
+                    <span class="ltms-badge ltms-badge-info" style="font-size:0.7rem;margin-left:4px;background:#e0f2fe;color:#0369a1;">
+                        <?php echo $ltms_tipo_icon . ' ' . esc_html( $ltms_tipo_label ); ?>
+                    </span>
                 </div>
             </div>
             <div class="ltms-product-actions">
@@ -128,6 +136,21 @@ $products  = wc_get_products([
             <div>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Stock', 'ltms' ); ?></label>
                 <input type="number" id="ltms-np-stock" min="0" step="1" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="<?php esc_attr_e( 'Dejar vacío = ilimitado', 'ltms' ); ?>">
+            </div>
+        </div>
+
+        <!-- Tipo: Producto o Servicio -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Tipo', 'ltms' ); ?> <span style="font-size:0.75rem;color:#6b7280;font-weight:400;"><?php esc_html_e( '(afecta el cálculo de comisiones)', 'ltms' ); ?></span></label>
+            <div style="display:flex;gap:10px;">
+                <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;transition:border-color .15s;" id="ltms-np-tipo-product-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-product" value="product" checked style="accent-color:#1a5276;">
+                    <span>📦 <?php esc_html_e( 'Producto físico', 'ltms' ); ?></span>
+                </label>
+                <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;transition:border-color .15s;" id="ltms-np-tipo-service-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-service" value="service" style="accent-color:#1a5276;">
+                    <span>🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
+                </label>
             </div>
         </div>
 
@@ -233,15 +256,16 @@ $products  = wc_get_products([
             url: ltmsDashboard.ajax_url,
             method: 'POST',
             data: {
-                action:      'ltms_create_product',
-                nonce:       ltmsDashboard.nonce,
-                name:        name,
-                description: $('#ltms-np-desc').val(),
-                price:       price,
-                stock:       $('#ltms-np-stock').val(),
-                category_id: $('#ltms-np-category').val(),
-                image_id:    $('#ltms-np-image-id').val(),
-                status:      $('#ltms-np-status').val(),
+                action:       'ltms_create_product',
+                nonce:        ltmsDashboard.nonce,
+                name:         name,
+                description:  $('#ltms-np-desc').val(),
+                price:        price,
+                stock:        $('#ltms-np-stock').val(),
+                category_id:  $('#ltms-np-category').val(),
+                image_id:     $('#ltms-np-image-id').val(),
+                status:       $('#ltms-np-status').val(),
+                product_type: $('input[name="ltms_np_tipo"]:checked').val() || 'product',
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -257,6 +281,7 @@ $products  = wc_get_products([
                     $('#ltms-np-image-id').val('');
                     $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
                     $('#ltms-np-img-status').text('');
+                    $('input[name="ltms_np_tipo"][value="product"]').prop('checked', true);
                     setTimeout(function(){ location.reload(); }, 1500);
                 } else {
                     $notice.removeClass('ltms-notice-success')
@@ -292,7 +317,24 @@ $products  = wc_get_products([
         $('#ltms-np-image-id').val('');
         $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-np-img-status').text('');
+        $('input[name="ltms_np_tipo"][value="product"]').prop('checked', true);
+        $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+        $('#ltms-np-tipo-service-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
     });
+
+    // ── Highlight visual para selector de tipo ───────────────────
+    $(document).on('change', 'input[name="ltms_np_tipo"]', function(){
+        const val = $(this).val();
+        if (val === 'product') {
+            $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+            $('#ltms-np-tipo-service-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+        } else {
+            $('#ltms-np-tipo-service-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+            $('#ltms-np-tipo-product-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+        }
+    });
+    // Estado inicial del highlight
+    $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
 
 })(jQuery);
 </script>
