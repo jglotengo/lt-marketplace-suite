@@ -25,6 +25,13 @@
             const $modal = $('#' + modalId);
             if ($modal.length === 0) return;
 
+            // M-202 FIX: Elementor usa transform en sus secciones, lo que hace que
+            // position:fixed sea relativo al padre en vez del viewport.
+            // Mover el modal al <body> para escapar ese contexto.
+            if ($modal.parent()[0] !== document.body) {
+                $modal.appendTo('body');
+            }
+
             $modal.addClass('ltms-modal-open');
             $('body').addClass('ltms-modal-body-lock');
 
