@@ -153,7 +153,12 @@ class LTMS_Vendor_Settings_Saver {
                 'name'              => get_user_meta( $vendor_id, 'ltms_store_name',        true ),
                 'phone'             => $phone,
                 'description'       => get_user_meta( $vendor_id, 'ltms_store_description', true ),
-                'bank_info'         => get_user_meta( $vendor_id, 'ltms_bank_info',         true ),
+                'bank_info'            => get_user_meta( $vendor_id, 'ltms_bank_info',             true ),
+                // Campos bancarios completos para retiros
+                'bank_name'            => get_user_meta( $vendor_id, 'ltms_bank_name',            true ),
+                'bank_account_number'  => get_user_meta( $vendor_id, 'ltms_bank_account_number',  true ),
+                'bank_account_type'    => get_user_meta( $vendor_id, 'ltms_bank_account_type',    true ) ?: 'ahorros',
+                'bank_account_holder'  => get_user_meta( $vendor_id, 'ltms_bank_account_holder',  true ),
                 // Campos de perfil público — usados en "Perfil Público de la Tienda"
                 'store_name'        => get_user_meta( $vendor_id, 'ltms_store_name',        true ),
                 'store_phone'       => $phone,
