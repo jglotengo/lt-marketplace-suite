@@ -1,0 +1,231 @@
+/**
+ * LTMS Homepage Fixes — v2.7.1
+ * Correcciones UX/UI para la homepage pública de lo-tengo.com.co
+ *
+ * Fixes incluidos:
+ *  HF-01: YouTube Facade — reemplaza iframes lentos por thumbnails clicables
+ *  HF-02: Trust bar — señales de confianza debajo del nav (visible en el fold)
+ *  HF-03: Textos editoriales cortados — oculta el texto truncado, muestra el completo
+ *  HF-04: QA Test Product — oculta visualmente el placeholder mientras se privatiza en BD
+ *  HF-05: Admin bar — elimina el espacio reservado por la admin bar en frontend
+ *  HF-06: Hero CTA — mejora visibilidad del botón de ofertas
+ *  HF-07: Second YouTube video (Xbox) — oculta el iframe ajeno al marketplace
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-05: Admin bar — eliminar espacio residual en frontend
+   ═══════════════════════════════════════════════════════════════ */
+html.wp-toolbar {
+    padding-top: 0 !important;
+}
+#wpadminbar {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-02: Trust bar — barra de confianza fija debajo del nav
+   Se inyecta via JS (ltms-homepage-fixes.js) si no existe en el tema
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-trust-bar {
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    padding: 8px 0;
+    width: 100%;
+    z-index: 999;
+}
+
+.ltms-trust-bar__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.ltms-trust-bar__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.ltms-trust-bar__item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #e53e3e;
+}
+
+@media (max-width: 600px) {
+    .ltms-trust-bar__inner {
+        gap: 16px;
+        font-size: 11px;
+    }
+    .ltms-trust-bar__item:nth-child(n+4) {
+        display: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-01: YouTube Facade — reemplaza iframes por thumbnails
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-yt-facade {
+    position: relative;
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    cursor: pointer;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    aspect-ratio: 16/9;
+}
+
+.ltms-yt-facade img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity .2s;
+}
+
+.ltms-yt-facade:hover img {
+    opacity: .85;
+}
+
+.ltms-yt-facade__play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 68px;
+    height: 48px;
+    background: #ff0000;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s, transform .2s;
+    pointer-events: none;
+}
+
+.ltms-yt-facade:hover .ltms-yt-facade__play {
+    background: #cc0000;
+    transform: translate(-50%, -50%) scale(1.08);
+}
+
+.ltms-yt-facade__play svg {
+    width: 24px;
+    height: 24px;
+    fill: #fff;
+    margin-left: 4px;
+}
+
+.ltms-yt-facade__label {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7);
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Ocultar el segundo iframe de YouTube (video Xbox no relacionado) */
+.ltms-yt-hide {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-03: Textos editoriales cortados
+   Las secciones editoriales tienen textos truncados. CSS trunca con
+   ellipsis + muestra tooltip, JS los completa si tiene data-full-text
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-editorial-text--fixed {
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: unset !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-04: Ocultar productos QA/placeholder visualmente
+   (El hook PHP los priva, pero si el caché sirve la versión vieja
+   este CSS actúa como segunda capa de defensa)
+   ═══════════════════════════════════════════════════════════════ */
+.products .product:has(.ltms-qa-badge),
+.products li[class*="product"]:has(img[src*="woocommerce-placeholder"]) {
+    display: none !important;
+}
+
+/* Fallback para navegadores sin :has() */
+.ltms-product-qa-hidden {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-06: Hero CTA — mejorar visibilidad del botón OFERTAS
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-hero-cta-overlay {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+}
+
+.ltms-hero-cta-overlay a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all .2s;
+    white-space: nowrap;
+}
+
+.ltms-hero-cta-overlay a.primary {
+    background: #e53e3e;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(229,62,62,.4);
+}
+
+.ltms-hero-cta-overlay a.primary:hover {
+    background: #c53030;
+    transform: translateY(-1px);
+}
+
+.ltms-hero-cta-overlay a.secondary {
+    background: rgba(255,255,255,.92);
+    color: #1a1a1a;
+    border: 2px solid rgba(255,255,255,.6);
+}
+
+.ltms-hero-cta-overlay a.secondary:hover {
+    background: #fff;
+}
+
+@media (max-width: 600px) {
+    .ltms-hero-cta-overlay {
+        flex-direction: column;
+        align-items: center;
+        bottom: 16px;
+    }
+}

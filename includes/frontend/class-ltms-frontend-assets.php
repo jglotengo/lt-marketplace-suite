@@ -35,8 +35,38 @@ final class LTMS_Frontend_Assets {
         $instance = new self();
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_frontend_assets' ] );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_header_nav' ], 5 );
+        add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_homepage_fixes' ], 20 );
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
+    }
+
+    /**
+     * Carga los fixes de homepage: YouTube Facade, Trust Bar, QA products, textos cortados.
+     * Aplica en todas las páginas públicas (el JS detecta el contexto internamente).
+     *
+     * @return void
+     */
+    public function enqueue_homepage_fixes(): void {
+        if ( is_admin() ) {
+            return;
+        }
+        $ver = LTMS_VERSION;
+        $url = LTMS_ASSETS_URL;
+
+        wp_enqueue_style(
+            'ltms-homepage-fixes',
+            $url . 'css/ltms-homepage-fixes.css',
+            [],
+            $ver
+        );
+
+        wp_enqueue_script(
+            'ltms-homepage-fixes',
+            $url . 'js/ltms-homepage-fixes.js',
+            [],
+            $ver,
+            true
+        );
     }
 
     /**
