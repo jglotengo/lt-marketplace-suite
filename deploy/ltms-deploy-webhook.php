@@ -163,7 +163,15 @@ if ($self) {
 echo "
 --- Plugin files ---
 ";
-$files = ['includes/frontend/views/view-kyc.php','includes/frontend/class-ltms-dashboard-logic.php','includes/admin/views/html-admin-kyc.php','lt-marketplace-suite.php'];
+$files = [
+    'includes/frontend/views/view-kyc.php',
+    'includes/frontend/class-ltms-dashboard-logic.php',
+    'includes/admin/views/html-admin-kyc.php',
+    'lt-marketplace-suite.php',
+    // P-01: vendor dashboard JS + products AJAX handler
+    'assets/js/ltms-dashboard.js',
+    'includes/frontend/class-ltms-products-ajax.php',
+];
 $ok=0; $err=0;
 foreach($files as $rel){
     $fc=gh_get($rel,$gh);
