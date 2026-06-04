@@ -24,8 +24,8 @@ echo "╠═══ 1. CLASES Y HOOKS ═══\n";
 
 $classes = [
     'LTMS_Frontend_Payout_Handler' => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/frontend/class-ltms-frontend-payout-handler.php',
-    'LTMS_Payout_Scheduler'        => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/class-ltms-payout-scheduler.php',
-    'LTMS_Business_Wallet'         => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/class-ltms-business-wallet.php',
+    'LTMS_Payout_Scheduler'        => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/business/class-ltms-payout-scheduler.php',
+    'LTMS_Business_Wallet'         => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/business/class-ltms-wallet.php',
     'LTMS_Vendor_Settings_Saver'   => ABSPATH . 'wp-content/plugins/lt-marketplace-suite/includes/frontend/class-ltms-vendor-settings-saver.php',
 ];
 foreach ($classes as $cls => $path) {
