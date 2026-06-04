@@ -45,8 +45,9 @@ class LTMS_Products_Ajax {
                 'status'   => $p->post_status,
                 'price'    => $product ? (float) $product->get_price() : 0,
                 'stock'    => $product ? $product->get_stock_quantity() : null,
-                    'image'   => ( $product && $product->get_image_id() ) ? wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) : '',
-                    'edit_url' => get_edit_post_link( $p->ID, 'raw' ),
+                    'image'        => ( $product && $product->get_image_id() ) ? wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) : '',
+                    'edit_url'     => get_edit_post_link( $p->ID, 'raw' ),
+                    'product_type' => get_post_meta( $p->ID, '_ltms_product_type', true ) ?: 'product',
             ];
         }
         wp_send_json_success( [ 'products' => $products ] );
@@ -150,17 +151,19 @@ class LTMS_Products_Ajax {
         }
         $cats = $product->get_category_ids();
         wp_send_json_success( [
-            'id'          => $product_id,
-            'name'        => $product->get_name(),
-            'description' => $product->get_description(),
-            'price'       => $product->get_regular_price(),
-            'stock'       => $product->get_stock_quantity(),
-            'status'      => $product->get_status(),
-            'category_id' => ! empty( $cats ) ? $cats[0] : 0,
-            'image_id'    => $product->get_image_id(),
-            'image_url'   => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
-            'gallery_ids' => $product->get_gallery_image_ids(),
-            'gallery_urls'=> array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
+            'id'           => $product_id,
+            'name'         => $product->get_name(),
+            'description'  => $product->get_description(),
+            'price'        => $product->get_regular_price(),
+            'stock'        => $product->get_stock_quantity(),
+            'status'       => $product->get_status(),
+            'category_id'  => ! empty( $cats ) ? $cats[0] : 0,
+            'image_id'     => $product->get_image_id(),
+            'image_url'    => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
+            'gallery_ids'  => $product->get_gallery_image_ids(),
+            'gallery_urls' => array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
+            // P-01: tipo para pre-llenar selector en edición
+            'product_type' => get_post_meta( $product_id, '_ltms_product_type', true ) ?: 'product',
         ] );
     }
 
@@ -199,6 +202,14 @@ class LTMS_Products_Ajax {
         // $product->save() de WooCommerce puede eliminar metas no gestionadas
         // por WC, lo que haría que el producto dejara de aparecer en pedidos del dashboard.
         update_post_meta( $product_id, '_ltms_vendor_id', get_current_user_id() );
+
+        // P-01: actualizar tipo si viene en la petición
+        if ( isset( $_POST['product_type'] ) ) {
+            $upd_type = sanitize_key( $_POST['product_type'] );
+            if ( in_array( $upd_type, [ 'product', 'service' ], true ) ) {
+                update_post_meta( $product_id, '_ltms_product_type', $upd_type );
+            }
+        }
 
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
@@ -442,9 +453,17 @@ class LTMS_Products_Ajax {
         // aparezcan en el dashboard del vendedor (get_vendor_orders filtra por esta meta).
         update_post_meta( $product_id, '_ltms_vendor_id', $current_user_id );
 
+        // P-01: guardar tipo (product | service) para lógica de comisiones
+        $product_type = sanitize_key( $_POST['product_type'] ?? 'product' );
+        if ( ! in_array( $product_type, [ 'product', 'service' ], true ) ) {
+            $product_type = 'product';
+        }
+        update_post_meta( $product_id, '_ltms_product_type', $product_type );
+
         wp_send_json_success( [
-            'product_id' => $product_id,
-            'message'    => 'Producto creado exitosamente',
+            'product_id'   => $product_id,
+            'product_type' => $product_type,
+            'message'      => 'Producto creado exitosamente',
         ] );
     }
 
