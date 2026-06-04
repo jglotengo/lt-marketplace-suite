@@ -258,7 +258,7 @@
             $tbody.empty();
 
             if (!orders || orders.length === 0) {
-                $tbody.append('<tr><td colspan="6" class="ltms-empty-cell">No tienes pedidos aún.</td></tr>');
+                $tbody.append('<tr><td colspan="7" class="ltms-empty-cell">No tienes pedidos aún.</td></tr>');
                 return;
             }
 
@@ -747,13 +747,13 @@
             const products = (data && data.products) ? data.products : [];
             let rows = products.length === 0
                 ? '<tr><td colspan="6" class="ltms-empty-cell">Aún no tienes productos. Crea tu primer producto con el botón de arriba.</td></tr>'
-                : products.map(p => `<tr><td style="width:60px;padding:4px;"><img src="${p.image||''}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;background:#f0f0f0;" onerror="this.style.background='#e0e0e0';this.src='';" /></td><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.stock ?? '-'}</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                : products.map(p => `<tr><td style="width:60px;padding:4px;"><img src="${p.image||''}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;background:#f0f0f0;" onerror="this.style.background='#e0e0e0';this.src='';" /></td><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.product_type === 'service' ? '🛠️ Servicio' : '📦 Producto'}</td><td>${p.stock ?? '-'}</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
   <button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}" style="background:#1976d2;color:#fff;border:none;font-weight:600;">✏️ Editar</button>
   <button class="ltms-btn ltms-btn-sm ltms-toggle-product-btn" data-id="${p.id}" data-status="${p.status}" style="${p.status==='publish'?'background:#f59e0b;color:#fff;border:none;font-weight:600;':'background:#16a34a;color:#fff;border:none;font-weight:600;'}">${p.status==='publish'?'⏸ Pausar':'▶ Publicar'}</button>
   <button class="ltms-btn ltms-btn-sm ltms-delete-product-btn" data-id="${p.id}" data-name="${this.escapeHtml(p.name)}" style="background:transparent;color:#dc2626;border:1px solid #dc2626;font-weight:600;">🗑</button>
 </div></td></tr>`).join('');
             const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
-            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th style="width:60px;"></th><th>Producto</th><th>Precio</th><th>Estado</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th style="width:60px;"></th><th>Producto</th><th>Precio</th><th>Estado</th><th>Tipo</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
         $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); LTMS.Dashboard.loadNewProductView(); });
             $(document).off('click','.ltms-edit-product-btn').on('click','.ltms-edit-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); var pid=$(this).data('id'); LTMS.Dashboard.loadEditProductView(pid); });
             $(document).off('click','.ltms-toggle-product-btn').on('click','.ltms-toggle-product-btn', function(e){
@@ -825,6 +825,13 @@
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
                             '<select id="ltms-np-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
+                            '<select id="ltms-np-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
+                                '<option value="product">📦 Producto físico</option>' +
+                                '<option value="service">🛠️ Servicio</option>' +
+                            '</select>' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (dejar vacío = ilimitado)</label>' +
@@ -922,6 +929,7 @@
                             name: name, price: price, status: status,
                             description: jQuery('#ltms-np-desc').val(),
                             category_id: jQuery('#ltms-np-cat').val(),
+                            product_type: jQuery('#ltms-np-type').val(),
                             stock: jQuery('#ltms-np-stock').val(),
                             image_id: jQuery('#ltms-np-img-id').val(),
                             gallery_ids: jQuery('#ltms-np-gallery-ids').val()
@@ -983,6 +991,13 @@
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
                         '<select id="ltms-ep-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
+                        '<select id="ltms-ep-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
+                            '<option value="product"' + (p.product_type === 'service' ? '' : ' selected') + '>📦 Producto físico</option>' +
+                            '<option value="service"' + (p.product_type === 'service' ? ' selected' : '') + '>🛠️ Servicio</option>' +
+                        '</select>' +
                     '</div>' +
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (vacío = ilimitado)</label>' +
@@ -1086,6 +1101,7 @@
                         name: name, price: price,
                         description: jQuery('#ltms-ep-desc').val(),
                         category_id: jQuery('#ltms-ep-cat').val(),
+                        product_type: jQuery('#ltms-ep-type').val(),
                         stock: jQuery('#ltms-ep-stock').val(),
                         image_id: jQuery('#ltms-ep-img-id').val(),
                         gallery_ids: jQuery('#ltms-ep-gallery-ids').val()
