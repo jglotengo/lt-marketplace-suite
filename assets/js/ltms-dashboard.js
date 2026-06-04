@@ -1,7 +1,7 @@
 /**
  * LT Marketplace Suite - Vendor Dashboard SPA
  * Panel del Vendedor - Single Page Application
- * Version: 1.5.0
+ * Version: 1.5.1
  */
 
 /* global ltmsDashboard, jQuery, Chart */
