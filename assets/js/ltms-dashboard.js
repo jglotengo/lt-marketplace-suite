@@ -345,6 +345,24 @@
          * Abre el modal de solicitud de retiro.
          */
         openPayoutModal() {
+            // M-201 FIX: el modal vive en view-wallet.php, no en view-home.php.
+            // Si no está en el DOM, navegar a Billetera primero y abrir tras cargar.
+            if ($('#ltms-modal-payout').length === 0) {
+                this.loadView('wallet');
+                // Esperar a que view-wallet.php se inyecte en el DOM
+                const waitForModal = setInterval(() => {
+                    if ($('#ltms-modal-payout').length > 0) {
+                        clearInterval(waitForModal);
+                        const balance = parseFloat(ltmsDashboard.wallet_balance) || 0;
+                        $('#ltms-payout-amount').attr('max', balance);
+                        $('#ltms-payout-balance-display').text(this.formatMoney(balance));
+                        LTMS.Modal.open('ltms-modal-payout');
+                    }
+                }, 100);
+                // Timeout de seguridad: no esperar más de 5s
+                setTimeout(() => clearInterval(waitForModal), 5000);
+                return;
+            }
             const balance = parseFloat(ltmsDashboard.wallet_balance) || 0;
             $('#ltms-payout-amount').attr('max', balance);
             $('#ltms-payout-balance-display').text(this.formatMoney(balance));
