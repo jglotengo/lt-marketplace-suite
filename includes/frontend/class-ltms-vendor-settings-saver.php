@@ -30,15 +30,20 @@ class LTMS_Vendor_Settings_Saver {
         }
 
         $fields = [
-            'ltms_store_name'        => 'text_field',
-            'ltms_store_description' => 'textarea_field',
-            'ltms_store_city'        => 'text_field',
-            'ltms_store_address'     => 'text_field',
-            'ltms_store_phone'       => 'text_field',
-            'ltms_store_schedule'    => 'textarea_field',
-            'ltms_store_categories'  => 'text_field',
-            'ltms_vendor_ga4_id'     => 'text_field',
-            'ltms_vendor_pixel_id'   => 'text_field',
+            'ltms_store_name'            => 'text_field',
+            'ltms_store_description'     => 'textarea_field',
+            'ltms_store_city'            => 'text_field',
+            'ltms_store_address'         => 'text_field',
+            'ltms_store_phone'           => 'text_field',
+            'ltms_store_schedule'        => 'textarea_field',
+            'ltms_store_categories'      => 'text_field',
+            'ltms_vendor_ga4_id'         => 'text_field',
+            'ltms_vendor_pixel_id'       => 'text_field',
+            // Datos bancarios para retiros
+            'ltms_bank_name'             => 'text_field',
+            'ltms_bank_account_number'   => 'text_field',
+            'ltms_bank_account_type'     => 'text_field',
+            'ltms_bank_account_holder'   => 'text_field',
         ];
 
         foreach ( $fields as $key => $sanitizer ) {
