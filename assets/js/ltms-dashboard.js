@@ -1112,7 +1112,16 @@
                     <div class="ltms-form-group"><label>Nombre de la Tienda</label><input type="text" class="ltms-form-control" name="store_name" value="${this.escapeHtml(store.name||'')}" placeholder="Mi Tienda"></div>
                     <div class="ltms-form-group"><label>Teléfono de Contacto</label><input type="text" class="ltms-form-control" name="store_phone" value="${this.escapeHtml(store.phone||'')}" placeholder="+57 300 000 0000"></div>
                     <div class="ltms-form-group"><label>Descripción</label><textarea class="ltms-form-control" name="store_description" rows="3">${this.escapeHtml(store.description||'')}</textarea></div>
-                    <div class="ltms-form-group"><label>Banco para Retiros</label><input type="text" class="ltms-form-control" name="bank_info" value="${this.escapeHtml(store.bank_info||'')}" placeholder="Banco / No. Cuenta"></div>
+                    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:12px;">
+                        <p style="font-size:0.78rem;font-weight:600;color:#374151;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px;">🏦 Cuenta Bancaria para Retiros</p>
+                        <p style="font-size:0.75rem;color:#6b7280;margin:0 0 12px;">Esta cuenta se usará automáticamente al solicitar un retiro.</p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                            <div class="ltms-form-group" style="margin:0;"><label>Banco</label><input type="text" class="ltms-form-control" name="ltms_bank_name" value="${this.escapeHtml(store.bank_name||'')}" placeholder="Ej: Bancolombia"></div>
+                            <div class="ltms-form-group" style="margin:0;"><label>Tipo de Cuenta</label><select class="ltms-form-control" name="ltms_bank_account_type"><option value="ahorros" ${(store.bank_account_type||'ahorros')==='ahorros'?'selected':''}>Ahorros</option><option value="corriente" ${(store.bank_account_type||'')==='corriente'?'selected':''}>Corriente</option><option value="nequi" ${(store.bank_account_type||'')==='nequi'?'selected':''}>Nequi</option><option value="daviplata" ${(store.bank_account_type||'')==='daviplata'?'selected':''}>Daviplata</option></select></div>
+                        </div>
+                        <div class="ltms-form-group" style="margin-bottom:10px;"><label>Número de Cuenta</label><input type="text" class="ltms-form-control" name="ltms_bank_account_number" value="${this.escapeHtml(store.bank_account_number||'')}" placeholder="Ej: 69812345678"></div>
+                        <div class="ltms-form-group" style="margin:0;"><label>Nombre del Titular</label><input type="text" class="ltms-form-control" name="ltms_bank_account_holder" value="${this.escapeHtml(store.bank_account_holder||'')}" placeholder="Nombre como aparece en el banco"></div>
+                    </div>
                     <button type="button" class="ltms-btn ltms-btn-primary ltms-save-settings-btn">💾 Guardar Cambios</button>
                     <span class="ltms-settings-msg" style="margin-left:10px;display:none;"></span>
                 </div>
