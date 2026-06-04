@@ -6,7 +6,8 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 $fields = [
-    'ltms_platform_name'    => [ 'label' => 'Nombre de la Plataforma', 'type' => 'text',   'default' => 'Lo-Tengo Marketplace', 'desc' => 'Aparece en emails y en el panel del vendedor.' ],
+    'ltms_platform_name'    => [ 'label' => 'Nombre de la Plataforma', 'type' => 'text',   'default' => 'Lo Tengo Colombia', 'desc' => 'Aparece en emails y en el panel del vendedor.' ],
+    'ltms_og_site_name'     => [ 'label' => 'Nombre SEO del Sitio (og:site_name)', 'type' => 'text', 'default' => 'Lo Tengo Colombia', 'desc' => 'Usado en Open Graph, Twitter Cards y Schema.org. Ej: Lo Tengo Colombia' ],
     'ltms_country'          => [ 'label' => 'País de Operación',        'type' => 'select', 'default' => 'CO', 'options' => [ 'CO' => 'Colombia', 'MX' => 'México', 'PE' => 'Perú', 'CL' => 'Chile' ] ],
     'ltms_environment'      => [ 'label' => 'Entorno',                  'type' => 'select', 'default' => 'sandbox', 'options' => [ 'sandbox' => 'Sandbox (Pruebas)', 'production' => 'Producción' ] ],
     'ltms_currency'         => [ 'label' => 'Moneda Principal',         'type' => 'select', 'default' => 'COP', 'options' => [ 'COP' => 'COP - Peso Colombiano', 'MXN' => 'MXN - Peso Mexicano', 'USD' => 'USD - Dólar' ] ],
@@ -14,6 +15,7 @@ $fields = [
     'ltms_support_phone'    => [ 'label' => 'Teléfono de Soporte',     'type' => 'text',   'default' => '', 'desc' => 'Visible para vendedores en el panel.' ],
     'ltms_terms_url'        => [ 'label' => 'URL Términos y Condiciones', 'type' => 'url', 'default' => home_url('/terminos-y-condiciones/') ],
     'ltms_privacy_url'      => [ 'label' => 'URL Política de Privacidad', 'type' => 'url', 'default' => home_url('/politica-de-privacidad/') ],
+    'ltms_devoluciones_url' => [ 'label' => 'URL Política de Devoluciones', 'type' => 'url', 'default' => home_url('/politica-de-devoluciones/'), 'desc' => 'Visible en footer y checkout.' ],
 ];
 ?>
 <div class="ltms-settings-section">

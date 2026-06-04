@@ -4,7 +4,20 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] — 2026-04-07
+## [2.7.1] — 2026-06-04
+
+### Fixed
+- **UX-01 Admin Bar**: Oculta la WordPress admin toolbar en el frontend para todos los usuarios (incluyendo administradores) — eliminando la UI contaminada visible en la homepage pública.
+- **UX-02 QA Products**: Los productos con "QA" o "test product" en el título se marcan automáticamente con `_ltms_qa_product=yes` y se privatizan — ya no aparecen en homepage ni catálogo público.
+- **UX-03 Uncategorized**: Productos en la categoría "Uncategorized"/"sin-categoria" quedan excluidos de homepage y tienda hasta ser correctamente categorizados.
+- **SEO-01 og:site_name**: El campo `ltms_og_site_name` ahora tiene default `Lo Tengo Colombia` (antes era cadena vacía). El `init@99` hook corrige el valor en instancias ya activas sin necesidad de reactivar el plugin.
+- **LEGAL-01 URLs Políticas**: Si `ltms_terms_url` o `ltms_privacy_url` apuntan a un dominio ajeno (`soycontracultura.com`, etc.), el hook `init@100` los corrige automáticamente al dominio de `home_url()`.
+- **Settings**: Añadido campo `ltms_og_site_name` en la sección General del panel admin. Añadido campo `ltms_devoluciones_url` para política de devoluciones. Default de `ltms_platform_name` corregido de 'Lo-Tengo Marketplace' → 'Lo Tengo Colombia'.
+
+### Security
+- Los filtros `pre_get_posts` de UX-02 y UX-03 solo corren en frontend (`! is_admin()`) para evitar impacto en el panel de administración.
+
+
 
 ### Added
 - **Módulo de Reservas ACID**: `LTMS_Booking_Manager` con `START TRANSACTION` + `SELECT…FOR UPDATE` para eliminar doble-booking

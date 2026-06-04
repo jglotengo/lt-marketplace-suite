@@ -97,7 +97,12 @@ class LTMS_SEO_Manager {
             $og = self::get_og_data();
             if ( empty( $og ) ) return;
 
-            $site_name = esc_attr( LTMS_Core_Config::get( 'ltms_og_site_name', get_bloginfo( 'name' ) ) );
+            $raw_site_name = LTMS_Core_Config::get( 'ltms_og_site_name', '' );
+            if ( empty( $raw_site_name ) ) {
+                $raw_site_name = 'Lo Tengo Colombia';
+                update_option( 'ltms_og_site_name', $raw_site_name );
+            }
+            $site_name = esc_attr( $raw_site_name );
             $locale    = esc_attr( LTMS_Core_Config::get( 'ltms_og_locale', 'es_CO' ) );
             echo '<meta property="og:site_name" content="' . $site_name . '">' . "\n";
             echo '<meta property="og:locale" content="' . $locale . '">' . "\n";

@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.7.0
+ * Version:           2.7.1
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -750,3 +750,132 @@ function ltms_emergency_dashboard_page(): void {
 
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-commission-writer.php';
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-backfill-kyc.php';
+
+// ============================================================
+// FIX UX-01: Ocultar admin bar en el frontend para no-admins
+// La barra de herramientas de WordPress contamina visualmente
+// la UI pública del marketplace para administradores logueados.
+// Se oculta para todos excepto el rol administrator.
+// ============================================================
+add_filter( 'show_admin_bar', function( bool $show ): bool {
+    if ( is_admin() ) {
+        return $show; // No tocar el admin real
+    }
+    if ( current_user_can( 'manage_options' ) ) {
+        return false; // Admins tampoco la ven en el frontend
+    }
+    return false;
+}, 999 );
+
+// ============================================================
+// FIX UX-02: Excluir productos QA/prueba de las consultas públicas
+// Cualquier producto con "QA" o "qa test" en el título, o con
+// "_ltms_qa_product" en meta, queda invisible en tienda y homepage.
+// ============================================================
+add_action( 'pre_get_posts', function( \WP_Query $q ): void {
+    // Solo afectar queries de frontend, no el admin ni búsquedas internas
+    if ( is_admin() || ! $q->is_main_query() ) {
+        return;
+    }
+    if ( ! in_array( $q->get( 'post_type' ), [ 'product', '', false, null ], true )
+        && ! $q->is_search() ) {
+        return;
+    }
+
+    // Excluir productos marcados como QA via meta
+    $meta_query = (array) $q->get( 'meta_query' );
+    $meta_query[] = [
+        'relation' => 'OR',
+        [
+            'key'     => '_ltms_qa_product',
+            'compare' => 'NOT EXISTS',
+        ],
+        [
+            'key'     => '_ltms_qa_product',
+            'value'   => 'yes',
+            'compare' => '!=',
+        ],
+    ];
+    $q->set( 'meta_query', $meta_query );
+} );
+
+// Marcar productos QA automáticamente al guardar si el título contiene "QA"
+add_action( 'save_post_product', function( int $post_id ): void {
+    if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+        return;
+    }
+    $title = get_the_title( $post_id );
+    if ( stripos( $title, 'qa ' ) !== false
+        || stripos( $title, 'qa test' ) !== false
+        || stripos( $title, 'test product' ) !== false ) {
+        update_post_meta( $post_id, '_ltms_qa_product', 'yes' );
+        // Forzar visibilidad privada en productos QA
+        wp_update_post( [
+            'ID'          => $post_id,
+            'post_status' => 'private',
+        ] );
+    }
+} );
+
+// ============================================================
+// FIX UX-03: Excluir productos en "Uncategorized" de homepage
+// Los productos sin categoría (sin asignar) no deben aparecer
+// en listas públicas — solo en búsqueda directa por ID.
+// ============================================================
+add_action( 'pre_get_posts', function( \WP_Query $q ): void {
+    if ( is_admin() || ! $q->is_main_query() ) {
+        return;
+    }
+    if ( ! is_front_page() && ! is_shop() && ! $q->is_search() ) {
+        return;
+    }
+    if ( $q->get( 'post_type' ) !== 'product' && ! is_shop() ) {
+        return;
+    }
+
+    // Excluir la categoría "Uncategorized" / "Sin categoría" de WooCommerce
+    $tax_query = (array) $q->get( 'tax_query' );
+    $tax_query[] = [
+        'taxonomy' => 'product_cat',
+        'field'    => 'slug',
+        'terms'    => [ 'uncategorized', 'sin-categoria', 'sin-categoría' ],
+        'operator' => 'NOT IN',
+    ];
+    $q->set( 'tax_query', $tax_query );
+}, 20 );
+
+// ============================================================
+// FIX SEO-01: Actualizar og:site_name en tiempo real si está vacío
+// (Cubre instancias ya activas que no corrieron el activador v2.7+)
+// ============================================================
+add_action( 'init', function(): void {
+    $val = get_option( 'ltms_og_site_name', '' );
+    if ( empty( $val ) ) {
+        update_option( 'ltms_og_site_name', 'Lo Tengo Colombia' );
+    }
+}, 99 );
+
+// ============================================================
+// FIX LEGAL-01: Corregir URLs de políticas si apuntan a dominio ajeno
+// Si ltms_terms_url o ltms_privacy_url apuntan a un dominio que no
+// es lo-tengo.com.co / lotengo.market, los redirigimos al dominio correcto.
+// ============================================================
+add_action( 'init', function(): void {
+    $home = home_url();
+    $bad_domains = [ 'soycontracultura.com', 'contracultura.com' ];
+
+    foreach ( [ 'ltms_terms_url', 'ltms_privacy_url', 'ltms_devoluciones_url' ] as $opt ) {
+        $url = get_option( $opt, '' );
+        if ( empty( $url ) ) continue;
+        foreach ( $bad_domains as $bad ) {
+            if ( stripos( $url, $bad ) !== false ) {
+                // Reconstruir con el dominio correcto conservando el path
+                $path    = wp_parse_url( $url, PHP_URL_PATH ) ?: '/';
+                $new_url = trailingslashit( $home ) . ltrim( $path, '/' );
+                update_option( $opt, $new_url );
+                error_log( "LTMS LEGAL-01: URL de {$opt} corregida de {$url} a {$new_url}" );
+                break;
+            }
+        }
+    }
+}, 100 );
