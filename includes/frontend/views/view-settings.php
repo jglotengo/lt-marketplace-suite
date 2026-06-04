@@ -13,7 +13,10 @@ $user         = get_userdata( $vendor_id );
 $store_name   = get_user_meta( $vendor_id, 'ltms_store_name', true );
 $store_desc   = get_user_meta( $vendor_id, 'ltms_store_description', true );
 $phone        = get_user_meta( $vendor_id, 'ltms_store_phone', true ) ?: get_user_meta( $vendor_id, 'ltms_phone', true );
-$bank_name    = get_user_meta( $vendor_id, 'ltms_bank_name', true );
+$bank_name        = get_user_meta( $vendor_id, 'ltms_bank_name',           true );
+$bank_account     = get_user_meta( $vendor_id, 'ltms_bank_account_number',  true );
+$bank_account_type= get_user_meta( $vendor_id, 'ltms_bank_account_type',    true ) ?: 'ahorros';
+$bank_holder      = get_user_meta( $vendor_id, 'ltms_bank_account_holder',  true );
 $kyc_status   = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) ?: 'pending';
 $referral_code = get_user_meta( $vendor_id, 'ltms_referral_code', true );
 // v2.3.0 — Analytics por vendedor
@@ -188,11 +191,46 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
                 <textarea name="ltms_store_description" rows="3"
                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;resize:vertical;"><?php echo esc_textarea( $store_desc ); ?></textarea>
             </div>
-            <div style="margin-bottom:20px;">
-                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Banco para Retiros', 'ltms' ); ?></label>
-                <input type="text" name="ltms_bank_name" id="ltms-setting-bank"
-                       value="<?php echo esc_attr( $bank_name ); ?>"
-                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+            <!-- Datos bancarios para retiros -->
+            <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:20px;">
+                <p style="font-size:0.8rem;font-weight:600;color:#374151;margin:0 0 14px;letter-spacing:.5px;text-transform:uppercase;">
+                    🏦 <?php esc_html_e( 'Cuenta Bancaria para Retiros', 'ltms' ); ?>
+                </p>
+                <p style="font-size:0.78rem;color:#6b7280;margin:0 0 14px;">
+                    <?php esc_html_e( 'Esta cuenta se usará automáticamente al solicitar un retiro.', 'ltms' ); ?>
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Banco', 'ltms' ); ?></label>
+                        <input type="text" name="ltms_bank_name" id="ltms-setting-bank"
+                               value="<?php echo esc_attr( $bank_name ); ?>"
+                               placeholder="<?php esc_attr_e( 'Ej: Bancolombia', 'ltms' ); ?>"
+                               style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Tipo de Cuenta', 'ltms' ); ?></label>
+                        <select name="ltms_bank_account_type" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                            <option value="ahorros" <?php selected( $bank_account_type, 'ahorros' ); ?>><?php esc_html_e( 'Ahorros', 'ltms' ); ?></option>
+                            <option value="corriente" <?php selected( $bank_account_type, 'corriente' ); ?>><?php esc_html_e( 'Corriente', 'ltms' ); ?></option>
+                            <option value="nequi" <?php selected( $bank_account_type, 'nequi' ); ?>><?php esc_html_e( 'Nequi', 'ltms' ); ?></option>
+                            <option value="daviplata" <?php selected( $bank_account_type, 'daviplata' ); ?>><?php esc_html_e( 'Daviplata', 'ltms' ); ?></option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Número de Cuenta', 'ltms' ); ?></label>
+                    <input type="text" name="ltms_bank_account_number" id="ltms-setting-bank-account"
+                           value="<?php echo esc_attr( $bank_account ); ?>"
+                           placeholder="<?php esc_attr_e( 'Ej: 69812345678', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Nombre del Titular', 'ltms' ); ?></label>
+                    <input type="text" name="ltms_bank_account_holder" id="ltms-setting-bank-holder"
+                           value="<?php echo esc_attr( $bank_holder ); ?>"
+                           placeholder="<?php esc_attr_e( 'Nombre como aparece en el banco', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
             </div>
 
             <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-save-settings-btn">
