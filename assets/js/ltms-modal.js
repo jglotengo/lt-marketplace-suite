@@ -1,7 +1,7 @@
 /**
  * LT Marketplace Suite - Modal Module
  * Sistema de modales accesibles para el dashboard del vendedor
- * Version: 1.5.0
+ * Version: 1.5.1
  */
 
 /* global jQuery */
