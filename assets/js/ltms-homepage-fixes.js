@@ -229,52 +229,33 @@
             ? window.ltmsData.assetsUrl + 'img/con-el-apoyo.png'
             : '/wp-content/plugins/lt-marketplace-suite/assets/img/con-el-apoyo.png';
 
-        // Selector exacto del widget Elementor Slides de lo-tengo.com.co
-        // Clase detectada via DevTools: .elementor-element-98f6846
-        // Estructura: .elementor-element-98f6846 > .elementor-widget-container > .elementor-slides-wrapper > .swiper
-        var hero =
-            document.querySelector('.elementor-element-98f6846') ||
-            document.querySelector('.elementor-widget-slides') ||
-            document.querySelector('.elementor-slides-wrapper') ||
-            document.querySelector('.swiper-container:has(.swiper-slide-inner)') ||
-            document.querySelector('.elementor-section:first-of-type');
-
         var overlay = document.createElement('div');
         overlay.className = 'ltms-support-overlay';
         overlay.setAttribute('aria-label', 'Con el apoyo de nuestros aliados');
         overlay.innerHTML =
             '<img ' +
                 'src="' + imgUrl + '" ' +
-                'alt="Con el apoyo de: Fundación Cardioinfantil, ADRwork CHC, Alegra, Openpay by BBVA, DanPago" ' +
+                'alt="Con el apoyo de: Fundacion Cardioinfantil, ADRwork CHC, Alegra, Openpay by BBVA, DanPago" ' +
                 'loading="lazy" ' +
                 'decoding="async"' +
             '>';
 
-        if (hero) {
-            var pos = window.getComputedStyle(hero).position;
-            if (pos === 'static') hero.style.position = 'relative';
-            hero.appendChild(overlay);
-            console.log('[LTMS HF-08] Overlay insertado en:', hero.className);
+        // Insertar DESPUES del widget slider (no dentro, el overflow:hidden lo cortaria)
+        var sliderWidget =
+            document.querySelector('.elementor-element-98f6846') ||
+            document.querySelector('.elementor-widget-slides') ||
+            document.querySelector('.elementor-slides-wrapper');
+
+        if (sliderWidget) {
+            sliderWidget.parentNode.insertBefore(overlay, sliderWidget.nextSibling);
+            console.log('[LTMS HF-08] OK despues slider:', sliderWidget.className.substring(0,40));
         } else {
-            // Fallback: sección standalone después del primer bloque
-            var content = document.querySelector('#content, .site-content, main, .elementor');
-            if (content && content.firstElementChild) {
-                content.insertBefore(overlay, content.firstElementChild.nextSibling);
-                overlay.classList.add('ltms-support-overlay--standalone');
-                console.log('[LTMS HF-08] Fallback standalone');
-            }
-        }
-    }
-            // Fallback final: después del primer section/div grande de contenido
-            var content = document.querySelector('#content, .site-content, main, .elementor');
-            if (content) {
-                var firstChild = content.firstElementChild;
-                if (firstChild) {
-                    content.insertBefore(overlay, firstChild.nextSibling);
-                } else {
-                    content.appendChild(overlay);
-                }
-                overlay.classList.add('ltms-support-overlay--standalone');
+            var firstSection = document.querySelector(
+                '.elementor-section:first-of-type, .e-con:first-of-type, section:first-of-type'
+            );
+            if (firstSection && firstSection.parentNode) {
+                firstSection.parentNode.insertBefore(overlay, firstSection.nextSibling);
+                console.log('[LTMS HF-08] Fallback despues primer section');
             }
         }
     }

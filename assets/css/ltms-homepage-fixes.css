@@ -176,113 +176,33 @@ html.wp-toolbar {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   HF-08: Overlay "Con el apoyo de" — Elementor widget-slides
-   Selector exacto: .elementor-element-98f6846
-   El swiper interno tiene overflow:hidden, por eso apuntamos al
-   widget externo que no lo tiene.
+   HF-08: Sección "Con el apoyo de" — entre slider y categorías
+   Se inserta como bloque DESPUÉS del widget Elementor del slider.
+   Fondo negro, imagen centrada, ancho completo.
    ═══════════════════════════════════════════════════════════════ */
-.elementor-element-98f6846,
-.elementor-widget-slides {
-    position: relative !important;
-}
-
 .ltms-support-overlay {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
-    pointer-events: none;
-    width: 88%;
-    max-width: 680px;
+    display: block;
+    width: 100%;
+    background: #000;
+    padding: 0;
+    margin: 0;
+    line-height: 0;
+    font-size: 0;
 }
 
 .ltms-support-overlay img {
-    width: 100%;
-    height: auto;
     display: block;
-    border-radius: 6px;
-    opacity: 0.95;
-}
-
-/* Versión standalone (fallback cuando no hay slider) */
-.ltms-support-overlay--standalone {
-    position: relative !important;
-    bottom: auto;
-    left: auto;
-    transform: none;
     width: 100%;
     max-width: 100%;
-    background: #000;
-    padding: 32px 16px;
-    box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-}
-
-.ltms-support-overlay--standalone img {
-    max-width: 860px;
-    opacity: 1;
+    height: auto;
+    margin: 0 auto;
 }
 
 @media (max-width: 768px) {
     .ltms-support-overlay {
-        bottom: 6px;
-        width: 95%;
+        padding: 0;
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-.ltms-hero-cta-overlay {
-    position: absolute;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 12px;
-    z-index: 10;
-}
-
-.ltms-hero-cta-overlay a {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 28px;
-    border-radius: 6px;
-    font-size: 15px;
-    font-weight: 700;
-    text-decoration: none;
-    transition: all .2s;
-    white-space: nowrap;
-}
-
-.ltms-hero-cta-overlay a.primary {
-    background: #e53e3e;
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(229,62,62,.4);
-}
-
-.ltms-hero-cta-overlay a.primary:hover {
-    background: #c53030;
-    transform: translateY(-1px);
-}
-
-.ltms-hero-cta-overlay a.secondary {
-    background: rgba(255,255,255,.92);
-    color: #1a1a1a;
-    border: 2px solid rgba(255,255,255,.6);
-}
-
-.ltms-hero-cta-overlay a.secondary:hover {
-    background: #fff;
-}
-
-@media (max-width: 600px) {
-    .ltms-hero-cta-overlay {
-        flex-direction: column;
-        align-items: center;
-        bottom: 16px;
-    }
-}
 /* ═══════════════════════════════════════════════════════════════
    HF-06: Hero CTA — mejorar visibilidad del botón OFERTAS
