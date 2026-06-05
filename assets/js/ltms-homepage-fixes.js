@@ -218,6 +218,52 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
+       HF-08: Imagen "Con el apoyo de" dentro del hero slider
+       Se inserta como overlay en la esquina inferior del hero/slider.
+       Si el slider no existe, se inyecta justo debajo del hero.
+       ══════════════════════════════════════════════════════════════ */
+    function injectSupportInHero() {
+        if (document.querySelector('.ltms-support-overlay')) return;
+
+        var imgUrl = (window.ltmsData && window.ltmsData.assetsUrl)
+            ? window.ltmsData.assetsUrl + 'img/con-el-apoyo.png'
+            : '/wp-content/plugins/lt-marketplace-suite/assets/img/con-el-apoyo.png';
+
+        // Buscar el contenedor del slider/hero
+        var hero = document.querySelector(
+            '.woocommerce-slider, .slider-wrapper, .home-slider, ' +
+            '.wp-block-cover, [class*="slider"], [class*="hero"], ' +
+            '.rev_slider_wrapper, .vc_row:first-of-type, ' +
+            '.elementor-section:first-of-type'
+        );
+
+        var overlay = document.createElement('div');
+        overlay.className = 'ltms-support-overlay';
+        overlay.setAttribute('aria-label', 'Con el apoyo de nuestros aliados');
+        overlay.innerHTML =
+            '<img ' +
+                'src="' + imgUrl + '" ' +
+                'alt="Con el apoyo de: Fundación Cardioinfantil, ADRwork CHC, Alegra, Openpay by BBVA, DanPago" ' +
+                'loading="lazy" ' +
+                'decoding="async"' +
+            '>';
+
+        if (hero) {
+            // Asegurar position relative para que el absolute funcione
+            var pos = window.getComputedStyle(hero).position;
+            if (pos === 'static') hero.style.position = 'relative';
+            hero.appendChild(overlay);
+        } else {
+            // Fallback: insertar justo después del primer bloque grande de la página
+            var firstSection = document.querySelector('section, .entry-content > div:first-child');
+            if (firstSection && firstSection.parentNode) {
+                firstSection.parentNode.insertBefore(overlay, firstSection.nextSibling);
+                overlay.classList.add('ltms-support-overlay--standalone');
+            }
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        Init — ejecutar todo en DOMContentLoaded
        ══════════════════════════════════════════════════════════════ */
     ready(function () {
@@ -227,6 +273,7 @@
         // Resto solo en homepage
         if (isHomePage()) {
             injectTrustBar();
+            injectSupportInHero();
             hideQAProducts();
             fixTruncatedTexts();
         }
