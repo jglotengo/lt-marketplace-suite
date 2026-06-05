@@ -225,9 +225,10 @@
     function injectSupportInHero() {
         if (document.querySelector('.ltms-support-overlay')) return;
 
-        var imgUrl = (window.ltmsData && window.ltmsData.assetsUrl)
-            ? window.ltmsData.assetsUrl + 'img/con-el-apoyo.png'
-            : '/wp-content/plugins/lt-marketplace-suite/assets/img/con-el-apoyo.png';
+        var base = (window.ltmsData && window.ltmsData.assetsUrl)
+            ? window.ltmsData.assetsUrl
+            : '/wp-content/plugins/lt-marketplace-suite/assets/';
+        var imgUrl = base + 'img/con-el-apoyo.png';
 
         var overlay = document.createElement('div');
         overlay.className = 'ltms-support-overlay';
@@ -236,26 +237,47 @@
             '<img ' +
                 'src="' + imgUrl + '" ' +
                 'alt="Con el apoyo de: Fundacion Cardioinfantil, ADRwork CHC, Alegra, Openpay by BBVA, DanPago" ' +
-                'loading="lazy" ' +
-                'decoding="async"' +
+                'width="1320" height="280" ' +
+                'loading="eager" ' +
+                'decoding="async" ' +
+                'style="width:100%;height:auto;display:block;"' +
             '>';
 
-        // Insertar DESPUES del widget slider (no dentro, el overflow:hidden lo cortaria)
+        // HF-08: Estrategia multi-selector para encontrar el hero slider Elementor
+        // El widget principal tiene id="elementor-element-98f6846" pero puede cambiar.
+        // Buscamos por widgetType (data attr), luego por clase, luego sección completa.
         var sliderWidget =
+            document.querySelector('[data-widget_type="slides.default"]') ||
+            document.querySelector('[data-widget_type="slides"]') ||
             document.querySelector('.elementor-element-98f6846') ||
             document.querySelector('.elementor-widget-slides') ||
-            document.querySelector('.elementor-slides-wrapper');
+            document.querySelector('.elementor-slides-wrapper') ||
+            document.querySelector('.swiper-wrapper');
 
-        if (sliderWidget) {
-            sliderWidget.parentNode.insertBefore(overlay, sliderWidget.nextSibling);
-            console.log('[LTMS HF-08] OK despues slider:', sliderWidget.className.substring(0,40));
+        // Subir al nivel de sección Elementor contenedora para insertar después de ella
+        var insertAfter = sliderWidget;
+        if (insertAfter) {
+            // Subir hasta .elementor-section o .e-con (contenedor de nivel superior)
+            var p = insertAfter.parentElement;
+            while (p && !p.classList.contains('elementor-section') && !p.classList.contains('e-con') && p.tagName !== 'MAIN') {
+                insertAfter = p;
+                p = p.parentElement;
+            }
+        }
+
+        if (insertAfter && insertAfter.parentNode) {
+            insertAfter.parentNode.insertBefore(overlay, insertAfter.nextSibling);
+            console.log('[LTMS HF-08] OK - insertado despues de:', insertAfter.className.substring(0,50));
         } else {
-            var firstSection = document.querySelector(
-                '.elementor-section:first-of-type, .e-con:first-of-type, section:first-of-type'
-            );
-            if (firstSection && firstSection.parentNode) {
-                firstSection.parentNode.insertBefore(overlay, firstSection.nextSibling);
-                console.log('[LTMS HF-08] Fallback despues primer section');
+            // Fallback: insertar antes del bloque de categorias
+            var catSection = document.querySelector('.ltms-category-buttons, .product-categories, .elementor-section:nth-child(2), .e-con:nth-child(2)');
+            if (catSection && catSection.parentNode) {
+                catSection.parentNode.insertBefore(overlay, catSection);
+                console.log('[LTMS HF-08] Fallback antes de categorias');
+            } else {
+                // Ultimo recurso: prepend al body
+                document.body.insertBefore(overlay, document.body.firstChild);
+                console.log('[LTMS HF-08] Ultimo recurso: prepend body');
             }
         }
     }
