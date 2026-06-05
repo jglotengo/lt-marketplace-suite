@@ -188,6 +188,11 @@ html.wp-toolbar {
     margin: 0;
     line-height: 0;
     font-size: 0;
+    box-sizing: border-box;
+    /* Asegurar que aparece sobre posibles z-index de Elementor */
+    position: relative;
+    z-index: 10;
+    clear: both;
 }
 
 .ltms-support-overlay img {
@@ -196,11 +201,15 @@ html.wp-toolbar {
     max-width: 100%;
     height: auto;
     margin: 0 auto;
+    object-fit: cover;
 }
 
 @media (max-width: 768px) {
     .ltms-support-overlay {
         padding: 0;
+    }
+    .ltms-support-overlay img {
+        min-height: 60px;
     }
 }
 
