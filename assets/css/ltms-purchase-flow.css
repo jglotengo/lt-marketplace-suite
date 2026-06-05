@@ -695,3 +695,185 @@
     font-weight: 700;
     color: var(--ltms-text);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   WOOCOMMERCE OVERRIDES — aplica paleta logo a WC nativo
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Botón principal "Añadir al carrito" y "Realizar pedido" */
+.woocommerce .single_add_to_cart_button,
+.woocommerce button.button.alt,
+.woocommerce-cart .wc-proceed-to-checkout .checkout-button,
+.woocommerce #payment #place_order {
+    background: var(--ltms-red) !important;
+    color: var(--ltms-white) !important;
+    border: none !important;
+    border-radius: var(--ltms-radius) !important;
+    font-weight: 700 !important;
+    padding: 14px 28px !important;
+    font-size: 15px !important;
+    letter-spacing: .01em !important;
+    transition: background .15s, transform .15s !important;
+}
+.woocommerce .single_add_to_cart_button:hover,
+.woocommerce button.button.alt:hover,
+.woocommerce #payment #place_order:hover {
+    background: #C0001A !important;
+    transform: translateY(-2px);
+}
+
+/* Precio del producto */
+.woocommerce .price,
+.woocommerce .product .price .amount {
+    color: var(--ltms-red) !important;
+    font-weight: 800 !important;
+}
+.woocommerce .product .price del .amount {
+    color: #aaa !important;
+    font-weight: 400 !important;
+}
+
+/* Tabs de producto (descripción / valoraciones) */
+.woocommerce div.product .woocommerce-tabs ul.tabs li.active a,
+.woocommerce div.product .woocommerce-tabs ul.tabs li a:hover {
+    color: var(--ltms-purple) !important;
+    border-bottom-color: var(--ltms-purple) !important;
+}
+
+/* Estrellas de rating */
+.woocommerce .star-rating span::before,
+.woocommerce .star-rating::before {
+    color: var(--ltms-yellow) !important;
+}
+
+/* Breadcrumb */
+.woocommerce .woocommerce-breadcrumb a {
+    color: var(--ltms-purple) !important;
+}
+
+/* Campo qty */
+.woocommerce div.product form.cart div.quantity .qty {
+    border: 2px solid var(--ltms-border) !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: var(--ltms-text) !important;
+    text-align: center !important;
+    width: 64px !important;
+}
+.woocommerce div.product form.cart div.quantity .qty:focus {
+    border-color: var(--ltms-purple) !important;
+    outline: none !important;
+}
+
+/* Checkout — campos de formulario */
+.woocommerce-checkout .woocommerce-input-wrapper input,
+.woocommerce-checkout .woocommerce-input-wrapper select,
+.woocommerce form .form-row input.input-text,
+.woocommerce form .form-row select {
+    border: 2px solid var(--ltms-border) !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    color: var(--ltms-text) !important;
+    transition: border-color .15s !important;
+}
+.woocommerce form .form-row input.input-text:focus,
+.woocommerce form .form-row select:focus {
+    border-color: var(--ltms-purple) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(91,45,142,.12) !important;
+}
+
+/* Checkout — método de pago radio */
+.woocommerce-checkout #payment ul.payment_methods li label {
+    font-weight: 600 !important;
+    font-size: 14px !important;
+}
+.woocommerce-checkout #payment ul.payment_methods li input[type="radio"]:checked + label {
+    color: var(--ltms-purple) !important;
+}
+
+/* Checkout — order review */
+.woocommerce-checkout-review-order-table tfoot tr td,
+.woocommerce-checkout-review-order-table tfoot tr th {
+    font-weight: 700 !important;
+}
+.woocommerce-checkout-review-order-table tfoot .order-total .amount {
+    color: var(--ltms-red) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PRODUCT ARCHIVE / SHOP — paleta en grid nativo WC
+   ═══════════════════════════════════════════════════════════════ */
+.woocommerce ul.products li.product .price {
+    color: var(--ltms-red) !important;
+    font-weight: 800 !important;
+}
+.woocommerce ul.products li.product a.add_to_cart_button,
+.woocommerce ul.products li.product a.button {
+    background: var(--ltms-red) !important;
+    color: var(--ltms-white) !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    padding: 8px 14px !important;
+    transition: background .15s !important;
+}
+.woocommerce ul.products li.product a.add_to_cart_button:hover {
+    background: #C0001A !important;
+}
+
+/* Sale badge */
+.woocommerce ul.products li.product .onsale,
+.woocommerce span.onsale {
+    background: var(--ltms-red) !important;
+    color: var(--ltms-white) !important;
+    border-radius: 4px !important;
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    min-width: auto !important;
+    min-height: auto !important;
+    line-height: 1.4 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CART PAGE — carrito de compras
+   ═══════════════════════════════════════════════════════════════ */
+.woocommerce-cart .cart_totals h2,
+.woocommerce-cart .cart-collaterals h2 {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: var(--ltms-text) !important;
+    border-bottom: 2px solid var(--ltms-red) !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 16px !important;
+}
+.woocommerce-cart-form .cart td.actions .coupon .input-text {
+    border: 2px solid var(--ltms-border) !important;
+    border-radius: 8px 0 0 8px !important;
+    padding: 10px 14px !important;
+}
+.woocommerce-cart-form .cart td.actions .coupon .button {
+    background: var(--ltms-purple) !important;
+    color: var(--ltms-white) !important;
+    border-radius: 0 8px 8px 0 !important;
+    border: none !important;
+    font-weight: 700 !important;
+}
+
+/* Confirmación de pedido WC nativo */
+.woocommerce-order-received .woocommerce-thankyou-order-received {
+    background: linear-gradient(135deg, var(--ltms-red), var(--ltms-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 24px !important;
+    font-weight: 800 !important;
+}
+.woocommerce ul.order_details li strong {
+    color: var(--ltms-red) !important;
+}
