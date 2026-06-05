@@ -67,6 +67,13 @@ final class LTMS_Frontend_Assets {
             $ver,
             true
         );
+
+        // HF-08: pasar assetsUrl al JS para que encuentre con-el-apoyo.png
+        wp_localize_script( 'ltms-homepage-fixes', 'ltmsData', [
+            'assetsUrl' => LTMS_ASSETS_URL,
+            'pluginUrl' => LTMS_PLUGIN_URL,
+            'homeUrl'   => home_url( '/' ),
+        ] );
     }
 
     /**
