@@ -1,5 +1,5 @@
 /**
- * LTMS Homepage Fixes JS — v2.7.1
+ * LTMS Homepage Fixes JS — v2.8.0
  * Ejecuta correcciones UX en la homepage pública.
  *
  * HF-01: YouTube Facade (lazy load real)
@@ -153,6 +153,59 @@
             // Fallback: insertarlo al inicio del body
             document.body.insertBefore(bar, document.body.firstChild);
         }
+
+        // HF-09: inyectar stats bar dentro del hero si aún no existe
+        injectHeroStats();
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-09: Hero stats bar
+       Inyecta la fila de estadísticas (Vendedores / Satisfacción /
+       Entrega / Registro gratuito) dentro del bloque hero Elementor.
+       ══════════════════════════════════════════════════════════════ */
+    function injectHeroStats() {
+        if (document.querySelector('.ltms-hf-stats')) return;
+        if (!document.body.classList.contains('home') &&
+            window.location.pathname !== '/') return;
+
+        var stats = [
+            { value: '+2.4k', label: 'Vendedores' },
+            { value: '98%',   label: 'Satisfacción' },
+            { value: '48h',   label: 'Entrega promedio' },
+            { value: '$0',    label: 'Registro' }
+        ];
+
+        var html = '<div class="ltms-hf-stats">' +
+            stats.map(function(s) {
+                return '<div>' +
+                    '<span class="ltms-hf-stat-value">' + s.value + '</span>' +
+                    '<span class="ltms-hf-stat-label">' + s.label + '</span>' +
+                '</div>';
+            }).join('') +
+        '</div>';
+
+        // Buscar el hero Elementor (sección de primer nivel con fondo rojo o imagen)
+        var heroSelectors = [
+            '.elementor-section.elementor-top-section:first-of-type',
+            '.e-con.e-parent:first-of-type',
+            '.wp-block-cover:first-of-type',
+            '.hero-section',
+            '[class*="hero"]:first-of-type'
+        ];
+        var hero = null;
+        for (var i = 0; i < heroSelectors.length; i++) {
+            hero = document.querySelector(heroSelectors[i]);
+            if (hero) break;
+        }
+        if (!hero) return;
+
+        // Agregar clase de override para aplicar paleta
+        hero.classList.add('ltms-hf-hero-override');
+
+        // Insertar stats al final del hero
+        var statsDiv = document.createElement('div');
+        statsDiv.innerHTML = html;
+        hero.appendChild(statsDiv.firstChild);
     }
 
     function iconSvg(name) {
