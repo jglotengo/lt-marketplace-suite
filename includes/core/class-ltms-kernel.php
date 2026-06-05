@@ -392,6 +392,9 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Assets' ) ) {
             LTMS_Frontend_Assets::init();
         }
+        if ( class_exists( 'LTMS_Purchase_Flow' ) ) {
+            LTMS_Purchase_Flow::init();
+        }
         if ( class_exists( 'LTMS_Dashboard_Logic' ) ) {
             LTMS_Dashboard_Logic::init();
         }
