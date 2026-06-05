@@ -36,6 +36,7 @@ final class LTMS_Frontend_Assets {
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_frontend_assets' ] );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_header_nav' ], 5 );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_homepage_fixes' ], 20 );
+        add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_purchase_flow' ], 21 );
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
     }
@@ -74,6 +75,35 @@ final class LTMS_Frontend_Assets {
             'pluginUrl' => LTMS_PLUGIN_URL,
             'homeUrl'   => home_url( '/' ),
         ] );
+    }
+
+    /**
+     * Carga los assets del flujo de compra rediseñado (purchase flow v1.0.0).
+     * CSS + JS para hero, product cards, checkout steps y social proof en vivo.
+     *
+     * @return void
+     */
+    public function enqueue_purchase_flow(): void {
+        if ( is_admin() ) {
+            return;
+        }
+        $ver = LTMS_VERSION;
+        $url = LTMS_ASSETS_URL;
+
+        wp_enqueue_style(
+            'ltms-purchase-flow',
+            $url . 'css/ltms-purchase-flow.css',
+            [],
+            $ver
+        );
+
+        wp_enqueue_script(
+            'ltms-purchase-flow',
+            $url . 'js/ltms-purchase-flow.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
     }
 
     /**
