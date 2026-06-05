@@ -176,30 +176,38 @@ html.wp-toolbar {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   HF-08: Overlay "Con el apoyo de" dentro del hero slider
+   HF-08: Overlay "Con el apoyo de" — Elementor widget-slides
+   Selector exacto: .elementor-element-98f6846
+   El swiper interno tiene overflow:hidden, por eso apuntamos al
+   widget externo que no lo tiene.
    ═══════════════════════════════════════════════════════════════ */
+.elementor-element-98f6846,
+.elementor-widget-slides {
+    position: relative !important;
+}
+
 .ltms-support-overlay {
     position: absolute;
-    bottom: 16px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 20;
+    z-index: 100;
     pointer-events: none;
-    width: 90%;
-    max-width: 700px;
+    width: 88%;
+    max-width: 680px;
 }
 
 .ltms-support-overlay img {
     width: 100%;
     height: auto;
     display: block;
-    /* Fondo negro ya incluido en la imagen, sin bordes */
     border-radius: 6px;
+    opacity: 0.95;
 }
 
 /* Versión standalone (fallback cuando no hay slider) */
 .ltms-support-overlay--standalone {
-    position: relative;
+    position: relative !important;
     bottom: auto;
     left: auto;
     transform: none;
@@ -214,16 +222,17 @@ html.wp-toolbar {
 
 .ltms-support-overlay--standalone img {
     max-width: 860px;
+    opacity: 1;
 }
 
 @media (max-width: 768px) {
     .ltms-support-overlay {
-        bottom: 8px;
+        bottom: 6px;
         width: 95%;
     }
 }
 
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
 .ltms-hero-cta-overlay {
     position: absolute;
     bottom: 32px;
