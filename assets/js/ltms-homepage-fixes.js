@@ -585,6 +585,7 @@
             fixApoyoSection();           // HF-15: sección aliados fondo blanco
             fixRecentlyViewedTitles();   // HF-16: nombres en "Vistos hoy"
             fixFooterContrast();         // HF-17: contraste footer
+            hideBlackSections();         // HF-15c: secciones negras en main
         }
 
         // QA products en cualquier página de tienda
@@ -655,5 +656,40 @@
         if (footer) {
             footer.classList.add('ltms-footer-override');
         }
+    }
+
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-15c: Sección negra "Con el apoyo de" — detectar por color
+       No está en el HTML estático. Se detecta en runtime buscando
+       contenedores con background-color negro entre las secciones
+       del homepage, excluyendo header y footer.
+       ══════════════════════════════════════════════════════════════ */
+    function hideBlackSections() {
+        // Solo actuar en los contenedores e-parent del main content
+        var main = document.querySelector('#content, main, .site-main');
+        if (!main) return;
+
+        var containers = main.querySelectorAll('.e-con.e-parent, .elementor-section');
+        containers.forEach(function(el) {
+            var bg = window.getComputedStyle(el).backgroundColor;
+            // rgb(0, 0, 0) = negro puro de Elementor
+            if (bg === 'rgb(0, 0, 0)' || bg === 'rgba(0, 0, 0, 1)') {
+                el.style.setProperty('background-color', '#ffffff', 'important');
+                el.style.setProperty('background', '#ffffff', 'important');
+                // También sus hijos con fondo negro
+                el.querySelectorAll('*').forEach(function(child) {
+                    var childBg = window.getComputedStyle(child).backgroundColor;
+                    if (childBg === 'rgb(0, 0, 0)' || childBg === 'rgba(0, 0, 0, 1)') {
+                        child.style.setProperty('background-color', '#ffffff', 'important');
+                    }
+                    // Texto blanco sobre fondo que ahora es blanco — hacerlo oscuro
+                    var childColor = window.getComputedStyle(child).color;
+                    if (childColor === 'rgb(255, 255, 255)' || childColor === 'rgba(255, 255, 255, 1)') {
+                        child.style.setProperty('color', '#1A1A1A', 'important');
+                    }
+                });
+            }
+        });
     }
 

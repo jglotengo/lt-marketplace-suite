@@ -721,3 +721,76 @@ footer .elementor-widget-heading .elementor-heading-title {
 footer .elementor-icon-list-item a {
     color: #F5A623 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15c: "Con el apoyo de" — ocultar sección negra completa
+   Esta sección no está en el HTML estático ni tiene texto indexable.
+   Es un template de Elementor cargado via JS. La solución más limpia
+   es ocultarla ya que no aporta valor comercial al homepage.
+   Si se quiere mantener, hacerlo en Elementor directamente.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ocultar cualquier sección con fondo negro puro entre el slider
+   y las categorías — patrón único en este homepage */
+.home .e-con.e-parent:not([data-elementor-type]) {
+    /* No hacer nada globalmente — solo los que detecte JS */
+}
+
+/* La sección "con el apoyo de" tiene fondo negro (#000 o rgb(0,0,0))
+   Elementor la genera con background inline. Atacar via JS es más preciso. */
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-17c: Footer — IDs reales del DOM extraídos del HTML
+   Footer Elementor ID: 13743
+   Contenedor principal: elementor-element-586bd11
+   Copyright bar: elementor-element-25fec764
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Contenedor principal del footer */
+.elementor-13743 .elementor-element-586bd11,
+[data-elementor-id="13743"] .e-con {
+    background: #1A1A1A !important;
+}
+
+/* Headings del footer */
+.elementor-13743 .elementor-heading-title {
+    color: #FFFFFF !important;
+}
+
+/* Links del nav-menu del footer */
+.elementor-13743 .elementor-item,
+.elementor-13743 .elementor-nav-menu a {
+    color: #F5A623 !important;
+}
+.elementor-13743 .elementor-item:hover,
+.elementor-13743 .elementor-nav-menu a:hover {
+    color: #FFFFFF !important;
+}
+
+/* Icon-list items (contactos, redes) */
+.elementor-13743 .elementor-icon-list-text,
+.elementor-13743 .elementor-icon-list-item a {
+    color: #E0E0E0 !important;
+}
+.elementor-13743 .elementor-icon-list-item a:hover {
+    color: #F5A623 !important;
+}
+
+/* SVG iconos del footer */
+.elementor-13743 .e-font-icon-svg path {
+    fill: #E0E0E0 !important;
+}
+
+/* Copyright bar */
+footer.elementor-element-25fec764 {
+    background: #111 !important;
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
+}
+footer.elementor-element-25fec764 .elementor-heading-title,
+footer.elementor-element-25fec764 a {
+    color: #AAAAAA !important;
+}
+footer.elementor-element-25fec764 a:hover {
+    color: #F5A623 !important;
+    text-decoration: underline !important;
+}
