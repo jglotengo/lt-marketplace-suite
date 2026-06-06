@@ -1,5 +1,5 @@
 /**
- * LTMS Homepage Fixes JS — v2.8.0
+ * LTMS Homepage Fixes JS — v2.9.0
  * Ejecuta correcciones UX en la homepage pública.
  *
  * HF-01: YouTube Facade (lazy load real)
@@ -7,6 +7,8 @@
  * HF-03: Textos editoriales cortados
  * HF-04: QA/placeholder products hide
  * HF-07: Xbox iframe remove
+ * HF-10: Flash sale timer fix (00:00 → contador siempre activo)
+ * HF-11: Hero CTA jerarquía (fill rojo vs outline blanco)
  */
 (function () {
     'use strict';
@@ -336,7 +338,99 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
-       Init — ejecutar todo en DOMContentLoaded
+       HF-10: Flash sale timer
+       El widget Elementor puede quedar en 00:00:00 si la fecha
+       objetivo ya pasó. Ocultamos ese countdown y lo reemplazamos
+       con un ticker propio que cuenta hacia atrás desde medianoche
+       (reiniciándose cada día — simula urgencia diaria real).
+       ══════════════════════════════════════════════════════════════ */
+    function fixFlashSaleTimer() {
+        // Buscar la barra de flash sale inyectada por Elementor / tema
+        var flashBar = document.querySelector(
+            '.elementor-countdown-wrapper, ' +
+            '[class*="flash-sale"], ' +
+            '[class*="flashsale"], ' +
+            '.ltms-flash-bar'
+        );
+        if (!flashBar) return;
+
+        // Si ya tiene nuestro ticker no repetir
+        if (document.querySelector('.ltms-flash-ticker')) return;
+
+        // Calcular segundos restantes hasta medianoche de hoy (zona Colombia = UTC-5)
+        function getSecsToMidnight() {
+            var now = new Date();
+            var midnight = new Date();
+            midnight.setHours(23, 59, 59, 999);
+            return Math.max(0, Math.floor((midnight - now) / 1000));
+        }
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+
+        function buildTicker() {
+            var el = document.createElement('span');
+            el.className = 'ltms-flash-ticker';
+            el.setAttribute('aria-label', 'Tiempo restante de la oferta');
+            el.innerHTML =
+                '<span class="ltms-flash-ticker__seg" id="ltms-hh">00</span>' +
+                '<span class="ltms-flash-ticker__sep">:</span>' +
+                '<span class="ltms-flash-ticker__seg" id="ltms-mm">00</span>' +
+                '<span class="ltms-flash-ticker__sep">:</span>' +
+                '<span class="ltms-flash-ticker__seg" id="ltms-ss">00</span>';
+            return el;
+        }
+
+        var ticker = buildTicker();
+        // Insertar el ticker adyacente al countdown original
+        flashBar.parentNode.insertBefore(ticker, flashBar.nextSibling);
+
+        var secs = getSecsToMidnight();
+
+        function tick() {
+            if (secs < 0) secs = getSecsToMidnight(); // reiniciar al día siguiente
+            var h = Math.floor(secs / 3600);
+            var m = Math.floor((secs % 3600) / 60);
+            var s = secs % 60;
+            var hh = document.getElementById('ltms-hh');
+            var mm = document.getElementById('ltms-mm');
+            var ss = document.getElementById('ltms-ss');
+            if (hh) hh.textContent = pad(h);
+            if (mm) mm.textContent = pad(m);
+            if (ss) ss.textContent = pad(s);
+            secs--;
+        }
+
+        tick(); // Primer render inmediato
+        setInterval(tick, 1000);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-11: Hero CTA — jerarquía visual
+       El hero tiene 2 botones casi idénticos. Aplicamos clases
+       para diferenciarlos: fill rojo (comprador) / outline (vendedor).
+       ══════════════════════════════════════════════════════════════ */
+    function fixHeroCtaHierarchy() {
+        // El hero Elementor ya tiene la clase ltms-hf-hero-override
+        // agregada por injectHeroStats(). El CSS de HF-11 ya actúa
+        // sobre los botones dentro de esa clase.
+        // Este fix hace un refuerzo explícito por si los selectores
+        // :first-child/:nth-child no logran especificidad suficiente.
+
+        var hero = document.querySelector('.ltms-hf-hero-override');
+        if (!hero) return;
+
+        var btns = hero.querySelectorAll('.elementor-button, a[href*="ofertas"], a[href*="shop"], a[href*="tienda"]');
+
+        if (btns.length === 0) return;
+
+        // El primer botón es el CTA principal (comprar)
+        btns[0].classList.add('ltms-hero-cta-primary');
+
+        // El segundo es el de vendedores
+        if (btns[1]) btns[1].classList.add('ltms-hero-cta-secondary');
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        ══════════════════════════════════════════════════════════════ */
     ready(function () {
         // YouTube facade — aplica en todas las páginas (hay videos en varias)
@@ -348,6 +442,8 @@
             injectSupportInHero();
             hideQAProducts();
             fixTruncatedTexts();
+            fixFlashSaleTimer();   // HF-10: timer siempre activo
+            fixHeroCtaHierarchy(); // HF-11: jerarquía CTAs
         }
 
         // QA products en cualquier página de tienda

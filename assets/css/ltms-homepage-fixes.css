@@ -1,5 +1,5 @@
 /**
- * LTMS Homepage Fixes — v2.7.1
+ * LTMS Homepage Fixes — v2.9.0
  * Correcciones UX/UI para la homepage pública de lo-tengo.com.co
  *
  * Fixes incluidos:
@@ -10,6 +10,8 @@
  *  HF-05: Admin bar — elimina el espacio reservado por la admin bar en frontend
  *  HF-06: Hero CTA — mejora visibilidad del botón de ofertas
  *  HF-07: Second YouTube video (Xbox) — oculta el iframe ajeno al marketplace
+ *  HF-10: Flash sale timer fix — reinicia contador si llega a 00:00
+ *  HF-11: Hero CTA jerarquía — botón comprador fill rojo / vendedor outline morado
  */
 
 /* ═══════════════════════════════════════════════════════════════
@@ -306,3 +308,95 @@ html.wp-toolbar {
 .ltms-vendor-avatar-2 { background: #5B2D8E; }
 .ltms-vendor-avatar-3 { background: #1A3A8F; }
 .ltms-vendor-avatar-4 { background: #F5A623; color: #1A1A1A !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-10: Flash sale timer — estilos del ticker inyectado por JS
+   El widget Elementor nativo puede llegar a 00:00. Mostramos uno
+   propio que siempre esté corriendo.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-flash-ticker {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    letter-spacing: .03em;
+}
+.ltms-flash-ticker__seg {
+    background: rgba(0,0,0,.35);
+    border-radius: 3px;
+    padding: 1px 5px;
+    min-width: 26px;
+    text-align: center;
+}
+.ltms-flash-ticker__sep {
+    opacity: .6;
+    animation: ltms-blink 1s step-end infinite;
+}
+@keyframes ltms-blink {
+    0%, 100% { opacity: .6; }
+    50% { opacity: 0; }
+}
+
+/* Ocultar el timer original Elementor que puede mostrar 00:00 */
+.elementor-countdown-wrapper {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-11: Hero CTA — jerarquía botón comprador (fill) vs vendedor (outline)
+   Targets: primeros 2 botones dentro de la sección hero Elementor.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Botón primario: "Ver ofertas" — fill rojo, llamada de acción dominante */
+.ltms-hf-hero-override .elementor-button-wrapper:first-child .elementor-button,
+.ltms-hf-hero-override a.elementor-button:first-of-type,
+.ltms-hero-cta-primary {
+    background: #E8001D !important;
+    color: #fff !important;
+    border: 2px solid #E8001D !important;
+    border-radius: 6px !important;
+    padding: 12px 28px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    transition: background .2s, transform .1s !important;
+    box-shadow: 0 4px 12px rgba(232,0,29,.3) !important;
+}
+.ltms-hf-hero-override .elementor-button-wrapper:first-child .elementor-button:hover,
+.ltms-hero-cta-primary:hover {
+    background: #C0001A !important;
+    border-color: #C0001A !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Botón secundario: "Crear tienda gratis" — outline morado, peso visual menor */
+.ltms-hf-hero-override .elementor-button-wrapper:nth-child(2) .elementor-button,
+.ltms-hf-hero-override a.elementor-button:nth-of-type(2),
+.ltms-hero-cta-secondary {
+    background: transparent !important;
+    color: #fff !important;
+    border: 2px solid rgba(255,255,255,.7) !important;
+    border-radius: 6px !important;
+    padding: 12px 28px !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    transition: border-color .2s, background .2s !important;
+}
+.ltms-hf-hero-override .elementor-button-wrapper:nth-child(2) .elementor-button:hover,
+.ltms-hero-cta-secondary:hover {
+    background: rgba(255,255,255,.12) !important;
+    border-color: #fff !important;
+}
+
+/* En mobile, apilar los botones verticalmente */
+@media (max-width: 600px) {
+    .ltms-hf-hero-override .elementor-button-wrapper {
+        width: 100% !important;
+    }
+    .ltms-hf-hero-override .elementor-button-wrapper .elementor-button {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+}
