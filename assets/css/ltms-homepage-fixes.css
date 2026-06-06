@@ -865,3 +865,16 @@ footer.elementor-element-25fec764 a:hover {
 .ltms-apoyo-hidden {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15g: Sección "Con el apoyo de" — CSS nuclear definitivo
+   Ocultar via nth-of-type en elementor-lazyload. La sección
+   negra es el 2do e-con lazy-loaded en el homepage (n+4 conteo
+   Elementor = el primero con lazyload). Se oculta por posición
+   absoluta en el DOM después del slider.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* El slider es el 1er e-con, la sección negra es el 2do */
+.home .elementor-30 .e-con.e-parent:nth-child(2) {
+    display: none !important;
+}
