@@ -338,7 +338,62 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
-       HF-10: Flash sale timer
+       HF-12: Stats bar — paleta logo
+       Detecta la sección Elementor con la barra de estadísticas
+       (4.8/5 calificación, pedidos hoy, productos publicados) por
+       su contenido de texto y le aplica fondo morado.
+       ══════════════════════════════════════════════════════════════ */
+    function fixStatsBar() {
+        if (document.querySelector('.ltms-hf-statsbar-override')) return;
+
+        // Buscar sección que contenga textos típicos de la stats bar
+        var keywords = ['calificaci', 'pedidos hoy', 'productos publicados', 'cobertura'];
+        var sections = document.querySelectorAll(
+            '.elementor-section, .e-con, section, [class*="section"]'
+        );
+
+        for (var i = 0; i < sections.length; i++) {
+            var text = sections[i].textContent.toLowerCase();
+            var matches = keywords.filter(function(k) { return text.includes(k); });
+            if (matches.length >= 2) {
+                sections[i].classList.add('ltms-hf-statsbar-override');
+                // Asegurarse de cubrir la sección completa
+                sections[i].style.setProperty('background', '#5B2D8E', 'important');
+                break;
+            }
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-13: Sección vendedores — contraste CTAs
+       Detecta la sección "Vende en Lo Tengo" por su contenido y
+       aplica clase para mejorar contraste de los botones.
+       ══════════════════════════════════════════════════════════════ */
+    function fixVendorSectionCtas() {
+        if (document.querySelector('.ltms-hf-vendor-override')) return;
+
+        var vendorKeywords = ['vende en lo tengo', 'crear tienda', 'cómo funciona', 'kyc aprobado', 'sin mensualidad'];
+        var sections = document.querySelectorAll(
+            '.elementor-section, .e-con, section, [class*="section"]'
+        );
+
+        for (var i = 0; i < sections.length; i++) {
+            var text = sections[i].textContent.toLowerCase();
+            var matches = vendorKeywords.filter(function(k) { return text.includes(k); });
+            if (matches.length >= 2) {
+                sections[i].classList.add('ltms-hf-vendor-override');
+
+                // Aplicar clases a botones directamente
+                var btns = sections[i].querySelectorAll('.elementor-button, a.button, a[href*="tienda"], a[href*="vender"]');
+                btns.forEach(function(btn, idx) {
+                    btn.classList.add(idx === 0 ? 'ltms-vendor-cta-primary' : 'ltms-vendor-cta-secondary');
+                });
+                break;
+            }
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        El widget Elementor puede quedar en 00:00:00 si la fecha
        objetivo ya pasó. Ocultamos ese countdown y lo reemplazamos
        con un ticker propio que cuenta hacia atrás desde medianoche
@@ -444,6 +499,8 @@
             fixTruncatedTexts();
             fixFlashSaleTimer();   // HF-10: timer siempre activo
             fixHeroCtaHierarchy(); // HF-11: jerarquía CTAs
+            fixStatsBar();         // HF-12: stats bar paleta logo
+            fixVendorSectionCtas();// HF-13: contraste CTAs vendedores
         }
 
         // QA products en cualquier página de tienda

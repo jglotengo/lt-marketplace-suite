@@ -400,3 +400,80 @@ html.wp-toolbar {
         justify-content: center !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-12: Stats bar — paleta logo (morado #5B2D8E)
+   La barra oscura con 4.8/5 / pedidos hoy / productos publicados
+   pasa de fondo negro a morado logo con valores en amarillo.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-hf-statsbar-override {
+    background: #5B2D8E !important;
+    color: #fff !important;
+}
+
+/* Valores numéricos: amarillo logo */
+.ltms-hf-statsbar-override .elementor-counter-number,
+.ltms-hf-statsbar-override .elementor-counter-number-wrapper,
+.ltms-hf-statsbar-override [class*="counter"],
+.ltms-hf-statsbar-override strong,
+.ltms-hf-statsbar-override .ltms-stat-num {
+    color: #F5A623 !important;
+}
+
+/* Labels / subtítulos: blanco semitransparente */
+.ltms-hf-statsbar-override .elementor-counter-title,
+.ltms-hf-statsbar-override [class*="title"],
+.ltms-hf-statsbar-override p,
+.ltms-hf-statsbar-override span,
+.ltms-hf-statsbar-override .ltms-stat-label {
+    color: rgba(255,255,255,.85) !important;
+}
+
+/* Separadores / iconos */
+.ltms-hf-statsbar-override svg,
+.ltms-hf-statsbar-override i {
+    color: #F5A623 !important;
+    fill: #F5A623 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-13: Sección vendedores — contraste WCAG en CTAs
+   Los botones "Crear tienda gratis" y "Cómo funciona" sobre fondo
+   oscuro necesitan contraste 4.5:1 mínimo.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Botón primario vendedor: amarillo logo — contraste 8:1 sobre oscuro */
+.ltms-hf-vendor-override .elementor-button-wrapper:first-child .elementor-button,
+.ltms-hf-vendor-override a.elementor-button:first-of-type,
+.ltms-vendor-cta-primary {
+    background: #F5A623 !important;
+    color: #1A1A1A !important;
+    border: 2px solid #F5A623 !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    padding: 12px 28px !important;
+    transition: background .2s !important;
+}
+.ltms-hf-vendor-override .elementor-button-wrapper:first-child .elementor-button:hover,
+.ltms-vendor-cta-primary:hover {
+    background: #E8961A !important;
+    border-color: #E8961A !important;
+}
+
+/* Botón secundario vendedor: outline blanco — contraste cumple */
+.ltms-hf-vendor-override .elementor-button-wrapper:nth-child(2) .elementor-button,
+.ltms-hf-vendor-override a.elementor-button:nth-of-type(2),
+.ltms-vendor-cta-secondary {
+    background: transparent !important;
+    color: #fff !important;
+    border: 2px solid rgba(255,255,255,.8) !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    padding: 12px 28px !important;
+    transition: background .2s, border-color .2s !important;
+}
+.ltms-hf-vendor-override .elementor-button-wrapper:nth-child(2) .elementor-button:hover,
+.ltms-vendor-cta-secondary:hover {
+    background: rgba(255,255,255,.1) !important;
+    border-color: #fff !important;
+}
