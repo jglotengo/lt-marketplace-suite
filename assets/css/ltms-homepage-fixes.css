@@ -822,3 +822,34 @@ footer.elementor-element-25fec764 a:hover {
 .ltms-black-section-hidden img {
     filter: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15e: Ocultar sección negra via atributo style inline
+   Elementor inyecta el background negro como style inline en el
+   e-con: style="--background-overlay-opacity:1" con background
+   definido en el stylesheet generado por Elementor.
+   Solución: ocultar el bloque que contiene "Con el apoyo de"
+   usando su posición relativa en el DOM (después del último
+   bloque de categorías y antes de las secciones de productos).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* El bloque negro aparece ENTRE el slider de categorías (e-parent)
+   y el primer bloque de productos. En el DOM es el 3er o 4to e-parent
+   del elementor-30. Ocultar via nth-of-type es demasiado frágil.
+   
+   CSS directo en el elementor-page-30 — el bloque negro es 
+   un e-con sin data-settings de background_background classic
+   pero CON overlay negro. Atacar todos los e-con con overlay: */
+
+/* Cualquier sección en el homepage con overlay negro visible */
+.home .elementor-30 .e-con.e-parent > .e-con-inner[style*="background"] {
+    background: #fff !important;
+}
+
+/* La clase que el JS inyecta — reforzar con más especificidad */
+.home .elementor-30 .ltms-black-section-hidden,
+.home .elementor-30 .ltms-black-section-hidden > .e-con-inner {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+}

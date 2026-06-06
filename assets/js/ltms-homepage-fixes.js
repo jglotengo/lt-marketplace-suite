@@ -586,6 +586,7 @@
             fixRecentlyViewedTitles();   // HF-16: nombres en "Vistos hoy"
             fixFooterContrast();         // HF-17: contraste footer
             hideBlackSections();         // HF-15c: secciones negras en main
+            hideApoyoSectionLate();       // HF-15e: búsqueda tardía post-Elementor
         }
 
         // QA products en cualquier página de tienda
@@ -597,6 +598,50 @@
     });
 
 })();
+
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-15e: Ocultar sección negra — búsqueda tardía por textContent
+       Elementor tarda >1s en renderizar el Global Widget.
+       Buscar a los 2s y 4s con textContent que ya está disponible.
+       ══════════════════════════════════════════════════════════════ */
+    function hideApoyoSectionLate() {
+        function findAndHide() {
+            var all = document.querySelectorAll('.e-con.e-parent, .elementor-section');
+            for (var i = 0; i < all.length; i++) {
+                var el = all[i];
+                var text = el.textContent || '';
+                if (text.toLowerCase().includes('con el apoyo') ||
+                    text.toLowerCase().includes('cardioinfantil') ||
+                    text.toLowerCase().includes('adrwork') ||
+                    text.toLowerCase().includes('danpago')) {
+                    // Encontrado — aplicar fondo blanco
+                    el.classList.add('ltms-black-section-hidden');
+                    el.style.setProperty('background', '#fff', 'important');
+                    el.style.setProperty('background-color', '#fff', 'important');
+                    el.style.setProperty('background-image', 'none', 'important');
+                    // Forzar en todos los hijos
+                    el.querySelectorAll('*').forEach(function(child) {
+                        child.style.removeProperty('background');
+                        child.style.removeProperty('background-color');
+                        child.style.removeProperty('background-image');
+                    });
+                    // Texto legible
+                    el.querySelectorAll('h1,h2,h3,p,span').forEach(function(t) {
+                        t.style.setProperty('color', '#1A1A1A', 'important');
+                    });
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Intentar a los 800ms, 1500ms, 3000ms
+        setTimeout(function() { if (!findAndHide()) {
+            setTimeout(function() { if (!findAndHide()) {
+                setTimeout(findAndHide, 3000);
+            }}, 1500);
+        }}, 800);
+    }
 
     /* ══════════════════════════════════════════════════════════════
        HF-07c: Video Xbox — ocultar el segundo widget de video
