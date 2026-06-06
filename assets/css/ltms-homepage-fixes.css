@@ -1424,6 +1424,33 @@ footer.elementor-element-25fec764 a:hover {
         margin-bottom: 8px !important;
     }
 
+    /* Reset: los li.menu-item del footer NO deben heredar chip rojo */
+    footer li.menu-item,
+    .elementor-location-footer li.menu-item,
+    [data-elementor-type="footer"] li.menu-item {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 2px 0 !important;
+        white-space: normal !important;
+        display: block !important;
+        list-style: none !important;
+    }
+
+    footer li.menu-item a,
+    .elementor-location-footer li.menu-item a,
+    [data-elementor-type="footer"] li.menu-item a {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        font-size: 11px !important;
+        color: #aaa !important;
+        display: block !important;
+        line-height: 1.9 !important;
+        text-decoration: none !important;
+    }
+
     /* Reset: los li del footer NO deben heredar chip rojo de trust-bar-theme */
     .elementor-location-footer .elementor-nav-menu li,
     [data-elementor-type="footer"] .elementor-nav-menu li,

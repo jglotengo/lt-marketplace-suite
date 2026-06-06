@@ -593,197 +593,223 @@
                 '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
         });
 
-        /* ── 2. Ocultar barra morada del tema (duplicada) ────────── */
-        var ourBar = document.querySelector('.ltms-trust-bar');
-        if (ourBar) {
-            document.querySelectorAll('.ltms-trust-bar-theme').forEach(function(b) {
-                b.style.setProperty('display', 'none', 'important');
-            });
-            /* También buscar por contenido — la barra morada tiene "KYC verificado" */
-            document.querySelectorAll(
-                '[class*="elementor-section"], [class*="e-con"]'
-            ).forEach(function(el) {
+        /* ── 2. Ocultar barra morada del tema por texto (timing-safe) ─
+           DOM real: morada[] = [] porque el bg se aplica tarde via Elementor.
+           Buscamos el contenedor MAS PEQUENO con texto KYC+Envio+Devolucion. */
+        function hidePurpleBar() {
+            var candidates = document.querySelectorAll(
+                '.elementor-section, .e-con, .e-con-full, [class*="elementor-element"]'
+            );
+            candidates.forEach(function(el) {
+                if (el.querySelectorAll('.elementor-section, .e-con').length > 3) return;
                 var txt = el.textContent || '';
-                if (txt.includes('KYC verificado') && txt.includes('Envío nacional') && txt.includes('Devolución')) {
-                    var bg = window.getComputedStyle(el).backgroundColor;
-                    /* Solo ocultar si tiene fondo morado/púrpura */
-                    if (bg.includes('88') || bg.includes('5B') || bg.includes('purple') ||
-                        el.style.backgroundColor || el.getAttribute('style') && el.getAttribute('style').includes('5B2D')) {
-                        el.style.setProperty('display', 'none', 'important');
-                    }
+                if (txt.includes('KYC') && txt.includes('Envío') && txt.includes('Devolución') &&
+                    txt.length < 200) {
+                    el.style.setProperty('display', 'none', 'important');
                 }
             });
         }
+        hidePurpleBar();
+        setTimeout(hidePurpleBar, 800);
+        setTimeout(hidePurpleBar, 2000);
 
-        /* ── 3. Ocultar barra morada trust pills del tema ─────────
-           La barra aparece como .elementor-section con fondo morado */
-        document.querySelectorAll('.elementor-section, .e-con.e-parent').forEach(function(sec) {
-            var style = sec.getAttribute('style') || '';
-            var computed = window.getComputedStyle(sec).backgroundColor;
-            var isMorado = style.includes('5B2D8E') || style.includes('7B3FA8') ||
-                computed === 'rgb(91, 45, 142)' || computed === 'rgb(123, 63, 168)';
-            var txt = sec.textContent || '';
-            var hasTrustText = txt.includes('KYC') || (txt.includes('Envío') && txt.includes('Devolución'));
-            if (isMorado && hasTrustText) {
-                sec.style.setProperty('display', 'none', 'important');
-            }
-        });
+        /* ── 3. Categorías: grid 2x2 — padres son e-con-full e-fl ──
+           DOM real (btnParents): cada widget-button está en e-con-full e-fl.
+           El grid container es el padre común de esos e-con-full. */
+        function applyCatGrid() {
+            var allBtnWidgets = Array.from(document.querySelectorAll('.home .elementor-widget-button'));
+            if (allBtnWidgets.length < 3) return false;
 
-        /* ── 4. Categorías: grid 2×2 con DOM traversal robusto ────
-           Estrategia: encontrar la sección que tiene SOLO botones
-           (≥3) sin imágenes de producto ni sliders. */
-        var allBtnWidgets = Array.from(document.querySelectorAll(
-            '.home .elementor-widget-button'
-        ));
+            var sectionMap = {};
+            allBtnWidgets.forEach(function(widget) {
+                var section = widget.closest('.elementor-section, .e-con[data-id]');
+                if (!section) return;
+                var sid = section.getAttribute('data-id') || section.className.slice(0,40);
+                if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
+                sectionMap[sid].widgets.push(widget);
+            });
 
-        var sectionMap = {};
-        allBtnWidgets.forEach(function(widget) {
-            var section = widget.closest('.elementor-section, .e-con.e-parent');
-            if (!section) return;
-            var sid = section.dataset.id || section.getAttribute('data-id') || section.className.slice(0,40);
-            if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
-            sectionMap[sid].widgets.push(widget);
-        });
+            var applied = false;
+            Object.keys(sectionMap).forEach(function(sid) {
+                var entry = sectionMap[sid];
+                var sec = entry.section;
+                var widgets = entry.widgets;
+                if (widgets.length < 3) return;
+                if (sec.querySelector('.woocommerce-loop-product__link, .elementor-slides')) return;
+                if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
+                sec.classList.add('ltms-hf19-catgrid-done');
 
-        Object.keys(sectionMap).forEach(function(sid) {
-            var entry = sectionMap[sid];
-            var sec = entry.section;
-            var widgets = entry.widgets;
-            if (widgets.length < 3) return;
-            if (sec.querySelector('.woocommerce-loop-product__link img, .elementor-widget-slides')) return;
-            if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
-            sec.classList.add('ltms-hf19-catgrid-done');
+                /* Grid container: padre directo común de los widget-buttons */
+                var gridContainer = widgets[0].parentNode;
+                var samePar = widgets.every(function(w) { return w.parentNode === gridContainer; });
+                if (!samePar) {
+                    gridContainer = widgets[0].parentNode.parentNode;
+                    samePar = widgets.every(function(w) { return w.parentNode.parentNode === gridContainer; });
+                }
+                if (!gridContainer || gridContainer === document.body) return;
 
-            /* Contenedor directo de los widget-buttons */
-            var commonParent = widgets[0].parentNode;
-            var allSameParent = widgets.every(function(w) { return w.parentNode === commonParent; });
-            if (!allSameParent) {
-                commonParent = sec.querySelector('.elementor-row, .e-con-inner') || sec;
-            }
+                /* Forzar grid con setProperty para ganar a Elementor Flexbox */
+                gridContainer.style.setProperty('display', 'grid', 'important');
+                gridContainer.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
+                gridContainer.style.setProperty('gap', '7px', 'important');
+                gridContainer.style.setProperty('padding', '10px 12px', 'important');
+                gridContainer.style.setProperty('background', '#fff', 'important');
+                gridContainer.style.setProperty('flex-direction', 'unset', 'important');
+                gridContainer.style.setProperty('flex-wrap', 'unset', 'important');
 
-            commonParent.style.cssText += [
-                'display:grid',
-                'grid-template-columns:repeat(2,1fr)',
-                'gap:7px',
-                'padding:10px 12px',
-                'background:#fff',
-                'flex-wrap:unset'
-            ].join(';') + ';';
+                sec.style.setProperty('background', '#fff', 'important');
+                sec.style.setProperty('padding-left', '0', 'important');
+                sec.style.setProperty('padding-right', '0', 'important');
 
-            sec.style.cssText += 'background:#fff;padding-left:0;padding-right:0;';
+                widgets.forEach(function(widget) {
+                    var widgetPar = widget.parentNode;
+                    if (widgetPar !== gridContainer) {
+                        widgetPar.style.setProperty('width', '100%', 'important');
+                        widgetPar.style.setProperty('padding', '0', 'important');
+                        widgetPar.style.setProperty('margin', '0', 'important');
+                        widgetPar.style.setProperty('min-width', '0', 'important');
+                    }
+                    widget.style.setProperty('width', '100%', 'important');
+                    var btn = widget.querySelector('.elementor-button');
+                    if (!btn) return;
+                    btn.setAttribute('style', [
+                        'display:flex',
+                        'align-items:center',
+                        'justify-content:center',
+                        'gap:8px',
+                        'background:#FFF0F0',
+                        'border:0.5px solid #FFCCCC',
+                        'border-radius:10px',
+                        'padding:10px 8px',
+                        'color:#1A1A1A',
+                        'font-size:12px',
+                        'font-weight:500',
+                        'width:100%',
+                        'box-sizing:border-box',
+                        'letter-spacing:0',
+                        'text-transform:none',
+                        'min-height:44px',
+                        'text-align:center',
+                        'white-space:normal'
+                    ].join(';') + ';');
+                    var icon = btn.querySelector('.elementor-button-icon, i, svg');
+                    if (icon) icon.style.cssText += 'color:#CC1818;font-size:15px;flex-shrink:0;';
+                });
 
-            widgets.forEach(function(widget) {
-                var col = widget.closest('.elementor-column');
-                if (col) col.style.cssText += 'width:100%;padding:0;';
-                widget.style.cssText += 'width:100%;';
-                var btn = widget.querySelector('.elementor-button');
-                if (!btn) return;
+                applied = true;
+                console.log('[LTMS HF-19] Cat grid:', widgets.length, 'btns, container:', gridContainer.className.slice(0,50));
+            });
+            return applied;
+        }
+
+        if (!applyCatGrid()) {
+            setTimeout(applyCatGrid, 600);
+            setTimeout(applyCatGrid, 1500);
+        } else {
+            setTimeout(applyCatGrid, 400); /* re-apply por si Elementor re-renderiza */
+        }
+
+        /* ── 4. Cards editoriales: layout horizontal ──────────────── */
+        function applyEditorialCards() {
+            var allSections = document.querySelectorAll('.home .elementor-section, .home .e-con[data-id]');
+            allSections.forEach(function(sec) {
+                if (sec.classList.contains('ltms-hf19-done') || sec.classList.contains('ltms-hf19-catgrid-done')) return;
+                var imgs  = sec.querySelectorAll('.elementor-widget-image img');
+                var btns  = sec.querySelectorAll('.elementor-button');
+                var heads = sec.querySelectorAll('.elementor-widget-heading');
+                var prods = sec.querySelectorAll('.product, .woocommerce-loop-product__link');
+                if (imgs.length !== 1 || btns.length < 1 || heads.length < 1 || prods.length > 0) return;
+                if (sec.querySelector('.elementor-widget-video, .elementor-widget-slides')) return;
+                if (sec.querySelector('.ltms-trust-bar, .ltms-hf-stats')) return;
+                sec.classList.add('ltms-hf19-done');
+
+                var img = imgs[0];
+                var btn = btns[0];
+                var imgWidget = img.closest('.elementor-widget-image');
+                var imgCol = imgWidget && imgWidget.closest('.elementor-column, .e-con-full');
+
+                sec.style.setProperty('display', 'flex', 'important');
+                sec.style.setProperty('flex-direction', 'row', 'important');
+                sec.style.setProperty('align-items', 'stretch', 'important');
+                sec.style.setProperty('background', '#fff', 'important');
+                sec.style.setProperty('border-radius', '12px', 'important');
+                sec.style.setProperty('overflow', 'hidden', 'important');
+                sec.style.setProperty('border', '0.5px solid rgba(0,0,0,0.08)', 'important');
+                sec.style.setProperty('margin', '0 12px 8px', 'important');
+                sec.style.setProperty('min-height', '90px', 'important');
+                sec.style.setProperty('max-height', '115px', 'important');
+                sec.style.setProperty('padding', '0', 'important');
+
+                if (imgWidget) {
+                    imgWidget.style.setProperty('width', '100px', 'important');
+                    imgWidget.style.setProperty('min-width', '100px', 'important');
+                    imgWidget.style.setProperty('flex-shrink', '0', 'important');
+                    imgWidget.style.setProperty('overflow', 'hidden', 'important');
+                    imgWidget.style.setProperty('padding', '0', 'important');
+                    imgWidget.style.setProperty('margin', '0', 'important');
+                    img.style.setProperty('width', '100px', 'important');
+                    img.style.setProperty('height', '115px', 'important');
+                    img.style.setProperty('object-fit', 'cover', 'important');
+                    img.style.setProperty('display', 'block', 'important');
+                    img.style.setProperty('border-radius', '0', 'important');
+                }
+                if (imgCol && imgCol !== imgWidget) {
+                    imgCol.style.setProperty('width', '100px', 'important');
+                    imgCol.style.setProperty('min-width', '100px', 'important');
+                    imgCol.style.setProperty('padding', '0', 'important');
+                    imgCol.style.setProperty('flex-shrink', '0', 'important');
+                }
+
+                var allCols = Array.from(sec.querySelectorAll('.elementor-column, .e-con-full'));
+                allCols.forEach(function(col) {
+                    if (col === imgCol) return;
+                    col.style.setProperty('flex', '1', 'important');
+                    col.style.setProperty('padding', '10px 12px', 'important');
+                    col.style.setProperty('display', 'flex', 'important');
+                    col.style.setProperty('flex-direction', 'column', 'important');
+                    col.style.setProperty('justify-content', 'space-between', 'important');
+                    col.style.setProperty('overflow', 'hidden', 'important');
+                    col.style.setProperty('min-width', '0', 'important');
+                });
+
+                heads.forEach(function(h) {
+                    var title = h.querySelector('.elementor-heading-title');
+                    if (title) title.style.cssText += 'font-size:13px;font-weight:500;color:#1a1a1a;margin:0 0 3px;line-height:1.3;';
+                });
+
                 btn.setAttribute('style', [
-                    'display:flex',
+                    'display:inline-flex',
                     'align-items:center',
-                    'justify-content:center',
-                    'gap:8px',
-                    'background:#FFF0F0',
-                    'border:0.5px solid #FFCCCC',
-                    'border-radius:10px',
-                    'padding:10px 8px',
-                    'color:#1A1A1A',
-                    'font-size:12px',
+                    'background:#CC1818',
+                    'color:#fff',
+                    'border:none',
+                    'border-radius:6px',
+                    'padding:5px 12px',
+                    'font-size:11px',
                     'font-weight:500',
-                    'width:100%',
-                    'box-sizing:border-box',
+                    'width:fit-content',
+                    'min-width:auto',
                     'letter-spacing:0',
                     'text-transform:none',
-                    'min-height:44px',
-                    'text-align:center'
+                    'margin-top:4px'
                 ].join(';') + ';');
-                var icon = btn.querySelector('.elementor-button-icon, i, svg');
-                if (icon) icon.style.cssText += 'color:#CC1818;font-size:15px;flex-shrink:0;';
             });
+        }
+        applyEditorialCards();
+        setTimeout(applyEditorialCards, 800);
 
-            console.log('[LTMS HF-19] Categorías grid aplicado:', widgets.length, 'botones');
-        });
-
-        /* ── 5. Cards editoriales: layout horizontal ──────────────
-           Secciones con 1 imagen GRANDE + heading + botón sin productos. */
-        var allSections = document.querySelectorAll('.home .elementor-section, .home .e-con.e-parent');
-        allSections.forEach(function(sec) {
-            if (sec.classList.contains('ltms-hf19-done') || sec.classList.contains('ltms-hf19-catgrid-done')) return;
-            var imgs  = sec.querySelectorAll('.elementor-widget-image img');
-            var btns  = sec.querySelectorAll('.elementor-button');
-            var heads = sec.querySelectorAll('.elementor-widget-heading');
-            var prods = sec.querySelectorAll('.product, .woocommerce-loop-product__link');
-            if (imgs.length !== 1 || btns.length < 1 || heads.length < 1 || prods.length > 0) return;
-            if (sec.querySelector('.elementor-widget-video, .elementor-widget-slides')) return;
-            if (sec.querySelector('.ltms-trust-bar, .ltms-hf-stats')) return;
-            sec.classList.add('ltms-hf19-done');
-
-            var img = imgs[0];
-            var btn = btns[0];
-            var imgWidget = img.closest('.elementor-widget-image');
-            var imgCol    = imgWidget && imgWidget.closest('.elementor-column');
-
-            sec.style.cssText += [
-                'display:flex',
-                'flex-direction:row',
-                'align-items:stretch',
-                'background:#fff',
-                'border-radius:12px',
-                'overflow:hidden',
-                'border:0.5px solid rgba(0,0,0,0.08)',
-                'margin:0 12px 8px',
-                'min-height:90px',
-                'max-height:115px',
-                'padding:0'
-            ].join(';') + ';';
-
-            if (imgWidget) {
-                imgWidget.style.cssText += 'width:100px;min-width:100px;flex-shrink:0;overflow:hidden;padding:0;margin:0;';
-                img.style.cssText += 'width:100px;height:115px;object-fit:cover;display:block;border-radius:0;';
-            }
-            if (imgCol) {
-                imgCol.style.cssText += 'width:100px;min-width:100px;padding:0;flex-shrink:0;';
-            }
-
-            var allCols = Array.from(sec.querySelectorAll('.elementor-column'));
-            allCols.forEach(function(col) {
-                if (col === imgCol) return;
-                col.style.cssText += 'flex:1;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;';
-            });
-
-            heads.forEach(function(h) {
-                var title = h.querySelector('.elementor-heading-title');
-                if (title) title.style.cssText += 'font-size:13px;font-weight:500;color:#1a1a1a;margin:0 0 3px;line-height:1.3;';
-            });
-
-            btn.setAttribute('style', [
-                'display:inline-flex',
-                'align-items:center',
-                'background:#CC1818',
-                'color:#fff',
-                'border:none',
-                'border-radius:6px',
-                'padding:5px 12px',
-                'font-size:11px',
-                'font-weight:500',
-                'width:fit-content',
-                'min-width:auto',
-                'letter-spacing:0',
-                'text-transform:none',
-                'margin-top:4px'
-            ].join(';') + ';');
-        });
-
-        /* ── 6. Footer: reset chip-rosa en nav links ─────────────── */
+        /* ── 5. Footer nav li: reset chip rosa ─────────────────────
+           footerLiClass real: "menu-item menu-item-type-custom ..."
+           No tienen clase elementor, son li.menu-item directos. */
         document.querySelectorAll(
-            'footer .elementor-nav-menu li, .elementor-location-footer .elementor-nav-menu li, [data-elementor-type="footer"] .elementor-nav-menu li'
+            'footer li.menu-item, .elementor-location-footer li.menu-item, [data-elementor-type="footer"] li.menu-item'
         ).forEach(function(li) {
-            li.style.cssText += 'background:transparent;border:none;border-radius:0;padding:0;white-space:normal;';
+            li.style.cssText = 'background:transparent!important;border:none!important;border-radius:0!important;padding:2px 0!important;white-space:normal!important;list-style:none;';
             var a = li.querySelector('a');
-            if (a) a.style.cssText += 'background:transparent;border:none;border-radius:0;padding:0;font-size:11px;color:#aaa;display:block;line-height:1.9;';
+            if (a) a.style.cssText = 'background:transparent!important;border:none!important;border-radius:0!important;padding:0!important;font-size:11px;color:#aaa!important;display:block;line-height:1.9;text-decoration:none;';
         });
 
-        /* ── 7. Footer: logos afiliación legibles ────────────────── */
+        /* ── 6. Footer: logos afiliación legibles ────────────────── */
         document.querySelectorAll(
             'footer img, .elementor-location-footer img, [data-elementor-type="footer"] img'
         ).forEach(function(img) {
@@ -792,25 +818,30 @@
             img.style.cssText += 'max-height:55px;max-width:150px;width:auto;height:auto;object-fit:contain;display:block;margin:4px auto;';
         });
 
-        /* ── 8. Footer: reducir padding columnas ─────────────────── */
+        /* ── 7. Footer: padding columnas ─────────────────────────── */
         document.querySelectorAll(
-            'footer .elementor-column, .elementor-location-footer .elementor-column'
+            'footer .elementor-column, .elementor-location-footer .elementor-column, footer .e-con-full, .elementor-location-footer .e-con-full'
         ).forEach(function(col) {
             col.style.cssText += 'padding-top:10px;padding-bottom:10px;';
         });
 
-        /* ── 9. QA / Demo products: ocultar en homepage ──────────── */
-        document.querySelectorAll('.woocommerce-loop-product__title, .products li.product h2').forEach(function(title) {
-            var text = (title.textContent || '').toLowerCase();
-            if (text.includes('qa test') || text.includes('qa ') ||
-                text.includes('demo ltms') || text.includes('producto demo') ||
-                text.includes('test product')) {
-                var productLi = title.closest('li.product, .product');
-                if (productLi) productLi.style.setProperty('display', 'none', 'important');
-            }
-        });
+        /* ── 8. QA / Demo products: ocultar (con retries por timing) */
+        function hideQAProducts() {
+            document.querySelectorAll('.woocommerce-loop-product__title, .products li.product h2').forEach(function(title) {
+                var text = (title.textContent || '').toLowerCase();
+                if (text.includes('qa test') || text.includes('qa ') ||
+                    text.includes('demo ltms') || text.includes('producto demo') ||
+                    text.includes('test product')) {
+                    var productLi = title.closest('li.product, .product');
+                    if (productLi) productLi.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+        hideQAProducts();
+        setTimeout(hideQAProducts, 600);
+        setTimeout(hideQAProducts, 1500);
 
-        console.log('[LTMS HF-19] Mobile enhancements v3 aplicados');
+        console.log('[LTMS HF-19] Mobile enhancements v4 aplicados');
     }
 
     ready(function () {
