@@ -391,27 +391,29 @@
        por texto y le aplicamos fondo blanco + altura comprimida.
        ══════════════════════════════════════════════════════════════ */
     function fixApoyoSection() {
-        var sections = document.querySelectorAll(
-            '.elementor-section, .e-con, section, div[class*="section"]'
-        );
+        var sections = document.querySelectorAll('.elementor-section, .e-con, section');
         var found = null;
         sections.forEach(function(sec) {
             if (found) return;
             var text = sec.textContent.toLowerCase();
-            if ((text.includes('con el apoyo') || text.includes('cardioinfantil')) &&
-                !sec.closest('.ltms-apoyo-section')) {
+            if (text.includes('con el apoyo') || text.includes('cardioinfantil')) {
                 found = sec;
             }
         });
-        if (found) {
-            found.classList.add('ltms-apoyo-section');
-            found.style.setProperty('background', '#fff', 'important');
-            // Reducir padding interno de sub-secciones con fondo negro
-            var darkKids = found.querySelectorAll('[style*="background"]');
-            darkKids.forEach(function(el) {
-                el.style.setProperty('background', '#fff', 'important');
-            });
-        }
+        if (!found) return;
+        found.classList.add('ltms-apoyo-section');
+        // Aplicar fondo blanco a found y TODOS sus descendientes
+        var applyWhite = function(el) {
+            el.style.setProperty('background', '#fff', 'important');
+            el.style.setProperty('background-color', '#fff', 'important');
+            el.style.setProperty('background-image', 'none', 'important');
+        };
+        applyWhite(found);
+        found.querySelectorAll('*').forEach(applyWhite);
+        found.style.setProperty('color', '#1A1A1A', 'important');
+        found.querySelectorAll('h1,h2,h3,h4,p,span,a').forEach(function(el) {
+            el.style.setProperty('color', '#1A1A1A', 'important');
+        });
     }
 
     /* ══════════════════════════════════════════════════════════════

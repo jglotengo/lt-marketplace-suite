@@ -638,3 +638,86 @@ footer.elementor-section a:hover {
     align-items: center !important;
     gap: 8px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15b: "Con el apoyo de" — CSS puro sin depender de JS
+   Ataca la sección por su posición y por el fondo negro de Elementor.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Cualquier sección Elementor con fondo negro en el homepage */
+.home .elementor-section[data-settings*="background_color"],
+.home .e-con[style*="background-color: rgb(0"],
+.home .e-con[style*="background-color:#000"],
+.home .e-con[style*="background-color: #000"],
+.home .elementor-section[style*="background-color: rgb(0"],
+.home .elementor-section[style*="background-color:#000"],
+.home .elementor-section[style*="background-color: #000"] {
+    background-color: #fff !important;
+    background-image: none !important;
+}
+/* Texto dentro de secciones con fondo negro que lo dejamos blanco */
+.home .elementor-section[style*="background-color: rgb(0"] *,
+.home .elementor-section[style*="background-color:#000"] * {
+    color: #1A1A1A !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-17b: Footer — selectores directos por estructura del tema
+   El footer de Lo Tengo usa clases de Elementor, no las nativas WP.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Selectores más amplios para capturar el footer real */
+.elementor-location-footer,
+[data-elementor-type="footer"],
+.ast-footer-html,
+.footer-widget-area,
+footer .elementor-container,
+.site-footer .elementor-container {
+    background: #1A1A1A !important;
+}
+
+/* Texto del footer — selectores de máxima especificidad */
+.elementor-location-footer *,
+[data-elementor-type="footer"] * {
+    color: #E0E0E0 !important;
+}
+.elementor-location-footer h2,
+.elementor-location-footer h3,
+.elementor-location-footer h4,
+.elementor-location-footer .elementor-heading-title,
+[data-elementor-type="footer"] h2,
+[data-elementor-type="footer"] h3,
+[data-elementor-type="footer"] h4 {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+.elementor-location-footer a,
+[data-elementor-type="footer"] a {
+    color: #F5A623 !important;
+    text-decoration: none !important;
+}
+.elementor-location-footer a:hover,
+[data-elementor-type="footer"] a:hover {
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+}
+
+/* Footer actual de Lo Tengo basado en capturas — fondo ya negro,
+   mejorar solo legibilidad del texto */
+footer {
+    --footer-text: #E0E0E0;
+}
+/* El footer visible en capturas tiene texto gris muy claro sobre negro.
+   Atacamos por los colores inline que Elementor suele inyectar. */
+footer .elementor-widget-text-editor,
+footer .elementor-widget-heading,
+footer .elementor-icon-list-item,
+footer .elementor-icon-list-item a {
+    color: #E0E0E0 !important;
+}
+footer .elementor-widget-heading .elementor-heading-title {
+    color: #FFFFFF !important;
+}
+footer .elementor-icon-list-item a {
+    color: #F5A623 !important;
+}
