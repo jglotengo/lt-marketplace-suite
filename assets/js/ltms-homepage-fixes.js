@@ -578,8 +578,11 @@
             fixHeroCtaHierarchy(); // HF-11: jerarquía CTAs
             fixStatsBar();         // HF-12: stats bar paleta logo
             fixVendorSectionCtas();// HF-13: contraste CTAs vendedores
-            hideXboxNativeVideo(); // HF-07b: video Xbox nativo del tema
-            fixApoyoSection();     // HF-15: sección aliados fondo blanco
+            hideXboxNativeVideo();       // HF-07b: video Xbox nativo del tema
+            hideXboxVideoByPosition();   // HF-07c: Xbox por posición DOM
+            fixApoyoSection();           // HF-15: sección aliados fondo blanco
+            fixRecentlyViewedTitles();   // HF-16: nombres en "Vistos hoy"
+            fixFooterContrast();         // HF-17: contraste footer
         }
 
         // QA products en cualquier página de tienda
@@ -591,3 +594,64 @@
     });
 
 })();
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-07c: Video Xbox — ocultar el segundo widget de video
+       El CSS nth-of-type solo funciona en elementos hermanos directos.
+       JS lo refuerza buscando todos los widgets de video en el DOM.
+       ══════════════════════════════════════════════════════════════ */
+    function hideXboxVideoByPosition() {
+        var videoWidgets = document.querySelectorAll(
+            '.elementor-widget-video, .wp-block-video, .elementor-widget-video-playlist'
+        );
+        if (videoWidgets.length >= 2) {
+            videoWidgets[1].classList.add('ltms-xbox-hidden');
+        }
+        // Fallback: ocultar cualquier video con poster que parezca gaming
+        var videos = document.querySelectorAll('video[poster]');
+        videos.forEach(function(v) {
+            var poster = (v.getAttribute('poster') || '').toLowerCase();
+            var src    = (v.getAttribute('src') || '').toLowerCase();
+            if (poster.indexOf('xbox') > -1 || poster.indexOf('control') > -1 ||
+                src.indexOf('xbox') > -1 || poster.indexOf('gaming') > -1) {
+                var wrapper = v.closest('.elementor-widget, section, figure, .e-con');
+                if (wrapper) wrapper.classList.add('ltms-xbox-hidden');
+            }
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-16: "Vistos hoy" — inyectar nombre de producto si falta
+       Recorre las cards de la sección recently-viewed y se asegura
+       de que el título sea visible.
+       ══════════════════════════════════════════════════════════════ */
+    function fixRecentlyViewedTitles() {
+        var cards = document.querySelectorAll(
+            '.woocommerce-recently-viewed li.product, .ltms-recently-viewed .ltms-pf-card'
+        );
+        cards.forEach(function(card) {
+            var title = card.querySelector(
+                '.woocommerce-loop-product__title, .ltms-pf-card-title, h2, h3'
+            );
+            if (title) {
+                title.style.display      = 'block';
+                title.style.overflow     = 'visible';
+                title.style.whiteSpace   = 'normal';
+                title.style.maxHeight    = 'none';
+                title.style.visibility   = 'visible';
+                title.style.opacity      = '1';
+            }
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-17: Footer — aplicar clase para contraste mejorado
+       Detecta el footer del tema y le aplica la clase override.
+       ══════════════════════════════════════════════════════════════ */
+    function fixFooterContrast() {
+        var footer = document.querySelector('footer, .site-footer, #colophon, footer.elementor-section');
+        if (footer) {
+            footer.classList.add('ltms-footer-override');
+        }
+    }
+

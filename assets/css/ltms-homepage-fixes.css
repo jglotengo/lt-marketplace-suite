@@ -531,3 +531,110 @@ html.wp-toolbar {
     padding-top: 20px !important;
     padding-bottom: 20px !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-07c: Video Xbox — ocultar por posición en el DOM
+   El <video> nativo no tiene "xbox" en el DOM. Se oculta siendo
+   el segundo widget de video en el homepage.
+   ═══════════════════════════════════════════════════════════════ */
+.home .elementor-widget-video:nth-of-type(2),
+.home .elementor-widget-video + .elementor-widget-video,
+.ltms-xbox-hidden {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-16: "Vistos hoy" / "Recién vistos" — nombre del producto visible
+   Los títulos de producto están ocultos o con overflow hidden.
+   ═══════════════════════════════════════════════════════════════ */
+.woocommerce-recently-viewed .woocommerce-loop-product__title,
+.products .woocommerce-loop-product__title,
+.ltms-recently-viewed .product-title,
+.ltms-pf-card .ltms-pf-card-title {
+    display: block !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    max-height: none !important;
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    color: #1A1A1A !important;
+    margin-top: 6px !important;
+}
+/* Dar altura mínima a las cards de la sección vistos */
+.woocommerce-recently-viewed li.product,
+.ltms-recently-viewed .ltms-pf-card {
+    min-height: 220px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-17: Footer — mejorar contraste de texto
+   El footer tiene texto gris claro sobre fondo oscuro, ratio < 3:1.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-footer-override,
+.site-footer,
+#colophon,
+footer.elementor-section {
+    background: #1A1A1A !important;
+}
+/* Texto principal del footer */
+.site-footer *,
+#colophon *,
+footer.elementor-section *,
+.ltms-footer-override * {
+    color: #E0E0E0 !important;
+}
+/* Headings del footer */
+.site-footer h3,
+.site-footer h4,
+#colophon h3,
+#colophon h4,
+footer.elementor-section h3,
+footer.elementor-section h4 {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+/* Links del footer */
+.site-footer a,
+#colophon a,
+footer.elementor-section a {
+    color: #F5A623 !important;
+    text-decoration: none !important;
+}
+.site-footer a:hover,
+#colophon a:hover,
+footer.elementor-section a:hover {
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+}
+/* Copyright bar */
+.site-footer .site-info,
+.footer-bottom,
+.copyright {
+    color: #AAAAAA !important;
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
+    padding-top: 16px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-18: Trust bar — iconos a 24px, mejor alineación
+   Los iconos actuales son muy pequeños (16px) y mal alineados.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-trust-bar .ltms-trust-item svg,
+.ltms-trust-bar .ltms-trust-item i,
+.ltms-trust-bar .ltms-trust-item img,
+.ltms-trust-bar-theme svg,
+.ltms-trust-bar-theme i {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 24px !important;
+    vertical-align: middle !important;
+    margin-right: 8px !important;
+    flex-shrink: 0 !important;
+}
+/* Alinear items en la trust bar */
+.ltms-trust-bar .ltms-trust-item,
+.ltms-trust-bar-theme .elementor-icon-list-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
