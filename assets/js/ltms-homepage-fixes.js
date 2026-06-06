@@ -575,156 +575,203 @@
        - Grid productos: precio rojo prominente
        - Footer: links en 2 col, logos de afiliación compactos
        ══════════════════════════════════════════════════════════════ */
-    function hf19MobileEnhancements() {
-        if (window.innerWidth > 768) return;
+/**
+ * HF-19 v5 — Reemplazo completo de hf19MobileEnhancements()
+ * Fixes aplicados vs v4:
+ *
+ * FIX-A: hidePurpleBar — quitar límite txt.length; buscar por nodo hoja
+ * FIX-B: applyCatGrid — apply styles también al <a> dentro de btn; aumentar retries
+ * FIX-C: applyEditorialCards — permitir imgs.length === 0 (imagen de fondo Elementor)
+ * FIX-D: hideQAProducts — usar también placeholder img + reforzar timing
+ * FIX-E: Footer chip rosa — reset más agresivo con :not selector via JS
+ * FIX-F: Footer contraste — forzar color blanco en links del footer oscuro
+ */
+function hf19MobileEnhancements() {
+    if (window.innerWidth > 768) return;
 
-        /* ── 1. Trust bar: reestructurar items como valor + label ─ */
-        var trustItems = document.querySelectorAll('.ltms-trust-bar__item');
-        var trustData = [
-            { value: '+2.4k', label: 'Vendedores' },
-            { value: '98%',   label: 'Satisfacción' },
-            { value: '48h',   label: 'Entrega' },
-            { value: '$0',    label: 'Registro' }
-        ];
-        trustItems.forEach(function(item, i) {
-            if (!trustData[i]) return;
-            item.innerHTML =
-                '<strong class="ltms-tb-value">' + trustData[i].value + '</strong>' +
-                '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
+    /* ── 1. Trust bar: reestructurar items como valor + label ─ */
+    var trustItems = document.querySelectorAll('.ltms-trust-bar__item');
+    var trustData = [
+        { value: '+2.4k', label: 'Vendedores' },
+        { value: '98%',   label: 'Satisfacción' },
+        { value: '48h',   label: 'Entrega' },
+        { value: '$0',    label: 'Registro' }
+    ];
+    trustItems.forEach(function(item, i) {
+        if (!trustData[i]) return;
+        item.innerHTML =
+            '<strong class="ltms-tb-value">' + trustData[i].value + '</strong>' +
+            '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
+    });
+
+    /* ── 2. FIX-A: Ocultar barra morada — sin límite de longitud ─
+       Buscamos el contenedor más pequeño (sin sub-sections) que tenga
+       los 3 textos clave. Eliminamos el límite txt.length < 200. */
+    function hidePurpleBar() {
+        var candidates = document.querySelectorAll(
+            '.elementor-section, .e-con, .e-con-full, [class*="elementor-element"]'
+        );
+        candidates.forEach(function(el) {
+            // Solo contenedores "hoja" — sin sub-sections directas
+            if (el.querySelectorAll('.elementor-section, .e-con[data-id]').length > 2) return;
+            var txt = el.textContent || '';
+            // Buscar las 3 señales clave de la trust-pills bar del tema
+            var hasKYC  = txt.includes('KYC') || txt.includes('verificado');
+            var hasEnv  = txt.includes('Envío') || txt.includes('Envio') || txt.includes('nacional');
+            var hasDev  = txt.includes('Devolución') || txt.includes('Devolucion') || txt.includes('30 días');
+            if (hasKYC && hasEnv && hasDev) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+        });
+    }
+    hidePurpleBar();
+    setTimeout(hidePurpleBar, 800);
+    setTimeout(hidePurpleBar, 2000);
+
+    /* ── 3. FIX-B: Categorías grid 2×2 ─────────────────────────
+       Clave: aplicar estilos también al <a> (el elemento con bg rojo inline) */
+    function applyCatGrid() {
+        var allBtnWidgets = Array.from(document.querySelectorAll('.home .elementor-widget-button'));
+        if (allBtnWidgets.length < 3) return false;
+
+        var sectionMap = {};
+        allBtnWidgets.forEach(function(widget) {
+            var section = widget.closest('.elementor-section, .e-con[data-id]');
+            if (!section) return;
+            var sid = section.getAttribute('data-id') || section.className.slice(0, 40);
+            if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
+            sectionMap[sid].widgets.push(widget);
         });
 
-        /* ── 2. Ocultar barra morada del tema por texto (timing-safe) ─
-           DOM real: morada[] = [] porque el bg se aplica tarde via Elementor.
-           Buscamos el contenedor MAS PEQUENO con texto KYC+Envio+Devolucion. */
-        function hidePurpleBar() {
-            var candidates = document.querySelectorAll(
-                '.elementor-section, .e-con, .e-con-full, [class*="elementor-element"]'
-            );
-            candidates.forEach(function(el) {
-                if (el.querySelectorAll('.elementor-section, .e-con').length > 3) return;
-                var txt = el.textContent || '';
-                if (txt.includes('KYC') && txt.includes('Envío') && txt.includes('Devolución') &&
-                    txt.length < 200) {
-                    el.style.setProperty('display', 'none', 'important');
+        var applied = false;
+        Object.keys(sectionMap).forEach(function(sid) {
+            var entry = sectionMap[sid];
+            var sec = entry.section;
+            var widgets = entry.widgets;
+            if (widgets.length < 3) return;
+            // No aplicar a secciones de productos o slider
+            if (sec.querySelector('.woocommerce-loop-product__link, .elementor-slides')) return;
+            if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
+            sec.classList.add('ltms-hf19-catgrid-done');
+
+            // Grid container: padre común de los widgets
+            var gridContainer = widgets[0].parentNode;
+            var samePar = widgets.every(function(w) { return w.parentNode === gridContainer; });
+            if (!samePar) {
+                gridContainer = widgets[0].parentNode.parentNode;
+                samePar = widgets.every(function(w) { return w.parentNode.parentNode === gridContainer; });
+            }
+            if (!gridContainer || gridContainer === document.body) return;
+
+            gridContainer.style.setProperty('display', 'grid', 'important');
+            gridContainer.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
+            gridContainer.style.setProperty('gap', '7px', 'important');
+            gridContainer.style.setProperty('padding', '10px 12px', 'important');
+            gridContainer.style.setProperty('background', '#fff', 'important');
+            gridContainer.style.setProperty('flex-direction', 'unset', 'important');
+            gridContainer.style.setProperty('flex-wrap', 'unset', 'important');
+
+            sec.style.setProperty('background', '#fff', 'important');
+            sec.style.setProperty('padding-left', '0', 'important');
+            sec.style.setProperty('padding-right', '0', 'important');
+
+            widgets.forEach(function(widget) {
+                var widgetPar = widget.parentNode;
+                if (widgetPar !== gridContainer) {
+                    widgetPar.style.setProperty('width', '100%', 'important');
+                    widgetPar.style.setProperty('padding', '0', 'important');
+                    widgetPar.style.setProperty('margin', '0', 'important');
+                    widgetPar.style.setProperty('min-width', '0', 'important');
                 }
-            });
-        }
-        hidePurpleBar();
-        setTimeout(hidePurpleBar, 800);
-        setTimeout(hidePurpleBar, 2000);
+                widget.style.setProperty('width', '100%', 'important');
 
-        /* ── 3. Categorías: grid 2x2 — padres son e-con-full e-fl ──
-           DOM real (btnParents): cada widget-button está en e-con-full e-fl.
-           El grid container es el padre común de esos e-con-full. */
-        function applyCatGrid() {
-            var allBtnWidgets = Array.from(document.querySelectorAll('.home .elementor-widget-button'));
-            if (allBtnWidgets.length < 3) return false;
+                var btn = widget.querySelector('.elementor-button');
+                if (!btn) return;
 
-            var sectionMap = {};
-            allBtnWidgets.forEach(function(widget) {
-                var section = widget.closest('.elementor-section, .e-con[data-id]');
-                if (!section) return;
-                var sid = section.getAttribute('data-id') || section.className.slice(0,40);
-                if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
-                sectionMap[sid].widgets.push(widget);
-            });
-
-            var applied = false;
-            Object.keys(sectionMap).forEach(function(sid) {
-                var entry = sectionMap[sid];
-                var sec = entry.section;
-                var widgets = entry.widgets;
-                if (widgets.length < 3) return;
-                if (sec.querySelector('.woocommerce-loop-product__link, .elementor-slides')) return;
-                if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
-                sec.classList.add('ltms-hf19-catgrid-done');
-
-                /* Grid container: padre directo común de los widget-buttons */
-                var gridContainer = widgets[0].parentNode;
-                var samePar = widgets.every(function(w) { return w.parentNode === gridContainer; });
-                if (!samePar) {
-                    gridContainer = widgets[0].parentNode.parentNode;
-                    samePar = widgets.every(function(w) { return w.parentNode.parentNode === gridContainer; });
-                }
-                if (!gridContainer || gridContainer === document.body) return;
-
-                /* Forzar grid con setProperty para ganar a Elementor Flexbox */
-                gridContainer.style.setProperty('display', 'grid', 'important');
-                gridContainer.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
-                gridContainer.style.setProperty('gap', '7px', 'important');
-                gridContainer.style.setProperty('padding', '10px 12px', 'important');
-                gridContainer.style.setProperty('background', '#fff', 'important');
-                gridContainer.style.setProperty('flex-direction', 'unset', 'important');
-                gridContainer.style.setProperty('flex-wrap', 'unset', 'important');
-
-                sec.style.setProperty('background', '#fff', 'important');
-                sec.style.setProperty('padding-left', '0', 'important');
-                sec.style.setProperty('padding-right', '0', 'important');
-
-                widgets.forEach(function(widget) {
-                    var widgetPar = widget.parentNode;
-                    if (widgetPar !== gridContainer) {
-                        widgetPar.style.setProperty('width', '100%', 'important');
-                        widgetPar.style.setProperty('padding', '0', 'important');
-                        widgetPar.style.setProperty('margin', '0', 'important');
-                        widgetPar.style.setProperty('min-width', '0', 'important');
-                    }
-                    widget.style.setProperty('width', '100%', 'important');
-                    var btn = widget.querySelector('.elementor-button');
-                    if (!btn) return;
-                    btn.setAttribute('style', [
-                        'display:flex',
-                        'align-items:center',
-                        'justify-content:center',
-                        'gap:8px',
-                        'background:#FFF0F0',
-                        'border:0.5px solid #FFCCCC',
-                        'border-radius:10px',
-                        'padding:10px 8px',
-                        'color:#1A1A1A',
-                        'font-size:12px',
-                        'font-weight:500',
-                        'width:100%',
-                        'box-sizing:border-box',
-                        'letter-spacing:0',
-                        'text-transform:none',
-                        'min-height:44px',
-                        'text-align:center',
-                        'white-space:normal'
-                    ].join(';') + ';');
-                    var icon = btn.querySelector('.elementor-button-icon, i, svg');
-                    if (icon) icon.style.cssText += 'color:#CC1818;font-size:15px;flex-shrink:0;';
+                var btnStyles = [
+                    ['display', 'flex'],
+                    ['align-items', 'center'],
+                    ['justify-content', 'center'],
+                    ['gap', '8px'],
+                    ['background-color', '#FFF0F0'],
+                    ['background', '#FFF0F0'],
+                    ['border', '0.5px solid #FFCCCC'],
+                    ['border-radius', '10px'],
+                    ['padding', '10px 8px'],
+                    ['color', '#1A1A1A'],
+                    ['font-size', '12px'],
+                    ['font-weight', '500'],
+                    ['width', '100%'],
+                    ['box-sizing', 'border-box'],
+                    ['letter-spacing', '0'],
+                    ['text-transform', 'none'],
+                    ['min-height', '44px'],
+                    ['text-align', 'center'],
+                    ['white-space', 'normal'],
+                    ['box-shadow', 'none']
+                ];
+                btnStyles.forEach(function(s) {
+                    btn.style.setProperty(s[0], s[1], 'important');
                 });
 
-                applied = true;
-                console.log('[LTMS HF-19] Cat grid:', widgets.length, 'btns, container:', gridContainer.className.slice(0,50));
+                // FIX-B: también aplicar al <a> dentro del botón (Elementor pone bg inline ahí)
+                var anchor = btn.tagName === 'A' ? btn : btn.querySelector('a');
+                if (anchor && anchor !== btn) {
+                    anchor.style.setProperty('background-color', '#FFF0F0', 'important');
+                    anchor.style.setProperty('background', '#FFF0F0', 'important');
+                    anchor.style.setProperty('color', '#1A1A1A', 'important');
+                }
+
+                var icon = btn.querySelector('.elementor-button-icon, i, svg');
+                if (icon) {
+                    icon.style.setProperty('color', '#CC1818', 'important');
+                    icon.style.setProperty('font-size', '15px', 'important');
+                    icon.style.setProperty('flex-shrink', '0', 'important');
+                }
             });
-            return applied;
-        }
 
-        if (!applyCatGrid()) {
-            setTimeout(applyCatGrid, 600);
-            setTimeout(applyCatGrid, 1500);
-        } else {
-            setTimeout(applyCatGrid, 400); /* re-apply por si Elementor re-renderiza */
-        }
+            applied = true;
+            console.log('[LTMS HF-19 v5] Cat grid:', widgets.length, 'btns');
+        });
+        return applied;
+    }
 
-        /* ── 4. Cards editoriales: layout horizontal ──────────────── */
-        function applyEditorialCards() {
-            var allSections = document.querySelectorAll('.home .elementor-section, .home .e-con[data-id]');
-            allSections.forEach(function(sec) {
-                if (sec.classList.contains('ltms-hf19-done') || sec.classList.contains('ltms-hf19-catgrid-done')) return;
-                var imgs  = sec.querySelectorAll('.elementor-widget-image img');
-                var btns  = sec.querySelectorAll('.elementor-button');
-                var heads = sec.querySelectorAll('.elementor-widget-heading');
-                var prods = sec.querySelectorAll('.product, .woocommerce-loop-product__link');
-                if (imgs.length !== 1 || btns.length < 1 || heads.length < 1 || prods.length > 0) return;
-                if (sec.querySelector('.elementor-widget-video, .elementor-widget-slides')) return;
-                if (sec.querySelector('.ltms-trust-bar, .ltms-hf-stats')) return;
-                sec.classList.add('ltms-hf19-done');
+    if (!applyCatGrid()) {
+        setTimeout(applyCatGrid, 600);
+        setTimeout(applyCatGrid, 1500);
+        setTimeout(applyCatGrid, 3000); // retry extra por Elementor lento
+    } else {
+        setTimeout(applyCatGrid, 400);
+        setTimeout(applyCatGrid, 1200);
+    }
 
+    /* ── 4. FIX-C: Cards editoriales — permitir 0 imgs (bg Elementor) ──
+       Antes: imgs.length === 1 → falla si la imagen es background.
+       Ahora: imgs.length <= 1 y requiere heads + btns. */
+    function applyEditorialCards() {
+        var allSections = document.querySelectorAll('.home .elementor-section, .home .e-con[data-id]');
+        allSections.forEach(function(sec) {
+            if (sec.classList.contains('ltms-hf19-done') || sec.classList.contains('ltms-hf19-catgrid-done')) return;
+            var imgs  = sec.querySelectorAll('.elementor-widget-image img');
+            var btns  = sec.querySelectorAll('.elementor-button');
+            var heads = sec.querySelectorAll('.elementor-widget-heading');
+            var prods = sec.querySelectorAll('.product, .woocommerce-loop-product__link');
+
+            // FIX-C: aceptar 0 o 1 imágenes inline (puede ser bg Elementor)
+            if (imgs.length > 1 || btns.length < 1 || heads.length < 1 || prods.length > 0) return;
+            if (sec.querySelector('.elementor-widget-video, .elementor-widget-slides')) return;
+            if (sec.querySelector('.ltms-trust-bar, .ltms-hf-stats')) return;
+            // No aplicar a secciones muy grandes (tienen muchos hijos)
+            var directChildren = sec.querySelectorAll('.elementor-column, .e-con-full');
+            if (directChildren.length > 4) return;
+
+            sec.classList.add('ltms-hf19-done');
+
+            var btn = btns[0];
+
+            // Si tiene imagen inline, layout horizontal con img izquierda
+            if (imgs.length === 1) {
                 var img = imgs[0];
-                var btn = btns[0];
                 var imgWidget = img.closest('.elementor-widget-image');
                 var imgCol = imgWidget && imgWidget.closest('.elementor-column, .e-con-full');
 
@@ -771,78 +818,165 @@
                     col.style.setProperty('overflow', 'hidden', 'important');
                     col.style.setProperty('min-width', '0', 'important');
                 });
+            } else {
+                // Sin imagen inline — layout compacto centrado con bg image
+                sec.style.setProperty('background', '#fff', 'important');
+                sec.style.setProperty('border-radius', '12px', 'important');
+                sec.style.setProperty('margin', '0 12px 8px', 'important');
+                sec.style.setProperty('padding', '12px', 'important');
+                sec.style.setProperty('min-height', '80px', 'important');
+            }
 
-                heads.forEach(function(h) {
-                    var title = h.querySelector('.elementor-heading-title');
-                    if (title) title.style.cssText += 'font-size:13px;font-weight:500;color:#1a1a1a;margin:0 0 3px;line-height:1.3;';
-                });
-
-                btn.setAttribute('style', [
-                    'display:inline-flex',
-                    'align-items:center',
-                    'background:#CC1818',
-                    'color:#fff',
-                    'border:none',
-                    'border-radius:6px',
-                    'padding:5px 12px',
-                    'font-size:11px',
-                    'font-weight:500',
-                    'width:fit-content',
-                    'min-width:auto',
-                    'letter-spacing:0',
-                    'text-transform:none',
-                    'margin-top:4px'
-                ].join(';') + ';');
-            });
-        }
-        applyEditorialCards();
-        setTimeout(applyEditorialCards, 800);
-
-        /* ── 5. Footer nav li: reset chip rosa ─────────────────────
-           footerLiClass real: "menu-item menu-item-type-custom ..."
-           No tienen clase elementor, son li.menu-item directos. */
-        document.querySelectorAll(
-            'footer li.menu-item, .elementor-location-footer li.menu-item, [data-elementor-type="footer"] li.menu-item'
-        ).forEach(function(li) {
-            li.style.cssText = 'background:transparent!important;border:none!important;border-radius:0!important;padding:2px 0!important;white-space:normal!important;list-style:none;';
-            var a = li.querySelector('a');
-            if (a) a.style.cssText = 'background:transparent!important;border:none!important;border-radius:0!important;padding:0!important;font-size:11px;color:#aaa!important;display:block;line-height:1.9;text-decoration:none;';
-        });
-
-        /* ── 6. Footer: logos afiliación legibles ────────────────── */
-        document.querySelectorAll(
-            'footer img, .elementor-location-footer img, [data-elementor-type="footer"] img'
-        ).forEach(function(img) {
-            var isMainLogo = img.closest('.site-branding, .ast-site-branding-wrap, .elementor-widget-site-logo');
-            if (isMainLogo) return;
-            img.style.cssText += 'max-height:55px;max-width:150px;width:auto;height:auto;object-fit:contain;display:block;margin:4px auto;';
-        });
-
-        /* ── 7. Footer: padding columnas ─────────────────────────── */
-        document.querySelectorAll(
-            'footer .elementor-column, .elementor-location-footer .elementor-column, footer .e-con-full, .elementor-location-footer .e-con-full'
-        ).forEach(function(col) {
-            col.style.cssText += 'padding-top:10px;padding-bottom:10px;';
-        });
-
-        /* ── 8. QA / Demo products: ocultar (con retries por timing) */
-        function hideQAProducts() {
-            document.querySelectorAll('.woocommerce-loop-product__title, .products li.product h2').forEach(function(title) {
-                var text = (title.textContent || '').toLowerCase();
-                if (text.includes('qa test') || text.includes('qa ') ||
-                    text.includes('demo ltms') || text.includes('producto demo') ||
-                    text.includes('test product')) {
-                    var productLi = title.closest('li.product, .product');
-                    if (productLi) productLi.style.setProperty('display', 'none', 'important');
+            heads.forEach(function(h) {
+                var title = h.querySelector('.elementor-heading-title');
+                if (title) {
+                    title.style.setProperty('font-size', '13px', 'important');
+                    title.style.setProperty('font-weight', '500', 'important');
+                    title.style.setProperty('color', '#1a1a1a', 'important');
+                    title.style.setProperty('margin', '0 0 3px', 'important');
+                    title.style.setProperty('line-height', '1.3', 'important');
                 }
             });
-        }
-        hideQAProducts();
-        setTimeout(hideQAProducts, 600);
-        setTimeout(hideQAProducts, 1500);
 
-        console.log('[LTMS HF-19] Mobile enhancements v4 aplicados');
+            var btnInlineStyles = [
+                'display:inline-flex',
+                'align-items:center',
+                'background:#CC1818',
+                'color:#fff',
+                'border:none',
+                'border-radius:6px',
+                'padding:5px 12px',
+                'font-size:11px',
+                'font-weight:500',
+                'width:fit-content',
+                'min-width:auto',
+                'letter-spacing:0',
+                'text-transform:none',
+                'margin-top:4px'
+            ].join(';') + ';';
+            btn.setAttribute('style', btnInlineStyles);
+        });
     }
+    applyEditorialCards();
+    setTimeout(applyEditorialCards, 800);
+
+    /* ── 5. FIX-D: QA products — ocultar con retry y múltiples selectores ─ */
+    function hideQAProductsMobile() {
+        // Por título
+        document.querySelectorAll(
+            '.woocommerce-loop-product__title, .products li.product h2, .product-title'
+        ).forEach(function(title) {
+            var text = (title.textContent || '').toLowerCase();
+            if (text.includes('qa test') || text.includes(' qa ') ||
+                text.includes('demo ltms') || text.includes('producto demo') ||
+                text.includes('test product')) {
+                var productLi = title.closest('li.product, .product, article.product');
+                if (productLi) productLi.style.setProperty('display', 'none', 'important');
+            }
+        });
+        // Por imagen placeholder de WooCommerce
+        document.querySelectorAll('.products .product img, ul.products li img').forEach(function(img) {
+            if (img.src && img.src.includes('woocommerce-placeholder')) {
+                var productLi = img.closest('li.product, .product, article.product');
+                if (productLi) productLi.style.setProperty('display', 'none', 'important');
+            }
+        });
+    }
+    hideQAProductsMobile();
+    setTimeout(hideQAProductsMobile, 600);
+    setTimeout(hideQAProductsMobile, 1500);
+
+    /* ── 6. FIX-E: Footer chip rosa — reset agresivo ──────────── */
+    function fixFooterChips() {
+        var footerSelectors = [
+            'footer li.menu-item',
+            '.elementor-location-footer li.menu-item',
+            '[data-elementor-type="footer"] li.menu-item',
+            'footer .elementor-icon-list-item',
+            '.elementor-location-footer .elementor-icon-list-item',
+            '[data-elementor-type="footer"] .elementor-icon-list-item'
+        ];
+        footerSelectors.forEach(function(sel) {
+            document.querySelectorAll(sel).forEach(function(li) {
+                li.style.setProperty('background', 'transparent', 'important');
+                li.style.setProperty('background-color', 'transparent', 'important');
+                li.style.setProperty('border', 'none', 'important');
+                li.style.setProperty('border-radius', '0', 'important');
+                li.style.setProperty('padding', '2px 0', 'important');
+                li.style.setProperty('white-space', 'normal', 'important');
+                li.style.setProperty('list-style', 'none', 'important');
+                li.style.setProperty('display', 'block', 'important');
+                var a = li.querySelector('a');
+                if (a) {
+                    a.style.setProperty('background', 'transparent', 'important');
+                    a.style.setProperty('background-color', 'transparent', 'important');
+                    a.style.setProperty('border', 'none', 'important');
+                    a.style.setProperty('border-radius', '0', 'important');
+                    a.style.setProperty('padding', '0', 'important');
+                    a.style.setProperty('font-size', '11px', 'important');
+                    a.style.setProperty('display', 'block', 'important');
+                    a.style.setProperty('line-height', '1.9', 'important');
+                    a.style.setProperty('text-decoration', 'none', 'important');
+                }
+            });
+        });
+    }
+    fixFooterChips();
+    setTimeout(fixFooterChips, 800);
+
+    /* ── 7. FIX-F: Footer links — color según fondo ─────────────
+       El footer tiene fondo oscuro (#1a1a1a / negro). Los links
+       deben ser blancos/grises claros, no heredar el color rojo. */
+    function fixFooterColors() {
+        var footers = document.querySelectorAll(
+            'footer, .site-footer, #colophon, .elementor-location-footer, [data-elementor-type="footer"]'
+        );
+        footers.forEach(function(footer) {
+            var bg = window.getComputedStyle(footer).backgroundColor;
+            var isDark = bg === 'rgb(0,0,0)' || bg === 'rgb(26,26,26)' ||
+                         bg === 'rgb(0, 0, 0)' || bg === 'rgb(26, 26, 26)' ||
+                         bg.includes('0, 0, 0') || bg.includes('26, 26, 26');
+            // Aplicar siempre — el footer de Lo Tengo tiene fondo oscuro
+            footer.querySelectorAll('a').forEach(function(a) {
+                // No tocar links que ya son botones con bg propio
+                if (a.classList.contains('elementor-button')) return;
+                var aBg = window.getComputedStyle(a).backgroundColor;
+                if (aBg && aBg !== 'rgba(0, 0, 0, 0)' && aBg !== 'transparent') return;
+                a.style.setProperty('color', '#aaaaaa', 'important');
+            });
+            // Textos de contacto
+            footer.querySelectorAll('p, span, .elementor-icon-list-text').forEach(function(el) {
+                el.style.setProperty('color', '#cccccc', 'important');
+            });
+        });
+    }
+    fixFooterColors();
+
+    /* ── 8. Footer logos afiliación legibles ─ */
+    document.querySelectorAll(
+        'footer img, .elementor-location-footer img, [data-elementor-type="footer"] img'
+    ).forEach(function(img) {
+        var isMainLogo = img.closest('.site-branding, .ast-site-branding-wrap, .elementor-widget-site-logo');
+        if (isMainLogo) return;
+        img.style.setProperty('max-height', '55px', 'important');
+        img.style.setProperty('max-width', '150px', 'important');
+        img.style.setProperty('width', 'auto', 'important');
+        img.style.setProperty('height', 'auto', 'important');
+        img.style.setProperty('object-fit', 'contain', 'important');
+        img.style.setProperty('display', 'block', 'important');
+        img.style.setProperty('margin', '4px auto', 'important');
+    });
+
+    /* ── 9. Footer padding columnas ─ */
+    document.querySelectorAll(
+        'footer .elementor-column, .elementor-location-footer .elementor-column, footer .e-con-full, .elementor-location-footer .e-con-full'
+    ).forEach(function(col) {
+        col.style.setProperty('padding-top', '10px', 'important');
+        col.style.setProperty('padding-bottom', '10px', 'important');
+    });
+
+    console.log('[LTMS HF-19] Mobile enhancements v5 aplicados');
+}
 
     ready(function () {
         // YouTube facade — aplica en todas las páginas (hay videos en varias)

@@ -1637,3 +1637,129 @@ footer.elementor-element-25fec764 a:hover {
         height: 48px !important;
     }
 }
+/* ═══════════════════════════════════════════════════════════════
+   LTMS HF-19 CSS PATCH v5
+   Agrega al final de ltms-homepage-fixes.css
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+    /* ── FIX-A: Barra morada trust pills — ocultar con display:none ──
+       La clase ltms-apoyo-hidden ya existe. Añadimos la barra morada. */
+    .ltms-trust-bar-theme {
+        display: none !important;
+    }
+
+    /* ── FIX-B: Category buttons — forzar fondo crema sobre Elementor ──
+       Elementor pone background-color en el <a> como inline style.
+       El JS ya usa setProperty !important. Este CSS es refuerzo. */
+    .ltms-hf19-catgrid-done .elementor-button,
+    .ltms-hf19-catgrid-done .elementor-button-wrapper a {
+        background-color: #FFF0F0 !important;
+        background: #FFF0F0 !important;
+        color: #1A1A1A !important;
+        border: 0.5px solid #FFCCCC !important;
+        border-radius: 10px !important;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        box-shadow: none !important;
+        min-height: 44px !important;
+    }
+    .ltms-hf19-catgrid-done .elementor-button-icon i,
+    .ltms-hf19-catgrid-done .elementor-button-icon svg {
+        color: #CC1818 !important;
+        fill: #CC1818 !important;
+    }
+
+    /* ── FIX-E: Footer chips rosa — reset total ──────────────────── */
+    /* El .ltms-trust-bar-theme CSS global no debe aplicar en footer */
+    footer .elementor-icon-list-item,
+    .elementor-location-footer .elementor-icon-list-item,
+    [data-elementor-type="footer"] .elementor-icon-list-item,
+    footer li.menu-item,
+    .elementor-location-footer li.menu-item,
+    [data-elementor-type="footer"] li.menu-item {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 2px 0 !important;
+        display: block !important;
+        white-space: normal !important;
+        list-style: none !important;
+    }
+    footer li.menu-item a,
+    .elementor-location-footer li.menu-item a,
+    [data-elementor-type="footer"] li.menu-item a,
+    footer .elementor-icon-list-item a,
+    .elementor-location-footer .elementor-icon-list-item a,
+    [data-elementor-type="footer"] .elementor-icon-list-item a {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        font-size: 11px !important;
+        line-height: 1.9 !important;
+        display: block !important;
+        text-decoration: none !important;
+        color: #aaaaaa !important;
+    }
+
+    /* ── FIX-F: Footer "Información" links — color legible ─────── */
+    footer .elementor-nav-menu a,
+    .elementor-location-footer .elementor-nav-menu a,
+    [data-elementor-type="footer"] .elementor-nav-menu a {
+        color: #aaaaaa !important;
+        background: transparent !important;
+    }
+
+    /* ── Logos afiliación — tamaño legible ────────────────────── */
+    .ltms-footer-override img:not(.site-logo-img):not(.custom-logo) {
+        max-height: 55px !important;
+        max-width: 150px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 4px auto !important;
+    }
+
+    /* ── Cards editoriales horizontales — refuerzo CSS ────────── */
+    .ltms-hf19-done {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        background: #fff !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        border: 0.5px solid rgba(0,0,0,0.08) !important;
+        margin: 0 12px 8px !important;
+        min-height: 90px !important;
+        max-height: 115px !important;
+        padding: 0 !important;
+    }
+    .ltms-hf19-done .elementor-widget-image {
+        width: 100px !important;
+        min-width: 100px !important;
+        flex-shrink: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .ltms-hf19-done .elementor-widget-image img {
+        width: 100px !important;
+        height: 115px !important;
+        object-fit: cover !important;
+        display: block !important;
+        border-radius: 0 !important;
+    }
+
+    /* ── QA products ocultos ─────────────────────────────────── */
+    .ltms-product-qa-hidden {
+        display: none !important;
+    }
+
+} /* end @media */
