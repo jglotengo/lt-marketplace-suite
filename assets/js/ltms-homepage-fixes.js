@@ -604,64 +604,78 @@ function hf19MobileEnhancements() {
             '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
     });
 
-    /* ── 2. FIX-A: Ocultar barra morada — sin límite de longitud ─
-       Buscamos el contenedor más pequeño (sin sub-sections) que tenga
-       los 3 textos clave. Eliminamos el límite txt.length < 200. */
+    /* ── 2. FIX-A: Ocultar barra morada — data-id exacto del DOM ─
+       Diagnóstico confirmó: purpleCandidates[0].id = "7e1aeca4"
+       con 3 .elementor-icon-list-item y cls: e-con-full */
     function hidePurpleBar() {
-        var candidates = document.querySelectorAll(
-            '.elementor-section, .e-con, .e-con-full, [class*="elementor-element"]'
-        );
-        candidates.forEach(function(el) {
-            // Solo contenedores "hoja" — sin sub-sections directas
-            if (el.querySelectorAll('.elementor-section, .e-con[data-id]').length > 2) return;
-            var txt = el.textContent || '';
-            // Buscar las 3 señales clave de la trust-pills bar del tema
-            var hasKYC  = txt.includes('KYC') || txt.includes('verificado');
-            var hasEnv  = txt.includes('Envío') || txt.includes('Envio') || txt.includes('nacional');
-            var hasDev  = txt.includes('Devolución') || txt.includes('Devolucion') || txt.includes('30 días');
-            if (hasKYC && hasEnv && hasDev) {
+        // Estrategia 1: data-id exacto (confirmado por debug DOM)
+        var byId = document.querySelector('[data-id="7e1aeca4"]');
+        if (byId) byId.style.setProperty('display', 'none', 'important');
+
+        // Estrategia 2: clase ltms-trust-bar-theme
+        document.querySelectorAll('.ltms-trust-bar-theme').forEach(function(el) {
+            el.style.setProperty('display', 'none', 'important');
+        });
+
+        // Estrategia 3: e-con-full con 2-5 icon-list-items sin sub-secciones
+        document.querySelectorAll('.e-con-full').forEach(function(el) {
+            var icons = el.querySelectorAll('.elementor-icon-list-item');
+            if (icons.length >= 2 && icons.length <= 5 &&
+                el.querySelectorAll('.e-con[data-id]').length === 0) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        // Estrategia 4: fondo morado en inline style
+        document.querySelectorAll('.e-con, .e-con-full, .elementor-section').forEach(function(el) {
+            var s = el.getAttribute('style') || '';
+            if (s.includes('5B2D8E') || s.includes('5b2d8e') || s.includes('91, 45, 142')) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+            var bg = window.getComputedStyle(el).backgroundColor;
+            if (bg === 'rgb(91, 45, 142)') {
                 el.style.setProperty('display', 'none', 'important');
             }
         });
     }
     hidePurpleBar();
-    setTimeout(hidePurpleBar, 800);
-    setTimeout(hidePurpleBar, 2000);
+    setTimeout(hidePurpleBar, 500);
+    setTimeout(hidePurpleBar, 1500);
 
     /* ── 3. FIX-B: Categorías grid 2×2 ─────────────────────────
-       Clave: aplicar estilos también al <a> (el elemento con bg rojo inline) */
+       DOM real confirmado: cada botón tiene su propio data-id.
+       w0parpar = "e-con-inner" → ese es el grid container.
+       Estrategia: encontrar el e-con-inner que contiene ≥3 btn-widgets. */
     function applyCatGrid() {
         var allBtnWidgets = Array.from(document.querySelectorAll('.home .elementor-widget-button'));
         if (allBtnWidgets.length < 3) return false;
 
-        var sectionMap = {};
+        // Agrupar widgets por su e-con-inner o e-con padre común
+        // Subir 2 niveles: widget → e-con-full → e-con-inner
+        var containerMap = {};
         allBtnWidgets.forEach(function(widget) {
-            var section = widget.closest('.elementor-section, .e-con[data-id]');
-            if (!section) return;
-            var sid = section.getAttribute('data-id') || section.className.slice(0, 40);
-            if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
-            sectionMap[sid].widgets.push(widget);
+            // Subir hasta encontrar un contenedor que no sea el widget mismo
+            var par = widget.parentNode;   // e-con-full (la sección individual del btn)
+            var cont = par && par.parentNode; // e-con-inner (el contenedor de todos)
+            if (!cont) return;
+            // No usar body o html
+            if (cont === document.body || cont.tagName === 'HTML') return;
+            var key = cont.getAttribute('data-id') || cont.className.slice(0, 50);
+            if (!containerMap[key]) containerMap[key] = { container: cont, section: cont.parentNode, widgets: [] };
+            containerMap[key].widgets.push(widget);
         });
 
         var applied = false;
-        Object.keys(sectionMap).forEach(function(sid) {
-            var entry = sectionMap[sid];
-            var sec = entry.section;
+        Object.keys(containerMap).forEach(function(key) {
+            var entry = containerMap[key];
+            var gridContainer = entry.container; // e-con-inner
+            var sec = entry.section;             // parent of e-con-inner
             var widgets = entry.widgets;
             if (widgets.length < 3) return;
             // No aplicar a secciones de productos o slider
-            if (sec.querySelector('.woocommerce-loop-product__link, .elementor-slides')) return;
-            if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
-            sec.classList.add('ltms-hf19-catgrid-done');
-
-            // Grid container: padre común de los widgets
-            var gridContainer = widgets[0].parentNode;
-            var samePar = widgets.every(function(w) { return w.parentNode === gridContainer; });
-            if (!samePar) {
-                gridContainer = widgets[0].parentNode.parentNode;
-                samePar = widgets.every(function(w) { return w.parentNode.parentNode === gridContainer; });
-            }
-            if (!gridContainer || gridContainer === document.body) return;
+            if (gridContainer.querySelector('.woocommerce-loop-product__link, .elementor-slides')) return;
+            if (gridContainer.classList.contains('ltms-hf19-catgrid-done')) return;
+            gridContainer.classList.add('ltms-hf19-catgrid-done');
 
             gridContainer.style.setProperty('display', 'grid', 'important');
             gridContainer.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
@@ -671,18 +685,19 @@ function hf19MobileEnhancements() {
             gridContainer.style.setProperty('flex-direction', 'unset', 'important');
             gridContainer.style.setProperty('flex-wrap', 'unset', 'important');
 
-            sec.style.setProperty('background', '#fff', 'important');
-            sec.style.setProperty('padding-left', '0', 'important');
-            sec.style.setProperty('padding-right', '0', 'important');
+            if (sec) {
+                sec.style.setProperty('background', '#fff', 'important');
+                sec.style.setProperty('padding-left', '0', 'important');
+                sec.style.setProperty('padding-right', '0', 'important');
+            }
 
             widgets.forEach(function(widget) {
-                var widgetPar = widget.parentNode;
-                if (widgetPar !== gridContainer) {
-                    widgetPar.style.setProperty('width', '100%', 'important');
-                    widgetPar.style.setProperty('padding', '0', 'important');
-                    widgetPar.style.setProperty('margin', '0', 'important');
-                    widgetPar.style.setProperty('min-width', '0', 'important');
-                }
+                // widget.parentNode = e-con-full (sección individual del botón)
+                var widgetCell = widget.parentNode; // la celda del grid
+                widgetCell.style.setProperty('width', '100%', 'important');
+                widgetCell.style.setProperty('padding', '0', 'important');
+                widgetCell.style.setProperty('margin', '0', 'important');
+                widgetCell.style.setProperty('min-width', '0', 'important');
                 widget.style.setProperty('width', '100%', 'important');
 
                 var btn = widget.querySelector('.elementor-button');
