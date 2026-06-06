@@ -601,46 +601,67 @@
 
 
     /* ══════════════════════════════════════════════════════════════
-       HF-15e: Ocultar sección negra — búsqueda tardía por textContent
-       Elementor tarda >1s en renderizar el Global Widget.
-       Buscar a los 2s y 4s con textContent que ya está disponible.
+       HF-15f: Sección "Con el apoyo de" — ocultar via template ID 13592
+       Confirmado via wp post list: el template "Home" tiene ID 13592.
+       Elementor renderiza este template en el homepage y le asigna
+       la clase .elementor-13592. La sección negra es un e-con.e-parent
+       dentro de ese template. JS la detecta y aplica display:none.
        ══════════════════════════════════════════════════════════════ */
     function hideApoyoSectionLate() {
         function findAndHide() {
-            var all = document.querySelectorAll('.e-con.e-parent, .elementor-section');
-            for (var i = 0; i < all.length; i++) {
-                var el = all[i];
-                var text = el.textContent || '';
-                if (text.toLowerCase().includes('con el apoyo') ||
-                    text.toLowerCase().includes('cardioinfantil') ||
-                    text.toLowerCase().includes('adrwork') ||
-                    text.toLowerCase().includes('danpago')) {
-                    // Encontrado — aplicar fondo blanco
-                    el.classList.add('ltms-black-section-hidden');
-                    el.style.setProperty('background', '#fff', 'important');
-                    el.style.setProperty('background-color', '#fff', 'important');
-                    el.style.setProperty('background-image', 'none', 'important');
-                    // Forzar en todos los hijos
-                    el.querySelectorAll('*').forEach(function(child) {
-                        child.style.removeProperty('background');
-                        child.style.removeProperty('background-color');
-                        child.style.removeProperty('background-image');
-                    });
-                    // Texto legible
-                    el.querySelectorAll('h1,h2,h3,p,span').forEach(function(t) {
-                        t.style.setProperty('color', '#1A1A1A', 'important');
-                    });
-                    return true;
-                }
+            // El template Home (ID 13592) se renderiza con clase .elementor-13592
+            var template = document.querySelector('.elementor-13592');
+            if (template) {
+                // Buscar todos los e-con.e-parent dentro del template
+                var sections = template.querySelectorAll('.e-con.e-parent');
+                sections.forEach(function(sec) {
+                    var text = (sec.textContent || '').toLowerCase();
+                    var html = sec.innerHTML || '';
+                    if (text.includes('con el apoyo') ||
+                        text.includes('cardioinfantil') ||
+                        text.includes('adrwork') ||
+                        html.includes('danpago') ||
+                        html.includes('alegra') ||
+                        html.includes('openpay')) {
+                        sec.classList.add('ltms-apoyo-hidden');
+                        return true;
+                    }
+                });
+                // Si no encontró por texto, ocultar el e-con con fondo negro
+                sections.forEach(function(sec) {
+                    var bg = window.getComputedStyle(sec).backgroundColor;
+                    var bgImg = window.getComputedStyle(sec).backgroundImage;
+                    if (bg === 'rgb(0, 0, 0)' || bg === 'rgba(0, 0, 0, 1)' ||
+                        (bgImg && bgImg !== 'none' && bgImg.includes('url') && 
+                         bg !== 'rgba(0, 0, 0, 0)')) {
+                        // Verificar que es la sección negra (no otra con imagen)
+                        var h = sec.offsetHeight;
+                        if (h > 200) { // la sección negra ocupa 3+ pantallas
+                            sec.classList.add('ltms-apoyo-hidden');
+                        }
+                    }
+                });
+                return true; // template encontrado
             }
-            return false;
+            return false; // template aún no renderizado
         }
-        // Intentar a los 800ms, 1500ms, 3000ms
-        setTimeout(function() { if (!findAndHide()) {
-            setTimeout(function() { if (!findAndHide()) {
-                setTimeout(findAndHide, 3000);
-            }}, 1500);
-        }}, 800);
+
+        // Intentar inmediatamente, luego con delays para Elementor lazy-load
+        if (!findAndHide()) {
+            setTimeout(function() {
+                if (!findAndHide()) {
+                    setTimeout(function() {
+                        if (!findAndHide()) {
+                            setTimeout(findAndHide, 3000);
+                        }
+                    }, 1000);
+                }
+            }, 500);
+        } else {
+            // Template ya está, pero la sección puede llegar después
+            setTimeout(findAndHide, 500);
+            setTimeout(findAndHide, 1500);
+        }
     }
 
     /* ══════════════════════════════════════════════════════════════

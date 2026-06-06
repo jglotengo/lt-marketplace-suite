@@ -853,3 +853,15 @@ footer.elementor-element-25fec764 a:hover {
     background-color: #ffffff !important;
     background-image: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15f: Sección "Con el apoyo de" — ocultar via ID del template
+   El template Elementor "Home" (ID 13592) contiene esta sección.
+   La sección negra se inyecta desde este template.
+   JS oculta el contenedor usando el template ID como ancla.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Clase aplicada por JS cuando detecta la sección en template-13592 */
+.ltms-apoyo-hidden {
+    display: none !important;
+}
