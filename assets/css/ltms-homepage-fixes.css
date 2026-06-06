@@ -1,5 +1,5 @@
 /**
- * LTMS Homepage Fixes — v2.9.0
+ * LTMS Homepage Fixes — v2.9.1
  * Correcciones UX/UI para la homepage pública de lo-tengo.com.co
  *
  * Fixes incluidos:
@@ -885,4 +885,710 @@ footer.elementor-element-25fec764 a:hover {
    ═══════════════════════════════════════════════════════════════ */
 .elementor-element-49db4d8a {
     display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-19: Mobile UX Redesign — jerarquía de color y diseño mobile
+   Aplica a viewport ≤ 768px en el homepage público.
+   Cubre: header, trust bar, trust pills, categorías, cards
+   destacados, grid productos, footer.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Variables de paleta ─────────────────────────────────────── */
+:root {
+    --ltms-red:        #CC1818;
+    --ltms-red-dark:   #B01212;
+    --ltms-red-light:  #FFF0F0;
+    --ltms-red-border: #FFCCCC;
+    --ltms-dark:       #1A1A1A;
+    --ltms-gray-text:  #666666;
+    --ltms-gray-bg:    #F8F8F8;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HEADER — rojo sólido, search integrada, sin duplicación de logo
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Fondo header rojo */
+    .site-header,
+    #masthead,
+    .ast-site-header-wrap,
+    .ast-primary-header-bar,
+    header.site-header,
+    .elementor-location-header,
+    [data-elementor-type="header"] {
+        background: var(--ltms-red) !important;
+    }
+
+    /* Logo: tamaño adecuado */
+    .site-header .site-branding img,
+    .ast-site-branding-wrap img,
+    .elementor-location-header .elementor-widget-image img,
+    [data-elementor-type="header"] .elementor-widget-image img {
+        max-height: 36px !important;
+        width: auto !important;
+    }
+
+    /* Nav mobile: fondo rojo oscuro */
+    .ast-mobile-header-wrap,
+    .ast-mobile-nav-wrap,
+    #ast-mobile-popup,
+    .main-navigation {
+        background: var(--ltms-red-dark) !important;
+    }
+
+    /* Iconos del header (carrito, usuario) blancos */
+    .ast-site-header-wrap .ast-header-custom-item,
+    .ast-site-header-wrap .ast-header-html,
+    header .elementor-widget a,
+    header .elementor-widget i,
+    header .elementor-widget svg {
+        color: #fff !important;
+        fill: #fff !important;
+    }
+
+    /* Hamburger blanco */
+    .menu-toggle,
+    .ast-mobile-menu-trigger,
+    button.menu-toggle,
+    .ast-header-break-point .ast-mobile-menu-trigger {
+        color: #fff !important;
+    }
+    .menu-toggle .menu-toggle-icon,
+    .ast-mobile-menu-trigger span {
+        background: #fff !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRUST BAR — 4 stats compactas en franja rojo oscuro
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Nuestra trust bar inyectada por JS */
+    .ltms-trust-bar {
+        background: var(--ltms-red-dark) !important;
+        padding: 6px 0 !important;
+    }
+
+    .ltms-trust-bar__inner {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        text-align: center !important;
+        flex-wrap: unset !important;
+    }
+
+    .ltms-trust-bar__item {
+        flex-direction: column !important;
+        gap: 1px !important;
+        align-items: center !important;
+        padding: 0 4px !important;
+        border-right: 1px solid rgba(255,255,255,0.2);
+        white-space: nowrap !important;
+        font-size: 0 !important; /* ocultar text-node directo */
+    }
+
+    .ltms-trust-bar__item:last-child {
+        border-right: none !important;
+    }
+
+    /* El valor numérico grande */
+    .ltms-trust-bar__item strong,
+    .ltms-trust-bar__item .ltms-tb-value {
+        display: block !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: #fff !important;
+        line-height: 1.1 !important;
+    }
+
+    /* El label descriptivo */
+    .ltms-trust-bar__item span,
+    .ltms-trust-bar__item .ltms-tb-label {
+        display: block !important;
+        font-size: 9px !important;
+        color: rgba(255,255,255,0.75) !important;
+        line-height: 1.2 !important;
+        font-weight: 400 !important;
+    }
+
+    /* Icono SVG: ocultar en mobile — no hay espacio */
+    .ltms-trust-bar__item svg {
+        display: none !important;
+    }
+
+    /* Mostrar todos los items (el CSS base oculta el 4to en mobile) */
+    .ltms-trust-bar__item:nth-child(n+4) {
+        display: flex !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRUST PILLS — chips rojos debajo del header/trust-bar
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Contenedor: la barra morada del tema (garantías) */
+    .ltms-trust-bar-theme,
+    .ast-mobile-header-wrap ~ .ltms-trust-bar-theme {
+        background: #fff !important;
+        padding: 7px 10px !important;
+        display: flex !important;
+        gap: 6px !important;
+        flex-wrap: wrap !important;
+        border-bottom: 0.5px solid rgba(0,0,0,0.08) !important;
+    }
+
+    /* Cada item como chip rojo suave */
+    .ltms-trust-bar-theme .elementor-icon-list-item,
+    .ltms-trust-bar-theme .ltms-trust-item {
+        background: var(--ltms-red-light) !important;
+        color: var(--ltms-red-dark) !important;
+        border-radius: 20px !important;
+        padding: 3px 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        font-size: 10px !important;
+        font-weight: 500 !important;
+        border: none !important;
+        white-space: nowrap !important;
+    }
+
+    .ltms-trust-bar-theme * {
+        color: var(--ltms-red-dark) !important;
+        font-size: 10px !important;
+    }
+
+    .ltms-trust-bar-theme svg,
+    .ltms-trust-bar-theme i {
+        width: 12px !important;
+        height: 12px !important;
+        font-size: 12px !important;
+        filter: none !important;
+        color: var(--ltms-red) !important;
+        fill: var(--ltms-red) !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CATEGORÍAS — grid 2x2 con chip de ícono rojo + texto
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Sección categorías: fondo blanco con padding limpio */
+    .ltms-category-buttons,
+    .ltms-hf-categories,
+    .elementor-widget-nav-menu.ltms-cat-menu {
+        background: #fff !important;
+        padding: 10px 12px 6px !important;
+    }
+
+    /* Los botones full-width actuales → grid 2 col */
+    .ltms-category-buttons a,
+    .ltms-category-btn,
+    .ltms-hf-cat-btn {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        background: var(--ltms-red-light) !important;
+        border: 0.5px solid var(--ltms-red-border) !important;
+        border-radius: 10px !important;
+        padding: 10px 10px !important;
+        color: var(--ltms-dark) !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        text-decoration: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+    }
+
+    /* Grid 2 columnas para las categorías Elementor full-width */
+    /* Botones de categoría del homepage (los full-width actuales) */
+    .home .elementor-widget-nav-menu .elementor-nav-menu,
+    .home .ltms-category-section .elementor-container,
+    .home .ltms-cat-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 7px !important;
+        padding: 10px 12px !important;
+    }
+
+    /* Cada ítem del menú de categorías */
+    .home .elementor-widget-nav-menu .elementor-nav-menu li,
+    .home .ltms-cat-grid li {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+
+    .home .elementor-widget-nav-menu .elementor-nav-menu li a,
+    .home .ltms-cat-grid li a {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background: var(--ltms-red-light) !important;
+        border: 0.5px solid var(--ltms-red-border) !important;
+        border-radius: 10px !important;
+        padding: 10px !important;
+        color: var(--ltms-dark) !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        text-decoration: none !important;
+        transition: background 0.15s !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .home .elementor-widget-nav-menu .elementor-nav-menu li a:hover,
+    .home .ltms-cat-grid li a:hover {
+        background: #FFD5D5 !important;
+    }
+
+    /* Botones Elementor full-width de categorías → grid 2 col */
+    .home .elementor-widget-button + .elementor-widget-button {
+        margin-top: 0 !important;
+    }
+
+    /* Contenedor de los botones de categoría en Elementor */
+    .home .elementor-section:has(.elementor-widget-button .ltms-cat-btn),
+    .home .e-con:has(.elementor-widget-button .ltms-cat-btn) {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 7px !important;
+        padding: 10px 12px !important;
+        background: #fff !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CARDS DESTACADOS — layout horizontal (imagen izq + contenido der)
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Sección de cards editoriales (Cocina, Peludos, Fitness, etc.) */
+    .home .elementor-section:has(.ltms-editorial-text--fixed),
+    .home .e-con:has(.ltms-editorial-text--fixed),
+    .ltms-featured-section {
+        background: var(--ltms-gray-bg) !important;
+        padding: 10px 12px !important;
+    }
+
+    /* Cada card: horizontal con imagen a la izquierda */
+    .ltms-featured-card,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        background: #fff !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        border: 0.5px solid rgba(0,0,0,0.08) !important;
+        margin-bottom: 8px !important;
+        max-height: 100px !important;
+    }
+
+    /* Imagen de la card: cuadrada a la izquierda */
+    .ltms-featured-card img,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-widget-image img {
+        width: 100px !important;
+        height: 100px !important;
+        object-fit: cover !important;
+        flex-shrink: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    /* Contenido de texto: flexible a la derecha */
+    .ltms-featured-card .ltms-card-content,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-widget-heading,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-widget-text-editor {
+        padding: 10px 12px !important;
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+    }
+
+    /* Título de la card */
+    .ltms-featured-card .elementor-heading-title,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-heading-title {
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: var(--ltms-dark) !important;
+        margin-bottom: 4px !important;
+        line-height: 1.3 !important;
+    }
+
+    /* Texto descriptivo */
+    .ltms-featured-card .elementor-widget-text-editor p,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-widget-text-editor p {
+        font-size: 11px !important;
+        color: var(--ltms-gray-text) !important;
+        line-height: 1.4 !important;
+        margin: 0 0 6px !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    /* Botón CTA de la card */
+    .ltms-featured-card .elementor-button,
+    .home .elementor-column:has(.ltms-editorial-text--fixed) .elementor-button {
+        background: var(--ltms-red) !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 4px 10px !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        width: fit-content !important;
+        min-width: auto !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GRID PRODUCTOS — cards compactas con precio rojo prominente
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Grid de productos WooCommerce */
+    .woocommerce ul.products,
+    .products.columns-2,
+    .products.columns-3,
+    .products.columns-4 {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+        margin: 0 !important;
+    }
+
+    /* Card individual de producto */
+    .woocommerce ul.products li.product,
+    .products li.product {
+        border-radius: 10px !important;
+        overflow: hidden !important;
+        border: 0.5px solid rgba(0,0,0,0.08) !important;
+        background: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* Imagen del producto */
+    .woocommerce ul.products li.product img,
+    .products li.product img {
+        width: 100% !important;
+        height: 110px !important;
+        object-fit: cover !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Contenido de la card */
+    .woocommerce ul.products li.product .woocommerce-loop-product__title,
+    .products li.product .woocommerce-loop-product__title,
+    .products li.product h2 {
+        font-size: 11px !important;
+        color: #444 !important;
+        line-height: 1.3 !important;
+        padding: 8px 8px 2px !important;
+        margin: 0 !important;
+        font-weight: 400 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    /* Precio — rojo prominente */
+    .woocommerce ul.products li.product .price,
+    .products li.product .price {
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: var(--ltms-red) !important;
+        padding: 0 8px 6px !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    .woocommerce ul.products li.product .price ins,
+    .products li.product .price ins {
+        text-decoration: none !important;
+        font-weight: 600 !important;
+        color: var(--ltms-red) !important;
+    }
+
+    .woocommerce ul.products li.product .price del,
+    .products li.product .price del {
+        font-size: 10px !important;
+        color: #aaa !important;
+        font-weight: 400 !important;
+    }
+
+    /* Botón "Añadir al carrito" */
+    .woocommerce ul.products li.product .button,
+    .woocommerce ul.products li.product a.button,
+    .products li.product .add_to_cart_button {
+        background: var(--ltms-red) !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 0 0 10px 10px !important;
+        width: 100% !important;
+        text-align: center !important;
+        padding: 6px 0 !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        display: block !important;
+        margin: auto 0 0 !important;
+        box-shadow: none !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+        transition: background 0.15s !important;
+    }
+
+    .woocommerce ul.products li.product .button:hover,
+    .products li.product .add_to_cart_button:hover {
+        background: var(--ltms-red-dark) !important;
+    }
+
+    /* "Ver más productos" — botón outline centrado */
+    .ltms-view-more-btn,
+    .woocommerce a.button.ltms-more,
+    .home .elementor-button.ltms-btn-more-products {
+        display: block !important;
+        width: fit-content !important;
+        margin: 12px auto !important;
+        background: transparent !important;
+        border: 1.5px solid var(--ltms-red) !important;
+        color: var(--ltms-red) !important;
+        border-radius: 8px !important;
+        padding: 8px 28px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FOOTER — compacto, legible, links en grid 2 col
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Contenedor principal del footer */
+    .site-footer,
+    #colophon,
+    footer,
+    .elementor-location-footer,
+    [data-elementor-type="footer"],
+    .elementor-13743 {
+        background: var(--ltms-dark) !important;
+        padding: 16px 14px 12px !important;
+    }
+
+    /* Logo del footer */
+    .site-footer .site-branding img,
+    .elementor-location-footer .elementor-widget-image img,
+    [data-elementor-type="footer"] .elementor-widget-image img {
+        max-height: 28px !important;
+        width: auto !important;
+        filter: brightness(0) invert(1) !important;
+    }
+
+    /* Headings de sección del footer */
+    .site-footer h3,
+    .site-footer h4,
+    .elementor-location-footer h3,
+    .elementor-location-footer h4,
+    [data-elementor-type="footer"] h3,
+    [data-elementor-type="footer"] h4,
+    .elementor-location-footer .elementor-heading-title,
+    [data-elementor-type="footer"] .elementor-heading-title,
+    .elementor-13743 .elementor-heading-title {
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: #fff !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Links del footer — grid 2 columnas */
+    .elementor-location-footer .elementor-nav-menu,
+    [data-elementor-type="footer"] .elementor-nav-menu,
+    .site-footer nav ul,
+    .elementor-13743 .elementor-nav-menu {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 4px 12px !important;
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a,
+    [data-elementor-type="footer"] .elementor-nav-menu li a,
+    .site-footer nav ul li a,
+    .elementor-13743 .elementor-nav-menu li a,
+    .elementor-13743 .elementor-item {
+        font-size: 11px !important;
+        color: #aaa !important;
+        text-decoration: none !important;
+        line-height: 1.8 !important;
+        display: block !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a:hover,
+    .elementor-13743 .elementor-item:hover {
+        color: #F5A623 !important;
+    }
+
+    /* Contactos — iconos rojos con texto gris */
+    .elementor-location-footer .elementor-icon-list-item,
+    [data-elementor-type="footer"] .elementor-icon-list-item,
+    .elementor-13743 .elementor-icon-list-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        margin-bottom: 4px !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-icon,
+    [data-elementor-type="footer"] .elementor-icon-list-icon,
+    .elementor-13743 .elementor-icon-list-icon {
+        color: var(--ltms-red) !important;
+        fill: var(--ltms-red) !important;
+        font-size: 13px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-text,
+    [data-elementor-type="footer"] .elementor-icon-list-text,
+    .elementor-13743 .elementor-icon-list-text {
+        font-size: 11px !important;
+        color: #bbb !important;
+        line-height: 1.4 !important;
+    }
+
+    /* Redes sociales — íconos más pequeños */
+    .elementor-location-footer .elementor-social-icons-wrapper,
+    [data-elementor-type="footer"] .elementor-social-icons-wrapper,
+    .elementor-13743 .elementor-social-icons-wrapper {
+        display: flex !important;
+        gap: 12px !important;
+        margin-top: 8px !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon,
+    [data-elementor-type="footer"] .elementor-social-icon,
+    .elementor-13743 .elementor-social-icon {
+        font-size: 18px !important;
+        color: #aaa !important;
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        transition: color 0.15s !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon:hover,
+    .elementor-13743 .elementor-social-icon:hover {
+        color: #fff !important;
+    }
+
+    /* Logos de afiliaciones — tamaño razonable, no pantalla completa */
+    .elementor-location-footer .elementor-widget-image img,
+    [data-elementor-type="footer"] .elementor-widget-image img,
+    .elementor-13743 .elementor-widget-image img {
+        max-height: 40px !important;
+        max-width: 120px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        filter: none !important;
+    }
+
+    /* Sección de afiliaciones: flex wrap horizontal */
+    .elementor-location-footer .ltms-affiliations,
+    .elementor-13743 .elementor-column:has(img[src*="camara"]),
+    .elementor-13743 .elementor-column:has(img[src*="comercio"]) {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+        align-items: center !important;
+    }
+
+    /* Copyright bar */
+    .elementor-location-footer .copyright,
+    [data-elementor-type="footer"] .copyright,
+    .footer-bottom,
+    .elementor-13743 .elementor-element-25fec764 {
+        border-top: 0.5px solid rgba(255,255,255,0.12) !important;
+        padding-top: 10px !important;
+        margin-top: 10px !important;
+    }
+
+    .elementor-location-footer .copyright *,
+    .footer-bottom *,
+    .elementor-13743 .elementor-element-25fec764 * {
+        font-size: 10px !important;
+        color: #666 !important;
+    }
+
+    /* Reducir padding excesivo de las secciones del footer */
+    .elementor-location-footer .elementor-section,
+    .elementor-location-footer .e-con,
+    [data-elementor-type="footer"] .elementor-section,
+    [data-elementor-type="footer"] .e-con,
+    .elementor-13743 .elementor-section,
+    .elementor-13743 .e-con {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+
+    /* Openpay logo — no gigante */
+    .elementor-location-footer img[src*="openpay"],
+    .elementor-13743 img[src*="openpay"] {
+        max-height: 30px !important;
+        max-width: 100px !important;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GENERAL MOBILE — espaciado entre secciones
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Eliminar padding gigante de secciones Elementor en mobile */
+    .home .e-con.e-parent,
+    .home .elementor-section.elementor-top-section {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Section label — estilo consistente */
+    .ltms-section-label {
+        font-size: 11px;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        font-weight: 500;
+        padding: 0 12px;
+        margin: 14px 0 6px;
+        display: block;
+    }
+
+    /* WhatsApp flotante — no tapar botones de carrito */
+    .ltms-whatsapp-float,
+    a[href*="wa.me"],
+    a[href*="whatsapp"] {
+        bottom: 12px !important;
+        right: 12px !important;
+        width: 48px !important;
+        height: 48px !important;
+    }
 }

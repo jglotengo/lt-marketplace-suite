@@ -1,5 +1,5 @@
 /**
- * LTMS Homepage Fixes JS — v2.9.0
+ * LTMS Homepage Fixes JS — v2.9.1
  * Ejecuta correcciones UX en la homepage pública.
  *
  * HF-01: YouTube Facade (lazy load real)
@@ -566,6 +566,186 @@
 
     /* ══════════════════════════════════════════════════════════════
        ══════════════════════════════════════════════════════════════ */
+    /* ══════════════════════════════════════════════════════════════
+       HF-19: Mobile UX Enhancements
+       Mejoras de jerarquía visual en mobile (≤768px).
+       - Trust bar en grid 4 columnas compacto
+       - Categorías en grid 2x2 con chip ícono
+       - Cards destacados: layout horizontal
+       - Grid productos: precio rojo prominente
+       - Footer: links en 2 col, logos de afiliación compactos
+       ══════════════════════════════════════════════════════════════ */
+    function hf19MobileEnhancements() {
+        if (window.innerWidth > 768) return;
+
+        /* ── Trust bar: reestructurar items como valor + label ─── */
+        var trustItems = document.querySelectorAll('.ltms-trust-bar__item');
+        var trustData = [
+            { value: '+2.4k', label: 'Vendedores' },
+            { value: '98%',   label: 'Satisfacción' },
+            { value: '48h',   label: 'Entrega' },
+            { value: '$0',    label: 'Registro' }
+        ];
+        trustItems.forEach(function(item, i) {
+            if (!trustData[i]) return;
+            item.innerHTML =
+                '<strong class="ltms-tb-value">' + trustData[i].value + '</strong>' +
+                '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
+        });
+
+        /* ── Categorías: wrap en grid 2 columnas ─────────────────
+           Los botones full-width de Elementor viven en contenedores
+           separados. Los agrupamos en un grid wrapper. */
+        var catBtns = document.querySelectorAll(
+            '.home .elementor-widget-button .elementor-button[href*="categoria"],' +
+            '.home .elementor-widget-button .elementor-button[href*="category"],' +
+            '.home .elementor-widget-button .elementor-button'
+        );
+
+        /* Solo procesar si hay ≥ 3 botones seguidos (sección categorías) */
+        if (catBtns.length >= 3) {
+            /* Recopilar los wrappers padre de cada botón */
+            var btnWrappers = [];
+            catBtns.forEach(function(btn) {
+                var wrapper = btn.closest('.elementor-widget-button');
+                if (wrapper && btnWrappers.indexOf(wrapper) === -1) {
+                    btnWrappers.push(wrapper);
+                }
+            });
+
+            /* El contenedor padre común (columna o sección Elementor) */
+            var container = btnWrappers[0] && btnWrappers[0].parentNode;
+            if (container && !container.classList.contains('ltms-cat-grid-done')) {
+                container.classList.add('ltms-cat-grid-done');
+                container.style.cssText += [
+                    'display:grid',
+                    'grid-template-columns:repeat(2,1fr)',
+                    'gap:7px',
+                    'padding:10px 12px',
+                    'background:#fff'
+                ].join(';') + ';';
+
+                /* Estilar cada botón individualmente */
+                btnWrappers.forEach(function(wrapper) {
+                    var btn = wrapper.querySelector('.elementor-button');
+                    if (!btn) return;
+                    wrapper.style.cssText += 'width:100%;margin:0;';
+                    btn.style.cssText += [
+                        'display:flex',
+                        'align-items:center',
+                        'gap:8px',
+                        'background:#FFF0F0',
+                        'border:0.5px solid #FFCCCC',
+                        'border-radius:10px',
+                        'padding:10px',
+                        'color:#1A1A1A',
+                        'font-size:12px',
+                        'font-weight:500',
+                        'text-align:left',
+                        'width:100%',
+                        'box-sizing:border-box',
+                        'justify-content:flex-start',
+                        'letter-spacing:0',
+                        'text-transform:none'
+                    ].join(';') + ';';
+                });
+            }
+        }
+
+        /* ── Cards destacados: horizontal layout ─────────────────
+           Detectar las secciones con imagen + heading + texto + botón
+           en columnas Elementor y aplicar layout flex horizontal */
+        var featuredSections = document.querySelectorAll(
+            '.home .elementor-section:not([data-elementor-type])'
+        );
+
+        featuredSections.forEach(function(section) {
+            /* ¿Tiene imagen + heading + botón? → es una card editorial */
+            var hasImg = section.querySelector('.elementor-widget-image img');
+            var hasBtn = section.querySelector('.elementor-button');
+            var hasHead = section.querySelector('.elementor-widget-heading');
+            if (!hasImg || !hasBtn || !hasHead) return;
+
+            /* No tocar el hero slider ni secciones con múltiples columnas de producto */
+            var isHero = section.querySelector('.elementor-widget-slider, [class*="slider"]');
+            var productCount = section.querySelectorAll('.product').length;
+            if (isHero || productCount > 1) return;
+
+            if (section.classList.contains('ltms-hf19-done')) return;
+            section.classList.add('ltms-hf19-done');
+
+            /* Construir el layout horizontal */
+            var img = hasImg;
+            var imgWrapper = img.closest('.elementor-widget-image');
+            var btnWrapper = hasBtn.closest('.elementor-widget-button');
+
+            /* Estilar la sección como card horizontal */
+            section.style.cssText += [
+                'background:#fff',
+                'border-radius:12px',
+                'overflow:hidden',
+                'border:0.5px solid rgba(0,0,0,0.08)',
+                'margin:0 12px 8px',
+                'display:flex',
+                'flex-direction:row',
+                'align-items:stretch',
+                'min-height:90px',
+                'max-height:110px'
+            ].join(';') + ';';
+
+            /* Imagen cuadrada a la izquierda */
+            if (imgWrapper) {
+                imgWrapper.style.cssText += [
+                    'width:100px',
+                    'flex-shrink:0',
+                    'overflow:hidden'
+                ].join(';') + ';';
+                img.style.cssText += [
+                    'width:100px',
+                    'height:100%',
+                    'object-fit:cover',
+                    'display:block'
+                ].join(';') + ';';
+            }
+
+            /* Botón CTA: compacto rojo */
+            hasBtn.style.cssText += [
+                'background:#CC1818',
+                'color:#fff',
+                'border:none',
+                'border-radius:6px',
+                'padding:4px 10px',
+                'font-size:11px',
+                'font-weight:500',
+                'min-width:auto',
+                'width:fit-content',
+                'letter-spacing:0',
+                'text-transform:none'
+            ].join(';') + ';';
+        });
+
+        /* ── Footer: logos de afiliación → tamaño compacto ─────── */
+        var footerImgs = document.querySelectorAll(
+            'footer img, .elementor-location-footer img, [data-elementor-type="footer"] img'
+        );
+        footerImgs.forEach(function(img) {
+            var src = img.src || img.getAttribute('data-src') || '';
+            /* No tocar el logo principal */
+            if (src.includes('logo') && !src.includes('camara') && !src.includes('openpay')) return;
+            img.style.cssText += 'max-height:40px;max-width:120px;width:auto;height:auto;object-fit:contain;';
+        });
+
+        /* Footer: reducir padding de columnas */
+        var footerCols = document.querySelectorAll(
+            'footer .elementor-column, .elementor-location-footer .elementor-column'
+        );
+        footerCols.forEach(function(col) {
+            col.style.cssText += 'padding-top:10px;padding-bottom:10px;';
+        });
+
+        console.log('[LTMS HF-19] Mobile enhancements aplicados');
+    }
+
     ready(function () {
         // YouTube facade — aplica en todas las páginas (hay videos en varias)
         fixYouTube();
@@ -587,6 +767,7 @@
             fixFooterContrast();         // HF-17: contraste footer
             hideBlackSections();         // HF-15c: secciones negras en main
             hideApoyoSectionLate();       // HF-15e: búsqueda tardía post-Elementor
+            hf19MobileEnhancements();    // HF-19: mobile UX redesign
         }
 
         // QA products en cualquier página de tienda
