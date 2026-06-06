@@ -578,7 +578,7 @@
     function hf19MobileEnhancements() {
         if (window.innerWidth > 768) return;
 
-        /* ── Trust bar: reestructurar items como valor + label ─── */
+        /* ── 1. Trust bar: reestructurar items como valor + label ─ */
         var trustItems = document.querySelectorAll('.ltms-trust-bar__item');
         var trustData = [
             { value: '+2.4k', label: 'Vendedores' },
@@ -593,157 +593,224 @@
                 '<span class="ltms-tb-label">' + trustData[i].label + '</span>';
         });
 
-        /* ── Categorías: wrap en grid 2 columnas ─────────────────
-           Los botones full-width de Elementor viven en contenedores
-           separados. Los agrupamos en un grid wrapper. */
-        var catBtns = document.querySelectorAll(
-            '.home .elementor-widget-button .elementor-button[href*="categoria"],' +
-            '.home .elementor-widget-button .elementor-button[href*="category"],' +
-            '.home .elementor-widget-button .elementor-button'
-        );
-
-        /* Solo procesar si hay ≥ 3 botones seguidos (sección categorías) */
-        if (catBtns.length >= 3) {
-            /* Recopilar los wrappers padre de cada botón */
-            var btnWrappers = [];
-            catBtns.forEach(function(btn) {
-                var wrapper = btn.closest('.elementor-widget-button');
-                if (wrapper && btnWrappers.indexOf(wrapper) === -1) {
-                    btnWrappers.push(wrapper);
+        /* ── 2. Ocultar barra morada del tema (duplicada) ────────── */
+        var ourBar = document.querySelector('.ltms-trust-bar');
+        if (ourBar) {
+            document.querySelectorAll('.ltms-trust-bar-theme').forEach(function(b) {
+                b.style.setProperty('display', 'none', 'important');
+            });
+            /* También buscar por contenido — la barra morada tiene "KYC verificado" */
+            document.querySelectorAll(
+                '[class*="elementor-section"], [class*="e-con"]'
+            ).forEach(function(el) {
+                var txt = el.textContent || '';
+                if (txt.includes('KYC verificado') && txt.includes('Envío nacional') && txt.includes('Devolución')) {
+                    var bg = window.getComputedStyle(el).backgroundColor;
+                    /* Solo ocultar si tiene fondo morado/púrpura */
+                    if (bg.includes('88') || bg.includes('5B') || bg.includes('purple') ||
+                        el.style.backgroundColor || el.getAttribute('style') && el.getAttribute('style').includes('5B2D')) {
+                        el.style.setProperty('display', 'none', 'important');
+                    }
                 }
             });
-
-            /* El contenedor padre común (columna o sección Elementor) */
-            var container = btnWrappers[0] && btnWrappers[0].parentNode;
-            if (container && !container.classList.contains('ltms-cat-grid-done')) {
-                container.classList.add('ltms-cat-grid-done');
-                container.style.cssText += [
-                    'display:grid',
-                    'grid-template-columns:repeat(2,1fr)',
-                    'gap:7px',
-                    'padding:10px 12px',
-                    'background:#fff'
-                ].join(';') + ';';
-
-                /* Estilar cada botón individualmente */
-                btnWrappers.forEach(function(wrapper) {
-                    var btn = wrapper.querySelector('.elementor-button');
-                    if (!btn) return;
-                    wrapper.style.cssText += 'width:100%;margin:0;';
-                    btn.style.cssText += [
-                        'display:flex',
-                        'align-items:center',
-                        'gap:8px',
-                        'background:#FFF0F0',
-                        'border:0.5px solid #FFCCCC',
-                        'border-radius:10px',
-                        'padding:10px',
-                        'color:#1A1A1A',
-                        'font-size:12px',
-                        'font-weight:500',
-                        'text-align:left',
-                        'width:100%',
-                        'box-sizing:border-box',
-                        'justify-content:flex-start',
-                        'letter-spacing:0',
-                        'text-transform:none'
-                    ].join(';') + ';';
-                });
-            }
         }
 
-        /* ── Cards destacados: horizontal layout ─────────────────
-           Detectar las secciones con imagen + heading + texto + botón
-           en columnas Elementor y aplicar layout flex horizontal */
-        var featuredSections = document.querySelectorAll(
-            '.home .elementor-section:not([data-elementor-type])'
-        );
+        /* ── 3. Ocultar barra morada trust pills del tema ─────────
+           La barra aparece como .elementor-section con fondo morado */
+        document.querySelectorAll('.elementor-section, .e-con.e-parent').forEach(function(sec) {
+            var style = sec.getAttribute('style') || '';
+            var computed = window.getComputedStyle(sec).backgroundColor;
+            var isMorado = style.includes('5B2D8E') || style.includes('7B3FA8') ||
+                computed === 'rgb(91, 45, 142)' || computed === 'rgb(123, 63, 168)';
+            var txt = sec.textContent || '';
+            var hasTrustText = txt.includes('KYC') || (txt.includes('Envío') && txt.includes('Devolución'));
+            if (isMorado && hasTrustText) {
+                sec.style.setProperty('display', 'none', 'important');
+            }
+        });
 
-        featuredSections.forEach(function(section) {
-            /* ¿Tiene imagen + heading + botón? → es una card editorial */
-            var hasImg = section.querySelector('.elementor-widget-image img');
-            var hasBtn = section.querySelector('.elementor-button');
-            var hasHead = section.querySelector('.elementor-widget-heading');
-            if (!hasImg || !hasBtn || !hasHead) return;
+        /* ── 4. Categorías: grid 2×2 con DOM traversal robusto ────
+           Estrategia: encontrar la sección que tiene SOLO botones
+           (≥3) sin imágenes de producto ni sliders. */
+        var allBtnWidgets = Array.from(document.querySelectorAll(
+            '.home .elementor-widget-button'
+        ));
 
-            /* No tocar el hero slider ni secciones con múltiples columnas de producto */
-            var isHero = section.querySelector('.elementor-widget-slider, [class*="slider"]');
-            var productCount = section.querySelectorAll('.product').length;
-            if (isHero || productCount > 1) return;
+        var sectionMap = {};
+        allBtnWidgets.forEach(function(widget) {
+            var section = widget.closest('.elementor-section, .e-con.e-parent');
+            if (!section) return;
+            var sid = section.dataset.id || section.getAttribute('data-id') || section.className.slice(0,40);
+            if (!sectionMap[sid]) sectionMap[sid] = { section: section, widgets: [] };
+            sectionMap[sid].widgets.push(widget);
+        });
 
-            if (section.classList.contains('ltms-hf19-done')) return;
-            section.classList.add('ltms-hf19-done');
+        Object.keys(sectionMap).forEach(function(sid) {
+            var entry = sectionMap[sid];
+            var sec = entry.section;
+            var widgets = entry.widgets;
+            if (widgets.length < 3) return;
+            if (sec.querySelector('.woocommerce-loop-product__link img, .elementor-widget-slides')) return;
+            if (sec.classList.contains('ltms-hf19-catgrid-done')) return;
+            sec.classList.add('ltms-hf19-catgrid-done');
 
-            /* Construir el layout horizontal */
-            var img = hasImg;
-            var imgWrapper = img.closest('.elementor-widget-image');
-            var btnWrapper = hasBtn.closest('.elementor-widget-button');
+            /* Contenedor directo de los widget-buttons */
+            var commonParent = widgets[0].parentNode;
+            var allSameParent = widgets.every(function(w) { return w.parentNode === commonParent; });
+            if (!allSameParent) {
+                commonParent = sec.querySelector('.elementor-row, .e-con-inner') || sec;
+            }
 
-            /* Estilar la sección como card horizontal */
-            section.style.cssText += [
+            commonParent.style.cssText += [
+                'display:grid',
+                'grid-template-columns:repeat(2,1fr)',
+                'gap:7px',
+                'padding:10px 12px',
+                'background:#fff',
+                'flex-wrap:unset'
+            ].join(';') + ';';
+
+            sec.style.cssText += 'background:#fff;padding-left:0;padding-right:0;';
+
+            widgets.forEach(function(widget) {
+                var col = widget.closest('.elementor-column');
+                if (col) col.style.cssText += 'width:100%;padding:0;';
+                widget.style.cssText += 'width:100%;';
+                var btn = widget.querySelector('.elementor-button');
+                if (!btn) return;
+                btn.setAttribute('style', [
+                    'display:flex',
+                    'align-items:center',
+                    'justify-content:center',
+                    'gap:8px',
+                    'background:#FFF0F0',
+                    'border:0.5px solid #FFCCCC',
+                    'border-radius:10px',
+                    'padding:10px 8px',
+                    'color:#1A1A1A',
+                    'font-size:12px',
+                    'font-weight:500',
+                    'width:100%',
+                    'box-sizing:border-box',
+                    'letter-spacing:0',
+                    'text-transform:none',
+                    'min-height:44px',
+                    'text-align:center'
+                ].join(';') + ';');
+                var icon = btn.querySelector('.elementor-button-icon, i, svg');
+                if (icon) icon.style.cssText += 'color:#CC1818;font-size:15px;flex-shrink:0;';
+            });
+
+            console.log('[LTMS HF-19] Categorías grid aplicado:', widgets.length, 'botones');
+        });
+
+        /* ── 5. Cards editoriales: layout horizontal ──────────────
+           Secciones con 1 imagen GRANDE + heading + botón sin productos. */
+        var allSections = document.querySelectorAll('.home .elementor-section, .home .e-con.e-parent');
+        allSections.forEach(function(sec) {
+            if (sec.classList.contains('ltms-hf19-done') || sec.classList.contains('ltms-hf19-catgrid-done')) return;
+            var imgs  = sec.querySelectorAll('.elementor-widget-image img');
+            var btns  = sec.querySelectorAll('.elementor-button');
+            var heads = sec.querySelectorAll('.elementor-widget-heading');
+            var prods = sec.querySelectorAll('.product, .woocommerce-loop-product__link');
+            if (imgs.length !== 1 || btns.length < 1 || heads.length < 1 || prods.length > 0) return;
+            if (sec.querySelector('.elementor-widget-video, .elementor-widget-slides')) return;
+            if (sec.querySelector('.ltms-trust-bar, .ltms-hf-stats')) return;
+            sec.classList.add('ltms-hf19-done');
+
+            var img = imgs[0];
+            var btn = btns[0];
+            var imgWidget = img.closest('.elementor-widget-image');
+            var imgCol    = imgWidget && imgWidget.closest('.elementor-column');
+
+            sec.style.cssText += [
+                'display:flex',
+                'flex-direction:row',
+                'align-items:stretch',
                 'background:#fff',
                 'border-radius:12px',
                 'overflow:hidden',
                 'border:0.5px solid rgba(0,0,0,0.08)',
                 'margin:0 12px 8px',
-                'display:flex',
-                'flex-direction:row',
-                'align-items:stretch',
                 'min-height:90px',
-                'max-height:110px'
+                'max-height:115px',
+                'padding:0'
             ].join(';') + ';';
 
-            /* Imagen cuadrada a la izquierda */
-            if (imgWrapper) {
-                imgWrapper.style.cssText += [
-                    'width:100px',
-                    'flex-shrink:0',
-                    'overflow:hidden'
-                ].join(';') + ';';
-                img.style.cssText += [
-                    'width:100px',
-                    'height:100%',
-                    'object-fit:cover',
-                    'display:block'
-                ].join(';') + ';';
+            if (imgWidget) {
+                imgWidget.style.cssText += 'width:100px;min-width:100px;flex-shrink:0;overflow:hidden;padding:0;margin:0;';
+                img.style.cssText += 'width:100px;height:115px;object-fit:cover;display:block;border-radius:0;';
+            }
+            if (imgCol) {
+                imgCol.style.cssText += 'width:100px;min-width:100px;padding:0;flex-shrink:0;';
             }
 
-            /* Botón CTA: compacto rojo */
-            hasBtn.style.cssText += [
+            var allCols = Array.from(sec.querySelectorAll('.elementor-column'));
+            allCols.forEach(function(col) {
+                if (col === imgCol) return;
+                col.style.cssText += 'flex:1;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;';
+            });
+
+            heads.forEach(function(h) {
+                var title = h.querySelector('.elementor-heading-title');
+                if (title) title.style.cssText += 'font-size:13px;font-weight:500;color:#1a1a1a;margin:0 0 3px;line-height:1.3;';
+            });
+
+            btn.setAttribute('style', [
+                'display:inline-flex',
+                'align-items:center',
                 'background:#CC1818',
                 'color:#fff',
                 'border:none',
                 'border-radius:6px',
-                'padding:4px 10px',
+                'padding:5px 12px',
                 'font-size:11px',
                 'font-weight:500',
-                'min-width:auto',
                 'width:fit-content',
+                'min-width:auto',
                 'letter-spacing:0',
-                'text-transform:none'
-            ].join(';') + ';';
+                'text-transform:none',
+                'margin-top:4px'
+            ].join(';') + ';');
         });
 
-        /* ── Footer: logos de afiliación → tamaño compacto ─────── */
-        var footerImgs = document.querySelectorAll(
+        /* ── 6. Footer: reset chip-rosa en nav links ─────────────── */
+        document.querySelectorAll(
+            'footer .elementor-nav-menu li, .elementor-location-footer .elementor-nav-menu li, [data-elementor-type="footer"] .elementor-nav-menu li'
+        ).forEach(function(li) {
+            li.style.cssText += 'background:transparent;border:none;border-radius:0;padding:0;white-space:normal;';
+            var a = li.querySelector('a');
+            if (a) a.style.cssText += 'background:transparent;border:none;border-radius:0;padding:0;font-size:11px;color:#aaa;display:block;line-height:1.9;';
+        });
+
+        /* ── 7. Footer: logos afiliación legibles ────────────────── */
+        document.querySelectorAll(
             'footer img, .elementor-location-footer img, [data-elementor-type="footer"] img'
-        );
-        footerImgs.forEach(function(img) {
-            var src = img.src || img.getAttribute('data-src') || '';
-            /* No tocar el logo principal */
-            if (src.includes('logo') && !src.includes('camara') && !src.includes('openpay')) return;
-            img.style.cssText += 'max-height:40px;max-width:120px;width:auto;height:auto;object-fit:contain;';
+        ).forEach(function(img) {
+            var isMainLogo = img.closest('.site-branding, .ast-site-branding-wrap, .elementor-widget-site-logo');
+            if (isMainLogo) return;
+            img.style.cssText += 'max-height:55px;max-width:150px;width:auto;height:auto;object-fit:contain;display:block;margin:4px auto;';
         });
 
-        /* Footer: reducir padding de columnas */
-        var footerCols = document.querySelectorAll(
+        /* ── 8. Footer: reducir padding columnas ─────────────────── */
+        document.querySelectorAll(
             'footer .elementor-column, .elementor-location-footer .elementor-column'
-        );
-        footerCols.forEach(function(col) {
+        ).forEach(function(col) {
             col.style.cssText += 'padding-top:10px;padding-bottom:10px;';
         });
 
-        console.log('[LTMS HF-19] Mobile enhancements aplicados');
+        /* ── 9. QA / Demo products: ocultar en homepage ──────────── */
+        document.querySelectorAll('.woocommerce-loop-product__title, .products li.product h2').forEach(function(title) {
+            var text = (title.textContent || '').toLowerCase();
+            if (text.includes('qa test') || text.includes('qa ') ||
+                text.includes('demo ltms') || text.includes('producto demo') ||
+                text.includes('test product')) {
+                var productLi = title.closest('li.product, .product');
+                if (productLi) productLi.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        console.log('[LTMS HF-19] Mobile enhancements v3 aplicados');
     }
 
     ready(function () {
