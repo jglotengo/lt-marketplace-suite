@@ -477,3 +477,57 @@ html.wp-toolbar {
     background: rgba(255,255,255,.1) !important;
     border-color: #fff !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-14: Trust bar del tema — aplicar paleta logo sin duplicar
+   Cuando el tema ya tiene una barra de confianza, le damos paleta.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-trust-bar-theme {
+    background: #5B2D8E !important;
+    color: #fff !important;
+}
+.ltms-trust-bar-theme * {
+    color: #fff !important;
+}
+.ltms-trust-bar-theme svg,
+.ltms-trust-bar-theme i,
+.ltms-trust-bar-theme img {
+    filter: brightness(0) invert(1) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15: Sección "Con el apoyo de" — reducir altura excesiva
+   El bloque de aliados ocupa 4 pantallas completas. Lo comprimimos
+   y le damos fondo blanco en lugar del negro actual.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Detectar sección por contenido via atributo inyectado por JS */
+.ltms-apoyo-section {
+    background: #fff !important;
+    padding: 40px 0 !important;
+    min-height: auto !important;
+    max-height: none !important;
+}
+.ltms-apoyo-section * {
+    color: #1A1A1A !important;
+}
+/* Título "Con el apoyo de:" */
+.ltms-apoyo-section h2,
+.ltms-apoyo-section h3,
+.ltms-apoyo-section p {
+    color: #333 !important;
+    font-size: 20px !important;
+}
+/* Logos de aliados: tamaño razonable */
+.ltms-apoyo-section img {
+    max-height: 60px !important;
+    width: auto !important;
+    filter: none !important;
+}
+/* Forzar altura mínima de los contenedores internos */
+.ltms-apoyo-section .elementor-section,
+.ltms-apoyo-section .e-con {
+    min-height: auto !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+}

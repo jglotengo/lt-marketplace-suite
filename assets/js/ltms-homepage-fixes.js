@@ -95,11 +95,43 @@
     }
 
     function isXboxVideo(iframe) {
-        var src = iframe.src || '';
+        var src = iframe.src || iframe.getAttribute('data-src') || '';
         var title = (iframe.title || '').toLowerCase();
         var parent = iframe.parentNode;
         var parentText = parent ? (parent.textContent || '').toLowerCase() : '';
         return title.includes('xbox') || src.includes('xbox') || parentText.includes('xbox');
+    }
+
+    /* Ocultar video Xbox que aparece como elemento nativo del tema (no iframe) */
+    function hideXboxNativeVideo() {
+        // Buscar cualquier video o sección que mencione Xbox
+        var allEls = document.querySelectorAll('video, [class*="video"], .elementor-widget-video, figure');
+        allEls.forEach(function(el) {
+            var src = (el.querySelector('source') || {}).src || '';
+            var poster = el.poster || el.getAttribute('data-poster') || '';
+            var text = el.textContent.toLowerCase();
+            var img = el.querySelector('img');
+            var imgSrc = img ? (img.src || img.getAttribute('data-src') || '') : '';
+
+            if (src.includes('xbox') || poster.includes('xbox') ||
+                text.includes('xbox') || imgSrc.includes('xbox')) {
+                var wrapper = el.closest('.elementor-section, .e-con, section') || el;
+                wrapper.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        // También buscar por imagen de thumbnail con control Xbox (detectar por contexto visual)
+        var figures = document.querySelectorAll('figure, .wp-block-video, .elementor-widget-video');
+        figures.forEach(function(fig) {
+            var imgs = fig.querySelectorAll('img');
+            imgs.forEach(function(img) {
+                var s = (img.src || img.getAttribute('data-src') || '').toLowerCase();
+                if (s.includes('xbox') || s.includes('controller') || s.includes('gamepad')) {
+                    var wrapper = fig.closest('.elementor-section, .e-con, section') || fig;
+                    wrapper.style.setProperty('display', 'none', 'important');
+                }
+            });
+        });
     }
 
     function loadYTIframe(facade, videoId, originalIframe) {
@@ -123,7 +155,23 @@
        principal si no existe ya en el DOM.
        ══════════════════════════════════════════════════════════════ */
     function injectTrustBar() {
-        if (document.querySelector('.ltms-trust-bar')) return; // Ya existe
+        if (document.querySelector('.ltms-trust-bar')) return; // Ya existe (nuestra)
+
+        // Si el tema ya tiene una barra de confianza propia, no duplicar —
+        // solo aplicarle la paleta con clase override
+        var themeBars = document.querySelectorAll(
+            '[class*="trust"], [class*="garantia"], [class*="benefit"], ' +
+            '[class*="feature-bar"], [class*="info-bar"], [class*="top-bar"]'
+        );
+        for (var i = 0; i < themeBars.length; i++) {
+            var t = themeBars[i].textContent.toLowerCase();
+            if (t.includes('envío') || t.includes('envio') || t.includes('pago') ||
+                t.includes('devoluc') || t.includes('verificad')) {
+                // Barra del tema detectada — aplicar paleta logo y no inyectar otra
+                themeBars[i].classList.add('ltms-trust-bar-theme');
+                return;
+            }
+        }
 
         var bar = document.createElement('div');
         bar.className = 'ltms-trust-bar';
@@ -338,6 +386,35 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
+       HF-15: Sección "Con el apoyo de" — fondo blanco + comprimir
+       El bloque ocupa 4+ pantallas con fondo negro. Lo detectamos
+       por texto y le aplicamos fondo blanco + altura comprimida.
+       ══════════════════════════════════════════════════════════════ */
+    function fixApoyoSection() {
+        var sections = document.querySelectorAll(
+            '.elementor-section, .e-con, section, div[class*="section"]'
+        );
+        var found = null;
+        sections.forEach(function(sec) {
+            if (found) return;
+            var text = sec.textContent.toLowerCase();
+            if ((text.includes('con el apoyo') || text.includes('cardioinfantil')) &&
+                !sec.closest('.ltms-apoyo-section')) {
+                found = sec;
+            }
+        });
+        if (found) {
+            found.classList.add('ltms-apoyo-section');
+            found.style.setProperty('background', '#fff', 'important');
+            // Reducir padding interno de sub-secciones con fondo negro
+            var darkKids = found.querySelectorAll('[style*="background"]');
+            darkKids.forEach(function(el) {
+                el.style.setProperty('background', '#fff', 'important');
+            });
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        HF-12: Stats bar — paleta logo
        Detecta la sección Elementor con la barra de estadísticas
        (4.8/5 calificación, pedidos hoy, productos publicados) por
@@ -501,6 +578,8 @@
             fixHeroCtaHierarchy(); // HF-11: jerarquía CTAs
             fixStatsBar();         // HF-12: stats bar paleta logo
             fixVendorSectionCtas();// HF-13: contraste CTAs vendedores
+            hideXboxNativeVideo(); // HF-07b: video Xbox nativo del tema
+            fixApoyoSection();     // HF-15: sección aliados fondo blanco
         }
 
         // QA products en cualquier página de tienda
