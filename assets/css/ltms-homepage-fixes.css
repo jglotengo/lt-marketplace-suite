@@ -878,3 +878,11 @@ footer.elementor-element-25fec764 a:hover {
 .home .elementor-30 .e-con.e-parent:nth-child(2) {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15h: Sección negra "Con el apoyo de" — ocultar por data-id
+   data-id confirmado via DevTools: 49db4d8a (primer e-con.e-parent)
+   ═══════════════════════════════════════════════════════════════ */
+.elementor-element-49db4d8a {
+    display: none !important;
+}
