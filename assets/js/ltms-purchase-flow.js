@@ -184,6 +184,34 @@
         initProductPage();
         initNativeCheckout();
         initCartPage();
+        injectQuickAddButtons(); // UX fix: botón compra rápida en cards custom
     });
+
+    /* ──────────────────────────────────────────────────────────────
+       UX FIX: Botón quick-add en cards custom LTMS (.ltms-pf-card)
+       El botón se inyecta solo si la card tiene un link de producto.
+       En WooCommerce nativo el CSS solo hace visible el botón ya existente.
+       ────────────────────────────────────────────────────────────── */
+    function injectQuickAddButtons() {
+        $('.ltms-pf-card').each(function() {
+            var $card = $(this);
+            if ($card.find('.ltms-pf-card__quick-add').length) return; // ya inyectado
+
+            // Obtener URL y nombre del producto desde la card
+            var $link = $card.find('a').first();
+            var url   = $link.attr('href') || '#';
+            var name  = $card.find('.ltms-pf-card__name').text().trim() || 'Ver producto';
+
+            var $btn = $('<a>', {
+                href:  url,
+                class: 'ltms-pf-card__quick-add',
+                text:  '+ Añadir',
+                'aria-label': 'Añadir al carrito: ' + name
+            });
+
+            // Insertar antes del body de la card para que quede sobre la imagen
+            $card.append($btn);
+        });
+    }
 
 })(jQuery);

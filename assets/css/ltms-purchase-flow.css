@@ -877,3 +877,138 @@
 .woocommerce ul.order_details li strong {
     color: var(--ltms-red) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   UX FIX: Cards de producto — fondo blanco uniforme
+   Reemplaza los fondos de colores aleatorios (rosa, verde, amarillo,
+   azul, beige) por blanco neutro. El color queda solo en badges.
+   Aplica a: cards custom LTMS + cards WooCommerce nativo.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Cards custom del plugin (homepage sections) */
+.ltms-pf-card {
+    background: #fff !important;
+    border: 1px solid #EBEBEB !important;
+}
+
+/* Imagen dentro de la card — fondo neutro uniforme */
+.ltms-pf-card__img {
+    background: #F7F7F7 !important;
+}
+
+/* Cards WooCommerce nativo — grillas de shop y homepage */
+.woocommerce ul.products li.product,
+.wc-block-grid__product,
+.products .product {
+    background: #fff !important;
+    border: 1px solid #EBEBEB !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    transition: box-shadow .2s, transform .15s !important;
+}
+
+/* Imagen WC — contenedor uniforme */
+.woocommerce ul.products li.product .woocommerce-loop-product__link img,
+.wc-block-grid__product-image img {
+    background: #F7F7F7 !important;
+    display: block !important;
+}
+
+/* Hover sutil en card WC nativo */
+.woocommerce ul.products li.product:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,.08) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UX FIX: Botón de compra rápida en hover de card
+   Muestra "Añadir" al hacer hover sobre la card. En mobile
+   el botón es visible siempre (no hay hover en touch).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Contenedor relativo para posicionar el botón */
+.woocommerce ul.products li.product {
+    position: relative !important;
+}
+
+/* Botón nativo WC — oculto por defecto, visible en hover */
+.woocommerce ul.products li.product a.add_to_cart_button,
+.woocommerce ul.products li.product a.button.add_to_cart_button {
+    position: absolute !important;
+    bottom: 52px !important; /* justo encima del precio */
+    left: 12px !important;
+    right: 12px !important;
+    width: calc(100% - 24px) !important;
+    text-align: center !important;
+    opacity: 0 !important;
+    transform: translateY(6px) !important;
+    transition: opacity .18s ease, transform .18s ease !important;
+    z-index: 2 !important;
+    border-radius: 6px !important;
+    padding: 9px 14px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    background: var(--ltms-red) !important;
+    color: #fff !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+/* Mostrar al hacer hover en la card */
+.woocommerce ul.products li.product:hover a.add_to_cart_button,
+.woocommerce ul.products li.product:hover a.button.add_to_cart_button {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+}
+
+/* Mobile: botón siempre visible (no hay hover en touch) */
+@media (max-width: 768px) {
+    .woocommerce ul.products li.product a.add_to_cart_button,
+    .woocommerce ul.products li.product a.button.add_to_cart_button {
+        position: static !important;
+        opacity: 1 !important;
+        transform: none !important;
+        width: 100% !important;
+        margin-top: 8px !important;
+        display: block !important;
+    }
+}
+
+/* Cards custom LTMS — botón quick-add en hover */
+.ltms-pf-card {
+    position: relative !important;
+}
+.ltms-pf-card__quick-add {
+    position: absolute;
+    bottom: 56px;
+    left: 12px;
+    right: 12px;
+    background: var(--ltms-red);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 0;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 2;
+    width: calc(100% - 24px);
+}
+.ltms-pf-card:hover .ltms-pf-card__quick-add {
+    opacity: 1;
+    transform: translateY(0);
+}
+@media (max-width: 768px) {
+    .ltms-pf-card__quick-add {
+        position: static;
+        opacity: 1;
+        transform: none;
+        width: 100%;
+        margin-top: 8px;
+        display: block;
+    }
+}
