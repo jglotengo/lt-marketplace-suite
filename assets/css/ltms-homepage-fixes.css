@@ -794,3 +794,31 @@ footer.elementor-element-25fec764 a:hover {
     color: #F5A623 !important;
     text-decoration: underline !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-15d: Sección negra — CSS nuclear para background-image negro
+   Elementor usa background-image (no background-color) para el negro.
+   Ataca cualquier e-con en el main del homepage que tenga bg negro.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-black-section-hidden {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+.ltms-black-section-hidden * {
+    background: transparent !important;
+    background-image: none !important;
+}
+/* Texto que era blanco sobre negro — hacerlo legible */
+.ltms-black-section-hidden h1,
+.ltms-black-section-hidden h2,
+.ltms-black-section-hidden h3,
+.ltms-black-section-hidden p,
+.ltms-black-section-hidden span,
+.ltms-black-section-hidden a {
+    color: #1A1A1A !important;
+}
+/* Logos: restaurar colores originales */
+.ltms-black-section-hidden img {
+    filter: none !important;
+}

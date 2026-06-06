@@ -660,36 +660,74 @@
 
 
     /* ══════════════════════════════════════════════════════════════
-       HF-15c: Sección negra "Con el apoyo de" — detectar por color
-       No está en el HTML estático. Se detecta en runtime buscando
-       contenedores con background-color negro entre las secciones
-       del homepage, excluyendo header y footer.
+       HF-15d: Sección negra — MutationObserver + background-image
+       La sección "Con el apoyo de" es un Global Widget de Elementor
+       inyectado dinámicamente DESPUÉS del DOMContentLoaded.
+       Usa background-image negro (no background-color), por eso
+       getComputedStyle no la detectaba en el evento ready.
+       Solución: MutationObserver que la captura al insertarse.
        ══════════════════════════════════════════════════════════════ */
     function hideBlackSections() {
-        // Solo actuar en los contenedores e-parent del main content
-        var main = document.querySelector('#content, main, .site-main');
+        var main = document.querySelector('#content, main, .site-main, .page-content');
         if (!main) return;
 
-        var containers = main.querySelectorAll('.e-con.e-parent, .elementor-section');
-        containers.forEach(function(el) {
+        function checkAndFix(el) {
+            if (!el || !el.querySelectorAll) return;
+            // Buscar el contenedor que tiene background-image oscuro o negro
+            // Elementor lo setea como style inline en el e-con
+            var style = el.getAttribute('style') || '';
             var bg = window.getComputedStyle(el).backgroundColor;
-            // rgb(0, 0, 0) = negro puro de Elementor
-            if (bg === 'rgb(0, 0, 0)' || bg === 'rgba(0, 0, 0, 1)') {
-                el.style.setProperty('background-color', '#ffffff', 'important');
-                el.style.setProperty('background', '#ffffff', 'important');
-                // También sus hijos con fondo negro
-                el.querySelectorAll('*').forEach(function(child) {
-                    var childBg = window.getComputedStyle(child).backgroundColor;
-                    if (childBg === 'rgb(0, 0, 0)' || childBg === 'rgba(0, 0, 0, 1)') {
-                        child.style.setProperty('background-color', '#ffffff', 'important');
-                    }
-                    // Texto blanco sobre fondo que ahora es blanco — hacerlo oscuro
-                    var childColor = window.getComputedStyle(child).color;
-                    if (childColor === 'rgb(255, 255, 255)' || childColor === 'rgba(255, 255, 255, 1)') {
-                        child.style.setProperty('color', '#1A1A1A', 'important');
+            var bgImg = window.getComputedStyle(el).backgroundImage;
+
+            var isBlack = (
+                bg === 'rgb(0, 0, 0)' ||
+                bg === 'rgba(0, 0, 0, 1)' ||
+                style.includes('#000') ||
+                style.includes('rgb(0, 0, 0)') ||
+                bgImg.includes('gradient') && bg === 'rgb(0, 0, 0)'
+            );
+
+            if (isBlack && el.closest('#content, main, .site-main, .page-content')) {
+                el.classList.add('ltms-black-section-hidden');
+            }
+        }
+
+        // Chequear elementos ya en el DOM
+        main.querySelectorAll('.e-con.e-parent, .elementor-section').forEach(checkAndFix);
+
+        // MutationObserver para elementos inyectados después
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(m) {
+                m.addedNodes.forEach(function(node) {
+                    if (node.nodeType !== 1) return;
+                    // El nodo mismo
+                    checkAndFix(node);
+                    // Sus hijos e-con
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('.e-con.e-parent, .elementor-section').forEach(checkAndFix);
                     }
                 });
-            }
+                // También chequear si se modificó el style de un nodo existente
+                if (m.type === 'attributes' && m.attributeName === 'style') {
+                    checkAndFix(m.target);
+                }
+            });
         });
+
+        observer.observe(main, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+
+        // Fallback: re-chequear 500ms y 1500ms después (Elementor lazy-load)
+        setTimeout(function() {
+            main.querySelectorAll('.e-con.e-parent, .elementor-section').forEach(checkAndFix);
+        }, 500);
+        setTimeout(function() {
+            main.querySelectorAll('.e-con.e-parent, .elementor-section').forEach(checkAndFix);
+            observer.disconnect(); // ya no necesitamos observar más
+        }, 1500);
     }
 
