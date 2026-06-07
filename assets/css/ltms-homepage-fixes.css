@@ -896,21 +896,145 @@ footer.elementor-element-25fec764 a:hover {
 
 /* ── Variables de paleta ─────────────────────────────────────── */
 :root {
-    --ltms-red:        #CC1818;
-    --ltms-red-dark:   #B01212;
-    --ltms-red-light:  #FFF0F0;
-    --ltms-red-border: #FFCCCC;
-    --ltms-dark:       #1A1A1A;
-    --ltms-gray-text:  #666666;
-    --ltms-gray-bg:    #F8F8F8;
+    /* ── Paleta oficial Lo Tengo ─────────────────────────── */
+    --ltms-red:         #E80001;   /* rojo primario logo */
+    --ltms-red-dark:    #B01212;   /* rojo oscuro hover/sombras */
+    --ltms-red-deeper:  #8B0000;   /* rojo profundo bordes activos */
+    --ltms-red-light:   #FFF5F5;   /* fondo suave rojo */
+    --ltms-red-border:  #FFD0D0;   /* borde suave rojo */
+    --ltms-yellow:      #FFC303;   /* amarillo logo */
+    --ltms-yellow-dark: #E6A800;   /* amarillo oscuro */
+    --ltms-purple:      #5B2D8E;   /* morado logo (solo acentos) */
+    --ltms-dark:        #1A1A1A;
+    --ltms-gray-text:   #555555;
+    --ltms-gray-bg:     #F7F7F7;
+    --ltms-white:       #FFFFFF;
 }
 
 /* ════════════════════════════════════════════════════════════════
-   HEADER — rojo sólido, search integrada, sin duplicación de logo
+   HEADER — HF-21 v1 — Jerarquía de marca Lo Tengo
+   Paleta: Rojo #E80001 primario · Amarillo #FFC303 acentos · Blanco
+   Estructura: [Logo + Nav] → [Stats rojo oscuro] → [Trust pills]
    ════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
-    /* Fondo header rojo */
+    /* ── Fondo header: rojo primario de marca ─────────────── */
+    .site-header,
+    #masthead,
+    .ast-site-header-wrap,
+    .ast-primary-header-bar,
+    header.site-header,
+    .elementor-location-header,
+    [data-elementor-type="header"],
+    [data-elementor-type="header"] .e-con,
+    [data-elementor-type="header"] .elementor-section {
+        background: var(--ltms-red) !important;
+        box-shadow: 0 2px 8px rgba(232,0,1,0.25) !important;
+    }
+
+    /* ── Logo: máximo visible, proporcional ───────────────── */
+    .site-header .site-branding img,
+    .ast-site-branding-wrap img,
+    .elementor-location-header .elementor-widget-image img,
+    [data-elementor-type="header"] .elementor-widget-image img,
+    [data-elementor-type="header"] .elementor-widget-image a img {
+        max-height: 40px !important;
+        max-width: 130px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+    }
+
+    /* ── Texto del sitio si no hay imagen logo ─────────────── */
+    .site-header .site-title a,
+    .ast-site-branding-wrap .site-title a,
+    [data-elementor-type="header"] .elementor-heading-title {
+        color: #fff !important;
+        font-weight: 800 !important;
+        font-size: 20px !important;
+        letter-spacing: -0.5px !important;
+        text-decoration: none !important;
+    }
+
+    /* ── Nav mobile: rojo oscuro (#B01212) ────────────────── */
+    .ast-mobile-header-wrap,
+    .ast-mobile-nav-wrap,
+    #ast-mobile-popup,
+    .main-navigation {
+        background: var(--ltms-red-dark) !important;
+    }
+
+    /* ── Links de nav: blanco sobre rojo ─────────────────── */
+    header .elementor-nav-menu a,
+    .elementor-location-header .elementor-nav-menu a,
+    [data-elementor-type="header"] .elementor-nav-menu a {
+        color: #fff !important;
+        font-weight: 500 !important;
+    }
+
+    header .elementor-nav-menu a:hover,
+    .elementor-location-header .elementor-nav-menu a:hover {
+        color: var(--ltms-yellow) !important;  /* amarillo en hover */
+    }
+
+    /* ── Iconos: carrito, usuario, búsqueda — blancos ──────── */
+    .ast-site-header-wrap .ast-header-custom-item,
+    .ast-site-header-wrap .ast-header-html,
+    header .elementor-widget a,
+    header .elementor-widget i,
+    header .elementor-widget svg,
+    [data-elementor-type="header"] .elementor-widget a,
+    [data-elementor-type="header"] .elementor-widget i,
+    [data-elementor-type="header"] .elementor-widget svg {
+        color: var(--ltms-white) !important;
+        fill: var(--ltms-white) !important;
+    }
+
+    /* ── Badge del carrito: amarillo de marca ─────────────── */
+    header .ast-cart-menu-wrap .count,
+    header .elementor-menu-cart__toggle_button .elementor-button-text,
+    [data-elementor-type="header"] .elementor-menu-cart__toggle_button {
+        background: var(--ltms-yellow) !important;
+        color: var(--ltms-dark) !important;
+        border-radius: 50% !important;
+        font-weight: 700 !important;
+        font-size: 10px !important;
+    }
+
+    /* ── Hamburger: blanco ────────────────────────────────── */
+    .menu-toggle,
+    .ast-mobile-menu-trigger,
+    button.menu-toggle,
+    .ast-header-break-point .ast-mobile-menu-trigger {
+        color: #fff !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    .menu-toggle .menu-toggle-icon,
+    .ast-mobile-menu-trigger span,
+    .ast-mobile-menu-trigger .menu-toggle-icon {
+        background: #fff !important;
+    }
+
+    /* ── Dropdown del nav mobile: rojo más oscuro ─────────── */
+    .ast-mobile-header-wrap .main-navigation ul ul,
+    .ast-mobile-header-wrap .main-navigation .sub-menu,
+    [data-elementor-type="header"] .elementor-nav-menu .sub-menu {
+        background: var(--ltms-red-deeper) !important;
+    }
+
+    .ast-mobile-header-wrap .main-navigation ul ul a,
+    .ast-mobile-header-wrap .main-navigation .sub-menu a,
+    [data-elementor-type="header"] .elementor-nav-menu .sub-menu a {
+        color: rgba(255,255,255,0.9) !important;
+        border-top: 1px solid rgba(255,255,255,0.1) !important;
+    }
+}
+
+/* ── DESKTOP: Header rojo en todos los breakpoints ──────────── */
+@media (min-width: 769px) {
+
     .site-header,
     #masthead,
     .ast-site-header-wrap,
@@ -921,43 +1045,42 @@ footer.elementor-element-25fec764 a:hover {
         background: var(--ltms-red) !important;
     }
 
-    /* Logo: tamaño adecuado */
     .site-header .site-branding img,
     .ast-site-branding-wrap img,
     .elementor-location-header .elementor-widget-image img,
     [data-elementor-type="header"] .elementor-widget-image img {
-        max-height: 36px !important;
+        max-height: 48px !important;
         width: auto !important;
+        object-fit: contain !important;
     }
 
-    /* Nav mobile: fondo rojo oscuro */
-    .ast-mobile-header-wrap,
-    .ast-mobile-nav-wrap,
-    #ast-mobile-popup,
-    .main-navigation {
-        background: var(--ltms-red-dark) !important;
+    header .elementor-nav-menu a,
+    .elementor-location-header .elementor-nav-menu a,
+    [data-elementor-type="header"] .elementor-nav-menu a {
+        color: #fff !important;
+        font-weight: 500 !important;
     }
 
-    /* Iconos del header (carrito, usuario) blancos */
-    .ast-site-header-wrap .ast-header-custom-item,
-    .ast-site-header-wrap .ast-header-html,
-    header .elementor-widget a,
+    header .elementor-nav-menu a:hover,
+    .elementor-location-header .elementor-nav-menu a:hover {
+        color: var(--ltms-yellow) !important;
+    }
+
     header .elementor-widget i,
-    header .elementor-widget svg {
+    header .elementor-widget svg,
+    header .elementor-widget a,
+    [data-elementor-type="header"] .elementor-widget i,
+    [data-elementor-type="header"] .elementor-widget svg,
+    [data-elementor-type="header"] .elementor-widget a {
         color: #fff !important;
         fill: #fff !important;
     }
 
-    /* Hamburger blanco */
-    .menu-toggle,
-    .ast-mobile-menu-trigger,
-    button.menu-toggle,
-    .ast-header-break-point .ast-mobile-menu-trigger {
-        color: #fff !important;
-    }
-    .menu-toggle .menu-toggle-icon,
-    .ast-mobile-menu-trigger span {
-        background: #fff !important;
+    header .ast-cart-menu-wrap .count,
+    [data-elementor-type="header"] .elementor-menu-cart__toggle_button .elementor-button-text {
+        background: var(--ltms-yellow) !important;
+        color: var(--ltms-dark) !important;
+        font-weight: 700 !important;
     }
 }
 
@@ -1027,46 +1150,53 @@ footer.elementor-element-25fec764 a:hover {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   TRUST PILLS — chips rojos debajo del header/trust-bar
+   TRUST PILLS — HF-21 v1 — paleta oficial marca Lo Tengo
+   Barra de garantías: fondo rojo muy suave, chips con paleta
+   Jerarquía: rojo primario → amarillo acentos → blanco fondo
    ════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
-    /* Contenedor: la barra morada del tema (garantías) */
-    .ltms-trust-bar-theme,
-    .ast-mobile-header-wrap ~ .ltms-trust-bar-theme {
-        background: #fff !important;
-        padding: 7px 10px !important;
-        display: flex !important;
-        gap: 6px !important;
-        flex-wrap: wrap !important;
-        border-bottom: 0.5px solid rgba(0,0,0,0.08) !important;
-    }
-
-    /* Cada item como chip rojo suave — scope acotado a la trust bar del tema */
-    .ltms-trust-bar-theme > * > .elementor-icon-list-item,
-    .ltms-trust-bar-theme > .elementor-icon-list-item,
-    .ltms-trust-bar-theme .ltms-trust-item {
-        background: var(--ltms-red-light) !important;
-        color: var(--ltms-red-dark) !important;
-        border-radius: 20px !important;
-        padding: 3px 10px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-        font-size: 10px !important;
-        font-weight: 500 !important;
-        border: none !important;
-        white-space: nowrap !important;
-    }
-
-    /* Ocultar barra morada si ya tenemos la nuestra trust bar roja */
+    /* Contenedor trust pills: fondo blanco cálido */
     .ltms-trust-bar-theme {
+        display: flex !important;
+        background: #fff !important;
+        padding: 6px 10px !important;
+        gap: 6px !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        border-bottom: 2px solid var(--ltms-red) !important;
+        /* visible — no ocultar */
+    }
+
+    .ltms-trust-bar-theme::-webkit-scrollbar {
         display: none !important;
     }
 
-    .ltms-trust-bar-theme * {
-        color: var(--ltms-red-dark) !important;
+    /* Cada pill: rojo suave con borde rojo */
+    .ltms-trust-bar-theme > * > .elementor-icon-list-item,
+    .ltms-trust-bar-theme > .elementor-icon-list-item,
+    .ltms-trust-bar-theme .ltms-trust-item,
+    .ltms-trust-bar-theme .elementor-icon-list-item {
+        background: var(--ltms-red-light) !important;
+        color: var(--ltms-red) !important;
+        border-radius: 20px !important;
+        border: 1px solid var(--ltms-red-border) !important;
+        padding: 4px 10px 4px 8px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
         font-size: 10px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+
+    .ltms-trust-bar-theme * {
+        color: var(--ltms-red) !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
     }
 
     .ltms-trust-bar-theme svg,
@@ -1074,9 +1204,16 @@ footer.elementor-element-25fec764 a:hover {
         width: 12px !important;
         height: 12px !important;
         font-size: 12px !important;
-        filter: none !important;
         color: var(--ltms-red) !important;
         fill: var(--ltms-red) !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Ícono estrella (KYC verificado): amarillo de marca */
+    .ltms-trust-bar-theme .elementor-icon-list-item:first-child svg,
+    .ltms-trust-bar-theme .elementor-icon-list-item:first-child i {
+        color: var(--ltms-yellow) !important;
+        fill: var(--ltms-yellow) !important;
     }
 }
 
