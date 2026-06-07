@@ -165,21 +165,26 @@ html body [data-elementor-type="footer"] .elementor-social-icon {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    6. AFILIACIONES — 586bd11 (padre) + 269ab79 (logos)
-   v3 — elimina fondo blanco e-con-boxed, logos proporcionales
+   v4 — ataque nuclear al fondo blanco inline de Elementor
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-/* Contenedor padre 586bd11 — e-con-boxed con fondo blanco */
-html body .elementor-element-586bd11,
-html body .elementor-element-586bd11.e-con,
-html body .elementor-element-586bd11.e-con-boxed {
+/* 586bd11: especificidad máxima + override CSS vars de Elementor */
+html body.elementor-page .elementor-element-586bd11,
+html body.elementor-page .elementor-element-586bd11.e-con,
+html body.elementor-page .elementor-element-586bd11.e-con-boxed,
+html body .elementor-location-footer .elementor-element-586bd11,
+html body [data-elementor-type="footer"] .elementor-element-586bd11 {
     background: transparent !important;
     background-color: transparent !important;
+    --background-color: transparent !important;
+    --e-con-background: transparent !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 16px !important;
+    padding: 14px 16px !important;
     margin: 0 !important;
 }
-html body .elementor-element-586bd11 > .e-con-inner {
+html body .elementor-element-586bd11 > .e-con-inner,
+html body .elementor-location-footer .elementor-element-586bd11 > .e-con-inner {
     background: transparent !important;
     background-color: transparent !important;
     padding: 0 !important;
@@ -336,13 +341,40 @@ html body .elementor-13743 .e-con.e-con-full {
 }
 
 /* Forzar transparencia en CUALQUIER div con background blanco dentro del footer */
+/* Cubre: #fff, #FFF, #ffffff, #FFFFFF, rgb(...), rgba(...), white, inline vars */
 html body .elementor-location-footer [style*="background-color: #fff"],
 html body .elementor-location-footer [style*="background-color:#fff"],
+html body .elementor-location-footer [style*="background-color: #FFF"],
+html body .elementor-location-footer [style*="background-color:#FFF"],
+html body .elementor-location-footer [style*="background-color: #ffffff"],
+html body .elementor-location-footer [style*="background-color:#ffffff"],
+html body .elementor-location-footer [style*="background-color: #FFFFFF"],
+html body .elementor-location-footer [style*="background-color:#FFFFFF"],
 html body .elementor-location-footer [style*="background-color: rgb(255, 255, 255)"],
+html body .elementor-location-footer [style*="background-color:rgb(255,255,255)"],
+html body .elementor-location-footer [style*="background-color: rgba(255, 255, 255"],
+html body .elementor-location-footer [style*="background-color: white"],
 html body [data-elementor-type="footer"] [style*="background-color: #fff"],
 html body [data-elementor-type="footer"] [style*="background-color:#fff"],
+html body [data-elementor-type="footer"] [style*="background-color: #FFF"],
+html body [data-elementor-type="footer"] [style*="background-color:#FFF"],
+html body [data-elementor-type="footer"] [style*="background-color: #ffffff"],
+html body [data-elementor-type="footer"] [style*="background-color:#ffffff"],
+html body [data-elementor-type="footer"] [style*="background-color: #FFFFFF"],
+html body [data-elementor-type="footer"] [style*="background-color:#FFFFFF"],
 html body [data-elementor-type="footer"] [style*="background-color: rgb(255, 255, 255)"],
+html body [data-elementor-type="footer"] [style*="background-color:rgb(255,255,255)"],
+html body [data-elementor-type="footer"] [style*="background-color: rgba(255, 255, 255"],
 html body [data-elementor-type="footer"] [style*="background-color: white"] {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Ataque directo a CSS custom property inline de Elementor */
+html body .elementor-location-footer [style*="--e-con-background"],
+html body [data-elementor-type="footer"] [style*="--e-con-background"] {
+    --e-con-background: transparent !important;
+    background: transparent !important;
     background-color: transparent !important;
 }
 
