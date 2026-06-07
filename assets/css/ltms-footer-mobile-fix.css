@@ -165,122 +165,116 @@ html body [data-elementor-type="footer"] .elementor-social-icon {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    6. AFILIACIONES — 586bd11 (padre) + 269ab79 (logos)
-   v4 — ataque nuclear al fondo blanco inline de Elementor
+   v5 — layout grid 2 col, logos grandes, contraste mejorado
+   Estructura real (imagen 2): columna izq = label+logos, col der = pagos
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-/* 586bd11: especificidad máxima + override CSS vars de Elementor */
-html body.elementor-page .elementor-element-586bd11,
-html body.elementor-page .elementor-element-586bd11.e-con,
-html body.elementor-page .elementor-element-586bd11.e-con-boxed,
+/* ── 586bd11 padre: fondo oscuro explícito para tapar el blanco ── */
 html body .elementor-location-footer .elementor-element-586bd11,
-html body [data-elementor-type="footer"] .elementor-element-586bd11 {
-    background: transparent !important;
-    background-color: transparent !important;
-    --background-color: transparent !important;
-    --e-con-background: transparent !important;
+html body [data-elementor-type="footer"] .elementor-element-586bd11,
+html body .elementor-element-586bd11 {
+    background-color: #1A1A1A !important;
+    background: #1A1A1A !important;
+    --e-con-background: #1A1A1A !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 14px 16px !important;
+    padding: 16px !important;
     margin: 0 !important;
 }
+
 html body .elementor-element-586bd11 > .e-con-inner,
 html body .elementor-location-footer .elementor-element-586bd11 > .e-con-inner {
-    background: transparent !important;
     background-color: transparent !important;
+    background: transparent !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-}
-
-/* Wrapper logos 269ab79 — dentro del 586bd11 */
-html body .elementor-element-269ab79,
-html body .elementor-element-269ab79.e-con {
-    background: transparent !important;
-    background-color: transparent !important;
-    padding: 0 !important;
-    width: 100% !important;
-}
-
-/* e-con-inner: logos en fila horizontal con etiqueta "Afiliaciones" */
-html body .elementor-element-269ab79 > .e-con-inner {
     display: flex !important;
     flex-direction: row !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 14px 20px !important;
-    padding: 0 !important;
-    width: 100% !important;
-    background: transparent !important;
+    gap: 12px !important;
+    align-items: stretch !important;
 }
 
-/* Cada columna (afiliado): sin card, flex column centrado */
+/* ── 269ab79: sección logos afiliados — ocupa ~55% del ancho ── */
+html body .elementor-element-269ab79,
+html body .elementor-element-269ab79.e-con {
+    background-color: transparent !important;
+    background: transparent !important;
+    padding: 0 !important;
+    flex: 1 1 55% !important;
+    min-width: 0 !important;
+}
+
+/* e-con-inner de 269ab79: grid 2×N para los logos */
+html body .elementor-element-269ab79 > .e-con-inner {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px 8px !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    align-items: center !important;
+}
+
+/* Cada celda de logo */
 html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     gap: 4px !important;
+    background-color: transparent !important;
     background: transparent !important;
     border: none !important;
-    border-radius: 0 !important;
     padding: 0 !important;
-    box-sizing: border-box !important;
-    flex: 0 0 auto !important;
-    max-width: 110px !important;
 }
 
-/* Widget imagen — transparente en todos los niveles */
+/* Widget + container de imagen */
 html body .elementor-element-269ab79 .elementor-widget-image,
 html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-    background: transparent !important;
     background-color: transparent !important;
+    background: transparent !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     padding: 0 !important;
+    width: 100% !important;
 }
 
-/* IMÁGENES DE LOGOS — proporcionales, sin fondo blanco */
+/* LOGOS: tamaño visible + contraste sobre oscuro */
 html body .elementor-element-269ab79 img {
-    max-width: 100px !important;
-    max-height: 38px !important;
+    max-width: 88px !important;
+    max-height: 44px !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
     display: block !important;
-    background: transparent !important;
+    margin: 0 auto !important;
+    /* Contraste: blanco brillante sobre fondo oscuro */
+    filter: brightness(0) invert(1) !important;
+    opacity: 0.82 !important;
     background-color: transparent !important;
-    /* Elimina fondo blanco PNG sobre fondo oscuro */
-    mix-blend-mode: luminosity !important;
-    filter: brightness(1.15) contrast(1.05) !important;
-    opacity: 0.9 !important;
+    background: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
-    margin: 0 !important;
 }
 
-/* Caption nombre del afiliado */
+/* Caption */
 html body .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title {
     font-size: 9px !important;
     font-weight: 400 !important;
-    color: #888888 !important;
+    color: #777777 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
     border-bottom: none !important;
     padding-bottom: 0 !important;
-    margin: 0 !important;
+    margin: 2px 0 0 !important;
     line-height: 1.2 !important;
     white-space: normal !important;
     text-align: center !important;
-}
-
-/* Separator visual entre Afiliaciones y Openpay */
-html body .elementor-element-586bd11 > .e-con-inner > .elementor-element + .elementor-element {
-    border-top: 1px solid rgba(255,255,255,0.07) !important;
-    padding-top: 14px !important;
-    margin-top: 4px !important;
+    display: block !important;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
