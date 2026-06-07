@@ -2554,3 +2554,130 @@ body.home {
     }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-23: Footer Mobile — Fix imágenes afiliaciones y alineación
+   IDs reales del DOM (DevTools 07/06/2026):
+     37db1646 → Cámara de Comercio de Cali
+     7f306b13 → Camara Colombiana de Comercio Electrónico
+     186f2b15 → Openpay / Pagos Seguros
+   Problema: imágenes ocupan ancho completo (372px) en móvil.
+   Solución: contener logos + centrar texto con padding correcto.
+   Scope: max-width 768px SOLO. Desktop intacto.
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+    /* ── Logos afiliación por data-id real ───────────────────── */
+    .elementor-element-37db1646 img,
+    .elementor-element-7f306b13 img {
+        max-height: 44px !important;
+        max-width: 130px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 6px auto !important;
+        filter: none !important;
+        opacity: 1 !important;
+    }
+
+    /* ── Openpay por data-id real ────────────────────────────── */
+    .elementor-element-186f2b15 img {
+        max-height: 26px !important;
+        max-width: 90px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 4px auto !important;
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.85 !important;
+    }
+
+    /* ── Contenedor de cada imagen: no estirar al ancho completo  */
+    .elementor-element-37db1646,
+    .elementor-element-7f306b13,
+    .elementor-element-186f2b15 {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 4px 0 !important;
+        width: auto !important;
+        flex: unset !important;
+    }
+
+    /* ── Texto de afiliaciones: centrar y tamaño razonable ───── */
+    .elementor-location-footer .elementor-widget-text-editor p,
+    [data-elementor-type="footer"] .elementor-widget-text-editor p {
+        text-align: center !important;
+        font-size: 11px !important;
+        color: #AAAAAA !important;
+        margin: 4px 0 !important;
+        line-height: 1.4 !important;
+    }
+
+    /* ── "Pagos y transferencias seguras a través de:" ────────── */
+    .elementor-element-186f2b15 .elementor-widget-text-editor,
+    .elementor-location-footer .elementor-widget-text-editor {
+        text-align: center !important;
+    }
+
+    /* ── Sección "Afiliaciones" y "Pagos Seguros" — centrar todo  */
+    .elementor-location-footer .elementor-column,
+    [data-elementor-type="footer"] .elementor-column {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+
+    /* ── Heading "Afiliaciones" / "Pagos Seguros" — centrar ───── */
+    .elementor-location-footer .elementor-heading-title,
+    [data-elementor-type="footer"] .elementor-heading-title {
+        text-align: left !important;
+    }
+
+    /* ── Contactos — alinear correctamente el icono + texto ───── */
+    .elementor-location-footer .elementor-icon-list-items,
+    [data-elementor-type="footer"] .elementor-icon-list-items {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    /* ── Secciones del footer: ancho correcto, no overflow ─────── */
+    .elementor-location-footer .e-con-inner,
+    [data-elementor-type="footer"] .e-con-inner {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── Columnas del footer: ancho 100% en mobile ─────────────── */
+    .elementor-location-footer .elementor-col-33,
+    .elementor-location-footer .elementor-col-25,
+    .elementor-location-footer .elementor-col-50,
+    [data-elementor-type="footer"] .elementor-col-33,
+    [data-elementor-type="footer"] .elementor-col-25,
+    [data-elementor-type="footer"] .elementor-col-50 {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* ── Widget image genérico del footer: nunca full-width ─────── */
+    .elementor-location-footer .elementor-widget-image,
+    [data-elementor-type="footer"] .elementor-widget-image {
+        display: flex !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+    }
+
+    /* ── Sobreescribir el filtro blanco que se aplica al logo ───── */
+    /* Los logos de afiliación NO deben estar en blanco */
+    .elementor-element-37db1646 img,
+    .elementor-element-7f306b13 img {
+        filter: none !important;
+    }
+
+}
+/* END HF-23 */
