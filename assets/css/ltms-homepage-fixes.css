@@ -2773,3 +2773,117 @@ body.home {
     }
 }
 /* END HF-24 */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-25: Footer Mobile — Fix NUCLEAR imágenes afiliaciones
+   Atacar directamente img.attachment-large.size-large.wp-image-*
+   y el widget elementor-element-4a4fa8d6 visible en DevTools.
+   El contenedor 269ab79 tiene 344×120 porque Elementor lo estira.
+   Solución: limitar la imagen directo + ocultar espacio vacío.
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+    /* ── Nuclear: TODAS las img.attachment-large en el footer ─── */
+    .elementor-location-footer img.attachment-large,
+    .elementor-location-footer img.size-large,
+    [data-elementor-type="footer"] img.attachment-large,
+    [data-elementor-type="footer"] img.size-large,
+    .elementor-13743 img.attachment-large,
+    .elementor-13743 img.size-large {
+        max-height: 42px !important;
+        max-width: 130px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto !important;
+        filter: none !important;
+        opacity: 1 !important;
+    }
+
+    /* ── Widget image 4a4fa8d6 (Cámara de Cali) — por data-id ── */
+    .elementor-element-4a4fa8d6 {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        padding: 0 !important;
+        max-width: 140px !important;
+        width: auto !important;
+    }
+
+    .elementor-element-4a4fa8d6 img {
+        max-height: 42px !important;
+        max-width: 130px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        filter: none !important;
+    }
+
+    /* ── Contenedor 269ab79: forzar layout horizontal compacto ── */
+    .elementor-element-269ab79 {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        padding: 6px 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+
+    /* Hijos del contenedor 269ab79 */
+    .elementor-element-269ab79 > * {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: 50% !important;
+    }
+
+    /* ── Contenedor 1a0501e5 (Openpay): mismo tratamiento ──────  */
+    .elementor-element-1a0501e5 {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding: 6px 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .elementor-element-1a0501e5 img.attachment-large,
+    .elementor-element-1a0501e5 img.size-large {
+        max-height: 24px !important;
+        max-width: 85px !important;
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.8 !important;
+    }
+
+    /* ── Fix: evitar que el wrapper blanco se expanda en altura ─ */
+    .elementor-element-269ab79.e-con-full,
+    .elementor-element-1a0501e5.e-con-full {
+        min-height: unset !important;
+        height: auto !important;
+    }
+
+    /* ── Elementor widget-image dentro del footer: no 100% ─────── */
+    .elementor-location-footer .elementor-widget-image .elementor-widget-container,
+    [data-elementor-type="footer"] .elementor-widget-image .elementor-widget-container {
+        line-height: 0 !important;
+        font-size: 0 !important;
+    }
+
+    /* ── Texto descriptivo debajo de logos ──────────────────────  */
+    .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title,
+    .elementor-element-1a0501e5 .elementor-widget-text-editor p {
+        font-size: 10px !important;
+        color: #AAAAAA !important;
+        margin: 2px 0 0 !important;
+        line-height: 1.3 !important;
+    }
+}
+/* END HF-25 */
