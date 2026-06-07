@@ -1260,298 +1260,262 @@ footer.elementor-element-25fec764 a:hover {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   GRID PRODUCTOS — HF-20 v1 — cards responsive mobile + desktop
+   GRID PRODUCTOS — HF-20 v2 — Elementor-aware, mobile + desktop
+   Elementor usa ul.products.elementor-grid.columns-N con CSS vars
+   propias. Se sobrescriben grid, width inline y estructura flex.
    ════════════════════════════════════════════════════════════════ */
 
-/* ── DESKTOP & TABLET (> 768px) ──────────────────────────────── */
+/* ══ RESET GRID — forzar 2 col en base, anular Elementor ═══════ */
+ul.products.elementor-grid,
+.woocommerce ul.products.elementor-grid,
+.woocommerce ul.products,
+.products.columns-2,
+.products.columns-3,
+.products.columns-4,
+.products.columns-5 {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    margin: 0 !important;
+    list-style: none !important;
+    --grid-columns-count: 2 !important;
+    --col-gap: 10px !important;
+    --row-gap: 10px !important;
+}
+
+/* ══ CARD BASE ══════════════════════════════════════════════════ */
+ul.products.elementor-grid li.product,
+.woocommerce ul.products li.product,
+.products li.product {
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    border: 0.5px solid rgba(0,0,0,0.09) !important;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08) !important;
+    width: auto !important;
+    max-width: 100% !important;
+    flex: unset !important;
+}
+
+/* ══ IMAGEN ═════════════════════════════════════════════════════ */
+ul.products.elementor-grid li.product a img,
+ul.products.elementor-grid li.product img,
+.woocommerce ul.products li.product a img,
+.woocommerce ul.products li.product img,
+.products li.product a img,
+.products li.product img {
+    width: 100% !important;
+    height: 140px !important;
+    object-fit: cover !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    flex-shrink: 0 !important;
+}
+
+/* ══ NOMBRE ═════════════════════════════════════════════════════ */
+ul.products.elementor-grid li.product .woocommerce-loop-product__title,
+.woocommerce ul.products li.product .woocommerce-loop-product__title,
+.products li.product .woocommerce-loop-product__title,
+.products li.product h2 {
+    font-size: 12px !important;
+    color: #333 !important;
+    line-height: 1.35 !important;
+    padding: 8px 8px 3px !important;
+    margin: 0 !important;
+    font-weight: 500 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    min-height: 34px !important;
+}
+
+/* ══ PRECIO ═════════════════════════════════════════════════════ */
+ul.products.elementor-grid li.product .price,
+.woocommerce ul.products li.product .price,
+.products li.product .price {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #E80001 !important;
+    padding: 2px 8px 8px !important;
+    margin: 0 !important;
+    display: block !important;
+    flex-grow: 1 !important;
+}
+
+ul.products.elementor-grid li.product .price ins,
+.woocommerce ul.products li.product .price ins,
+.products li.product .price ins {
+    text-decoration: none !important;
+    font-weight: 700 !important;
+    color: #E80001 !important;
+}
+
+ul.products.elementor-grid li.product .price del,
+.woocommerce ul.products li.product .price del,
+.products li.product .price del {
+    font-size: 10px !important;
+    color: #aaa !important;
+    font-weight: 400 !important;
+    display: block !important;
+}
+
+/* ══ BOTÓN AÑADIR AL CARRITO ════════════════════════════════════ */
+ul.products.elementor-grid li.product .button,
+ul.products.elementor-grid li.product a.button,
+ul.products.elementor-grid li.product .add_to_cart_button,
+.woocommerce ul.products li.product .button,
+.woocommerce ul.products li.product a.button,
+.woocommerce ul.products li.product .add_to_cart_button,
+.products li.product .button,
+.products li.product a.button,
+.products li.product .add_to_cart_button {
+    background: #E80001 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 0 0 10px 10px !important;
+    width: 100% !important;
+    text-align: center !important;
+    padding: 10px 0 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    display: block !important;
+    margin: auto 0 0 !important;
+    margin-top: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    box-shadow: none !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    transition: background 0.15s !important;
+    cursor: pointer !important;
+}
+
+ul.products.elementor-grid li.product .button:hover,
+ul.products.elementor-grid li.product .add_to_cart_button:hover,
+.woocommerce ul.products li.product .button:hover,
+.woocommerce ul.products li.product .add_to_cart_button:hover,
+.products li.product .button:hover,
+.products li.product .add_to_cart_button:hover {
+    background: #b01212 !important;
+}
+
+/* ══ DESKTOP (≥ 769px): 4 columnas ═════════════════════════════ */
 @media (min-width: 769px) {
 
-    /* Grid 4 columnas en desktop, 3 en tablet */
+    ul.products.elementor-grid,
+    .woocommerce ul.products.elementor-grid,
     .woocommerce ul.products,
     .products.columns-2,
     .products.columns-3,
-    .products.columns-4 {
-        display: grid !important;
+    .products.columns-4,
+    .products.columns-5 {
         grid-template-columns: repeat(4, 1fr) !important;
         gap: 16px !important;
         padding: 16px 20px !important;
-        margin: 0 !important;
-        list-style: none !important;
+        --grid-columns-count: 4 !important;
+        --col-gap: 16px !important;
     }
 
-    /* Tablet: 3 columnas */
-    @media (max-width: 1024px) {
-        .woocommerce ul.products,
-        .products.columns-2,
-        .products.columns-3,
-        .products.columns-4 {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 14px !important;
-        }
-    }
-
-    /* Card individual */
+    ul.products.elementor-grid li.product,
     .woocommerce ul.products li.product,
     .products li.product {
         border-radius: 12px !important;
-        overflow: hidden !important;
-        border: 1px solid rgba(0,0,0,0.07) !important;
-        background: #fff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
         transition: box-shadow 0.2s, transform 0.2s !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
     }
 
+    ul.products.elementor-grid li.product:hover,
     .woocommerce ul.products li.product:hover,
     .products li.product:hover {
         box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
         transform: translateY(-2px) !important;
     }
 
-    /* Imagen del producto */
+    ul.products.elementor-grid li.product a img,
+    ul.products.elementor-grid li.product img,
     .woocommerce ul.products li.product a img,
-    .products li.product a img,
     .woocommerce ul.products li.product img,
+    .products li.product a img,
     .products li.product img {
-        width: 100% !important;
         height: 200px !important;
-        object-fit: cover !important;
-        border-radius: 0 !important;
-        margin: 0 !important;
-        display: block !important;
     }
 
-    /* Nombre del producto */
+    ul.products.elementor-grid li.product .woocommerce-loop-product__title,
     .woocommerce ul.products li.product .woocommerce-loop-product__title,
     .products li.product .woocommerce-loop-product__title,
     .products li.product h2 {
         font-size: 13px !important;
-        color: #333 !important;
-        line-height: 1.4 !important;
         padding: 12px 12px 4px !important;
-        margin: 0 !important;
-        font-weight: 500 !important;
-        display: -webkit-box !important;
-        -webkit-line-clamp: 2 !important;
-        -webkit-box-orient: vertical !important;
-        overflow: hidden !important;
         min-height: 38px !important;
     }
 
-    /* Precio */
+    ul.products.elementor-grid li.product .price,
     .woocommerce ul.products li.product .price,
     .products li.product .price {
         font-size: 16px !important;
-        font-weight: 700 !important;
-        color: #E80001 !important;
         padding: 4px 12px 10px !important;
-        margin: 0 !important;
-        display: block !important;
-        flex-grow: 1 !important;
     }
 
-    .woocommerce ul.products li.product .price ins,
-    .products li.product .price ins {
-        text-decoration: none !important;
-        font-weight: 700 !important;
-        color: #E80001 !important;
-    }
-
-    .woocommerce ul.products li.product .price del,
-    .products li.product .price del {
-        font-size: 11px !important;
-        color: #aaa !important;
-        font-weight: 400 !important;
-        display: block !important;
-    }
-
-    /* Botón Añadir al carrito */
+    ul.products.elementor-grid li.product .button,
+    ul.products.elementor-grid li.product a.button,
+    ul.products.elementor-grid li.product .add_to_cart_button,
     .woocommerce ul.products li.product .button,
     .woocommerce ul.products li.product a.button,
-    .products li.product .add_to_cart_button,
-    .woocommerce ul.products li.product .add_to_cart_button {
-        background: #E80001 !important;
-        color: #fff !important;
-        border: none !important;
+    .woocommerce ul.products li.product .add_to_cart_button,
+    .products li.product .button,
+    .products li.product a.button,
+    .products li.product .add_to_cart_button {
         border-radius: 0 0 12px 12px !important;
-        width: 100% !important;
-        text-align: center !important;
-        padding: 10px 0 !important;
+        padding: 11px 0 !important;
         font-size: 13px !important;
-        font-weight: 600 !important;
-        display: block !important;
-        margin: auto 0 0 !important;
-        box-shadow: none !important;
-        letter-spacing: 0.2px !important;
-        text-transform: none !important;
-        transition: background 0.15s !important;
-        cursor: pointer !important;
-    }
-
-    .woocommerce ul.products li.product .button:hover,
-    .woocommerce ul.products li.product a.button:hover,
-    .products li.product .add_to_cart_button:hover {
-        background: #b01212 !important;
-    }
-
-    /* \"Ver más productos\" */
-    .ltms-view-more-btn,
-    .woocommerce a.button.ltms-more,
-    .home .elementor-button.ltms-btn-more-products {
-        display: block !important;
-        width: fit-content !important;
-        margin: 20px auto !important;
-        background: transparent !important;
-        border: 2px solid #E80001 !important;
-        color: #E80001 !important;
-        border-radius: 8px !important;
-        padding: 10px 36px !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
-        transition: all 0.15s !important;
-    }
-
-    .ltms-view-more-btn:hover,
-    .woocommerce a.button.ltms-more:hover,
-    .home .elementor-button.ltms-btn-more-products:hover {
-        background: #E80001 !important;
-        color: #fff !important;
     }
 }
 
-/* ── MOBILE (≤ 768px) ────────────────────────────────────────── */
-@media (max-width: 768px) {
+/* ══ TABLET (769–1024px): 3 columnas ═══════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
 
-    /* Grid 2 columnas */
+    ul.products.elementor-grid,
+    .woocommerce ul.products.elementor-grid,
     .woocommerce ul.products,
     .products.columns-2,
     .products.columns-3,
-    .products.columns-4 {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 10px !important;
-        padding: 10px 12px !important;
-        margin: 0 !important;
-        list-style: none !important;
+    .products.columns-4,
+    .products.columns-5 {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 14px !important;
+        --grid-columns-count: 3 !important;
     }
+}
 
-    /* Card individual */
-    .woocommerce ul.products li.product,
-    .products li.product {
-        border-radius: 10px !important;
-        overflow: hidden !important;
-        border: 0.5px solid rgba(0,0,0,0.09) !important;
-        background: #fff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
-    }
+/* ══ VER MÁS PRODUCTOS ══════════════════════════════════════════ */
+.ltms-view-more-btn,
+.woocommerce a.button.ltms-more,
+.home .elementor-button.ltms-btn-more-products {
+    display: block !important;
+    width: fit-content !important;
+    margin: 16px auto !important;
+    background: transparent !important;
+    border: 1.5px solid #E80001 !important;
+    color: #E80001 !important;
+    border-radius: 8px !important;
+    padding: 9px 32px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    transition: all 0.15s !important;
+}
 
-    /* Imagen del producto */
-    .woocommerce ul.products li.product a img,
-    .products li.product a img,
-    .woocommerce ul.products li.product img,
-    .products li.product img {
-        width: 100% !important;
-        height: 140px !important;
-        object-fit: cover !important;
-        border-radius: 0 !important;
-        margin: 0 !important;
-        display: block !important;
-    }
-
-    /* Nombre */
-    .woocommerce ul.products li.product .woocommerce-loop-product__title,
-    .products li.product .woocommerce-loop-product__title,
-    .products li.product h2 {
-        font-size: 12px !important;
-        color: #333 !important;
-        line-height: 1.35 !important;
-        padding: 8px 8px 3px !important;
-        margin: 0 !important;
-        font-weight: 500 !important;
-        display: -webkit-box !important;
-        -webkit-line-clamp: 2 !important;
-        -webkit-box-orient: vertical !important;
-        overflow: hidden !important;
-        min-height: 34px !important;
-    }
-
-    /* Precio */
-    .woocommerce ul.products li.product .price,
-    .products li.product .price {
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        color: #E80001 !important;
-        padding: 2px 8px 8px !important;
-        margin: 0 !important;
-        display: block !important;
-        flex-grow: 1 !important;
-    }
-
-    .woocommerce ul.products li.product .price ins,
-    .products li.product .price ins {
-        text-decoration: none !important;
-        font-weight: 700 !important;
-        color: #E80001 !important;
-    }
-
-    .woocommerce ul.products li.product .price del,
-    .products li.product .price del {
-        font-size: 10px !important;
-        color: #aaa !important;
-        font-weight: 400 !important;
-        display: block !important;
-    }
-
-    /* Botón Añadir al carrito */
-    .woocommerce ul.products li.product .button,
-    .woocommerce ul.products li.product a.button,
-    .products li.product .add_to_cart_button,
-    .woocommerce ul.products li.product .add_to_cart_button {
-        background: #E80001 !important;
-        color: #fff !important;
-        border: none !important;
-        border-radius: 0 0 10px 10px !important;
-        width: 100% !important;
-        text-align: center !important;
-        padding: 9px 0 !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        display: block !important;
-        margin: auto 0 0 !important;
-        box-shadow: none !important;
-        letter-spacing: 0 !important;
-        text-transform: none !important;
-        transition: background 0.15s !important;
-        cursor: pointer !important;
-    }
-
-    .woocommerce ul.products li.product .button:hover,
-    .products li.product .add_to_cart_button:hover {
-        background: #b01212 !important;
-    }
-
-    /* \"Ver más productos\" */
-    .ltms-view-more-btn,
-    .woocommerce a.button.ltms-more,
-    .home .elementor-button.ltms-btn-more-products {
-        display: block !important;
-        width: fit-content !important;
-        margin: 12px auto !important;
-        background: transparent !important;
-        border: 1.5px solid #E80001 !important;
-        color: #E80001 !important;
-        border-radius: 8px !important;
-        padding: 8px 28px !important;
-        font-size: 12px !important;
-        font-weight: 500 !important;
-    }
+.ltms-view-more-btn:hover,
+.woocommerce a.button.ltms-more:hover,
+.home .elementor-button.ltms-btn-more-products:hover {
+    background: #E80001 !important;
+    color: #fff !important;
 }
 
 /* ════════════════════════════════════════════════════════════════
