@@ -3221,3 +3221,71 @@ body.home {
     }
 }
 /* END HF-26 */
+
+/* ============================================================
+   HF-27 · FOOTER AFILIACIONES — fondo transparente + logos limpios
+   Elementos inspeccionados: 269ab79, 1a0501e5, 37db1646
+   Fecha: 2026-06-07
+   ============================================================ */
+
+/* Fila contenedora de afiliaciones: quitar fondo blanco */
+.elementor-element-269ab79.e-con,
+.elementor-element-269ab79 {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Columnas internas */
+.elementor-element-1a0501e5.e-con,
+.elementor-element-1a0501e5 {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Widget de cada logo: quitar fondo blanco de la caja */
+.elementor-element-37db1646 .elementor-widget-container,
+.elementor-element-37db1646 {
+    background-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Logos: mezcla multiply para eliminar fondo blanco visual */
+.elementor-element-269ab79 img,
+.elementor-element-1a0501e5 img,
+[class*="elementor-element-269ab79"] img {
+    mix-blend-mode: multiply !important;
+    background: transparent !important;
+    max-height: 52px !important;
+    width: auto !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Fallback: si el footer tiene fondo oscuro, usar luminosity invert */
+@supports not (mix-blend-mode: multiply) {
+    .elementor-element-269ab79 img,
+    .elementor-element-1a0501e5 img {
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.8 !important;
+    }
+}
+
+/* Sección "Afiliaciones" — label texto */
+.elementor-element-269ab79 .elementor-heading-title,
+.elementor-element-269ab79 h2 {
+    color: #AAAAAA !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+}
+
+/* ── Sección de pagos seguros (heading blanco bajo afiliaciones) */
+.elementor-element-1a0501e5 h2.elementor-heading-title,
+.elementor-element-1a0501e5 .elementor-size-default {
+    color: #FFFFFF !important;
+    font-size: 12px !important;
+}
+/* END HF-27 */
