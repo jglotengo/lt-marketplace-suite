@@ -2681,3 +2681,95 @@ body.home {
 
 }
 /* END HF-23 */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-24: Footer Mobile — Fix contenedores e-con-full afiliaciones
+   Problema raíz: .e-con.e-con-full se estira a 344px (ancho total)
+   Los contenedores 269ab79 y 1a0501e5 son los wrappers de los logos.
+   IDs DOM: 269ab79 = Cámara Cali row, 1a0501e5 = Openpay row
+   Solución: shrink-wrap el contenedor + imagen contenida
+   Desktop: intacto (solo max-width:768px)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+    /* ── Contenedores e-con-full dentro del footer: no full-width ─ */
+    .elementor-location-footer .e-con.e-con-full,
+    [data-elementor-type="footer"] .e-con.e-con-full,
+    .elementor-13743 .e-con.e-con-full {
+        width: auto !important;
+        max-width: 100% !important;
+        align-self: center !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    /* ── Por data-id específicos (269ab79 = Cámara, 1a0501e5 = Openpay) ─ */
+    .elementor-element-269ab79,
+    .elementor-element-1a0501e5 {
+        width: auto !important;
+        max-width: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+        padding: 8px 12px !important;
+    }
+
+    /* ── Hijos directos (filas de cada logo): no ocupar 100% ──── */
+    .elementor-element-269ab79 > .e-con,
+    .elementor-element-1a0501e5 > .e-con,
+    .elementor-element-269ab79 > div,
+    .elementor-element-1a0501e5 > div {
+        width: auto !important;
+        max-width: 160px !important;
+        flex: 0 0 auto !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* ── Imágenes dentro: tamaño fijo razonable ─────────────────  */
+    .elementor-element-269ab79 img {
+        max-height: 40px !important;
+        max-width: 120px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto !important;
+        filter: none !important;
+    }
+
+    .elementor-element-1a0501e5 img {
+        max-height: 24px !important;
+        max-width: 85px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto !important;
+    }
+
+    /* ── Texto "Pagos y transferencias..." ─────────────────────── */
+    .elementor-element-1a0501e5 p,
+    .elementor-element-1a0501e5 .elementor-widget-text-editor {
+        font-size: 10px !important;
+        color: #AAAAAA !important;
+        text-align: center !important;
+        margin: 0 0 4px !important;
+    }
+
+    /* ── Caption de logos de afiliación ────────────────────────── */
+    .elementor-element-269ab79 p,
+    .elementor-element-269ab79 .elementor-widget-text-editor {
+        font-size: 10px !important;
+        color: #AAAAAA !important;
+        text-align: center !important;
+        margin: 2px 0 0 !important;
+    }
+}
+/* END HF-24 */
