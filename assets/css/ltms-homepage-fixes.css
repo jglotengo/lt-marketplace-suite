@@ -2035,3 +2035,522 @@ ul.products.elementor-grid li.product .add_to_cart_button:hover,
     }
 
 } /* end @media */
+
+
+/* ════════════════════════════════════════════════════════════════
+   HF-22 — FINISH DESIGN: nav mobile, cards editoriales, footer
+   Paleta oficial: Rojo #E80001 · Amarillo #FFC303 · Oscuro #1A1A1A
+   ════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. NAV MOBILE DROPDOWN — eliminar fondo morado/gris ════════
+   El .elementor-nav-menu--dropdown-mobi flota sobre el header
+   con fondo heredado del tema. Forzar rojo oscuro de marca.     */
+.elementor-nav-menu--dropdown-mobi,
+.elementor-nav-menu--dropdown-mobi.elementor-nav-menu__container,
+div[class*="elementor-nav-menu--dropdown-mobi"] {
+    background: #B01212 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    border-top: 2px solid #E80001 !important;
+}
+
+.elementor-nav-menu--dropdown-mobi .elementor-item,
+.elementor-nav-menu--dropdown-mobi a {
+    color: #fff !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+    padding: 10px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+.elementor-nav-menu--dropdown-mobi .elementor-item:hover,
+.elementor-nav-menu--dropdown-mobi a:hover {
+    background: rgba(255,255,255,0.1) !important;
+    color: #FFC303 !important;
+}
+
+/* ══ 2. STATS BAR — asegurar rojo oscuro, no hereda nav morado == */
+@media (max-width: 768px) {
+    .ltms-trust-bar,
+    .ltms-trust-bar.ltms-hf-stats {
+        background: #B01212 !important;
+        border-bottom: none !important;
+    }
+}
+
+/* ══ 3. TRUST PILLS — fix específico del menú morado de Elementor
+   .elementor-element-67342c11 es el nav-menu trust bar visible   */
+@media (max-width: 768px) {
+    [data-id="67342c11"],
+    .elementor-element-67342c11 {
+        background: #fff !important;
+        border-bottom: 2px solid #E80001 !important;
+    }
+
+    [data-id="67342c11"] .elementor-nav-menu,
+    .elementor-element-67342c11 .elementor-nav-menu {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        gap: 6px !important;
+        padding: 6px 10px !important;
+        list-style: none !important;
+        margin: 0 !important;
+        scrollbar-width: none !important;
+        -webkit-overflow-scrolling: touch !important;
+        /* Override grid del nav-menu del footer */
+        grid-template-columns: unset !important;
+    }
+
+    [data-id="67342c11"] .elementor-nav-menu::-webkit-scrollbar,
+    .elementor-element-67342c11 .elementor-nav-menu::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    [data-id="67342c11"] .elementor-nav-menu li,
+    .elementor-element-67342c11 .elementor-nav-menu li {
+        background: #FFF5F5 !important;
+        border: 1px solid #FFD0D0 !important;
+        border-radius: 20px !important;
+        flex-shrink: 0 !important;
+        padding: 0 !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+    }
+
+    [data-id="67342c11"] .elementor-nav-menu li a,
+    .elementor-element-67342c11 .elementor-nav-menu li a,
+    [data-id="67342c11"] .elementor-item,
+    .elementor-element-67342c11 .elementor-item {
+        color: #E80001 !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        padding: 4px 10px !important;
+        border-radius: 20px !important;
+        background: transparent !important;
+        border: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+}
+
+/* ══ 4. CARDS EDITORIALES — fix horizontal con imagen completa ══
+   Las cards (Cocina, Peludos, Piel, Moda, etc.) aparecen
+   en layout vertical. Forzar horizontal con image izquierda.     */
+@media (max-width: 768px) {
+
+    /* Contenedor de cada card editorial */
+    .ltms-hf19-done,
+    .home .e-con:has(.elementor-widget-image):has(.elementor-widget-heading):not(.e-parent):not([data-id="67342c11"]) {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        background: #fff !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        border: 0.5px solid rgba(0,0,0,0.08) !important;
+        margin: 0 12px 10px !important;
+        min-height: 100px !important;
+        max-height: 120px !important;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.07) !important;
+        padding: 0 !important;
+    }
+
+    /* Imagen izquierda de la card editorial */
+    .ltms-hf19-done .elementor-widget-image,
+    .ltms-hf19-done > .e-con > .elementor-widget-image {
+        width: 110px !important;
+        min-width: 110px !important;
+        max-width: 110px !important;
+        flex-shrink: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        order: -1 !important;
+    }
+
+    .ltms-hf19-done .elementor-widget-image img {
+        width: 110px !important;
+        height: 120px !important;
+        object-fit: cover !important;
+        display: block !important;
+        border-radius: 0 !important;
+    }
+
+    /* Contenido der: título + texto + botón */
+    .ltms-hf19-done .elementor-widget-heading,
+    .ltms-hf19-done .elementor-widget-text-editor,
+    .ltms-hf19-done .elementor-widget-button {
+        padding-left: 0 !important;
+    }
+
+    .ltms-hf19-done .elementor-heading-title {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #E80001 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2px !important;
+    }
+
+    .ltms-hf19-done .elementor-widget-text-editor p,
+    .ltms-hf19-done .elementor-widget-text-editor {
+        font-size: 10px !important;
+        color: #666 !important;
+        line-height: 1.3 !important;
+        margin: 0 0 4px !important;
+    }
+
+    .ltms-hf19-done .elementor-button {
+        background: #E80001 !important;
+        color: #fff !important;
+        border-radius: 6px !important;
+        padding: 5px 12px !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        display: inline-block !important;
+        border: none !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.3px !important;
+    }
+}
+
+/* ══ 5. FOOTER — rediseño completo con paleta de marca ══════════
+   Fondo: #1A1A1A · Títulos: blanco · Links: #CCCCCC → rojo hover
+   Iconos contacto: rojo · Redes: blanco → amarillo hover          */
+@media (max-width: 768px) {
+
+    /* Contenedor raíz del footer */
+    .site-footer,
+    #colophon,
+    footer,
+    .elementor-location-footer,
+    [data-elementor-type="footer"],
+    .elementor-13743 {
+        background: #1A1A1A !important;
+        padding: 0 !important;
+        border-top: 3px solid #E80001 !important;
+    }
+
+    /* Secciones internas del footer */
+    .elementor-location-footer .e-con,
+    .elementor-location-footer .elementor-section,
+    [data-elementor-type="footer"] .e-con,
+    [data-elementor-type="footer"] .elementor-section,
+    .elementor-13743 .e-con,
+    .elementor-13743 .elementor-section {
+        background: transparent !important;
+        padding-top: 14px !important;
+        padding-bottom: 14px !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+
+    /* Divisor entre secciones del footer */
+    .elementor-location-footer .e-con + .e-con,
+    [data-elementor-type="footer"] .e-con + .e-con {
+        border-top: 0.5px solid rgba(255,255,255,0.08) !important;
+    }
+
+    /* Headings del footer */
+    .elementor-location-footer .elementor-heading-title,
+    [data-elementor-type="footer"] .elementor-heading-title,
+    .elementor-13743 .elementor-heading-title,
+    .elementor-location-footer h3,
+    .elementor-location-footer h4,
+    [data-elementor-type="footer"] h3,
+    [data-elementor-type="footer"] h4 {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        color: #fff !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 10px !important;
+        border-bottom: 1px solid rgba(232,0,1,0.4) !important;
+        padding-bottom: 6px !important;
+    }
+
+    /* Nav-menu "Información" del footer — grid 2 col limpio */
+    .elementor-location-footer .elementor-nav-menu,
+    [data-elementor-type="footer"] .elementor-nav-menu,
+    .elementor-13743 .elementor-nav-menu {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 2px 10px !important;
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        /* Anular los flex del trust-pills que podría heredar */
+        flex-direction: unset !important;
+        flex-wrap: unset !important;
+        overflow-x: unset !important;
+    }
+
+    /* li del nav-menu footer — sin herencia de chip rojo */
+    .elementor-location-footer .elementor-nav-menu li,
+    [data-elementor-type="footer"] .elementor-nav-menu li,
+    .elementor-13743 .elementor-nav-menu li {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        white-space: normal !important;
+        display: block !important;
+        flex-shrink: unset !important;
+    }
+
+    /* Links del footer */
+    .elementor-location-footer .elementor-nav-menu li a,
+    .elementor-location-footer .elementor-nav-menu .elementor-item,
+    [data-elementor-type="footer"] .elementor-nav-menu li a,
+    [data-elementor-type="footer"] .elementor-nav-menu .elementor-item,
+    .elementor-13743 .elementor-nav-menu li a,
+    .elementor-13743 .elementor-item {
+        font-size: 12px !important;
+        color: #CCCCCC !important;
+        text-decoration: none !important;
+        line-height: 2 !important;
+        display: block !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        font-weight: 400 !important;
+        white-space: normal !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a:hover,
+    [data-elementor-type="footer"] .elementor-nav-menu li a:hover,
+    .elementor-13743 .elementor-item:hover {
+        color: #E80001 !important;
+    }
+
+    /* También menu-item links normales */
+    footer li.menu-item a,
+    .elementor-location-footer li.menu-item a,
+    [data-elementor-type="footer"] li.menu-item a {
+        font-size: 12px !important;
+        color: #CCCCCC !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        line-height: 2 !important;
+    }
+
+    /* Contactos — iconos rojo, texto gris claro */
+    .elementor-location-footer .elementor-icon-list-items,
+    [data-elementor-type="footer"] .elementor-icon-list-items,
+    .elementor-13743 .elementor-icon-list-items {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-item,
+    [data-elementor-type="footer"] .elementor-icon-list-item,
+    .elementor-13743 .elementor-icon-list-item {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        white-space: normal !important;
+        flex-shrink: unset !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-icon,
+    [data-elementor-type="footer"] .elementor-icon-list-icon,
+    .elementor-13743 .elementor-icon-list-icon {
+        color: #E80001 !important;
+        fill: #E80001 !important;
+        font-size: 14px !important;
+        flex-shrink: 0 !important;
+        margin-top: 2px !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-text,
+    [data-elementor-type="footer"] .elementor-icon-list-text,
+    .elementor-13743 .elementor-icon-list-text,
+    .elementor-location-footer .elementor-icon-list-text a,
+    [data-elementor-type="footer"] .elementor-icon-list-text a {
+        font-size: 12px !important;
+        color: #CCCCCC !important;
+        line-height: 1.5 !important;
+        text-decoration: none !important;
+    }
+
+    /* span.elementor-icon-list-icon con color heredado — override */
+    .elementor-location-footer span.elementor-icon-list-icon,
+    [data-elementor-type="footer"] span.elementor-icon-list-icon {
+        color: #E80001 !important;
+    }
+
+    /* Redes sociales */
+    .elementor-location-footer .elementor-social-icons-wrapper,
+    [data-elementor-type="footer"] .elementor-social-icons-wrapper,
+    .elementor-13743 .elementor-social-icons-wrapper {
+        display: flex !important;
+        gap: 14px !important;
+        margin-top: 6px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon,
+    [data-elementor-type="footer"] .elementor-social-icon,
+    .elementor-13743 .elementor-social-icon {
+        color: #CCCCCC !important;
+        fill: #CCCCCC !important;
+        font-size: 20px !important;
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        transition: color 0.15s !important;
+        border: none !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon:hover,
+    [data-elementor-type="footer"] .elementor-social-icon:hover,
+    .elementor-13743 .elementor-social-icon:hover {
+        color: #FFC303 !important;
+        fill: #FFC303 !important;
+    }
+
+    /* Logo en footer — blanco */
+    .elementor-location-footer .elementor-widget-image img,
+    [data-elementor-type="footer"] .elementor-widget-image img {
+        max-height: 32px !important;
+        width: auto !important;
+        filter: brightness(0) invert(1) !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 0 8px !important;
+    }
+
+    /* Afiliaciones — logos pequeños centrados */
+    .elementor-13743 .elementor-widget-image img,
+    .elementor-location-footer .elementor-widget-image img[src*="camara"],
+    .elementor-location-footer .elementor-widget-image img[src*="ccce"],
+    .elementor-location-footer .elementor-widget-image img[src*="comercio"] {
+        max-height: 40px !important;
+        max-width: 120px !important;
+        filter: none !important;
+        opacity: 0.8 !important;
+    }
+
+    /* Openpay */
+    .elementor-location-footer img[src*="openpay"],
+    .elementor-13743 img[src*="openpay"] {
+        max-height: 24px !important;
+        max-width: 90px !important;
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.7 !important;
+    }
+
+    /* Separadores y texto de sección dentro del footer */
+    .elementor-location-footer p,
+    [data-elementor-type="footer"] p,
+    .elementor-13743 p {
+        color: #AAAAAA !important;
+        font-size: 11px !important;
+        line-height: 1.6 !important;
+        margin: 0 0 6px !important;
+    }
+
+    /* Copyright bar */
+    .elementor-location-footer .elementor-element-25fec764,
+    [data-elementor-type="footer"] .elementor-element-25fec764 {
+        border-top: 0.5px solid rgba(255,255,255,0.1) !important;
+        padding-top: 12px !important;
+        margin-top: 8px !important;
+    }
+
+    .elementor-location-footer .elementor-element-25fec764 *,
+    [data-elementor-type="footer"] .elementor-element-25fec764 * {
+        font-size: 10px !important;
+        color: #555 !important;
+        text-align: center !important;
+    }
+
+    /* Padding del inner del footer */
+    .elementor-location-footer .e-con-inner,
+    [data-elementor-type="footer"] .e-con-inner,
+    .elementor-13743 .e-con-inner {
+        padding: 14px 16px !important;
+    }
+}
+
+/* ══ 6. FOOTER DESKTOP — consistencia de marca ═════════════════ */
+@media (min-width: 769px) {
+
+    .site-footer,
+    #colophon,
+    footer,
+    .elementor-location-footer,
+    [data-elementor-type="footer"],
+    .elementor-13743 {
+        background: #1A1A1A !important;
+        border-top: 3px solid #E80001 !important;
+    }
+
+    .elementor-location-footer .elementor-heading-title,
+    [data-elementor-type="footer"] .elementor-heading-title {
+        color: #fff !important;
+        border-bottom: 1px solid rgba(232,0,1,0.4) !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a,
+    [data-elementor-type="footer"] .elementor-nav-menu li a,
+    .elementor-13743 .elementor-item {
+        color: #CCCCCC !important;
+        font-size: 13px !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a:hover,
+    .elementor-13743 .elementor-item:hover {
+        color: #E80001 !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-icon,
+    [data-elementor-type="footer"] .elementor-icon-list-icon {
+        color: #E80001 !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-text,
+    [data-elementor-type="footer"] .elementor-icon-list-text {
+        color: #CCCCCC !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon,
+    [data-elementor-type="footer"] .elementor-social-icon {
+        color: #CCCCCC !important;
+        background: transparent !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon:hover,
+    [data-elementor-type="footer"] .elementor-social-icon:hover {
+        color: #FFC303 !important;
+    }
+}
+
+/* ══ 7. BODY BG — asegurar fondo claro consistente en homepage == */
+.home,
+body.home {
+    background-color: #F7F7F7 !important;
+}
+
+/* ══ 8. SECCIÓN SEPARADORES — línea roja entre bloques ══════════ */
+@media (max-width: 768px) {
+    .home .e-con.e-parent {
+        border-bottom: 0.5px solid rgba(0,0,0,0.04) !important;
+    }
+
+    .home .e-con.e-parent:last-child {
+        border-bottom: none !important;
+    }
+}
+
