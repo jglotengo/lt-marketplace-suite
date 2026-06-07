@@ -61,6 +61,14 @@ final class LTMS_Frontend_Assets {
             $ver
         );
 
+        // Footer mobile fix — CSS dedicado alta especificidad (carga en todas las páginas frontend)
+        wp_enqueue_style(
+            'ltms-footer-mobile-fix',
+            $url . 'css/ltms-footer-mobile-fix.css',
+            [ 'ltms-homepage-fixes' ],
+            $ver . '-fm1'
+        );
+
         wp_enqueue_script(
             'ltms-homepage-fixes',
             $url . 'js/ltms-homepage-fixes.js',
