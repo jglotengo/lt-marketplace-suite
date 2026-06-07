@@ -2887,3 +2887,337 @@ body.home {
     }
 }
 /* END HF-25 */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-26: Footer Mobile — Rediseño completo inspirado en desktop
+   Desktop: 4 col (Información · Contactos · Afiliaciones · Pagos)
+   Mobile:  stacked, misma jerarquía visual, logos 97×55 reales
+   Referencia DOM: img.wp-image-13759 = 97.77×55 (Cámara Cali)
+   Contenedor afiliaciones: elementor-element-269ab79 (row)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+    /* ── 1. ESTRUCTURA BASE FOOTER ───────────────────────────── */
+    .elementor-location-footer,
+    [data-elementor-type="footer"],
+    .elementor-13743 {
+        background: #1A1A1A !important;
+        border-top: 3px solid #E80001 !important;
+        padding: 0 !important;
+    }
+
+    /* Secciones internas: padding uniforme */
+    .elementor-location-footer .e-con,
+    [data-elementor-type="footer"] .e-con,
+    .elementor-13743 .e-con {
+        background: transparent !important;
+        padding: 16px 16px !important;
+        border-bottom: 0.5px solid rgba(255,255,255,0.07) !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+    }
+
+    .elementor-location-footer .e-con-inner,
+    [data-elementor-type="footer"] .e-con-inner,
+    .elementor-13743 .e-con-inner {
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* ── 2. HEADINGS — igual al desktop (blanco, borde rojo) ─── */
+    .elementor-location-footer .elementor-heading-title,
+    [data-elementor-type="footer"] .elementor-heading-title,
+    .elementor-13743 .elementor-heading-title {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #FFFFFF !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        margin: 0 0 12px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid rgba(232,0,1,0.5) !important;
+        display: block !important;
+    }
+
+    /* ── 3. NAV LINKS "Información" — grid 2 col ─────────────── */
+    .elementor-location-footer .elementor-nav-menu,
+    [data-elementor-type="footer"] .elementor-nav-menu,
+    .elementor-13743 .elementor-nav-menu {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0 10px !important;
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        flex-direction: unset !important;
+        flex-wrap: unset !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li,
+    [data-elementor-type="footer"] .elementor-nav-menu li {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        flex-shrink: unset !important;
+        white-space: normal !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a,
+    .elementor-location-footer .elementor-item,
+    [data-elementor-type="footer"] .elementor-nav-menu li a,
+    .elementor-13743 .elementor-item {
+        font-size: 12px !important;
+        color: #BBBBBB !important;
+        line-height: 2.1 !important;
+        text-decoration: none !important;
+        display: block !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        font-weight: 400 !important;
+    }
+
+    .elementor-location-footer .elementor-nav-menu li a:hover,
+    .elementor-13743 .elementor-item:hover {
+        color: #E80001 !important;
+    }
+
+    /* ── 4. CONTACTOS — lista icono + texto ──────────────────── */
+    .elementor-location-footer .elementor-icon-list-items,
+    [data-elementor-type="footer"] .elementor-icon-list-items,
+    .elementor-13743 .elementor-icon-list-items {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-item,
+    [data-elementor-type="footer"] .elementor-icon-list-item,
+    .elementor-13743 .elementor-icon-list-item {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        white-space: normal !important;
+        flex-shrink: unset !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-icon,
+    [data-elementor-type="footer"] .elementor-icon-list-icon,
+    .elementor-13743 .elementor-icon-list-icon {
+        color: #E80001 !important;
+        fill: #E80001 !important;
+        font-size: 14px !important;
+        flex-shrink: 0 !important;
+        margin-top: 3px !important;
+        min-width: 16px !important;
+    }
+
+    .elementor-location-footer .elementor-icon-list-text,
+    [data-elementor-type="footer"] .elementor-icon-list-text,
+    .elementor-13743 .elementor-icon-list-text {
+        font-size: 12px !important;
+        color: #CCCCCC !important;
+        line-height: 1.5 !important;
+    }
+
+    /* ── 5. REDES SOCIALES ───────────────────────────────────── */
+    .elementor-location-footer .elementor-social-icons-wrapper,
+    [data-elementor-type="footer"] .elementor-social-icons-wrapper,
+    .elementor-13743 .elementor-social-icons-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 16px !important;
+        margin-top: 4px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon,
+    [data-elementor-type="footer"] .elementor-social-icon,
+    .elementor-13743 .elementor-social-icon {
+        font-size: 22px !important;
+        color: #AAAAAA !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        transition: color 0.15s !important;
+    }
+
+    .elementor-location-footer .elementor-social-icon:hover,
+    .elementor-13743 .elementor-social-icon:hover {
+        color: #FFC303 !important;
+    }
+
+    /* ── 6. AFILIACIONES — logo + caption, diseño tarjeta ─────── */
+    /* Contenedor principal de afiliaciones (269ab79) */
+    .elementor-element-269ab79 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Cada fila de afiliado: card blanca con logo + texto */
+    .elementor-element-269ab79 > .e-con,
+    .elementor-element-269ab79 > div {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 12px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 0.5px solid rgba(255,255,255,0.1) !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Widget imagen del afiliado */
+    .elementor-element-269ab79 .elementor-widget-image {
+        flex: 0 0 auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+
+    /* La imagen real (97×55 según DevTools) */
+    .elementor-element-269ab79 img,
+    .elementor-element-269ab79 img.attachment-large,
+    .elementor-element-269ab79 img.wp-image-13759 {
+        width: auto !important;
+        height: auto !important;
+        max-height: 48px !important;
+        max-width: 110px !important;
+        object-fit: contain !important;
+        display: block !important;
+        filter: none !important;
+        opacity: 1 !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Texto caption del afiliado (heading: "Cámara de Comercio...") */
+    .elementor-element-269ab79 .elementor-widget-heading,
+    .elementor-element-269ab79 .elementor-widget-text-editor {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .elementor-element-269ab79 .elementor-heading-title {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #DDDDDD !important;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+        margin: 0 !important;
+        line-height: 1.3 !important;
+        white-space: normal !important;
+    }
+
+    /* ── 7. PAGOS SEGUROS (Openpay) — 1a0501e5 ───────────────── */
+    .elementor-element-1a0501e5 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .elementor-element-1a0501e5 > .e-con,
+    .elementor-element-1a0501e5 > div {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 12px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 0.5px solid rgba(255,255,255,0.1) !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .elementor-element-1a0501e5 img,
+    .elementor-element-1a0501e5 img.attachment-large {
+        max-height: 28px !important;
+        max-width: 100px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.85 !important;
+    }
+
+    .elementor-element-1a0501e5 p,
+    .elementor-element-1a0501e5 .elementor-widget-text-editor p {
+        font-size: 11px !important;
+        color: #AAAAAA !important;
+        margin: 0 !important;
+        line-height: 1.4 !important;
+    }
+
+    /* ── 8. COPYRIGHT BAR ────────────────────────────────────── */
+    .elementor-location-footer .elementor-element-25fec764,
+    [data-elementor-type="footer"] .elementor-element-25fec764 {
+        border-top: 0.5px solid rgba(255,255,255,0.1) !important;
+        padding: 12px 16px !important;
+        background: #111111 !important;
+    }
+
+    .elementor-location-footer .elementor-element-25fec764 *,
+    [data-elementor-type="footer"] .elementor-element-25fec764 * {
+        font-size: 10px !important;
+        color: #555555 !important;
+        text-align: center !important;
+    }
+
+    /* ── 9. RESET: evitar herencia de chips rosas ────────────── */
+    footer li.menu-item,
+    .elementor-location-footer li.menu-item,
+    [data-elementor-type="footer"] li.menu-item {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        white-space: normal !important;
+    }
+
+    footer li.menu-item a,
+    .elementor-location-footer li.menu-item a,
+    [data-elementor-type="footer"] li.menu-item a {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        color: #BBBBBB !important;
+    }
+
+    /* ── 10. TEXTO GENERAL en footer ─────────────────────────── */
+    .elementor-location-footer p,
+    [data-elementor-type="footer"] p,
+    .elementor-13743 p {
+        color: #AAAAAA !important;
+        font-size: 12px !important;
+        line-height: 1.6 !important;
+        margin: 0 0 4px !important;
+    }
+}
+/* END HF-26 */
