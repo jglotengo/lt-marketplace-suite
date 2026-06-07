@@ -165,59 +165,57 @@ html body [data-elementor-type="footer"] .elementor-social-icon {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    6. AFILIACIONES — 586bd11 (padre) + 269ab79 (logos)
-   v5 — layout grid 2 col, logos grandes, contraste mejorado
-   Estructura real (imagen 2): columna izq = label+logos, col der = pagos
+   v6 — fix background shorthand bug, layout horizontal limpio
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-/* ── 586bd11 padre: fondo oscuro explícito para tapar el blanco ── */
+/* 586bd11: pinto el mismo color del footer para tapar el blanco de Elementor.
+   NO usar background shorthand — causa background-color:initial en Chrome */
 html body .elementor-location-footer .elementor-element-586bd11,
 html body [data-elementor-type="footer"] .elementor-element-586bd11,
 html body .elementor-element-586bd11 {
     background-color: #1A1A1A !important;
-    background: #1A1A1A !important;
     --e-con-background: #1A1A1A !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 16px !important;
+    padding: 14px 16px !important;
     margin: 0 !important;
 }
 
+/* e-con-inner del 586bd11: columna vertical, cada bloque apilado */
 html body .elementor-element-586bd11 > .e-con-inner,
 html body .elementor-location-footer .elementor-element-586bd11 > .e-con-inner {
     background-color: transparent !important;
-    background: transparent !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     display: flex !important;
-    flex-direction: row !important;
-    gap: 12px !important;
-    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    align-items: flex-start !important;
 }
 
-/* ── 269ab79: sección logos afiliados — ocupa ~55% del ancho ── */
+/* ── 269ab79: bloque de logos ── */
 html body .elementor-element-269ab79,
 html body .elementor-element-269ab79.e-con {
     background-color: transparent !important;
-    background: transparent !important;
     padding: 0 !important;
-    flex: 1 1 55% !important;
-    min-width: 0 !important;
+    width: 100% !important;
 }
 
-/* e-con-inner de 269ab79: grid 2×N para los logos */
+/* Inner de 269ab79: logos en fila horizontal uniforme */
 html body .elementor-element-269ab79 > .e-con-inner {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 10px 8px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 16px !important;
     padding: 0 !important;
     width: 100% !important;
     background-color: transparent !important;
-    background: transparent !important;
-    align-items: center !important;
 }
 
-/* Cada celda de logo */
+/* Cada logo + caption: columna centrada */
 html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: column !important;
@@ -225,16 +223,16 @@ html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     justify-content: center !important;
     gap: 4px !important;
     background-color: transparent !important;
-    background: transparent !important;
     border: none !important;
     padding: 0 !important;
+    flex: 0 0 auto !important;
+    max-width: 100px !important;
 }
 
-/* Widget + container de imagen */
+/* Widget + container transparente */
 html body .elementor-element-269ab79 .elementor-widget-image,
 html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
     background-color: transparent !important;
-    background: transparent !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -242,35 +240,33 @@ html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-c
     width: 100% !important;
 }
 
-/* LOGOS: tamaño visible + contraste sobre oscuro */
+/* LOGOS — tamaño generoso, blancos sobre oscuro */
 html body .elementor-element-269ab79 img {
-    max-width: 88px !important;
-    max-height: 44px !important;
+    max-width: 90px !important;
+    max-height: 42px !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
     display: block !important;
     margin: 0 auto !important;
-    /* Contraste: blanco brillante sobre fondo oscuro */
     filter: brightness(0) invert(1) !important;
-    opacity: 0.82 !important;
+    opacity: 0.80 !important;
     background-color: transparent !important;
-    background: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
 }
 
-/* Caption */
+/* Caption del logo */
 html body .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title {
     font-size: 9px !important;
     font-weight: 400 !important;
-    color: #777777 !important;
+    color: #666666 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
     border-bottom: none !important;
     padding-bottom: 0 !important;
-    margin: 2px 0 0 !important;
+    margin: 3px 0 0 !important;
     line-height: 1.2 !important;
     white-space: normal !important;
     text-align: center !important;
@@ -278,97 +274,109 @@ html body .elementor-element-269ab79 .elementor-widget-heading .elementor-headin
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   7. OPENPAY — 1a0501e5
-   Layout: texto arriba, logo abajo (o lado a lado si cabe)
+   7. PAGOS SEGUROS / OPENPAY — 1a0501e5
+   Cuadro blanco => fondo oscuro sutil, texto + logos blancos
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-element-1a0501e5 {
-    background: transparent !important;
+html body .elementor-element-1a0501e5,
+html body .elementor-element-1a0501e5.e-con {
     background-color: transparent !important;
+    --e-con-background: transparent !important;
     padding: 0 !important;
     width: 100% !important;
 }
 
 html body .elementor-element-1a0501e5 > .e-con-inner {
     display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 14px !important;
-    background: rgba(255,255,255,0.05) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 10px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    background-color: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
     padding: 12px 14px !important;
     width: 100% !important;
     box-sizing: border-box !important;
 }
 
+/* Heading "PAGOS SEGUROS" dentro del bloque */
+html body .elementor-element-1a0501e5 .elementor-heading-title {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #CCCCCC !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.8px !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+}
+
+/* Imágenes de métodos de pago */
 html body .elementor-element-1a0501e5 img {
-    max-width: 88px !important;
-    max-height: 28px !important;
+    max-width: 120px !important;
+    max-height: 32px !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
     display: block !important;
-    background: transparent !important;
+    background-color: transparent !important;
     filter: brightness(0) invert(1) !important;
-    opacity: 0.85 !important;
+    opacity: 0.75 !important;
     padding: 0 !important;
     margin: 0 !important;
 }
 
+/* Fila de logos de pago en horizontal */
+html body .elementor-element-1a0501e5 .e-con-inner > .elementor-element {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    align-items: center !important;
+    background-color: transparent !important;
+}
+
 html body .elementor-element-1a0501e5 p,
-html body .elementor-element-1a0501e5 .elementor-widget-text-editor {
+html body .elementor-element-1a0501e5 .elementor-widget-text-editor p {
     font-size: 11px !important;
-    color: #AAAAAA !important;
+    color: #999999 !important;
     margin: 0 !important;
     line-height: 1.4 !important;
-    flex: 1 !important;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   8. ELIMINAR FONDO BLANCO — e-con-full Elementor
+   8. NUCLEAR OVERRIDE — cualquier fondo blanco en el footer
+   Solo background-color (NO shorthand) para evitar el bug initial
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .e-con.e-con-full,
 html body [data-elementor-type="footer"] .e-con.e-con-full,
 html body .elementor-13743 .e-con.e-con-full {
-    background: transparent !important;
     background-color: transparent !important;
 }
 
-/* Forzar transparencia en CUALQUIER div con background blanco dentro del footer */
-/* Cubre: #fff, #FFF, #ffffff, #FFFFFF, rgb(...), rgba(...), white, inline vars */
-html body .elementor-location-footer [style*="background-color: #fff"],
-html body .elementor-location-footer [style*="background-color:#fff"],
-html body .elementor-location-footer [style*="background-color: #FFF"],
-html body .elementor-location-footer [style*="background-color:#FFF"],
-html body .elementor-location-footer [style*="background-color: #ffffff"],
-html body .elementor-location-footer [style*="background-color:#ffffff"],
-html body .elementor-location-footer [style*="background-color: #FFFFFF"],
-html body .elementor-location-footer [style*="background-color:#FFFFFF"],
-html body .elementor-location-footer [style*="background-color: rgb(255, 255, 255)"],
-html body .elementor-location-footer [style*="background-color:rgb(255,255,255)"],
-html body .elementor-location-footer [style*="background-color: rgba(255, 255, 255"],
-html body .elementor-location-footer [style*="background-color: white"],
-html body [data-elementor-type="footer"] [style*="background-color: #fff"],
-html body [data-elementor-type="footer"] [style*="background-color:#fff"],
-html body [data-elementor-type="footer"] [style*="background-color: #FFF"],
-html body [data-elementor-type="footer"] [style*="background-color:#FFF"],
-html body [data-elementor-type="footer"] [style*="background-color: #ffffff"],
-html body [data-elementor-type="footer"] [style*="background-color:#ffffff"],
-html body [data-elementor-type="footer"] [style*="background-color: #FFFFFF"],
-html body [data-elementor-type="footer"] [style*="background-color:#FFFFFF"],
-html body [data-elementor-type="footer"] [style*="background-color: rgb(255, 255, 255)"],
-html body [data-elementor-type="footer"] [style*="background-color:rgb(255,255,255)"],
-html body [data-elementor-type="footer"] [style*="background-color: rgba(255, 255, 255"],
-html body [data-elementor-type="footer"] [style*="background-color: white"] {
+/* Inline style con color blanco en cualquier variante */
+html body .elementor-location-footer [style*="#fff"],
+html body .elementor-location-footer [style*="#FFF"],
+html body .elementor-location-footer [style*="#ffffff"],
+html body .elementor-location-footer [style*="#FFFFFF"],
+html body .elementor-location-footer [style*="rgb(255, 255, 255)"],
+html body .elementor-location-footer [style*="rgb(255,255,255)"],
+html body .elementor-location-footer [style*="rgba(255, 255, 255, 1)"],
+html body .elementor-location-footer [style*="white"],
+html body [data-elementor-type="footer"] [style*="#fff"],
+html body [data-elementor-type="footer"] [style*="#FFF"],
+html body [data-elementor-type="footer"] [style*="#ffffff"],
+html body [data-elementor-type="footer"] [style*="#FFFFFF"],
+html body [data-elementor-type="footer"] [style*="rgb(255, 255, 255)"],
+html body [data-elementor-type="footer"] [style*="rgb(255,255,255)"],
+html body [data-elementor-type="footer"] [style*="rgba(255, 255, 255, 1)"],
+html body [data-elementor-type="footer"] [style*="white"] {
     background-color: transparent !important;
-    background: transparent !important;
 }
 
-/* Ataque directo a CSS custom property inline de Elementor */
+/* CSS var de Elementor */
 html body .elementor-location-footer [style*="--e-con-background"],
 html body [data-elementor-type="footer"] [style*="--e-con-background"] {
     --e-con-background: transparent !important;
-    background: transparent !important;
     background-color: transparent !important;
 }
 
