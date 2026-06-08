@@ -226,7 +226,9 @@ html body .elementor-element-269ab79 > .e-con-inner {
 }
 
 /* Cada celda logo: columna (imagen arriba + texto debajo) */
-html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
+html body .elementor-element-269ab79 > .e-con-inner > .elementor-element,
+html body .elementor-element-269ab79 > .e-con-inner > .e-con,
+html body .elementor-element-269ab79 > .e-con-inner > .e-con > .e-con-inner {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -241,6 +243,8 @@ html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     width: 80px !important;
     max-width: 80px !important;
     overflow: visible !important;
+    /* Forzar wrap desactivado para que no hagan row */
+    flex-wrap: nowrap !important;
 }
 
 /* Widget imagen dentro de cada celda */
