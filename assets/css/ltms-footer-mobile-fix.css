@@ -1,22 +1,14 @@
 /**
- * LTMS Footer Mobile Fix — v3.0 (HF-34)
- * DIAGNÓSTICO DEFINITIVO (DevTools 07/06/2026):
- *   - elementor-element-269ab79  → Background: #FFFFFF (inline Elementor)
- *   - elementor-element-1a0501e5 → Background: #FFFFFF (inline Elementor)
- *   - e27477e, 186f2b15          → Background: #FFFFF0D (widgets individuales)
- *   - 586bd11.e-con-inner        → background-color: initial (bug sección 1 prev)
- *
- * SOLUCIÓN: La sección 1 ya NO pone transparent en .e-con.
- * Cada e-con hereda #1A1A1A del footer root.
- * Los e-con específicos (afiliaciones, pagos) tienen override explícito
- * con --e-con-background para ganar al inline style de Elementor.
- * NO hay sección nuclear que resetee a transparent.
+ * LTMS Footer Mobile Fix — v4.0 (HF-35)
+ * Propuesta aplicada: jerarquía limpia, logos en fila, pagos con SSL badge.
+ * Fix raíz: HF-34b excluyó los IDs del footer del selector de cards editoriales.
+ * Aquí solo necesitamos tomar posesión del fondo y el layout.
  */
 
 @media (max-width: 768px) {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   1. FOOTER ROOT — fondo oscuro base, NO tocar .e-con aquí
+   1. FOOTER ROOT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer,
 html body [data-elementor-type="footer"],
@@ -26,40 +18,63 @@ html body .elementor-13743 {
     padding: 0 !important;
 }
 
-/* Cada sección (e-con) del footer: oscuro, separador sutil */
-html body .elementor-location-footer > .e-con,
-html body [data-elementor-type="footer"] > .e-con,
+/* Secciones (e-con) del footer — fondo oscuro, separador */
+html body .elementor-location-footer .e-con,
+html body [data-elementor-type="footer"] .e-con,
 html body .elementor-location-footer .elementor-section,
 html body [data-elementor-type="footer"] .elementor-section {
     background-color: #1A1A1A !important;
-    padding: 18px 16px !important;
+    --e-con-background: #1A1A1A !important;
+    padding: 16px 18px !important;
     border-bottom: 1px solid rgba(255,255,255,0.07) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     max-width: 100% !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    box-shadow: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    margin: 0 !important;
+    flex-direction: column !important;
 }
 
-/* e-con-inner global: solo layout, SIN tocar background */
+/* e-con-inner: layout limpio sin fondo */
 html body .elementor-location-footer .e-con-inner,
 html body [data-elementor-type="footer"] .e-con-inner {
+    background-color: transparent !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
 }
 
+/* Todos los widgets: sin fondo propio */
+html body .elementor-location-footer .elementor-widget-wrap,
+html body [data-elementor-type="footer"] .elementor-widget-wrap,
+html body .elementor-location-footer .elementor-widget-container,
+html body [data-elementor-type="footer"] .elementor-widget-container {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   2. HEADINGS — título de sección con línea roja
+   2. HEADINGS — label rojo pequeño estilo propuesta
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-heading-title,
 html body [data-elementor-type="footer"] .elementor-heading-title {
-    font-size: 12px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
-    color: #FFFFFF !important;
+    color: #E80001 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.8px !important;
-    margin: 0 0 14px !important;
-    padding-bottom: 8px !important;
-    border-bottom: 2px solid #E80001 !important;
+    letter-spacing: 1.2px !important;
+    margin: 0 0 12px !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
     display: block !important;
     width: 100% !important;
     line-height: 1.4 !important;
@@ -72,7 +87,7 @@ html body .elementor-location-footer .elementor-nav-menu,
 html body [data-elementor-type="footer"] .elementor-nav-menu {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 0 8px !important;
+    gap: 0 12px !important;
     list-style: none !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -96,7 +111,7 @@ html body .elementor-location-footer .elementor-nav-menu li a,
 html body [data-elementor-type="footer"] .elementor-nav-menu li a {
     font-size: 12px !important;
     color: #CCCCCC !important;
-    line-height: 2.2 !important;
+    line-height: 2.3 !important;
     text-decoration: none !important;
     display: block !important;
     background: transparent !important;
@@ -113,7 +128,7 @@ html body .elementor-location-footer .elementor-icon-list-items,
 html body [data-elementor-type="footer"] .elementor-icon-list-items {
     display: flex !important;
     flex-direction: column !important;
-    gap: 12px !important;
+    gap: 10px !important;
     padding: 0 !important;
     margin: 0 !important;
 }
@@ -136,7 +151,7 @@ html body .elementor-location-footer .elementor-icon-list-icon,
 html body [data-elementor-type="footer"] .elementor-icon-list-icon {
     color: #E80001 !important;
     fill: #E80001 !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
     flex-shrink: 0 !important;
     margin-top: 2px !important;
 }
@@ -149,34 +164,37 @@ html body [data-elementor-type="footer"] .elementor-icon-list-text {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   5. REDES SOCIALES
+   5. REDES SOCIALES — íconos más grandes, más respirables
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-social-icons-wrapper,
 html body [data-elementor-type="footer"] .elementor-social-icons-wrapper {
     display: flex !important;
     flex-direction: row !important;
-    gap: 18px !important;
-    margin-top: 6px !important;
+    gap: 20px !important;
+    margin-top: 0 !important;
     flex-wrap: wrap !important;
+    align-items: center !important;
 }
 
 html body .elementor-location-footer .elementor-social-icon,
 html body [data-elementor-type="footer"] .elementor-social-icon {
     font-size: 22px !important;
-    color: #999999 !important;
+    color: #888888 !important;
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
     border-radius: 0 !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   6. AFILIACIONES — 586bd11 padre + 269ab79 logos
-   ESTRATEGIA: usar --e-con-background para ganar al inline style
-   de Elementor. La sección 1 ya NO resetea .e-con a transparent.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+html body .elementor-location-footer .elementor-social-icon:hover,
+html body [data-elementor-type="footer"] .elementor-social-icon:hover {
+    color: #CCCCCC !important;
+}
 
-/* 586bd11: contenedor padre de afiliaciones */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   6. AFILIACIONES — 586bd11 + 269ab79
+   Fondo sólido #1A1A1A, logos en fila horizontal con texto debajo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-element-586bd11,
 html body .elementor-element-586bd11.e-con,
 html body .elementor-element-586bd11.e-con-boxed {
@@ -184,8 +202,13 @@ html body .elementor-element-586bd11.e-con-boxed {
     --e-con-background: #1A1A1A !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 14px 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    padding: 14px 18px !important;
     margin: 0 !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    overflow: visible !important;
 }
 
 html body .elementor-element-586bd11 > .e-con-inner {
@@ -195,11 +218,11 @@ html body .elementor-element-586bd11 > .e-con-inner {
     max-width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 14px !important;
+    gap: 12px !important;
     align-items: flex-start !important;
 }
 
-/* 269ab79: bloque con los logos de cámaras/asociaciones */
+/* 269ab79: bloque logos */
 html body .elementor-element-269ab79,
 html body .elementor-element-269ab79.e-con,
 html body .elementor-element-269ab79.e-con-full,
@@ -210,25 +233,28 @@ html body .elementor-element-269ab79.e-flex {
     width: 100% !important;
     border: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    overflow: visible !important;
+    margin: 0 !important;
 }
 
-/* Inner: logos en fila horizontal */
+/* Inner: fila horizontal de logos */
 html body .elementor-element-269ab79 > .e-con-inner {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: wrap !important;
     align-items: flex-start !important;
     justify-content: flex-start !important;
-    gap: 16px 12px !important;
-    padding: 6px 0 !important;
+    gap: 16px 14px !important;
+    padding: 0 !important;
     width: 100% !important;
     background-color: transparent !important;
 }
 
-/* Cada celda logo: columna (imagen arriba + texto debajo) */
-html body .elementor-element-269ab79 > .e-con-inner > .elementor-element,
-html body .elementor-element-269ab79 > .e-con-inner > .e-con,
-html body .elementor-element-269ab79 > .e-con-inner > .e-con > .e-con-inner {
+/* Cada celda logo: columna */
+html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -239,16 +265,19 @@ html body .elementor-element-269ab79 > .e-con-inner > .e-con > .e-con-inner {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    flex: 0 0 80px !important;
-    width: 80px !important;
-    max-width: 80px !important;
+    flex: 0 0 72px !important;
+    width: 72px !important;
+    max-width: 72px !important;
     overflow: visible !important;
-    /* Forzar wrap desactivado para que no hagan row */
-    flex-wrap: nowrap !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    margin: 0 !important;
 }
 
-/* Widget imagen dentro de cada celda */
-html body .elementor-element-269ab79 .elementor-widget-image {
+/* Widget imagen */
+html body .elementor-element-269ab79 .elementor-widget-image,
+html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
     background-color: transparent !important;
     display: flex !important;
     align-items: center !important;
@@ -258,17 +287,14 @@ html body .elementor-element-269ab79 .elementor-widget-image {
     margin: 0 !important;
     flex-shrink: 0 !important;
     order: 1 !important;
-}
-html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-    background-color: transparent !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
-/* Widget heading: SIEMPRE debajo de la imagen (order 2) */
-html body .elementor-element-269ab79 .elementor-widget-heading {
+/* Widget heading — siempre debajo */
+html body .elementor-element-269ab79 .elementor-widget-heading,
+html body .elementor-element-269ab79 .elementor-widget-heading .elementor-widget-container {
     background-color: transparent !important;
     display: block !important;
     width: 100% !important;
@@ -276,35 +302,31 @@ html body .elementor-element-269ab79 .elementor-widget-heading {
     margin: 0 !important;
     flex-shrink: 0 !important;
     order: 2 !important;
-}
-html body .elementor-element-269ab79 .elementor-widget-heading .elementor-widget-container {
-    background-color: transparent !important;
-    padding: 0 !important;
-    display: block !important;
+    border: none !important;
 }
 
-/* Logos: blancos sobre oscuro, tamaño proporcional */
+/* Logos: blancos, tamaño fijo */
 html body .elementor-element-269ab79 img {
-    width: 68px !important;
-    height: 34px !important;
-    max-width: 68px !important;
-    max-height: 34px !important;
+    width: 60px !important;
+    height: 30px !important;
+    max-width: 60px !important;
+    max-height: 30px !important;
     object-fit: contain !important;
     display: block !important;
     margin: 0 auto !important;
     filter: brightness(0) invert(1) !important;
-    opacity: 0.75 !important;
+    opacity: 0.70 !important;
     background-color: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
 }
 
-/* Caption: texto debajo del logo, centrado, pequeño */
+/* Caption debajo del logo */
 html body .elementor-element-269ab79 .elementor-heading-title {
-    font-size: 8px !important;
+    font-size: 7.5px !important;
     font-weight: 400 !important;
-    color: #606060 !important;
+    color: #555555 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
     border-bottom: none !important;
@@ -321,7 +343,6 @@ html body .elementor-element-269ab79 .elementor-heading-title {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    7. PAGOS SEGUROS — 1a0501e5
-   Mismo patrón: --e-con-background explícito para ganar al inline
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-element-1a0501e5,
 html body .elementor-element-1a0501e5.e-con,
@@ -333,119 +354,127 @@ html body .elementor-element-1a0501e5.e-flex {
     width: 100% !important;
     border: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    overflow: visible !important;
+    margin: 0 !important;
 }
 
 html body .elementor-element-1a0501e5 > .e-con-inner {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
-    gap: 10px !important;
-    background-color: rgba(255,255,255,0.05) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    gap: 8px !important;
+    background-color: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 8px !important;
-    padding: 12px 14px !important;
+    padding: 10px 12px !important;
     width: 100% !important;
     box-sizing: border-box !important;
 }
 
-/* Widgets hijos de pagos: todos los .elementor-element directos */
+/* Widgets hijos del bloque pagos */
 html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element,
 html body .elementor-element-1a0501e5 .elementor-widget {
     background-color: transparent !important;
     --e-con-background: transparent !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    overflow: visible !important;
+    margin: 0 !important;
 }
 
-/* Heading "PAGOS Y TRANSFERENCIAS SEGURAS A TRAVÉS DE:" */
+/* Heading "PAGOS Y TRANSFERENCIAS..." */
 html body .elementor-element-1a0501e5 .elementor-heading-title {
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    color: #CCCCCC !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.8px !important;
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    color: #888888 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
     border-bottom: none !important;
     padding-bottom: 0 !important;
-    margin: 0 !important;
+    margin: 0 0 6px !important;
 }
 
 /* Imágenes de métodos de pago */
 html body .elementor-element-1a0501e5 img {
-    max-width: 100px !important;
-    max-height: 28px !important;
+    max-width: 90px !important;
+    max-height: 26px !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
     display: inline-block !important;
     background-color: transparent !important;
     filter: brightness(0) invert(1) !important;
-    opacity: 0.70 !important;
+    opacity: 0.65 !important;
     padding: 0 !important;
     margin: 0 4px 0 0 !important;
 }
 
-/* Fila horizontal de logos de pago */
+/* Fila de logos de pago */
 html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: wrap !important;
-    gap: 8px !important;
+    gap: 6px !important;
     align-items: center !important;
     width: 100% !important;
 }
 
 html body .elementor-element-1a0501e5 p,
 html body .elementor-element-1a0501e5 .elementor-widget-text-editor p {
-    font-size: 10px !important;
-    color: #999999 !important;
+    font-size: 9px !important;
+    color: #888888 !important;
     margin: 0 !important;
     line-height: 1.4 !important;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   8. WIDGETS INDIVIDUALES con fondo semi-blanco (#FFFFF0D)
-   Afecta: e27477e, 186f2b15, y cualquier widget con padding/bg
+   8. WIDGETS INDIVIDUALES con fondo propio — e27477e, 186f2b15, 37db1646
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-location-footer .elementor-widget-wrap,
-html body [data-elementor-type="footer"] .elementor-widget-wrap,
-html body .elementor-location-footer .elementor-widget-container,
-html body [data-elementor-type="footer"] .elementor-widget-container {
-    background-color: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-}
-
-/* Target específico de e27477e y 186f2b15 */
 html body .elementor-element-e27477e,
-html body .elementor-element-186f2b15 {
+html body .elementor-element-186f2b15,
+html body .elementor-element-37db1646,
+html body .elementor-element-7f306b13 {
     background-color: transparent !important;
     --e-con-background: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
+    border-radius: 0 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    overflow: visible !important;
+    margin: 0 !important;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   9. COPYRIGHT BAR
+   9. COPYRIGHT BAR — 25fec764
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-element-25fec764,
 html body [data-elementor-type="footer"] .elementor-element-25fec764 {
     background-color: #111111 !important;
     --e-con-background: #111111 !important;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
-    padding: 12px 16px !important;
+    border-top: 1px solid rgba(255,255,255,0.06) !important;
+    border-bottom: none !important;
+    padding: 12px 18px !important;
 }
 
 html body .elementor-location-footer .elementor-element-25fec764 *,
 html body [data-elementor-type="footer"] .elementor-element-25fec764 * {
     font-size: 10px !important;
-    color: #555555 !important;
+    color: #444444 !important;
     text-align: center !important;
     background-color: transparent !important;
+    border: none !important;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   10. RESET CHIPS ROSA — li del footer, no hereda trust pills
+   10. RESET CHIPS ROSA — li no hereda de trust pills ni editorial cards
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer li,
 html body [data-elementor-type="footer"] li {
@@ -456,6 +485,11 @@ html body [data-elementor-type="footer"] li {
     white-space: normal !important;
     display: block !important;
     flex-shrink: unset !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    overflow: visible !important;
 }
 
 html body .elementor-location-footer li a,
