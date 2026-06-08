@@ -1,10 +1,82 @@
 /**
- * LTMS Footer Mobile Fix — v4.0 (HF-35)
- * Propuesta aplicada: jerarquía limpia, logos en fila, pagos con SSL badge.
- * Fix raíz: HF-34b excluyó los IDs del footer del selector de cards editoriales.
- * Aquí solo necesitamos tomar posesión del fondo y el layout.
+ * LTMS Footer Fix — v5.0 (HF-36)
+ * Mejoras de visibilidad: logos afiliaciones + Openpay en desktop y mobile.
+ * - Opacidad aumentada 0.70→0.92 afiliaciones, 0.65→0.90 pagos
+ * - Logos afiliaciones más grandes (desktop + mobile)
+ * - Fondo pill suave detrás de cada logo afiliación (mejor legibilidad)
+ * - Openpay con fondo blanco suave para contraste
  */
 
+/* ══════════════════════════════════════════════════════════════
+   GLOBAL (desktop + mobile): imágenes de afiliaciones y pagos
+   ══════════════════════════════════════════════════════════════ */
+
+/* Afiliaciones — logos blancos, visibles */
+html body .elementor-element-269ab79 img {
+    filter: brightness(0) invert(1) !important;
+    opacity: 0.92 !important;
+    object-fit: contain !important;
+    display: block !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Desktop: tamaño generoso */
+@media (min-width: 769px) {
+    html body .elementor-element-269ab79 img {
+        width: auto !important;
+        height: 40px !important;
+        max-height: 40px !important;
+        max-width: 130px !important;
+    }
+
+    /* Caption afiliaciones desktop */
+    html body .elementor-element-269ab79 .elementor-heading-title {
+        font-size: 9px !important;
+        color: #999999 !important;
+        text-align: center !important;
+        margin-top: 6px !important;
+        line-height: 1.3 !important;
+        display: block !important;
+    }
+
+    /* Pill contenedor logo afiliación */
+    html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
+        background: rgba(255,255,255,0.06) !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 120px !important;
+    }
+
+    /* Pagos seguros — Openpay desktop */
+    html body .elementor-element-1a0501e5 img {
+        max-width: 110px !important;
+        max-height: 32px !important;
+        height: auto !important;
+        width: auto !important;
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.90 !important;
+        object-fit: contain !important;
+    }
+
+    /* Pill para Openpay */
+    html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-widget-container {
+        background: rgba(255,255,255,0.06) !important;
+        border-radius: 6px !important;
+        padding: 6px 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE (≤768px): todo el CSS anterior + mejoras
+   ══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -18,7 +90,6 @@ html body .elementor-13743 {
     padding: 0 !important;
 }
 
-/* Secciones (e-con) del footer — fondo oscuro, separador */
 html body .elementor-location-footer .e-con,
 html body [data-elementor-type="footer"] .e-con,
 html body .elementor-location-footer .elementor-section,
@@ -42,7 +113,6 @@ html body [data-elementor-type="footer"] .elementor-section {
     flex-direction: column !important;
 }
 
-/* e-con-inner: layout limpio sin fondo */
 html body .elementor-location-footer .e-con-inner,
 html body [data-elementor-type="footer"] .e-con-inner {
     background-color: transparent !important;
@@ -51,7 +121,6 @@ html body [data-elementor-type="footer"] .e-con-inner {
     max-width: 100% !important;
 }
 
-/* Todos los widgets: sin fondo propio */
 html body .elementor-location-footer .elementor-widget-wrap,
 html body [data-elementor-type="footer"] .elementor-widget-wrap,
 html body .elementor-location-footer .elementor-widget-container,
@@ -63,7 +132,7 @@ html body [data-elementor-type="footer"] .elementor-widget-container {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   2. HEADINGS — label rojo pequeño estilo propuesta
+   2. HEADINGS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-heading-title,
 html body [data-elementor-type="footer"] .elementor-heading-title {
@@ -81,7 +150,7 @@ html body [data-elementor-type="footer"] .elementor-heading-title {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   3. NAV LINKS — grid 2 col
+   3. NAV LINKS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-nav-menu,
 html body [data-elementor-type="footer"] .elementor-nav-menu {
@@ -164,7 +233,7 @@ html body [data-elementor-type="footer"] .elementor-icon-list-text {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   5. REDES SOCIALES — íconos más grandes, más respirables
+   5. REDES SOCIALES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-social-icons-wrapper,
 html body [data-elementor-type="footer"] .elementor-social-icons-wrapper {
@@ -192,8 +261,7 @@ html body [data-elementor-type="footer"] .elementor-social-icon:hover {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   6. AFILIACIONES — 586bd11 + 269ab79
-   Fondo sólido #1A1A1A, logos en fila horizontal con texto debajo
+   6. AFILIACIONES MOBILE — 586bd11 + 269ab79
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-element-586bd11,
 html body .elementor-element-586bd11.e-con,
@@ -222,7 +290,6 @@ html body .elementor-element-586bd11 > .e-con-inner {
     align-items: flex-start !important;
 }
 
-/* 269ab79: bloque logos */
 html body .elementor-element-269ab79,
 html body .elementor-element-269ab79.e-con,
 html body .elementor-element-269ab79.e-con-full,
@@ -240,7 +307,6 @@ html body .elementor-element-269ab79.e-flex {
     margin: 0 !important;
 }
 
-/* Inner: fila horizontal de logos */
 html body .elementor-element-269ab79 > .e-con-inner {
     display: flex !important;
     flex-direction: row !important;
@@ -253,7 +319,6 @@ html body .elementor-element-269ab79 > .e-con-inner {
     background-color: transparent !important;
 }
 
-/* Cada celda logo: columna */
 html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: column !important;
@@ -265,9 +330,9 @@ html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    flex: 0 0 72px !important;
-    width: 72px !important;
-    max-width: 72px !important;
+    flex: 0 0 80px !important;
+    width: 80px !important;
+    max-width: 80px !important;
     overflow: visible !important;
     border-radius: 0 !important;
     min-height: unset !important;
@@ -275,24 +340,22 @@ html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     margin: 0 !important;
 }
 
-/* Widget imagen */
 html body .elementor-element-269ab79 .elementor-widget-image,
 html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-    background-color: transparent !important;
+    background: rgba(255,255,255,0.06) !important;
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     width: 100% !important;
-    padding: 0 !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
     order: 1 !important;
     border: none !important;
     box-shadow: none !important;
-    border-radius: 0 !important;
 }
 
-/* Widget heading — siempre debajo */
 html body .elementor-element-269ab79 .elementor-widget-heading,
 html body .elementor-element-269ab79 .elementor-widget-heading .elementor-widget-container {
     background-color: transparent !important;
@@ -305,28 +368,26 @@ html body .elementor-element-269ab79 .elementor-widget-heading .elementor-widget
     border: none !important;
 }
 
-/* Logos: blancos, tamaño fijo */
+/* Logos afiliaciones mobile: más grandes y visibles */
 html body .elementor-element-269ab79 img {
-    width: 60px !important;
-    height: 30px !important;
-    max-width: 60px !important;
-    max-height: 30px !important;
+    width: 64px !important;
+    height: 34px !important;
+    max-width: 64px !important;
+    max-height: 34px !important;
     object-fit: contain !important;
     display: block !important;
     margin: 0 auto !important;
-    filter: brightness(0) invert(1) !important;
-    opacity: 0.70 !important;
+    opacity: 0.92 !important;
     background-color: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
 }
 
-/* Caption debajo del logo */
 html body .elementor-element-269ab79 .elementor-heading-title {
     font-size: 7.5px !important;
     font-weight: 400 !important;
-    color: #555555 !important;
+    color: #888888 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
     border-bottom: none !important;
@@ -342,7 +403,7 @@ html body .elementor-element-269ab79 .elementor-heading-title {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   7. PAGOS SEGUROS — 1a0501e5
+   7. PAGOS SEGUROS MOBILE — 1a0501e5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-element-1a0501e5,
 html body .elementor-element-1a0501e5.e-con,
@@ -374,7 +435,6 @@ html body .elementor-element-1a0501e5 > .e-con-inner {
     box-sizing: border-box !important;
 }
 
-/* Widgets hijos del bloque pagos */
 html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element,
 html body .elementor-element-1a0501e5 .elementor-widget {
     background-color: transparent !important;
@@ -388,7 +448,6 @@ html body .elementor-element-1a0501e5 .elementor-widget {
     margin: 0 !important;
 }
 
-/* Heading "PAGOS Y TRANSFERENCIAS..." */
 html body .elementor-element-1a0501e5 .elementor-heading-title {
     font-size: 9px !important;
     font-weight: 400 !important;
@@ -400,22 +459,22 @@ html body .elementor-element-1a0501e5 .elementor-heading-title {
     margin: 0 0 6px !important;
 }
 
-/* Imágenes de métodos de pago */
+/* Openpay logo mobile: más visible */
 html body .elementor-element-1a0501e5 img {
-    max-width: 90px !important;
-    max-height: 26px !important;
+    max-width: 100px !important;
+    max-height: 30px !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
     display: inline-block !important;
-    background-color: transparent !important;
+    background-color: rgba(255,255,255,0.08) !important;
+    border-radius: 6px !important;
     filter: brightness(0) invert(1) !important;
-    opacity: 0.65 !important;
-    padding: 0 !important;
+    opacity: 0.90 !important;
+    padding: 4px 8px !important;
     margin: 0 4px 0 0 !important;
 }
 
-/* Fila de logos de pago */
 html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element {
     display: flex !important;
     flex-direction: row !important;
@@ -434,7 +493,7 @@ html body .elementor-element-1a0501e5 .elementor-widget-text-editor p {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   8. WIDGETS INDIVIDUALES con fondo propio — e27477e, 186f2b15, 37db1646
+   8. WIDGETS INDIVIDUALES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-element-e27477e,
 html body .elementor-element-186f2b15,
@@ -453,7 +512,7 @@ html body .elementor-element-7f306b13 {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   9. COPYRIGHT BAR — 25fec764
+   9. COPYRIGHT BAR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer .elementor-element-25fec764,
 html body [data-elementor-type="footer"] .elementor-element-25fec764 {
@@ -474,7 +533,7 @@ html body [data-elementor-type="footer"] .elementor-element-25fec764 * {
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   10. RESET CHIPS ROSA — li no hereda de trust pills ni editorial cards
+   10. RESET CHIPS ROSA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer li,
 html body [data-elementor-type="footer"] li {
