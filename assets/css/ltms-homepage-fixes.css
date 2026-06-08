@@ -2142,7 +2142,7 @@ div[class*="elementor-nav-menu--dropdown-mobi"] {
 
     /* Contenedor de cada card editorial */
     .ltms-hf19-done,
-    .home .e-con:has(.elementor-widget-image):has(.elementor-widget-heading):not(.e-parent):not([data-id="67342c11"]) {
+    .home .e-con:has(.elementor-widget-image):has(.elementor-widget-heading):not(.e-parent):not([data-id="67342c11"]):not([data-id="269ab79"]):not([data-id="586bd11"]):not([data-id="1a0501e5"]):not([data-id="37db1646"]):not([data-id="e27477e"]):not([data-id="7f306b13"]):not([data-id="186f2b15"]) {
         display: flex !important;
         flex-direction: row !important;
         align-items: stretch !important;
