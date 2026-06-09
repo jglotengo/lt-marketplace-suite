@@ -3289,3 +3289,38 @@ body.home {
     font-size: 12px !important;
 }
 /* END HF-27 */
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   HF-47: Footer nav — ocultar instancia duplicada (--dropdown)
+   Elementor renderiza el nav DOS veces: --main (lista real) y --dropdown
+   (copia flotante usada para mobile hamburger). En el footer ambas quedan
+   visibles. Ocultamos el --dropdown y el --dropdown-mobile del footer.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Ocultar el nav duplicado (--dropdown) SOLO en el footer */
+.elementor-location-footer .elementor-nav-menu--dropdown,
+[data-elementor-type="footer"] .elementor-nav-menu--dropdown,
+.elementor-13743 .elementor-nav-menu--dropdown,
+.elementor-location-footer .elementor-nav-menu--dropdown-mobile,
+[data-elementor-type="footer"] .elementor-nav-menu--dropdown-mobile,
+.elementor-location-footer div.elementor-nav-menu__container.elementor-nav-menu--dropdown,
+[data-elementor-type="footer"] div.elementor-nav-menu__container.elementor-nav-menu--dropdown {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Asegurar que el --main SÍ se muestre */
+.elementor-location-footer .elementor-nav-menu--main,
+[data-elementor-type="footer"] .elementor-nav-menu--main,
+.elementor-13743 .elementor-nav-menu--main {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 4px 12px !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+}
