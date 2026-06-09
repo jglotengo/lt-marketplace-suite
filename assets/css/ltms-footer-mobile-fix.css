@@ -1,103 +1,132 @@
 /**
- * LTMS Footer Fix — v6.0 (HF-37)
- * Fix crítico: eliminar filter brightness/invert que ocultaba logos.
- * Afiliaciones y Openpay: fondo blanco pill + opacidad natural.
+ * LTMS Footer Fix — v7.0 (HF-38)
+ * Estrategia: selectores universales footer + overrides por ID donde sea posible.
+ * Logos afiliaciones/Openpay visibles con pill blanco, tamaño forzado.
  */
 
-/* ══════════════════════════════════════════════════════════════
-   GLOBAL: afiliaciones — fondo blanco para que logos originales sean visibles
-   ══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   GLOBAL — aplica desktop y mobile
+   ══════════════════════════════════════════════════════════════════ */
 
-/* Pill blanco alrededor de cada imagen de afiliación */
-html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-    background: #ffffff !important;
-    border-radius: 8px !important;
-    padding: 8px 14px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-/* Logos afiliaciones: tamaño natural, sin filtro */
-html body .elementor-element-269ab79 img {
+/* Todas las imágenes dentro del footer — base */
+html body .elementor-location-footer img,
+html body [data-elementor-type="footer"] img {
     filter: none !important;
     opacity: 1 !important;
-    object-fit: contain !important;
     display: block !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
     margin: 0 auto !important;
 }
 
-/* Desktop */
-@media (min-width: 769px) {
-    html body .elementor-element-269ab79 img {
-        height: 36px !important;
-        width: auto !important;
-        max-width: 120px !important;
-        max-height: 36px !important;
-    }
+/* ─── AFILIACIONES: columna 3 del footer ─────────────────────────
+   IDs conocidos: 586bd11 (wrapper), 269ab79 (grid logos)
+   Estrategia extra: apuntar cualquier widget-image dentro de 269ab79
+   ─────────────────────────────────────────────────────────────── */
 
-    html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-        min-width: 110px !important;
-    }
-
-    /* Caption afiliaciones desktop */
-    html body .elementor-element-269ab79 .elementor-heading-title {
-        font-size: 9px !important;
-        color: #999999 !important;
-        text-align: center !important;
-        margin-top: 6px !important;
-        line-height: 1.3 !important;
-        display: block !important;
-        text-transform: none !important;
-        letter-spacing: 0 !important;
-        font-weight: 400 !important;
-        border-bottom: none !important;
-    }
-
-    /* Openpay desktop: pill blanco */
-    html body .elementor-element-1a0501e5 img {
-        filter: none !important;
-        opacity: 1 !important;
-        max-width: 110px !important;
-        max-height: 30px !important;
-        height: auto !important;
-        width: auto !important;
-        object-fit: contain !important;
-    }
-
-    html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-widget-container {
-        background: #ffffff !important;
-        border-radius: 6px !important;
-        padding: 5px 10px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-    }
+/* Contenedor de cada logo — pill blanco */
+html body .elementor-element-269ab79 .elementor-widget-image,
+html body .elementor-element-269ab79 figure,
+html body .elementor-element-269ab79 .wp-image-wrap {
+    background: #ffffff !important;
+    border-radius: 8px !important;
+    padding: 7px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-bottom: 4px !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   MOBILE (≤768px)
-   ══════════════════════════════════════════════════════════════ */
+html body .elementor-element-269ab79 .elementor-widget-container {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Logos afiliaciones — tamaño forzado */
+html body .elementor-element-269ab79 img {
+    width: auto !important;
+    height: 38px !important;
+    max-height: 38px !important;
+    max-width: 130px !important;
+    min-height: 30px !important;
+    object-fit: contain !important;
+    filter: none !important;
+    opacity: 1 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Caption afiliaciones */
+html body .elementor-element-269ab79 .elementor-heading-title {
+    font-size: 8px !important;
+    font-weight: 400 !important;
+    color: #999999 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+    margin: 4px 0 0 !important;
+    line-height: 1.3 !important;
+    text-align: center !important;
+}
+
+/* ─── OPENPAY: columna 4 del footer ─────────────────────────────
+   ID: 1a0501e5
+   ─────────────────────────────────────────────────────────────── */
+
+html body .elementor-element-1a0501e5 .elementor-widget-image,
+html body .elementor-element-1a0501e5 figure {
+    background: #ffffff !important;
+    border-radius: 7px !important;
+    padding: 6px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+html body .elementor-element-1a0501e5 img {
+    width: auto !important;
+    height: 28px !important;
+    max-height: 28px !important;
+    max-width: 110px !important;
+    min-height: 22px !important;
+    object-fit: contain !important;
+    filter: none !important;
+    opacity: 1 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+}
+
+/* Texto "Pagos y transferencias seguras a través de:" */
+html body .elementor-element-1a0501e5 .elementor-heading-title,
+html body .elementor-element-1a0501e5 p {
+    font-size: 9px !important;
+    color: #999999 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    border-bottom: none !important;
+    font-weight: 400 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE ≤768px
+   ══════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   1. FOOTER ROOT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 html body .elementor-location-footer,
-html body [data-elementor-type="footer"],
-html body .elementor-13743 {
+html body [data-elementor-type="footer"] {
     background-color: #1A1A1A !important;
     border-top: 3px solid #E80001 !important;
     padding: 0 !important;
 }
 
 html body .elementor-location-footer .e-con,
-html body [data-elementor-type="footer"] .e-con,
-html body .elementor-location-footer .elementor-section,
-html body [data-elementor-type="footer"] .elementor-section {
+html body [data-elementor-type="footer"] .e-con {
     background-color: #1A1A1A !important;
     --e-con-background: #1A1A1A !important;
     padding: 16px 18px !important;
@@ -108,13 +137,11 @@ html body [data-elementor-type="footer"] .elementor-section {
     border-radius: 0 !important;
     overflow: visible !important;
     min-height: unset !important;
-    max-height: unset !important;
     box-shadow: none !important;
     border-left: none !important;
     border-right: none !important;
     border-top: none !important;
     margin: 0 !important;
-    flex-direction: column !important;
 }
 
 html body .elementor-location-footer .e-con-inner,
@@ -122,7 +149,6 @@ html body [data-elementor-type="footer"] .e-con-inner {
     background-color: transparent !important;
     padding: 0 !important;
     width: 100% !important;
-    max-width: 100% !important;
 }
 
 html body .elementor-location-footer .elementor-widget-wrap,
@@ -135,9 +161,7 @@ html body [data-elementor-type="footer"] .elementor-widget-container {
     border-radius: 0 !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   2. HEADINGS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Headings mobile */
 html body .elementor-location-footer .elementor-heading-title,
 html body [data-elementor-type="footer"] .elementor-heading-title {
     font-size: 9px !important;
@@ -153,9 +177,7 @@ html body [data-elementor-type="footer"] .elementor-heading-title {
     line-height: 1.4 !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   3. NAV LINKS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Nav links */
 html body .elementor-location-footer .elementor-nav-menu,
 html body [data-elementor-type="footer"] .elementor-nav-menu {
     display: grid !important;
@@ -164,20 +186,6 @@ html body [data-elementor-type="footer"] .elementor-nav-menu {
     list-style: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    flex-direction: unset !important;
-    flex-wrap: unset !important;
-    overflow: visible !important;
-}
-
-html body .elementor-location-footer .elementor-nav-menu li,
-html body [data-elementor-type="footer"] .elementor-nav-menu li {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-    display: block !important;
-    flex-shrink: unset !important;
-    white-space: normal !important;
 }
 
 html body .elementor-location-footer .elementor-nav-menu li a,
@@ -186,17 +194,13 @@ html body [data-elementor-type="footer"] .elementor-nav-menu li a {
     color: #CCCCCC !important;
     line-height: 2.3 !important;
     text-decoration: none !important;
-    display: block !important;
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
     font-weight: 400 !important;
-    border-radius: 0 !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   4. CONTACTOS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Contactos */
 html body .elementor-location-footer .elementor-icon-list-items,
 html body [data-elementor-type="footer"] .elementor-icon-list-items {
     display: flex !important;
@@ -214,16 +218,12 @@ html body [data-elementor-type="footer"] .elementor-icon-list-item {
     gap: 10px !important;
     background: transparent !important;
     border: none !important;
-    border-radius: 0 !important;
     padding: 0 !important;
-    white-space: normal !important;
-    flex-shrink: unset !important;
 }
 
 html body .elementor-location-footer .elementor-icon-list-icon,
 html body [data-elementor-type="footer"] .elementor-icon-list-icon {
     color: #E80001 !important;
-    fill: #E80001 !important;
     font-size: 13px !important;
     flex-shrink: 0 !important;
     margin-top: 2px !important;
@@ -236,15 +236,12 @@ html body [data-elementor-type="footer"] .elementor-icon-list-text {
     line-height: 1.5 !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   5. REDES SOCIALES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Redes sociales */
 html body .elementor-location-footer .elementor-social-icons-wrapper,
 html body [data-elementor-type="footer"] .elementor-social-icons-wrapper {
     display: flex !important;
     flex-direction: row !important;
     gap: 20px !important;
-    margin-top: 0 !important;
     flex-wrap: wrap !important;
     align-items: center !important;
 }
@@ -256,253 +253,37 @@ html body [data-elementor-type="footer"] .elementor-social-icon {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    border-radius: 0 !important;
 }
 
-html body .elementor-location-footer .elementor-social-icon:hover,
-html body [data-elementor-type="footer"] .elementor-social-icon:hover {
-    color: #CCCCCC !important;
-}
-
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   6. AFILIACIONES MOBILE — logos en fila horizontal con pill blanco
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-element-586bd11,
-html body .elementor-element-586bd11.e-con {
-    background-color: #1A1A1A !important;
-    --e-con-background: #1A1A1A !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
-    padding: 14px 18px !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-}
-
-html body .elementor-element-586bd11 > .e-con-inner {
-    background-color: transparent !important;
-    padding: 0 !important;
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 12px !important;
-}
-
-html body .elementor-element-269ab79,
-html body .elementor-element-269ab79.e-con {
-    background-color: #1A1A1A !important;
-    --e-con-background: #1A1A1A !important;
-    padding: 0 !important;
-    width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    margin: 0 !important;
-}
-
-html body .elementor-element-269ab79 > .e-con-inner {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-    justify-content: flex-start !important;
-    gap: 12px !important;
-    padding: 0 !important;
-    width: 100% !important;
-    background-color: transparent !important;
-}
-
-html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 4px !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    flex: 0 0 auto !important;
-    width: auto !important;
-    max-width: 120px !important;
-    overflow: visible !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-}
-
-/* Pill blanco para cada logo afiliación en mobile */
-html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
-    background: #ffffff !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-html body .elementor-element-269ab79 .elementor-widget-heading,
-html body .elementor-element-269ab79 .elementor-widget-heading .elementor-widget-container {
-    background-color: transparent !important;
-    display: block !important;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-}
-
-/* Logos afiliaciones mobile: sin filtro, tamaño natural */
+/* Afiliaciones mobile — logos más pequeños */
 html body .elementor-element-269ab79 img {
-    width: auto !important;
-    height: 28px !important;
-    max-height: 28px !important;
-    max-width: 90px !important;
-    object-fit: contain !important;
-    display: block !important;
-    margin: 0 auto !important;
-    filter: none !important;
-    opacity: 1 !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
+    height: 30px !important;
+    max-height: 30px !important;
+    max-width: 100px !important;
+    min-height: 24px !important;
 }
 
-html body .elementor-element-269ab79 .elementor-heading-title {
-    font-size: 7px !important;
-    font-weight: 400 !important;
-    color: #888888 !important;
-    text-transform: none !important;
-    letter-spacing: 0 !important;
-    border-bottom: none !important;
-    padding-bottom: 0 !important;
-    margin: 4px 0 0 !important;
-    line-height: 1.3 !important;
-    white-space: normal !important;
-    text-align: center !important;
-    display: block !important;
-    word-break: break-word !important;
-    width: 100% !important;
+html body .elementor-element-269ab79 .elementor-widget-image,
+html body .elementor-element-269ab79 figure {
+    padding: 5px 8px !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   7. PAGOS SEGUROS MOBILE — Openpay con pill blanco
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-element-1a0501e5,
-html body .elementor-element-1a0501e5.e-con {
-    background-color: #1A1A1A !important;
-    --e-con-background: #1A1A1A !important;
-    padding: 0 !important;
-    width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    margin: 0 !important;
-}
-
-html body .elementor-element-1a0501e5 > .e-con-inner {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 8px !important;
-    background-color: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 8px !important;
-    padding: 10px 12px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element,
-html body .elementor-element-1a0501e5 .elementor-widget {
-    background-color: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    margin: 0 !important;
-}
-
-html body .elementor-element-1a0501e5 .elementor-heading-title {
-    font-size: 9px !important;
-    font-weight: 400 !important;
-    color: #888888 !important;
-    text-transform: none !important;
-    letter-spacing: 0 !important;
-    border-bottom: none !important;
-    padding-bottom: 0 !important;
-    margin: 0 0 6px !important;
-}
-
-/* Openpay: pill blanco, sin filtro */
+/* Openpay mobile */
 html body .elementor-element-1a0501e5 img {
+    height: 24px !important;
+    max-height: 24px !important;
     max-width: 90px !important;
-    max-height: 28px !important;
-    width: auto !important;
-    height: auto !important;
-    object-fit: contain !important;
-    display: inline-block !important;
-    filter: none !important;
-    opacity: 1 !important;
-    background-color: #ffffff !important;
-    border-radius: 5px !important;
-    padding: 4px 8px !important;
-    margin: 0 !important;
 }
 
-html body .elementor-element-1a0501e5 > .e-con-inner > .elementor-element {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-    align-items: center !important;
-    width: 100% !important;
-}
-
-html body .elementor-element-1a0501e5 p,
-html body .elementor-element-1a0501e5 .elementor-widget-text-editor p {
-    font-size: 9px !important;
-    color: #888888 !important;
-    margin: 0 !important;
-    line-height: 1.4 !important;
-}
-
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   8. WIDGETS INDIVIDUALES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-element-e27477e,
-html body .elementor-element-186f2b15,
-html body .elementor-element-37db1646,
-html body .elementor-element-7f306b13 {
-    background-color: transparent !important;
-    --e-con-background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-    margin: 0 !important;
-}
-
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   9. COPYRIGHT BAR
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-html body .elementor-location-footer .elementor-element-25fec764,
-html body [data-elementor-type="footer"] .elementor-element-25fec764 {
+/* Copyright bar */
+html body .elementor-element-25fec764 {
     background-color: #111111 !important;
     --e-con-background: #111111 !important;
     border-top: 1px solid rgba(255,255,255,0.06) !important;
-    border-bottom: none !important;
     padding: 12px 18px !important;
 }
 
-html body .elementor-location-footer .elementor-element-25fec764 *,
-html body [data-elementor-type="footer"] .elementor-element-25fec764 * {
+html body .elementor-element-25fec764 * {
     font-size: 10px !important;
     color: #444444 !important;
     text-align: center !important;
@@ -510,23 +291,16 @@ html body [data-elementor-type="footer"] .elementor-element-25fec764 * {
     border: none !important;
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   10. RESET CHIPS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Reset chips */
 html body .elementor-location-footer li,
 html body [data-elementor-type="footer"] li {
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
-    white-space: normal !important;
     display: block !important;
-    flex-shrink: unset !important;
-    min-height: unset !important;
-    max-height: unset !important;
     box-shadow: none !important;
     margin: 0 !important;
-    overflow: visible !important;
 }
 
 html body .elementor-location-footer li a,
@@ -535,7 +309,6 @@ html body [data-elementor-type="footer"] li a {
     border: none !important;
     padding: 0 !important;
     color: #CCCCCC !important;
-    border-radius: 0 !important;
 }
 
 } /* end @media 768px */
