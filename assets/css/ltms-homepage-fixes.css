@@ -2568,43 +2568,77 @@ body.home {
 
 @media (max-width: 768px) {
 
-    /* ── Logos afiliación por data-id real ───────────────────── */
+    /* ── HF-49: Logos afiliación 3× — mobile ─────────────────── */
+    /* Original: 44px/130px → 3× = 132px/390px                    */
     .elementor-element-37db1646 img,
     .elementor-element-7f306b13 img {
-        max-height: 44px !important;
-        max-width: 130px !important;
+        max-height: 132px !important;
+        max-width: 390px !important;
         width: auto !important;
         height: auto !important;
         object-fit: contain !important;
         display: block !important;
-        margin: 6px auto !important;
+        margin: 8px auto !important;
         filter: none !important;
         opacity: 1 !important;
     }
 
-    /* ── Openpay por data-id real ────────────────────────────── */
-    .elementor-element-186f2b15 img {
-        max-height: 26px !important;
-        max-width: 90px !important;
+    /* ── HF-49: Openpay 3× — mobile ─────────────────────────── */
+    /* Original: 26px/90px → 3× = 78px/270px                     */
+    .elementor-element-186f2b15 img,
+    .elementor-element-186f2b15 .elementor-widget-image img {
+        max-height: 78px !important;
+        max-width: 270px !important;
         width: auto !important;
         height: auto !important;
         object-fit: contain !important;
         display: block !important;
-        margin: 4px auto !important;
-        filter: brightness(0) invert(1) !important;
-        opacity: 0.85 !important;
+        margin: 8px auto !important;
+        filter: none !important;
+        opacity: 1 !important;
     }
 
-    /* ── Contenedor de cada imagen: no estirar al ancho completo  */
+    /* ── HF-49: Contenedores blancos — mismo tamaño que imagen ─ */
     .elementor-element-37db1646,
-    .elementor-element-7f306b13,
+    .elementor-element-7f306b13 {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 16px 20px !important;
+        width: 100% !important;
+        max-width: 390px !important;
+        min-height: 132px !important;
+        background: #ffffff !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        margin: 0 auto 12px auto !important;
+        flex: unset !important;
+    }
+
+    /* ── HF-49: Contenedor Openpay — fondo blanco visible ────── */
     .elementor-element-186f2b15 {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        padding: 4px 0 !important;
-        width: auto !important;
+        padding: 12px 16px !important;
+        width: 100% !important;
+        max-width: 270px !important;
+        min-height: 78px !important;
+        background: #ffffff !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        margin: 0 auto !important;
         flex: unset !important;
+    }
+
+    /* ── HF-49: widget-container interno sin restricción ──────── */
+    .elementor-element-37db1646 .elementor-widget-container,
+    .elementor-element-7f306b13 .elementor-widget-container,
+    .elementor-element-186f2b15 .elementor-widget-container {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     /* ── Texto de afiliaciones: centrar y tamaño razonable ───── */
