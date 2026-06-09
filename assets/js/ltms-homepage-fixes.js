@@ -1060,14 +1060,12 @@ function hf19MobileEnhancements() {
             return;
         }
 
-        // Nav containers
+        // Nav containers — excluir --dropdown (es la copia duplicada, se oculta via CSS HF-47)
         var navContainerSels = [
             '.elementor-nav-menu--main',
-            '.elementor-nav-menu--dropdown',
             '.elementor-nav-menu-wrapper',
-            '.elementor-nav-menu__container',
-            '.elementor-widget-nav-menu .elementor-widget-container',
-            '.elementor-nav-menu'
+            '.elementor-nav-menu__container:not(.elementor-nav-menu--dropdown)',
+            '.elementor-widget-nav-menu .elementor-widget-container'
         ];
         navContainerSels.forEach(function(sel) {
             footer.querySelectorAll(sel).forEach(fixFooterNavEl);
