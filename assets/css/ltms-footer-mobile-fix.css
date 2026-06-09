@@ -1,13 +1,14 @@
 /**
- * LTMS Footer Fix — v10.0 (HF-41)
- * - Openpay: img width/height explícitos + !important en cada nivel del DOM
- * - Afiliaciones desktop: fila horizontal
- * - Captions: 11px legible
- * - Mobile: grid 2col afiliaciones funcional
+ * LTMS Footer Fix — v11.0 (HF-44)
+ * Reescritura limpia. Fix definitivo:
+ * - Nav Información: forzar visibilidad a todos los niveles posibles
+ * - Redes sociales: fila horizontal
+ * - Afiliaciones: 2 columnas mobile
+ * - Openpay: width+height absolutos en img
  */
 
 /* ════════════════════════════════════════════════════
-   BASE GLOBAL — sin filtros en todo el footer
+   GLOBAL — base imágenes
    ════════════════════════════════════════════════════ */
 html body .elementor-location-footer img,
 html body [data-elementor-type="footer"] img {
@@ -16,8 +17,7 @@ html body [data-elementor-type="footer"] img {
 }
 
 /* ════════════════════════════════════════════════════
-   AFILIACIONES — 269ab79
-   Pill blanco + img 36px
+   AFILIACIONES 269ab79 — pill blanco + img 36px
    ════════════════════════════════════════════════════ */
 html body .elementor-element-269ab79 .elementor-widget-image,
 html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container,
@@ -35,7 +35,6 @@ html body .elementor-element-269ab79 .elementor-widget-image a {
     box-shadow: none !important;
     margin: 0 !important;
 }
-/* Excepto el <img> mismo: fondo transparente */
 html body .elementor-element-269ab79 img {
     background: transparent !important;
     width: auto !important;
@@ -51,9 +50,7 @@ html body .elementor-element-269ab79 img {
     margin: 0 auto !important;
     border: none !important;
     border-radius: 0 !important;
-    flex-shrink: 0 !important;
 }
-/* Caption afiliaciones — gris 11px */
 html body .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title {
     color: #999999 !important;
     font-size: 11px !important;
@@ -68,7 +65,7 @@ html body .elementor-element-269ab79 .elementor-widget-heading .elementor-headin
     background: transparent !important;
 }
 
-/* Desktop: afiliaciones en fila horizontal */
+/* Desktop: afiliaciones en fila */
 @media (min-width: 769px) {
     html body .elementor-element-269ab79 > .e-con-inner {
         display: flex !important;
@@ -88,11 +85,8 @@ html body .elementor-element-269ab79 .elementor-widget-heading .elementor-headin
 }
 
 /* ════════════════════════════════════════════════════
-   OPENPAY — 1a0501e5
-   Pill blanco + img con width Y height explícitos
+   OPENPAY 1a0501e5
    ════════════════════════════════════════════════════ */
-
-/* Heading "Pagos Seguros" */
 html body .elementor-element-1a0501e5 .elementor-widget-heading .elementor-heading-title {
     color: #aaaaaa !important;
     font-size: 11px !important;
@@ -104,7 +98,6 @@ html body .elementor-element-1a0501e5 .elementor-widget-heading .elementor-headi
     margin: 0 0 8px !important;
     background: transparent !important;
 }
-/* Texto subtítulo */
 html body .elementor-element-1a0501e5 p,
 html body .elementor-element-1a0501e5 .elementor-text-editor p {
     font-size: 11px !important;
@@ -115,7 +108,6 @@ html body .elementor-element-1a0501e5 .elementor-text-editor p {
     margin: 0 0 8px !important;
     line-height: 1.5 !important;
 }
-/* Pill blanco — todos los niveles intermedios */
 html body .elementor-element-1a0501e5 .elementor-widget-image,
 html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-widget-container,
 html body .elementor-element-1a0501e5 .elementor-widget-image figure,
@@ -133,7 +125,6 @@ html body .elementor-element-1a0501e5 .elementor-widget-image a {
     box-shadow: none !important;
     margin: 0 !important;
 }
-/* Openpay img — width Y height ambos forzados */
 html body .elementor-element-1a0501e5 img {
     background: transparent !important;
     width: 100px !important;
@@ -150,21 +141,6 @@ html body .elementor-element-1a0501e5 img {
     margin: 0 auto !important;
     border: none !important;
     border-radius: 0 !important;
-    flex-shrink: 0 !important;
-}
-
-/* ════════════════════════════════════════════════════
-   HEADING TÍTULO SECCIÓN "AFILIACIONES" y "PAGOS SEGUROS"
-   ════════════════════════════════════════════════════ */
-html body .elementor-element-586bd11 > .e-con-inner > .elementor-element:first-child .elementor-heading-title {
-    color: #aaaaaa !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.8px !important;
-    border-bottom: none !important;
-    padding: 0 !important;
-    margin: 0 0 10px !important;
 }
 
 /* ════════════════════════════════════════════════════
@@ -204,16 +180,14 @@ html body [data-elementor-type="footer"] .e-con-inner {
     width: 100% !important;
 }
 html body .elementor-location-footer .elementor-widget-wrap,
-html body [data-elementor-type="footer"] .elementor-widget-wrap,
-html body .elementor-location-footer .elementor-widget-container,
-html body [data-elementor-type="footer"] .elementor-widget-container {
+html body [data-elementor-type="footer"] .elementor-widget-wrap {
     background-color: transparent !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
 }
 
-/* Headings sección — rojo */
+/* ── Headings sección — rojo ── */
 html body .elementor-location-footer .elementor-heading-title,
 html body [data-elementor-type="footer"] .elementor-heading-title {
     font-size: 10px !important;
@@ -228,7 +202,7 @@ html body [data-elementor-type="footer"] .elementor-heading-title {
     line-height: 1.4 !important;
     background: transparent !important;
 }
-/* Override captions afiliaciones/pagos → gris */
+/* Override: captions de logos → gris */
 html body .elementor-element-269ab79 .elementor-heading-title,
 html body .elementor-element-1a0501e5 .elementor-heading-title {
     color: #999999 !important;
@@ -236,55 +210,93 @@ html body .elementor-element-1a0501e5 .elementor-heading-title {
     font-weight: 400 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
-    margin: 6px 0 0 !important;
+    margin: 5px 0 0 !important;
 }
 
-/* Nav links — forzar visibilidad y 2 columnas */
-/* Nav Información — mostrar main, ocultar dropdown duplicado y hamburger */
+/* ── NAV INFORMACIÓN: máxima especificidad ── */
+/* Ocultar hamburger */
 html body .elementor-location-footer .elementor-menu-toggle,
-html body [data-elementor-type="footer"] .elementor-menu-toggle {
+html body [data-elementor-type="footer"] .elementor-menu-toggle,
+html body .elementor-location-footer button.elementor-menu-toggle,
+html body [data-elementor-type="footer"] button.elementor-menu-toggle {
     display: none !important;
+    visibility: hidden !important;
 }
-/* Ocultar el menú dropdown (segunda instancia generada por Elementor) */
+/* Forzar visibilidad de TODOS los wrappers del nav */
+html body .elementor-location-footer nav,
+html body [data-elementor-type="footer"] nav,
+html body .elementor-location-footer .elementor-nav-menu--main,
+html body [data-elementor-type="footer"] .elementor-nav-menu--main,
+html body .elementor-location-footer .elementor-nav-menu-wrapper,
+html body [data-elementor-type="footer"] .elementor-nav-menu-wrapper,
+html body .elementor-location-footer .elementor-nav-menu__container,
+html body [data-elementor-type="footer"] .elementor-nav-menu__container,
 html body .elementor-location-footer .elementor-nav-menu--dropdown,
 html body [data-elementor-type="footer"] .elementor-nav-menu--dropdown {
-    display: none !important;
-}
-/* Mostrar el menú principal */
-html body .elementor-location-footer .elementor-nav-menu--main,
-html body [data-elementor-type="footer"] .elementor-nav-menu--main {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     height: auto !important;
-    max-height: none !important;
+    max-height: 9999px !important;
     overflow: visible !important;
     position: static !important;
     transform: none !important;
-}
-/* Grid 2 columnas limpio */
-html body .elementor-location-footer .elementor-nav-menu--main .elementor-nav-menu,
-html body [data-elementor-type="footer"] .elementor-nav-menu--main .elementor-nav-menu {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 2px 10px !important;
-    list-style: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-html body .elementor-location-footer .elementor-nav-menu--main li,
-html body [data-elementor-type="footer"] .elementor-nav-menu--main li {
-    display: block !important;
+    top: auto !important;
+    left: auto !important;
+    pointer-events: auto !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    list-style: none !important;
-    border-radius: 0 !important;
+    width: 100% !important;
 }
-html body .elementor-location-footer .elementor-nav-menu--main li a,
-html body [data-elementor-type="footer"] .elementor-nav-menu--main li a {
+/* UL del nav: grid 2 columnas */
+html body .elementor-location-footer ul.elementor-nav-menu,
+html body [data-elementor-type="footer"] ul.elementor-nav-menu,
+html body .elementor-location-footer .elementor-nav-menu,
+html body [data-elementor-type="footer"] .elementor-nav-menu {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0 8px !important;
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+}
+/* LI del nav */
+html body .elementor-location-footer .elementor-nav-menu li,
+html body [data-elementor-type="footer"] .elementor-nav-menu li,
+html body .elementor-location-footer ul.elementor-nav-menu li,
+html body [data-elementor-type="footer"] ul.elementor-nav-menu li {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    list-style: none !important;
+    transform: none !important;
+    position: static !important;
+    overflow: visible !important;
+    flex: unset !important;
+    width: auto !important;
+}
+/* A del nav */
+html body .elementor-location-footer .elementor-nav-menu li a,
+html body [data-elementor-type="footer"] .elementor-nav-menu li a,
+html body .elementor-location-footer ul.elementor-nav-menu li a,
+html body [data-elementor-type="footer"] ul.elementor-nav-menu li a {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
     font-size: 12px !important;
     color: #BBBBBB !important;
     line-height: 2.4 !important;
@@ -293,10 +305,13 @@ html body [data-elementor-type="footer"] .elementor-nav-menu--main li a {
     padding: 0 !important;
     border: none !important;
     border-radius: 0 !important;
-    display: block !important;
+    box-shadow: none !important;
+    transform: none !important;
+    position: static !important;
+    white-space: normal !important;
 }
 
-/* Contactos */
+/* ── Contactos ── */
 html body .elementor-location-footer .elementor-icon-list-items,
 html body [data-elementor-type="footer"] .elementor-icon-list-items {
     display: flex !important;
@@ -329,14 +344,30 @@ html body [data-elementor-type="footer"] .elementor-icon-list-text {
     line-height: 1.5 !important;
 }
 
-/* Redes sociales — fila horizontal */
+/* ── Redes sociales: FILA HORIZONTAL ── */
 html body .elementor-location-footer .elementor-social-icons-wrapper,
 html body [data-elementor-type="footer"] .elementor-social-icons-wrapper {
     display: flex !important;
     flex-direction: row !important;
-    gap: 18px !important;
     flex-wrap: nowrap !important;
+    gap: 18px !important;
     align-items: center !important;
+    justify-content: flex-start !important;
+}
+html body .elementor-location-footer .elementor-widget-social-icons .elementor-grid,
+html body [data-elementor-type="footer"] .elementor-widget-social-icons .elementor-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 18px !important;
+    align-items: center !important;
+}
+html body .elementor-location-footer .elementor-grid-item,
+html body [data-elementor-type="footer"] .elementor-grid-item {
+    display: inline-flex !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 html body .elementor-location-footer .elementor-social-icon,
 html body [data-elementor-type="footer"] .elementor-social-icon {
@@ -347,9 +378,12 @@ html body [data-elementor-type="footer"] .elementor-social-icon {
     padding: 0 !important;
     width: auto !important;
     height: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
-/* Afiliaciones mobile: 2 columnas */
+/* ── Afiliaciones mobile: 2 columnas ── */
 html body .elementor-element-586bd11,
 html body .elementor-element-586bd11.e-con {
     background-color: #1A1A1A !important;
@@ -369,7 +403,6 @@ html body .elementor-element-586bd11 > .e-con-inner {
     gap: 10px !important;
     width: 100% !important;
 }
-/* Grid 2 columnas logos */
 html body .elementor-element-269ab79 > .e-con-inner {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -388,9 +421,7 @@ html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
     margin: 0 !important;
     box-shadow: none !important;
     width: 100% !important;
-    max-width: 100% !important;
 }
-/* Afiliaciones mobile: pill blanco más compacto */
 html body .elementor-element-269ab79 .elementor-widget-image,
 html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container,
 html body .elementor-element-269ab79 .elementor-widget-image figure,
@@ -408,7 +439,7 @@ html body .elementor-element-269ab79 img {
     max-width: 85px !important;
 }
 
-/* Pagos Seguros mobile */
+/* ── Pagos Seguros mobile ── */
 html body .elementor-element-1a0501e5,
 html body .elementor-element-1a0501e5.e-con {
     background: #1A1A1A !important;
@@ -431,7 +462,6 @@ html body .elementor-element-1a0501e5 > .e-con-inner {
     width: 100% !important;
     box-sizing: border-box !important;
 }
-/* Openpay mobile: pill + img ambos forzados */
 html body .elementor-element-1a0501e5 .elementor-widget-image,
 html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-widget-container,
 html body .elementor-element-1a0501e5 .elementor-widget-image figure,
@@ -467,7 +497,7 @@ html body .elementor-element-1a0501e5 img {
     border-radius: 0 !important;
 }
 
-/* Copyright */
+/* ── Copyright ── */
 html body .elementor-element-25fec764,
 html body .elementor-element-25fec764.e-con {
     background-color: #111111 !important;
@@ -485,14 +515,13 @@ html body .elementor-element-25fec764 * {
     border: none !important;
 }
 
-/* Reset chips/li */
+/* ── Reset chips/li ── */
 html body .elementor-location-footer li,
 html body [data-elementor-type="footer"] li {
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
-    display: block !important;
     box-shadow: none !important;
     margin: 0 !important;
     list-style: none !important;
@@ -503,6 +532,7 @@ html body [data-elementor-type="footer"] li a {
     border: none !important;
     padding: 0 !important;
     color: #BBBBBB !important;
+    border-radius: 0 !important;
 }
 
 } /* end @media 768px */
