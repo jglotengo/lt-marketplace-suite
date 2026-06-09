@@ -1,95 +1,109 @@
 /**
- * LTMS Footer Fix — v8.0 (HF-39)
- * Fixes: caption afiliaciones rojo→gris, Openpay visible en pill blanco,
- *        "Pagos Seguros" heading gris no rojo.
+ * LTMS Footer Fix — v9.0 (HF-40)
+ * Refactor completo:
+ * - Layout mobile: afiliaciones en fila 2 columnas compactas
+ * - Openpay: imagen visible con dimensiones absolutas en todos los contenedores
+ * - Colores texto corregidos (headings secciones gris, no rojo)
+ * - Redes sociales en fila horizontal
  */
 
-/* ══════════════════════════════════════════════════════════════════
-   GLOBAL (desktop + mobile)
-   ══════════════════════════════════════════════════════════════════ */
-
-/* Base todas las imágenes footer — sin filtro */
+/* ══════════════════════════════════════
+   RESET BASE — todas las imgs del footer
+   ══════════════════════════════════════ */
 html body .elementor-location-footer img,
 html body [data-elementor-type="footer"] img {
     filter: none !important;
     opacity: 1 !important;
+    display: inline-block !important;
 }
 
-/* ─── AFILIACIONES (elementor-element-269ab79) ─────────────────── */
+/* ══════════════════════════════════════
+   AFILIACIONES — #269ab79
+   Pill blanco + imagen visible desktop/mobile
+   ══════════════════════════════════════ */
 
-/* Pill blanco en figure/widget */
-html body .elementor-element-269ab79 .elementor-widget-image,
-html body .elementor-element-269ab79 figure {
+/* Cada widget-image de afiliaciones: pill blanco */
+html body .elementor-element-269ab79 .elementor-widget-image {
     background: #ffffff !important;
     border-radius: 8px !important;
-    padding: 7px 12px !important;
+    padding: 6px 10px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    margin-bottom: 4px !important;
-    box-shadow: none !important;
-    border: none !important;
+    width: auto !important;
+    min-width: 80px !important;
 }
-
-html body .elementor-element-269ab79 .elementor-widget-container {
+html body .elementor-element-269ab79 .elementor-widget-image .elementor-widget-container {
     background: transparent !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
-
-/* Logos — tamaño forzado */
+html body .elementor-element-269ab79 .elementor-widget-image figure,
+html body .elementor-element-269ab79 .elementor-widget-image a,
+html body .elementor-element-269ab79 .elementor-widget-image .elementor-image {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+/* Imagen afiliación — tamaño forzado absoluto */
 html body .elementor-element-269ab79 img {
+    display: block !important;
     width: auto !important;
-    height: 38px !important;
-    max-height: 38px !important;
-    max-width: 130px !important;
-    min-height: 28px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    max-width: 110px !important;
     object-fit: contain !important;
     filter: none !important;
     opacity: 1 !important;
     background: transparent !important;
     padding: 0 !important;
-    display: block !important;
     margin: 0 auto !important;
+    border: none !important;
+    flex-shrink: 0 !important;
 }
-
-/* Caption afiliaciones — gris, NO rojo */
-html body .elementor-element-269ab79 .elementor-heading-title,
+/* Caption afiliación — gris pequeño */
 html body .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title {
+    color: #888888 !important;
     font-size: 8px !important;
     font-weight: 400 !important;
-    color: #999999 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
     border-bottom: none !important;
-    padding-bottom: 0 !important;
-    margin: 5px 0 0 !important;
+    padding: 0 !important;
+    margin: 4px 0 0 !important;
     line-height: 1.3 !important;
     text-align: center !important;
     background: transparent !important;
 }
 
-/* ─── PAGOS SEGUROS (elementor-element-1a0501e5) ───────────────── */
+/* ══════════════════════════════════════
+   OPENPAY — #1a0501e5
+   ══════════════════════════════════════ */
 
-/* Heading "Pagos Seguros" — gris no rojo */
-html body .elementor-element-1a0501e5 .elementor-heading-title,
-html body .elementor-element-586bd11 ~ .elementor-element .elementor-heading-title {
+/* Heading "Pagos Seguros" — gris */
+html body .elementor-element-1a0501e5 .elementor-widget-heading .elementor-heading-title {
     color: #aaaaaa !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 1px !important;
+    letter-spacing: 0.8px !important;
     border-bottom: none !important;
-    padding-bottom: 0 !important;
-    margin: 0 0 8px !important;
+    padding: 0 !important;
+    margin: 0 0 6px !important;
     background: transparent !important;
 }
-
-/* Texto "Pagos y transferencias seguras a través de:" */
+/* Texto "Pagos y transferencias..." */
 html body .elementor-element-1a0501e5 p,
-html body .elementor-element-1a0501e5 .elementor-widget-text-editor p,
-html body .elementor-element-1a0501e5 .elementor-text-editor {
+html body .elementor-element-1a0501e5 .elementor-text-editor,
+html body .elementor-element-1a0501e5 .elementor-widget-text-editor .elementor-widget-container {
     font-size: 9px !important;
     color: #888888 !important;
     background: transparent !important;
@@ -98,60 +112,71 @@ html body .elementor-element-1a0501e5 .elementor-text-editor {
     margin: 0 0 8px !important;
     line-height: 1.5 !important;
 }
-
 /* Pill blanco Openpay */
-html body .elementor-element-1a0501e5 .elementor-widget-image,
-html body .elementor-element-1a0501e5 figure {
+html body .elementor-element-1a0501e5 .elementor-widget-image {
     background: #ffffff !important;
     border-radius: 7px !important;
-    padding: 6px 14px !important;
+    padding: 6px 12px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-shadow: none !important;
-    border: none !important;
-    margin: 0 !important;
+    width: auto !important;
 }
-
-html body .elementor-element-1a0501e5 .elementor-widget-container {
+html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-widget-container {
     background: transparent !important;
     padding: 0 !important;
     border: none !important;
+    display: flex !important;
+    align-items: center !important;
 }
-
-/* Logo Openpay — tamaño forzado */
+html body .elementor-element-1a0501e5 .elementor-widget-image figure,
+html body .elementor-element-1a0501e5 .elementor-widget-image a,
+html body .elementor-element-1a0501e5 .elementor-widget-image .elementor-image {
+    display: flex !important;
+    align-items: center !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+/* Logo Openpay — dimensiones absolutas */
 html body .elementor-element-1a0501e5 img {
+    display: block !important;
     width: auto !important;
-    height: 28px !important;
-    max-height: 28px !important;
-    max-width: 110px !important;
-    min-height: 20px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+    max-width: 100px !important;
     object-fit: contain !important;
     filter: none !important;
     opacity: 1 !important;
     background: transparent !important;
     padding: 0 !important;
-    display: block !important;
-    border-radius: 0 !important;
     margin: 0 auto !important;
+    border: none !important;
+    border-radius: 0 !important;
+    flex-shrink: 0 !important;
 }
 
-/* ─── HEADING "AFILIACIONES" (título de sección) ───────────────── */
-/* Apunta al heading de sección dentro del wrapper 586bd11 */
+/* ══════════════════════════════════════
+   HEADING "AFILIACIONES" título sección
+   ══════════════════════════════════════ */
 html body .elementor-element-586bd11 > .e-con-inner > .elementor-element:first-child .elementor-heading-title {
     color: #aaaaaa !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 1px !important;
+    letter-spacing: 0.8px !important;
     border-bottom: none !important;
+    padding: 0 !important;
+    margin: 0 0 10px !important;
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   MOBILE ≤768px
-   ══════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   MOBILE ≤768px — layout completo
+   ══════════════════════════════════════ */
 @media (max-width: 768px) {
 
+/* Footer root */
 html body .elementor-location-footer,
 html body [data-elementor-type="footer"] {
     background-color: #1A1A1A !important;
@@ -159,11 +184,12 @@ html body [data-elementor-type="footer"] {
     padding: 0 !important;
 }
 
+/* Secciones */
 html body .elementor-location-footer .e-con,
 html body [data-elementor-type="footer"] .e-con {
     background-color: #1A1A1A !important;
     --e-con-background: #1A1A1A !important;
-    padding: 16px 18px !important;
+    padding: 14px 16px !important;
     border-bottom: 1px solid rgba(255,255,255,0.07) !important;
     box-sizing: border-box !important;
     width: 100% !important;
@@ -177,14 +203,12 @@ html body [data-elementor-type="footer"] .e-con {
     border-top: none !important;
     margin: 0 !important;
 }
-
 html body .elementor-location-footer .e-con-inner,
 html body [data-elementor-type="footer"] .e-con-inner {
     background-color: transparent !important;
     padding: 0 !important;
     width: 100% !important;
 }
-
 html body .elementor-location-footer .elementor-widget-wrap,
 html body [data-elementor-type="footer"] .elementor-widget-wrap,
 html body .elementor-location-footer .elementor-widget-container,
@@ -195,49 +219,58 @@ html body [data-elementor-type="footer"] .elementor-widget-container {
     border-radius: 0 !important;
 }
 
-/* Headings generales mobile — rojo EXCEPTO los de afiliaciones/pagos */
-html body .elementor-location-footer .elementor-heading-title,
-html body [data-elementor-type="footer"] .elementor-heading-title {
+/* Headings generales de sección — rojo */
+html body .elementor-location-footer > * .elementor-heading-title,
+html body [data-elementor-type="footer"] > * .elementor-heading-title {
     font-size: 9px !important;
     font-weight: 700 !important;
     color: #E80001 !important;
     text-transform: uppercase !important;
-    letter-spacing: 1.2px !important;
-    margin: 0 0 12px !important;
-    padding-bottom: 0 !important;
+    letter-spacing: 1px !important;
+    margin: 0 0 10px !important;
+    padding: 0 !important;
     border-bottom: none !important;
     display: block !important;
-    width: 100% !important;
     line-height: 1.4 !important;
+    background: transparent !important;
 }
 
-/* Override: headings de afiliaciones y pagos → gris */
+/* Override: headings afiliaciones y pagos → gris */
 html body .elementor-element-269ab79 .elementor-heading-title,
-html body .elementor-element-1a0501e5 .elementor-heading-title {
-    color: #999999 !important;
+html body .elementor-element-269ab79 .elementor-widget-heading .elementor-heading-title,
+html body .elementor-element-1a0501e5 .elementor-heading-title,
+html body .elementor-element-1a0501e5 .elementor-widget-heading .elementor-heading-title,
+html body .elementor-element-586bd11 .elementor-widget-heading .elementor-heading-title {
+    color: #888888 !important;
     font-size: 8px !important;
     font-weight: 400 !important;
     text-transform: none !important;
     letter-spacing: 0 !important;
-    margin: 5px 0 0 !important;
+    margin: 4px 0 0 !important;
 }
 
-/* Nav links */
+/* ── Nav links ── */
 html body .elementor-location-footer .elementor-nav-menu,
 html body [data-elementor-type="footer"] .elementor-nav-menu {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 0 12px !important;
+    gap: 0 10px !important;
     list-style: none !important;
     padding: 0 !important;
     margin: 0 !important;
 }
-
+html body .elementor-location-footer .elementor-nav-menu li,
+html body [data-elementor-type="footer"] .elementor-nav-menu li {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    display: block !important;
+}
 html body .elementor-location-footer .elementor-nav-menu li a,
 html body [data-elementor-type="footer"] .elementor-nav-menu li a {
-    font-size: 12px !important;
-    color: #CCCCCC !important;
-    line-height: 2.3 !important;
+    font-size: 11px !important;
+    color: #BBBBBB !important;
+    line-height: 2.2 !important;
     text-decoration: none !important;
     background: transparent !important;
     border: none !important;
@@ -245,99 +278,193 @@ html body [data-elementor-type="footer"] .elementor-nav-menu li a {
     font-weight: 400 !important;
 }
 
-/* Contactos */
+/* ── Contactos ── */
 html body .elementor-location-footer .elementor-icon-list-items,
 html body [data-elementor-type="footer"] .elementor-icon-list-items {
     display: flex !important;
     flex-direction: column !important;
-    gap: 10px !important;
+    gap: 8px !important;
     padding: 0 !important;
     margin: 0 !important;
 }
-
 html body .elementor-location-footer .elementor-icon-list-item,
 html body [data-elementor-type="footer"] .elementor-icon-list-item {
     display: flex !important;
     flex-direction: row !important;
     align-items: flex-start !important;
-    gap: 10px !important;
+    gap: 8px !important;
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
 }
-
 html body .elementor-location-footer .elementor-icon-list-icon,
 html body [data-elementor-type="footer"] .elementor-icon-list-icon {
     color: #E80001 !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     flex-shrink: 0 !important;
     margin-top: 2px !important;
 }
-
 html body .elementor-location-footer .elementor-icon-list-text,
 html body [data-elementor-type="footer"] .elementor-icon-list-text {
-    font-size: 12px !important;
-    color: #CCCCCC !important;
+    font-size: 11px !important;
+    color: #BBBBBB !important;
     line-height: 1.5 !important;
 }
 
-/* Redes sociales */
+/* ── Redes sociales: fila horizontal compacta ── */
 html body .elementor-location-footer .elementor-social-icons-wrapper,
 html body [data-elementor-type="footer"] .elementor-social-icons-wrapper {
     display: flex !important;
     flex-direction: row !important;
-    gap: 20px !important;
-    flex-wrap: wrap !important;
+    gap: 16px !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
+    margin-top: 4px !important;
 }
-
 html body .elementor-location-footer .elementor-social-icon,
 html body [data-elementor-type="footer"] .elementor-social-icon {
-    font-size: 22px !important;
+    font-size: 20px !important;
     color: #888888 !important;
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
+    border-radius: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    display: inline-flex !important;
 }
 
-/* Afiliaciones mobile — tamaño reducido */
+/* ── Afiliaciones mobile: 2 columnas ── */
+html body .elementor-element-586bd11,
+html body .elementor-element-586bd11.e-con {
+    background-color: #1A1A1A !important;
+    --e-con-background: #1A1A1A !important;
+    padding: 14px 16px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    box-shadow: none !important;
+}
+html body .elementor-element-586bd11 > .e-con-inner {
+    background: transparent !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+
+/* Grid 2 columnas para los logos */
+html body .elementor-element-269ab79 > .e-con-inner {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    width: 100% !important;
+}
+html body .elementor-element-269ab79 > .e-con-inner > .elementor-element {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    min-height: unset !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+/* Pill blanco afiliaciones mobile */
+html body .elementor-element-269ab79 .elementor-widget-image {
+    background: #ffffff !important;
+    border-radius: 7px !important;
+    padding: 6px 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 48px !important;
+}
+/* Imagen mobile */
 html body .elementor-element-269ab79 img {
-    height: 30px !important;
-    max-height: 30px !important;
-    max-width: 100px !important;
-    min-height: 22px !important;
-}
-
-html body .elementor-element-269ab79 .elementor-widget-image,
-html body .elementor-element-269ab79 figure {
-    padding: 5px 8px !important;
-}
-
-/* Openpay mobile */
-html body .elementor-element-1a0501e5 img {
-    height: 24px !important;
-    max-height: 24px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
     max-width: 90px !important;
-    min-height: 18px !important;
+    width: auto !important;
 }
 
-/* Copyright */
-html body .elementor-element-25fec764 {
+/* ── Pagos Seguros mobile ── */
+html body .elementor-element-1a0501e5,
+html body .elementor-element-1a0501e5.e-con {
+    background: #1A1A1A !important;
+    --e-con-background: #1A1A1A !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+}
+html body .elementor-element-1a0501e5 > .e-con-inner {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+/* Openpay pill mobile */
+html body .elementor-element-1a0501e5 .elementor-widget-image {
+    background: #ffffff !important;
+    border-radius: 6px !important;
+    padding: 5px 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 38px !important;
+    min-width: 90px !important;
+}
+html body .elementor-element-1a0501e5 img {
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    max-width: 90px !important;
+    width: auto !important;
+}
+
+/* ── Copyright ── */
+html body .elementor-element-25fec764,
+html body .elementor-element-25fec764.e-con {
     background-color: #111111 !important;
     --e-con-background: #111111 !important;
     border-top: 1px solid rgba(255,255,255,0.06) !important;
-    padding: 12px 18px !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    padding: 10px 16px !important;
+    margin: 0 !important;
 }
-
 html body .elementor-element-25fec764 * {
-    font-size: 10px !important;
+    font-size: 9px !important;
     color: #444444 !important;
     text-align: center !important;
     background-color: transparent !important;
     border: none !important;
 }
 
-/* Reset chips */
+/* ── Reset chips/li ── */
 html body .elementor-location-footer li,
 html body [data-elementor-type="footer"] li {
     background: transparent !important;
@@ -347,14 +474,14 @@ html body [data-elementor-type="footer"] li {
     display: block !important;
     box-shadow: none !important;
     margin: 0 !important;
+    list-style: none !important;
 }
-
 html body .elementor-location-footer li a,
 html body [data-elementor-type="footer"] li a {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    color: #CCCCCC !important;
+    color: #BBBBBB !important;
 }
 
 } /* end @media 768px */
