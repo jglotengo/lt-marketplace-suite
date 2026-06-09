@@ -1027,88 +1027,109 @@ function hf19MobileEnhancements() {
 
 
     /* ══════════════════════════════════════════════════════════════
-       HF-45: Footer nav — forzar visibilidad en mobile
-       Elementor usa JS para ocultar el nav con inline styles/clases.
-       Este fix los sobreescribe después del DOM ready y tras 300ms.
+       HF-46: Footer nav — forzar visibilidad con MutationObserver
+       Elementor manipula el DOM después del ready(), re-aplica display:none
+       al nav-menu--main en mobile. MutationObserver detecta cada cambio
+       y revierte inline styles inmediatamente.
        ══════════════════════════════════════════════════════════════ */
-    function fixFooterNav() {
-        var footer = document.querySelector(
-            '.elementor-location-footer, [data-elementor-type="footer"]'
-        );
-        if (!footer) return;
+    function fixFooterNavEl(el) {
+        el.style.setProperty('display', 'block', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('height', 'auto', 'important');
+        el.style.setProperty('max-height', '9999px', 'important');
+        el.style.setProperty('overflow', 'visible', 'important');
+        el.style.setProperty('position', 'static', 'important');
+        el.style.setProperty('transform', 'none', 'important');
+        el.style.setProperty('pointer-events', 'auto', 'important');
+        el.style.setProperty('clip', 'auto', 'important');
+        el.style.setProperty('clip-path', 'none', 'important');
+        el.removeAttribute('aria-expanded');
+        el.removeAttribute('aria-hidden');
+        el.classList.remove('elementor-nav-menu--hidden');
+    }
 
-        // Selectores de todos los contenedores del nav que Elementor puede ocultar
-        var navSelectors = [
+    function fixFooterNav() {
+        // Buscar footer por múltiples selectores
+        var footer = document.querySelector(
+            '.elementor-location-footer, [data-elementor-type="footer"], ' +
+            '.elementor-13743, footer'
+        );
+        if (!footer) {
+            console.log('[LTMS HF-46] Footer no encontrado');
+            return;
+        }
+
+        // Nav containers
+        var navContainerSels = [
             '.elementor-nav-menu--main',
             '.elementor-nav-menu--dropdown',
             '.elementor-nav-menu-wrapper',
             '.elementor-nav-menu__container',
-            '.elementor-nav-menu',
-            'nav'
+            '.elementor-widget-nav-menu .elementor-widget-container',
+            '.elementor-nav-menu'
         ];
-
-        navSelectors.forEach(function(sel) {
-            footer.querySelectorAll(sel).forEach(function(el) {
-                el.style.setProperty('display', 'block', 'important');
-                el.style.setProperty('visibility', 'visible', 'important');
-                el.style.setProperty('opacity', '1', 'important');
-                el.style.setProperty('height', 'auto', 'important');
-                el.style.setProperty('max-height', '9999px', 'important');
-                el.style.setProperty('overflow', 'visible', 'important');
-                el.style.setProperty('position', 'static', 'important');
-                el.style.setProperty('transform', 'none', 'important');
-                el.style.setProperty('pointer-events', 'auto', 'important');
-                el.style.setProperty('background', 'transparent', 'important');
-                el.style.setProperty('border', 'none', 'important');
-                el.style.setProperty('box-shadow', 'none', 'important');
-                el.style.setProperty('padding', '0', 'important');
-                el.style.setProperty('top', 'auto', 'important');
-                el.style.setProperty('left', 'auto', 'important');
-                el.removeAttribute('aria-expanded');
-                el.removeAttribute('aria-hidden');
-            });
+        navContainerSels.forEach(function(sel) {
+            footer.querySelectorAll(sel).forEach(fixFooterNavEl);
         });
 
-        // Ocultar hamburger toggle
-        footer.querySelectorAll('.elementor-menu-toggle, button.elementor-menu-toggle').forEach(function(el) {
+        // Hamburger oculto
+        footer.querySelectorAll('.elementor-menu-toggle').forEach(function(el) {
             el.style.setProperty('display', 'none', 'important');
         });
 
-        // Forzar cada LI y A visibles
-        footer.querySelectorAll('.elementor-nav-menu li').forEach(function(li) {
+        // LI items
+        footer.querySelectorAll('.elementor-nav-menu li, .elementor-nav-menu .menu-item').forEach(function(li) {
             li.style.setProperty('display', 'block', 'important');
             li.style.setProperty('visibility', 'visible', 'important');
-            li.style.setProperty('opacity', '1', 'important');
             li.style.setProperty('height', 'auto', 'important');
-            li.style.setProperty('background', 'transparent', 'important');
-            li.style.setProperty('border', 'none', 'important');
-            li.style.setProperty('border-radius', '0', 'important');
-            li.style.setProperty('box-shadow', 'none', 'important');
-            li.style.setProperty('padding', '0', 'important');
-            li.style.setProperty('margin', '0', 'important');
+            li.style.setProperty('opacity', '1', 'important');
         });
 
-        footer.querySelectorAll('.elementor-nav-menu li a').forEach(function(a) {
+        // Links
+        footer.querySelectorAll('.elementor-nav-menu li a, .elementor-nav-menu .elementor-item').forEach(function(a) {
             a.style.setProperty('display', 'block', 'important');
             a.style.setProperty('visibility', 'visible', 'important');
-            a.style.setProperty('opacity', '1', 'important');
             a.style.setProperty('height', 'auto', 'important');
-            a.style.setProperty('background', 'transparent', 'important');
-            a.style.setProperty('border', 'none', 'important');
-            a.style.setProperty('border-radius', '0', 'important');
-            a.style.setProperty('padding', '0', 'important');
+            a.style.setProperty('opacity', '1', 'important');
             a.style.setProperty('color', '#BBBBBB', 'important');
         });
 
-        console.log('[LTMS HF-45] Footer nav fix aplicado');
+        console.log('[LTMS HF-46] Footer nav fix aplicado');
     }
 
     ready(function() {
         fixFooterNav();
-        // Re-aplicar después de que Elementor termine de inicializar
-        setTimeout(fixFooterNav, 300);
-        setTimeout(fixFooterNav, 800);
+        setTimeout(fixFooterNav, 200);
+        setTimeout(fixFooterNav, 600);
         setTimeout(fixFooterNav, 1500);
+        setTimeout(fixFooterNav, 3000);
+
+        // MutationObserver: revertir cualquier cambio que Elementor haga al nav
+        if (window.MutationObserver) {
+            var footerEl = document.querySelector(
+                '.elementor-location-footer, [data-elementor-type="footer"], .elementor-13743, footer'
+            );
+            if (footerEl) {
+                var obs = new MutationObserver(function(mutations) {
+                    var needsFix = false;
+                    mutations.forEach(function(m) {
+                        if (m.type === 'attributes' && m.attributeName === 'style') {
+                            var t = m.target;
+                            if (t.classList.contains('elementor-nav-menu--main') ||
+                                t.classList.contains('elementor-nav-menu--dropdown') ||
+                                t.classList.contains('elementor-nav-menu-wrapper') ||
+                                t.classList.contains('elementor-nav-menu')) {
+                                needsFix = true;
+                            }
+                        }
+                    });
+                    if (needsFix) fixFooterNav();
+                });
+                obs.observe(footerEl, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+                console.log('[LTMS HF-46] MutationObserver activo en footer');
+            }
+        }
     });
 
 
