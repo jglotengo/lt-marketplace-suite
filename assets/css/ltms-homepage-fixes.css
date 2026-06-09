@@ -3324,3 +3324,79 @@ body.home {
     height: auto !important;
     overflow: visible !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   HF-48: Footer Desktop — Imágenes afiliaciones 3× tamaño original
+   Original: max-height:55px / max-width:150px → 3× = 165px / 450px
+   Contenedores (37db1646, 7f306b13) expandidos al mismo tamaño.
+   Openpay: 30px → 90px alto / 100px → 300px ancho.
+   Scope: min-width:769px (desktop only, no toca mobile).
+   ══════════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 769px) {
+
+    /* ── Imágenes de afiliación — 3× escala ──────────────────────── */
+    .elementor-element-37db1646 img,
+    .elementor-element-7f306b13 img,
+    .elementor-location-footer .elementor-widget-image img,
+    [data-elementor-type="footer"] .elementor-widget-image img,
+    .elementor-13743 .elementor-widget-image img {
+        max-height: 165px !important;
+        max-width: 450px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+    }
+
+    /* ── Openpay logo — 3× escala ────────────────────────────────── */
+    .elementor-element-186f2b15 img,
+    .elementor-location-footer img[src*="openpay"],
+    .elementor-13743 img[src*="openpay"] {
+        max-height: 90px !important;
+        max-width: 300px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+    }
+
+    /* ── Contenedor blanco de cada logo — mismo tamaño que imagen ── */
+    .elementor-element-37db1646,
+    .elementor-element-7f306b13 {
+        width: 450px !important;
+        min-height: 165px !important;
+        background: #ffffff !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 16px 24px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── Contenedor Openpay — mismo tamaño ───────────────────────── */
+    .elementor-element-186f2b15 {
+        width: 300px !important;
+        min-height: 90px !important;
+        background: #ffffff !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 12px 20px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ── Widget container interno — no restringir ────────────────── */
+    .elementor-element-37db1646 .elementor-widget-container,
+    .elementor-element-7f306b13 .elementor-widget-container,
+    .elementor-element-186f2b15 .elementor-widget-container {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+}
