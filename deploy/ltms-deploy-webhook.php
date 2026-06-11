@@ -139,6 +139,48 @@ if (isset($_GET['qa'])) {
     exit;
 }
 
+
+// ── FIX SELLERS MODE ─────────────────────────────────────────────────────────
+if (isset($_GET['fix_sellers'])) {
+    $plugin_file = PLUGIN_PATH . '/includes/frontend/views/view-sellers-landing.php';
+    echo "=== FIX SELLERS LANDING ===\n\n";
+
+    echo "1. FILE CHECK:\n";
+    echo "   Exists: " . (file_exists($plugin_file) ? 'YES' : 'NO') . "\n";
+    if (file_exists($plugin_file)) {
+        $c = file_get_contents($plugin_file);
+        echo "   Has 95%: " . (strpos($c,'95%')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
+        echo "   Has recibes: " . (strpos($c,'recibes')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
+    }
+
+    echo "\n2. FORCE OVERWRITE FROM GITHUB:\n";
+    $fresh = gh_get('includes/frontend/views/view-sellers-landing.php', $gh);
+    if ($fresh) {
+        $bytes = file_put_contents($plugin_file, $fresh);
+        @opcache_invalidate($plugin_file, true);
+        $c2 = file_get_contents($plugin_file);
+        echo "   Written: {$bytes} bytes\n";
+        echo "   Has 95% after: " . (strpos($c2,'95%')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
+        echo "   Has recibes after: " . (strpos($c2,'recibes')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
+    } else {
+        echo "   ERROR: download failed\n";
+    }
+
+    echo "\n3. CACHE PURGE:\n";
+    if (file_exists(__DIR__ . '/wp-load.php')) {
+        require_once __DIR__ . '/wp-load.php';
+        if (function_exists('opcache_reset')) { opcache_reset(); echo "   opcache: OK\n"; }
+        if (function_exists('wp_cache_flush')) { wp_cache_flush(); echo "   wp_cache: OK\n"; }
+        if (function_exists('sg_cachepress_purge_cache')) { sg_cachepress_purge_cache(); echo "   sg_cache: OK\n"; }
+        if (function_exists('sg_cachepress_purge_single_url')) {
+            sg_cachepress_purge_single_url(home_url('/sellers/'));
+            echo "   sg_url: OK\n";
+        }
+    }
+    echo "\n=== DONE. Reload /sellers/ in incognito ===\n";
+    exit;
+}
+
 // ── DEPLOY MODE ───────────────────────────────────────────────────────────────
 $ts = date('Y-m-d H:i:s');
 echo "[{$ts}] v5
