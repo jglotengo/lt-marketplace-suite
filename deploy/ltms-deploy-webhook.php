@@ -142,42 +142,53 @@ if (isset($_GET['qa'])) {
 
 // ── FIX SELLERS MODE ─────────────────────────────────────────────────────────
 if (isset($_GET['fix_sellers'])) {
+    header('Content-Type: text/plain; charset=utf-8');
     $plugin_file = PLUGIN_PATH . '/includes/frontend/views/view-sellers-landing.php';
     echo "=== FIX SELLERS LANDING ===\n\n";
 
-    echo "1. FILE CHECK:\n";
+    // 1. Check file on disk
+    echo "1. FILE ON DISK:\n";
     echo "   Exists: " . (file_exists($plugin_file) ? 'YES' : 'NO') . "\n";
     if (file_exists($plugin_file)) {
         $c = file_get_contents($plugin_file);
-        echo "   Has 95%: " . (strpos($c,'95%')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
-        echo "   Has recibes: " . (strpos($c,'recibes')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
+        echo "   Has 95%: " . (strpos($c,'95%')!==false ? 'YES-BAD' : 'NO-OK') . "\n";
+        echo "   Has recibes: " . (strpos($c,'recibes')!==false ? 'YES-BAD' : 'NO-OK') . "\n";
+        $lines = explode("\n", $c);
+        echo "   Lines 29-33:\n";
+        for ($i=28;$i<=32&&$i<count($lines);$i++) echo "     ".($i+1).": ".$lines[$i]."\n";
     }
 
-    echo "\n2. FORCE OVERWRITE FROM GITHUB:\n";
-    $fresh = gh_get('includes/frontend/views/view-sellers-landing.php', $gh);
-    if ($fresh) {
-        $bytes = file_put_contents($plugin_file, $fresh);
-        @opcache_invalidate($plugin_file, true);
-        $c2 = file_get_contents($plugin_file);
-        echo "   Written: {$bytes} bytes\n";
-        echo "   Has 95% after: " . (strpos($c2,'95%')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
-        echo "   Has recibes after: " . (strpos($c2,'recibes')!==false ? 'YES (BAD)' : 'NO (OK)') . "\n";
-    } else {
-        echo "   ERROR: download failed\n";
-    }
+    // 2. Load WP and check/fix DB
+    echo "\n2. WORDPRESS DB CHECK:\n";
+    require_once __DIR__ . '/wp-load.php';
+    global $wpdb;
+    // Check all postmeta for the phrase
+    $hits = $wpdb->get_results(
+        "SELECT post_id, meta_key FROM {$wpdb->postmeta} 
+         WHERE meta_value LIKE '%recibes%' OR meta_value LIKE '%95%venta%'
+         LIMIT 20"
+    );
+    echo "   DB hits with phrase: " . count($hits) . "\n";
+    foreach ($hits as $h) echo "   post_id={$h->post_id} meta_key={$h->meta_key}\n";
+    
+    // Check post_content directly
+    $posts = $wpdb->get_results(
+        "SELECT ID, post_title, post_status FROM {$wpdb->posts} 
+         WHERE post_content LIKE '%recibes%' OR post_content LIKE '%95%venta%'
+         LIMIT 10"
+    );
+    echo "   Posts with phrase in content: " . count($posts) . "\n";
+    foreach ($posts as $p) echo "   ID={$p->ID} '{$p->post_title}' ({$p->post_status})\n";
 
+    // 3. Cache purge
     echo "\n3. CACHE PURGE:\n";
-    if (file_exists(__DIR__ . '/wp-load.php')) {
-        require_once __DIR__ . '/wp-load.php';
-        if (function_exists('opcache_reset')) { opcache_reset(); echo "   opcache: OK\n"; }
-        if (function_exists('wp_cache_flush')) { wp_cache_flush(); echo "   wp_cache: OK\n"; }
-        if (function_exists('sg_cachepress_purge_cache')) { sg_cachepress_purge_cache(); echo "   sg_cache: OK\n"; }
-        if (function_exists('sg_cachepress_purge_single_url')) {
-            sg_cachepress_purge_single_url(home_url('/sellers/'));
-            echo "   sg_url: OK\n";
-        }
+    if (function_exists('opcache_reset')) { opcache_reset(); echo "   opcache: OK\n"; }
+    if (function_exists('wp_cache_flush')) { wp_cache_flush(); echo "   wp_cache: OK\n"; }
+    if (function_exists('sg_cachepress_purge_cache')) { sg_cachepress_purge_cache(); echo "   sg_cache: OK\n"; }
+    if (function_exists('sg_cachepress_purge_single_url')) {
+        sg_cachepress_purge_single_url(home_url('/sellers/')); echo "   sg_url: OK\n";
     }
-    echo "\n=== DONE. Reload /sellers/ in incognito ===\n";
+    echo "\n=== DONE ===\n";
     exit;
 }
 
