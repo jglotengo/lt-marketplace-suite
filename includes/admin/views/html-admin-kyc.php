@@ -135,10 +135,20 @@ $total_kyc = array_sum( $count_map );
 
                 // Generar URLs pre-firmadas para documentos del modal (B2 privado)
                 $docs = [];
-                foreach ( [ 'doc_front_url', 'doc_back_url', 'selfie_url', 'extra_doc_url', 'file_path' ] as $field ) {
+                // 1. Campos directos de la tabla KYC
+                foreach ( [ 'doc_front_url', 'doc_back_url', 'selfie_url', 'extra_doc_url', 'file_path', 'rut_path', 'camara_path', 'selfie_path' ] as $field ) {
                     if ( ! empty( $kyc[ $field ] ) ) {
                         $signed = $make_signed_url( $kyc[ $field ] );
                         if ( $signed ) $docs[] = $signed;
+                    }
+                }
+                // 2. Documentos adicionales desde user_meta (RUT, cámara, banco, selfie)
+                $vid = (int) $kyc['vendor_id'];
+                foreach ( [ 'ltms_kyc_file_cedula', 'ltms_kyc_doc_path', 'ltms_kyc_file_rut', 'ltms_kyc_file_camara', 'ltms_kyc_selfie_url', 'ltms_kyc_file_banco' ] as $meta_key ) {
+                    $val = get_user_meta( $vid, $meta_key, true );
+                    if ( ! empty( $val ) ) {
+                        $signed = $make_signed_url( $val );
+                        if ( $signed && ! in_array( $signed, $docs, true ) ) $docs[] = $signed;
                     }
                 }
             ?>
