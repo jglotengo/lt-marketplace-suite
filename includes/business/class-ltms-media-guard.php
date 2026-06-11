@@ -38,14 +38,17 @@ class LTMS_Media_Guard {
             return;
         }
 
+        // Reconstruct full B2 key: entity/key (e.g. kyc/168/uuid.pdf)
+        $b2_key = $entity . '/' . $key;
+
         // Authenticate the request
         $user_id = get_current_user_id();
         if ( ! $user_id ) {
             wp_die( esc_html__( 'Acceso denegado. Debes iniciar sesión.', 'ltms' ), 403 );
         }
 
-        // Validate access
-        if ( ! self::validate_access( $user_id, $entity, $key ) ) {
+        // Validate access using full B2 key
+        if ( ! self::validate_access( $user_id, $entity, $b2_key ) ) {
             LTMS_Core_Logger::warning( 'VAULT_ACCESS_DENIED', sprintf( 'User #%d denied access to vault: %s/%s', $user_id, $entity, $key ) );
             wp_die( esc_html__( 'No tienes permiso para acceder a este archivo.', 'ltms' ), 403 );
         }
@@ -56,7 +59,7 @@ class LTMS_Media_Guard {
             $bucket = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
                 ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' );
             $signed_url_ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
-            $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $key ), $signed_url_ttl );
+            $url    = $b2->get_signed_url( $bucket, sanitize_text_field( $b2_key ), $signed_url_ttl );
 
             // L-2: Registro de acceso a documentos sensibles (trazabilidad Habeas Data)
             LTMS_Core_Logger::info( 'VAULT_ACCESS_GRANTED', sprintf(
