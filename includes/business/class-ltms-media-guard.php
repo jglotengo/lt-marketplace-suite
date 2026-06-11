@@ -20,8 +20,9 @@ class LTMS_Media_Guard {
     }
 
     public static function add_rewrite_rules(): void {
+        // Supports paths like ltms-vault/kyc/168/UUID.pdf (entity=kyc, key=168/UUID.pdf)
         add_rewrite_rule(
-            '^ltms-vault/([^/]+)/([^/]+)/?$',
+            '^ltms-vault/([^/]+)/(.+?)/?$',
             'index.php?ltms_vault_entity=$matches[1]&ltms_vault_key=$matches[2]',
             'top'
         );
@@ -193,7 +194,8 @@ class LTMS_Media_Guard {
         LTMS_Core_Logger::info( 'KYC_UPLOAD_SUCCESS', sprintf( 'Vendor #%d uploaded KYC: %s', $vendor_id, $key ) );
 
         // M-119: devolver file_path (alias de vault_url) para compatibilidad con el JS del frontend
-        $vault_url = site_url( 'ltms-vault/kyc/' . rawurlencode( $key ) );
+        // Key format: kyc/{vendor_id}/{uuid}.ext — build vault URL preserving slashes
+        $vault_url = site_url( 'ltms-vault/' . $key );
         return [
             'file_id'   => (int) $wpdb->insert_id,
             'file_key'  => $key,
