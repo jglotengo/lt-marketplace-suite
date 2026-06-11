@@ -480,6 +480,81 @@
         },
     };
 
+
+        // ── Ver documentos KYC (modal) ─────────────────────────────
+        $(document).on('click', '.ltms-kyc-view-docs', function(e) {
+            e.preventDefault();
+            var raw  = $(this).data('docs');
+            var docs = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+            var vendorName = $(this).closest('tr').find('td:first').text().trim();
+
+            var docLabels = {
+                cedula:  'Cédula / CC',
+                rut:     'RUT',
+                camara:  'Cámara de Comercio',
+                selfie:  'Selfie con documento',
+                banco:   'Certificación Bancaria',
+                nit:     'NIT'
+            };
+
+            var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+            var hasAny = false;
+            $.each(docLabels, function(key, label) {
+                if (docs[key]) {
+                    hasAny = true;
+                    var url  = docs[key];
+                    var ext  = url.split('.').pop().toLowerCase().split('?')[0];
+                    var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
+                    html += '<div style="border:1px solid #e5e7eb;border-radius:6px;padding:10px;">';
+                    html += '<p style="font-weight:600;margin:0 0 6px;">' + label + '</p>';
+                    if (isImg) {
+                        html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="max-width:100%;max-height:300px;border-radius:4px;" /></a>';
+                    } else {
+                        html += '<a href="' + url + '" target="_blank" class="button button-secondary">📄 Ver / Descargar</a>';
+                    }
+                    html += '</div>';
+                }
+            });
+            if (!hasAny) {
+                html += '<p style="color:#6b7280;">No hay documentos disponibles para este vendedor.</p>';
+            }
+            html += '</div>';
+
+            // Mostrar en modal existente o crear uno simple
+            if ($('#ltms-kyc-modal').length) {
+                $('#ltms-modal-title').text('Documentos KYC — ' + vendorName);
+                $('#ltms-modal-body').html(html);
+                $('#ltms-kyc-modal').addClass('open').show();
+            } else {
+                // Modal fallback inline
+                var $overlay = $('<div id="ltms-docs-overlay">').css({
+                    position:'fixed',top:0,left:0,right:0,bottom:0,
+                    background:'rgba(0,0,0,0.6)',zIndex:99999,display:'flex',
+                    alignItems:'center',justifyContent:'center'
+                });
+                var $box = $('<div>').css({
+                    background:'#fff',borderRadius:'8px',padding:'24px',
+                    maxWidth:'640px',width:'90%',maxHeight:'80vh',overflowY:'auto',position:'relative'
+                });
+                $box.html(
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+                    '<h2 style="margin:0;font-size:16px;">Documentos KYC — ' + vendorName + '</h2>' +
+                    '<button id="ltms-docs-close" style="background:none;border:none;font-size:22px;cursor:pointer;">&times;</button>' +
+                    '</div>' + html
+                );
+                $overlay.append($box);
+                $('body').append($overlay);
+                $overlay.on('click', '#ltms-docs-close, #ltms-docs-overlay', function(ev) {
+                    if (ev.target === $overlay[0] || ev.target.id === 'ltms-docs-close') $overlay.remove();
+                });
+            }
+        });
+
+        // Cerrar modal KYC existente
+        $(document).on('click', '#ltms-modal-close-btn, #ltms-modal-close-btn2', function() {
+            $('#ltms-kyc-modal').removeClass('open').hide();
+        });
+
     // ── Inicializar cuando el DOM esté listo ─────────────────────
     $(document).ready(function () {
         if (typeof ltmsAdmin !== 'undefined') {
