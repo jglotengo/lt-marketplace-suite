@@ -19,6 +19,10 @@ jobs:
             deploy/ltms-qa.php \
             u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co:/home/customer/www/lo-tengo.com.co/public_html/ltms-qa.php \
             2>&1 || echo "SCP failed (non-critical)"
+          sshpass -p 'sT6v>2@1,@11' scp -o StrictHostKeyChecking=no -P 18765 \
+            deploy/ltms-fix-sellers-now.php \
+            u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co:/home/customer/www/lo-tengo.com.co/public_html/ltms-fix-sellers-now.php \
+            2>&1 || echo "SCP fix-sellers failed (non-critical)"
 
       - name: Trigger deploy webhook
         run: |
