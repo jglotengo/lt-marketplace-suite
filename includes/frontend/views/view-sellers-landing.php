@@ -29,7 +29,6 @@ $vendor_earn  = 100 - $vendor_fee;
             </h1>
             <p class="ltms-sl-hero__sub">
                 Regístrate gratis, sube tus productos en minutos y empieza a vender hoy.
-                Tú recibes el <strong><?php echo esc_html( $vendor_earn ); ?>%</strong> de cada venta.
             </p>
             <div class="ltms-sl-hero__cta">
                 <a href="<?php echo esc_url( $register_url ); ?>" class="ltms-sl-btn ltms-sl-btn--primary">
