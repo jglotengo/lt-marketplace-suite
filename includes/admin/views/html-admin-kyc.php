@@ -231,18 +231,33 @@ $total_kyc = array_sum( $count_map );
 
     // Modal docs
     $( document ).on( 'click', '.ltms-kyc-view-docs', function() {
-        var docs = JSON.parse( $( this ).data( 'docs' ) || '[]' );
+        var raw  = $( this ).data( 'docs' );
+        var docs = [];
+        try {
+            docs = ( typeof raw === 'string' ) ? JSON.parse( raw ) : ( Array.isArray( raw ) ? raw : [] );
+        } catch(e) { docs = []; }
         var html = '';
-        $.each( docs, function( i, url ) {
-            html += '<div style="flex:1;min-width:200px;">' +
-                '<a href="' + url + '" target="_blank">' +
-                '<img src="' + url + '" style="width:100%;border-radius:6px;border:1px solid #e5e7eb;" ' +
-                'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\';">' +
-                '<span style="display:none;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">&#x1F4C4; ' + url.split( '/' ).pop() + '</span>' +
-                '</a></div>';
-        } );
+        if ( ! docs.length ) {
+            html = '<p style="color:#6b7280;">No hay documentos disponibles.</p>';
+        } else {
+            $.each( docs, function( i, url ) {
+                var ext = url.split('.').pop().toLowerCase().split('?')[0];
+                var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
+                html += '<div style="flex:1;min-width:200px;margin-bottom:8px;">';
+                if ( isImg ) {
+                    html += '<a href="' + url + '" target="_blank">' +
+                        '<img src="' + url + '" style="width:100%;border-radius:6px;border:1px solid #e5e7eb;" ' +
+                        'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\';"/>' +
+                        '<span style="display:none;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">&#x1F4C4; ' + url.split('/').pop().split('?')[0] + '</span>' +
+                        '</a>';
+                } else {
+                    html += '<a href="' + url + '" target="_blank" style="display:inline-block;padding:8px 12px;background:#f3f4f6;border-radius:4px;font-size:12px;text-decoration:none;color:#1d4ed8;">&#x1F4C4; ' + url.split('/').pop().split('?')[0] + '</a>';
+                }
+                html += '</div>';
+            } );
+        }
         $( '#ltms-kyc-modal-content' ).html( html );
-        $( '#ltms-kyc-modal' ).css( 'display', 'flex' );
+        $( '#ltms-kyc-modal' ).removeAttr( 'style' ).css({ display: 'flex', position: 'fixed', inset: '0', background: 'rgba(0,0,0,.6)', zIndex: '99999', alignItems: 'center', justifyContent: 'center' });
     } );
     $( '#ltms-kyc-modal-close, #ltms-kyc-modal' ).on( 'click', function( e ) {
         if ( e.target === this ) $( '#ltms-kyc-modal' ).hide();
