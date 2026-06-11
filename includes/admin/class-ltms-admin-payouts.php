@@ -466,11 +466,38 @@ final class LTMS_Admin_Payouts {
             );
         }
 
-        // Construir URLs de documentos — intentar desde BD primero, luego user_meta
-        $doc_url_cedula  = $kyc['file_path']       ?: get_user_meta( $vendor_id, 'ltms_kyc_file_cedula',  true );
-        $doc_url_rut     = $kyc['rut_path']         ?: get_user_meta( $vendor_id, 'ltms_kyc_file_rut',    true );
-        $doc_url_camara  = $kyc['camara_path']      ?: get_user_meta( $vendor_id, 'ltms_kyc_file_camara', true );
-        $doc_url_selfie  = $kyc['selfie_path']      ?: get_user_meta( $vendor_id, 'ltms_kyc_selfie_url',  true );
+        // Construir URLs de documentos — leer todos los rows del vendor por document_type
+        $kyc_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT document_type, file_path FROM `{$table}` WHERE vendor_id = %d AND file_path IS NOT NULL AND file_path != ''",
+                $vendor_id
+            ),
+            ARRAY_A
+        );
+        $docs_by_type = [];
+        foreach ( (array) $kyc_rows as $row ) {
+            $docs_by_type[ strtolower( $row['document_type'] ) ] = $row['file_path'];
+        }
+        // Intentar B2 presigned URL si el path no es una URL completa
+        $b2_bucket = LTMS_Core_Config::get( 'ltms_b2_kyc_bucket', 'lotengo-kyc-docs' );
+        $sign_doc  = static function( string $path ) use ( $b2_bucket ): string {
+            if ( empty( $path ) ) return '';
+            if ( filter_var( $path, FILTER_VALIDATE_URL ) ) return $path;
+            if ( class_exists( 'LTMS_Api_Factory' ) ) {
+                try {
+                    $b2  = LTMS_Api_Factory::get( 'backblaze' );
+                    $ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
+                    return $b2->get_signed_url( $b2_bucket, $path, $ttl );
+                } catch ( \Throwable $e ) {}
+            }
+            return $path;
+        };
+        $doc_url_cedula = $sign_doc( $docs_by_type['cc'] ?? $docs_by_type['cedula'] ?? $kyc['file_path'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_cedula', true ) ?: get_user_meta( $vendor_id, 'ltms_kyc_doc_path', true ) );
+        $doc_url_rut    = $sign_doc( $docs_by_type['rut'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_rut', true ) );
+        $doc_url_camara = $sign_doc( $docs_by_type['camara'] ?? $docs_by_type['camara_comercio'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_camara', true ) );
+        $doc_url_selfie = $sign_doc( $docs_by_type['selfie'] ?? get_user_meta( $vendor_id, 'ltms_kyc_selfie_url', true ) );
+        $doc_url_nit    = $sign_doc( $docs_by_type['nit'] ?? '' );
+        $doc_url_banco  = $sign_doc( $docs_by_type['banco'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_banco', true ) );
 
         // Datos de perfil del vendedor
         $store_name      = get_user_meta( $vendor_id, 'ltms_store_name',     true );
@@ -504,6 +531,7 @@ final class LTMS_Admin_Payouts {
                 'rut'     => $doc_url_rut     ? esc_url( $doc_url_rut )     : '',
                 'camara'  => $doc_url_camara  ? esc_url( $doc_url_camara )  : '',
                 'selfie'  => $doc_url_selfie  ? esc_url( $doc_url_selfie )  : '',
+                'banco'   => $doc_url_banco   ? esc_url( $doc_url_banco )   : '',
             ],
         ]);
     }
