@@ -171,6 +171,7 @@ $files = [
     // P-01: vendor dashboard JS + products AJAX handler
     'assets/js/ltms-dashboard.js',
     'includes/frontend/class-ltms-products-ajax.php',
+    'includes/frontend/views/view-sellers-landing.php',
 ];
 $ok=0; $err=0;
 foreach($files as $rel){
@@ -187,8 +188,13 @@ foreach($files as $rel){
 echo "Done: {$ok} ok, {$err} err
 
 ";
-echo "opcache_reset: ".(function_exists('opcache_reset')&&opcache_reset()?'OK':'N/A')."
-";
+echo "opcache_reset: ".(function_exists('opcache_reset')&&opcache_reset()?'OK':'N/A')."\n";
+// Purge SiteGround cache
+if (file_exists(__DIR__ . '/wp-load.php')) {
+    @require_once __DIR__ . '/wp-load.php';
+    if (function_exists('sg_cachepress_purge_cache')) { sg_cachepress_purge_cache(); echo "SG cache purged\n"; }
+    if (function_exists('wp_cache_flush')) { wp_cache_flush(); echo "WP cache flushed\n"; }
+}
 echo "
 Deploy OK [".date('Y-m-d H:i:s')."]
 ";
