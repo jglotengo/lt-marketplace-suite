@@ -488,10 +488,10 @@ final class LTMS_Core_Kernel {
             LTMS_Admin_Settings::init();
         }
         if ( class_exists( 'LTMS_Admin_Payouts' ) ) {
-        if ( class_exists( 'LTMS_Admin_Accounting' ) ) { LTMS_Admin_Accounting::init(); }
-        if ( class_exists( 'LTMS_Admin_Shipping' ) ) { LTMS_Admin_Shipping::init(); }
             LTMS_Admin_Payouts::init();
         }
+        if ( class_exists( 'LTMS_Admin_Accounting' ) ) { LTMS_Admin_Accounting::init(); }
+        if ( class_exists( 'LTMS_Admin_Shipping' ) ) { LTMS_Admin_Shipping::init(); }
         // F-05: Panel admin depósitos manuales
         if ( class_exists( 'LTMS_Admin_Deposits' ) ) {
             LTMS_Admin_Deposits::init();
