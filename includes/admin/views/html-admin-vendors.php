@@ -198,14 +198,16 @@ function ltms_vendors_url( array $overrides = [] ): string {
                             ✏️ <?php esc_html_e( 'Editar', 'ltms' ); ?>
                         </a>
                         <?php if ( 'pending' === $kyc_status && current_user_can( 'ltms_manage_kyc' ) ) : ?>
-                        <button type="button" class="ltms-btn ltms-btn-success ltms-btn-sm"
-                                onclick="if(confirm('<?php esc_attr_e( '¿Aprobar KYC de este vendedor?', 'ltms' ); ?>')) LTMS.Admin.ajaxAction('ltms_quick_approve_kyc', {vendor_id: <?php echo esc_js( $vendor->ID ); ?>}, function(r){ if(r.success){ location.reload(); } else { alert(r.data||'Error'); } })">
+                        <button type="button"
+                                class="ltms-btn ltms-btn-success ltms-btn-sm ltms-quick-approve-kyc"
+                                data-vendor-id="<?php echo esc_attr( $vendor->ID ); ?>">
                             ✅ <?php esc_html_e( 'Aprobar KYC', 'ltms' ); ?>
                         </button>
                         <?php endif; ?>
                         <?php if ( $wallet['is_frozen'] ) : ?>
-                        <button type="button" class="ltms-btn ltms-btn-warning ltms-btn-sm"
-                                onclick="LTMS.Admin.unfreezeWallet(<?php echo esc_js( $vendor->ID ); ?>)">
+                        <button type="button"
+                                class="ltms-btn ltms-btn-warning ltms-btn-sm ltms-unfreeze-wallet"
+                                data-vendor-id="<?php echo esc_attr( $vendor->ID ); ?>">
                             🔓 <?php esc_html_e( 'Descongelar', 'ltms' ); ?>
                         </button>
                         <?php else : ?>
