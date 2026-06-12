@@ -247,8 +247,8 @@
                     if (response.success) {
                         LTMS.Admin.showNotice('success', response.data?.message || 'KYC aprobado.');
                         $btn.closest('tr').find('.ltms-badge-warning')
-                            .removeClass('ltms-badge-warning').addClass('ltms-badge-success').text('Aprobado');
-                        $btn.closest('.ltms-kyc-actions').hide();
+                            .removeClass('ltms-badge-warning').addClass('ltms-badge-success').text('Approved');
+                        $btn.hide();
                     } else {
                         const msg = typeof response.data === 'string' ? response.data : (response.data?.message || 'Error');
                         LTMS.Admin.showNotice('error', msg);
