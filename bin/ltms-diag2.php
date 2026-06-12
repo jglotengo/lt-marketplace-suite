@@ -1,73 +1,84 @@
 <?php
-// Diagnóstico 2: probar AJAX directamente simulando la petición
-// wp eval-file bin/ltms-diag2.php --path=/home/customer/www/lo-tengo.com.co/public_html --allow-root
+/**
+ * LTMS Diagnóstico 2 — Simula una petición REAL a admin-ajax.php
+ * (la única forma válida de probar wp_ajax_* hooks, ya que wp eval-file
+ * NO es is_admin() ni wp_doing_ajax(), por lo que boot_admin() nunca corre
+ * en ese contexto).
+ *
+ * Ejecutar: wp eval-file bin/ltms-diag2.php --path=/home/customer/www/lo-tengo.com.co/public_html --allow-root
+ */
 
-echo "=== DIAGNÓSTICO 2: AJAX REAL TEST ===\n\n";
+echo "=== DIAGNÓSTICO 2: PETICIÓN REAL A admin-ajax.php ===\n\n";
 
-// 1. Info del admin
-$admin = get_user_by('id', 1);
-echo "Admin ID 1: " . ($admin ? $admin->user_login . " / " . $admin->user_email : "NO EXISTE") . "\n";
-
-// Buscar admins
-$admins = get_users(['role' => 'administrator', 'number' => 3]);
-foreach ($admins as $u) {
-    echo "Admin encontrado: ID={$u->ID} login={$u->user_login} email={$u->user_email}\n";
+$user_id = 1;
+$user = get_user_by( 'id', $user_id );
+if ( ! $user ) {
+    echo "❌ No existe el usuario ID 1\n";
+    exit;
 }
+echo "Usuario: {$user->user_login} (ID {$user_id})\n";
 
-echo "\n";
+// Generar cookies de autenticación válidas
+$expiration = time() + 3600;
+$auth_cookie   = wp_generate_auth_cookie( $user_id, $expiration, 'logged_in' );
+$scheme        = is_ssl() ? 'logged_in' : 'logged_in';
+$cookie_name   = LOGGED_IN_COOKIE;
 
-// 2. Simular boot_admin manualmente y verificar
-echo "Simulando boot_admin...\n";
-$_SERVER['REQUEST_URI'] = '/wp-admin/admin-ajax.php';
-// Forzar wp_doing_ajax = true
-if (!defined('DOING_AJAX')) define('DOING_AJAX', true);
+echo "Cookie name: $cookie_name\n";
 
-// Llamar init de Admin_Payouts directamente
-if (class_exists('LTMS_Admin_Payouts')) {
-    LTMS_Admin_Payouts::init();
-    echo "LTMS_Admin_Payouts::init() ejecutado\n";
-}
+// Generar nonce igual que lo haría el JS (ltmsAdmin.nonce)
+$nonce = wp_create_nonce( 'ltms_admin_nonce' );
+echo "Nonce: $nonce\n\n";
 
-// Re-verificar hooks
-global $wp_filter;
-$hooks = ['wp_ajax_ltms_quick_approve_kyc','wp_ajax_ltms_freeze_wallet','wp_ajax_ltms_unfreeze_wallet'];
-foreach ($hooks as $h) {
-    $ok = isset($wp_filter[$h]) && !empty($wp_filter[$h]->callbacks);
-    echo "  $h: " . ($ok ? "✅" : "❌") . "\n";
-}
+// Buscar un vendor real para probar (PRAGA DESIGN, pending)
+global $wpdb;
+$vendor = $wpdb->get_row( "SELECT ID, user_login FROM {$wpdb->users} ORDER BY ID DESC LIMIT 1" );
+$vendor_id = $vendor ? $vendor->ID : 168;
+echo "Vendor de prueba: ID $vendor_id ($vendor->user_login)\n\n";
 
-echo "\n";
+$ajax_url = admin_url( 'admin-ajax.php' );
+echo "URL: $ajax_url\n\n";
 
-// 3. Hacer una llamada AJAX real con wp_remote_post
-echo "Probando llamada AJAX real...\n";
-$admin_user = get_users(['role'=>'administrator','number'=>1])[0] ?? null;
-if ($admin_user) {
-    wp_set_current_user($admin_user->ID);
-    $nonce = wp_create_nonce('ltms_admin_nonce');
-    echo "Nonce para user {$admin_user->ID}: $nonce\n";
-    
-    // Test: llamar admin-ajax.php directamente
-    $response = wp_remote_post(admin_url('admin-ajax.php'), [
-        'timeout' => 15,
-        'cookies' => [],
-        'body' => [
-            'action'    => 'ltms_quick_approve_kyc',
-            'nonce'     => $nonce,
-            'vendor_id' => 999999, // ID que no existe → esperamos error de "vendedor no encontrado"
+$tests = [
+    'ltms_quick_approve_kyc' => [ 'vendor_id' => $vendor_id ],
+    'ltms_freeze_wallet'     => [ 'vendor_id' => $vendor_id ],
+];
+
+foreach ( $tests as $action => $extra_args ) {
+    echo "--- Probando action=$action ---\n";
+
+    $body = array_merge(
+        [
+            'action' => $action,
+            'nonce'  => $nonce,
         ],
-        'headers' => [
-            'X-WP-Nonce' => $nonce,
+        $extra_args
+    );
+
+    $response = wp_remote_post( $ajax_url, [
+        'timeout'   => 15,
+        'sslverify' => false,
+        'headers'   => [
+            'Cookie' => "$cookie_name=$auth_cookie",
         ],
-    ]);
-    
-    if (is_wp_error($response)) {
-        echo "WP_Error: " . $response->get_error_message() . "\n";
-    } else {
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        echo "HTTP $code\n";
-        echo "Body: $body\n";
+        'body'      => $body,
+    ] );
+
+    if ( is_wp_error( $response ) ) {
+        echo "❌ ERROR DE PETICIÓN: " . $response->get_error_message() . "\n\n";
+        continue;
     }
+
+    $code = wp_remote_retrieve_response_code( $response );
+    $resp_body = wp_remote_retrieve_body( $response );
+
+    echo "HTTP CODE: $code\n";
+    echo "BODY: " . substr( $resp_body, 0, 1000 ) . "\n\n";
 }
+
+// También verificar: ¿wp_doing_ajax() y is_admin() en este contexto?
+echo "--- Contexto actual (wp eval-file) ---\n";
+echo "is_admin(): " . ( is_admin() ? 'true' : 'false' ) . "\n";
+echo "wp_doing_ajax(): " . ( wp_doing_ajax() ? 'true' : 'false' ) . "\n";
 
 echo "\n=== FIN DIAGNÓSTICO 2 ===\n";
