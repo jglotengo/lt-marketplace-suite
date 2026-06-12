@@ -10,12 +10,14 @@
 
 echo "=== DIAGNÓSTICO 2: PETICIÓN REAL A admin-ajax.php ===\n\n";
 
-$user_id = 1;
-$user = get_user_by( 'id', $user_id );
-if ( ! $user ) {
-    echo "❌ No existe el usuario ID 1\n";
+// Buscar el primer usuario administrador (no asumir ID 1)
+$admins = get_users( [ 'role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'order' => 'ASC' ] );
+if ( empty( $admins ) ) {
+    echo "❌ No existe ningún usuario con rol administrator\n";
     exit;
 }
+$user    = $admins[0];
+$user_id = $user->ID;
 echo "Usuario: {$user->user_login} (ID {$user_id})\n";
 
 // Generar cookies de autenticación válidas
