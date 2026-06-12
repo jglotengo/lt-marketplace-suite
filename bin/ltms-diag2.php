@@ -20,17 +20,28 @@ $user    = $admins[0];
 $user_id = $user->ID;
 echo "Usuario: {$user->user_login} (ID {$user_id})\n";
 
-// Generar cookies de autenticación válidas
-$expiration = time() + 3600;
-$auth_cookie   = wp_generate_auth_cookie( $user_id, $expiration, 'logged_in' );
-$scheme        = is_ssl() ? 'logged_in' : 'logged_in';
-$cookie_name   = LOGGED_IN_COOKIE;
+// Generar cookie de autenticación válida CON un token de sesión persistido,
+// y usar ESE MISMO token para generar el nonce (wp_create_nonce usa el
+// session token del usuario actual via wp_get_session_token()).
+$expiration  = time() + 3600;
+$manager     = WP_Session_Tokens::get_instance( $user_id );
+$token       = $manager->create( $expiration );
+$auth_cookie = wp_generate_auth_cookie( $user_id, $expiration, 'logged_in', $token );
+$cookie_name = LOGGED_IN_COOKIE;
 
 echo "Cookie name: $cookie_name\n";
+echo "Session token: $token\n";
+
+// Para que wp_create_nonce use el mismo token de sesión, simulamos la cookie
+// en $_COOKIE y fijamos el usuario actual ANTES de generar el nonce.
+$_COOKIE[ $cookie_name ] = $auth_cookie;
+wp_set_current_user( $user_id );
 
 // Generar nonce igual que lo haría el JS (ltmsAdmin.nonce)
 $nonce = wp_create_nonce( 'ltms_admin_nonce' );
-echo "Nonce: $nonce\n\n";
+echo "Nonce: $nonce\n";
+echo "current_user_can(ltms_manage_kyc): " . ( current_user_can( 'ltms_manage_kyc' ) ? 'true' : 'false' ) . "\n";
+echo "current_user_can(ltms_freeze_wallets): " . ( current_user_can( 'ltms_freeze_wallets' ) ? 'true' : 'false' ) . "\n\n";
 
 // Buscar un vendor real para probar (PRAGA DESIGN, pending)
 global $wpdb;
