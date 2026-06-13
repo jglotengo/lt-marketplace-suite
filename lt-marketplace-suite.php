@@ -918,26 +918,58 @@ add_filter( 'wp_insert_post_data', function( array $data, array $postarr ): arra
 // ============================================================
 // FIX PROD-02: Permitir al administrador cambiar el estado
 // de productos desde el panel de WP (botón Editar estado).
-// WooCommerce requiere publish_products / edit_published_products
-// que no siempre están en el role administrator al usar roles
-// personalizados. Este filtro los garantiza en tiempo real.
+// WordPress post.js chequea publish_posts (que en WooCommerce se
+// mapea a publish_products). El metabox de publicación solo muestra
+// el dropdown de estado si el usuario tiene esa cap resuelta.
+// Estrategia: garantizar TODAS las caps de producto al admin
+// usando user_has_cap (prioridad 1) Y map_meta_cap.
 // ============================================================
 add_filter( 'user_has_cap', function( array $allcaps, array $caps, array $args ): array {
+    // Solo actuar si el usuario tiene manage_options (administrador)
     if ( empty( $allcaps['manage_options'] ) ) {
         return $allcaps;
     }
-    $woo_product_caps = [
+    // Caps de producto de WooCommerce + caps nativas de WordPress posts
+    // que el metabox de publicación y post.js requieren
+    $product_caps = [
         'publish_products',
         'edit_published_products',
         'delete_published_products',
         'edit_private_products',
         'read_private_products',
         'delete_private_products',
+        'edit_products',
+        'edit_others_products',
+        'manage_product_terms',
+        'edit_product_terms',
+        'assign_product_terms',
+        // Caps nativas WP que post.js verifica directamente
+        'publish_posts',
+        'edit_published_posts',
+        'edit_private_posts',
     ];
-    foreach ( $caps as $cap ) {
-        if ( in_array( $cap, $woo_product_caps, true ) ) {
-            $allcaps[ $cap ] = true;
-        }
+    foreach ( $product_caps as $cap ) {
+        $allcaps[ $cap ] = true;
     }
     return $allcaps;
-}, 5, 3 );
+}, 1, 3 );
+
+// FIX PROD-02b: map_meta_cap para post type 'product'
+// Garantiza que cuando WP resuelve caps primitivas para productos,
+// el administrador siempre las tenga concedidas.
+add_filter( 'map_meta_cap', function( array $caps, string $cap, int $user_id, array $args ): array {
+    if ( ! user_can( $user_id, 'manage_options' ) ) {
+        return $caps;
+    }
+    $product_meta_caps = [
+        'publish_post', 'edit_post', 'delete_post',
+        'edit_published_post', 'delete_published_post',
+    ];
+    if ( in_array( $cap, $product_meta_caps, true ) && ! empty( $args[0] ) ) {
+        $post = get_post( $args[0] );
+        if ( $post && $post->post_type === 'product' ) {
+            return [ 'exist' ]; // cap siempre concedida
+        }
+    }
+    return $caps;
+}, 1, 4 );
