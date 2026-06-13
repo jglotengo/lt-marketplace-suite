@@ -74,6 +74,10 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_review_order_before_submit',  [ __CLASS__, 'add_privacy_consent_field' ] );
         add_action( 'woocommerce_checkout_process',            [ __CLASS__, 'validate_privacy_consent' ] );
         add_action( 'woocommerce_checkout_order_created',      [ __CLASS__, 'save_privacy_consent' ] );
+
+        // FIX CHECKOUT-01: LTMS ya tiene su propio checkbox de consentimiento (Ley 1581).
+        // Eliminamos los checkboxes nativos de WooCommerce para evitar duplicados.
+        add_action( 'woocommerce_checkout_terms_and_conditions', [ __CLASS__, 'remove_wc_native_checkboxes' ], 1 );
         $instance = new self();
 
         // Proceso de pago — solo usuarios logueados
@@ -669,6 +673,14 @@ final class LTMS_Frontend_Checkout_Handler {
         }
         return $items;
     }
+    /**
+     * FIX CHECKOUT-01: Eliminar checkboxes nativos de WooCommerce (duplicados con LTMS).
+     */
+    public static function remove_wc_native_checkboxes(): void {
+        remove_action( 'woocommerce_checkout_terms_and_conditions', 'wc_checkout_privacy_policy_text', 20 );
+        remove_action( 'woocommerce_checkout_terms_and_conditions', 'wc_terms_and_conditions_page_content', 30 );
+    }
+
     /**
      * L-3: Campo de consentimiento de datos en checkout.
      */
