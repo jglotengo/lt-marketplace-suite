@@ -285,7 +285,7 @@ class LTMS_Business_Redi_Manager {
     /**
      * Renders ReDi fields in the WooCommerce General product data tab.
      */
-    private static function render_redi_product_fields(): void {
+    public static function render_redi_product_fields(): void {
         global $post;
         $product_id   = $post ? (int) $post->ID : 0;
         $redi_enabled = get_post_meta( $product_id, '_ltms_redi_enabled', true );
@@ -336,7 +336,7 @@ class LTMS_Business_Redi_Manager {
      *
      * @param int $post_id WC product post ID.
      */
-    private static function save_redi_product_fields( int $post_id ): void {
+    public static function save_redi_product_fields( int $post_id ): void {
         $redi_enabled = isset( $_POST['_ltms_redi_enabled'] ) && sanitize_key( $_POST['_ltms_redi_enabled'] ) === 'yes' // phpcs:ignore
             ? 'yes'
             : 'no';
