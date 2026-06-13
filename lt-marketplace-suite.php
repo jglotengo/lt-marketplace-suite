@@ -970,3 +970,37 @@ jQuery(document).ready(function($) {
 JS;
     wp_add_inline_script( 'jquery', $js );
 } );
+
+// ============================================================
+// FIX PROD-02e: Garantizar caps de producto al rol administrator
+// WooCommerce agrega estas caps en su instalacion, pero pueden
+// perderse si el rol fue regenerado por LTMS. Este hook las
+// restaura de forma idem-potente en cada carga del admin.
+// ============================================================
+add_action( 'admin_init', function() {
+    $admin_role = get_role( 'administrator' );
+    if ( ! $admin_role ) {
+        return;
+    }
+    $woo_caps = [
+        'publish_products',
+        'edit_products',
+        'edit_published_products',
+        'edit_others_products',
+        'delete_products',
+        'delete_published_products',
+        'delete_others_products',
+        'read_private_products',
+        'edit_private_products',
+        'delete_private_products',
+        'manage_product_terms',
+        'edit_product_terms',
+        'delete_product_terms',
+        'assign_product_terms',
+    ];
+    foreach ( $woo_caps as $cap ) {
+        if ( ! isset( $admin_role->capabilities[ $cap ] ) ) {
+            $admin_role->add_cap( $cap );
+        }
+    }
+} );
