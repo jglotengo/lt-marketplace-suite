@@ -937,3 +937,44 @@ add_filter( 'wp_insert_post_data', function( array $data, array $postarr ): arra
     }
     return $data;
 }, 10, 2 );
+
+// ============================================================
+// FIX PROD-02d: Re-bind del boton "Editar" de estado en post.php
+// ============================================================
+add_action( 'admin_footer-post.php', function() {
+    $screen = get_current_screen();
+    if ( ! $screen || $screen->post_type !== 'product' ) {
+        return;
+    }
+    ?>
+    <script type="text/javascript">
+    jQuery(function($) {
+        var sel = document.getElementById('post-status-select');
+        var lnk = document.querySelector('a.edit-post-status');
+        if ( !sel || !lnk ) { return; }
+        var jSel = $(sel), jLnk = $(lnk);
+        jLnk.off('click.ltmsFix').on('click.ltmsFix', function(e) {
+            e.preventDefault();
+            if ( jSel.is(':hidden') ) {
+                jSel.slideDown('fast', function() { jSel.find('select').trigger('focus'); });
+                jLnk.hide();
+            }
+        });
+        jSel.find('.save-post-status').off('click.ltmsFix').on('click.ltmsFix', function(e) {
+            e.preventDefault();
+            var val = jSel.find('select').val();
+            var txt = jSel.find('select option:selected').text();
+            document.getElementById('post-status-display').textContent = txt;
+            document.getElementById('hidden_post_status').value = val;
+            jSel.slideUp('fast');
+            jLnk.show().trigger('focus');
+        });
+        jSel.find('.cancel-post-status').off('click.ltmsFix').on('click.ltmsFix', function(e) {
+            e.preventDefault();
+            jSel.slideUp('fast');
+            jLnk.show().trigger('focus');
+        });
+    });
+    </script>
+    <?php
+} );
