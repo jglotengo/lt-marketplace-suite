@@ -242,12 +242,13 @@ class LTMS_KYC_Guard {
             return;
         }
 
-        // Administradores pueden publicar sin restricción KYC
-        if ( current_user_can( 'manage_woocommerce' ) ) {
+        $vendor_id = (int) $post->post_author;
+
+        // Solo aplicar a vendedores — si el autor es admin, dejar pasar
+        $author = get_userdata( $vendor_id );
+        if ( ! $author || in_array( 'administrator', (array) $author->roles, true ) ) {
             return;
         }
-
-        $vendor_id = (int) $post->post_author;
         $missing   = self::get_missing_kyc_fields( $vendor_id );
 
         if ( empty( $missing ) ) {
