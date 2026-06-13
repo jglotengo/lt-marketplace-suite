@@ -249,6 +249,19 @@ class LTMS_KYC_Guard {
         if ( ! $author || in_array( 'administrator', (array) $author->roles, true ) ) {
             return;
         }
+        // Si el KYC fue aprobado en la tabla ltms_kyc, permitir publicar
+        global $wpdb;
+        $kyc_table = $wpdb->prefix . 'ltms_kyc';
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$kyc_table}'" ) === $kyc_table ) {
+            $kyc_status = $wpdb->get_var( $wpdb->prepare(
+                "SELECT status FROM {$kyc_table} WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
+                $vendor_id
+            ) );
+            if ( $kyc_status === 'approved' ) {
+                return; // KYC aprobado en tabla — OK
+            }
+        }
+
         $missing   = self::get_missing_kyc_fields( $vendor_id );
 
         if ( empty( $missing ) ) {
