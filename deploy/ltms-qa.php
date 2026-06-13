@@ -4,11 +4,14 @@ header('Content-Type: text/plain; charset=utf-8');
 set_time_limit(60);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
-define('SHORTINIT', true);
+
+// Full WordPress load - no SHORTINIT
 require_once __DIR__ . '/wp-load.php';
 global $wpdb;
 
 echo "=== LTMS CAPS FIX ===\n\n";
+echo "PHP: " . PHP_VERSION . "\n";
+echo "WP: " . get_bloginfo('version') . "\n\n";
 
 $option_name = $wpdb->prefix . 'user_roles';
 $roles_raw = $wpdb->get_var(
@@ -16,18 +19,21 @@ $roles_raw = $wpdb->get_var(
 );
 
 if (!$roles_raw) {
-    echo "ERROR: user_roles not found\n";
+    echo "ERROR: user_roles not found (prefix=" . $wpdb->prefix . ")\n";
     exit;
 }
 
-$roles = maybe_unserialize($roles_raw);
+$roles = unserialize($roles_raw);
 if (!isset($roles['administrator'])) {
     echo "ERROR: administrator role not found\n";
+    var_dump(array_keys($roles));
     exit;
 }
 
-echo "Caps before: " . count($roles['administrator']['capabilities']) . "\n";
-echo "Has publish_products before: " . (empty($roles['administrator']['capabilities']['publish_products']) ? 'NO' : 'YES') . "\n\n";
+$before = count($roles['administrator']['capabilities']);
+$has_before = !empty($roles['administrator']['capabilities']['publish_products']);
+echo "Caps before: $before\n";
+echo "publish_products before: " . ($has_before ? 'YES' : 'NO') . "\n\n";
 
 $woo_caps = [
     'publish_products', 'edit_products', 'edit_published_products',
@@ -45,27 +51,29 @@ foreach ($woo_caps as $cap) {
         $added[] = $cap;
     }
 }
+echo "Added: " . (empty($added) ? 'none (already set)' : implode(', ', $added)) . "\n\n";
 
-echo "Added caps: " . (empty($added) ? 'none (all already set)' : implode(', ', $added)) . "\n\n";
-
-$result = $wpdb->update(
-    $wpdb->options,
-    ['option_value' => serialize($roles)],
-    ['option_name' => $option_name]
+$serialized = serialize($roles);
+$result = $wpdb->query(
+    $wpdb->prepare(
+        "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s",
+        $serialized,
+        $option_name
+    )
 );
 
-if ($result === false) {
-    echo "ERROR saving: " . $wpdb->last_error . "\n";
-    exit;
-}
-echo "Save result: OK (rows affected: $result)\n\n";
+echo "DB update result: " . ($result === false ? "ERROR: " . $wpdb->last_error : "OK (rows: $result)") . "\n\n";
 
-// Verify from DB
+// Hard verify from DB
 $v_raw = $wpdb->get_var(
     $wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $option_name)
 );
-$v = maybe_unserialize($v_raw);
-$has = !empty($v['administrator']['capabilities']['publish_products']);
-echo "VERIFY publish_products in DB: " . ($has ? "YES ✓" : "NO ✗") . "\n";
+$v = unserialize($v_raw);
+$ok = !empty($v['administrator']['capabilities']['publish_products']);
+echo "VERIFY publish_products: " . ($ok ? "YES ✓" : "NO ✗") . "\n";
 echo "Total caps after: " . count($v['administrator']['capabilities']) . "\n";
+
+// Also flush WP object cache so it picks up new role
+wp_cache_delete($option_name, 'options');
+echo "Cache flushed\n";
 echo "\nDONE\n";
