@@ -917,19 +917,23 @@ add_filter( 'wp_insert_post_data', function( array $data, array $postarr ): arra
 
 // ============================================================
 // FIX PROD-02d: Re-bind del boton "Editar" de estado en post.php
+// Usa admin_enqueue_scripts para garantizar ejecucion en todos
+// los viewports y contextos del admin de WordPress.
 // ============================================================
-add_action( 'admin_footer-post.php', function() {
+add_action( 'admin_enqueue_scripts', function( $hook ) {
+    if ( $hook !== 'post.php' ) {
+        return;
+    }
     $screen = get_current_screen();
     if ( ! $screen || $screen->post_type !== 'product' ) {
         return;
     }
-    ?>
-    <script type="text/javascript">
-    jQuery(function($) {
-        var sel = document.getElementById('post-status-select');
-        var lnk = document.querySelector('a.edit-post-status');
-        if ( !sel || !lnk ) { return; }
-        var jSel = $(sel), jLnk = $(lnk);
+    $js = <<<'JS'
+jQuery(document).ready(function($) {
+    function ltmsBindStatusEdit() {
+        var jSel = $('#post-status-select');
+        var jLnk = $('a.edit-post-status');
+        if ( !jSel.length || !jLnk.length ) { return; }
         jLnk.off('click.ltmsFix').on('click.ltmsFix', function(e) {
             e.preventDefault();
             if ( jSel.is(':hidden') ) {
@@ -941,8 +945,8 @@ add_action( 'admin_footer-post.php', function() {
             e.preventDefault();
             var val = jSel.find('select').val();
             var txt = jSel.find('select option:selected').text();
-            document.getElementById('post-status-display').textContent = txt;
-            document.getElementById('hidden_post_status').value = val;
+            $('#post-status-display').text(txt);
+            $('#hidden_post_status').val(val);
             jSel.slideUp('fast');
             jLnk.show().trigger('focus');
         });
@@ -951,7 +955,11 @@ add_action( 'admin_footer-post.php', function() {
             jSel.slideUp('fast');
             jLnk.show().trigger('focus');
         });
-    });
-    </script>
-    <?php
+    }
+    ltmsBindStatusEdit();
+    // Re-bind tras 1s por si postboxes.js corre tarde
+    setTimeout(ltmsBindStatusEdit, 1000);
+});
+JS;
+    wp_add_inline_script( 'jquery', $js );
 } );
