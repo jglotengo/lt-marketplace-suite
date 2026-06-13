@@ -251,7 +251,7 @@ class LTMS_KYC_Guard {
         }
         // Si el KYC fue aprobado en la tabla ltms_kyc, permitir publicar
         global $wpdb;
-        $kyc_table = $wpdb->prefix . 'ltms_kyc';
+        $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
         if ( $wpdb->get_var( "SHOW TABLES LIKE '{$kyc_table}'" ) === $kyc_table ) {
             $kyc_status = $wpdb->get_var( $wpdb->prepare(
                 "SELECT status FROM {$kyc_table} WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
