@@ -879,3 +879,65 @@ add_action( 'init', function(): void {
         }
     }
 }, 100 );
+
+// ============================================================
+// FIX PROD-01: Auto-publicar productos de vendedores
+// Si ltms_vendor_product_auto_publish = 'yes', los productos
+// creados/guardados por vendedores (no admin) se publican
+// directamente en lugar de quedar en 'pending'.
+// ============================================================
+add_filter( 'wp_insert_post_data', function( array $data, array $postarr ): array {
+    // Solo aplica a productos WooCommerce
+    if ( ( $data['post_type'] ?? '' ) !== 'product' ) {
+        return $data;
+    }
+    // Solo si la opción está activada
+    if ( get_option( 'ltms_vendor_product_auto_publish', 'no' ) !== 'yes' ) {
+        return $data;
+    }
+    // Solo afecta a vendedores (no al administrador ni al propio sistema)
+    if ( current_user_can( 'manage_options' ) ) {
+        return $data;
+    }
+    $user = wp_get_current_user();
+    if ( ! $user || ! $user->exists() ) {
+        return $data;
+    }
+    $is_vendor = in_array( 'ltms_vendor', (array) $user->roles, true )
+              || in_array( 'ltms_vendor_premium', (array) $user->roles, true );
+    if ( ! $is_vendor ) {
+        return $data;
+    }
+    // Forzar publicación directa
+    if ( in_array( $data['post_status'], [ 'pending', 'draft' ], true ) ) {
+        $data['post_status'] = 'publish';
+    }
+    return $data;
+}, 10, 2 );
+
+// ============================================================
+// FIX PROD-02: Permitir al administrador cambiar el estado
+// de productos desde el panel de WP (botón Editar estado).
+// WooCommerce requiere publish_products / edit_published_products
+// que no siempre están en el role administrator al usar roles
+// personalizados. Este filtro los garantiza en tiempo real.
+// ============================================================
+add_filter( 'user_has_cap', function( array $allcaps, array $caps, array $args ): array {
+    if ( empty( $allcaps['manage_options'] ) ) {
+        return $allcaps;
+    }
+    $woo_product_caps = [
+        'publish_products',
+        'edit_published_products',
+        'delete_published_products',
+        'edit_private_products',
+        'read_private_products',
+        'delete_private_products',
+    ];
+    foreach ( $caps as $cap ) {
+        if ( in_array( $cap, $woo_product_caps, true ) ) {
+            $allcaps[ $cap ] = true;
+        }
+    }
+    return $allcaps;
+}, 5, 3 );
