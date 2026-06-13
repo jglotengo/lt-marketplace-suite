@@ -16,6 +16,13 @@ $fields = [
     'ltms_terms_url'        => [ 'label' => 'URL Términos y Condiciones', 'type' => 'url', 'default' => home_url('/terminos-y-condiciones/') ],
     'ltms_privacy_url'      => [ 'label' => 'URL Política de Privacidad', 'type' => 'url', 'default' => home_url('/politica-de-privacidad/') ],
     'ltms_devoluciones_url' => [ 'label' => 'URL Política de Devoluciones', 'type' => 'url', 'default' => home_url('/politica-de-devoluciones/'), 'desc' => 'Visible en footer y checkout.' ],
+    // FIX PROD-01: Auto-publicación de productos de vendedores
+    'ltms_vendor_product_auto_publish' => [
+        'label'   => 'Auto-publicar productos de vendedores',
+        'type'    => 'checkbox',
+        'default' => 'no',
+        'desc'    => 'Si está activo, los productos creados por vendedores se publican directamente (sin revisión). Si está inactivo, quedan en "Pendiente de revisión" hasta que el admin los apruebe.',
+    ],
 ];
 ?>
 <div class="ltms-settings-section">
