@@ -5,35 +5,32 @@ set_time_limit(60);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-// Full WordPress load - no SHORTINIT
-require_once __DIR__ . '/wp-load.php';
-global $wpdb;
+// Read DB credentials directly from wp-config.php
+$cfg = file_get_contents(__DIR__ . '/wp-config.php');
+preg_match("/define\(\s*'DB_NAME'\s*,\s*'([^']+)'/", $cfg, $m); $db_name = $m[1];
+preg_match("/define\(\s*'DB_USER'\s*,\s*'([^']+)'/", $cfg, $m); $db_user = $m[1];
+preg_match("/define\(\s*'DB_PASSWORD'\s*,\s*'([^']+)'/", $cfg, $m); $db_pass = $m[1];
+preg_match("/define\(\s*'DB_HOST'\s*,\s*'([^']+)'/", $cfg, $m); $db_host = $m[1];
+preg_match("/\\\$table_prefix\s*=\s*'([^']+)'/", $cfg, $m); $prefix = $m[1] ?? 'bkr_';
 
-echo "=== LTMS CAPS FIX ===\n\n";
-echo "PHP: " . PHP_VERSION . "\n";
-echo "WP: " . get_bloginfo('version') . "\n\n";
+echo "=== LTMS CAPS FIX (raw SQL) ===\n";
+echo "DB: $db_name @ $db_host | prefix: $prefix\n\n";
 
-$option_name = $wpdb->prefix . 'user_roles';
-$roles_raw = $wpdb->get_var(
-    $wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $option_name)
-);
+$pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-if (!$roles_raw) {
-    echo "ERROR: user_roles not found (prefix=" . $wpdb->prefix . ")\n";
-    exit;
-}
+$option_name = $prefix . 'user_roles';
+$row = $pdo->query("SELECT option_value FROM {$prefix}options WHERE option_name = '$option_name' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 
-$roles = unserialize($roles_raw);
-if (!isset($roles['administrator'])) {
-    echo "ERROR: administrator role not found\n";
-    var_dump(array_keys($roles));
-    exit;
-}
+if (!$row) { echo "ERROR: $option_name not found\n"; exit; }
+
+$roles = unserialize($row['option_value']);
+if (!isset($roles['administrator'])) { echo "ERROR: administrator role missing\n"; exit; }
 
 $before = count($roles['administrator']['capabilities']);
-$has_before = !empty($roles['administrator']['capabilities']['publish_products']);
+$has_pub = !empty($roles['administrator']['capabilities']['publish_products']);
 echo "Caps before: $before\n";
-echo "publish_products before: " . ($has_before ? 'YES' : 'NO') . "\n\n";
+echo "publish_products before: " . ($has_pub ? 'YES' : 'NO') . "\n\n";
 
 $woo_caps = [
     'publish_products', 'edit_products', 'edit_published_products',
@@ -51,29 +48,16 @@ foreach ($woo_caps as $cap) {
         $added[] = $cap;
     }
 }
-echo "Added: " . (empty($added) ? 'none (already set)' : implode(', ', $added)) . "\n\n";
+echo "Adding: " . (empty($added) ? 'none (all already set)' : implode(', ', $added)) . "\n\n";
 
-$serialized = serialize($roles);
-$result = $wpdb->query(
-    $wpdb->prepare(
-        "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s",
-        $serialized,
-        $option_name
-    )
-);
+$new_val = serialize($roles);
+$stmt = $pdo->prepare("UPDATE {$prefix}options SET option_value = ? WHERE option_name = ?");
+$ok = $stmt->execute([$new_val, $option_name]);
+echo "Save: " . ($ok ? "OK (rows: " . $stmt->rowCount() . ")" : "ERROR") . "\n\n";
 
-echo "DB update result: " . ($result === false ? "ERROR: " . $wpdb->last_error : "OK (rows: $result)") . "\n\n";
-
-// Hard verify from DB
-$v_raw = $wpdb->get_var(
-    $wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $option_name)
-);
-$v = unserialize($v_raw);
-$ok = !empty($v['administrator']['capabilities']['publish_products']);
-echo "VERIFY publish_products: " . ($ok ? "YES ✓" : "NO ✗") . "\n";
+// Verify
+$v = unserialize($pdo->query("SELECT option_value FROM {$prefix}options WHERE option_name = '$option_name' LIMIT 1")->fetchColumn());
+$verified = !empty($v['administrator']['capabilities']['publish_products']);
+echo "VERIFY publish_products: " . ($verified ? "YES ✓" : "NO ✗") . "\n";
 echo "Total caps after: " . count($v['administrator']['capabilities']) . "\n";
-
-// Also flush WP object cache so it picks up new role
-wp_cache_delete($option_name, 'options');
-echo "Cache flushed\n";
 echo "\nDONE\n";
