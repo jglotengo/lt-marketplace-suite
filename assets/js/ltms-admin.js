@@ -125,16 +125,17 @@
                 // A-7 FIX: texto correcto para aprobación (no reutilizar confirm_delete)
                 if (!confirm(ltmsAdmin.i18n.confirm_approve_payout || '¿Aprobar este retiro? El pago se procesará de inmediato.')) return;
 
-                self.ajaxAction('ltms_approve_payout', { payout_id: payoutId }, (response) => {
+                const $btn_payout = $(this);
+                self.ajaxAction('ltms_approve_payout', { payout_id: payoutId }, function(response) {
                     if (response.success) {
                         self.showNotice('success', response.data.message);
-                        $(this).closest('tr').fadeOut(400, function () { $(this).remove(); });
+                        $btn_payout.closest('tr').fadeOut(400, function () { $(this).remove(); });
                     } else {
                         // A-7 FIX: response.data puede ser objeto
                         const errMsg = typeof response.data === 'string' ? response.data : (response.data?.message || ltmsAdmin.i18n.error || 'Error');
                         self.showNotice('error', errMsg);
                     }
-                }.bind(this));
+                });
             });
 
             // Rechazar solicitud de retiro
@@ -144,14 +145,15 @@
                 const reason = prompt('Motivo del rechazo (requerido):');
                 if (!reason || !reason.trim()) return;
 
-                self.ajaxAction('ltms_reject_payout', { payout_id: payoutId, reason: reason }, (response) => {
+                const $btn_reject = $(this);
+                self.ajaxAction('ltms_reject_payout', { payout_id: payoutId, reason: reason }, function(response) {
                     if (response.success) {
                         self.showNotice('success', response.data.message);
-                        $(this).closest('tr').fadeOut(400, function () { $(this).remove(); });
+                        $btn_reject.closest('tr').fadeOut(400, function () { $(this).remove(); });
                     } else {
                         self.showNotice('error', response.data);
                     }
-                }.bind(this));
+                });
             });
 
             // Congelar billetera
@@ -175,15 +177,16 @@
             $(document).on('click', '.ltms-approve-kyc', function (e) {
                 e.preventDefault();
                 const kycId = $(this).data('kyc-id');
-                self.ajaxAction('ltms_approve_kyc', { kyc_id: kycId }, (response) => {
+                const $btn_kyc = $(this);
+                self.ajaxAction('ltms_approve_kyc', { kyc_id: kycId }, function(response) {
                     if (response.success) {
                         self.showNotice('success', response.data.message);
-                        $(this).closest('tr').find('.ltms-badge').removeClass().addClass('ltms-badge ltms-badge-success').text('Aprobado');
-                        $(this).closest('.ltms-actions').hide();
+                        $btn_kyc.closest('tr').find('.ltms-badge').removeClass().addClass('ltms-badge ltms-badge-success').text('Aprobado');
+                        $btn_kyc.closest('.ltms-actions').hide();
                     } else {
                         self.showNotice('error', response.data);
                     }
-                }.bind(this));
+                });
             });
 
             // Exportar solicitudes de retiro a CSV (A-8a)
