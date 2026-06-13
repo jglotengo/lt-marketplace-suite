@@ -516,21 +516,21 @@ function ltms_run(): void {
     //     WordPress core (meta-boxes.php:36) revisa current_user_can(publish_products)
     //     para mostrar el botón inline "Editar" del estado en post.php.
     //     Sin esta cap el link existe en el HTML pero el JS no puede cambiar el estado.
-    add_filter( 'map_meta_cap', static function( array , string , int  ): array {
+    add_filter( 'map_meta_cap', static function( array $caps, string $cap, int $user_id ): array {
         // Solo actúa para administrators (tienen manage_options)
-        if ( in_array( , [
+        if ( in_array( $cap, [
             'publish_products',
             'edit_published_products',
             'delete_published_products',
             'edit_private_products',
             'read_private_products',
         ], true ) ) {
-             = get_userdata(  );
-            if (  && ->has_cap( 'manage_options' ) ) {
+            $user = get_userdata( $user_id );
+            if ( $user && $user->has_cap( 'manage_options' ) ) {
                 return [ 'exist' ]; // cap primitiva siempre válida
             }
         }
-        return ;
+        return $caps;
     }, 5, 3 );
     //
     // 2. Menú de emergencia: si el Kernel falló y LTMS_Admin no registró el
