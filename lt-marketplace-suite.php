@@ -510,6 +510,29 @@ function ltms_run(): void {
         return $allcaps;
     }, 1, 3 );
     //
+    // 1c. FIX PROD-02c: garantizar publish_products al administrador via map_meta_cap.
+    //     map_meta_cap opera ANTES de user_has_cap y no causa recursión porque
+    //     solo mapea caps primitivas — no llama current_user_can() ni user_can().
+    //     WordPress core (meta-boxes.php:36) revisa current_user_can(publish_products)
+    //     para mostrar el botón inline "Editar" del estado en post.php.
+    //     Sin esta cap el link existe en el HTML pero el JS no puede cambiar el estado.
+    add_filter( 'map_meta_cap', static function( array , string , int  ): array {
+        // Solo actúa para administrators (tienen manage_options)
+        if ( in_array( , [
+            'publish_products',
+            'edit_published_products',
+            'delete_published_products',
+            'edit_private_products',
+            'read_private_products',
+        ], true ) ) {
+             = get_userdata(  );
+            if (  && ->has_cap( 'manage_options' ) ) {
+                return [ 'exist' ]; // cap primitiva siempre válida
+            }
+        }
+        return ;
+    }, 5, 3 );
+    //
     // 2. Menú de emergencia: si el Kernel falló y LTMS_Admin no registró el
     //    menú principal, este fallback lo registra en admin_menu@99 con
     //    manage_options para que siempre sea visible al administrador.
