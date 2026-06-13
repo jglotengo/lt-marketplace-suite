@@ -934,6 +934,13 @@ jQuery(document).ready(function($) {
         var jSel = $('#post-status-select');
         var jLnk = $('a.edit-post-status');
         if ( !jSel.length || !jLnk.length ) { return; }
+
+        // Agregar opcion "Publicada" si no existe (productos pending/draft no la tienen)
+        var jSelect = jSel.find('select#post_status');
+        if ( jSelect.length && jSelect.find('option[value="publish"]').length === 0 ) {
+            jSelect.prepend('<option value="publish">Publicada</option>');
+        }
+
         jLnk.off('click.ltmsFix').on('click.ltmsFix', function(e) {
             e.preventDefault();
             if ( jSel.is(':hidden') ) {
