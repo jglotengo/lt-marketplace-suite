@@ -382,6 +382,8 @@ function ltms_load_autoloader(): void {
                 'ltms-settings-deprisa'            => 'settings/class-ltms-settings-deprisa.php',
                 'ltms-deprisa-order-metabox'       => 'admin/class-ltms-deprisa-order-metabox.php',
                 'ltms-deprisa-shipping-method'     => 'shipping/class-ltms-deprisa-shipping-method.php',
+                // v2.9.2 — Ave-Hub: listener genérico de reporte de estados (envíos propios)
+                'ltms-aveonline-hub-listener'      => 'business/listeners/class-ltms-aveonline-hub-listener.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
@@ -970,4 +972,5 @@ jQuery(document).ready(function($) {
 JS;
     wp_add_inline_script( 'jquery', $js );
 } );
+
 
