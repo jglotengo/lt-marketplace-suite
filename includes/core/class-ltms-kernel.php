@@ -293,6 +293,11 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Aveonline_Sandbox::init();
         }
 
+        // v2.9.2 — Ave-Hub: log local de eventos de estado reportados (envíos propios)
+        if ( class_exists( 'LTMS_Business_Aveonline_Hub_Log' ) ) {
+            LTMS_Business_Aveonline_Hub_Log::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();
@@ -675,3 +680,4 @@ final class LTMS_Core_Kernel {
         throw new \RuntimeException( 'No se puede deserializar un Singleton.' );
     }
 }
+
