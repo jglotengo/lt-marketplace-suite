@@ -78,22 +78,59 @@ class LTMS_Shipping_Method_Aveonline extends WC_Shipping_Method {
         }
 
         // Aveonline v2 retorna array 'cotizaciones' con la estructura del endpoint cotizar2.
-        // Cada elemento tiene: codTransportadora, nombreTransportadora, total, diasentrega, etc.
+        // Por cada transportadora se registran DOS rates: entrega a domicilio y recogida en oficina.
+        // Las transportadoras sin soporte de oficinas (ej: Envia=29) solo generan el rate de domicilio.
         foreach ( $rates as $rate ) {
             $cost = (float) ( $rate['total'] ?? $rate['valorTotal'] ?? $rate['price'] ?? 0 );
             if ( $cost <= 0 ) {
                 continue;
             }
-            $transportadora = $rate['nombreTransportadora'] ?? $rate['service_name'] ?? __( 'Estándar', 'ltms' );
+            $carrier_code   = (string) ( $rate['codTransportadora'] ?? $rate['service_code'] ?? '' );
+            $transportadora = $rate['nombreTransportadora'] ?? $rate['service_name'] ?? __( 'Estandar', 'ltms' );
             $dias           = (int) ( $rate['diasentrega'] ?? $rate['estimated_days'] ?? 0 );
-            $label          = $dias > 0
-                ? sprintf( '%s — %s (%d %s)', $this->title, $transportadora, $dias, __( 'días', 'ltms' ) )
-                : sprintf( '%s — %s', $this->title, $transportadora );
+            $rate_suffix    = $carrier_code ?: sanitize_key( $transportadora );
+            $dias_label     = $dias > 0 ? sprintf( ' (%d %s)', $dias, __( 'dias', 'ltms' ) ) : '';
+
+            // Rate 1: entrega a domicilio (siempre disponible).
             $this->add_rate( [
-                'id'    => $this->get_rate_id() . '_' . ( $rate['codTransportadora'] ?? $rate['service_code'] ?? sanitize_key( $transportadora ) ),
-                'label' => $label,
-                'cost'  => $cost,
+                'id'        => $this->get_rate_id() . '_' . $rate_suffix . '_domicilio',
+                'label'     => sprintf(
+                    '%s — %s — %s%s',
+                    $this->title,
+                    $transportadora,
+                    __( 'Envio a domicilio', 'ltms' ),
+                    $dias_label
+                ),
+                'cost'      => $cost,
+                'meta_data' => [
+                    'ltms_delivery_mode' => 'domicilio',
+                    'ltms_carrier_code'  => $carrier_code,
+                    'ltms_carrier_name'  => $transportadora,
+                ],
             ] );
+
+            // Rate 2: recogida en oficina (solo transportadoras soportadas por /offices/all).
+            $has_offices = class_exists( 'LTMS_Business_Aveonline_Offices' )
+                && LTMS_Business_Aveonline_Offices::is_valid_carrier( $carrier_code );
+
+            if ( $has_offices ) {
+                $this->add_rate( [
+                    'id'        => $this->get_rate_id() . '_' . $rate_suffix . '_oficina',
+                    'label'     => sprintf(
+                        '%s — %s — %s%s',
+                        $this->title,
+                        $transportadora,
+                        __( 'Recoger en oficina', 'ltms' ),
+                        $dias_label
+                    ),
+                    'cost'      => $cost,
+                    'meta_data' => [
+                        'ltms_delivery_mode' => 'oficina',
+                        'ltms_carrier_code'  => $carrier_code,
+                        'ltms_carrier_name'  => $transportadora,
+                    ],
+                ] );
+            }
         }
     }
 

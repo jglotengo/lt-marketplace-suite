@@ -150,9 +150,10 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 				$chosen = $('input[name^="shipping_method"]').first();
 			}
 			var rateId = $chosen.val() || '';
-			var isAveonline = rateId.indexOf('ltms_aveonline') !== -1;
+			// Mostrar selector solo cuando el rate elegido es modo oficina
+			var isOficina = rateId.indexOf('ltms_aveonline') !== -1 && rateId.indexOf('_oficina') !== -1;
 
-			if ( ! isAveonline ) {
+			if ( ! isOficina ) {
 				this.$row.hide();
 				this.$select.val('');
 				return;
@@ -168,8 +169,9 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 			this.$select.prop('disabled', true).html('<option value=""><?php echo esc_js( __( '— Cargando oficinas… —', 'ltms' ) ); ?></option>');
 			this.$note.text('');
 
-			// Extraer carrier code del rate ID si está codificado (ltms_aveonline_1016_...)
-			var carrierMatch = rateId.match(/ltms_aveonline[_\-]?(\d+)/);
+			// Extraer carrier code del rate ID: formato ltms_aveonline:INSTANCEID_CARRIERCODE_oficina
+			// Ej: ltms_aveonline:5_1016_oficina -> carrier = 1016
+			var carrierMatch = rateId.match(/_(\d{2,4})_oficina$/);
 			var carrier = carrierMatch ? carrierMatch[1] : '';
 
 			$.ajax({
@@ -241,7 +243,11 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 		$carrier = sanitize_text_field( wp_unslash( $_POST['carrier'] ?? '' ) );
 		$rate_id = sanitize_text_field( wp_unslash( $_POST['rate_id'] ?? '' ) );
 
-		// Si no viene carrier explícito, intentar leerlo de la opción de configuración.
+		// Si no viene carrier explícito, extraerlo del rate_id: ..._1016_oficina -> 1016
+		if ( '' === $carrier && preg_match( '/(\d{2,4})_oficina$/', $rate_id, $m ) ) {
+			$carrier = $m[1];
+		}
+		// Fallback a la opción global si todavía no hay carrier.
 		if ( '' === $carrier ) {
 			$carrier = (string) get_option( 'ltms_aveonline_idtransportador', '' );
 		}
@@ -286,8 +292,9 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 		$chosen = WC()->session ? WC()->session->get( 'chosen_shipping_methods' ) : [];
 		$rate   = is_array( $chosen ) ? ( $chosen[0] ?? '' ) : '';
 
-		if ( false === strpos( $rate, 'ltms_aveonline' ) ) {
-			return; // No es envío Aveonline — no validar.
+		// Solo validar si el rate elegido es modo oficina (no domicilio)
+		if ( false === strpos( $rate, 'ltms_aveonline' ) || false === strpos( $rate, '_oficina' ) ) {
+			return;
 		}
 
 		$office = sanitize_text_field( wp_unslash( $_POST['ltms_aveonline_office'] ?? '' ) );
@@ -305,15 +312,22 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 	 * @param int $order_id ID del pedido creado.
 	 */
 	public function save_meta( int $order_id ): void {
-		$office  = sanitize_text_field( wp_unslash( $_POST['ltms_aveonline_office']  ?? '' ) );
-		$carrier = (string) get_option( 'ltms_aveonline_idtransportador', '' );
+		$office = sanitize_text_field( wp_unslash( $_POST['ltms_aveonline_office'] ?? '' ) );
+		if ( '' === $office ) {
+			return; // No se eligió oficina — probablemente modo domicilio.
+		}
 
-		if ( '' !== $office ) {
-			update_post_meta( $order_id, self::META_KEY_OFFICE,  $office );
+		// Extraer carrier del rate elegido: ltms_aveonline:5_1016_oficina -> 1016
+		$chosen  = WC()->session ? WC()->session->get( 'chosen_shipping_methods' ) : [];
+		$rate_id = is_array( $chosen ) ? ( $chosen[0] ?? '' ) : '';
+		$carrier = '';
+		if ( preg_match( '/_(\d{2,4})_oficina$/', $rate_id, $m ) ) {
+			$carrier = $m[1];
 		}
-		if ( '' !== $carrier ) {
-			update_post_meta( $order_id, self::META_KEY_CARRIER, $carrier );
-		}
+
+		update_post_meta( $order_id, self::META_KEY_OFFICE,  $office );
+		update_post_meta( $order_id, self::META_KEY_CARRIER, $carrier );
+		update_post_meta( $order_id, '_ltms_delivery_mode', 'oficina' );
 	}
 
 	// -------------------------------------------------------------------------
