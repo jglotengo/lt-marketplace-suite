@@ -274,6 +274,10 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Aveonline_Cities::init();
         }
 
+        if ( class_exists( 'LTMS_Business_Aveonline_ShipmentRelations' ) ) {
+            LTMS_Business_Aveonline_ShipmentRelations::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();

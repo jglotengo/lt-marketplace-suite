@@ -237,3 +237,321 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     <p class="description"><?php esc_html_e( 'Haz clic en "Sincronizar transportadoras" para cargar el catálogo desde Aveonline.', 'ltms' ); ?></p>
     <?php endif; ?>
 </div>
+
+<?php
+// ── Relaciones de Envíos ──────────────────────────────────────────────────────
+$relations_count = class_exists( 'LTMS_Business_Aveonline_ShipmentRelations' )
+    ? LTMS_Business_Aveonline_ShipmentRelations::count()
+    : 0;
+$relations_local = class_exists( 'LTMS_Business_Aveonline_ShipmentRelations' )
+    ? LTMS_Business_Aveonline_ShipmentRelations::get_local( 20 )
+    : [];
+$carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
+    ? LTMS_Business_Aveonline_Carriers::all()
+    : [];
+?>
+<div class="ltms-settings-section" style="margin-top:32px;">
+    <h3><?php esc_html_e( 'Relaciones de Envíos', 'ltms' ); ?></h3>
+    <p class="description">
+        <?php esc_html_e( 'Una Relación de Envíos agrupa varias guías en un manifiesto que la transportadora firma al recoger los paquetes. Cada relación se imprime y se entrega al mensajero.', 'ltms' ); ?>
+    </p>
+
+    <?php /* ── Formulario crear relación ── */ ?>
+    <div id="ltms-relation-form" style="background:#f9f9f9;border:1px solid #ddd;padding:16px;border-radius:4px;max-width:600px;margin-bottom:20px;">
+        <h4 style="margin-top:0;"><?php esc_html_e( 'Crear nueva relación', 'ltms' ); ?></h4>
+
+        <table class="form-table" style="margin:0;">
+            <tr>
+                <th style="width:160px;padding:6px 0;"><?php esc_html_e( 'Transportadora', 'ltms' ); ?> <span style="color:red">*</span></th>
+                <td style="padding:6px 0;">
+                    <select id="ltms-rel-transportadora" style="width:100%;max-width:320px;">
+                        <option value=""><?php esc_html_e( '— Seleccionar —', 'ltms' ); ?></option>
+                        <?php foreach ( $carriers_for_select as $code => $carrier ) : ?>
+                        <option value="<?php echo esc_attr( $code ); ?>"><?php echo esc_html( $carrier['label'] ); ?> (<?php echo esc_html( $code ); ?>)</option>
+                        <?php endforeach; ?>
+                        <?php if ( empty( $carriers_for_select ) ) : ?>
+                        <option value="1016">INTERRAPIDISIMO (1016)</option>
+                        <option value="33">SERVIENTREGA (33)</option>
+                        <option value="1010">TCC SA (1010)</option>
+                        <option value="1009">COORDINADORA MERCANTIL (1009)</option>
+                        <option value="29">ENVIA (29)</option>
+                        <?php endif; ?>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th style="padding:6px 0;"><?php esc_html_e( 'Guías', 'ltms' ); ?> <span style="color:red">*</span></th>
+                <td style="padding:6px 0;">
+                    <textarea id="ltms-rel-guias" rows="4" style="width:100%;max-width:420px;font-family:monospace;font-size:12px;" placeholder="<?php esc_attr_e( 'Una guía por línea o separadas por coma', 'ltms' ); ?>"></textarea>
+                    <p class="description" style="margin:4px 0 0;"><?php esc_html_e( 'Pega aquí los números de guía a agrupar en esta relación.', 'ltms' ); ?></p>
+                </td>
+            </tr>
+        </table>
+
+        <div style="margin-top:12px;">
+            <button type="button" id="ltms-btn-create-relation" class="button button-primary">
+                <?php esc_html_e( 'Crear relación', 'ltms' ); ?>
+            </button>
+            <span id="ltms-create-relation-result" style="margin-left:12px;font-style:italic;"></span>
+        </div>
+
+        <div id="ltms-relation-created" style="display:none;margin-top:14px;padding:12px;background:#e7f5e9;border:1px solid #4caf50;border-radius:4px;">
+            <strong><?php esc_html_e( '✓ Relación creada:', 'ltms' ); ?></strong>
+            <code id="ltms-rel-numero" style="font-size:14px;margin-left:6px;"></code><br>
+            <span style="font-size:12px;color:#555;"><?php esc_html_e( 'Fecha:', 'ltms' ); ?> <span id="ltms-rel-fecha"></span></span><br>
+            <a id="ltms-rel-print-link" href="#" target="_blank" class="button button-secondary" style="margin-top:8px;">
+                🖨 <?php esc_html_e( 'Imprimir manifiesto', 'ltms' ); ?>
+            </a>
+        </div>
+    </div>
+
+    <?php /* ── Búsqueda / filtros ── */ ?>
+    <div id="ltms-relation-search" style="background:#f9f9f9;border:1px solid #ddd;padding:16px;border-radius:4px;max-width:600px;margin-bottom:20px;">
+        <h4 style="margin-top:0;"><?php esc_html_e( 'Buscar relaciones en Aveonline', 'ltms' ); ?></h4>
+        <p class="description" style="margin-top:0;"><?php esc_html_e( 'Opcional — usa al menos un filtro para consultar Aveonline directamente.', 'ltms' ); ?></p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <div>
+                <label style="display:block;font-size:12px;margin-bottom:3px;"><?php esc_html_e( 'Nº Relación', 'ltms' ); ?></label>
+                <input type="text" id="ltms-search-numero" placeholder="6077101620220418..." style="width:200px;" />
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;margin-bottom:3px;"><?php esc_html_e( 'Desde (AAAA/MM/DD)', 'ltms' ); ?></label>
+                <input type="text" id="ltms-search-fecha-ini" placeholder="2024/01/01" style="width:130px;" />
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;margin-bottom:3px;"><?php esc_html_e( 'Hasta (AAAA/MM/DD)', 'ltms' ); ?></label>
+                <input type="text" id="ltms-search-fecha-fin" placeholder="2024/12/31" style="width:130px;" />
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;margin-bottom:3px;"><?php esc_html_e( 'Nº Guía', 'ltms' ); ?></label>
+                <input type="text" id="ltms-search-guia" placeholder="034..." style="width:140px;" />
+            </div>
+        </div>
+
+        <div style="margin-top:12px;">
+            <button type="button" id="ltms-btn-search-relations" class="button">
+                <?php esc_html_e( 'Buscar en Aveonline', 'ltms' ); ?>
+            </button>
+            <button type="button" id="ltms-btn-load-local" class="button" style="margin-left:8px;">
+                <?php printf( esc_html__( 'Ver relaciones locales (%d)', 'ltms' ), $relations_count ); ?>
+            </button>
+            <span id="ltms-search-relations-result" style="margin-left:12px;font-style:italic;"></span>
+        </div>
+    </div>
+
+    <?php /* ── Tabla de resultados ── */ ?>
+    <div id="ltms-relations-table-wrap" style="max-width:900px;display:none;">
+        <table id="ltms-relations-table" class="widefat striped">
+            <thead>
+                <tr>
+                    <th><?php esc_html_e( 'Nº Relación', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Transportadora', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Guías', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Acciones', 'ltms' ); ?></th>
+                </tr>
+            </thead>
+            <tbody id="ltms-relations-tbody">
+                <tr><td colspan="5" style="text-align:center;color:#999;"><?php esc_html_e( 'Sin datos', 'ltms' ); ?></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<?php /* ── Modal confirmar eliminación ── */ ?>
+<div id="ltms-rel-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:6px;padding:28px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <h3 style="margin-top:0;"><?php esc_html_e( 'Eliminar relación', 'ltms' ); ?></h3>
+        <p><?php esc_html_e( '¿Confirmas que deseas eliminar la relación', 'ltms' ); ?> <strong id="ltms-rel-delete-num"></strong>? <?php esc_html_e( 'Esta acción no se puede deshacer en Aveonline.', 'ltms' ); ?></p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" id="ltms-rel-delete-cancel" class="button"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            <button type="button" id="ltms-rel-delete-confirm" class="button button-primary" style="background:#d63638;border-color:#d63638;">
+                <?php esc_html_e( 'Sí, eliminar', 'ltms' ); ?>
+            </button>
+        </div>
+        <span id="ltms-rel-delete-result" style="display:block;margin-top:10px;font-style:italic;"></span>
+    </div>
+</div>
+
+<script>
+(function($){
+    var nonce = '<?php echo esc_js( wp_create_nonce( 'ltms_aveonline_relations_nonce' ) ); ?>';
+    var deleteTarget = '';
+
+    // ── Crear relación ────────────────────────────────────────────────
+    $('#ltms-btn-create-relation').on('click', function(){
+        var $btn  = $(this);
+        var trans = $('#ltms-rel-transportadora').val();
+        var guias = $.trim($('#ltms-rel-guias').val());
+
+        if (!trans || !guias) {
+            $('#ltms-create-relation-result').css('color','red').text('<?php echo esc_js( __( 'Completa transportadora y guías.', 'ltms' ) ); ?>');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Creando…', 'ltms' ) ); ?>');
+        $('#ltms-create-relation-result').css('color','').text('');
+        $('#ltms-relation-created').hide();
+
+        $.post(ajaxurl, {
+            action: 'ltms_aveonline_create_relation',
+            nonce: nonce,
+            transportadora: trans,
+            guias: guias
+        }, function(res){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Crear relación', 'ltms' ) ); ?>');
+            if (res.success) {
+                $('#ltms-rel-numero').text(res.data.relacionenvio);
+                $('#ltms-rel-fecha').text(res.data.fecha);
+                $('#ltms-rel-print-link').attr('href', res.data.rutaimpresion || '#');
+                if (!res.data.rutaimpresion) $('#ltms-rel-print-link').hide();
+                $('#ltms-relation-created').show();
+                $('#ltms-create-relation-result').css('color','green').text(res.data.message);
+                // limpiar guías
+                $('#ltms-rel-guias').val('');
+            } else {
+                $('#ltms-create-relation-result').css('color','red').text(res.data.message || '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>');
+            }
+        }).fail(function(){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Crear relación', 'ltms' ) ); ?>');
+            $('#ltms-create-relation-result').css('color','red').text('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+        });
+    });
+
+    // ── Buscar en Aveonline ───────────────────────────────────────────
+    $('#ltms-btn-search-relations').on('click', function(){
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Buscando…', 'ltms' ) ); ?>');
+        $('#ltms-search-relations-result').css('color','').text('');
+
+        $.post(ajaxurl, {
+            action: 'ltms_aveonline_list_relations',
+            nonce: nonce,
+            numero_relacion: $('#ltms-search-numero').val(),
+            fecha_inicial:   $('#ltms-search-fecha-ini').val(),
+            fecha_final:     $('#ltms-search-fecha-fin').val(),
+            numero_guia:     $('#ltms-search-guia').val()
+        }, function(res){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Buscar en Aveonline', 'ltms' ) ); ?>');
+            if (res.success) {
+                renderRelations(res.data.registros, res.data.source);
+                $('#ltms-search-relations-result').css('color','green').text(res.data.total + ' <?php echo esc_js( __( 'resultado(s)', 'ltms' ) ); ?>');
+            } else {
+                $('#ltms-search-relations-result').css('color','red').text(res.data.message);
+                $('#ltms-relations-table-wrap').hide();
+            }
+        }).fail(function(){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Buscar en Aveonline', 'ltms' ) ); ?>');
+            $('#ltms-search-relations-result').css('color','red').text('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+        });
+    });
+
+    // ── Ver locales ───────────────────────────────────────────────────
+    $('#ltms-btn-load-local').on('click', function(){
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $('#ltms-search-relations-result').css('color','').text('');
+
+        $.post(ajaxurl, {
+            action: 'ltms_aveonline_list_relations',
+            nonce: nonce
+        }, function(res){
+            $btn.prop('disabled', false);
+            if (res.success) {
+                renderRelations(res.data.registros, 'local');
+                $('#ltms-search-relations-result').css('color','').text(res.data.total + ' <?php echo esc_js( __( 'relación(es) local(es)', 'ltms' ) ); ?>');
+            } else {
+                $('#ltms-search-relations-result').css('color','red').text(res.data.message);
+            }
+        });
+    });
+
+    // ── Render tabla ──────────────────────────────────────────────────
+    function renderRelations(rows, source) {
+        var $tbody = $('#ltms-relations-tbody').empty();
+        if (!rows || !rows.length) {
+            $tbody.append('<tr><td colspan="5" style="text-align:center;color:#999;"><?php echo esc_js( __( 'Sin resultados', 'ltms' ) ); ?></td></tr>');
+            $('#ltms-relations-table-wrap').show();
+            return;
+        }
+
+        rows.forEach(function(r){
+            var num   = r.relacionenvio || r.id || '';
+            var trans = r.transportadora || r.transportadora || '';
+            var guias = '';
+            if (r.guias && Array.isArray(r.guias)) {
+                guias = r.guias.map(function(g){ return g.numero || g; }).join(', ');
+            } else if (typeof r.guias === 'string') {
+                guias = r.guias;
+            }
+            var fecha = r.fecha || r.fecha_aveonline || r.created_at || '';
+            var numGuias = r.numeroguias || (r.guias ? r.guias.length : '—');
+
+            var actions = '<a href="#" class="ltms-rel-delete button button-small" style="color:#d63638;border-color:#d63638;" data-rel="' + escHtml(num) + '"><?php echo esc_js( __( 'Eliminar', 'ltms' ) ); ?></a>';
+
+            $tbody.append(
+                '<tr>' +
+                '<td><code>' + escHtml(num) + '</code></td>' +
+                '<td>' + escHtml(trans) + '</td>' +
+                '<td style="font-size:11px;max-width:260px;word-break:break-all;">' + escHtml(guias) + ' <em style="color:#999;">(' + numGuias + ')</em></td>' +
+                '<td style="white-space:nowrap;font-size:12px;">' + escHtml(fecha) + '</td>' +
+                '<td>' + actions + '</td>' +
+                '</tr>'
+            );
+        });
+
+        $('#ltms-relations-table-wrap').show();
+    }
+
+    // ── Eliminar (modal) ──────────────────────────────────────────────
+    $(document).on('click', '.ltms-rel-delete', function(e){
+        e.preventDefault();
+        deleteTarget = $(this).data('rel');
+        $('#ltms-rel-delete-num').text(deleteTarget);
+        $('#ltms-rel-delete-result').text('');
+        $('#ltms-rel-delete-modal').css('display','flex');
+    });
+
+    $('#ltms-rel-delete-cancel').on('click', function(){
+        $('#ltms-rel-delete-modal').hide();
+        deleteTarget = '';
+    });
+
+    $('#ltms-rel-delete-confirm').on('click', function(){
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Eliminando…', 'ltms' ) ); ?>');
+        $('#ltms-rel-delete-result').text('');
+
+        $.post(ajaxurl, {
+            action: 'ltms_aveonline_delete_relation',
+            nonce: nonce,
+            relacionenvio: deleteTarget
+        }, function(res){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
+            if (res.success) {
+                $('#ltms-rel-delete-result').css('color','green').text(res.data.message);
+                // Remover fila de la tabla
+                $('code:contains("' + deleteTarget + '")').closest('tr').fadeOut(400, function(){ $(this).remove(); });
+                setTimeout(function(){ $('#ltms-rel-delete-modal').hide(); deleteTarget = ''; }, 1500);
+            } else {
+                $('#ltms-rel-delete-result').css('color','red').text(res.data.message);
+            }
+        }).fail(function(){
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
+            $('#ltms-rel-delete-result').css('color','red').text('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+        });
+    });
+
+    // ── Escape HTML helper ────────────────────────────────────────────
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+})(jQuery);
+</script>
+

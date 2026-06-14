@@ -809,4 +809,152 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     private function sanitize_email_field( string $email ): string {
         return is_email( $email ) ? $email : '';
     }
+
+    // ── Relaciones de Envíos ──────────────────────────────────────────────────
+
+    /**
+     * Crea una Relación de Envíos (manifiesto de despacho).
+     *
+     * Agrupa varias guías bajo un número único para su entrega a la transportadora.
+     *
+     * @param string       $transportadora Código de la transportadora (ej: '1016', '33').
+     * @param string|array $guias          Número(s) de guía. Array o string separado por comas.
+     * @return array {
+     *   @type bool   $success       true si el status de Aveonline es 'ok'.
+     *   @type string $relacionenvio Número de la relación creada.
+     *   @type string $fecha         Fecha/hora de registro.
+     *   @type string $rutaimpresion URL del PDF de manifiesto.
+     *   @type string $message       Mensaje de la API.
+     * }
+     * @throws \RuntimeException Si la petición HTTP falla.
+     */
+    public function create_shipment_relation( string $transportadora, $guias ): array {
+        if ( is_array( $guias ) ) {
+            $guias = implode( ', ', array_filter( array_map( 'trim', $guias ) ) );
+        }
+
+        $token = $this->get_token();
+
+        $payload = [
+            'tipo'          => 'relacionEnvios',
+            'token'         => $token,
+            'idempresa'     => $this->idempresa,
+            'transportadora'=> $transportadora,
+            'guias'         => $guias,
+        ];
+
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload );
+        $success  = ( $response['status'] ?? '' ) === 'ok';
+
+        return [
+            'success'        => $success,
+            'relacionenvio'  => $response['relacionenvio'] ?? '',
+            'fecha'          => $response['fecha'] ?? '',
+            'rutaimpresion'  => $response['rutaimpresion'] ?? '',
+            'message'        => $response['message'] ?? '',
+        ];
+    }
+
+    /**
+     * Lista relaciones de envíos filtradas por distintos criterios.
+     *
+     * Se debe pasar al menos uno de: $numero_relacion, ($fecha_inicial + $fecha_final) o $numero_guia.
+     *
+     * @param string|null $numero_relacion Número de relación (ej: '6077101620220418145538').
+     * @param string|null $fecha_inicial   Fecha inicio AAAA/MM/DD.
+     * @param string|null $fecha_final     Fecha fin AAAA/MM/DD.
+     * @param string|null $numero_guia     Número de guía individual.
+     * @return array {
+     *   @type bool   $success    true si se encontraron registros.
+     *   @type array  $registros  Lista de relaciones; cada una con id, transportadora, fecha,
+     *                            numeroguias, oc, guias[].
+     *   @type string $message    Mensaje de la API.
+     * }
+     * @throws \RuntimeException Si la petición HTTP falla.
+     */
+    public function list_shipment_relations(
+        ?string $numero_relacion = null,
+        ?string $fecha_inicial   = null,
+        ?string $fecha_final     = null,
+        ?string $numero_guia     = null
+    ): array {
+        $token = $this->get_token();
+
+        $payload = [
+            'tipo'      => 'listarRelacionEnvios',
+            'token'     => $token,
+            'idempresa' => (string) $this->idempresa,
+        ];
+
+        if ( $numero_relacion ) {
+            $payload['numeroRelacionEnvios'] = $numero_relacion;
+        }
+        if ( $fecha_inicial ) {
+            $payload['fechainicial'] = $fecha_inicial;
+        }
+        if ( $fecha_final ) {
+            $payload['fechafinal'] = $fecha_final;
+        }
+        if ( $numero_guia ) {
+            $payload['numeroguia'] = $numero_guia;
+        }
+
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload );
+        $success  = ( $response['status'] ?? '' ) === 'ok';
+
+        return [
+            'success'   => $success,
+            'registros' => $response['registros'] ?? [],
+            'message'   => $response['message'] ?? '',
+        ];
+    }
+
+    /**
+     * Elimina una Relación de Envíos.
+     *
+     * Usa el endpoint v2.0 con JWT en cabecera Authorization (diferente al resto de métodos).
+     *
+     * @param string $numero_relacion Número de relación a eliminar.
+     * @return array {
+     *   @type bool   $success true si Aveonline confirmó la eliminación.
+     *   @type string $message Mensaje de la API.
+     * }
+     * @throws \RuntimeException Si la petición HTTP falla.
+     */
+    public function delete_shipment_relation( string $numero_relacion ): array {
+        if ( trim( $numero_relacion ) === '' ) {
+            throw new \InvalidArgumentException( 'El número de relación no puede estar vacío.' );
+        }
+
+        $token = $this->get_token();
+
+        // Este endpoint usa v2.0 y el JWT va en el header Authorization, no en el body.
+        $url     = $this->api_url . '/nal/v2.0/generarGuiaTransporteNacional.php';
+        $payload = [
+            'tipo'                  => 'eliminarRelacionEnvios',
+            'usuario'               => $this->usuario,
+            'numeroRelacionEnvios'  => $numero_relacion,
+        ];
+
+        $raw = wp_remote_post( $url, [
+            'headers' => [
+                'Content-Type'  => 'application/json',
+                'Authorization' => $token,
+            ],
+            'body'    => wp_json_encode( $payload ),
+            'timeout' => 20,
+        ] );
+
+        if ( is_wp_error( $raw ) ) {
+            throw new \RuntimeException( 'Aveonline HTTP error (deleteRelacion): ' . $raw->get_error_message() );
+        }
+
+        $body    = json_decode( wp_remote_retrieve_body( $raw ), true );
+        $success = is_array( $body ) && ( $body['status'] ?? '' ) === 'ok';
+
+        return [
+            'success' => $success,
+            'message' => is_array( $body ) ? ( $body['message'] ?? '' ) : 'Respuesta inválida',
+        ];
+    }
 }
