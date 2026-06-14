@@ -280,6 +280,7 @@ $files = [
     'assets/js/ltms-dashboard.js',
     'includes/frontend/class-ltms-products-ajax.php',
     'includes/frontend/views/view-sellers-landing.php',
+    'includes/frontend/views/dashboard-wrapper.php',
     'patchwork.json',
     // DIAG temp
     'deploy/ltms-panel-diag.php',

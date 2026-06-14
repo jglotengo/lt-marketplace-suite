@@ -160,4 +160,45 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
     </main><!-- /ltms-main-content -->
 
 </div><!-- /ltms-dashboard-container -->
+
+<!-- DIAG TEMPORAL - quitar después -->
+<div id="ltms-debug-banner" style="background:#fffae6;border:3px solid #f59e0b;padding:12px;margin:12px;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;">Cargando diagnóstico LTMS...</div>
+<script>
+window.addEventListener('load', function () {
+    setTimeout(function () {
+        var out = [];
+        out.push('jQuery: ' + (typeof jQuery));
+        out.push('ltmsDashboard: ' + (typeof ltmsDashboard));
+        try { out.push('ltmsDashboard data: ' + JSON.stringify(ltmsDashboard)); } catch (e) { out.push('ltmsDashboard err: ' + e.message); }
+        out.push('#ltms-dashboard-container: ' + document.querySelectorAll('#ltms-dashboard-container').length);
+        out.push('#ltms-main-content: ' + document.querySelectorAll('#ltms-main-content').length);
+        var el = document.getElementById('ltms-view-home');
+        out.push('#ltms-view-home: ' + (el ? 1 : 0));
+        if (el) {
+            out.push('view-home style attr: ' + el.getAttribute('style'));
+            out.push('view-home computed display: ' + window.getComputedStyle(el).display);
+        }
+        var scripts = Array.prototype.filter.call(document.querySelectorAll('script[src]'), function (s) {
+            return s.src.indexOf('ltms-dashboard') > -1;
+        });
+        out.push('ltms-dashboard.js tags: ' + scripts.length);
+        scripts.forEach(function (s) { out.push('  ' + s.src); });
+
+        document.getElementById('ltms-debug-banner').textContent = out.join('\n');
+
+        if (typeof jQuery !== 'undefined' && typeof ltmsDashboard !== 'undefined') {
+            jQuery.post(ltmsDashboard.ajax_url, { action: 'ltms_get_dashboard_data', nonce: ltmsDashboard.nonce })
+                .done(function (resp) {
+                    document.getElementById('ltms-debug-banner').textContent += '\nAJAX OK: ' + JSON.stringify(resp).substring(0, 500);
+                })
+                .fail(function (xhr) {
+                    document.getElementById('ltms-debug-banner').textContent += '\nAJAX FAIL status=' + xhr.status + ' body=' + xhr.responseText.substring(0, 500);
+                });
+        } else {
+            document.getElementById('ltms-debug-banner').textContent += '\nNo se intentó AJAX (jQuery o ltmsDashboard no definidos)';
+        }
+    }, 1500);
+});
+</script>
+<!-- FIN DIAG TEMPORAL -->
  
