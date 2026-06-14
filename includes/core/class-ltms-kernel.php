@@ -252,6 +252,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Redi_Order_Listener' ) ) {
             LTMS_Redi_Order_Listener::init();
         }
+        // v2.9.2 — Ave-Hub: reporta a Aveonline el estado de envíos propios (domiciliario, pickup, etc.)
+        if ( class_exists( 'LTMS_Aveonline_Hub_Listener' ) ) {
+            LTMS_Aveonline_Hub_Listener::init();
+        }
         if ( class_exists( 'LTMS_Business_Pickup_Handler' ) ) {
             LTMS_Business_Pickup_Handler::init();
         }
