@@ -272,12 +272,15 @@ echo "
 $files = [
     'includes/frontend/views/view-kyc.php',
     'includes/frontend/class-ltms-dashboard-logic.php',
+    'includes/frontend/class-ltms-frontend-assets.php',
     'includes/admin/views/html-admin-kyc.php',
+    'includes/admin/class-ltms-admin-settings.php',
     'lt-marketplace-suite.php',
     // P-01: vendor dashboard JS + products AJAX handler
     'assets/js/ltms-dashboard.js',
     'includes/frontend/class-ltms-products-ajax.php',
     'includes/frontend/views/view-sellers-landing.php',
+    'patchwork.json',
 ];
 $ok=0; $err=0;
 foreach($files as $rel){
