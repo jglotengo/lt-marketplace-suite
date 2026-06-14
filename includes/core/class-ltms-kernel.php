@@ -278,6 +278,11 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Aveonline_ShipmentRelations::init();
         }
 
+        // v2.7.0 — Guías de envío del vendedor (tabla local + 6 handlers AJAX)
+        if ( class_exists( 'LTMS_Business_Aveonline_Guias' ) ) {
+            LTMS_Business_Aveonline_Guias::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();
