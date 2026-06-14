@@ -687,6 +687,51 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Consulta las oficinas y puntos de atención de una transportadora en una ciudad.
+     *
+     * Endpoint: GET https://api.aveonline.co/api-oficinas/public/api/v1/offices/{carrier}/{cityId}
+     *
+     * @param int|string $carrier Código de la transportadora (1016=Interrápidísimo, 1010=TCC, 1009=Coordinadora, 29=Envía, 33=Servientrega).
+     * @param string     $city_id Código DANE de 9 dígitos de la ciudad (ej: 11001000 = Bogotá, 05001000 = Medellín).
+     * @return array {
+     *     @type string $status  'success' o 'error'.
+     *     @type array  $data    Lista de oficinas: cada item tiene location, name, id, city.
+     *     @type string $message Null en éxito, mensaje de error en fallo.
+     * }
+     */
+    public function get_carrier_offices( $carrier, string $city_id ): array {
+        $base_url = 'https://api.aveonline.co/api-oficinas/public/api/v1/offices';
+        $url      = sprintf( '%s/%s/%s', $base_url, rawurlencode( (string) $carrier ), rawurlencode( $city_id ) );
+
+        $response = wp_remote_get( $url, [
+            'timeout' => 10,
+            'headers' => [ 'Accept' => 'application/json' ],
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return [
+                'status'  => 'error',
+                'data'    => [],
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        $http_code = wp_remote_retrieve_response_code( $response );
+        $body      = wp_remote_retrieve_body( $response );
+        $decoded   = json_decode( $body, true );
+
+        if ( ! is_array( $decoded ) ) {
+            return [
+                'status'  => 'error',
+                'data'    => [],
+                'message' => "HTTP {$http_code}: respuesta no válida",
+            ];
+        }
+
+        return $decoded;
+    }
+
+    /**
      * Valida y retorna un email, o string vacío si es inválido.
      *
      * @param string $email Email a validar.
