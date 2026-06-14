@@ -444,6 +444,8 @@ final class LTMS_Admin_Settings {
             wp_send_json_error( [ 'message' => $e->getMessage() ] );
         }
     }
+    /**
+     * Obtiene datos del gráfico vía AJAX.
      *
      * @return void
      */
