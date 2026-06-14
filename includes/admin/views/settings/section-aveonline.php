@@ -103,6 +103,46 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </td>
         </tr>
 
+        <tr>
+            <th><?php esc_html_e( 'Ciudad de origen (bodega)', 'ltms' ); ?></th>
+            <td>
+                <input type="text" name="ltms_store_city"
+                    value="<?php echo esc_attr( get_option( 'ltms_store_city', 'Bogotá' ) ); ?>"
+                    class="regular-text" placeholder="ej: MEDELLIN(ANTIOQUIA)">
+                <p class="description"><?php esc_html_e( 'Ciudad desde donde se despachan los paquetes. Usar el nombre exacto del listado de ciudades de Aveonline. Ej: BOGOTA(CUNDINAMARCA)', 'ltms' ); ?></p>
+            </td>
+        </tr>
+
+    </tbody></table>
+
+    <hr style="margin:24px 0;">
+    <h3>🔔 <?php esc_html_e( 'Webhook de estados de guía', 'ltms' ); ?></h3>
+    <p class="description">
+        <?php esc_html_e( 'Aveonline notifica cada cambio de estado de una guía al webhook personalizado registrado en', 'ltms' ); ?>
+        <a href="https://guias.aveonline.co/panel/mis-integraciones" target="_blank">Mis integraciones →</a>
+    </p>
+    <table class="form-table" role="presentation"><tbody>
+        <tr>
+            <th><?php esc_html_e( 'URL del Webhook (registrar en Aveonline)', 'ltms' ); ?></th>
+            <td>
+                <code style="display:inline-block;padding:6px 10px;background:#f0f0f0;border:1px solid #ccc;border-radius:3px;font-size:13px;word-break:break-all;">
+                    <?php echo esc_html( rest_url( 'ltms/v1/webhooks/aveonline' ) ); ?>
+                </code>
+                <p class="description"><?php esc_html_e( 'Copia esta URL y pégala en el campo "webhook url" de tu integración en Aveonline.', 'ltms' ); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <th><?php esc_html_e( 'Token del Webhook 🔐', 'ltms' ); ?></th>
+            <td>
+                <input type="text" name="ltms_aveonline_webhook_token"
+                    value="<?php echo esc_attr( get_option( 'ltms_aveonline_webhook_token', '' ) ); ?>"
+                    class="regular-text" autocomplete="off"
+                    placeholder="<?php esc_attr_e( 'Ej: 000000^cZtUEYw', 'ltms' ); ?>">
+                <p class="description">
+                    <?php esc_html_e( 'Token que registraste en Aveonline al crear el webhook personalizado. Se usará para validar cada notificación entrante. Si está vacío, no se valida el token (no recomendado en producción).', 'ltms' ); ?>
+                </p>
+            </td>
+        </tr>
     </tbody></table>
 
     <hr style="margin:24px 0;">
