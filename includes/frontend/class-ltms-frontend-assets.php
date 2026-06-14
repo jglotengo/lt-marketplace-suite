@@ -182,6 +182,14 @@ final class LTMS_Frontend_Assets {
                 }
             }
         }
+        // M-56b: fallback por slug — cubre páginas Elementor donde post_content no tiene shortcode.
+        if ( ! $is_vendor_panel && $page_id > 0 ) {
+            $vendor_slugs = [ 'panel-vendedor', 'mis-pedidos', 'mi-billetera', 'verificacion-identidad', 'mi-seguro', 'panel-vendedor-2' ];
+            $current_post = get_post( $page_id );
+            if ( $current_post && in_array( $current_post->post_name, $vendor_slugs, true ) ) {
+                $is_vendor_panel = true;
+            }
+        }
         if ( $is_vendor_panel ) {
             $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
