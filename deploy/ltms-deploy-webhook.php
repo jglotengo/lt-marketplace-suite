@@ -281,7 +281,14 @@ $files = [
     'includes/frontend/class-ltms-products-ajax.php',
     'includes/frontend/views/view-sellers-landing.php',
     'patchwork.json',
+    // DIAG temp
+    'deploy/ltms-panel-diag.php',
 ];
+// Deploy diag to webroot
+$diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
+$diag_dst = __DIR__ . '/ltms-panel-diag.php';
+$diag_fc = gh_get('deploy/ltms-panel-diag.php', $gh);
+if ($diag_fc) { file_put_contents($diag_dst, $diag_fc); echo "OK diag deployed\n"; }
 $ok=0; $err=0;
 foreach($files as $rel){
     $fc=gh_get($rel,$gh);
