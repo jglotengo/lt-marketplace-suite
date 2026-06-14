@@ -288,6 +288,11 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Aveonline_OrdenCompra::init();
         }
 
+        // v2.9.1 — Sandbox Aveonline (QA: obtenerEstadoAuth + avanzarEstado)
+        if ( class_exists( 'LTMS_Business_Aveonline_Sandbox' ) ) {
+            LTMS_Business_Aveonline_Sandbox::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();

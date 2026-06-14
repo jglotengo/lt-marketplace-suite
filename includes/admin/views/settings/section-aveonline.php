@@ -595,3 +595,268 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
 })(jQuery);
 </script>
 
+<?php /* ══════════════════════════════════════════════════════════════════════
+   PANEL DE QA — SANDBOX AVEONLINE
+   Permite probar obtenerEstadoAuth y avanzarEstado sin mensajero real.
+   Solo funciona con empresa IDs 6077 o 25505.
+══════════════════════════════════════════════════════════════════════ */ ?>
+<hr style="margin:40px 0 24px;">
+
+<h2 style="display:flex;align-items:center;gap:8px;font-size:1.25rem;">
+    🧪 <?php esc_html_e( 'QA Sandbox — Aveonline', 'ltms' ); ?>
+    <span style="font-size:.75rem;font-weight:400;background:#f0f0f0;border:1px solid #ccc;
+        border-radius:4px;padding:2px 8px;color:#555;">
+        <?php esc_html_e( 'Solo empresas 6077 / 25505', 'ltms' ); ?>
+    </span>
+</h2>
+<p class="description" style="margin-bottom:20px;">
+    <?php esc_html_e( 'Herramienta de prueba del ciclo completo Aveonline. Obtén un token con las credenciales sandbox, consulta los estados de ejemplo y avanza el estado de una guía real de prueba.', 'ltms' ); ?>
+</p>
+
+<div id="ltms-sandbox-panel" style="max-width:820px;">
+
+    <?php /* ── Credenciales sandbox ── */ ?>
+    <table class="form-table" role="presentation" style="margin-bottom:0;">
+        <tr>
+            <th style="width:200px;"><?php esc_html_e( 'Token Aveonline', 'ltms' ); ?></th>
+            <td>
+                <input type="text" id="ltms-sb-token" class="regular-text"
+                    placeholder="<?php esc_attr_e( 'Pega aquí el token obtenido en la autenticación', 'ltms' ); ?>">
+                <p class="description">
+                    <?php esc_html_e( 'El token lo obtienes llamando al endpoint de autenticación de Aveonline (vigencia 1 hora).', 'ltms' ); ?>
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <th><?php esc_html_e( 'ID Empresa Sandbox', 'ltms' ); ?></th>
+            <td>
+                <select id="ltms-sb-id">
+                    <option value="25505">25505 — Sandbox #2 (recomendada)</option>
+                    <option value="6077">6077 — Sandbox #1</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><?php esc_html_e( 'Número de guía', 'ltms' ); ?></th>
+            <td>
+                <input type="text" id="ltms-sb-guia" class="regular-text"
+                    placeholder="<?php esc_attr_e( 'Ej: 212342474354', 'ltms' ); ?>">
+                <p class="description">
+                    <?php esc_html_e( 'Para avanzarEstado: guía real de la empresa sandbox. Para obtenerEstadoAuth: se usa como referencia de contexto (no filtra).', 'ltms' ); ?>
+                </p>
+            </td>
+        </tr>
+    </table>
+
+    <?php /* ── Acciones ── */ ?>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin:20px 0;">
+        <button type="button" id="ltms-sb-btn-estados" class="button button-primary">
+            📋 <?php esc_html_e( 'Consultar todos los estados (obtenerEstadoAuth)', 'ltms' ); ?>
+        </button>
+        <button type="button" id="ltms-sb-btn-avanzar" class="button button-secondary">
+            ▶ <?php esc_html_e( 'Avanzar estado (siguiente automático)', 'ltms' ); ?>
+        </button>
+    </div>
+
+    <?php /* ── Forzar estado específico ── */ ?>
+    <details style="margin-bottom:20px;">
+        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">
+            ⚡ <?php esc_html_e( 'Forzar estado específico (avanzarEstado con parámetro)', 'ltms' ); ?>
+        </summary>
+        <div style="padding:16px;background:#f9f9f9;border:1px solid #e2e2e2;border-radius:4px;margin-top:8px;">
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th style="width:200px;"><?php esc_html_e( 'Estado a forzar', 'ltms' ); ?></th>
+                    <td>
+                        <select id="ltms-sb-estado-forzado">
+                            <option value=""><?php esc_html_e( '— (avance automático, sin forzar) —', 'ltms' ); ?></option>
+                            <option value="GENERADA">GENERADA</option>
+                            <option value="PRODUCIDA">PRODUCIDA</option>
+                            <option value="EN DESPACHO">EN DESPACHO</option>
+                            <option value="EN REPARTO">EN REPARTO</option>
+                            <option value="EN NOVEDAD">EN NOVEDAD</option>
+                            <option value="ENTREGADA">ENTREGADA</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th><?php esc_html_e( 'Descripción', 'ltms' ); ?></th>
+                    <td>
+                        <input type="text" id="ltms-sb-descripcion" class="regular-text"
+                            placeholder="<?php esc_attr_e( 'Ej: Entregado a: JUAN PEREZ – C.C 12345678', 'ltms' ); ?>">
+                    </td>
+                </tr>
+                <tr>
+                    <th><?php esc_html_e( 'Aclaración', 'ltms' ); ?></th>
+                    <td>
+                        <input type="text" id="ltms-sb-aclaracion" class="regular-text"
+                            placeholder="<?php esc_attr_e( 'Ej: Recibido conforme', 'ltms' ); ?>">
+                    </td>
+                </tr>
+            </table>
+            <button type="button" id="ltms-sb-btn-forzar" class="button button-secondary" style="margin-top:8px;">
+                ⚡ <?php esc_html_e( 'Forzar estado seleccionado', 'ltms' ); ?>
+            </button>
+        </div>
+    </details>
+
+    <?php /* ── Área de resultados ── */ ?>
+    <div id="ltms-sb-spinner" style="display:none;margin-bottom:12px;">
+        <span class="spinner is-active" style="float:none;vertical-align:middle;"></span>
+        <em style="margin-left:8px;"><?php esc_html_e( 'Consultando Aveonline Sandbox…', 'ltms' ); ?></em>
+    </div>
+
+    <div id="ltms-sb-result-wrap" style="display:none;">
+        <div id="ltms-sb-result-badge" style="padding:10px 14px;border-radius:4px;margin-bottom:12px;font-weight:600;"></div>
+        <div id="ltms-sb-result-body" style="background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:.82rem;
+            padding:16px;border-radius:4px;max-height:500px;overflow:auto;white-space:pre-wrap;word-break:break-all;">
+        </div>
+    </div>
+
+    <?php /* ── Tabla de estados del flujo (referencia) ── */ ?>
+    <details style="margin-top:24px;">
+        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">
+            📋 <?php esc_html_e( 'Referencia: flujo de estados Aveonline', 'ltms' ); ?>
+        </summary>
+        <table class="widefat" style="margin-top:10px;max-width:600px;">
+            <thead>
+                <tr>
+                    <th><?php esc_html_e( 'Llamada', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Estado anterior', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Estado nuevo', 'ltms' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>1ª</td><td><?php esc_html_e( '(sin estado)', 'ltms' ); ?></td><td><code>GENERADA</code></td></tr>
+                <tr><td>2ª</td><td><code>GENERADA</code></td><td><code>PRODUCIDA</code></td></tr>
+                <tr><td>3ª</td><td><code>PRODUCIDA</code></td><td><code>EN DESPACHO</code></td></tr>
+                <tr><td>4ª</td><td><code>EN DESPACHO</code></td><td><code>EN REPARTO</code></td></tr>
+                <tr><td>5ª</td><td><code>EN REPARTO</code></td><td><code>ENTREGADA</code> ✅</td></tr>
+                <tr><td><?php esc_html_e( 'forzado', 'ltms' ); ?></td><td><?php esc_html_e( 'cualquiera', 'ltms' ); ?></td><td><code>EN NOVEDAD</code> / <code>ENTREGADA</code></td></tr>
+            </tbody>
+        </table>
+    </details>
+
+</div><!-- #ltms-sandbox-panel -->
+
+<script>
+(function($){
+    'use strict';
+
+    var nonce  = '<?php echo esc_js( wp_create_nonce( 'ltms_admin_nonce' ) ); ?>';
+
+    function sbToken()  { return $('#ltms-sb-token').val().trim();  }
+    function sbId()     { return parseInt( $('#ltms-sb-id').val(), 10 ); }
+    function sbGuia()   { return $('#ltms-sb-guia').val().trim();   }
+
+    function sbShowResult( ok, data ) {
+        var $badge = $('#ltms-sb-result-badge');
+        var $body  = $('#ltms-sb-result-body');
+        $('#ltms-sb-result-wrap').show();
+
+        if ( ok ) {
+            $badge.css({ background: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' })
+                  .text( '✅ ' + ( data.message || '<?php echo esc_js( __( 'OK', 'ltms' ) ); ?>' ) );
+        } else {
+            $badge.css({ background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' })
+                  .text( '❌ ' + ( data.message || '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>' ) );
+        }
+
+        $body.text( JSON.stringify( data, null, 2 ) );
+    }
+
+    function sbSetLoading( on ) {
+        $('#ltms-sb-spinner').toggle( on );
+        $('#ltms-sb-btn-estados, #ltms-sb-btn-avanzar, #ltms-sb-btn-forzar').prop( 'disabled', on );
+    }
+
+    // ── Consultar estados de ejemplo ─────────────────────────────────────────
+    $('#ltms-sb-btn-estados').on('click', function(){
+        if ( ! sbToken() ) {
+            alert('<?php echo esc_js( __( 'Ingresa el token de Aveonline primero.', 'ltms' ) ); ?>');
+            return;
+        }
+        sbSetLoading( true );
+        $('#ltms-sb-result-wrap').hide();
+
+        $.post( ajaxurl, {
+            action : 'ltms_aveonline_sandbox_estados',
+            nonce  : nonce,
+            token  : sbToken(),
+            id     : sbId(),
+            guia   : sbGuia()
+        }, function( res ) {
+            sbSetLoading( false );
+            if ( res.success ) {
+                sbShowResult( true, res.data );
+            } else {
+                sbShowResult( false, res.data );
+            }
+        }).fail(function(){
+            sbSetLoading( false );
+            sbShowResult( false, { message: '<?php echo esc_js( __( 'Error de conexión con el servidor.', 'ltms' ) ); ?>' } );
+        });
+    });
+
+    // ── Avanzar estado (automático) ──────────────────────────────────────────
+    $('#ltms-sb-btn-avanzar').on('click', function(){
+        if ( ! sbToken() || ! sbGuia() ) {
+            alert('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
+            return;
+        }
+        sbSetLoading( true );
+        $('#ltms-sb-result-wrap').hide();
+
+        $.post( ajaxurl, {
+            action : 'ltms_aveonline_sandbox_avanzar',
+            nonce  : nonce,
+            token  : sbToken(),
+            id     : sbId(),
+            guia   : sbGuia()
+        }, function( res ) {
+            sbSetLoading( false );
+            if ( res.success ) {
+                sbShowResult( true, res.data );
+            } else {
+                sbShowResult( false, res.data );
+            }
+        }).fail(function(){
+            sbSetLoading( false );
+            sbShowResult( false, { message: '<?php echo esc_js( __( 'Error de conexión con el servidor.', 'ltms' ) ); ?>' } );
+        });
+    });
+
+    // ── Forzar estado específico ─────────────────────────────────────────────
+    $('#ltms-sb-btn-forzar').on('click', function(){
+        if ( ! sbToken() || ! sbGuia() ) {
+            alert('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
+            return;
+        }
+        sbSetLoading( true );
+        $('#ltms-sb-result-wrap').hide();
+
+        $.post( ajaxurl, {
+            action      : 'ltms_aveonline_sandbox_avanzar',
+            nonce       : nonce,
+            token       : sbToken(),
+            id          : sbId(),
+            guia        : sbGuia(),
+            estado      : $('#ltms-sb-estado-forzado').val(),
+            descripcion : $('#ltms-sb-descripcion').val().trim(),
+            aclaracion  : $('#ltms-sb-aclaracion').val().trim()
+        }, function( res ) {
+            sbSetLoading( false );
+            if ( res.success ) {
+                sbShowResult( true, res.data );
+            } else {
+                sbShowResult( false, res.data );
+            }
+        }).fail(function(){
+            sbSetLoading( false );
+            sbShowResult( false, { message: '<?php echo esc_js( __( 'Error de conexión con el servidor.', 'ltms' ) ); ?>' } );
+        });
+    });
+
+})(jQuery);
+</script>
+
