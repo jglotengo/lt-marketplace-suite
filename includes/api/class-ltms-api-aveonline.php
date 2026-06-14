@@ -35,9 +35,13 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     const API_BASE_SANDBOX = 'https://sandbox.aveonline.co/api'; // fallback para entornos no-prod
 
     // Endpoints
-    const ENDPOINT_AUTH     = '/comunes/v2.0/autenticarusuario.php';
-    const ENDPOINT_GUIA     = '/nal/v1.0/generarGuiaTransporteNacional.php';
-    const ENDPOINT_ESTADO   = '/nal/v1.0/guia.php';
+    const ENDPOINT_AUTH          = '/comunes/v2.0/autenticarusuario.php';
+    const ENDPOINT_GUIA          = '/nal/v1.0/generarGuiaTransporteNacional.php';
+    const ENDPOINT_ESTADO        = '/nal/v1.0/guia.php';
+    const ENDPOINT_AGENTES       = '/comunes/v1.0/agentes.php';
+    const ENDPOINT_CIUDADES      = '/box/v1.0/ciudad.php';
+    const ENDPOINT_TRANSPORTADORAS = '/box/v1.0/transportadora.php';
+    const ENDPOINT_DESTINATARIOS = '/comunes/v1.0/destinatarios.php';
 
     // Caché del token (segundos). La API otorga 12 h; renovamos a las 11 h.
     const TOKEN_TTL = 39600; // 11 horas
@@ -400,7 +404,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         );
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
@@ -452,7 +456,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $token = $this->get_token();
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( [
@@ -504,7 +508,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         );
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
@@ -541,7 +545,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $token = $this->get_token();
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( [
@@ -602,7 +606,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         );
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
@@ -636,7 +640,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $token = $this->get_token();
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            $this->api_url . self::ENDPOINT_AGENTES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( [
@@ -897,7 +901,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      */
     public function search_cities( string $query, int $registros = 10 ): array {
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/box/v1.0/ciudad.php',
+            $this->api_url . self::ENDPOINT_CIUDADES,
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( [
@@ -997,7 +1001,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         ];
 
         $response = wp_remote_post(
-            'https://app.aveonline.co/api/box/v1.0/transportadora.php',
+            $this->api_url . self::ENDPOINT_TRANSPORTADORAS,
             [
                 'timeout' => 15,
                 'headers' => [ 'Content-Type' => 'application/json' ],
@@ -1188,7 +1192,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      */
     public function search_recipients( string $param ): array {
         $token = $this->get_token();
-        $url   = 'https://app.aveonline.co/api/comunes/v1.0/destinatarios.php';
+        $url   = $this->api_url . self::ENDPOINT_DESTINATARIOS;
 
         $payload = [
             'tipo'       => 'listardestinatarios',
