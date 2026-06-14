@@ -146,6 +146,68 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     </tbody></table>
 
     <hr style="margin:24px 0;">
+    <h3>🛰️ <?php esc_html_e( 'Ave-Hub — Reporte de estados de envíos propios', 'ltms' ); ?></h3>
+    <p class="description">
+        <?php esc_html_e( 'Lo Tengo actúa como proveedor logístico dentro del ecosistema Ave-Hub para los envíos gestionados directamente (domiciliario propio del vendedor, recogida en tienda, etc.). Cada cambio de estado de esos envíos se reporta a Ave-Hub mediante esta integración.', 'ltms' ); ?>
+    </p>
+    <table class="form-table" role="presentation"><tbody>
+        <tr>
+            <th><?php esc_html_e( 'ID Transportadora (Ave-Hub)', 'ltms' ); ?></th>
+            <td>
+                <input type="text" name="ltms_aveonline_hub_idtransportadora"
+                    value="<?php echo esc_attr( get_option( 'ltms_aveonline_hub_idtransportadora', '' ) ); ?>"
+                    class="regular-text" inputmode="numeric" placeholder="ej: 1026">
+                <p class="description">
+                    <?php esc_html_e( 'ID numérico del proveedor logístico asignado a Lo Tengo dentro de Ave-Hub (distinto del ID de empresa de la API principal).', 'ltms' ); ?>
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <th><?php esc_html_e( 'Estado del token Ave-Hub', 'ltms' ); ?></th>
+            <td>
+                <?php
+                $hub_token_expires = (int) get_option( 'ltms_aveonline_hub_token_expires', 0 );
+                if ( $hub_token_expires > time() ) {
+                    echo '<p style="color:#0a7c00;margin:0 0 8px;">✅ ' . esc_html__( 'Token activo hasta:', 'ltms' ) . ' <strong>' . esc_html( wp_date( 'd/m/Y H:i', $hub_token_expires ) ) . '</strong></p>';
+                } elseif ( $hub_token_expires > 0 ) {
+                    echo '<p style="color:#d63638;margin:0 0 8px;">⚠️ ' . esc_html__( 'Token vencido — se renovará automáticamente al usar la integración.', 'ltms' ) . '</p>';
+                } else {
+                    echo '<p style="color:#999;margin:0 0 8px;">⚪ ' . esc_html__( 'Sin token aún — se obtendrá al hacer la primera prueba o envío.', 'ltms' ) . '</p>';
+                }
+                ?>
+                <button type="button" id="ltms-hub-test-btn" class="button button-secondary">
+                    🔌 <?php esc_html_e( 'Probar conexión Ave-Hub', 'ltms' ); ?>
+                </button>
+                <span id="ltms-hub-test-result" style="margin-left:12px;font-style:italic;"></span>
+            </td>
+        </tr>
+    </tbody></table>
+    <script>
+    (function($){
+        $('#ltms-hub-test-btn').on('click', function(){
+            var $btn = $(this);
+            var $res = $('#ltms-hub-test-result');
+            $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Probando…', 'ltms' ) ); ?>');
+            $res.css('color','').text('');
+            $.post(ajaxurl, {
+                action: 'ltms_aveonline_hub_test_connection',
+                nonce:  '<?php echo esc_js( wp_create_nonce( 'ltms_admin_nonce' ) ); ?>'
+            }, function(res){
+                $btn.prop('disabled', false).text('🔌 <?php echo esc_js( __( 'Probar conexión Ave-Hub', 'ltms' ) ); ?>');
+                if (res.success) {
+                    $res.css('color','#0a7c00').text('✅ ' + res.data.message);
+                } else {
+                    $res.css('color','#d63638').text('❌ ' + (res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>'));
+                }
+            }).fail(function(){
+                $btn.prop('disabled', false).text('🔌 <?php echo esc_js( __( 'Probar conexión Ave-Hub', 'ltms' ) ); ?>');
+                $res.css('color','#d63638').text('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+            });
+        });
+    })(jQuery);
+    </script>
+
+    <hr style="margin:24px 0;">
     <h3><?php esc_html_e( 'Estado de conexión', 'ltms' ); ?></h3>
     <?php
     $token_cached = get_transient( 'ltms_aveonline_jwt' );
@@ -859,4 +921,5 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
 
 })(jQuery);
 </script>
+
 
