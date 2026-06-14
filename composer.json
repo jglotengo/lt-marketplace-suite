@@ -24,7 +24,6 @@
         "stripe/stripe-php": "^13.0"
     },
     "require-dev": {
-        "antecedent/patchwork": "^2.2.4",
         "brain/monkey": "^2.6",
         "doctrine/instantiator": "1.5",
         "mockery/mockery": "^1.6",
