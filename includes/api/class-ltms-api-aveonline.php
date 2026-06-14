@@ -757,6 +757,49 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         return $decoded;
     }
 
+
+    /**
+     * Obtiene el listado de transportadoras disponibles para la empresa.
+     *
+     * Endpoint: POST https://app.aveonline.co/api/box/v1.0/transportadora.php
+     * tipo: "listarTransportadorasPorEmpresa"
+     *
+     * @return array Lista de transportadoras. Cada elemento:
+     *               [ 'id' => int, 'text' => string, 'imagen' => string, 'imagen2' => string ]
+     *               o array vacio en caso de error.
+     */
+    public function get_carriers(): array {
+        $token = $this->get_token();
+
+        $payload = [
+            'tipo'  => 'listarTransportadorasPorEmpresa',
+            'token' => $token,
+            'id'    => $this->idempresa,
+        ];
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/box/v1.0/transportadora.php',
+            [
+                'timeout' => 15,
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( $payload ),
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            return [];
+        }
+
+        $body    = wp_remote_retrieve_body( $response );
+        $decoded = json_decode( $body, true );
+
+        if ( ! isset( $decoded['status'] ) || $decoded['status'] !== 'ok' ) {
+            return [];
+        }
+
+        return $decoded['transportadoras'] ?? [];
+    }
+
     /**
      * Valida y retorna un email, o string vacío si es inválido.
      *

@@ -165,16 +165,75 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     })(jQuery);
     </script>
 
-    <h3 style="margin-top:16px;"><?php esc_html_e( 'Referencia de códigos de transportadora', 'ltms' ); ?></h3>
-    <table class="widefat striped" style="max-width:500px;">
-        <thead><tr><th><?php esc_html_e( 'Código', 'ltms' ); ?></th><th><?php esc_html_e( 'Transportadora', 'ltms' ); ?></th></tr></thead>
+    <h3 style="margin-top:24px;"><?php esc_html_e( 'Transportadoras disponibles en tu cuenta', 'ltms' ); ?></h3>
+    <?php
+    $carriers_count   = class_exists( 'LTMS_Business_Aveonline_Carriers' ) ? LTMS_Business_Aveonline_Carriers::count() : 0;
+    $carriers_sync_at = class_exists( 'LTMS_Business_Aveonline_Carriers' ) ? LTMS_Business_Aveonline_Carriers::last_sync_at() : null;
+    $all_carriers     = class_exists( 'LTMS_Business_Aveonline_Carriers' ) ? LTMS_Business_Aveonline_Carriers::all() : [];
+    ?>
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:16px;">
+        <span>
+            <?php
+            printf(
+                esc_html__( '%d transportadoras sincronizadas. Última sincronización: %s', 'ltms' ),
+                $carriers_count,
+                $carriers_sync_at
+                    ? esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $carriers_sync_at ) )
+                    : esc_html__( 'nunca', 'ltms' )
+            );
+            ?>
+        </span>
+        <button type="button" id="ltms-sync-carriers-btn" class="button button-secondary">
+            <?php esc_html_e( 'Sincronizar transportadoras', 'ltms' ); ?>
+        </button>
+        <span id="ltms-sync-carriers-result" style="color:green;"></span>
+    </div>
+    <script>
+    (function($){ 'use strict';
+        $('#ltms-sync-carriers-btn').on('click', function(){
+            var $btn = $(this);
+            $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Sincronizando...', 'ltms' ) ); ?>');
+            $('#ltms-sync-carriers-result').text('');
+            $.post(ajaxurl, {
+                action  : 'ltms_sync_aveonline_carriers',
+                _wpnonce: '<?php echo wp_create_nonce( 'ltms_sync_aveonline_carriers' ); ?>'
+            }, function(res){
+                $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sincronizar transportadoras', 'ltms' ) ); ?>');
+                if (res.success) {
+                    $('#ltms-sync-carriers-result').text(res.data.message);
+                    setTimeout(function(){ location.reload(); }, 1500);
+                } else {
+                    $('#ltms-sync-carriers-result').css('color','red').text(res.data || '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>');
+                }
+            });
+        });
+    })(jQuery);
+    </script>
+
+    <?php if ( ! empty( $all_carriers ) ) : ?>
+    <table class="widefat striped" style="max-width:600px;">
+        <thead>
+            <tr>
+                <th><?php esc_html_e( 'Código', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Transportadora', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Soporte oficinas', 'ltms' ); ?></th>
+            </tr>
+        </thead>
         <tbody>
-            <tr><td>1016</td><td>Interrápidísimo</td></tr>
-            <tr><td>1010</td><td>TCC</td></tr>
-            <tr><td>1009</td><td>Coordinadora</td></tr>
-            <tr><td>29</td><td>Envía</td></tr>
-            <tr><td>33</td><td>Servientrega</td></tr>
-            <tr><td><em><?php esc_html_e( 'vacío', 'ltms' ); ?></em></td><td><?php esc_html_e( 'Todas las habilitadas en tu cuenta', 'ltms' ); ?></td></tr>
+            <?php foreach ( $all_carriers as $id => $carrier ) : ?>
+            <tr>
+                <td><code><?php echo esc_html( $id ); ?></code></td>
+                <td><?php echo esc_html( $carrier['label'] ); ?></td>
+                <td><?php echo isset( $carrier['slug'] ) ? '&#10003;' : '&mdash;'; ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <tr style="border-top:2px solid #ddd;">
+                <td><em><?php esc_html_e( 'vacío', 'ltms' ); ?></em></td>
+                <td colspan="2"><?php esc_html_e( 'Cotizar con todas las habilitadas', 'ltms' ); ?></td>
+            </tr>
         </tbody>
     </table>
+    <?php else : ?>
+    <p class="description"><?php esc_html_e( 'Haz clic en "Sincronizar transportadoras" para cargar el catálogo desde Aveonline.', 'ltms' ); ?></p>
+    <?php endif; ?>
 </div>

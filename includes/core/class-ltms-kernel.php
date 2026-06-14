@@ -267,6 +267,9 @@ final class LTMS_Core_Kernel {
         }
 
         // v2.2.0 — Catálogo de ciudades Aveonline (sincronización desde JSON oficial)
+        if ( class_exists( 'LTMS_Business_Aveonline_Carriers' ) ) {
+            LTMS_Business_Aveonline_Carriers::init();
+        }
         if ( class_exists( 'LTMS_Business_Aveonline_Cities' ) ) {
             LTMS_Business_Aveonline_Cities::init();
         }

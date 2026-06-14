@@ -29,17 +29,28 @@ class LTMS_Business_Aveonline_Offices {
     private const CACHE_PREFIX = 'ltms_aveonline_offices_';
 
     /**
-     * Transportadoras disponibles según doc oficial Aveonline (endpoint /offices/all).
-     * carrier_code => [ 'slug' => string, 'label' => string ]
+     * Retorna las transportadoras con soporte de oficinas.
+     * Delega a LTMS_Business_Aveonline_Carriers para el catalogo dinamico.
+     * Mantiene compatibilidad con el formato anterior [ id => ['slug','label'] ].
      *
-     * Nota: Envía (29) no está soportada por este endpoint.
+     * @return array [ carrier_code => [ 'slug' => string, 'label' => string ] ]
      */
-    public const CARRIERS = [
-        1009 => [ 'slug' => 'coordinadora', 'label' => 'Coordinadora' ],
-        1010 => [ 'slug' => 'tcc',          'label' => 'TCC'          ],
-        1016 => [ 'slug' => 'inter',         'label' => 'Interrápidísimo' ],
-        33   => [ 'slug' => 'servientrega',  'label' => 'Servientrega' ],
-    ];
+    public static function carriers(): array {
+        if ( class_exists( 'LTMS_Business_Aveonline_Carriers' ) ) {
+            $result = [];
+            foreach ( LTMS_Business_Aveonline_Carriers::with_offices() as $id => $c ) {
+                $result[ $id ] = [ 'slug' => $c['slug'], 'label' => $c['label'] ];
+            }
+            return $result;
+        }
+        // Fallback hardcodeado si la clase no esta disponible.
+        return [
+            1009 => [ 'slug' => 'coordinadora', 'label' => 'Coordinadora' ],
+            1010 => [ 'slug' => 'tcc',          'label' => 'TCC' ],
+            1016 => [ 'slug' => 'inter',        'label' => 'Interrapidisimo' ],
+            33   => [ 'slug' => 'servientrega', 'label' => 'Servientrega' ],
+        ];
+    }
 
     /**
      * Retorna las oficinas de una transportadora, opcionalmente filtradas por ciudad.
@@ -93,7 +104,7 @@ class LTMS_Business_Aveonline_Offices {
      * @return void
      */
     public static function invalidate_city_cache( string $city_id ): void {
-        foreach ( array_keys( self::CARRIERS ) as $carrier ) {
+        foreach ( array_keys( self::carriers() ) as $carrier ) {
             // Invalida la clave base por carrier+ciudad (sin filtros adicionales).
             $cache_key = self::CACHE_PREFIX . sanitize_key( (string) $carrier ) . '_' . sanitize_key( $city_id );
             delete_transient( $cache_key );
@@ -132,7 +143,8 @@ class LTMS_Business_Aveonline_Offices {
      * @return string Nombre o el código como string si no se encuentra.
      */
     public static function carrier_name( $carrier ): string {
-        return self::CARRIERS[ (int) $carrier ]['label'] ?? (string) $carrier;
+        $c = self::carriers();
+        return $c[ (int) $carrier ]['label'] ?? ( class_exists( 'LTMS_Business_Aveonline_Carriers' ) ? LTMS_Business_Aveonline_Carriers::label( $carrier ) : (string) $carrier );
     }
 
     /**
@@ -142,7 +154,8 @@ class LTMS_Business_Aveonline_Offices {
      * @return string Slug o el código como string si no se encuentra.
      */
     public static function carrier_slug( $carrier ): string {
-        return self::CARRIERS[ (int) $carrier ]['slug'] ?? (string) $carrier;
+        $c = self::carriers();
+        return $c[ (int) $carrier ]['slug'] ?? (string) $carrier;
     }
 
     /**
@@ -152,6 +165,6 @@ class LTMS_Business_Aveonline_Offices {
      * @return bool
      */
     public static function is_valid_carrier( $carrier ): bool {
-        return array_key_exists( (int) $carrier, self::CARRIERS );
+        return array_key_exists( (int) $carrier, self::carriers() );
     }
 }
