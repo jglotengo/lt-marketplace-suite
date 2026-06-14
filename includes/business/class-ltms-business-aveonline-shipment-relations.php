@@ -34,10 +34,16 @@ class LTMS_Business_Aveonline_ShipmentRelations {
      * Registra hooks AJAX y crea la tabla si no existe.
      */
     public static function init(): void {
-        add_action( 'wp_ajax_ltms_aveonline_create_relation',  [ __CLASS__, 'ajax_create'  ] );
-        add_action( 'wp_ajax_ltms_aveonline_list_relations',   [ __CLASS__, 'ajax_list'    ] );
-        add_action( 'wp_ajax_ltms_aveonline_delete_relation',  [ __CLASS__, 'ajax_delete'  ] );
-        add_action( 'wp_ajax_ltms_aveonline_print_relation',   [ __CLASS__, 'ajax_print'   ] );
+        add_action( 'wp_ajax_ltms_aveonline_create_relation',          [ __CLASS__, 'ajax_create'           ] );
+        add_action( 'wp_ajax_ltms_aveonline_list_relations',           [ __CLASS__, 'ajax_list'             ] );
+        add_action( 'wp_ajax_ltms_aveonline_delete_relation',          [ __CLASS__, 'ajax_delete'           ] );
+        add_action( 'wp_ajax_ltms_aveonline_print_relation',           [ __CLASS__, 'ajax_print'            ] );
+        // Vendor-specific handlers (filtra por vendor_id del usuario actual)
+        add_action( 'wp_ajax_ltms_vendor_create_relation',             [ __CLASS__, 'ajax_vendor_create'    ] );
+        add_action( 'wp_ajax_ltms_vendor_list_relations',              [ __CLASS__, 'ajax_vendor_list'      ] );
+        add_action( 'wp_ajax_ltms_vendor_delete_relation',             [ __CLASS__, 'ajax_vendor_delete'    ] );
+        // Búsqueda de destinatarios (usada en el form de creación del vendedor)
+        add_action( 'wp_ajax_ltms_aveonline_search_recipients',        [ __CLASS__, 'ajax_search_recipients'] );
 
         add_action( 'ltms_plugin_activated', [ __CLASS__, 'maybe_create_table' ] );
         self::maybe_create_table();
@@ -60,11 +66,13 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             guias           TEXT         NOT NULL,
             fecha_aveonline DATETIME     DEFAULT NULL,
             rutaimpresion   TEXT         NOT NULL DEFAULT '',
+            vendor_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
             created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             deleted_at      DATETIME     DEFAULT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY relacionenvio (relacionenvio),
             KEY transportadora (transportadora),
+            KEY vendor_id (vendor_id),
             KEY created_at (created_at)
         ) {$charset};";
 
@@ -96,9 +104,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
                 'guias'           => $guias,
                 'fecha_aveonline' => $fecha_dt,
                 'rutaimpresion'   => $rutaimpresion,
+                'vendor_id'       => 0,
                 'created_at'      => current_time( 'mysql' ),
             ],
-            [ '%s', '%s', '%s', '%s', '%s', '%s' ]
+            [ '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
         );
 
         return $result ? $wpdb->insert_id : false;
@@ -338,6 +347,163 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             'url'      => '',  // Aveonline no expone URL en listar; abrir el panel de Aveonline
             'registro' => $reg,
         ] );
+    }
+
+    // ── Vendor Handlers ───────────────────────────────────────────────────────
+
+    /**
+     * AJAX: Crea una relación de envíos como vendedor.
+     * Filtra las guías al vendor_id actual y persiste la relación con ese vendor_id.
+     */
+    public static function ajax_vendor_create(): void {
+        check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() || ! LTMS_Utils::is_ltms_vendor() ) {
+            wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ] );
+        }
+
+        $vendor_id     = get_current_user_id();
+        $transportadora = sanitize_text_field( wp_unslash( $_POST['transportadora'] ?? '' ) );
+        $guias_raw      = sanitize_textarea_field( wp_unslash( $_POST['guias'] ?? '' ) );
+
+        if ( ! $transportadora || ! $guias_raw ) {
+            wp_send_json_error( [ 'message' => __( 'Transportadora y guías son requeridas.', 'ltms' ) ] );
+        }
+
+        try {
+            $api    = new LTMS_Api_Aveonline();
+            $result = $api->create_shipment_relation( $transportadora, $guias_raw );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            return;
+        }
+
+        if ( ! ( $result['success'] ?? false ) ) {
+            wp_send_json_error( [ 'message' => $result['message'] ?? __( 'Error al crear la relación.', 'ltms' ) ] );
+        }
+
+        // Persistir con vendor_id
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE;
+        $fecha_dt = self::parse_aveonline_date( $result['fecha'] ?? '' );
+
+        $wpdb->insert(
+            $table,
+            [
+                'relacionenvio'   => $result['relacionenvio'],
+                'transportadora'  => $transportadora,
+                'guias'           => $guias_raw,
+                'fecha_aveonline' => $fecha_dt,
+                'rutaimpresion'   => $result['rutaimpresion'] ?? '',
+                'vendor_id'       => $vendor_id,
+                'created_at'      => current_time( 'mysql' ),
+            ],
+            [ '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
+        );
+
+        wp_send_json_success( [
+            'relacionenvio' => $result['relacionenvio'],
+            'fecha'         => $result['fecha'] ?? '',
+            'rutaimpresion' => $result['rutaimpresion'] ?? '',
+        ] );
+    }
+
+    /**
+     * AJAX: Lista las relaciones locales del vendedor actual.
+     */
+    public static function ajax_vendor_list(): void {
+        check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() || ! LTMS_Utils::is_ltms_vendor() ) {
+            wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ] );
+        }
+
+        global $wpdb;
+        $vendor_id = get_current_user_id();
+        $table     = $wpdb->prefix . self::TABLE;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM `{$table}` WHERE vendor_id = %d AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50",
+                $vendor_id
+            ),
+            ARRAY_A
+        );
+
+        wp_send_json_success( [ 'relations' => $rows ?: [] ] );
+    }
+
+    /**
+     * AJAX: Elimina (soft-delete) una relación del vendedor actual.
+     */
+    public static function ajax_vendor_delete(): void {
+        check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() || ! LTMS_Utils::is_ltms_vendor() ) {
+            wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ] );
+        }
+
+        $vendor_id     = get_current_user_id();
+        $numero_relacion = sanitize_text_field( wp_unslash( $_POST['numero_relacion'] ?? '' ) );
+
+        if ( ! $numero_relacion ) {
+            wp_send_json_error( [ 'message' => __( 'Número de relación requerido.', 'ltms' ) ] );
+        }
+
+        // Verificar que la relación pertenece a este vendor
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id FROM `{$table}` WHERE relacionenvio = %s AND vendor_id = %d AND deleted_at IS NULL LIMIT 1",
+            $numero_relacion, $vendor_id
+        ) );
+
+        if ( ! $row ) {
+            wp_send_json_error( [ 'message' => __( 'Relación no encontrada o sin permisos.', 'ltms' ) ] );
+        }
+
+        try {
+            $api    = new LTMS_Api_Aveonline();
+            $result = $api->delete_shipment_relation( $numero_relacion );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            return;
+        }
+
+        if ( ! ( $result['success'] ?? false ) ) {
+            wp_send_json_error( [ 'message' => $result['message'] ?? __( 'Error al eliminar en Aveonline.', 'ltms' ) ] );
+        }
+
+        self::db_soft_delete( $numero_relacion );
+        wp_send_json_success( [ 'message' => __( 'Relación eliminada correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * AJAX: Busca destinatarios en Aveonline (autocomplete).
+     */
+    public static function ajax_search_recipients(): void {
+        check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => 'Sin permisos.' ] );
+        }
+
+        $param = sanitize_text_field( wp_unslash( $_GET['param'] ?? '' ) );
+        if ( strlen( $param ) < 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Mínimo 3 caracteres.', 'ltms' ) ] );
+        }
+
+        try {
+            $api    = new LTMS_Api_Aveonline();
+            $result = $api->search_recipients( $param );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            return;
+        }
+
+        wp_send_json_success( [ 'destinatarios' => $result['destinatarios'] ] );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

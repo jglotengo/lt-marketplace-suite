@@ -26,6 +26,7 @@ $nav_items = [
     [ 'view' => 'home',     'icon' => '📊', 'label' => __( 'Inicio', 'ltms' ) ],
     [ 'view' => 'orders',   'icon' => '📦', 'label' => __( 'Pedidos', 'ltms' ) ],
     [ 'view' => 'products', 'icon' => '🛍️', 'label' => __( 'Productos', 'ltms' ) ],
+    [ 'view' => 'envios',   'icon' => '🚚', 'label' => __( 'Envíos', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
     [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
 ];
@@ -132,6 +133,10 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 
         <div class="ltms-view-section" id="ltms-view-settings" style="display:none;">
             <?php include __DIR__ . '/view-settings.php'; ?>
+        </div>
+
+        <div class="ltms-view-section" id="ltms-view-envios" style="display:none;">
+            <?php include __DIR__ . '/view-envios.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">

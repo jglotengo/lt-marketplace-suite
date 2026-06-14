@@ -957,4 +957,46 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'message' => is_array( $body ) ? ( $body['message'] ?? '' ) : 'Respuesta inválida',
         ];
     }
+
+    // ── Destinatarios ──────────────────────────────────────────────────────────
+
+    /**
+     * Busca destinatarios registrados en Aveonline por término de búsqueda.
+     *
+     * @param  string $param  Término de búsqueda (mínimo 3 caracteres).
+     * @return array{status:string, destinatarios:array}
+     * @throws \RuntimeException Si la petición HTTP falla.
+     */
+    public function search_recipients( string $param ): array {
+        $token = $this->get_token();
+        $url   = 'https://app.aveonline.co/api/comunes/v1.0/destinatarios.php';
+
+        $payload = [
+            'tipo'       => 'listardestinatarios',
+            'token'      => $token,
+            'idempresa'  => (int) $this->idempresa,
+            'param'      => $param,
+        ];
+
+        $raw = wp_remote_post( $url, [
+            'headers' => [ 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode( $payload ),
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $raw ) ) {
+            throw new \RuntimeException( 'Aveonline HTTP error (destinatarios): ' . $raw->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $raw ), true );
+
+        if ( ! is_array( $body ) || ( $body['status'] ?? '' ) !== 'ok' ) {
+            return [ 'status' => 'error', 'destinatarios' => [] ];
+        }
+
+        return [
+            'status'        => 'ok',
+            'destinatarios' => $body['destinatarios'] ?? [],
+        ];
+    }
 }
