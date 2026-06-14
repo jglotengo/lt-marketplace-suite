@@ -69,7 +69,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 <input type="text" name="ltms_aveonline_idtransportador"
                     value="<?php echo esc_attr( get_option( 'ltms_aveonline_idtransportador', '' ) ); ?>"
                     class="regular-text" placeholder="ej: 29">
-                <p class="description"><?php esc_html_e( 'Código de la transportadora (ej: 29 = ENVIA, 1010 = TCC, 1022 = SAFERBO). Dejar vacío para cotizar con todas las disponibles.', 'ltms' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Código de la transportadora (ej: 1016 = Interrápidísimo, 1010 = TCC, 1009 = Coordinadora, 29 = Envía, 33 = Servientrega). Dejar vacío para cotizar con todas las disponibles.', 'ltms' ); ?></p>
             </td>
         </tr>
 
@@ -169,10 +169,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     <table class="widefat striped" style="max-width:500px;">
         <thead><tr><th><?php esc_html_e( 'Código', 'ltms' ); ?></th><th><?php esc_html_e( 'Transportadora', 'ltms' ); ?></th></tr></thead>
         <tbody>
-            <tr><td>29</td><td>ENVIA - nacional</td></tr>
-            <tr><td>1010</td><td>TCC SA - nacional</td></tr>
-            <tr><td>1022</td><td>SAFERBO - nacional</td></tr>
-            <tr><td>33</td><td>SERVIENTREGA</td></tr>
+            <tr><td>1016</td><td>Interrápidísimo</td></tr>
+            <tr><td>1010</td><td>TCC</td></tr>
+            <tr><td>1009</td><td>Coordinadora</td></tr>
+            <tr><td>29</td><td>Envía</td></tr>
+            <tr><td>33</td><td>Servientrega</td></tr>
             <tr><td><em><?php esc_html_e( 'vacío', 'ltms' ); ?></em></td><td><?php esc_html_e( 'Todas las habilitadas en tu cuenta', 'ltms' ); ?></td></tr>
         </tbody>
     </table>
