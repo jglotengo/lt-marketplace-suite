@@ -46,6 +46,12 @@ final class LTMS_Business_Aveonline_Agents {
 
 		// Cron de retry para agentes que fallaron al crearse
 		add_action( 'ltms_aveonline_retry_create_agent', [ $instance, 'retry_create_agent' ] );
+
+		// ── AJAX handlers — admin ────────────────────────────────────────────
+		add_action( 'wp_ajax_ltms_aveonline_list_agents',          [ __CLASS__, 'ajax_list_agents'          ] );
+		add_action( 'wp_ajax_ltms_aveonline_update_agent',         [ __CLASS__, 'ajax_update_agent'         ] );
+		add_action( 'wp_ajax_ltms_aveonline_update_agent_status',  [ __CLASS__, 'ajax_update_agent_status'  ] );
+		add_action( 'wp_ajax_ltms_aveonline_create_agent_user',    [ __CLASS__, 'ajax_create_agent_user'    ] );
 	}
 
 	// ── Handlers ──────────────────────────────────────────────────
@@ -203,5 +209,152 @@ final class LTMS_Business_Aveonline_Agents {
 			'verRecaudos'     => 1, // no ver recaudos
 			'agentePrincipal' => 2, // no es principal
 		] );
+	}
+
+	// ── AJAX handlers estáticos (admin) ───────────────────────────────────────
+
+	/**
+	 * AJAX: listar todos los agentes de la empresa en Aveonline.
+	 * action: ltms_aveonline_list_agents
+	 */
+	public static function ajax_list_agents(): void {
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ], 403 );
+		}
+
+		try {
+			/** @var LTMS_Api_Aveonline $api */
+			$api    = LTMS_Api_Factory::get( 'aveonline' );
+			$agents = $api->list_agents();
+			wp_send_json_success( [ 'agentes' => $agents ] );
+		} catch ( \Throwable $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
+	}
+
+	/**
+	 * AJAX: actualizar datos de un agente Aveonline.
+	 * action: ltms_aveonline_update_agent
+	 *
+	 * POST params: agent_id (int), + todos los campos editables del agente.
+	 */
+	public static function ajax_update_agent(): void {
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ], 403 );
+		}
+
+		$agent_id = absint( $_POST['agent_id'] ?? 0 );
+		if ( ! $agent_id ) {
+			wp_send_json_error( [ 'message' => __( 'agent_id es obligatorio.', 'ltms' ) ] );
+		}
+
+		// Campos editables permitidos — lista blanca
+		$allowed = [
+			'nombre', 'idnit', 'telefono', 'direccion', 'correo', 'ciudad',
+			'nombreContacto', 'valorminimo', 'comentarios',
+			'email1', 'email2', 'email3', 'email4',
+			'rutaimgalterna', 'agentePrincipal',
+		];
+
+		$data = [];
+		foreach ( $allowed as $field ) {
+			if ( isset( $_POST[ $field ] ) ) {
+				$data[ $field ] = sanitize_text_field( wp_unslash( $_POST[ $field ] ) );
+			}
+		}
+
+		if ( empty( $data ) ) {
+			wp_send_json_error( [ 'message' => __( 'No se enviaron campos a actualizar.', 'ltms' ) ] );
+		}
+
+		try {
+			/** @var LTMS_Api_Aveonline $api */
+			$api    = LTMS_Api_Factory::get( 'aveonline' );
+			$result = $api->update_agent( $agent_id, $data );
+
+			// Si el agente está vinculado a un vendedor WP, actualizar el meta también
+			if ( ! empty( $data['correo'] ) ) {
+				$users = get_users( [
+					'meta_key'   => '_ltms_aveonline_idagente',
+					'meta_value' => (string) $agent_id,
+					'number'     => 1,
+					'fields'     => 'ID',
+				] );
+				if ( ! empty( $users ) ) {
+					// Actualizar email en WP si cambió
+					wp_update_user( [ 'ID' => $users[0], 'user_email' => $data['correo'] ] );
+				}
+			}
+
+			wp_send_json_success( $result );
+		} catch ( \Throwable $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
+	}
+
+	/**
+	 * AJAX: activar o desactivar un agente en Aveonline.
+	 * action: ltms_aveonline_update_agent_status
+	 *
+	 * POST params: agent_nit (int), estado (int: 0=inactivo, 1=activo).
+	 */
+	public static function ajax_update_agent_status(): void {
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ], 403 );
+		}
+
+		$agent_nit = absint( $_POST['agent_nit'] ?? 0 );
+		$estado    = isset( $_POST['estado'] ) ? (int) $_POST['estado'] : -1;
+
+		if ( ! $agent_nit || $estado === -1 ) {
+			wp_send_json_error( [ 'message' => __( 'agent_nit y estado son obligatorios.', 'ltms' ) ] );
+		}
+
+		try {
+			/** @var LTMS_Api_Aveonline $api */
+			$api    = LTMS_Api_Factory::get( 'aveonline' );
+			$result = $api->update_agent_status( $agent_nit, $estado );
+			wp_send_json_success( $result );
+		} catch ( \Throwable $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
+	}
+
+	/**
+	 * AJAX: crear usuario de acceso para un agente Aveonline.
+	 * action: ltms_aveonline_create_agent_user
+	 *
+	 * POST params: idAgente, idCiudad, idActivo, cod, login, password, nombre, correo, telefono.
+	 */
+	public static function ajax_create_agent_user(): void {
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Sin permisos.', 'ltms' ) ], 403 );
+		}
+
+		$required = [ 'idAgente', 'idCiudad', 'idActivo', 'cod', 'login', 'password', 'nombre', 'correo', 'telefono' ];
+		$data     = [];
+
+		foreach ( $required as $field ) {
+			$val = sanitize_text_field( wp_unslash( $_POST[ $field ] ?? '' ) );
+			if ( $val === '' ) {
+				wp_send_json_error( [
+					'message' => sprintf( __( 'Campo obligatorio faltante: %s', 'ltms' ), $field ),
+				] );
+			}
+			$data[ $field ] = $val;
+		}
+
+		try {
+			/** @var LTMS_Api_Aveonline $api */
+			$api    = LTMS_Api_Factory::get( 'aveonline' );
+			$result = $api->create_agent_user( $data );
+			wp_send_json_success( $result );
+		} catch ( \Throwable $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
 	}
 }

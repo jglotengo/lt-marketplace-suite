@@ -481,6 +481,183 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Actualiza los datos de un agente existente en Aveonline.
+     *
+     * Documentación: POST /agentes.php tipo:"ActualizarAgente"
+     *
+     * @param int   $agent_id    ID numérico del agente en Aveonline.
+     * @param array $agent_data  Campos a actualizar (mismos que crearAgente, más 'id').
+     * @return array{status: string, message: string}
+     * @throws \RuntimeException Si hay error de red o la API retorna error.
+     */
+    public function update_agent( int $agent_id, array $agent_data ): array {
+        $token = $this->get_token();
+
+        $payload = array_merge(
+            [
+                'tipo'           => 'ActualizarAgente',
+                'token'          => $token,
+                'identificacion' => $this->idempresa,
+                'id'             => $agent_id,
+            ],
+            $agent_data
+        );
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( $payload ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al actualizar agente: ' . $response->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( ( $body['status'] ?? '' ) !== 'ok' ) {
+            throw new \RuntimeException(
+                sprintf( 'Aveonline ActualizarAgente error: %s', $body['message'] ?? wp_json_encode( $body ) )
+            );
+        }
+
+        return $body;
+    }
+
+    /**
+     * Actualiza el estado activo/inactivo de un agente en Aveonline.
+     *
+     * Documentación: POST /agentes.php tipo:"actualizarEstadoAgente"
+     *
+     * @param int $agent_nit  NIT o identificación del agente (campo 'id' en la API).
+     * @param int $estado     0 = inactivo, 1 = activo (o según los valores de Aveonline).
+     * @return array{status: string, message: string}
+     * @throws \RuntimeException Si hay error de red o la API retorna error.
+     */
+    public function update_agent_status( int $agent_nit, int $estado ): array {
+        $token = $this->get_token();
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( [
+                    'tipo'           => 'actualizarEstadoAgente',
+                    'token'          => $token,
+                    'identificacion' => $this->idempresa,
+                    'estado'         => $estado,
+                    'id'             => $agent_nit,
+                ] ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al actualizar estado agente: ' . $response->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( ( $body['status'] ?? '' ) !== 'ok' ) {
+            throw new \RuntimeException(
+                sprintf( 'Aveonline actualizarEstadoAgente error: %s', $body['message'] ?? wp_json_encode( $body ) )
+            );
+        }
+
+        return $body;
+    }
+
+    /**
+     * Crea un usuario de acceso asociado a un agente Aveonline.
+     *
+     * Documentación: POST /agentes.php tipo:"crearUsuarioAgente"
+     *
+     * @param array $user_data {
+     *   @type string $idAgente      ID del agente. Requerido.
+     *   @type string $idCiudad      ID de ciudad del agente. Requerido.
+     *   @type string $idActivo      ID activo (estado). Requerido.
+     *   @type string $cod           Código del agente. Requerido.
+     *   @type string $login         Login del nuevo usuario. Requerido.
+     *   @type string $password      Contraseña. Requerido.
+     *   @type string $nombre        Nombre del usuario. Requerido.
+     *   @type string $correo        Email. Requerido.
+     *   @type string $telefono      Teléfono. Requerido.
+     * }
+     * @return array{status: string, message: string}
+     * @throws \RuntimeException Si hay error de red o la API retorna error.
+     */
+    public function create_agent_user( array $user_data ): array {
+        $token = $this->get_token();
+
+        $payload = array_merge(
+            [
+                'tipo'           => 'crearUsuarioAgente',
+                'token'          => $token,
+                'identificacion' => (string) $this->idempresa,
+            ],
+            $user_data
+        );
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( $payload ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al crear usuario agente: ' . $response->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( ( $body['status'] ?? '' ) !== 'ok' ) {
+            $msg = $body['message'] ?? $body['Campos Requeridos'] ?? wp_json_encode( $body );
+            throw new \RuntimeException( sprintf( 'Aveonline crearUsuarioAgente error: %s', $msg ) );
+        }
+
+        return $body;
+    }
+
+    /**
+     * Lista todos los agentes asociados a la empresa en Aveonline.
+     *
+     * Documentación: POST /agentes.php tipo:"listarAgentesPorEmpresaAuth"
+     *
+     * @return array  Array de agentes con id, nombre, email, direccion, telefono, idciudad, principal.
+     * @throws \RuntimeException Si hay error de red.
+     */
+    public function list_agents(): array {
+        $token = $this->get_token();
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( [
+                    'tipo'      => 'listarAgentesPorEmpresaAuth',
+                    'token'     => $token,
+                    'idempresa' => $this->idempresa,
+                ] ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al listar agentes: ' . $response->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        return $body['agentes'] ?? [];
+    }
+
+    /**
      * Verifica conectividad con la API de Aveonline intentando autenticar.
      *
      * @return array{status: string, message: string}
