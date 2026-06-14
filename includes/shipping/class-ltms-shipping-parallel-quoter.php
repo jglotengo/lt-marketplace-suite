@@ -41,7 +41,7 @@ class LTMS_Shipping_Parallel_Quoter {
 		$dest    = $package['destination'] ?? [];
 		$country = LTMS_Core_Config::get_country();
 
-		$requests = self::build_requests( $weight, $dest, $country );
+		$requests = self::build_requests( $weight, $dest, $country, $package );
 		if ( empty( $requests ) ) {
 			return [];
 		}
@@ -114,7 +114,7 @@ class LTMS_Shipping_Parallel_Quoter {
 
 	// ── Private helpers ──────────────────────────────────────────────
 
-	private static function build_requests( float $weight, array $dest, string $country ): array {
+	private static function build_requests( float $weight, array $dest, string $country, array $package = [] ): array {
 		$requests = [];
 
 		// Aveonline — Colombia only
@@ -122,7 +122,14 @@ class LTMS_Shipping_Parallel_Quoter {
 		if ( $country === 'CO' ) {
 			$token      = get_transient( 'ltms_aveonline_jwt' );
 			$idempresa  = (int) LTMS_Core_Config::get( 'ltms_aveonline_idempresa', 0 );
-			$idagente   = (string) LTMS_Core_Config::get( 'ltms_aveonline_idagente', '' );
+
+			// Resolver idagente por vendedor si el package lo proporciona
+			$vendor_id = class_exists( 'LTMS_Business_Aveonline_Agents' )
+				? LTMS_Business_Aveonline_Agents::get_vendor_id_from_package( $package )
+				: null;
+			$idagente  = class_exists( 'LTMS_Business_Aveonline_Agents' )
+				? LTMS_Business_Aveonline_Agents::get_vendor_idagente( $vendor_id )
+				: (string) LTMS_Core_Config::get( 'ltms_aveonline_idagente', '' );
 			$origin     = LTMS_Core_Config::get( 'ltms_store_city', 'Bogotá' );
 			if ( $token && $idempresa && ! empty( $dest['city'] ) ) {
 				$body = wp_json_encode( [

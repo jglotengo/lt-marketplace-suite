@@ -317,7 +317,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'contraentrega'  => (int) ( $rate_query['contraentrega'] ?? 0 ),
             'idtransportador'=> $rate_query['idtransportador'] ?? '',
             'plugin'         => 'apiave',
-            'idagente'       => $this->idagente,
+            'idagente'       => $rate_query['idagente'] ?? $this->idagente,
         ];
 
         $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload );
@@ -359,6 +359,125 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             throw new \InvalidArgumentException( 'El shipment_id no puede estar vacío.' );
         }
         throw new \RuntimeException( 'Aveonline no expone endpoint de cancelación en la API pública v2. Gestiona la anulación desde el panel o contacta al asesor.' );
+    }
+
+    /**
+     * Crea un agente en Aveonline asociado al idempresa configurado.
+     *
+     * Documentación: POST https://app.aveonline.co/api/comunes/v1.0/agentes.php
+     * tipo: "crearAgente"
+     *
+     * Si el agente ya existe ("El registro ya existe con el cliente asociado"),
+     * intenta recuperar su ID mediante find_agent_id_by_email().
+     *
+     * @param array $agent_data {
+     *   @type string $nombre          Nombre del agente. Requerido.
+     *   @type string $idnit           NIT o cédula del agente. Requerido.
+     *   @type string $telefono        Teléfono (solo dígitos). Requerido.
+     *   @type string $direccion       Dirección. Requerido.
+     *   @type string $correo          Email del agente. Requerido.
+     *   @type string $ciudad          Nombre o código DANE de la ciudad. Requerido.
+     *   @type string $email1          Email para novedades. Requerido.
+     *   @type string $email2          Email comercial. Requerido.
+     *   @type int    $idvalorminimo   1=con mínimos, 2=sin mínimos. Requerido.
+     *   @type int    $verRecaudos     0=sí puede ver, 1=no puede ver. Requerido.
+     *   @type int    $agentePrincipal 1=sí, 2=no. Requerido.
+     *   @type string $nombreContacto  Nombre de contacto. Opcional.
+     * }
+     * @return string|null ID del agente creado o recuperado. Null si no se puede obtener.
+     * @throws \RuntimeException Si la API retorna error definitivo.
+     */
+    public function create_agent( array $agent_data ): ?string {
+        $token = $this->get_token();
+
+        $payload = array_merge(
+            [
+                'tipo'           => 'crearAgente',
+                'token'          => $token,
+                'identificacion' => $this->idempresa,
+            ],
+            $agent_data
+        );
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( $payload ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al crear agente: ' . $response->get_error_message() );
+        }
+
+        $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+        $status = $body['status'] ?? 'error';
+
+        // Agente creado exitosamente
+        if ( $status === 'ok' && ! empty( $body['id'] ) ) {
+            return (string) $body['id'];
+        }
+
+        // Agente ya existe — recuperar ID por email
+        $message = $body['message'] ?? '';
+        if ( $status === 'ok' && strpos( $message, 'ya existe' ) !== false ) {
+            $email = $agent_data['correo'] ?? '';
+            if ( $email ) {
+                return $this->find_agent_id_by_email( $email );
+            }
+            return null;
+        }
+
+        throw new \RuntimeException(
+            sprintf( 'Aveonline crearAgente error: %s', $message ?: wp_json_encode( $body ) )
+        );
+    }
+
+    /**
+     * Busca un agente por email en el listado de agentes de la empresa.
+     *
+     * Documentación: POST /agentes.php tipo:"listarAgentesPorEmpresaAuth"
+     * La respuesta incluye: id, nombre, email, direccion, telefono, idciudad, principal.
+     *
+     * @param string $email Email a buscar.
+     * @return string|null ID del agente o null si no se encuentra.
+     */
+    public function find_agent_id_by_email( string $email ): ?string {
+        if ( ! is_email( $email ) ) {
+            return null;
+        }
+
+        $token = $this->get_token();
+
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/comunes/v1.0/agentes.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( [
+                    'tipo'      => 'listarAgentesPorEmpresaAuth',
+                    'token'     => $token,
+                    'idempresa' => $this->idempresa,
+                ] ),
+                'timeout' => 30,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            return null;
+        }
+
+        $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+        $agents = $body['agentes'] ?? [];
+
+        foreach ( $agents as $agent ) {
+            if ( isset( $agent['email'] ) && strtolower( $agent['email'] ) === strtolower( $email ) ) {
+                return (string) $agent['id'];
+            }
+        }
+
+        return null;
     }
 
     /**

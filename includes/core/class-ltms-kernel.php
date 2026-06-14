@@ -261,6 +261,11 @@ final class LTMS_Core_Kernel {
             LTMS_Alegra_Sync::init();
         }
 
+        // v2.2.0 — Agentes Aveonline por vendedor
+        if ( class_exists( 'LTMS_Business_Aveonline_Agents' ) ) {
+            LTMS_Business_Aveonline_Agents::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();
