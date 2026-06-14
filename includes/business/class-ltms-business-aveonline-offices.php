@@ -2,8 +2,8 @@
 /**
  * Gestión de oficinas y puntos de atención de transportadoras Aveonline.
  *
- * Wrappea el endpoint GET /api-oficinas/public/api/v1/offices/{carrier}/{cityId}
- * con caché transitoria de 6 horas por par (carrier, cityId).
+ * Wrappea el endpoint GET /api-oficinas/public/api/v1/offices/all (con JWT)
+ * con caché transitoria de 6 horas por combinación de parámetros.
  *
  * @package LTMS
  * @since   2.1.0
@@ -29,43 +29,56 @@ class LTMS_Business_Aveonline_Offices {
     private const CACHE_PREFIX = 'ltms_aveonline_offices_';
 
     /**
-     * Transportadoras disponibles según doc oficial Aveonline.
-     * carrier_code => nombre legible.
+     * Transportadoras disponibles según doc oficial Aveonline (endpoint /offices/all).
+     * carrier_code => [ 'slug' => string, 'label' => string ]
+     *
+     * Nota: Envía (29) no está soportada por este endpoint.
      */
     public const CARRIERS = [
-        1016 => 'Interrápidísimo',
-        1010 => 'TCC',
-        1009 => 'Coordinadora',
-        29   => 'Envía',
-        33   => 'Servientrega',
+        1009 => [ 'slug' => 'coordinadora', 'label' => 'Coordinadora' ],
+        1010 => [ 'slug' => 'tcc',          'label' => 'TCC'          ],
+        1016 => [ 'slug' => 'inter',         'label' => 'Interrápidísimo' ],
+        33   => [ 'slug' => 'servientrega',  'label' => 'Servientrega' ],
     ];
 
     /**
-     * Retorna las oficinas de una transportadora en la ciudad indicada.
+     * Retorna las oficinas de una transportadora, opcionalmente filtradas por ciudad.
      *
-     * Usa caché transitoria de 6 horas para evitar llamadas repetidas.
-     * El city_id debe ser el código DANE de 9 dígitos, tal como lo almacena
-     * la tabla lt_aveonline_cities en la columna `codigodane`.
-     *
-     * @param int|string $carrier Código de transportadora.
-     * @param string     $city_id Código DANE de 9 dígitos (ej: 11001000).
+     * @param int|string  $carrier Código o slug de la transportadora.
+     * @param string|null $city_id Código DANE de 8 dígitos. Null = consulta nacional.
+     * @param string|null $nombre  Filtro parcial por nombre del punto de venta.
+     * @param string|null $direccion Filtro parcial por dirección.
      * @return array Lista de oficinas. Cada elemento:
-     *               [ 'location' => string, 'name' => string, 'id' => string, 'city' => string ]
+     *               [ 'nombre' => string, 'direccion' => string, 'ciudad' => string ]
      */
-    public static function get_offices( $carrier, string $city_id ): array {
-        $cache_key = self::CACHE_PREFIX . (int) $carrier . '_' . sanitize_key( $city_id );
-        $cached    = get_transient( $cache_key );
+    public static function get_offices( $carrier, ?string $city_id = null, ?string $nombre = null, ?string $direccion = null ): array {
+        $cache_key = self::CACHE_PREFIX . sanitize_key( (string) $carrier )
+            . '_' . sanitize_key( (string) $city_id )
+            . ( $nombre    ? '_n' . sanitize_key( $nombre )    : '' )
+            . ( $direccion ? '_d' . sanitize_key( $direccion ) : '' );
 
+        $cached = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
         }
 
         $api      = new LTMS_Api_Aveonline();
-        $response = $api->get_carrier_offices( $carrier, $city_id );
+        $response = $api->get_carrier_offices( $carrier, $city_id, $nombre, $direccion );
 
         $offices = [];
-        if ( isset( $response['status'] ) && 'success' === $response['status'] && is_array( $response['data'] ) ) {
-            $offices = $response['data'];
+        if ( isset( $response['status'] ) && 'success' === $response['status'] && ! empty( $response['operadores'] ) ) {
+            // La respuesta agrupa por operador; aplanamos todas las oficinas en un array único.
+            foreach ( $response['operadores'] as $operador ) {
+                if ( is_array( $operador['oficinas'] ?? null ) ) {
+                    foreach ( $operador['oficinas'] as $oficina ) {
+                        $offices[] = [
+                            'nombre'    => $oficina['nombre']    ?? '',
+                            'direccion' => $oficina['direccion'] ?? '',
+                            'ciudad'    => $oficina['ciudad']    ?? '',
+                        ];
+                    }
+                }
+            }
         }
 
         set_transient( $cache_key, $offices, self::CACHE_TTL );
@@ -76,14 +89,13 @@ class LTMS_Business_Aveonline_Offices {
     /**
      * Invalida la caché de oficinas de una ciudad concreta para todas las transportadoras.
      *
-     * Útil cuando se actualiza el catálogo de ciudades.
-     *
-     * @param string $city_id Código DANE de 9 dígitos.
+     * @param string $city_id Código DANE de 8 dígitos.
      * @return void
      */
     public static function invalidate_city_cache( string $city_id ): void {
         foreach ( array_keys( self::CARRIERS ) as $carrier ) {
-            $cache_key = self::CACHE_PREFIX . $carrier . '_' . sanitize_key( $city_id );
+            // Invalida la clave base por carrier+ciudad (sin filtros adicionales).
+            $cache_key = self::CACHE_PREFIX . sanitize_key( (string) $carrier ) . '_' . sanitize_key( $city_id );
             delete_transient( $cache_key );
         }
     }
@@ -91,22 +103,22 @@ class LTMS_Business_Aveonline_Offices {
     /**
      * Retorna las oficinas formateadas como opciones para un <select>.
      *
-     * @param int|string $carrier Código de transportadora.
-     * @param string     $city_id Código DANE de 9 dígitos.
-     * @return array [ value => label ] donde value = 'name||location' y label = 'Nombre — Dirección'.
+     * @param int|string  $carrier Código o slug de la transportadora.
+     * @param string|null $city_id Código DANE de 8 dígitos.
+     * @return array [ value => label ] donde value = 'nombre||direccion' y label = 'Nombre — Dirección'.
      */
-    public static function get_select_options( $carrier, string $city_id ): array {
+    public static function get_select_options( $carrier, ?string $city_id = null ): array {
         $offices = self::get_offices( $carrier, $city_id );
         $options = [];
 
         foreach ( $offices as $office ) {
-            $name     = $office['name']     ?? '';
-            $location = $office['location'] ?? '';
-            if ( '' === $name && '' === $location ) {
+            $nombre    = $office['nombre']    ?? '';
+            $direccion = $office['direccion'] ?? '';
+            if ( '' === $nombre && '' === $direccion ) {
                 continue;
             }
-            $value            = esc_attr( $name . '||' . $location );
-            $label            = $name . ( $location ? ' — ' . $location : '' );
+            $value            = esc_attr( $nombre . '||' . $direccion );
+            $label            = $nombre . ( $direccion ? ' — ' . $direccion : '' );
             $options[ $value ] = $label;
         }
 
@@ -120,11 +132,21 @@ class LTMS_Business_Aveonline_Offices {
      * @return string Nombre o el código como string si no se encuentra.
      */
     public static function carrier_name( $carrier ): string {
-        return self::CARRIERS[ (int) $carrier ] ?? (string) $carrier;
+        return self::CARRIERS[ (int) $carrier ]['label'] ?? (string) $carrier;
     }
 
     /**
-     * Retorna true si el código de transportadora es válido según la doc oficial.
+     * Retorna el slug de una transportadora dado su código numérico.
+     *
+     * @param int|string $carrier Código de transportadora.
+     * @return string Slug o el código como string si no se encuentra.
+     */
+    public static function carrier_slug( $carrier ): string {
+        return self::CARRIERS[ (int) $carrier ]['slug'] ?? (string) $carrier;
+    }
+
+    /**
+     * Retorna true si el código de transportadora es válido para el endpoint /offices/all.
      *
      * @param int|string $carrier Código de transportadora.
      * @return bool

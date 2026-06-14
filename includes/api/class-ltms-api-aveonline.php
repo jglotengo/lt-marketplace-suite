@@ -687,32 +687,53 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Consulta las oficinas y puntos de atención de una transportadora en una ciudad.
+     * Consulta las oficinas y puntos de atención de una transportadora.
      *
-     * Endpoint: GET https://api.aveonline.co/api-oficinas/public/api/v1/offices/{carrier}/{cityId}
+     * Endpoint: GET https://api.aveonline.co/api-oficinas/public/api/v1/offices/all
+     * Requiere JWT en cabecera Authorization: Bearer <token>.
      *
-     * @param int|string $carrier Código de la transportadora (1016=Interrápidísimo, 1010=TCC, 1009=Coordinadora, 29=Envía, 33=Servientrega).
-     * @param string     $city_id Código DANE de 9 dígitos de la ciudad (ej: 11001000 = Bogotá, 05001000 = Medellín).
+     * @param int|string  $carrier Código o slug de la transportadora
+     *                             (1016|'inter', 1010|'tcc', 1009|'coordinadora', 33|'servientrega').
+     * @param string|null $city_id Código DANE de 8 dígitos (ej: 11001000 = Bogotá). Opcional.
+     * @param string|null $nombre  Filtro parcial por nombre del punto de venta. Opcional.
+     * @param string|null $direccion Filtro parcial por dirección física. Opcional.
      * @return array {
-     *     @type string $status  'success' o 'error'.
-     *     @type array  $data    Lista de oficinas: cada item tiene location, name, id, city.
-     *     @type string $message Null en éxito, mensaje de error en fallo.
+     *     @type string $status     'success' o 'error'.
+     *     @type array  $operadores Lista de operadores; cada uno con 'nombre' y 'oficinas'
+     *                              (array de ['nombre','direccion','ciudad']).
+     *     @type string $message    Vacío en éxito, mensaje de error en fallo.
      * }
      */
-    public function get_carrier_offices( $carrier, string $city_id ): array {
-        $base_url = 'https://api.aveonline.co/api-oficinas/public/api/v1/offices';
-        $url      = sprintf( '%s/%s/%s', $base_url, rawurlencode( (string) $carrier ), rawurlencode( $city_id ) );
+    public function get_carrier_offices( $carrier, ?string $city_id = null, ?string $nombre = null, ?string $direccion = null ): array {
+        $base_url = 'https://api.aveonline.co/api-oficinas/public/api/v1/offices/all';
+
+        $params = [ 'operador' => (string) $carrier ];
+        if ( ! empty( $city_id ) ) {
+            $params['ciudad'] = $city_id;
+        }
+        if ( ! empty( $nombre ) ) {
+            $params['nombre'] = $nombre;
+        }
+        if ( ! empty( $direccion ) ) {
+            $params['direccion'] = $direccion;
+        }
+
+        $url   = $base_url . '?' . http_build_query( $params );
+        $token = $this->get_token();
 
         $response = wp_remote_get( $url, [
-            'timeout' => 10,
-            'headers' => [ 'Accept' => 'application/json' ],
+            'timeout' => 15,
+            'headers' => [
+                'Accept'        => 'application/json',
+                'Authorization' => 'Bearer ' . $token,
+            ],
         ] );
 
         if ( is_wp_error( $response ) ) {
             return [
-                'status'  => 'error',
-                'data'    => [],
-                'message' => $response->get_error_message(),
+                'status'     => 'error',
+                'operadores' => [],
+                'message'    => $response->get_error_message(),
             ];
         }
 
@@ -722,10 +743,15 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
 
         if ( ! is_array( $decoded ) ) {
             return [
-                'status'  => 'error',
-                'data'    => [],
-                'message' => "HTTP {$http_code}: respuesta no válida",
+                'status'     => 'error',
+                'operadores' => [],
+                'message'    => "HTTP {$http_code}: respuesta no válida",
             ];
+        }
+
+        // Normalizar al formato esperado si la respuesta no trae 'operadores'
+        if ( ! isset( $decoded['operadores'] ) ) {
+            $decoded['operadores'] = [];
         }
 
         return $decoded;
