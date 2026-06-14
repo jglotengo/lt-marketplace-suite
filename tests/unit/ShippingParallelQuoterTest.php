@@ -37,6 +37,7 @@ class ShippingParallelQuoterTest extends TestCase
             public function replace(string $t, array $d, mixed $f = null): int { return 1; }
             public function get_results(mixed $q = null, string $output = OBJECT): array { return []; }
             public function update(string $t, array $d, array $w, mixed $f = null, mixed $wf = null): int { return 1; }
+            public function esc_like( string $text ): string { return addcslashes( $text, '_%\\' ); }
         };
     }
 
