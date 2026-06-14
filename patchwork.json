@@ -1,4 +1,7 @@
 {
+    "blacklist": [
+        "includes/"
+    ],
     "redefinable-internals": [
         "error_log",
         "time",
