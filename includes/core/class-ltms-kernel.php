@@ -444,6 +444,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Municipality_Field' ) ) {
             LTMS_Frontend_Checkout_Municipality_Field::init();
         }
+        // v2.1.0: selección de oficina / punto de entrega Aveonline en checkout.
+        if ( class_exists( 'LTMS_Frontend_Checkout_Aveonline_Office' ) ) {
+            LTMS_Frontend_Checkout_Aveonline_Office::init();
+        }
         if ( class_exists( 'LTMS_Secure_Downloads' ) ) {
             LTMS_Secure_Downloads::init();
         }

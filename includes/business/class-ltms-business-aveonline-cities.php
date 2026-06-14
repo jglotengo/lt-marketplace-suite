@@ -248,6 +248,48 @@ final class LTMS_Business_Aveonline_Cities {
 	}
 
 	/**
+	 * Retorna el código DANE de 8 dígitos dado un nombre de ciudad (en cualquier formato).
+	 * Primero normaliza el nombre con find_by_name(), luego busca el codigodane.
+	 *
+	 * @param string $input Texto libre: "Bogotá", "BOGOTA(CUNDINAMARCA)", código DANE de 5 dígitos, etc.
+	 * @return string Código DANE de 8 dígitos (ej: "11001000") o '' si no se encuentra.
+	 */
+	public static function get_dane_code( string $input ): string {
+		if ( $input === '' ) {
+			return '';
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'lt_aveonline_cities';
+		$clean = strtoupper( trim( $input ) );
+
+		// Busca por nombre exacto en formato Aveonline primero
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$dane = $wpdb->get_var( $wpdb->prepare(
+			"SELECT codigodane FROM `{$table}` WHERE UPPER(nombre) = %s LIMIT 1",
+			$clean
+		) );
+		if ( $dane ) {
+			return (string) $dane;
+		}
+
+		// Normaliza el nombre y reintenta
+		$normalizado = self::find_by_name( $input );
+		if ( $normalizado && $normalizado !== $input ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$dane = $wpdb->get_var( $wpdb->prepare(
+				"SELECT codigodane FROM `{$table}` WHERE nombre = %s LIMIT 1",
+				$normalizado
+			) );
+			if ( $dane ) {
+				return (string) $dane;
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Verifica si un nombre ya está en el catálogo de Aveonline (en su formato exacto).
 	 *
 	 * @param string $nombre Nombre en formato Aveonline. Ej: "MEDELLIN(ANTIOQUIA)".
