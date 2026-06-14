@@ -100,24 +100,96 @@ class LTMS_Business_Aveonline_Hub_Log {
     }
 
     /**
-     * Obtiene los registros más recientes.
+     * Obtiene los registros más recientes, con filtros opcionales.
      *
-     * @param int $limit  Máximo de registros.
-     * @param int $offset Offset de paginación.
+     * @param int   $limit   Máximo de registros.
+     * @param int   $offset  Offset de paginación.
+     * @param array $filters Filtros opcionales:
+     *   - id_envio     (string) Coincidencia exacta con id_envio (= order_id).
+     *   - fecha_inicio (string) AAAA-MM-DD, filtra created_at >= fecha_inicio 00:00:00.
+     *   - fecha_fin    (string) AAAA-MM-DD, filtra created_at <= fecha_fin 23:59:59.
+     *   - status       (string) 'success' | 'error'.
      * @return array
      */
-    public static function get_recent( int $limit = 50, int $offset = 0 ): array {
+    public static function get_recent( int $limit = 50, int $offset = 0, array $filters = [] ): array {
         global $wpdb;
         $table = $wpdb->prefix . self::TABLE;
 
-        return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM `{$table}` ORDER BY created_at DESC LIMIT %d OFFSET %d",
-                $limit,
-                $offset
-            ),
-            ARRAY_A
-        ) ?: [];
+        $where  = [];
+        $params = [];
+
+        if ( ! empty( $filters['id_envio'] ) ) {
+            $where[]  = 'id_envio = %s';
+            $params[] = sanitize_text_field( (string) $filters['id_envio'] );
+        }
+
+        if ( ! empty( $filters['status'] ) && in_array( $filters['status'], [ 'success', 'error' ], true ) ) {
+            $where[]  = 'status = %s';
+            $params[] = $filters['status'];
+        }
+
+        if ( ! empty( $filters['fecha_inicio'] ) ) {
+            $where[]  = 'created_at >= %s';
+            $params[] = sanitize_text_field( (string) $filters['fecha_inicio'] ) . ' 00:00:00';
+        }
+
+        if ( ! empty( $filters['fecha_fin'] ) ) {
+            $where[]  = 'created_at <= %s';
+            $params[] = sanitize_text_field( (string) $filters['fecha_fin'] ) . ' 23:59:59';
+        }
+
+        $sql = "SELECT * FROM `{$table}`";
+        if ( $where ) {
+            $sql .= ' WHERE ' . implode( ' AND ', $where );
+        }
+        $sql .= ' ORDER BY created_at DESC LIMIT %d OFFSET %d';
+
+        $params[] = $limit;
+        $params[] = $offset;
+
+        return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ) ?: [];
+    }
+
+    /**
+     * Cuenta registros, con los mismos filtros que get_recent().
+     *
+     * @param array $filters Ver get_recent().
+     * @return int
+     */
+    public static function count_filtered( array $filters = [] ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE;
+
+        $where  = [];
+        $params = [];
+
+        if ( ! empty( $filters['id_envio'] ) ) {
+            $where[]  = 'id_envio = %s';
+            $params[] = sanitize_text_field( (string) $filters['id_envio'] );
+        }
+
+        if ( ! empty( $filters['status'] ) && in_array( $filters['status'], [ 'success', 'error' ], true ) ) {
+            $where[]  = 'status = %s';
+            $params[] = $filters['status'];
+        }
+
+        if ( ! empty( $filters['fecha_inicio'] ) ) {
+            $where[]  = 'created_at >= %s';
+            $params[] = sanitize_text_field( (string) $filters['fecha_inicio'] ) . ' 00:00:00';
+        }
+
+        if ( ! empty( $filters['fecha_fin'] ) ) {
+            $where[]  = 'created_at <= %s';
+            $params[] = sanitize_text_field( (string) $filters['fecha_fin'] ) . ' 23:59:59';
+        }
+
+        $sql = "SELECT COUNT(*) FROM `{$table}`";
+        if ( $where ) {
+            $sql .= ' WHERE ' . implode( ' AND ', $where );
+            return (int) $wpdb->get_var( $wpdb->prepare( $sql, $params ) );
+        }
+
+        return (int) $wpdb->get_var( $sql );
     }
 
     /**
@@ -150,3 +222,4 @@ class LTMS_Business_Aveonline_Hub_Log {
         return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
     }
 }
+
