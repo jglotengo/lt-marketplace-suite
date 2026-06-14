@@ -47,6 +47,7 @@ final class LTMS_Admin_Settings {
             return ( '' !== trim( $custom ) ) ? $custom : $name;
         } );
         add_action( 'wp_ajax_ltms_test_api_connection', [ $instance, 'ajax_test_api_connection' ] );
+        add_action( 'wp_ajax_ltms_aveonline_hub_test_connection', [ $instance, 'ajax_aveonline_hub_test_connection' ] );
         add_action( 'wp_ajax_ltms_get_chart_data', [ $instance, 'ajax_get_chart_data' ] );
         add_action( 'wp_ajax_ltms_fix_admin_caps', [ $instance, 'ajax_fix_admin_caps' ] );
     }
@@ -346,6 +347,48 @@ final class LTMS_Admin_Settings {
     }
 
     /**
+     * AJAX: Prueba la conexión con Ave-Hub (login + obtención de token JWT).
+     *
+     * No usa LTMS_Api_Factory porque LTMS_Api_Aveonline_Hub no implementa
+     * LTMS_Abstract_API_Client (es un cliente auxiliar, no un proveedor
+     * logístico registrado en el factory).
+     *
+     * @return void
+     */
+    public function ajax_aveonline_hub_test_connection(): void {
+        $nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) ); // phpcs:ignore
+        if ( ! wp_verify_nonce( $nonce, 'ltms_admin_nonce' ) &&
+             ! wp_verify_nonce( $nonce, 'ltms_settings_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce inválido.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Api_Aveonline_Hub' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Clase LTMS_Api_Aveonline_Hub no disponible.', 'ltms' ) ] );
+        }
+
+        try {
+            $client = new LTMS_Api_Aveonline_Hub();
+            $token  = $client->refresh_token();
+            $expires = (int) get_option( 'ltms_aveonline_hub_token_expires', 0 );
+
+            wp_send_json_success( [
+                'message'    => sprintf(
+                    /* translators: %s: fecha de expiración del token */
+                    __( 'Conexión exitosa. Token válido hasta %s.', 'ltms' ),
+                    $expires ? wp_date( 'd/m/Y H:i', $expires ) : '—'
+                ),
+                'token_preview' => substr( $token, 0, 12 ) . '…',
+            ] );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+        }
+    }
+
+    /**
      * AJAX: Devuelve datos de gráficos para el dashboard admin.
      *
      * @return void
@@ -485,3 +528,4 @@ final class LTMS_Admin_Settings {
         ] );
     }
 }
+
