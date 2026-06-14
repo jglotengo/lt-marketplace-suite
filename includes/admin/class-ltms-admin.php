@@ -225,6 +225,15 @@ final class LTMS_Admin {
                 'slug'       => 'ltms-tourism',
                 'callback'   => [ $this, 'render_tourism' ],
             ],
+            // v2.9.2 — Ave-Hub
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Ave-Hub — Logs', 'ltms' ),
+                'menu_title' => __( 'Ave-Hub Logs', 'ltms' ),
+                'capability' => 'ltms_manage_platform_settings',
+                'slug'       => 'ltms-aveonline-hub',
+                'callback'   => [ $this, 'render_aveonline_hub' ],
+            ],
         ];
 
         foreach ( $submenus as $submenu ) {
@@ -467,6 +476,11 @@ final class LTMS_Admin {
 
     public function render_tourism(): void {
         $this->render_view( 'html-admin-tourism-compliance' );
+    }
+
+    // v2.9.2 — Ave-Hub
+    public function render_aveonline_hub(): void {
+        $this->render_view( 'html-admin-aveonline-hub' );
     }
 
     /**
