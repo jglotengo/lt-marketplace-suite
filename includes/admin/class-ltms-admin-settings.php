@@ -48,6 +48,7 @@ final class LTMS_Admin_Settings {
         } );
         add_action( 'wp_ajax_ltms_test_api_connection', [ $instance, 'ajax_test_api_connection' ] );
         add_action( 'wp_ajax_ltms_aveonline_hub_test_connection', [ $instance, 'ajax_aveonline_hub_test_connection' ] );
+        add_action( 'wp_ajax_ltms_aveonline_hub_get_logs', [ $instance, 'ajax_aveonline_hub_get_logs' ] );
         add_action( 'wp_ajax_ltms_get_chart_data', [ $instance, 'ajax_get_chart_data' ] );
         add_action( 'wp_ajax_ltms_fix_admin_caps', [ $instance, 'ajax_fix_admin_caps' ] );
     }
@@ -389,7 +390,60 @@ final class LTMS_Admin_Settings {
     }
 
     /**
-     * AJAX: Devuelve datos de gráficos para el dashboard admin.
+     * AJAX: Consulta los logs remotos de Ave-Hub (LTMS_Api_Aveonline_Hub::get_logs()).
+     *
+     * Acepta filtros opcionales: id_envio, fecha_inicio, fecha_fin (AAAA-MM-DD), hoy.
+     *
+     * @return void
+     */
+    public function ajax_aveonline_hub_get_logs(): void {
+        $nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) ); // phpcs:ignore
+        if ( ! wp_verify_nonce( $nonce, 'ltms_admin_nonce' ) &&
+             ! wp_verify_nonce( $nonce, 'ltms_settings_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce inválido.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Api_Aveonline_Hub' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Clase LTMS_Api_Aveonline_Hub no disponible.', 'ltms' ) ] );
+        }
+
+        $filters = [];
+
+        $id_envio = sanitize_text_field( wp_unslash( $_REQUEST['id_envio'] ?? '' ) ); // phpcs:ignore
+        if ( '' !== $id_envio ) {
+            $filters['id_envio'] = $id_envio;
+        }
+
+        $fecha_inicio = sanitize_text_field( wp_unslash( $_REQUEST['fecha_inicio'] ?? '' ) ); // phpcs:ignore
+        if ( '' !== $fecha_inicio ) {
+            $filters['fecha_inicio'] = $fecha_inicio;
+        }
+
+        $fecha_fin = sanitize_text_field( wp_unslash( $_REQUEST['fecha_fin'] ?? '' ) ); // phpcs:ignore
+        if ( '' !== $fecha_fin ) {
+            $filters['fecha_fin'] = $fecha_fin;
+        }
+
+        if ( ! empty( $_REQUEST['hoy'] ) ) { // phpcs:ignore
+            $filters['hoy'] = true;
+        }
+
+        try {
+            $client = new LTMS_Api_Aveonline_Hub();
+            $result = $client->get_logs( $filters );
+
+            wp_send_json_success( [
+                'meta' => $result['meta'] ?? [],
+                'rows' => $result['data'] ?? [],
+            ] );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+        }
+    }
      *
      * @return void
      */
@@ -528,4 +582,5 @@ final class LTMS_Admin_Settings {
         ] );
     }
 }
+
 
