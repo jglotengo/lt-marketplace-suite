@@ -131,13 +131,19 @@ class LTMS_Shipping_Parallel_Quoter {
 				? LTMS_Business_Aveonline_Agents::get_vendor_idagente( $vendor_id )
 				: (string) LTMS_Core_Config::get( 'ltms_aveonline_idagente', '' );
 			$origin     = LTMS_Core_Config::get( 'ltms_store_city', 'Bogotá' );
-			if ( $token && $idempresa && ! empty( $dest['city'] ) ) {
+			// Normalizar ciudad destino al formato oficial Aveonline
+			$dest_city = $dest['city'] ?? '';
+			if ( $dest_city && class_exists( 'LTMS_Business_Aveonline_Cities' ) ) {
+				$dest_city = LTMS_Business_Aveonline_Cities::find_by_name( $dest_city );
+			}
+
+			if ( $token && $idempresa && ! empty( $dest_city ) ) {
 				$body = wp_json_encode( [
 					'tipo'           => 'cotizar2',
 					'token'          => $token,
 					'idempresa'      => $idempresa,
 					'origen'         => $origin,
-					'destino'        => $dest['city'],
+					'destino'        => $dest_city,
 					'valorrecaudo'   => 0,
 					'unidades'       => 1,
 					'productos'      => [[

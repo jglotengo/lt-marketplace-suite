@@ -266,6 +266,11 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Aveonline_Agents::init();
         }
 
+        // v2.2.0 — Catálogo de ciudades Aveonline (sincronización desde JSON oficial)
+        if ( class_exists( 'LTMS_Business_Aveonline_Cities' ) ) {
+            LTMS_Business_Aveonline_Cities::init();
+        }
+
         // L-1..L-8: Cumplimiento legal — Habeas Data, consentimientos, vault log
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::init();

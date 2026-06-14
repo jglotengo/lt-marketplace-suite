@@ -176,8 +176,12 @@ final class LTMS_Business_Aveonline_Agents {
 		$direccion = get_user_meta( $vendor_id, 'billing_address_1', true )
 			      ?: get_user_meta( $vendor_id, 'ltms_address', true )
 			      ?: 'Dirección pendiente';
-		$ciudad   = get_user_meta( $vendor_id, 'billing_city', true )
-			     ?: LTMS_Core_Config::get( 'ltms_store_city', 'BOGOTA(CUNDINAMARCA)' );
+		// Resolver ciudad al formato oficial Aveonline (ej: "BOGOTA(CUNDINAMARCA)")
+		$ciudad_raw = get_user_meta( $vendor_id, 'billing_city', true )
+			       ?: LTMS_Core_Config::get( 'ltms_store_city', 'BOGOTA(CUNDINAMARCA)' );
+		$ciudad = class_exists( 'LTMS_Business_Aveonline_Cities' )
+			? LTMS_Business_Aveonline_Cities::find_by_name( $ciudad_raw )
+			: $ciudad_raw;
 		$nit      = get_user_meta( $vendor_id, 'ltms_nit', true )
 			     ?: get_user_meta( $vendor_id, 'ltms_document_number', true )
 			     ?: (string) $vendor_id; // fallback: usar el user_id como NIT

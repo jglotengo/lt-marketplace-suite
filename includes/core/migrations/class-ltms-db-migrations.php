@@ -642,6 +642,23 @@ final class LTMS_DB_Migrations {
             KEY `idx_name` (`municipality_name`)
         ) {$charset}";
 
+        // lt_aveonline_cities — Catálogo de ciudades de Aveonline sincronizado desde
+        // https://app.aveonline.co/assets/resources/public/listadociudades.json
+        // nombre = formato "BOGOTA(CUNDINAMARCA)" usado en la API. codigodane = 8 dígitos Aveonline.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_aveonline_cities` (
+            `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `nombre`       VARCHAR(160) NOT NULL,
+            `codigodane`   VARCHAR(12)  NOT NULL DEFAULT \'\',
+            `departamento` VARCHAR(80)  NOT NULL DEFAULT \'\',
+            `nombremun`    VARCHAR(120) NOT NULL DEFAULT \'\',
+            `synced_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uk_nombre` (`nombre`),
+            KEY `idx_codigodane` (`codigodane`),
+            KEY `idx_departamento` (`departamento`)
+        ) {$charset}";
+
+
         // lt_co_reteica_rates_municipal — ReteICA por (municipio DANE + CIIU completo).
         // Reemplaza a lt_co_reteica_rates. rate_per_thousand expresada en por mil (4.1400 = 0.414%).
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_co_reteica_rates_municipal` (

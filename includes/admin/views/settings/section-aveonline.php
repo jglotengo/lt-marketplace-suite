@@ -116,6 +116,55 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     }
     ?>
 
+    <hr style="margin:24px 0;">
+    <h3><?php esc_html_e( 'Catálogo de ciudades Aveonline', 'ltms' ); ?></h3>
+    <p class="description"><?php esc_html_e( 'El plugin sincroniza automáticamente el listado oficial de ciudades de Aveonline cada 24 horas. Puedes forzar una sincronización manual aquí.', 'ltms' ); ?></p>
+    <?php
+    if ( class_exists( 'LTMS_Business_Aveonline_Cities' ) ) {
+        $city_count = LTMS_Business_Aveonline_Cities::count();
+        $last_sync  = LTMS_Business_Aveonline_Cities::last_sync_at();
+        if ( $city_count > 0 ) {
+            echo '<p style="color:#0a7c00;">✅ <strong>' . esc_html( number_format( $city_count ) ) . '</strong> ' . esc_html__( 'ciudades en el catálogo local.', 'ltms' );
+            if ( $last_sync ) {
+                echo ' ' . esc_html__( 'Última sincronización:', 'ltms' ) . ' <strong>' . esc_html( wp_date( 'd/m/Y H:i', $last_sync ) ) . '</strong>';
+            }
+            echo '</p>';
+        } else {
+            echo '<p style="color:#d63638;">⚠️ ' . esc_html__( 'Catálogo vacío — haz clic en "Sincronizar ahora" para cargar las ciudades.', 'ltms' ) . '</p>';
+        }
+    }
+    ?>
+    <p>
+        <button type="button" id="ltms-sync-cities-btn" class="button button-secondary">
+            🔄 <?php esc_html_e( 'Sincronizar ciudades ahora', 'ltms' ); ?>
+        </button>
+        <span id="ltms-sync-cities-status" style="margin-left:12px;display:none;"></span>
+    </p>
+    <script>
+    (function($){
+        $('#ltms-sync-cities-btn').on('click', function(){
+            var $btn    = $(this);
+            var $status = $('#ltms-sync-cities-status');
+            $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Sincronizando...', 'ltms' ) ); ?>');
+            $status.hide();
+            $.post(ajaxurl, {
+                action: 'ltms_aveonline_sync_cities',
+                nonce:  '<?php echo esc_js( wp_create_nonce( 'ltms_aveonline_sync_cities' ) ); ?>'
+            }, function(resp){
+                $btn.prop('disabled', false).text('🔄 <?php echo esc_js( __( 'Sincronizar ciudades ahora', 'ltms' ) ); ?>');
+                if (resp.success) {
+                    $status.css('color','#0a7c00').text('✅ ' + resp.data.message).show();
+                } else {
+                    $status.css('color','#d63638').text('❌ ' + (resp.data.message || 'Error')).show();
+                }
+            }).fail(function(){
+                $btn.prop('disabled', false).text('🔄 <?php echo esc_js( __( 'Sincronizar ciudades ahora', 'ltms' ) ); ?>');
+                $status.css('color','#d63638').text('❌ <?php echo esc_js( __( 'Error de red. Intenta de nuevo.', 'ltms' ) ); ?>').show();
+            });
+        });
+    })(jQuery);
+    </script>
+
     <h3 style="margin-top:16px;"><?php esc_html_e( 'Referencia de códigos de transportadora', 'ltms' ); ?></h3>
     <table class="widefat striped" style="max-width:500px;">
         <thead><tr><th><?php esc_html_e( 'Código', 'ltms' ); ?></th><th><?php esc_html_e( 'Transportadora', 'ltms' ); ?></th></tr></thead>
