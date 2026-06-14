@@ -72,7 +72,11 @@ final class LTMS_Business_Aveonline_Cities {
 		add_action( 'ltms_plugin_updated',   [ $instance, 'maybe_sync' ] );
 
 		// AJAX admin: sincronización manual desde el panel
-		add_action( 'wp_ajax_ltms_aveonline_sync_cities', [ $instance, 'ajax_sync' ] );
+		add_action( 'wp_ajax_ltms_aveonline_sync_cities',    [ $instance, 'ajax_sync'          ] );
+
+		// AJAX público + admin: búsqueda dinámica de ciudades (autocompletar checkout/vendedor)
+		add_action( 'wp_ajax_ltms_aveonline_search_cities',        [ __CLASS__, 'ajax_search_cities' ] );
+		add_action( 'wp_ajax_nopriv_ltms_aveonline_search_cities', [ __CLASS__, 'ajax_search_cities' ] );
 	}
 
 	// ── Sincronización ────────────────────────────────────────────
@@ -426,5 +430,86 @@ final class LTMS_Business_Aveonline_Cities {
 		}
 
 		return $data;
+	}
+
+	// ── Búsqueda dinámica (API en tiempo real) ────────────────────
+
+	/**
+	 * AJAX: busca ciudades en tiempo real via API de Aveonline.
+	 *
+	 * Disponible para usuarios logueados y visitantes (para el checkout).
+	 * Protegido con nonce 'ltms_search_cities'.
+	 *
+	 * POST params:
+	 *   query     (string) Texto a buscar. Mínimo 2 caracteres.
+	 *   registros (int)    Máximo de resultados. Default 10.
+	 *
+	 * Respuesta success: { ciudades: [ {nombre, id, codigoDANE}, ... ] }
+	 *
+	 * action: ltms_aveonline_search_cities
+	 */
+	public static function ajax_search_cities(): void {
+		check_ajax_referer( 'ltms_search_cities', 'nonce' );
+
+		$query     = sanitize_text_field( wp_unslash( $_POST['query']     ?? '' ) );
+		$registros = absint( $_POST['registros'] ?? 10 );
+
+		if ( mb_strlen( $query ) < 2 ) {
+			wp_send_json_error( [ 'message' => __( 'Ingresa al menos 2 caracteres para buscar.', 'ltms' ) ] );
+		}
+
+		if ( is_numeric( $query ) ) {
+			wp_send_json_error( [ 'message' => __( 'El término de búsqueda no puede ser solo números.', 'ltms' ) ] );
+		}
+
+		// 1. Intentar primero desde la tabla local (más rápido, sin llamada externa)
+		$local = self::search_local( $query, $registros );
+		if ( ! empty( $local ) ) {
+			wp_send_json_success( [ 'ciudades' => $local, 'source' => 'local' ] );
+		}
+
+		// 2. Fallback a la API de Aveonline si la tabla local no tiene resultados
+		try {
+			/** @var LTMS_Api_Aveonline $api */
+			$api     = LTMS_Api_Factory::get( 'aveonline' );
+			$results = $api->search_cities( $query, $registros ?: 10 );
+			wp_send_json_success( [ 'ciudades' => $results, 'source' => 'api' ] );
+		} catch ( \Throwable $e ) {
+			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+		}
+	}
+
+	/**
+	 * Busca ciudades en la tabla local lt_aveonline_cities.
+	 *
+	 * @param  string $query     Texto a buscar (LIKE %query%).
+	 * @param  int    $limit     Máximo de resultados.
+	 * @return array  Array de [ nombre, id, codigoDANE ].
+	 */
+	private static function search_local( string $query, int $limit = 10 ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'lt_aveonline_cities';
+
+		// Verificar que la tabla existe antes de consultar
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			return [];
+		}
+
+		$like  = '%' . $wpdb->esc_like( $query ) . '%';
+		$limit = max( 1, min( $limit, 50 ) ); // cap a 50
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT nombre, codigodane AS codigoDANE FROM {$table} WHERE nombre LIKE %s ORDER BY nombre ASC LIMIT %d",
+				$like,
+				$limit
+			),
+			ARRAY_A
+		);
+
+		return $rows ?: [];
 	}
 }

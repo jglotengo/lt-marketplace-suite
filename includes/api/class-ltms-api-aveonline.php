@@ -881,6 +881,48 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
      *     @type string $message    Vacío en éxito, mensaje de error en fallo.
      * }
      */
+
+    /**
+     * Busca ciudades disponibles en Aveonline por nombre (búsqueda dinámica).
+     *
+     * Complementa el JSON estático de LTMS_Business_Aveonline_Cities.
+     * Útil para autocompletar en tiempo real o verificar id/codigoDANE oficial.
+     *
+     * Endpoint: POST https://app.aveonline.co/api/box/v1.0/ciudad.php
+     *
+     * @param  string $query     Nombre parcial o completo de la ciudad.
+     * @param  int    $registros Máximo de resultados (0 = sin límite, default 10).
+     * @return array  Array de ciudades: [ ['nombre'=>..., 'id'=>..., 'codigoDANE'=>...], ... ]
+     * @throws \RuntimeException Si hay error de red.
+     */
+    public function search_cities( string $query, int $registros = 10 ): array {
+        $response = wp_remote_post(
+            'https://app.aveonline.co/api/box/v1.0/ciudad.php',
+            [
+                'headers' => [ 'Content-Type' => 'application/json' ],
+                'body'    => wp_json_encode( [
+                    'tipo'      => 'listar',
+                    'data'      => $query,
+                    'registros' => $registros ?: '',
+                ] ),
+                'timeout' => 15,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( 'Error de red al buscar ciudades: ' . $response->get_error_message() );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        // 'registros no encontrados' es un resultado vacío válido, no un error fatal
+        if ( ( $body['status'] ?? '' ) === 'error' && ( $body['message'] ?? '' ) !== 'registros no encontrados' ) {
+            throw new \RuntimeException( 'Aveonline ciudad error: ' . ( $body['message'] ?? wp_json_encode( $body ) ) );
+        }
+
+        return $body['ciudades'] ?? [];
+    }
+
     public function get_carrier_offices( $carrier, ?string $city_id = null, ?string $nombre = null, ?string $direccion = null ): array {
         $base_url = 'https://api.aveonline.co/api-oficinas/public/api/v1/offices/all';
 
