@@ -21,6 +21,18 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </tr>
 
         <tr>
+            <th><?php esc_html_e( 'Habilitar Órdenes de Compra', 'ltms' ); ?></th>
+            <td>
+                <input type="checkbox" name="ltms_ordenes_compra_enabled" value="yes"
+                    <?php checked( get_option( 'ltms_ordenes_compra_enabled', 'no' ), 'yes' ); ?>>
+                <label><?php esc_html_e( 'Mostrar el módulo "Órdenes de Compra" en el dashboard de vendors', 'ltms' ); ?></label>
+                <p class="description">
+                    <?php esc_html_e( 'Permite a los vendors generar órdenes de compra hacia proveedores registrados en Aveonline (dropshipping externo). Desactivado por defecto; el código y las tablas permanecen intactos al ocultarlo.', 'ltms' ); ?>
+                </p>
+            </td>
+        </tr>
+
+        <tr>
             <th><?php esc_html_e( 'Token Onboarding (JWT) 🔐', 'ltms' ); ?></th>
             <td>
                 <input type="password" name="ltms_aveonline_onboarding_token"
@@ -924,5 +936,6 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
 
 })(jQuery);
 </script>
+
 
 
