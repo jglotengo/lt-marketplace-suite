@@ -44,9 +44,11 @@ class LTMS_Api_Aveonline_Onboarding {
 
     // ── Singleton ─────────────────────────────────────────────────────────────
 
-    private static ?self $instance = null;
+    /** @var self|null */
+    private static $instance = null;
 
-    private string $jwt = '';
+    /** @var string */
+    private $jwt = '';
 
     private function __construct() {
         $this->jwt = (string) get_option( self::OPTION_JWT, '' );
