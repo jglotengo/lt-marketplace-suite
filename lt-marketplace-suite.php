@@ -490,6 +490,13 @@ function ltms_run(): void {
     //    Se ejecuta en init@1 (antes de admin_menu) en cada request hasta que
     //    las caps estén todas guardadas en la BD.
     add_action( 'init', 'ltms_direct_ensure_caps', 1 );
+    // v2.8 — Aveonline: relaciones de envío y órdenes de compra (AJAX vendor)
+    if ( class_exists( 'LTMS_Business_Aveonline_ShipmentRelations' ) ) {
+        LTMS_Business_Aveonline_ShipmentRelations::init();
+    }
+    if ( class_exists( 'LTMS_Business_Aveonline_OrdenCompra' ) ) {
+        LTMS_Business_Aveonline_OrdenCompra::init();
+    }
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
     if ( class_exists( 'LTMS_Retention_Cron' ) ) {
         LTMS_Retention_Cron::init();
