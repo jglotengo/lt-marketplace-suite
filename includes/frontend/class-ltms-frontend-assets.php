@@ -299,7 +299,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'chart-js',
-            'https://cdn.jsdelivr.net/npm/chart.js@4.4/dist/chart.umd.min.js',
+            $url . 'js/chart.umd.min.js',
             [],
             '4.4.0',
             true
