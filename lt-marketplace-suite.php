@@ -492,12 +492,18 @@ function ltms_run(): void {
     //    las caps estén todas guardadas en la BD.
     add_action( 'init', 'ltms_direct_ensure_caps', 1 );
     // v2.8 — Aveonline: relaciones de envío y órdenes de compra (AJAX vendor)
-    if ( class_exists( 'LTMS_Business_Aveonline_ShipmentRelations' ) ) {
+    // require_once explícito porque el autoloader no resuelve nombres CamelCase compuestos
+    $ltms_sr_file = LTMS_INCLUDES_DIR . 'business/class-ltms-business-aveonline-shipment-relations.php';
+    $ltms_oc_file = LTMS_INCLUDES_DIR . 'business/class-ltms-business-aveonline-orden-compra.php';
+    if ( file_exists( $ltms_sr_file ) ) {
+        require_once $ltms_sr_file;
         LTMS_Business_Aveonline_ShipmentRelations::init();
     }
-    if ( class_exists( 'LTMS_Business_Aveonline_OrdenCompra' ) ) {
+    if ( file_exists( $ltms_oc_file ) ) {
+        require_once $ltms_oc_file;
         LTMS_Business_Aveonline_OrdenCompra::init();
     }
+    unset( $ltms_sr_file, $ltms_oc_file );
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
     if ( class_exists( 'LTMS_Retention_Cron' ) ) {
         LTMS_Retention_Cron::init();
