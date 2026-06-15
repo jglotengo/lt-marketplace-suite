@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Obtener transportadoras disponibles
 $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
-    ? LTMS_Business_Aveonline_Carriers::get_all()
+    ? LTMS_Business_Aveonline_Carriers::all()
     : [];
 ?>
 
@@ -70,7 +70,7 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
                         <option value=""><?php esc_html_e( '— Selecciona transportadora —', 'ltms' ); ?></option>
                         <?php foreach ( $carriers as $c ) : ?>
                             <option value="<?php echo esc_attr( $c['id'] ); ?>">
-                                <?php echo esc_html( $c['text'] ?? $c['id'] ); ?>
+                                <?php echo esc_html( $c['label'] ?? $c['id'] ); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
