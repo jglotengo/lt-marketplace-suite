@@ -27,10 +27,18 @@ $nav_items = [
     [ 'view' => 'orders',   'icon' => '📦', 'label' => __( 'Pedidos', 'ltms' ) ],
     [ 'view' => 'products', 'icon' => '🛍️', 'label' => __( 'Productos', 'ltms' ) ],
     [ 'view' => 'envios',        'icon' => '🚚', 'label' => __( 'Envíos', 'ltms' ) ],
-    [ 'view' => 'ordenes-compra','icon' => '🛒', 'label' => __( 'Órdenes de Compra', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
     [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
 ];
+
+// Órdenes de Compra Aveonline: oculto por defecto, controlado desde Configuración > Aveonline.
+if ( get_option( 'ltms_ordenes_compra_enabled', 'no' ) === 'yes' ) {
+    array_splice( $nav_items, 4, 0, [[
+        'view'  => 'ordenes-compra',
+        'icon'  => '🛒',
+        'label' => __( 'Órdenes de Compra', 'ltms' ),
+    ]] );
+}
 
 // Agregar Analytics solo para premium
 if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
