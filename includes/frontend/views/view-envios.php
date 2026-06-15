@@ -20,7 +20,7 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
     : [];
 ?>
 
-<div class="ltms-view-section">
+<div class="ltms-view-pad">
 
     <!-- Header -->
     <div class="ltms-view-header" style="margin-bottom:24px;">
@@ -153,7 +153,7 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
         </div>
     </div>
 
-</div><!-- /ltms-view-section -->
+</div><!-- /ltms-view-pad -->
 
 <script>
 (function($) {
