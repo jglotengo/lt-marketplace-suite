@@ -388,6 +388,9 @@ function ltms_load_autoloader(): void {
                 // Keys = resultado de strtolower(str_replace('_','-', className))
                 'ltms-business-aveonline-shipmentrelations' => 'business/class-ltms-business-aveonline-shipment-relations.php',
                 'ltms-business-aveonline-ordencompra'       => 'business/class-ltms-business-aveonline-orden-compra.php',
+                // v2.9 — Aveonline Onboarding (registro de vendedores)
+                'ltms-api-aveonline-onboarding'          => 'api/class-ltms-api-aveonline-onboarding.php',
+                'ltms-aveonline-onboarding-ajax'         => 'business/class-ltms-aveonline-onboarding-ajax.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
@@ -504,6 +507,15 @@ function ltms_run(): void {
         LTMS_Business_Aveonline_OrdenCompra::init();
     }
     unset( $ltms_sr_file, $ltms_oc_file );
+    // v2.9 — Aveonline Onboarding
+    $ltms_ob_api  = LTMS_INCLUDES_DIR . 'api/class-ltms-api-aveonline-onboarding.php';
+    $ltms_ob_ajax = LTMS_INCLUDES_DIR . 'business/class-ltms-aveonline-onboarding-ajax.php';
+    if ( file_exists( $ltms_ob_api ) && file_exists( $ltms_ob_ajax ) ) {
+        require_once $ltms_ob_api;
+        require_once $ltms_ob_ajax;
+        LTMS_Aveonline_Onboarding_Ajax::init();
+    }
+    unset( $ltms_ob_api, $ltms_ob_ajax );
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
     if ( class_exists( 'LTMS_Retention_Cron' ) ) {
         LTMS_Retention_Cron::init();
