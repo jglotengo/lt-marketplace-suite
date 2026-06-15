@@ -515,7 +515,12 @@ function ltms_run(): void {
         require_once $ltms_ob_api;
     }
     if ( file_exists( $ltms_ob_ajax ) ) {
-        require_once $ltms_ob_ajax;
+        // Forzar carga aunque require_once ya lo haya incluido previamente
+        // (el autoloader SPL puede haberlo requerido antes sin registrar la clase)
+        if ( ! class_exists( 'LTMS_Aveonline_Onboarding_Ajax', false ) ) {
+            // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
+            include_once $ltms_ob_ajax;
+        }
         if ( class_exists( 'LTMS_Aveonline_Onboarding_Ajax' ) ) {
             LTMS_Aveonline_Onboarding_Ajax::init();
         }
