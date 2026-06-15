@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
-<div class="ltms-view-section">
+<div class="ltms-view-pad">
 
     <!-- Header -->
     <div class="ltms-view-header" style="margin-bottom:24px;">
@@ -184,7 +184,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
     </div><!-- /tab-historial -->
 
-</div><!-- /ltms-view-section -->
+</div><!-- /ltms-view-pad -->
 
 <script>
 (function($) {
