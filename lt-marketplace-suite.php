@@ -385,8 +385,9 @@ function ltms_load_autoloader(): void {
                 // v2.9.2 — Ave-Hub: listener genérico de reporte de estados (envíos propios)
                 'ltms-aveonline-hub-listener'      => 'business/listeners/class-ltms-aveonline-hub-listener.php',
                 // v2.8 — Aveonline: relaciones de envío y órdenes de compra
-                'ltms-aveonline-shipment-relations' => 'business/class-ltms-business-aveonline-shipment-relations.php',
-                'ltms-aveonline-orden-compra'       => 'business/class-ltms-business-aveonline-orden-compra.php',
+                // Keys = resultado de strtolower(str_replace('_','-', className))
+                'ltms-business-aveonline-shipmentrelations' => 'business/class-ltms-business-aveonline-shipment-relations.php',
+                'ltms-business-aveonline-ordencompra'       => 'business/class-ltms-business-aveonline-orden-compra.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
