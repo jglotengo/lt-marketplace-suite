@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </td>
         </tr>
 
-                <tr>
+        <tr>
             <th><?php esc_html_e( 'Usuario Aveonline', 'ltms' ); ?></th>
             <td>
                 <input type="text" name="ltms_aveonline_usuario"
@@ -103,16 +103,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                     value="" class="regular-text" autocomplete="new-password"
                     placeholder="<?php esc_attr_e( 'Dejar vacío para no cambiar', 'ltms' ); ?>">
                 <p class="description"><?php esc_html_e( 'Contraseña secundaria para generación de guías. Se guarda cifrada.', 'ltms' ); ?></p>
-            </td>
-        </tr>
-
-        <tr>
-            <th><?php esc_html_e( 'Ciudad de origen (bodega)', 'ltms' ); ?></th>
-            <td>
-                <input type="text" name="ltms_store_city"
-                    value="<?php echo esc_attr( get_option( 'ltms_store_city', 'Bogotá' ) ); ?>"
-                    class="regular-text" placeholder="ej: MEDELLIN(ANTIOQUIA)">
-                <p class="description"><?php esc_html_e( 'Ciudad desde donde se despachan los paquetes. Usar el nombre exacto del listado de ciudades de Aveonline. Ej: BOGOTA(CUNDINAMARCA)', 'ltms' ); ?></p>
             </td>
         </tr>
 
