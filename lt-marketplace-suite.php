@@ -508,12 +508,17 @@ function ltms_run(): void {
     }
     unset( $ltms_sr_file, $ltms_oc_file );
     // v2.9 — Aveonline Onboarding
+    // require_once individuales para evitar que un fatal en la API aborte la carga del AJAX
     $ltms_ob_api  = LTMS_INCLUDES_DIR . 'api/class-ltms-api-aveonline-onboarding.php';
     $ltms_ob_ajax = LTMS_INCLUDES_DIR . 'business/class-ltms-aveonline-onboarding-ajax.php';
-    if ( file_exists( $ltms_ob_api ) && file_exists( $ltms_ob_ajax ) ) {
+    if ( file_exists( $ltms_ob_api ) ) {
         require_once $ltms_ob_api;
+    }
+    if ( file_exists( $ltms_ob_ajax ) ) {
         require_once $ltms_ob_ajax;
-        LTMS_Aveonline_Onboarding_Ajax::init();
+        if ( class_exists( 'LTMS_Aveonline_Onboarding_Ajax' ) ) {
+            LTMS_Aveonline_Onboarding_Ajax::init();
+        }
     }
     unset( $ltms_ob_api, $ltms_ob_ajax );
     // SAGRILAFT Retention Cron — barrido diario de datos KYC
