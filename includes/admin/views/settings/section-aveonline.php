@@ -21,6 +21,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </tr>
 
         <tr>
+            <th><?php esc_html_e( 'Token Onboarding (JWT) 🔐', 'ltms' ); ?></th>
+            <td>
+                <input type="password" name="ltms_aveonline_onboarding_token"
+                    value="" class="regular-text" autocomplete="new-password"
+                    placeholder="<?php esc_attr_e( 'Dejar vacío para no cambiar', 'ltms' ); ?>">
+                <p class="description">
+                    <?php esc_html_e( 'Token JWT estático que Aveonline asigna a tu plataforma para la API de Onboarding de clientes (/api-onboarding/public/api/v1/external/…). Se guarda cifrado con AES-256.', 'ltms' ); ?>
+                    <a href="https://integraciones.aveonline.co/docs/registro-clientes-api" target="_blank"><?php esc_html_e( 'Ver documentación →', 'ltms' ); ?></a>
+                </p>
+            </td>
+        </tr>
+
+                <tr>
             <th><?php esc_html_e( 'Usuario Aveonline', 'ltms' ); ?></th>
             <td>
                 <input type="text" name="ltms_aveonline_usuario"
