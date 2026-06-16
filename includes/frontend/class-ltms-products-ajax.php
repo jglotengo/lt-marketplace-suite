@@ -151,19 +151,28 @@ class LTMS_Products_Ajax {
         }
         $cats = $product->get_category_ids();
         wp_send_json_success( [
-            'id'           => $product_id,
-            'name'         => $product->get_name(),
-            'description'  => $product->get_description(),
-            'price'        => $product->get_regular_price(),
-            'stock'        => $product->get_stock_quantity(),
-            'status'       => $product->get_status(),
-            'category_id'  => ! empty( $cats ) ? $cats[0] : 0,
-            'image_id'     => $product->get_image_id(),
-            'image_url'    => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
-            'gallery_ids'  => $product->get_gallery_image_ids(),
-            'gallery_urls' => array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
+            'id'                  => $product_id,
+            'name'                => $product->get_name(),
+            'description'         => $product->get_description(),
+            'price'               => $product->get_regular_price(),
+            'sale_price'          => $product->get_sale_price(),
+            'stock'               => $product->get_stock_quantity(),
+            'status'              => $product->get_status(),
+            'catalog_visibility'  => $product->get_catalog_visibility(),
+            'weight'              => $product->get_weight(),
+            'length'              => $product->get_length(),
+            'width'               => $product->get_width(),
+            'height'              => $product->get_height(),
+            'category_id'         => ! empty( $cats ) ? $cats[0] : 0,
+            'image_id'            => $product->get_image_id(),
+            'image_url'           => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
+            'gallery_ids'         => $product->get_gallery_image_ids(),
+            'gallery_urls'        => array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
             // CS-07: tipo para pre-llenar selector en edición (mapeo legacy)
-            'product_type'    => ( function( $t ) { return ( $t === 'product' || $t === '' ) ? 'physical' : $t; } )( get_post_meta( $product_id, '_ltms_product_type', true ) ),
+            'product_type'        => ( function( $t ) { return ( $t === 'product' || $t === '' ) ? 'physical' : $t; } )( get_post_meta( $product_id, '_ltms_product_type', true ) ),
+            // CS-08: ReDi
+            'redi_enabled'        => get_post_meta( $product_id, '_ltms_redi_enabled', true ) ?: 'no',
+            'redi_rate'           => (float) get_post_meta( $product_id, '_ltms_redi_rate', true ) * 100,
         ] );
     }
 
@@ -174,24 +183,45 @@ class LTMS_Products_Ajax {
         if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
             wp_send_json_error( 'Producto no encontrado', 404 );
         }
-        $name        = sanitize_text_field( $_POST['name'] ?? '' );
-        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $price       = floatval( $_POST['price'] ?? 0 );
-        $stock       = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
-        $category_id = intval( $_POST['category_id'] ?? 0 );
-        $image_id    = intval( $_POST['image_id'] ?? 0 );
-        $status      = sanitize_text_field( $_POST['status'] ?? $product->get_status() );
+        $name               = sanitize_text_field( $_POST['name'] ?? '' );
+        $description        = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $price              = floatval( $_POST['price'] ?? 0 );
+        $sale_price_raw     = isset( $_POST['sale_price'] ) && $_POST['sale_price'] !== '' ? floatval( $_POST['sale_price'] ) : null;
+        $stock              = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
+        $category_id        = intval( $_POST['category_id'] ?? 0 );
+        $image_id           = intval( $_POST['image_id'] ?? 0 );
+        $status             = sanitize_text_field( $_POST['status'] ?? $product->get_status() );
+        $catalog_visibility = sanitize_key( $_POST['catalog_visibility'] ?? '' );
+        $weight             = isset( $_POST['weight'] ) && $_POST['weight'] !== '' ? sanitize_text_field( wp_unslash( $_POST['weight'] ) ) : null;
+        $dim_length         = isset( $_POST['dim_length'] ) && $_POST['dim_length'] !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_length'] ) ) : null;
+        $dim_width          = isset( $_POST['dim_width'] )  && $_POST['dim_width']  !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_width'] ) )  : null;
+        $dim_height         = isset( $_POST['dim_height'] ) && $_POST['dim_height'] !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_height'] ) ) : null;
+
         if ( empty( $name ) || $price <= 0 ) {
             wp_send_json_error( 'Nombre y precio son requeridos', 400 );
         }
+
         $product->set_name( $name );
         $product->set_description( $description );
         $product->set_regular_price( $price );
+        // CS-09: precio de oferta — vacío = sin oferta activa
+        if ( $sale_price_raw !== null && $sale_price_raw > 0 && $sale_price_raw < $price ) {
+            $product->set_sale_price( (string) $sale_price_raw );
+        } else {
+            $product->set_sale_price( '' ); // limpiar oferta si se dejó vacío
+        }
         $product->set_status( $status );
+        if ( in_array( $catalog_visibility, [ 'visible', 'catalog', 'search', 'hidden' ], true ) ) {
+            $product->set_catalog_visibility( $catalog_visibility );
+        }
         if ( $stock !== null ) {
             $product->set_manage_stock( true );
             $product->set_stock_quantity( $stock );
         }
+        if ( $weight !== null )     $product->set_weight( $weight );
+        if ( $dim_length !== null ) $product->set_length( $dim_length );
+        if ( $dim_width  !== null ) $product->set_width( $dim_width );
+        if ( $dim_height !== null ) $product->set_height( $dim_height );
         if ( $category_id ) $product->set_category_ids( [ $category_id ] );
         if ( $image_id )    $product->set_image_id( $image_id );
         $gallery_ids = isset( $_POST['gallery_ids'] ) ? array_filter( array_map( 'intval', explode( ',', $_POST['gallery_ids'] ) ) ) : null;
@@ -433,13 +463,19 @@ class LTMS_Products_Ajax {
         if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
             wp_send_json_error( 'Sin permiso', 403 );
         }
-        $name        = sanitize_text_field( $_POST['name'] ?? '' );
-        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $price       = floatval( $_POST['price'] ?? 0 );
-        $stock       = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
-        $category_id = intval( $_POST['category_id'] ?? 0 );
-        $image_id    = intval( $_POST['image_id'] ?? 0 );
-        $status      = sanitize_text_field( $_POST['status'] ?? 'pending' );
+        $name               = sanitize_text_field( $_POST['name'] ?? '' );
+        $description        = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $price              = floatval( $_POST['price'] ?? 0 );
+        $sale_price_raw     = isset( $_POST['sale_price'] ) && $_POST['sale_price'] !== '' ? floatval( $_POST['sale_price'] ) : null;
+        $stock              = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
+        $category_id        = intval( $_POST['category_id'] ?? 0 );
+        $image_id           = intval( $_POST['image_id'] ?? 0 );
+        $status             = sanitize_text_field( $_POST['status'] ?? 'pending' );
+        $catalog_visibility = sanitize_key( $_POST['catalog_visibility'] ?? 'visible' );
+        $weight             = isset( $_POST['weight'] ) && $_POST['weight'] !== '' ? sanitize_text_field( wp_unslash( $_POST['weight'] ) ) : null;
+        $dim_length         = isset( $_POST['dim_length'] ) && $_POST['dim_length'] !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_length'] ) ) : null;
+        $dim_width          = isset( $_POST['dim_width'] )  && $_POST['dim_width']  !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_width'] ) )  : null;
+        $dim_height         = isset( $_POST['dim_height'] ) && $_POST['dim_height'] !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_height'] ) ) : null;
 
         if ( empty( $name ) || $price <= 0 ) {
             wp_send_json_error( 'Nombre y precio son requeridos', 400 );
@@ -449,11 +485,22 @@ class LTMS_Products_Ajax {
         $product->set_name( $name );
         $product->set_description( $description );
         $product->set_regular_price( $price );
+        // CS-09: precio de oferta
+        if ( $sale_price_raw !== null && $sale_price_raw > 0 && $sale_price_raw < $price ) {
+            $product->set_sale_price( (string) $sale_price_raw );
+        }
         $product->set_status( $status );
+        if ( in_array( $catalog_visibility, [ 'visible', 'catalog', 'search', 'hidden' ], true ) ) {
+            $product->set_catalog_visibility( $catalog_visibility );
+        }
         if ( $stock !== null ) {
             $product->set_manage_stock( true );
             $product->set_stock_quantity( $stock );
         }
+        if ( $weight !== null )     $product->set_weight( $weight );
+        if ( $dim_length !== null ) $product->set_length( $dim_length );
+        if ( $dim_width  !== null ) $product->set_width( $dim_width );
+        if ( $dim_height !== null ) $product->set_height( $dim_height );
         if ( $category_id ) {
             $product->set_category_ids( [ $category_id ] );
         }
