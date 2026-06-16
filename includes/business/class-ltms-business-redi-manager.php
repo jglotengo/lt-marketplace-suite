@@ -345,8 +345,25 @@ class LTMS_Business_Redi_Manager {
 
         if ( isset( $_POST['_ltms_redi_rate'] ) ) { // phpcs:ignore
             $rate = (float) sanitize_text_field( wp_unslash( $_POST['_ltms_redi_rate'] ) ); // phpcs:ignore
-            $rate = max( 0.0, min( 1.0, $rate ) );
+            // CS-08: clampar dentro del rango definido por el marketplace (valores en %)
+            $min_pct = (float) get_option( 'ltms_redi_min_rate', 5 );
+            $max_pct = (float) get_option( 'ltms_redi_max_rate', 40 );
+            // La tasa se almacena como decimal (0.15), pero la opción admin está en % (15)
+            $rate = max( $min_pct / 100, min( $max_pct / 100, $rate ) );
             update_post_meta( $post_id, '_ltms_redi_rate', $rate );
         }
+    }
+
+    /**
+     * Validates and clamps a ReDi rate (decimal 0–1) against the marketplace-defined range.
+     * Used by the vendor frontend AJAX to enforce the same rules.
+     *
+     * @param float $rate Proposed rate as decimal (e.g. 0.15).
+     * @return float Clamped rate.
+     */
+    public static function clamp_redi_rate( float $rate ): float {
+        $min_pct = (float) get_option( 'ltms_redi_min_rate', 5 );
+        $max_pct = (float) get_option( 'ltms_redi_max_rate', 40 );
+        return max( $min_pct / 100, min( $max_pct / 100, $rate ) );
     }
 }
