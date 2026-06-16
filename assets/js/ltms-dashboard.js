@@ -840,6 +840,28 @@
                             '<input type="number" id="ltms-np-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Cantidad en stock" min="0">' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio de oferta (COP) <small style="font-weight:400;color:#666;">Opcional — debe ser menor al precio regular</small></label>' +
+                            '<input type="number" id="ltms-np-sale-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Dejar vacío si no hay oferta" min="0">' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Visibilidad en catálogo</label>' +
+                            '<select id="ltms-np-visibility" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
+                            '<option value="visible">Visible en catálogo y búsqueda</option>' +
+                            '<option value="catalog">Solo en catálogo</option>' +
+                            '<option value="search">Solo en búsqueda</option>' +
+                            '<option value="hidden">Oculto (no visible)</option>' +
+                            '</select>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:8px;">Peso y dimensiones <small style="font-weight:400;color:#666;">(para envíos — dejar vacío si no aplica)</small></label>' +
+                            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Peso (kg)</label><input type="number" id="ltms-np-weight" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0.000" min="0" step="0.001"></div>' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Largo (cm)</label><input type="number" id="ltms-np-length" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Ancho (cm)</label><input type="number" id="ltms-np-width" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Alto (cm)</label><input type="number" id="ltms-np-height" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
                             '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
                             '<input type="file" id="ltms-np-img-input" accept="image/*" style="display:none;">' +
@@ -933,6 +955,12 @@
                             category_id: jQuery('#ltms-np-cat').val(),
                             product_type: jQuery('#ltms-np-type').val(),
                             stock: jQuery('#ltms-np-stock').val(),
+                            sale_price: jQuery('#ltms-np-sale-price').val(),
+                            catalog_visibility: jQuery('#ltms-np-visibility').val(),
+                            weight: jQuery('#ltms-np-weight').val(),
+                            dim_length: jQuery('#ltms-np-length').val(),
+                            dim_width: jQuery('#ltms-np-width').val(),
+                            dim_height: jQuery('#ltms-np-height').val(),
                             image_id: jQuery('#ltms-np-img-id').val(),
                             gallery_ids: jQuery('#ltms-np-gallery-ids').val()
                         }, success: function(r) {
@@ -1006,6 +1034,28 @@
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (vacío = ilimitado)</label>' +
                         '<input type="number" id="ltms-ep-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.stock !== null ? p.stock : '') + '" min="0">' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio de oferta (COP) <small style="font-weight:400;color:#666;">Opcional — debe ser menor al precio regular</small></label>' +
+                        '<input type="number" id="ltms-ep-sale-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.sale_price || '') + '" placeholder="Dejar vacío si no hay oferta" min="0">' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Visibilidad en catálogo</label>' +
+                        '<select id="ltms-ep-visibility" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
+                        '<option value="visible"' + (p.catalog_visibility === 'visible' ? ' selected' : '') + '>Visible en catálogo y búsqueda</option>' +
+                        '<option value="catalog"' + (p.catalog_visibility === 'catalog' ? ' selected' : '') + '>Solo en catálogo</option>' +
+                        '<option value="search"' + (p.catalog_visibility === 'search' ? ' selected' : '') + '>Solo en búsqueda</option>' +
+                        '<option value="hidden"' + (p.catalog_visibility === 'hidden' ? ' selected' : '') + '>Oculto (no visible)</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                        '<label style="display:block;font-weight:600;margin-bottom:8px;">Peso y dimensiones <small style="font-weight:400;color:#666;">(para envíos — dejar vacío si no aplica)</small></label>' +
+                        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Peso (kg)</label><input type="number" id="ltms-ep-weight" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.weight || '') + '" placeholder="0.000" min="0" step="0.001"></div>' +
+                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Largo (cm)</label><input type="number" id="ltms-ep-length" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.length || '') + '" placeholder="0" min="0"></div>' +
+                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Ancho (cm)</label><input type="number" id="ltms-ep-width" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.width || '') + '" placeholder="0" min="0"></div>' +
+                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Alto (cm)</label><input type="number" id="ltms-ep-height" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.height || '') + '" placeholder="0" min="0"></div>' +
+                        '</div>' +
                     '</div>' +
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
@@ -1107,6 +1157,12 @@
                         category_id: jQuery('#ltms-ep-cat').val(),
                         product_type: jQuery('#ltms-ep-type').val(),
                         stock: jQuery('#ltms-ep-stock').val(),
+                        sale_price: jQuery('#ltms-ep-sale-price').val(),
+                        catalog_visibility: jQuery('#ltms-ep-visibility').val(),
+                        weight: jQuery('#ltms-ep-weight').val(),
+                        dim_length: jQuery('#ltms-ep-length').val(),
+                        dim_width: jQuery('#ltms-ep-width').val(),
+                        dim_height: jQuery('#ltms-ep-height').val(),
                         image_id: jQuery('#ltms-ep-img-id').val(),
                         gallery_ids: jQuery('#ltms-ep-gallery-ids').val()
                     }, success: function(r) {
