@@ -989,6 +989,10 @@
                             }
                         }});
                     }
+                    jQuery('#ltms-np-redi-enabled').on('change', function() {
+                        jQuery('#ltms-np-redi-rate-wrap').toggle(this.checked);
+                        if (!this.checked) jQuery('#ltms-np-redi-rate').val('');
+                    });
                     jQuery('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
                     jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
                 }
@@ -1166,6 +1170,11 @@
                 });
                 // Cancelar
                 jQuery('#ltms-ep-cancel').on('click', function() { LTMS.Dashboard.loadView('products'); });
+                // ReDi toggle
+                jQuery('#ltms-ep-redi-enabled').on('change', function() {
+                    jQuery('#ltms-ep-redi-rate-wrap').toggle(this.checked);
+                    if (!this.checked) jQuery('#ltms-ep-redi-rate').val('');
+                });
                 // Guardar
                 jQuery('#ltms-ep-submit').on('click', function() {
                     var name = jQuery('#ltms-ep-name').val().trim();
