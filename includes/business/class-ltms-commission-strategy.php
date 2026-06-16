@@ -28,6 +28,17 @@ final class LTMS_Commission_Strategy {
     /** Tasa base de comisión por defecto. */
     const DEFAULT_RATE = 0.10; // 10%
 
+    /** Tipos de producto válidos para comisión diferenciada. */
+    const PRODUCT_TYPES = [ 'physical', 'digital', 'service', 'booking' ];
+
+    /** Defaults por tipo (físico 10%, resto 15%). */
+    const PRODUCT_TYPE_DEFAULTS = [
+        'physical' => 0.10,
+        'digital'  => 0.15,
+        'service'  => 0.15,
+        'booking'  => 0.15,
+    ];
+
     /**
      * Punto de entrada del Kernel. Sin hooks que registrar para esta clase.
      *
@@ -43,6 +54,18 @@ final class LTMS_Commission_Strategy {
      * @return float Tasa decimal (0.10 = 10%).
      */
     public static function get_rate( int $vendor_id, \WC_Order $order ): float {
+        // CS-01: nivel 0 — tasa individual por producto (_ltms_commission_rate)
+        $individual_rate = self::get_product_individual_rate( $order );
+        if ( $individual_rate !== null ) {
+            return $individual_rate;
+        }
+
+        // CS-02: nivel 1 — tasa por tipo de producto (physical/digital/service/booking)
+        $type_rate = self::get_product_type_rate( $order );
+        if ( $type_rate !== null ) {
+            return $type_rate;
+        }
+
         // 1. Verificar tasa especial por contrato individual
         $custom_rate = get_user_meta( $vendor_id, 'ltms_custom_commission_rate', true );
         if ( $custom_rate !== '' && is_numeric( $custom_rate ) ) {
@@ -74,6 +97,81 @@ final class LTMS_Commission_Strategy {
         $global_rate = (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', self::DEFAULT_RATE );
 
         return max( 0.0, min( 1.0, $global_rate ) );
+    }
+
+    /**
+     * CS-01: Tasa de comisión individual por producto.
+     *
+     * Si el producto tiene _ltms_commission_rate en post_meta (valor 0–100),
+     * lo convierte a decimal y lo devuelve. Aplica solo si hay un único
+     * producto en el pedido; si hay varios, no aplica (ambigüedad).
+     *
+     * @param \WC_Order $order Pedido.
+     * @return float|null Tasa decimal o null si no aplica.
+     */
+    private static function get_product_individual_rate( \WC_Order $order ): ?float {
+        $items = array_values( $order->get_items() );
+        if ( count( $items ) !== 1 ) {
+            return null; // Solo aplica en pedidos de un solo producto
+        }
+        $product_id  = $items[0]->get_product_id();
+        $stored_rate = get_post_meta( $product_id, '_ltms_commission_rate', true );
+        if ( $stored_rate === '' || ! is_numeric( $stored_rate ) ) {
+            return null;
+        }
+        $rate = (float) $stored_rate;
+        // Acepta tanto porcentaje (>1) como decimal (<=1)
+        if ( $rate > 1 ) {
+            $rate = $rate / 100;
+        }
+        return ( $rate >= 0 && $rate <= 1 ) ? $rate : null;
+    }
+
+    /**
+     * CS-02: Tasa de comisión por tipo de producto (physical/digital/service/booking).
+     *
+     * Lee _ltms_product_type del primer producto del pedido y busca la opción
+     * ltms_commission_{type} en la configuración. Si no está configurada, usa
+     * los defaults de PRODUCT_TYPE_DEFAULTS.
+     *
+     * Mapeo legacy: 'product' → 'physical' para compatibilidad con registros
+     * creados antes de la v2.x donde el valor era 'product'.
+     *
+     * @param \WC_Order $order Pedido.
+     * @return float|null Tasa decimal o null si el tipo no está reconocido.
+     */
+    private static function get_product_type_rate( \WC_Order $order ): ?float {
+        $items = array_values( $order->get_items() );
+        if ( empty( $items ) ) {
+            return null;
+        }
+        $product_id   = $items[0]->get_product_id();
+        $product_type = get_post_meta( $product_id, '_ltms_product_type', true );
+
+        // Mapeo legacy: 'product' era el valor anterior a 'physical'
+        if ( $product_type === 'product' || $product_type === '' ) {
+            $product_type = 'physical';
+        }
+
+        // Verificar tipo reconocido
+        if ( ! in_array( $product_type, self::PRODUCT_TYPES, true ) ) {
+            return null;
+        }
+
+        $option_key     = 'ltms_commission_' . $product_type;
+        $default        = self::PRODUCT_TYPE_DEFAULTS[ $product_type ];
+        $configured_pct = LTMS_Core_Config::get( $option_key, '' );
+
+        if ( $configured_pct !== '' && is_numeric( $configured_pct ) ) {
+            $rate = (float) $configured_pct;
+            // Admin guarda porcentaje (10 = 10%), convertir a decimal
+            if ( $rate > 1 ) {
+                $rate = $rate / 100;
+            }
+            return max( 0.0, min( 1.0, $rate ) );
+        }
+
+        return $default;
     }
 
     /**
