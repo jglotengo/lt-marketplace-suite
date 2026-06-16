@@ -210,6 +210,19 @@ class LTMS_Products_Ajax {
             if ( $upd_type === 'product' ) { $upd_type = 'physical'; }
             if ( in_array( $upd_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
                 update_post_meta( $product_id, '_ltms_product_type', $upd_type );
+
+        // CS-08: ReDi toggle + tasa con validación de rango
+        if ( 'yes' === get_option( 'ltms_redi_enabled' ) ) {
+            $redi_enabled = ( isset( $_POST['redi_enabled'] ) && 'yes' === sanitize_key( $_POST['redi_enabled'] ) ) // phpcs:ignore
+                ? 'yes' : 'no';
+            update_post_meta( $product_id, '_ltms_redi_enabled', $redi_enabled );
+            if ( isset( $_POST['redi_rate'] ) ) { // phpcs:ignore
+                $redi_rate_pct = (float) sanitize_text_field( wp_unslash( $_POST['redi_rate'] ) ); // phpcs:ignore
+                // redi_rate llega en % desde el frontend (ej: 15), convertir a decimal y clampar
+                $redi_rate = LTMS_Business_Redi_Manager::clamp_redi_rate( $redi_rate_pct / 100 );
+                update_post_meta( $product_id, '_ltms_redi_rate', $redi_rate );
+            }
+        }
             }
         }
 
@@ -464,6 +477,18 @@ class LTMS_Products_Ajax {
             $product_type = 'physical';
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
+
+        // CS-08: ReDi toggle + tasa con validación de rango
+        if ( 'yes' === get_option( 'ltms_redi_enabled' ) ) {
+            $redi_enabled = ( isset( $_POST['redi_enabled'] ) && 'yes' === sanitize_key( $_POST['redi_enabled'] ) ) // phpcs:ignore
+                ? 'yes' : 'no';
+            update_post_meta( $product_id, '_ltms_redi_enabled', $redi_enabled );
+            if ( 'yes' === $redi_enabled && isset( $_POST['redi_rate'] ) ) { // phpcs:ignore
+                $redi_rate_pct = (float) sanitize_text_field( wp_unslash( $_POST['redi_rate'] ) ); // phpcs:ignore
+                $redi_rate = LTMS_Business_Redi_Manager::clamp_redi_rate( $redi_rate_pct / 100 );
+                update_post_meta( $product_id, '_ltms_redi_rate', $redi_rate );
+            }
+        }
 
         // CS-07: commission_rate solo configurable por admin (LTMS_Commission_Strategy),
         // nunca desde el panel del vendedor. Se elimina la escritura desde el frontend.
