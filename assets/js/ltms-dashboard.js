@@ -829,8 +829,10 @@
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
                             '<select id="ltms-np-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                                '<option value="product">📦 Producto físico</option>' +
-                                '<option value="service">🛠️ Servicio</option>' +
+                                '<option value="physical">📦 Físico</option>' +
+                                '<option value="digital">💾 Digital</option>' +
+                                '<option value="service">🔧 Servicio</option>' +
+                                '<option value="booking">🏨 Turismo</option>' +
                             '</select>' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
