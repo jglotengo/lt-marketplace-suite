@@ -874,7 +874,19 @@
                             '<input type="file" id="ltms-np-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
                             '<input type="hidden" id="ltms-np-gallery-ids" value="">' +
                         '</div>' +
-                        '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">' +
+                        '<div style="background:#f0f7ff;border:1px solid #c2d9f5;border-radius:8px;padding:16px;margin-top:16px;">' +
+                            '<label style="font-weight:600;font-size:14px;color:#1a4a8a;display:block;margin-bottom:10px;">🔁 Distribución ReDi</label>' +
+                            '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">' +
+                                '<input type="checkbox" id="ltms-np-redi-enabled" style="width:16px;height:16px;">' +
+                                '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
+                            '</label>' +
+                            '<div id="ltms-np-redi-rate-wrap" style="display:none;">' +
+                                '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi (%)</label>' +
+                                '<input type="number" id="ltms-np-redi-rate" min="1" max="80" step="0.5" placeholder="Ej: 15" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                                '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">
                             '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:100px;">Publicar Producto</button>' +
                             '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;min-width:100px;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
                             '<button id="ltms-np-cancel" class="ltms-btn" style="flex:1;min-width:80px;background:#f5f5f5;color:#333;">Cancelar</button>' +
@@ -962,7 +974,9 @@
                             dim_width: jQuery('#ltms-np-width').val(),
                             dim_height: jQuery('#ltms-np-height').val(),
                             image_id: jQuery('#ltms-np-img-id').val(),
-                            gallery_ids: jQuery('#ltms-np-gallery-ids').val()
+                            gallery_ids: jQuery('#ltms-np-gallery-ids').val(),
+                            redi_enabled: jQuery('#ltms-np-redi-enabled').is(':checked') ? 1 : 0,
+                            redi_rate: jQuery('#ltms-np-redi-rate').val()
                         }, success: function(r) {
                             if (r.success) {
                                 jQuery('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
@@ -1070,7 +1084,19 @@
                         '<input type="file" id="ltms-ep-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
                         '<input type="hidden" id="ltms-ep-gallery-ids" value="' + (p.gallery_ids ? p.gallery_ids.join(",") : "") + '">' +
                     '</div>' +
-                    '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">' +
+                    '<div style="background:#f0f7ff;border:1px solid #c2d9f5;border-radius:8px;padding:16px;margin-top:16px;">' +
+                        '<label style="font-weight:600;font-size:14px;color:#1a4a8a;display:block;margin-bottom:10px;">🔁 Distribución ReDi</label>' +
+                        '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">' +
+                            '<input type="checkbox" id="ltms-ep-redi-enabled" ' + (p.redi_enabled ? 'checked' : '') + ' style="width:16px;height:16px;">' +
+                            '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
+                        '</label>' +
+                        '<div id="ltms-ep-redi-rate-wrap" style="display:' + (p.redi_enabled ? 'block' : 'none') + ';">' +
+                            '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi (%)</label>' +
+                            '<input type="number" id="ltms-ep-redi-rate" min="1" max="80" step="0.5" value="' + (p.redi_rate || '') + '" placeholder="Ej: 15" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                            '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">
                         '<button id="ltms-ep-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:120px;">Guardar Cambios</button>' +
                         '<button id="ltms-ep-cancel" class="ltms-btn" style="flex:1;min-width:80px;background:#f5f5f5;color:#333;">Cancelar</button>' +
                     '</div>' +
@@ -1164,7 +1190,9 @@
                         dim_width: jQuery('#ltms-ep-width').val(),
                         dim_height: jQuery('#ltms-ep-height').val(),
                         image_id: jQuery('#ltms-ep-img-id').val(),
-                        gallery_ids: jQuery('#ltms-ep-gallery-ids').val()
+                        gallery_ids: jQuery('#ltms-ep-gallery-ids').val(),
+                        redi_enabled: jQuery('#ltms-ep-redi-enabled').is(':checked') ? 1 : 0,
+                        redi_rate: jQuery('#ltms-ep-redi-rate').val()
                     }, success: function(r) {
                         if (r.success) {
                             jQuery('#ltms-ep-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
