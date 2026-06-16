@@ -21,6 +21,9 @@ $fields = [
     // C-03 NOTE: La tasa ReDi se configura por producto en _ltms_redi_rate, no globalmente.
     // Este campo es el default sugerido al crear un acuerdo ReDi, leído por LTMS_Business_Redi_Manager.
     'ltms_redi_default_rate'        => [ 'label' => 'Tasa ReDi por Defecto (%)',     'type' => 'number', 'default' => '15', 'desc' => 'Tasa sugerida al crear un acuerdo ReDi. Se guarda por producto en _ltms_redi_rate.' ],
+    // CS-08: rango permitido para la tasa ReDi que propone el vendedor
+    'ltms_redi_min_rate'            => [ 'label' => 'Tasa ReDi Mínima (%)',            'type' => 'number', 'default' => '5',  'desc' => 'Comisión mínima que el vendedor debe ofrecer al revendedor. Ej: 5 = 5%.' ],
+    'ltms_redi_max_rate'            => [ 'label' => 'Tasa ReDi Máxima (%)',            'type' => 'number', 'default' => '40', 'desc' => 'Comisión máxima que el vendedor puede ofrecer al revendedor. Ej: 40 = 40%.' ],
 ];
 ?>
 <div class="ltms-settings-section">
