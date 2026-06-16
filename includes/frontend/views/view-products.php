@@ -59,9 +59,17 @@ $products  = wc_get_products([
                         <?php echo esc_html( $product->get_status() === 'publish' ? __( 'Publicado', 'ltms' ) : __( 'Borrador', 'ltms' ) ); ?>
                     </span>
                     <?php
-                    $ltms_tipo = get_post_meta( $product->get_id(), '_ltms_product_type', true ) ?: 'product';
-                    $ltms_tipo_label = $ltms_tipo === 'service' ? __( 'Servicio', 'ltms' ) : __( 'Producto', 'ltms' );
-                    $ltms_tipo_icon  = $ltms_tipo === 'service' ? '🔧' : '📦';
+                    $ltms_tipo = get_post_meta( $product->get_id(), '_ltms_product_type', true ) ?: 'physical';
+                    // CS-04: mapeo legacy 'product' → 'physical'
+                    if ( $ltms_tipo === 'product' ) { $ltms_tipo = 'physical'; }
+                    $ltms_tipo_map = [
+                        'physical' => [ 'label' => __( 'Físico',   'ltms' ), 'icon' => '📦' ],
+                        'digital'  => [ 'label' => __( 'Digital',  'ltms' ), 'icon' => '💾' ],
+                        'service'  => [ 'label' => __( 'Servicio', 'ltms' ), 'icon' => '🔧' ],
+                        'booking'  => [ 'label' => __( 'Turismo',  'ltms' ), 'icon' => '🏨' ],
+                    ];
+                    $ltms_tipo_label = $ltms_tipo_map[ $ltms_tipo ]['label'] ?? __( 'Físico', 'ltms' );
+                    $ltms_tipo_icon  = $ltms_tipo_map[ $ltms_tipo ]['icon']  ?? '📦';
                     ?>
                     <span class="ltms-badge ltms-badge-info" style="font-size:0.7rem;margin-left:4px;background:#e0f2fe;color:#0369a1;">
                         <?php echo $ltms_tipo_icon . ' ' . esc_html( $ltms_tipo_label ); ?>
@@ -317,9 +325,12 @@ $products  = wc_get_products([
         $('#ltms-np-image-id').val('');
         $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-np-img-status').text('');
-        $('input[name="ltms_np_tipo"][value="product"]').prop('checked', true);
-        $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
-        $('#ltms-np-tipo-service-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+        $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true);
+        // CS-04: reset visual de los 4 tipos
+        ['physical','digital','service','booking'].forEach(function(t){
+            $('#ltms-np-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+        });
+        $('#ltms-np-tipo-physical-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
     });
 
     // ── Highlight visual para selector de tipo ───────────────────
