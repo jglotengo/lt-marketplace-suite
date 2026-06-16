@@ -807,8 +807,10 @@
                             catOptions += '<option value="' + c.id + '">' + c.name + '</option>';
                         });
                     }
-                    var rediMin = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                    var rediMax = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                    var rediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                    var rediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                    var rediMin = rediMinRaw < 1 ? Math.round(rediMinRaw * 100) : rediMinRaw;
+                    var rediMax = rediMaxRaw < 1 ? Math.round(rediMaxRaw * 100) : rediMaxRaw;
                     const html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
                         '<h3 style="margin-bottom:20px;">Nuevo Producto</h3>' +
                         '<div id="ltms-np-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
@@ -1022,8 +1024,10 @@
                 var imgHtml = p.image_url
                     ? '<img src="' + p.image_url + '" style="width:100%;height:100%;object-fit:cover;">'
                     : '<span style="color:#999;font-size:13px;">+ Imagen</span>';
-                var rediMin = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                var rediMax = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                var rediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                var rediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                var rediMin = rediMinRaw < 1 ? Math.round(rediMinRaw * 100) : rediMinRaw;
+                var rediMax = rediMaxRaw < 1 ? Math.round(rediMaxRaw * 100) : rediMaxRaw;
                 var html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
                     '<h3 style="margin-bottom:20px;">Editar Producto</h3>' +
                     '<div id="ltms-ep-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
