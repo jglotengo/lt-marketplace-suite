@@ -162,6 +162,19 @@ $products  = wc_get_products([
             </div>
         </div>
 
+        <!-- CS-06: Comisión individual (opcional) -->
+        <div style="margin-bottom:14px;" id="ltms-np-comision-wrap">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                <?php esc_html_e( 'Comisión individual (%)', 'ltms' ); ?>
+                <span style="font-size:0.75rem;color:#6b7280;font-weight:400;">
+                    &nbsp;<?php esc_html_e( '(opcional — vacío = tasa por tipo)', 'ltms' ); ?>
+                </span>
+            </label>
+            <input type="number" id="ltms-np-commission-rate" min="0" max="100" step="0.01"
+                   style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;"
+                   placeholder="<?php esc_attr_e( 'Ej: 8 = 8%', 'ltms' ); ?>">
+        </div>
+
         <!-- Categoría -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Categoría', 'ltms' ); ?></label>
@@ -273,7 +286,8 @@ $products  = wc_get_products([
                 category_id:  $('#ltms-np-category').val(),
                 image_id:     $('#ltms-np-image-id').val(),
                 status:       $('#ltms-np-status').val(),
-                product_type: $('input[name="ltms_np_tipo"]:checked').val() || 'product',
+                product_type:    $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
+                commission_rate: $('#ltms-np-commission-rate').val(),
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -289,7 +303,7 @@ $products  = wc_get_products([
                     $('#ltms-np-image-id').val('');
                     $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
                     $('#ltms-np-img-status').text('');
-                    $('input[name="ltms_np_tipo"][value="product"]').prop('checked', true);
+                    $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true);
                     setTimeout(function(){ location.reload(); }, 1500);
                 } else {
                     $notice.removeClass('ltms-notice-success')
@@ -321,7 +335,7 @@ $products  = wc_get_products([
     // ── Limpiar modal al cerrar ───────────────────────────────────
     $(document).on('click', '.ltms-modal-backdrop, .ltms-modal-close', function(){
         $('#ltms-np-notice').hide().text('');
-        $('#ltms-np-name, #ltms-np-desc, #ltms-np-stock, #ltms-np-price').val('');
+        $('#ltms-np-name, #ltms-np-desc, #ltms-np-stock, #ltms-np-price, #ltms-np-commission-rate').val('');
         $('#ltms-np-image-id').val('');
         $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-np-img-status').text('');
@@ -333,19 +347,16 @@ $products  = wc_get_products([
         $('#ltms-np-tipo-physical-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
     });
 
-    // ── Highlight visual para selector de tipo ───────────────────
+    // CS-04/CS-06: highlight para los 4 tipos
     $(document).on('change', 'input[name="ltms_np_tipo"]', function(){
-        const val = $(this).val();
-        if (val === 'product') {
-            $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
-            $('#ltms-np-tipo-service-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
-        } else {
-            $('#ltms-np-tipo-service-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
-            $('#ltms-np-tipo-product-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
-        }
+        ['physical','digital','service','booking'].forEach(function(t){
+            $('#ltms-np-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+        });
+        $('#ltms-np-tipo-'+$(this).val()+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
     });
     // Estado inicial del highlight
-    $('#ltms-np-tipo-product-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+    var _initTipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
+    $('#ltms-np-tipo-'+_initTipo+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
 
 })(jQuery);
 </script>
