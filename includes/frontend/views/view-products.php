@@ -203,6 +203,36 @@ $products  = wc_get_products([
             </select>
         </div>
 
+        <!-- CS-08: ReDi toggle + tasa -->
+        <?php
+        $ltms_redi_min = (float) get_option('ltms_redi_min_rate', 5);
+        $ltms_redi_max = (float) get_option('ltms_redi_max_rate', 40);
+        $ltms_redi_default = round( (float) get_option('ltms_redi_default_rate', 15) / 100, 4 );
+        if ( 'yes' === get_option('ltms_redi_enabled') ) : ?>
+        <div style="margin-bottom:16px;padding:14px;background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <input type="checkbox" id="ltms-np-redi-enabled" style="width:18px;height:18px;accent-color:#1a5276;cursor:pointer;">
+                <label for="ltms-np-redi-enabled" style="font-weight:600;font-size:0.9rem;cursor:pointer;">
+                    🔁 <?php esc_html_e( 'Habilitar distribución ReDi', 'ltms' ); ?>
+                </label>
+            </div>
+            <div id="ltms-np-redi-rate-wrap" style="display:none;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php printf( esc_html__( 'Comisión para revendedor (%% — mín %s%%, máx %s%%)', 'ltms' ), $ltms_redi_min, $ltms_redi_max ); ?>
+                </label>
+                <input type="number" id="ltms-np-redi-rate"
+                    min="<?php echo esc_attr( $ltms_redi_min ); ?>"
+                    max="<?php echo esc_attr( $ltms_redi_max ); ?>"
+                    step="0.5"
+                    value="<?php echo esc_attr( get_option('ltms_redi_default_rate', 15) ); ?>"
+                    style="width:100%;padding:9px 12px;border:1.5px solid #93c5fd;border-radius:6px;box-sizing:border-box;">
+                <p style="font-size:0.8rem;color:#4b5563;margin-top:4px;">
+                    <?php esc_html_e( 'Porcentaje del precio de venta que recibirá el revendedor al distribuir tu producto.', 'ltms' ); ?>
+                </p>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div style="display:flex;gap:12px;justify-content:flex-end;">
             <button type="button" class="ltms-modal-close" style="padding:10px 20px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;">
                 <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
@@ -221,6 +251,13 @@ $products  = wc_get_products([
     // ── Imagen: click en preview o botón ─────────────────────────
     $('#ltms-np-img-preview, #ltms-np-img-btn').on('click', function(){
         $('#ltms-np-img-input').trigger('click');
+        // CS-08: toggle ReDi rate field
+        $('#ltms-np-redi-enabled').on('change', function(){
+            $('#ltms-np-redi-rate-wrap').toggle($(this).is(':checked'));
+        });
+        $('#ltms-ep-redi-enabled').on('change', function(){
+            $('#ltms-ep-redi-rate-wrap').toggle($(this).is(':checked'));
+        });
     });
 
     $('#ltms-np-img-input').on('change', function(){
@@ -290,6 +327,8 @@ $products  = wc_get_products([
                 image_id:     $('#ltms-np-image-id').val(),
                 status:       $('#ltms-np-status').val(),
                 product_type:    $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
+                redi_enabled:    $('#ltms-np-redi-enabled').is(':checked') ? 'yes' : 'no',
+                redi_rate:       parseFloat($('#ltms-np-redi-rate').val()) || 0,
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -430,6 +469,8 @@ $products  = wc_get_products([
                 status:$('#ltms-ep-status').val(),
                 image_id:$('#ltms-ep-image-id').val(),
                 product_type:$('input[name="ltms_ep_tipo"]:checked').val()||'physical',
+                redi_enabled:$('#ltms-ep-redi-enabled').is(':checked') ? 'yes' : 'no',
+                redi_rate:parseFloat($('#ltms-ep-redi-rate').val())||0,
             },
             success:function(res){
                 $btn.prop('disabled',false).text('Guardar Cambios');
@@ -557,6 +598,36 @@ $products  = wc_get_products([
                 <option value="publish"><?php esc_html_e( 'Publicado', 'ltms' ); ?></option>
             </select>
         </div>
+
+        <!-- CS-08: ReDi toggle + tasa (edición) -->
+        <?php if ( 'yes' === get_option('ltms_redi_enabled') ) : ?>
+        <div id="ltms-ep-redi-wrap" style="margin-bottom:16px;padding:14px;background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <input type="checkbox" id="ltms-ep-redi-enabled" style="width:18px;height:18px;accent-color:#1a5276;cursor:pointer;">
+                <label for="ltms-ep-redi-enabled" style="font-weight:600;font-size:0.9rem;cursor:pointer;">
+                    🔁 <?php esc_html_e( 'Habilitar distribución ReDi', 'ltms' ); ?>
+                </label>
+            </div>
+            <div id="ltms-ep-redi-rate-wrap" style="display:none;">
+                <?php
+                $ltms_redi_min = (float) get_option('ltms_redi_min_rate', 5);
+                $ltms_redi_max = (float) get_option('ltms_redi_max_rate', 40);
+                ?>
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php printf( esc_html__( 'Comisión para revendedor (%% — mín %s%%, máx %s%%)', 'ltms' ), $ltms_redi_min, $ltms_redi_max ); ?>
+                </label>
+                <input type="number" id="ltms-ep-redi-rate"
+                    min="<?php echo esc_attr( $ltms_redi_min ); ?>"
+                    max="<?php echo esc_attr( $ltms_redi_max ); ?>"
+                    step="0.5"
+                    value="<?php echo esc_attr( get_option('ltms_redi_default_rate', 15) ); ?>"
+                    style="width:100%;padding:9px 12px;border:1.5px solid #93c5fd;border-radius:6px;box-sizing:border-box;">
+                <p style="font-size:0.8rem;color:#4b5563;margin-top:4px;">
+                    <?php esc_html_e( 'Porcentaje del precio de venta que recibirá el revendedor al distribuir tu producto.', 'ltms' ); ?>
+                </p>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div style="display:flex;gap:12px;justify-content:flex-end;">
             <button type="button" class="ltms-modal-close" style="padding:10px 20px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;">
