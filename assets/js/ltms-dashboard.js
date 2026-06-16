@@ -747,7 +747,7 @@
             const products = (data && data.products) ? data.products : [];
             let rows = products.length === 0
                 ? '<tr><td colspan="6" class="ltms-empty-cell">Aún no tienes productos. Crea tu primer producto con el botón de arriba.</td></tr>'
-                : products.map(p => `<tr><td style="width:60px;padding:4px;"><img src="${p.image||''}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;background:#f0f0f0;" onerror="this.style.background='#e0e0e0';this.src='';" /></td><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${p.product_type === 'service' ? '🛠️ Servicio' : '📦 Producto'}</td><td>${p.stock ?? '-'}</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                : products.map(p => `<tr><td style="width:60px;padding:4px;"><img src="${p.image||''}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;background:#f0f0f0;" onerror="this.style.background='#e0e0e0';this.src='';" /></td><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${({'physical':'📦 Físico','product':'📦 Físico','digital':'💾 Digital','service':'🔧 Servicio','booking':'🏨 Turismo'}[p.product_type] || '📦 Físico')}</td><td>${p.stock ?? '-'}</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
   <button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}" style="background:#1976d2;color:#fff;border:none;font-weight:600;">✏️ Editar</button>
   <button class="ltms-btn ltms-btn-sm ltms-toggle-product-btn" data-id="${p.id}" data-status="${p.status}" style="${p.status==='publish'?'background:#f59e0b;color:#fff;border:none;font-weight:600;':'background:#16a34a;color:#fff;border:none;font-weight:600;'}">${p.status==='publish'?'⏸ Pausar':'▶ Publicar'}</button>
   <button class="ltms-btn ltms-btn-sm ltms-delete-product-btn" data-id="${p.id}" data-name="${this.escapeHtml(p.name)}" style="background:transparent;color:#dc2626;border:1px solid #dc2626;font-weight:600;">🗑</button>
@@ -995,8 +995,10 @@
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                         '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
                         '<select id="ltms-ep-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                            '<option value="product"' + (p.product_type === 'service' ? '' : ' selected') + '>📦 Producto físico</option>' +
-                            '<option value="service"' + (p.product_type === 'service' ? ' selected' : '') + '>🛠️ Servicio</option>' +
+                            '<option value="physical"'  + (['physical','product',''].indexOf(p.product_type||'') >= 0 ? ' selected' : '') + '>📦 Físico</option>' +
+                            '<option value="digital"'  + (p.product_type === 'digital'  ? ' selected' : '') + '>💾 Digital</option>' +
+                            '<option value="service"'  + (p.product_type === 'service'  ? ' selected' : '') + '>🔧 Servicio</option>' +
+                            '<option value="booking"'  + (p.product_type === 'booking'  ? ' selected' : '') + '>🏨 Turismo</option>' +
                         '</select>' +
                     '</div>' +
                     '<div class="ltms-form-group" style="margin-bottom:15px;">' +
