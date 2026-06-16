@@ -162,9 +162,8 @@ class LTMS_Products_Ajax {
             'image_url'    => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
             'gallery_ids'  => $product->get_gallery_image_ids(),
             'gallery_urls' => array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
-            // CS-05: tipo para pre-llenar selector en edición (mapeo legacy)
+            // CS-07: tipo para pre-llenar selector en edición (mapeo legacy)
             'product_type'    => ( function( $t ) { return ( $t === 'product' || $t === '' ) ? 'physical' : $t; } )( get_post_meta( $product_id, '_ltms_product_type', true ) ),
-            'commission_rate' => get_post_meta( $product_id, '_ltms_commission_rate', true ),
         ] );
     }
 
@@ -214,18 +213,7 @@ class LTMS_Products_Ajax {
             }
         }
 
-        // CS-05: actualizar tasa individual si viene en la petición
-        if ( isset( $_POST['commission_rate'] ) ) { // phpcs:ignore
-            $upd_rate = $_POST['commission_rate']; // phpcs:ignore
-            if ( $upd_rate === '' ) {
-                delete_post_meta( $product_id, '_ltms_commission_rate' );
-            } else {
-                $upd_rate_f = floatval( $upd_rate );
-                if ( $upd_rate_f >= 0 && $upd_rate_f <= 100 ) {
-                    update_post_meta( $product_id, '_ltms_commission_rate', $upd_rate_f );
-                }
-            }
-        }
+        // CS-07: commission_rate es de exclusiva gestión del admin — no se acepta desde el frontend.
 
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
@@ -477,13 +465,8 @@ class LTMS_Products_Ajax {
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
 
-        // CS-05: tasa de comisión individual opcional (0–100 como porcentaje)
-        if ( isset( $_POST['commission_rate'] ) && $_POST['commission_rate'] !== '' ) { // phpcs:ignore
-            $comm_rate = floatval( $_POST['commission_rate'] ); // phpcs:ignore
-            if ( $comm_rate >= 0 && $comm_rate <= 100 ) {
-                update_post_meta( $product_id, '_ltms_commission_rate', $comm_rate );
-            }
-        }
+        // CS-07: commission_rate solo configurable por admin (LTMS_Commission_Strategy),
+        // nunca desde el panel del vendedor. Se elimina la escritura desde el frontend.
 
         wp_send_json_success( [
             'product_id'   => $product_id,
