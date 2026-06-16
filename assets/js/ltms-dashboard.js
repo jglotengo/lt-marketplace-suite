@@ -807,6 +807,8 @@
                             catOptions += '<option value="' + c.id + '">' + c.name + '</option>';
                         });
                     }
+                    var rediMin = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                    var rediMax = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
                     const html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
                         '<h3 style="margin-bottom:20px;">Nuevo Producto</h3>' +
                         '<div id="ltms-np-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
@@ -881,8 +883,8 @@
                                 '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
                             '</label>' +
                             '<div id="ltms-np-redi-rate-wrap" style="display:none;">' +
-                                '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi (%)</label>' +
-                                '<input type="number" id="ltms-np-redi-rate" min="1" max="80" step="0.5" placeholder="Ej: 15" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                                '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
+                                '<input type="number" id="ltms-np-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="0.5" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
                                 '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
                             '</div>' +
                         '</div>' +
@@ -1020,6 +1022,8 @@
                 var imgHtml = p.image_url
                     ? '<img src="' + p.image_url + '" style="width:100%;height:100%;object-fit:cover;">'
                     : '<span style="color:#999;font-size:13px;">+ Imagen</span>';
+                var rediMin = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                var rediMax = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
                 var html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
                     '<h3 style="margin-bottom:20px;">Editar Producto</h3>' +
                     '<div id="ltms-ep-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
@@ -1095,8 +1099,8 @@
                             '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
                         '</label>' +
                         '<div id="ltms-ep-redi-rate-wrap" style="display:' + (p.redi_enabled ? 'block' : 'none') + ';">' +
-                            '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi (%)</label>' +
-                            '<input type="number" id="ltms-ep-redi-rate" min="1" max="80" step="0.5" value="' + (p.redi_rate || '') + '" placeholder="Ej: 15" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                            '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
+                            '<input type="number" id="ltms-ep-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="0.5" value="' + (p.redi_rate || '') + '" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
                             '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
                         '</div>' +
                     '</div>' +
