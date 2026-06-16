@@ -501,6 +501,8 @@ final class LTMS_Frontend_Assets {
                 'confirm_payout' => __( '¿Confirmas la solicitud de retiro?', 'ltms' ),
                 'success'      => __( '¡Operación exitosa!', 'ltms' ),
             ],
+            'redi_min_rate'  => (float) get_option( 'ltms_redi_min_rate', 5 ),
+            'redi_max_rate'  => (float) get_option( 'ltms_redi_max_rate', 40 ),
         ]);
     }
 
