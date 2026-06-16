@@ -77,14 +77,20 @@ $products  = wc_get_products([
                 </div>
             </div>
             <div class="ltms-product-actions">
-                <a href="<?php echo esc_url( get_edit_post_link( $product->get_id() ) ); ?>"
-                   class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">
+                <!-- CS-07: Edición inline en panel vendedor (no redirige a wp-admin) -->
+                <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-edit-product-btn"
+                        data-product-id="<?php echo esc_attr( $product->get_id() ); ?>">
                     ✏️ <?php esc_html_e( 'Editar', 'ltms' ); ?>
-                </a>
+                </button>
                 <a href="<?php echo esc_url( get_permalink( $product->get_id() ) ); ?>"
                    class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">
                     👁 <?php esc_html_e( 'Ver', 'ltms' ); ?>
                 </a>
+                <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm ltms-delete-product-btn"
+                        data-product-id="<?php echo esc_attr( $product->get_id() ); ?>"
+                        data-product-name="<?php echo esc_attr( $product->get_name() ); ?>">
+                    🗑 <?php esc_html_e( 'Eliminar', 'ltms' ); ?>
+                </button>
             </div>
         </div>
         <?php endforeach; ?>
@@ -147,32 +153,29 @@ $products  = wc_get_products([
             </div>
         </div>
 
-        <!-- Tipo: Producto o Servicio -->
+        <!-- CS-07: Tipo — grilla 2×2 con los 4 tipos definidos por el marketplace -->
         <div style="margin-bottom:14px;">
-            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Tipo', 'ltms' ); ?> <span style="font-size:0.75rem;color:#6b7280;font-weight:400;"><?php esc_html_e( '(afecta el cálculo de comisiones)', 'ltms' ); ?></span></label>
-            <div style="display:flex;gap:10px;">
-                <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;transition:border-color .15s;" id="ltms-np-tipo-product-lbl">
-                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-product" value="product" checked style="accent-color:#1a5276;">
-                    <span>📦 <?php esc_html_e( 'Producto físico', 'ltms' ); ?></span>
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                <?php esc_html_e( 'Tipo de Producto', 'ltms' ); ?>
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-physical-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-physical" value="physical" checked style="accent-color:#1a5276;">
+                    <span>📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
                 </label>
-                <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;transition:border-color .15s;" id="ltms-np-tipo-service-lbl">
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-digital-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-digital" value="digital" style="accent-color:#1a5276;">
+                    <span>💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-service-lbl">
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-service" value="service" style="accent-color:#1a5276;">
                     <span>🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
                 </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-booking-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-booking" value="booking" style="accent-color:#1a5276;">
+                    <span>🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                </label>
             </div>
-        </div>
-
-        <!-- CS-06: Comisión individual (opcional) -->
-        <div style="margin-bottom:14px;" id="ltms-np-comision-wrap">
-            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
-                <?php esc_html_e( 'Comisión individual (%)', 'ltms' ); ?>
-                <span style="font-size:0.75rem;color:#6b7280;font-weight:400;">
-                    &nbsp;<?php esc_html_e( '(opcional — vacío = tasa por tipo)', 'ltms' ); ?>
-                </span>
-            </label>
-            <input type="number" id="ltms-np-commission-rate" min="0" max="100" step="0.01"
-                   style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;"
-                   placeholder="<?php esc_attr_e( 'Ej: 8 = 8%', 'ltms' ); ?>">
         </div>
 
         <!-- Categoría -->
@@ -287,7 +290,6 @@ $products  = wc_get_products([
                 image_id:     $('#ltms-np-image-id').val(),
                 status:       $('#ltms-np-status').val(),
                 product_type:    $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
-                commission_rate: $('#ltms-np-commission-rate').val(),
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -303,7 +305,7 @@ $products  = wc_get_products([
                     $('#ltms-np-image-id').val('');
                     $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
                     $('#ltms-np-img-status').text('');
-                    $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true);
+                    $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true).trigger('change');
                     setTimeout(function(){ location.reload(); }, 1500);
                 } else {
                     $notice.removeClass('ltms-notice-success')
@@ -335,7 +337,7 @@ $products  = wc_get_products([
     // ── Limpiar modal al cerrar ───────────────────────────────────
     $(document).on('click', '.ltms-modal-backdrop, .ltms-modal-close', function(){
         $('#ltms-np-notice').hide().text('');
-        $('#ltms-np-name, #ltms-np-desc, #ltms-np-stock, #ltms-np-price, #ltms-np-commission-rate').val('');
+        $('#ltms-np-name, #ltms-np-desc, #ltms-np-stock, #ltms-np-price').val('');
         $('#ltms-np-image-id').val('');
         $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-np-img-status').text('');
@@ -358,5 +360,211 @@ $products  = wc_get_products([
     var _initTipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
     $('#ltms-np-tipo-'+_initTipo+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
 
+    // ── CS-07: Editar producto inline ────────────────────────────
+    $(document).on('click', '.ltms-edit-product-btn', function(){
+        var pid = $(this).data('product-id');
+        $('#ltms-ep-notice').hide().text('');
+        $('#ltms-ep-product-id').val(pid);
+        $('#ltms-ep-name,#ltms-ep-desc,#ltms-ep-price,#ltms-ep-stock').val('');
+        $('#ltms-ep-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
+        $('#ltms-ep-image-id').val('');
+        $.ajax({
+            url: ltmsDashboard.ajax_url,
+            method: 'POST',
+            data: { action:'ltms_get_product', nonce:ltmsDashboard.nonce, product_id:pid },
+            success: function(res){
+                if(!res.success) return;
+                var d = res.data;
+                $('#ltms-ep-name').val(d.name);
+                $('#ltms-ep-desc').val(d.description);
+                $('#ltms-ep-price').val(d.price);
+                $('#ltms-ep-stock').val(d.stock !== null ? d.stock : '');
+                $('#ltms-ep-category').val(d.category_id);
+                $('#ltms-ep-status').val(d.status);
+                $('#ltms-ep-image-id').val(d.image_id);
+                if(d.image_url){ $('#ltms-ep-img-preview').html('<img src="'+d.image_url+'" style="width:100%;height:100%;object-fit:cover;">'); }
+                // Tipo
+                var tipo = d.product_type || 'physical';
+                $('input[name="ltms_ep_tipo"][value="'+tipo+'"]').prop('checked',true).trigger('change');
+                LTMS.Modal.open('ltms-modal-edit-product');
+            }
+        });
+    });
+
+    // Imagen modal edición
+    $('#ltms-ep-img-preview, #ltms-ep-img-btn').on('click', function(){ $('#ltms-ep-img-input').trigger('click'); });
+    $('#ltms-ep-img-input').on('change', function(){
+        var file = this.files[0]; if(!file) return;
+        var $s = $('#ltms-ep-img-status'); $s.text('Subiendo...');
+        var fd = new FormData();
+        fd.append('action','ltms_upload_product_image');
+        fd.append('nonce', ltmsDashboard.nonce);
+        fd.append('image', file);
+        $.ajax({ url:ltmsDashboard.ajax_url, method:'POST', data:fd, processData:false, contentType:false,
+            success:function(r){ if(r.success){ $('#ltms-ep-image-id').val(r.data.attachment_id); $('#ltms-ep-img-preview').html('<img src="'+r.data.url+'" style="width:100%;height:100%;object-fit:cover;">'); $s.text('✓'); } else { $s.text('Error'); } },
+            error:function(){ $s.text('Error'); }
+        });
+    });
+
+    // Highlight tipo en modal edición
+    $(document).on('change','input[name="ltms_ep_tipo"]',function(){
+        ['physical','digital','service','booking'].forEach(function(t){ $('#ltms-ep-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'}); });
+        $('#ltms-ep-tipo-'+$(this).val()+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+    });
+
+    // Guardar cambios edición
+    $('#ltms-ep-submit').on('click', function(){
+        var name  = $('#ltms-ep-name').val().trim();
+        var price = parseFloat($('#ltms-ep-price').val());
+        var $n    = $('#ltms-ep-notice');
+        if(!name || isNaN(price) || price<=0){ $n.removeClass('ltms-notice-success').addClass('ltms-notice-error').text('Nombre y precio son obligatorios.').show(); return; }
+        var $btn = $(this); $btn.prop('disabled',true).text('Guardando...');
+        $.ajax({
+            url: ltmsDashboard.ajax_url, method:'POST',
+            data:{
+                action:'ltms_update_product', nonce:ltmsDashboard.nonce,
+                product_id: $('#ltms-ep-product-id').val(),
+                name:name, description:$('#ltms-ep-desc').val(),
+                price:price, stock:$('#ltms-ep-stock').val(),
+                category_id:$('#ltms-ep-category').val(),
+                status:$('#ltms-ep-status').val(),
+                image_id:$('#ltms-ep-image-id').val(),
+                product_type:$('input[name="ltms_ep_tipo"]:checked').val()||'physical',
+            },
+            success:function(res){
+                $btn.prop('disabled',false).text('Guardar Cambios');
+                if(res.success){
+                    $n.removeClass('ltms-notice-error').addClass('ltms-notice-success').text('✅ Cambios guardados. Recargando...').show();
+                    setTimeout(function(){ location.reload(); },1500);
+                } else {
+                    $n.removeClass('ltms-notice-success').addClass('ltms-notice-error').text(res.data||'Error al guardar.').show();
+                }
+            },
+            error:function(){ $btn.prop('disabled',false).text('Guardar Cambios'); $n.addClass('ltms-notice-error').text('Error de conexión.').show(); }
+        });
+    });
+
+    // CS-07: Eliminar producto
+    $(document).on('click', '.ltms-delete-product-btn', function(){
+        var pid  = $(this).data('product-id');
+        var name = $(this).data('product-name');
+        if(!confirm('¿Eliminar el producto "'+name+'"? Esta acción no se puede deshacer.')) return;
+        $.ajax({
+            url:ltmsDashboard.ajax_url, method:'POST',
+            data:{action:'ltms_delete_product', nonce:ltmsDashboard.nonce, product_id:pid},
+            success:function(res){ if(res.success){ location.reload(); } else { alert(res.data||'No se pudo eliminar.'); } },
+            error:function(){ alert('Error de conexión.'); }
+        });
+    });
+
 })(jQuery);
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL: Editar Producto  (id="ltms-modal-edit-product")
+     CS-07: edición inline en panel vendedor sin redirigir a wp-admin
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="ltms-modal" id="ltms-modal-edit-product">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Editar Producto', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;" aria-label="Cerrar">✕</button>
+        </div>
+
+        <input type="hidden" id="ltms-ep-product-id" value="">
+        <div id="ltms-ep-notice" class="ltms-modal-error" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;font-size:0.875rem;"></div>
+
+        <!-- Imagen -->
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Imagen del Producto', 'ltms' ); ?></label>
+            <div id="ltms-ep-img-preview" style="width:100%;height:140px;border:2px dashed #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#f9fafb;overflow:hidden;">
+                <span style="color:#9ca3af;font-size:2rem;">📷</span>
+            </div>
+            <input type="file" id="ltms-ep-img-input" accept="image/*" style="display:none;">
+            <input type="hidden" id="ltms-ep-image-id" value="">
+            <button type="button" style="margin-top:8px;padding:6px 14px;border:1.5px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:0.85rem;" id="ltms-ep-img-btn">
+                📁 <?php esc_html_e( 'Cambiar imagen', 'ltms' ); ?>
+            </button>
+            <span id="ltms-ep-img-status" style="font-size:0.8rem;color:#6b7280;margin-left:8px;"></span>
+        </div>
+
+        <!-- Nombre -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Nombre del Producto *', 'ltms' ); ?></label>
+            <input type="text" id="ltms-ep-name" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+        </div>
+
+        <!-- Descripción -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Descripción', 'ltms' ); ?></label>
+            <textarea id="ltms-ep-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;"></textarea>
+        </div>
+
+        <!-- Precio y Stock -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Precio *', 'ltms' ); ?></label>
+                <input type="number" id="ltms-ep-price" min="0" step="0.01" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+            </div>
+            <div>
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Stock', 'ltms' ); ?></label>
+                <input type="number" id="ltms-ep-stock" min="0" step="1" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="<?php esc_attr_e( 'Vacío = ilimitado', 'ltms' ); ?>">
+            </div>
+        </div>
+
+        <!-- Tipo — grilla 2×2 -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Tipo de Producto', 'ltms' ); ?></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-physical-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="physical" style="accent-color:#1a5276;"> <span>📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-digital-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="digital" style="accent-color:#1a5276;"> <span>💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-service-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="service" style="accent-color:#1a5276;"> <span>🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-booking-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="booking" style="accent-color:#1a5276;"> <span>🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Categoría -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Categoría', 'ltms' ); ?></label>
+            <select id="ltms-ep-category" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+                <option value=""><?php esc_html_e( 'Sin categoría', 'ltms' ); ?></option>
+                <?php
+                $ep_terms = get_terms([ 'taxonomy' => 'product_cat', 'hide_empty' => false, 'number' => 100 ]);
+                if ( ! is_wp_error( $ep_terms ) ) :
+                    foreach ( $ep_terms as $ep_term ) :
+                ?>
+                <option value="<?php echo esc_attr( $ep_term->term_id ); ?>"><?php echo esc_html( $ep_term->name ); ?></option>
+                <?php endforeach; endif; ?>
+            </select>
+        </div>
+
+        <!-- Estado -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Estado', 'ltms' ); ?></label>
+            <select id="ltms-ep-status" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+                <option value="pending"><?php esc_html_e( 'Pendiente de revisión', 'ltms' ); ?></option>
+                <option value="draft"><?php esc_html_e( 'Borrador', 'ltms' ); ?></option>
+                <option value="publish"><?php esc_html_e( 'Publicado', 'ltms' ); ?></option>
+            </select>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button type="button" class="ltms-modal-close" style="padding:10px 20px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;">
+                <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
+            </button>
+            <button type="button" id="ltms-ep-submit" style="padding:10px 22px;background:#1a5276;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">
+                💾 <?php esc_html_e( 'Guardar Cambios', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
+</div>
