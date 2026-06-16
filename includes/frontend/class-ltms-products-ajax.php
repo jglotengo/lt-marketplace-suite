@@ -162,8 +162,9 @@ class LTMS_Products_Ajax {
             'image_url'    => $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '',
             'gallery_ids'  => $product->get_gallery_image_ids(),
             'gallery_urls' => array_map( 'wp_get_attachment_url', $product->get_gallery_image_ids() ),
-            // P-01: tipo para pre-llenar selector en edición
-            'product_type' => get_post_meta( $product_id, '_ltms_product_type', true ) ?: 'product',
+            // CS-05: tipo para pre-llenar selector en edición (mapeo legacy)
+            'product_type'    => ( function( $t ) { return ( $t === 'product' || $t === '' ) ? 'physical' : $t; } )( get_post_meta( $product_id, '_ltms_product_type', true ) ),
+            'commission_rate' => get_post_meta( $product_id, '_ltms_commission_rate', true ),
         ] );
     }
 
@@ -203,11 +204,26 @@ class LTMS_Products_Ajax {
         // por WC, lo que haría que el producto dejara de aparecer en pedidos del dashboard.
         update_post_meta( $product_id, '_ltms_vendor_id', get_current_user_id() );
 
-        // P-01: actualizar tipo si viene en la petición
-        if ( isset( $_POST['product_type'] ) ) {
-            $upd_type = sanitize_key( $_POST['product_type'] );
-            if ( in_array( $upd_type, [ 'product', 'service' ], true ) ) {
+        // CS-05: actualizar tipo si viene en la petición
+        if ( isset( $_POST['product_type'] ) ) { // phpcs:ignore
+            $upd_type = sanitize_key( $_POST['product_type'] ); // phpcs:ignore
+            // Mapeo legacy: 'product' → 'physical'
+            if ( $upd_type === 'product' ) { $upd_type = 'physical'; }
+            if ( in_array( $upd_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
                 update_post_meta( $product_id, '_ltms_product_type', $upd_type );
+            }
+        }
+
+        // CS-05: actualizar tasa individual si viene en la petición
+        if ( isset( $_POST['commission_rate'] ) ) { // phpcs:ignore
+            $upd_rate = $_POST['commission_rate']; // phpcs:ignore
+            if ( $upd_rate === '' ) {
+                delete_post_meta( $product_id, '_ltms_commission_rate' );
+            } else {
+                $upd_rate_f = floatval( $upd_rate );
+                if ( $upd_rate_f >= 0 && $upd_rate_f <= 100 ) {
+                    update_post_meta( $product_id, '_ltms_commission_rate', $upd_rate_f );
+                }
             }
         }
 
@@ -453,12 +469,21 @@ class LTMS_Products_Ajax {
         // aparezcan en el dashboard del vendedor (get_vendor_orders filtra por esta meta).
         update_post_meta( $product_id, '_ltms_vendor_id', $current_user_id );
 
-        // P-01: guardar tipo (product | service) para lógica de comisiones
-        $product_type = sanitize_key( $_POST['product_type'] ?? 'product' );
-        if ( ! in_array( $product_type, [ 'product', 'service' ], true ) ) {
-            $product_type = 'product';
+        // CS-05: guardar tipo (physical/digital/service/booking) para lógica de comisiones
+        // Mapeo legacy: 'product' → 'physical'
+        $product_type = sanitize_key( $_POST['product_type'] ?? 'physical' );
+        if ( $product_type === 'product' || ! in_array( $product_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
+            $product_type = 'physical';
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
+
+        // CS-05: tasa de comisión individual opcional (0–100 como porcentaje)
+        if ( isset( $_POST['commission_rate'] ) && $_POST['commission_rate'] !== '' ) { // phpcs:ignore
+            $comm_rate = floatval( $_POST['commission_rate'] ); // phpcs:ignore
+            if ( $comm_rate >= 0 && $comm_rate <= 100 ) {
+                update_post_meta( $product_id, '_ltms_commission_rate', $comm_rate );
+            }
+        }
 
         wp_send_json_success( [
             'product_id'   => $product_id,
