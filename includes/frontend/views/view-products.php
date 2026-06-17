@@ -205,9 +205,14 @@ $products  = wc_get_products([
 
         <!-- CS-08: ReDi toggle + tasa -->
         <?php
-        $ltms_redi_min = (float) get_option('ltms_redi_min_rate', 5);
-        $ltms_redi_max = (float) get_option('ltms_redi_max_rate', 40);
-        $ltms_redi_default = round( (float) get_option('ltms_redi_default_rate', 15) / 100, 4 );
+        // M-QA-11: ltms_redi_min_rate / max_rate / default_rate siempre se guardan en DB
+        // como decimal [0,1] (todo campo "*_rate" pasa por el sanitizador de
+        // class-ltms-admin-settings.php, que normaliza a decimal). Deben multiplicarse
+        // por 100 para mostrarse como porcentaje en min/max/value/label del input —
+        // de lo contrario el campo queda con rango "mín 0.05%, máx 0.4%" (ver QA sesión).
+        $ltms_redi_min     = round( (float) get_option( 'ltms_redi_min_rate', 0.05 ) * 100, 2 );
+        $ltms_redi_max     = round( (float) get_option( 'ltms_redi_max_rate', 0.40 ) * 100, 2 );
+        $ltms_redi_default = round( (float) get_option( 'ltms_redi_default_rate', 0.15 ) * 100, 2 );
         if ( 'yes' === get_option('ltms_redi_enabled') ) : ?>
         <div style="margin-bottom:16px;padding:14px;background:#f0f7ff;border:1.5px solid #bfdbfe;border-radius:8px;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -223,8 +228,9 @@ $products  = wc_get_products([
                 <input type="number" id="ltms-np-redi-rate"
                     min="<?php echo esc_attr( $ltms_redi_min ); ?>"
                     max="<?php echo esc_attr( $ltms_redi_max ); ?>"
-                    step="0.5"
-                    value="<?php echo esc_attr( get_option('ltms_redi_default_rate', 15) ); ?>"
+                    step="1"
+                    placeholder="<?php echo esc_attr( $ltms_redi_default ); ?>"
+                    value="<?php echo esc_attr( $ltms_redi_default ); ?>"
                     style="width:100%;padding:9px 12px;border:1.5px solid #93c5fd;border-radius:6px;box-sizing:border-box;">
                 <p style="font-size:0.8rem;color:#4b5563;margin-top:4px;">
                     <?php esc_html_e( 'Porcentaje del precio de venta que recibirá el revendedor al distribuir tu producto.', 'ltms' ); ?>
@@ -425,6 +431,13 @@ $products  = wc_get_products([
                 // Tipo
                 var tipo = d.product_type || 'physical';
                 $('input[name="ltms_ep_tipo"][value="'+tipo+'"]').prop('checked',true).trigger('change');
+                // M-QA-11: poblar estado real de ReDi (antes el modal siempre arrancaba
+                // sin marcar, ignorando si el producto ya tenía ReDi activo y a qué tasa).
+                // d.redi_rate llega ya en porcentaje (backend hace ×100 en get_product()).
+                var rediOn = d.redi_enabled === 'yes';
+                $('#ltms-ep-redi-enabled').prop('checked', rediOn);
+                $('#ltms-ep-redi-rate-wrap').toggle(rediOn);
+                if (d.redi_rate) { $('#ltms-ep-redi-rate').val(d.redi_rate); }
                 LTMS.Modal.open('ltms-modal-edit-product');
             }
         });
@@ -610,8 +623,9 @@ $products  = wc_get_products([
             </div>
             <div id="ltms-ep-redi-rate-wrap" style="display:none;">
                 <?php
-                $ltms_redi_min = (float) get_option('ltms_redi_min_rate', 5);
-                $ltms_redi_max = (float) get_option('ltms_redi_max_rate', 40);
+                // M-QA-11: misma normalización decimal→porcentaje que en el modal de creación.
+                $ltms_redi_min = round( (float) get_option( 'ltms_redi_min_rate', 0.05 ) * 100, 2 );
+                $ltms_redi_max = round( (float) get_option( 'ltms_redi_max_rate', 0.40 ) * 100, 2 );
                 ?>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                     <?php printf( esc_html__( 'Comisión para revendedor (%% — mín %s%%, máx %s%%)', 'ltms' ), $ltms_redi_min, $ltms_redi_max ); ?>
@@ -619,8 +633,7 @@ $products  = wc_get_products([
                 <input type="number" id="ltms-ep-redi-rate"
                     min="<?php echo esc_attr( $ltms_redi_min ); ?>"
                     max="<?php echo esc_attr( $ltms_redi_max ); ?>"
-                    step="0.5"
-                    value="<?php echo esc_attr( get_option('ltms_redi_default_rate', 15) ); ?>"
+                    step="1"
                     style="width:100%;padding:9px 12px;border:1.5px solid #93c5fd;border-radius:6px;box-sizing:border-box;">
                 <p style="font-size:0.8rem;color:#4b5563;margin-top:4px;">
                     <?php esc_html_e( 'Porcentaje del precio de venta que recibirá el revendedor al distribuir tu producto.', 'ltms' ); ?>
@@ -639,3 +652,4 @@ $products  = wc_get_products([
         </div>
     </div>
 </div>
+
