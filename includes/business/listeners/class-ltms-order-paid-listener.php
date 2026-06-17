@@ -142,7 +142,7 @@ final class LTMS_Order_Paid_Listener {
             $order->save();
             WC()->session->__unset( 'ltms_absorbed_shipping_quote' );
         } catch ( \Throwable $e ) {
-            error_log( 'LTMS save_absorbed_shipping_quote: ' . $e->getMessage() );
+            LTMS_Core_Logger::warning( 'SHIPPING_QUOTE_SAVE_FAILED', 'save_absorbed_shipping_quote: ' . $e->getMessage() );
         }
     }
 
@@ -176,7 +176,7 @@ final class LTMS_Order_Paid_Listener {
             $order->update_meta_data( '_ltms_shipping_debited', 1 );
             $order->save();
         } catch ( \Throwable $e ) {
-            error_log( 'LTMS debit_absorbed_shipping order #' . $order->get_id() . ': ' . $e->getMessage() );
+            LTMS_Core_Logger::warning( 'SHIPPING_DEBIT_FAILED', 'debit_absorbed_shipping order #' . $order->get_id() . ': ' . $e->getMessage() );
         }
     }
 
