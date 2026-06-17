@@ -2,16 +2,6 @@
 /**
  * Tests unitarios — LTMS_Commission_Strategy
  *
- * Verifica la lógica de cálculo de comisiones:
- *   - Prioridad: custom > volume_tier > category > plan > global
- *   - Tiers de volumen mensual (CO y MX) — lógica inline sin DB
- *   - Tasa por plan (premium vs básico)
- *   - Tasa global configurable
- *   - Invariantes: rango [0, 1], tipo float
- *   - get_rate_summary() — estructura, tipo y tier MX
- *   - Aritmética de comisión aplicada a montos reales
- *   - Reflexión: clase final, constantes, métodos públicos, tipos de retorno
- *
  * @package LTMS\Tests\Unit
  */
 
@@ -21,12 +11,8 @@ namespace LTMS\Tests\Unit;
 
 use Brain\Monkey\Functions;
 
-/**
- * Class CommissionStrategyTest
- */
 class CommissionStrategyTest extends LTMS_Unit_Test_Case {
 
-    // ── Tolerancias ──────────────────────────────────────────────────────────
     private const DELTA = 0.00001;
 
     protected function setUp(): void {
@@ -35,6 +21,11 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
         if ( ! class_exists( 'LTMS_Commission_Strategy' ) ) {
             $this->markTestSkipped( 'LTMS_Commission_Strategy no disponible.' );
         }
+
+        // M-QA-10: get_rate_summary() now calls get_custom_contract_rate() internally,
+        // which invokes get_user_meta(). Default safe stub ('' = no contract) for all
+        // Section-7 tests that don't stub it explicitly.
+        Functions\when( 'get_user_meta' )->justReturn( '' );
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -42,13 +33,7 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     // ════════════════════════════════════════════════════════════════════════
 
     public function test_default_rate_es_0_15(): void {
-        // M-QA-05: DEFAULT_RATE synced to 0.15 matching ltms_platform_commission_rate admin default.
-        $this->assertEqualsWithDelta(
-            0.15,
-            \LTMS_Commission_Strategy::DEFAULT_RATE,
-            self::DELTA,
-            'DEFAULT_RATE debe ser 0.15 (15%)'
-        );
+        $this->assertEqualsWithDelta( 0.15, \LTMS_Commission_Strategy::DEFAULT_RATE, self::DELTA, 'DEFAULT_RATE debe ser 0.15 (15%)' );
     }
 
     public function test_default_rate_es_float(): void {
@@ -56,12 +41,7 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_default_rate_como_porcentaje_es_15(): void {
-        // M-QA-05: DEFAULT_RATE * 100 = 15%
-        $this->assertEqualsWithDelta(
-            15.0,
-            \LTMS_Commission_Strategy::DEFAULT_RATE * 100,
-            self::DELTA
-        );
+        $this->assertEqualsWithDelta( 15.0, \LTMS_Commission_Strategy::DEFAULT_RATE * 100, self::DELTA );
     }
 
     public function test_default_rate_en_rango_valido(): void {
@@ -135,22 +115,12 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     // SECCIÓN 3 — Prioridad 1: Tasa personalizada por contrato
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * @dataProvider provider_custom_rates
-     */
+    /** @dataProvider provider_custom_rates */
     public function test_custom_rate_tiene_maxima_prioridad( float $custom_rate ): void {
         Functions\when( 'get_user_meta' )->justReturn( (string) $custom_rate );
-
         $order = $this->make_order_mock();
-
-        $rate = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
-        $this->assertEqualsWithDelta(
-            $custom_rate,
-            $rate,
-            self::DELTA,
-            "La tasa custom {$custom_rate} debe tener prioridad absoluta"
-        );
+        $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
+        $this->assertEqualsWithDelta( $custom_rate, $rate, self::DELTA, "La tasa custom {$custom_rate} debe tener prioridad absoluta" );
     }
 
     /** @return array<string, array{float}> */
@@ -165,31 +135,25 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_custom_rate_invalida_se_ignora(): void {
-        Functions\when( 'get_user_meta' )->justReturn( '2.5' ); // 250% — inválido
+        Functions\when( 'get_user_meta' )->justReturn( '2.5' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.10 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
-        $this->assertLessThanOrEqual( 1.0, $rate, 'La tasa no puede superar 1.0' );
-        $this->assertGreaterThanOrEqual( 0.0, $rate, 'La tasa no puede ser negativa' );
+        $this->assertLessThanOrEqual( 1.0, $rate );
+        $this->assertGreaterThanOrEqual( 0.0, $rate );
     }
 
     public function test_custom_rate_negativa_se_ignora(): void {
-        Functions\when( 'get_user_meta' )->justReturn( '-0.5' ); // negativo — inválido
+        Functions\when( 'get_user_meta' )->justReturn( '-0.5' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.10 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertGreaterThanOrEqual( 0.0, $rate );
         $this->assertLessThanOrEqual( 1.0, $rate );
     }
@@ -197,49 +161,36 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     public function test_custom_rate_vacia_cae_a_siguiente_prioridad(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.07 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.07, $rate, self::DELTA );
     }
 
     public function test_custom_rate_exactamente_uno_es_valido(): void {
-        // 1.0 está en el límite superior válido → debe aceptarse
         Functions\when( 'get_user_meta' )->justReturn( '1.0' );
-
         $order = $this->make_order_mock();
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 1.0, $rate, self::DELTA );
     }
 
     public function test_custom_rate_exactamente_cero_es_valido(): void {
-        // 0.0 es válido — vendedor estratégico sin comisión
         Functions\when( 'get_user_meta' )->justReturn( '0' );
-
         $order = $this->make_order_mock();
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.0, $rate, self::DELTA );
     }
 
     public function test_custom_rate_mayor_que_uno_punto_uno_se_ignora(): void {
         Functions\when( 'get_user_meta' )->justReturn( '1.1' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.10 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
-        // 1.1 es inválido → cae al global (0.10)
         $this->assertEqualsWithDelta( 0.10, $rate, self::DELTA );
     }
 
@@ -249,140 +200,101 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
 
     public function test_vendor_premium_usa_tasa_premium(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $user        = new \stdClass();
-        $user->roles = [ 'ltms_vendor_premium' ];
+        $user = new \stdClass(); $user->roles = [ 'ltms_vendor_premium' ];
         Functions\when( 'get_userdata' )->justReturn( $user );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_premium_commission_rate', 0.08 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.08, $rate, self::DELTA, 'Vendor premium debe pagar 8%' );
     }
 
     public function test_vendor_basico_usa_tasa_basica(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $user        = new \stdClass();
-        $user->roles = [ 'ltms_vendor' ];
+        $user = new \stdClass(); $user->roles = [ 'ltms_vendor' ];
         Functions\when( 'get_userdata' )->justReturn( $user );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_basic_commission_rate', 0.10 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.10, $rate, self::DELTA, 'Vendor básico debe pagar 10%' );
     }
 
     public function test_vendor_sin_rol_ltms_cae_a_global(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $user        = new \stdClass();
-        $user->roles = [ 'subscriber' ];
+        $user = new \stdClass(); $user->roles = [ 'subscriber' ];
         Functions\when( 'get_userdata' )->justReturn( $user );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.09 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.09, $rate, self::DELTA );
     }
 
     public function test_vendor_not_found_cae_a_global(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.11 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 99, $order );
-
         $this->assertEqualsWithDelta( 0.11, $rate, self::DELTA );
     }
 
     public function test_premium_rate_configurable(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $user        = new \stdClass();
-        $user->roles = [ 'ltms_vendor_premium' ];
+        $user = new \stdClass(); $user->roles = [ 'ltms_vendor_premium' ];
         Functions\when( 'get_userdata' )->justReturn( $user );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_premium_commission_rate', 0.06 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.06, $rate, self::DELTA );
     }
 
     public function test_basic_rate_configurable(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $user        = new \stdClass();
-        $user->roles = [ 'ltms_vendor' ];
+        $user = new \stdClass(); $user->roles = [ 'ltms_vendor' ];
         Functions\when( 'get_userdata' )->justReturn( $user );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_basic_commission_rate', 0.12 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.12, $rate, self::DELTA );
     }
 
     public function test_premium_menor_que_basic_es_posible(): void {
-        // El admin puede configurar premium < basic — el sistema debe respetarlo
         Functions\when( 'get_user_meta' )->justReturn( '' );
-
-        $premium_user        = new \stdClass();
-        $premium_user->roles = [ 'ltms_vendor_premium' ];
-        Functions\when( 'get_userdata' )->justReturn( $premium_user );
-
+        $user = new \stdClass(); $user->roles = [ 'ltms_vendor_premium' ];
+        Functions\when( 'get_userdata' )->justReturn( $user );
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_premium_commission_rate', 0.05 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertEqualsWithDelta( 0.05, $rate, self::DELTA );
-        $this->assertLessThan( 0.10, $rate ); // premium < basic por config
+        $this->assertLessThan( 0.10, $rate );
     }
 
     // ════════════════════════════════════════════════════════════════════════
     // SECCIÓN 5 — Prioridad 5: Tasa global configurable (fallback final)
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * @dataProvider provider_global_rates
-     */
+    /** @dataProvider provider_global_rates */
     public function test_tasa_global_como_fallback_final( float $global_rate ): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', $global_rate );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 99, $order );
-
         $this->assertEqualsWithDelta( $global_rate, $rate, self::DELTA );
     }
 
@@ -421,16 +333,16 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     /** @return array<string, array{float, string}> */
     public static function provider_tiers_colombia(): array {
         return [
-            'COP 0 → base'           => [          0.0, 'base'     ],
-            'COP 4.999.999 → base'   => [  4_999_999.0, 'base'     ],
-            'COP 5.000.000 → silver' => [  5_000_000.0, 'silver'   ],
-            'COP 10M → silver'       => [ 10_000_000.0, 'silver'   ],
-            'COP 19.999.999 → silver'=> [ 19_999_999.0, 'silver'   ],
-            'COP 20M → gold'         => [ 20_000_000.0, 'gold'     ],
-            'COP 30M → gold'         => [ 30_000_000.0, 'gold'     ],
-            'COP 49.999.999 → gold'  => [ 49_999_999.0, 'gold'     ],
-            'COP 50M → platinum'     => [ 50_000_000.0, 'platinum' ],
-            'COP 100M → platinum'    => [100_000_000.0, 'platinum' ],
+            'COP 0 → base'            => [          0.0, 'base'     ],
+            'COP 4.999.999 → base'    => [  4_999_999.0, 'base'     ],
+            'COP 5.000.000 → silver'  => [  5_000_000.0, 'silver'   ],
+            'COP 10M → silver'        => [ 10_000_000.0, 'silver'   ],
+            'COP 19.999.999 → silver' => [ 19_999_999.0, 'silver'   ],
+            'COP 20M → gold'          => [ 20_000_000.0, 'gold'     ],
+            'COP 30M → gold'          => [ 30_000_000.0, 'gold'     ],
+            'COP 49.999.999 → gold'   => [ 49_999_999.0, 'gold'     ],
+            'COP 50M → platinum'      => [ 50_000_000.0, 'platinum' ],
+            'COP 100M → platinum'     => [100_000_000.0, 'platinum' ],
         ];
     }
 
@@ -442,16 +354,16 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     /** @return array<string, array{float, string}> */
     public static function provider_tiers_mexico(): array {
         return [
-            'MXN 0 → base'           => [       0.0, 'base'     ],
-            'MXN 24.999 → base'      => [  24_999.0, 'base'     ],
-            'MXN 25.000 → silver'    => [  25_000.0, 'silver'   ],
-            'MXN 50K → silver'       => [  50_000.0, 'silver'   ],
-            'MXN 99.999 → silver'    => [  99_999.0, 'silver'   ],
-            'MXN 100K → gold'        => [ 100_000.0, 'gold'     ],
-            'MXN 200K → gold'        => [ 200_000.0, 'gold'     ],
-            'MXN 299.999 → gold'     => [ 299_999.0, 'gold'     ],
-            'MXN 300K → platinum'    => [ 300_000.0, 'platinum' ],
-            'MXN 500K → platinum'    => [ 500_000.0, 'platinum' ],
+            'MXN 0 → base'        => [       0.0, 'base'     ],
+            'MXN 24.999 → base'   => [  24_999.0, 'base'     ],
+            'MXN 25.000 → silver' => [  25_000.0, 'silver'   ],
+            'MXN 50K → silver'    => [  50_000.0, 'silver'   ],
+            'MXN 99.999 → silver' => [  99_999.0, 'silver'   ],
+            'MXN 100K → gold'     => [ 100_000.0, 'gold'     ],
+            'MXN 200K → gold'     => [ 200_000.0, 'gold'     ],
+            'MXN 299.999 → gold'  => [ 299_999.0, 'gold'     ],
+            'MXN 300K → platinum' => [ 300_000.0, 'platinum' ],
+            'MXN 500K → platinum' => [ 500_000.0, 'platinum' ],
         ];
     }
 
@@ -461,14 +373,11 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_tier_platinum_es_el_mas_alto(): void {
-        // Montos estratosféricos → siempre platinum en CO y MX
         $this->assertSame( 'platinum', $this->classify_tier( 1_000_000_000.0, 'CO' ) );
         $this->assertSame( 'platinum', $this->classify_tier( 1_000_000_000.0, 'MX' ) );
     }
 
     public function test_tiers_co_mx_tienen_distintos_umbrales(): void {
-        // COP 100K → base (muy por debajo del mínimo COP de 5M)
-        // MXN 100K → gold (sobre el umbral MXN de 100K)
         $this->assertSame( 'base', $this->classify_tier( 100_000.0, 'CO' ) );
         $this->assertSame( 'gold', $this->classify_tier( 100_000.0, 'MX' ) );
     }
@@ -479,90 +388,88 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
 
     public function test_get_rate_summary_retorna_estructura_correcta(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertIsArray( $summary );
         $this->assertArrayHasKey( 'current_rate',  $summary );
+        $this->assertArrayHasKey( 'rate_source',   $summary );
         $this->assertArrayHasKey( 'tier',          $summary );
         $this->assertArrayHasKey( 'monthly_sales', $summary );
     }
 
     public function test_current_rate_en_summary_es_float(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertIsFloat( $summary['current_rate'] );
     }
 
     public function test_monthly_sales_en_summary_es_float(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertIsFloat( $summary['monthly_sales'] );
     }
 
     public function test_tier_en_summary_es_string(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertIsString( $summary['tier'] );
     }
 
     public function test_tier_en_summary_es_valor_valido(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
-        $this->assertContains(
-            $summary['tier'],
-            [ 'base', 'silver', 'gold', 'platinum' ]
-        );
+        $this->assertContains( $summary['tier'], [ 'base', 'silver', 'gold', 'platinum' ] );
     }
 
     public function test_summary_monthly_sales_desde_wpdb_null_es_cero(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertEqualsWithDelta( 0.0, $summary['monthly_sales'], self::DELTA );
     }
 
     public function test_summary_tier_es_base_cuando_ventas_son_cero(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_country', 'CO' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertSame( 'base', $summary['tier'] );
     }
 
     public function test_summary_tier_es_base_para_mx_con_ventas_cero(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_country', 'MX' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
-        // MXN 0 ventas → base
         $this->assertSame( 'base', $summary['tier'] );
     }
 
-    public function test_summary_retorna_exactamente_tres_claves(): void {
+    public function test_summary_retorna_exactamente_cuatro_claves(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
+        $this->assertCount( 4, $summary );
+    }
 
-        $this->assertCount( 3, $summary );
+    /**
+     * M-QA-10: get_rate_summary() must reflect CS-00 contract rate.
+     * Regression: Juguetería Taiwán at 0.12 showed 0.15 in admin panel.
+     */
+    public function test_summary_current_rate_usa_contrato_individual_cuando_existe(): void {
+        \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
+        Functions\when( 'get_user_meta' )->alias( function( $user_id, $key, $single ) {
+            return ( $key === 'ltms_custom_commission_rate' ) ? '0.12' : '';
+        } );
+        $summary = \LTMS_Commission_Strategy::get_rate_summary( 168 );
+        $this->assertEqualsWithDelta( 0.12, $summary['current_rate'], self::DELTA );
+        $this->assertSame( 'custom_contract', $summary['rate_source'] );
+    }
+
+    public function test_summary_rate_source_es_default_sin_contrato_ni_tier(): void {
+        \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
+        $this->assertSame( 'default', $summary['rate_source'] );
     }
 
     public function test_summary_current_rate_en_rango_valido(): void {
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
-
         $summary = \LTMS_Commission_Strategy::get_rate_summary( 1 );
-
         $this->assertGreaterThanOrEqual( 0.0, $summary['current_rate'] );
         $this->assertLessThanOrEqual( 1.0, $summary['current_rate'] );
     }
@@ -571,23 +478,17 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     // SECCIÓN 8 — Invariantes matemáticos
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * @dataProvider provider_vendor_scenarios
-     */
+    /** @dataProvider provider_vendor_scenarios */
     public function test_tasa_siempre_en_rango_valido( array $config, string $scenario ): void {
         Functions\when( 'get_user_meta' )->justReturn( $config['custom_rate'] ?? '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
-
         if ( isset( $config['global_rate'] ) ) {
             \LTMS_Core_Config::set( 'ltms_platform_commission_rate', $config['global_rate'] );
         }
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertGreaterThanOrEqual( 0.0, $rate, "{$scenario}: tasa no puede ser negativa" );
         $this->assertLessThanOrEqual( 1.0, $rate, "{$scenario}: tasa no puede superar 1.0" );
     }
@@ -595,118 +496,78 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     /** @return array<string, array{array, string}> */
     public static function provider_vendor_scenarios(): array {
         return [
-            'custom rate 0.05'    => [ [ 'custom_rate' => '0.05'  ], 'custom 5%'     ],
-            'custom rate 0.0'     => [ [ 'custom_rate' => '0.0'   ], 'custom 0%'     ],
-            'custom rate 1.0'     => [ [ 'custom_rate' => '1.0'   ], 'custom 100%'   ],
-            'global rate 0.08'    => [ [ 'global_rate' =>  0.08   ], 'global 8%'     ],
-            'global rate 0.12'    => [ [ 'global_rate' =>  0.12   ], 'global 12%'    ],
-            'sin config'          => [ [                           ], 'default'       ],
+            'custom rate 0.05' => [ [ 'custom_rate' => '0.05' ], 'custom 5%'   ],
+            'custom rate 0.0'  => [ [ 'custom_rate' => '0.0'  ], 'custom 0%'   ],
+            'custom rate 1.0'  => [ [ 'custom_rate' => '1.0'  ], 'custom 100%' ],
+            'global rate 0.08' => [ [ 'global_rate' =>  0.08  ], 'global 8%'   ],
+            'global rate 0.12' => [ [ 'global_rate' =>  0.12  ], 'global 12%'  ],
+            'sin config'       => [ [                          ], 'default'     ],
         ];
     }
 
     public function test_tasa_es_float(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
-
         $this->assertIsFloat( $rate );
     }
 
     public function test_global_rate_clamped_a_cero_si_negativa(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', -0.5 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 99, $order );
-
         $this->assertEqualsWithDelta( 0.0, $rate, self::DELTA, 'Rate negativa debe ser clamped a 0' );
     }
 
     public function test_global_rate_clamped_a_uno_si_mayor(): void {
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'get_userdata' )->justReturn( false );
-
         \LTMS_Core_Config::set( 'ltms_volume_tiers_enabled', 'no' );
         \LTMS_Core_Config::set( 'ltms_category_commission_rates', [] );
         \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 5.0 );
-
         $order = $this->make_order_mock( [] );
         $rate  = \LTMS_Commission_Strategy::get_rate( 99, $order );
-
         $this->assertEqualsWithDelta( 1.0, $rate, self::DELTA, 'Rate > 1 debe ser clamped a 1.0' );
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // SECCIÓN 9 — Aritmética aplicada (comisión = rate × monto)
+    // SECCIÓN 9 — Aritmética aplicada
     // ════════════════════════════════════════════════════════════════════════
 
     public function test_comision_calculada_sobre_monto_cop(): void {
-        // rate 10% sobre $500.000 COP = $50.000 COP
-        $rate   = 0.10;
-        $amount = 500_000.0;
-
-        $commission = round( $rate * $amount, 2 );
-
-        $this->assertEqualsWithDelta( 50_000.0, $commission, 0.01 );
+        $this->assertEqualsWithDelta( 50_000.0, round( 0.10 * 500_000.0, 2 ), 0.01 );
     }
 
     public function test_comision_tasa_cero_siempre_es_cero(): void {
-        $rate   = 0.0;
-        $amount = 999_999.0;
-
-        $commission = round( $rate * $amount, 2 );
-
-        $this->assertEqualsWithDelta( 0.0, $commission, self::DELTA );
+        $this->assertEqualsWithDelta( 0.0, round( 0.0 * 999_999.0, 2 ), self::DELTA );
     }
 
     public function test_comision_tasa_100_igual_al_monto(): void {
-        $rate   = 1.0;
         $amount = 250_000.0;
-
-        $commission = round( $rate * $amount, 2 );
-
-        $this->assertEqualsWithDelta( $amount, $commission, 0.01 );
+        $this->assertEqualsWithDelta( $amount, round( 1.0 * $amount, 2 ), 0.01 );
     }
 
     public function test_comision_premium_menor_que_basica_en_mismo_monto(): void {
-        $amount        = 1_000_000.0;
-        $premium_rate  = 0.08;
-        $basic_rate    = 0.10;
-
-        $premium_commission = round( $premium_rate * $amount, 2 );
-        $basic_commission   = round( $basic_rate   * $amount, 2 );
-
-        $this->assertLessThan( $basic_commission, $premium_commission );
-        $this->assertEqualsWithDelta( 80_000.0,  $premium_commission, 0.01 );
-        $this->assertEqualsWithDelta( 100_000.0, $basic_commission,   0.01 );
+        $amount = 1_000_000.0;
+        $this->assertLessThan( round( 0.10 * $amount, 2 ), round( 0.08 * $amount, 2 ) );
+        $this->assertEqualsWithDelta( 80_000.0,  round( 0.08 * $amount, 2 ), 0.01 );
+        $this->assertEqualsWithDelta( 100_000.0, round( 0.10 * $amount, 2 ), 0.01 );
     }
 
     public function test_comision_default_rate_sobre_millon(): void {
-        // M-QA-05: DEFAULT_RATE = 0.15 → 1.000.000 × 0.15 = 150.000
-        $rate   = \LTMS_Commission_Strategy::DEFAULT_RATE;
-        $amount = 1_000_000.0;
-
-        $commission = round( $rate * $amount, 2 );
-
-        $this->assertEqualsWithDelta( 150_000.0, $commission, 0.01 );
+        $this->assertEqualsWithDelta( 150_000.0, round( \LTMS_Commission_Strategy::DEFAULT_RATE * 1_000_000.0, 2 ), 0.01 );
     }
 
     public function test_vendor_neto_es_monto_menos_comision(): void {
-        $rate      = 0.10;
-        $amount    = 500_000.0;
-        $comision  = round( $rate * $amount, 2 );
-        $neto      = $amount - $comision;
-
-        $this->assertEqualsWithDelta( 450_000.0, $neto, 0.01 );
+        $rate = 0.10; $amount = 500_000.0;
+        $this->assertEqualsWithDelta( 450_000.0, $amount - round( $rate * $amount, 2 ), 0.01 );
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -724,11 +585,8 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
 
     private function make_order_mock( ?array $items = null ): object {
         $order = \Mockery::mock( 'WC_Order' );
-
         if ( $items === null ) {
-            $order->shouldReceive( 'get_items' )
-                  ->zeroOrMoreTimes()
-                  ->andReturn( [] );
+            $order->shouldReceive( 'get_items' )->zeroOrMoreTimes()->andReturn( [] );
         } else {
             $wc_items = [];
             foreach ( $items as $product_id ) {
@@ -738,50 +596,26 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
             }
             $order->shouldReceive( 'get_items' )->andReturn( $wc_items );
         }
-
         return $order;
     }
-    // ── C-01: get_rate() lee ltms_platform_commission_rate (no ltms_commission_rate) ──
 
-    /**
-     * @test
-     * Verifica que get_rate() lee ltms_platform_commission_rate, no ltms_commission_rate.
-     * Bug C-01 — la vista guardaba con la clave incorrecta.
-     */
-    public function test_get_rate_reads_platform_commission_rate_key(): void
-    {
-        \LTMS_Core_Config::set('ltms_platform_commission_rate', 0.12);
-        // La clave incorrecta NO debe afectar el resultado
-        \LTMS_Core_Config::set('ltms_commission_rate', 0.99);
-
-        Functions\when('get_user_meta')->justReturn('');
-        Functions\when('get_userdata')->justReturn(false);
-        Functions\when('wpdb')->justReturn(null);
-
-        $order = $this->make_order_mock([]);
-        $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
-
-        // Debe usar ltms_platform_commission_rate (0.12), no ltms_commission_rate (0.99)
-        $this->assertEqualsWithDelta(0.12, $rate, 0.001);
+    public function test_get_rate_reads_platform_commission_rate_key(): void {
+        \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.12 );
+        \LTMS_Core_Config::set( 'ltms_commission_rate', 0.99 );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        Functions\when( 'get_userdata' )->justReturn( false );
+        $order = $this->make_order_mock( [] );
+        $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
+        $this->assertEqualsWithDelta( 0.12, $rate, 0.001 );
     }
 
-    /**
-     * @test
-     */
-    public function test_get_rate_wrong_key_does_not_override_platform_rate(): void
-    {
-        \LTMS_Core_Config::set('ltms_platform_commission_rate', 0.10);
-        // Si ltms_commission_rate (incorrecto) existiera en la BD, no debe usarse
-        \LTMS_Core_Config::set('ltms_commission_rate', 0.50);
-
-        Functions\when('get_user_meta')->justReturn('');
-        Functions\when('get_userdata')->justReturn(false);
-
-        $order = $this->make_order_mock([]);
-        $rate  = \LTMS_Commission_Strategy::get_rate(1, $order);
-
-        $this->assertNotEqualsWithDelta(0.50, $rate, 0.001);
+    public function test_get_rate_wrong_key_does_not_override_platform_rate(): void {
+        \LTMS_Core_Config::set( 'ltms_platform_commission_rate', 0.10 );
+        \LTMS_Core_Config::set( 'ltms_commission_rate', 0.50 );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        Functions\when( 'get_userdata' )->justReturn( false );
+        $order = $this->make_order_mock( [] );
+        $rate  = \LTMS_Commission_Strategy::get_rate( 1, $order );
+        $this->assertNotEqualsWithDelta( 0.50, $rate, 0.001 );
     }
-
 }
-
