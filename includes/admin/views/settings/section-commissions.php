@@ -49,6 +49,7 @@ $fields = [
                     <option value="<?php echo esc_attr($k); ?>" <?php selected($value,$k); ?>><?php echo esc_html($v); ?></option>
                 <?php endforeach; ?>
             </select>
+            <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>
         <?php elseif ( $field['type'] === 'checkbox' ) : ?>
             <label><input type="checkbox" name="<?php echo esc_attr($key); ?>" value="yes" <?php checked($value,'yes'); ?>> <?php echo esc_html($field['desc']??''); ?></label>
         <?php elseif ( $field['type'] === 'textarea' ) : ?>
@@ -63,4 +64,5 @@ $fields = [
     <?php endforeach; ?>
     </tbody></table>
 </div>
+
 
