@@ -49,54 +49,81 @@ final class LTMS_Commission_Strategy {
     /**
      * Calcula la tasa de comisión efectiva para un vendedor y pedido.
      *
+     * Cascada de prioridades (M-QA-08):
+     * CS-00 contrato individual del vendedor → CS-01 producto individual →
+     * CS-02 tipo de producto → CS-03 tier de volumen → CS-04 categoría →
+     * CS-05 plan del vendedor → CS-06 tasa global.
+     *
      * @param int       $vendor_id ID del vendedor.
      * @param \WC_Order $order     Pedido.
      * @return float Tasa decimal (0.10 = 10%).
      */
     public static function get_rate( int $vendor_id, \WC_Order $order ): float {
-        // CS-01: nivel 0 — tasa individual por producto (_ltms_commission_rate)
+        // CS-00: contrato individual negociado con el vendedor (máxima prioridad).
+        // M-QA-08: un acuerdo comercial explícito con el vendedor debe pesar más que
+        // cualquier configuración genérica por producto o tipo; de lo contrario CS-01/CS-02
+        // la anulan en silencio (ej: vendedor con 12% negociado pagando 15% por tipo físico).
+        $custom_rate = self::get_custom_contract_rate( $vendor_id );
+        if ( $custom_rate !== null ) {
+            return $custom_rate;
+        }
+
+        // CS-01: tasa individual por producto (_ltms_commission_rate)
         $individual_rate = self::get_product_individual_rate( $order );
         if ( $individual_rate !== null ) {
             return $individual_rate;
         }
 
-        // CS-02: nivel 1 — tasa por tipo de producto (physical/digital/service/booking)
+        // CS-02: tasa por tipo de producto (physical/digital/service/booking)
         $type_rate = self::get_product_type_rate( $order );
         if ( $type_rate !== null ) {
             return $type_rate;
         }
 
-        // 1. Verificar tasa especial por contrato individual
-        $custom_rate = get_user_meta( $vendor_id, 'ltms_custom_commission_rate', true );
-        if ( $custom_rate !== '' && is_numeric( $custom_rate ) ) {
-            $rate = (float) $custom_rate;
-            if ( $rate >= 0 && $rate <= 1 ) {
-                return $rate;
-            }
-        }
-
-        // 2. Tasa por tier de volumen de ventas
+        // CS-03: tasa por tier de volumen de ventas
         $tier_rate = self::get_volume_tier_rate( $vendor_id );
         if ( $tier_rate !== null ) {
             return $tier_rate;
         }
 
-        // 3. Tasa por categoría del producto
+        // CS-04: tasa por categoría del producto
         $category_rate = self::get_category_rate( $order );
         if ( $category_rate !== null ) {
             return $category_rate;
         }
 
-        // 4. Tasa según plan del vendedor (premium vs básico)
+        // CS-05: tasa según plan del vendedor (premium vs básico)
         $plan_rate = self::get_plan_rate( $vendor_id );
         if ( $plan_rate !== null ) {
             return $plan_rate;
         }
 
-        // 5. Tasa global configurada
+        // CS-06: tasa global configurada
         $global_rate = (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', self::DEFAULT_RATE );
 
         return max( 0.0, min( 1.0, $global_rate ) );
+    }
+
+    /**
+     * CS-00: Tasa negociada por contrato individual con el vendedor.
+     *
+     * Lee ltms_custom_commission_rate de user meta. Acepta tanto formato decimal
+     * (0.12 = 12%) como porcentaje (12 = 12%), igual que CS-01, para tolerar cómo
+     * se haya guardado el dato manualmente o desde la futura UI de admin.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return float|null Tasa decimal (0–1) o null si el vendedor no tiene contrato propio.
+     */
+    private static function get_custom_contract_rate( int $vendor_id ): ?float {
+        $stored_rate = get_user_meta( $vendor_id, 'ltms_custom_commission_rate', true );
+        if ( $stored_rate === '' || ! is_numeric( $stored_rate ) ) {
+            return null;
+        }
+        $rate = (float) $stored_rate;
+        if ( $rate > 1 ) {
+            $rate = $rate / 100;
+        }
+        return ( $rate >= 0 && $rate <= 1 ) ? $rate : null;
     }
 
     /**
@@ -133,7 +160,7 @@ final class LTMS_Commission_Strategy {
      * Lee _ltms_product_type del primer producto del pedido y busca la opción
      * ltms_commission_{type} en la configuración. Si no está configurada
      * explícitamente en el admin, devuelve null para que la cascada continúe
-     * hasta el global rate (CS-07). PRODUCT_TYPE_DEFAULTS solo sirve como
+     * hasta el global rate (CS-06). PRODUCT_TYPE_DEFAULTS solo sirve como
      * referencia documental, no como fallback en runtime.
      *
      * Mapeo legacy: 'product' → 'physical' para compatibilidad con registros
@@ -173,7 +200,7 @@ final class LTMS_Commission_Strategy {
             return max( 0.0, min( 1.0, $rate ) );
         }
 
-        // No configurado explícitamente → dejar que la cascada continúe al global rate (CS-07).
+        // No configurado explícitamente → dejar que la cascada continúe al global rate (CS-06).
         return null;
     }
 
@@ -342,5 +369,6 @@ final class LTMS_Commission_Strategy {
         ];
     }
 }
+
 
 
