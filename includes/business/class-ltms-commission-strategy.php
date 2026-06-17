@@ -131,8 +131,10 @@ final class LTMS_Commission_Strategy {
      * CS-02: Tasa de comisión por tipo de producto (physical/digital/service/booking).
      *
      * Lee _ltms_product_type del primer producto del pedido y busca la opción
-     * ltms_commission_{type} en la configuración. Si no está configurada, usa
-     * los defaults de PRODUCT_TYPE_DEFAULTS.
+     * ltms_commission_{type} en la configuración. Si no está configurada
+     * explícitamente en el admin, devuelve null para que la cascada continúe
+     * hasta el global rate (CS-07). PRODUCT_TYPE_DEFAULTS solo sirve como
+     * referencia documental, no como fallback en runtime.
      *
      * Mapeo legacy: 'product' → 'physical' para compatibilidad con registros
      * creados antes de la v2.x donde el valor era 'product'.
@@ -171,7 +173,8 @@ final class LTMS_Commission_Strategy {
             return max( 0.0, min( 1.0, $rate ) );
         }
 
-        return $default;
+        // No configurado explícitamente → dejar que la cascada continúe al global rate (CS-07).
+        return null;
     }
 
     /**
@@ -339,4 +342,5 @@ final class LTMS_Commission_Strategy {
         ];
     }
 }
+
 
