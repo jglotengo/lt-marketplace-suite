@@ -180,14 +180,16 @@ class LTMS_Business_Redi_Order_Split {
     }
 
     private static function get_vendor_data( int $vendor_id ): array {
+        // M-QA-01: aligned key names with LTMS_Business_Order_Split::get_vendor_data()
+        // so LTMS_Tax_Engine receives consistent field names regardless of order type.
         return [
-            'vendor_id'       => $vendor_id,
-            'regime'          => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'responsable_iva',
-            'nit'             => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
-            'is_gran_contrib' => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),
-            'ciiu_code'       => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',
-            'municipality'    => get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: 'bogota',
-            'monthly_income'  => (float) get_user_meta( $vendor_id, 'ltms_monthly_income_avg', true ),
+            'vendor_id'             => $vendor_id,
+            'tax_regime'            => get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'simplified',
+            'nit'                   => get_user_meta( $vendor_id, 'ltms_nit', true ) ?: '',
+            'is_gran_contribuyente' => (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true ),
+            'ciiu_code'             => get_user_meta( $vendor_id, 'ltms_ciiu_code', true ) ?: '4791',
+            'municipality_code'     => get_user_meta( $vendor_id, 'ltms_municipality', true ) ?: '',
+            'monthly_income'        => (float) get_user_meta( $vendor_id, 'ltms_monthly_income_avg', true ),
         ];
     }
 }
