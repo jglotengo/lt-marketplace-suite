@@ -240,8 +240,10 @@ class LTMS_Products_Ajax {
             if ( $upd_type === 'product' ) { $upd_type = 'physical'; }
             if ( in_array( $upd_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
                 update_post_meta( $product_id, '_ltms_product_type', $upd_type );
+            }
+        }
 
-        // CS-08: ReDi toggle + tasa con validación de rango
+        // CS-08: ReDi toggle + tasa con validación de rango (independiente de CS-05)
         if ( 'yes' === get_option( 'ltms_redi_enabled' ) ) {
             $redi_enabled = ( isset( $_POST['redi_enabled'] ) && 'yes' === sanitize_key( $_POST['redi_enabled'] ) ) // phpcs:ignore
                 ? 'yes' : 'no';
@@ -251,8 +253,6 @@ class LTMS_Products_Ajax {
                 // redi_rate llega en % desde el frontend (ej: 15), convertir a decimal y clampar
                 $redi_rate = LTMS_Business_Redi_Manager::clamp_redi_rate( $redi_rate_pct / 100 );
                 update_post_meta( $product_id, '_ltms_redi_rate', $redi_rate );
-            }
-        }
             }
         }
 
@@ -605,3 +605,4 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
     }
     return $prevent;
 } );
+
