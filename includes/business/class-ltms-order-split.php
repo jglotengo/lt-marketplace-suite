@@ -68,7 +68,9 @@ final class LTMS_Business_Order_Split {
         $vendor_gross   = $gross_amount - $platform_fee;
 
         // Calcular retenciones a descontar del pago al vendedor
-        $withholding_total = $tax_breakdown['total_withholding'] ?? $tax_breakdown['withholding_total'] ?? 0.0;
+        // M-QA-02: normalised key. Tax engine returns 'withholding_total'; 'total_withholding' kept as
+        // defensive fallback until all Tax_Engine strategies are verified to emit 'withholding_total'.
+        $withholding_total = $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0;
         $vendor_net        = max( 0.0, $vendor_gross - $withholding_total );
 
         // Retener comisión durante el período de protección al consumidor (Ley 1480 Colombia)
@@ -201,7 +203,7 @@ final class LTMS_Business_Order_Split {
                 'gross_amount'      => $gross_amount,
                 'commission_amount' => $platform_fee,               // comisión de la plataforma
                 'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
-                'tax_withholding'   => $tax_breakdown['total_withholding'] ?? $tax_breakdown['withholding_total'] ?? 0.0,
+                'tax_withholding'   => $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0, // M-QA-02: normalised
                 'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
                 'currency'          => $order->get_currency(),
                 'country_code'      => LTMS_Core_Config::get_country(),
