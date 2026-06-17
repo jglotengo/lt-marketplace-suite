@@ -309,7 +309,8 @@ function ltms_load_autoloader(): void {
                 'ltms-frontend-deposit-handler'         => 'frontend/class-ltms-frontend-deposit-handler.php',
                 'ltms-business-order-split'     => 'business/class-ltms-order-split.php',
                 // Business — subdir derivado de la clase no existe; archivo en business/
-                'ltms-commission-strategy'      => 'business/class-ltms-commission-strategy.php',
+                'ltms-commission-strategy'          => 'business/class-ltms-commission-strategy.php',
+                'ltms-business-commission-strategy' => 'business/class-ltms-commission-strategy.php',
                 'ltms-tax-engine'               => 'business/class-ltms-tax-engine.php',
                 'ltms-referral-tree'            => 'business/class-ltms-referral-tree.php',
                 'ltms-payout-scheduler'         => 'business/class-ltms-payout-scheduler.php',
