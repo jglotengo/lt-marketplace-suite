@@ -26,7 +26,7 @@ final class LTMS_Commission_Strategy {
     use LTMS_Logger_Aware;
 
     /** Tasa base de comisión por defecto. */
-    const DEFAULT_RATE = 0.10; // 10%
+    const DEFAULT_RATE = 0.15; // 15% — M-QA-05: synced with ltms_platform_commission_rate admin default
 
     /** Tipos de producto válidos para comisión diferenciada. */
     const PRODUCT_TYPES = [ 'physical', 'digital', 'service', 'booking' ];
