@@ -17,7 +17,10 @@ class LTMS_Business_Redi_Order_Split {
      * @return void
      */
     public static function process( \WC_Order $order, array $redi_items ): void {
-        $platform_rate = (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.10 );
+        // CS-CASCADE: Use LTMS_Commission_Strategy::get_rate() so per-vendor/per-product rules apply.
+        $platform_rate = class_exists( 'LTMS_Commission_Strategy' )
+            ? LTMS_Commission_Strategy::get_rate( $origin_vendor_id, $order )
+            : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 );
         $country       = LTMS_Core_Config::get_country();
 
         foreach ( $redi_items as $item_data ) {
@@ -193,3 +196,4 @@ class LTMS_Business_Redi_Order_Split {
         ];
     }
 }
+
