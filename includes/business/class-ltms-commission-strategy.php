@@ -351,7 +351,7 @@ final class LTMS_Commission_Strategy {
      * Devuelve un resumen de las tasas aplicables a un vendedor (para UI).
      *
      * @param int $vendor_id ID del vendedor.
-     * @return array{current_rate: float, tier: string, monthly_sales: float}
+     * @return array{current_rate: float, rate_source: string, tier: string, monthly_sales: float}
      */
     public static function get_rate_summary( int $vendor_id ): array {
         $monthly_sales = self::get_vendor_monthly_sales( $vendor_id );
@@ -368,13 +368,28 @@ final class LTMS_Commission_Strategy {
             elseif ( $monthly_sales >=  25_000 )    $tier = 'silver';
         }
 
+        // CS-00: contrato individual tiene prioridad sobre tier y global.
+        // M-QA-10: get_rate_summary() mostraba DEFAULT_RATE ignorando contratos negociados
+        // (ej. Juguetería Taiwán al 12%) porque antes solo miraba get_volume_tier_rate().
+        $contract_rate = self::get_custom_contract_rate( $vendor_id );
+        if ( $contract_rate !== null ) {
+            return [
+                'current_rate'  => $contract_rate,
+                'rate_source'   => 'custom_contract',
+                'tier'          => $tier,
+                'monthly_sales' => $monthly_sales,
+            ];
+        }
+
         return [
             'current_rate'  => self::get_volume_tier_rate( $vendor_id ) ?? self::DEFAULT_RATE,
+            'rate_source'   => 'default',
             'tier'          => $tier,
             'monthly_sales' => $monthly_sales,
         ];
     }
 }
+
 
 
 
