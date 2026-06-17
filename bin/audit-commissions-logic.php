@@ -36,7 +36,7 @@ printf("  mlm_enabled      = %s | redi_enabled = %s\n\n", $mlm_enabled, $redi_en
 // ── 2. CLASES CARGADAS ───────────────────────────────────────────────────────
 echo "── 2. CLASES CARGADAS (context: wp eval-file no ejecuta plugins_loaded) ─\n";
 $classes = [
-    'LTMS_Business_Commission_Strategy' => 'business/class-ltms-commission-strategy.php',
+    'LTMS_Commission_Strategy'  => 'business/class-ltms-commission-strategy.php',
     'LTMS_Business_Order_Split'         => 'business/class-ltms-order-split.php',
     'LTMS_Business_Redi_Manager'        => 'business/class-ltms-business-redi-manager.php',
     'LTMS_Business_Redi_Order_Split'    => 'business/class-ltms-business-redi-order-split.php',
@@ -58,7 +58,7 @@ echo "\n";
 
 // Intentar cargar manualmente Commission_Strategy para testear
 $cs_file = WP_PLUGIN_DIR . '/lt-marketplace-suite/includes/business/class-ltms-commission-strategy.php';
-if (file_exists($cs_file) && !class_exists('LTMS_Business_Commission_Strategy', false)) {
+if (file_exists($cs_file) && !class_exists('LTMS_Commission_Strategy', false)) {
     // Necesita traits primero
     $traits_ok = true;
     foreach (['class-ltms-logger-aware.php'] as $trait_file) {
@@ -70,7 +70,7 @@ if (file_exists($cs_file) && !class_exists('LTMS_Business_Commission_Strategy', 
 
 // ── 3. SIMULACIÓN get_rate() ─────────────────────────────────────────────────
 echo "── 3. SIMULACIÓN Commission_Strategy::get_rate() ───────────────────────\n";
-if (class_exists('LTMS_Business_Commission_Strategy')) {
+if (class_exists('LTMS_Commission_Strategy')) {
     echo "  ✅ Clase disponible. Simulando para tipos de producto:\n";
     foreach (['physical','digital','service','booking'] as $type) {
         $key = 'ltms_commission_' . $type;
@@ -86,7 +86,7 @@ if (class_exists('LTMS_Business_Commission_Strategy')) {
         printf("  type=%-10s option=%s → rate=%.4f (%.2f%%)  ✅\n", $type, $configured_pct ?: 'default', $rate, $rate*100);
     }
 } else {
-    echo "  ❌ No se pudo cargar. Autoloader no resuelve 'LTMS_Business_Commission_Strategy'\n";
+    echo "  ❌ No se pudo cargar. Autoloader no resuelve 'LTMS_Commission_Strategy'\n";
     echo "  FIX APLICADO: se agregó 'ltms-business-commission-strategy' al mapa de excepciones.\n";
     echo "  Simulación manual:\n";
     foreach (['physical'=>0.10,'digital'=>0.15,'service'=>0.15,'booking'=>0.15] as $type=>$def) {
