@@ -111,6 +111,12 @@ final class LTMS_Commission_Strategy {
      * (0.12 = 12%) como porcentaje (12 = 12%), igual que CS-01, para tolerar cómo
      * se haya guardado el dato manualmente o desde la futura UI de admin.
      *
+     * M-QA-09: el umbral de auto-conversión a porcentaje es >= 2, no > 1. Valores
+     * apenas superiores a 1 (ej. 1.1) no son un porcentaje creíble de dos cifras
+     * (nadie negocia una comisión de "1.1%"); son datos corruptos y deben
+     * descartarse, en vez de convertirse silenciosamente a 0.011 (1.1%).
+     * 1.0 (100%) sigue siendo válido como límite superior legítimo.
+     *
      * @param int $vendor_id ID del vendedor.
      * @return float|null Tasa decimal (0–1) o null si el vendedor no tiene contrato propio.
      */
@@ -120,7 +126,7 @@ final class LTMS_Commission_Strategy {
             return null;
         }
         $rate = (float) $stored_rate;
-        if ( $rate > 1 ) {
+        if ( $rate >= 2 ) {
             $rate = $rate / 100;
         }
         return ( $rate >= 0 && $rate <= 1 ) ? $rate : null;
@@ -369,6 +375,7 @@ final class LTMS_Commission_Strategy {
         ];
     }
 }
+
 
 
 
