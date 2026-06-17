@@ -886,7 +886,7 @@
                             '</label>' +
                             '<div id="ltms-np-redi-rate-wrap" style="display:none;">' +
                                 '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
-                                '<input type="number" id="ltms-np-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="0.5" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                                '<input type="number" id="ltms-np-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="1" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" oninput="(function(el){var v=parseFloat(el.value),mn=' + rediMin + ',mx=' + rediMax + ';el.style.borderColor=(isNaN(v)||v<mn||v>mx)?\'#c00\':\'#4CAF50\';})(this)">' +
                                 '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
                             '</div>' +
                         '</div>' +
@@ -961,6 +961,21 @@
                         if (!name || !price) {
                             jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
                             return;
+                        }
+                        // Validar tasa ReDi si está activa
+                        if (jQuery('#ltms-np-redi-enabled').is(':checked')) {
+                            var npRediVal = parseFloat(jQuery('#ltms-np-redi-rate').val());
+                            var npRediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                            var npRediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                            var npRediMin = npRediMinRaw < 1 ? Math.round(npRediMinRaw * 100) : npRediMinRaw;
+                            var npRediMax = npRediMaxRaw < 1 ? Math.round(npRediMaxRaw * 100) : npRediMaxRaw;
+                            if (isNaN(npRediVal) || npRediVal < npRediMin || npRediVal > npRediMax) {
+                                jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'})
+                                    .text('⚠️ La tasa ReDi debe estar entre ' + npRediMin + '% y ' + npRediMax + '%.');
+                                jQuery('#ltms-np-redi-rate').focus().css('border-color','#c00');
+                                return;
+                            }
+                            jQuery('#ltms-np-redi-rate').css('border-color','#ccc');
                         }
                         jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
                         const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
@@ -1104,7 +1119,7 @@
                         '</label>' +
                         '<div id="ltms-ep-redi-rate-wrap" style="display:' + (p.redi_enabled ? 'block' : 'none') + ';">' +
                             '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
-                            '<input type="number" id="ltms-ep-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="0.5" value="' + (p.redi_rate || '') + '" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;">' +
+                            '<input type="number" id="ltms-ep-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="1" value="' + (p.redi_rate || '') + '" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" oninput="(function(el){var v=parseFloat(el.value),mn=' + rediMin + ',mx=' + rediMax + ';el.style.borderColor=(isNaN(v)||v<mn||v>mx)?\'#c00\':\'#4CAF50\';})(this)">' +
                             '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
                         '</div>' +
                     '</div>' +
@@ -1190,6 +1205,21 @@
                     if (!name || !price) {
                         jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
                         return;
+                    }
+                    // Validar tasa ReDi si está activa
+                    if (jQuery('#ltms-ep-redi-enabled').is(':checked')) {
+                        var epRediVal = parseFloat(jQuery('#ltms-ep-redi-rate').val());
+                        var epRediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
+                        var epRediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
+                        var epRediMin = epRediMinRaw < 1 ? Math.round(epRediMinRaw * 100) : epRediMinRaw;
+                        var epRediMax = epRediMaxRaw < 1 ? Math.round(epRediMaxRaw * 100) : epRediMaxRaw;
+                        if (isNaN(epRediVal) || epRediVal < epRediMin || epRediVal > epRediMax) {
+                            jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'})
+                                .text('⚠️ La tasa ReDi debe estar entre ' + epRediMin + '% y ' + epRediMax + '%.');
+                            jQuery('#ltms-ep-redi-rate').focus().css('border-color','#c00');
+                            return;
+                        }
+                        jQuery('#ltms-ep-redi-rate').css('border-color','#ccc');
                     }
                     jQuery('#ltms-ep-submit').prop('disabled', true).text('Guardando...');
                     jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
