@@ -221,7 +221,16 @@ final class LTMS_Commission_Strategy {
                 $monthly_sales
             )
         );
-        return $rate !== null ? (float) $rate : null;
+        if ( $rate === null ) {
+            return null;
+        }
+        $rate_float = (float) $rate;
+        // lt_commission_tiers.rate is stored as integer percentage (e.g. 10 = 10%).
+        // Convert to decimal before returning so callers receive a value in the 0–1 range.
+        if ( $rate_float > 1 ) {
+            $rate_float = $rate_float / 100;
+        }
+        return $rate_float;
     }
 
     /**
@@ -330,3 +339,4 @@ final class LTMS_Commission_Strategy {
         ];
     }
 }
+
