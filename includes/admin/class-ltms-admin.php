@@ -33,6 +33,12 @@ final class LTMS_Admin {
         add_action( 'admin_init',    [ $instance, 'handle_activation_redirect' ] );
         add_filter( 'plugin_action_links_' . LTMS_PLUGIN_BASENAME, [ $instance, 'add_plugin_links' ] );
         add_action( 'admin_notices', [ $instance, 'render_admin_notices' ] );
+
+        // Tasa de comisión negociada por contrato — campo en perfil de usuario
+        add_action( 'show_user_profile',   [ $instance, 'render_vendor_commission_field' ] );
+        add_action( 'edit_user_profile',   [ $instance, 'render_vendor_commission_field' ] );
+        add_action( 'personal_options_update',  [ $instance, 'save_vendor_commission_field' ] );
+        add_action( 'edit_user_profile_update', [ $instance, 'save_vendor_commission_field' ] );
     }
 
     /**
@@ -502,4 +508,107 @@ final class LTMS_Admin {
                 ) . '</p></div>';
         }
     }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tasa de comisión negociada por contrato individual
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Renderiza el campo de tasa de comisión negociada en el perfil del usuario.
+     * Solo visible para admins con permiso ltms_manage_platform_settings.
+     *
+     * @param \WP_User $user Usuario que se está editando.
+     * @return void
+     */
+    public function render_vendor_commission_field( \WP_User $user ): void {
+        if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
+            return;
+        }
+
+        $raw  = get_user_meta( $user->ID, 'ltms_custom_commission_rate', true );
+        // Normalizar a porcentaje para mostrar (0.12 → 12, '' → '')
+        $display = '';
+        if ( $raw !== '' && is_numeric( $raw ) ) {
+            $val     = (float) $raw;
+            $display = $val <= 1.0 ? number_format( $val * 100, 2, '.', '' ) : number_format( $val, 2, '.', '' );
+        }
+
+        wp_nonce_field( 'ltms_commission_rate_' . $user->ID, '_ltms_commission_nonce' );
+        ?>
+        <h2><?php esc_html_e( 'Lo Tengo — Comisión por contrato', 'ltms' ); ?></h2>
+        <table class="form-table" role="presentation">
+            <tr>
+                <th scope="row">
+                    <label for="ltms_custom_commission_rate">
+                        <?php esc_html_e( 'Tasa de comisión negociada (%)', 'ltms' ); ?>
+                    </label>
+                </th>
+                <td>
+                    <input
+                        type="number"
+                        id="ltms_custom_commission_rate"
+                        name="ltms_custom_commission_rate"
+                        value="<?php echo esc_attr( $display ); ?>"
+                        min="0" max="100" step="0.01"
+                        class="small-text"
+                        placeholder="<?php esc_attr_e( 'ej. 12', 'ltms' ); ?>"
+                    />
+                    <span class="description">
+                        <?php esc_html_e( 'Dejar vacío para usar la tasa global de la plataforma. Este valor tiene prioridad sobre cualquier otra regla de comisión.', 'ltms' ); ?>
+                    </span>
+                    <?php if ( $display !== '' ) : ?>
+                        <br><span style="color:#0073aa;font-size:12px;margin-top:4px;display:inline-block;">
+                            <?php
+                            $effective = get_user_meta( $user->ID, 'ltms_custom_commission_rate', true );
+                            printf(
+                                esc_html__( 'Tasa efectiva actual: %s%%', 'ltms' ),
+                                esc_html( $display )
+                            );
+                            ?>
+                        </span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+
+    /**
+     * Guarda la tasa de comisión negociada desde el perfil del usuario.
+     *
+     * @param int $user_id ID del usuario que se está guardando.
+     * @return void
+     */
+    public function save_vendor_commission_field( int $user_id ): void {
+        if ( ! isset( $_POST['_ltms_commission_nonce'] ) ) {
+            return;
+        }
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_ltms_commission_nonce'] ) ), 'ltms_commission_rate_' . $user_id ) ) {
+            return;
+        }
+        if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
+            return;
+        }
+
+        $raw = isset( $_POST['ltms_custom_commission_rate'] )
+            ? sanitize_text_field( wp_unslash( $_POST['ltms_custom_commission_rate'] ) )
+            : '';
+
+        if ( $raw === '' ) {
+            // Campo vacío → eliminar la tasa negociada, vuelve a la tasa global
+            delete_user_meta( $user_id, 'ltms_custom_commission_rate' );
+            return;
+        }
+
+        $pct = (float) $raw;
+
+        // Validar rango 0–100%
+        if ( $pct < 0.0 || $pct > 100.0 ) {
+            return; // Valor fuera de rango — ignorar sin guardar
+        }
+
+        // Guardar siempre en formato decimal (12 → 0.12)
+        $decimal = $pct / 100.0;
+        update_user_meta( $user_id, 'ltms_custom_commission_rate', (string) $decimal );
+    }
+
 }
