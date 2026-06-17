@@ -563,6 +563,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Admin_Bookings' ) ) {
             LTMS_Admin_Bookings::init();
         }
+
+        // M-QA-12: Metabox de tipo y comisión individual en el editor de producto WC
+        if ( class_exists( 'LTMS_Admin_Product_Meta' ) ) {
+            LTMS_Admin_Product_Meta::init();
+        }
     }
 
     /**
