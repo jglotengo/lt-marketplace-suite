@@ -30,7 +30,15 @@ $fields = [
     <h2 style="margin-top:24px;">💰 Comisiones y Pagos</h2>
     <table class="form-table" role="presentation"><tbody>
     <?php foreach ( $fields as $key => $field ) :
-        $value = get_option( $key, $field['default'] ?? '' );
+        $raw_value = get_option( $key, $field['default'] ?? '' );
+        // Campos _rate guardados como decimal (0.15) → mostrar como % (15) en el UI
+        $is_rate_field = ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false )
+                         && $key !== 'ltms_referral_rates';
+        if ( $is_rate_field && $field['type'] === 'number' && is_numeric( $raw_value ) && (float) $raw_value < 1 && (float) $raw_value > 0 ) {
+            $value = round( (float) $raw_value * 100, 4 );
+        } else {
+            $value = $raw_value;
+        }
     ?>
     <tr>
         <th scope="row"><label for="<?php echo esc_attr($key); ?>"><?php echo esc_html($field['label']); ?></label></th>

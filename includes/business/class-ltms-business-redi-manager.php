@@ -362,8 +362,14 @@ class LTMS_Business_Redi_Manager {
      * @return float Clamped rate.
      */
     public static function clamp_redi_rate( float $rate ): float {
-        $min_pct = (float) get_option( 'ltms_redi_min_rate', 5 );
-        $max_pct = (float) get_option( 'ltms_redi_max_rate', 40 );
-        return max( $min_pct / 100, min( $max_pct / 100, $rate ) );
+        $min_raw = (float) get_option( 'ltms_redi_min_rate', 5 );
+        $max_raw = (float) get_option( 'ltms_redi_max_rate', 40 );
+
+        // Normalizar a decimal: si el valor guardado es decimal (<1) ya es la tasa decimal.
+        // Si es pct (>=1), dividir por 100. Ej: 0.05→0.05 | 5→0.05 | 0.4→0.4 | 40→0.40
+        $min_decimal = ( $min_raw < 1 ) ? $min_raw : $min_raw / 100;
+        $max_decimal = ( $max_raw < 1 ) ? $max_raw : $max_raw / 100;
+
+        return max( $min_decimal, min( $max_decimal, $rate ) );
     }
 }
