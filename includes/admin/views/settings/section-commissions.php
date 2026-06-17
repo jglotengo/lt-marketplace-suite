@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $fields = [
     // C-01 FIX: La clave correcta que lee el código de producción es ltms_platform_commission_rate.
     // Anteriormente la vista guardaba ltms_commission_rate, que nunca era leída.
-    'ltms_platform_commission_rate' => [ 'label' => 'Comisión de la Plataforma (%)', 'type' => 'number', 'default' => '10', 'desc' => 'Porcentaje que retiene la plataforma por cada venta. El código espera un valor como porcentaje (ej: 10 = 10%).' ],
+    'ltms_platform_commission_rate' => [ 'label' => 'Comisión de la Plataforma (%)', 'type' => 'number', 'default' => '15', 'desc' => 'Porcentaje que retiene la plataforma por cada venta. El código espera un valor como porcentaje (ej: 10 = 10%).' ],
     // CS-03: tasas por tipo de producto — físico 10%, resto 15% por defecto
     'ltms_commission_physical' => [ 'label' => 'Comisión Producto Físico (%)',   'type' => 'number', 'default' => '10', 'desc' => 'Tasa para productos físicos (nivel 1 de la cascada). Ej: 10 = 10%.' ],
     'ltms_commission_digital'  => [ 'label' => 'Comisión Producto Digital (%)',  'type' => 'number', 'default' => '15', 'desc' => 'Tasa para productos digitales. Ej: 15 = 15%.' ],
@@ -63,3 +63,4 @@ $fields = [
     <?php endforeach; ?>
     </tbody></table>
 </div>
+
