@@ -215,17 +215,20 @@ class RediOrderSplitTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_get_vendor_data_defaults_via_reflection(): void {
+        // M-QA-01: key names aligned with LTMS_Business_Order_Split::get_vendor_data()
         $data = $this->call_get_vendor_data( 999999 );
         $this->assertArrayHasKey( 'vendor_id', $data );
-        $this->assertArrayHasKey( 'regime', $data );
+        $this->assertArrayHasKey( 'tax_regime', $data );
         $this->assertArrayHasKey( 'ciiu_code', $data );
-        $this->assertArrayHasKey( 'municipality', $data );
+        $this->assertArrayHasKey( 'municipality_code', $data );
         $this->assertArrayHasKey( 'monthly_income', $data );
+        $this->assertArrayHasKey( 'is_gran_contribuyente', $data );
     }
 
-    public function test_get_vendor_data_default_regime_is_responsable_iva(): void {
+    public function test_get_vendor_data_default_regime_is_simplified(): void {
+        // M-QA-01: default regime aligned with Order_Split ('simplified')
         $data = $this->call_get_vendor_data( 999999 );
-        $this->assertSame( 'responsable_iva', $data['regime'] );
+        $this->assertSame( 'simplified', $data['tax_regime'] );
     }
 
     public function test_get_vendor_data_default_ciiu_is_4791(): void {
@@ -233,9 +236,10 @@ class RediOrderSplitTest extends LTMS_Unit_Test_Case {
         $this->assertSame( '4791', $data['ciiu_code'] );
     }
 
-    public function test_get_vendor_data_default_municipality_is_bogota(): void {
+    public function test_get_vendor_data_default_municipality_code_is_empty(): void {
+        // M-QA-01: municipality_code returns '' when no meta set (DANE resolution happens in Order_Split)
         $data = $this->call_get_vendor_data( 999999 );
-        $this->assertSame( 'bogota', $data['municipality'] );
+        $this->assertSame( '', $data['municipality_code'] );
     }
 
     public function test_get_vendor_data_monthly_income_is_float(): void {
@@ -243,9 +247,10 @@ class RediOrderSplitTest extends LTMS_Unit_Test_Case {
         $this->assertIsFloat( $data['monthly_income'] );
     }
 
-    public function test_get_vendor_data_is_gran_contrib_is_bool(): void {
+    public function test_get_vendor_data_is_gran_contribuyente_is_bool(): void {
+        // M-QA-01: key renamed to is_gran_contribuyente to match Order_Split
         $data = $this->call_get_vendor_data( 999999 );
-        $this->assertIsBool( $data['is_gran_contrib'] );
+        $this->assertIsBool( $data['is_gran_contribuyente'] );
     }
 
     // ── Invariantes adicionales de la fórmula ────────────────────────────
@@ -337,4 +342,5 @@ class RediOrderSplitTest extends LTMS_Unit_Test_Case {
     }
 
 }
+
 
