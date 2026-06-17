@@ -124,7 +124,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     public function test_process_runs_without_exception_for_valid_order(): void {
         Functions\when( 'get_post_meta' )->justReturn( '' ); // no es ReDi
-        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 10 ] );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 10, 'roles' => [] ] );
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
         Functions\when( '__' )->returnArg();
@@ -281,7 +281,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             }
             return '';
         } );
-        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 5 ] );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 5, 'roles' => [] ] );
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
         Functions\when( '__' )->returnArg();
@@ -360,7 +360,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             if ( $key === '_ltms_redi_origin_product_id' ) return '';
             return '';
         } );
-        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 8 ] );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 8, 'roles' => [] ] );
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
         Functions\when( '__' )->returnArg();
@@ -381,7 +381,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         LTMS_Core_Config::set( 'ltms_mlm_enabled', 'no' );
 
         Functions\when( 'get_post_meta' )->justReturn( '' );
-        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 3 ] );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 3, 'roles' => [] ] );
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
         Functions\when( '__' )->returnArg();
@@ -397,7 +397,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         LTMS_Core_Config::set( 'ltms_mlm_enabled', 'yes' );
 
         Functions\when( 'get_post_meta' )->justReturn( '' );
-        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 3 ] );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 3, 'roles' => [] ] );
         Functions\when( 'get_user_meta' )->justReturn( '' );
         Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
         Functions\when( '__' )->returnArg();
@@ -797,4 +797,5 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
 }
+
 
