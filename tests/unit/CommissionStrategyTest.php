@@ -41,12 +41,13 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     // SECCIÓN 1 — Constantes y estructura de clase
     // ════════════════════════════════════════════════════════════════════════
 
-    public function test_default_rate_es_0_10(): void {
+    public function test_default_rate_es_0_15(): void {
+        // M-QA-05: DEFAULT_RATE synced to 0.15 matching ltms_platform_commission_rate admin default.
         $this->assertEqualsWithDelta(
-            0.10,
+            0.15,
             \LTMS_Commission_Strategy::DEFAULT_RATE,
             self::DELTA,
-            'DEFAULT_RATE debe ser 0.10 (10%)'
+            'DEFAULT_RATE debe ser 0.15 (15%)'
         );
     }
 
@@ -54,9 +55,10 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
         $this->assertIsFloat( \LTMS_Commission_Strategy::DEFAULT_RATE );
     }
 
-    public function test_default_rate_como_porcentaje_es_10(): void {
+    public function test_default_rate_como_porcentaje_es_15(): void {
+        // M-QA-05: DEFAULT_RATE * 100 = 15%
         $this->assertEqualsWithDelta(
-            10.0,
+            15.0,
             \LTMS_Commission_Strategy::DEFAULT_RATE * 100,
             self::DELTA
         );
@@ -689,12 +691,13 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_comision_default_rate_sobre_millon(): void {
+        // M-QA-05: DEFAULT_RATE = 0.15 → 1.000.000 × 0.15 = 150.000
         $rate   = \LTMS_Commission_Strategy::DEFAULT_RATE;
         $amount = 1_000_000.0;
 
         $commission = round( $rate * $amount, 2 );
 
-        $this->assertEqualsWithDelta( 100_000.0, $commission, 0.01 );
+        $this->assertEqualsWithDelta( 150_000.0, $commission, 0.01 );
     }
 
     public function test_vendor_neto_es_monto_menos_comision(): void {
@@ -781,3 +784,4 @@ class CommissionStrategyTest extends LTMS_Unit_Test_Case {
     }
 
 }
+
