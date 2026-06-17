@@ -565,10 +565,11 @@ Puedes enviar una nueva solicitud desde tu panel.
      * @return float Comisión en moneda local.
      */
     private static function calculate_payout_fee( float $amount, string $method ): float {
+        // M-QA-04: fees read from config so they can be updated without a deploy.
         $fees = [
-            'bank_transfer' => 0.0,   // Sin costo por defecto
-            'openpay'       => 4000.0, // $4.000 COP fijo en Colombia
-            'nequi'         => 0.0,
+            'bank_transfer' => (float) LTMS_Core_Config::get( 'ltms_payout_fee_bank_transfer', 0.0 ),
+            'openpay'       => (float) LTMS_Core_Config::get( 'ltms_payout_fee_openpay', 4000.0 ), // default $4.000 COP
+            'nequi'         => (float) LTMS_Core_Config::get( 'ltms_payout_fee_nequi', 0.0 ),
         ];
 
         return $fees[ $method ] ?? 0.0;
@@ -646,10 +647,14 @@ Puedes enviar una nueva solicitud desde tu panel.
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // M-QA-03: include minimum payout amount guard to prevent approving dust amounts.
+        $min_auto_amount = self::get_minimum_payout_amount();
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $eligible = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT id FROM `{$table}` WHERE status = 'pending' AND amount <= %f ORDER BY created_at ASC LIMIT 20",
+                "SELECT id FROM `{$table}` WHERE status = 'pending' AND amount >= %f AND amount <= %f ORDER BY created_at ASC LIMIT 20",
+                $min_auto_amount,
                 $max_auto_amount
             ),
             ARRAY_A
