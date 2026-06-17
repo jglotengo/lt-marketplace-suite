@@ -57,7 +57,11 @@ final class LTMS_Business_Order_Split {
             return;
         }
 
-        $platform_rate   = (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.10 ); // 10% default
+        // CS-CASCADE: Use LTMS_Commission_Strategy::get_rate() cascade (individual→type→contract→tier→category→plan→global)
+        // instead of reading ltms_platform_commission_rate directly, so per-vendor and per-product rules apply.
+        $platform_rate = class_exists( 'LTMS_Commission_Strategy' )
+            ? LTMS_Commission_Strategy::get_rate( $vendor_id, $order )
+            : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 ); // fallback
         $country         = LTMS_Core_Config::get_country();
 
         // Calcular retenciones fiscales
@@ -387,3 +391,4 @@ final class LTMS_Business_Order_Split {
         }
     }
 }
+
