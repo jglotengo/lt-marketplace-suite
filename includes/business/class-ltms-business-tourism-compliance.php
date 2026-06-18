@@ -38,6 +38,14 @@ class LTMS_Business_Tourism_Compliance {
      * Crea el registro de compliance cuando se aprueba el vendedor.
      */
     public static function create_compliance_record( int $vendor_id ): void {
+        // M-TURISMO-01: solo vendedores con business_type='tourism' entran en el flujo RNT/SECTUR.
+        // Los de physical/digital/services no necesitan RNT y no deben aparecer en el panel de
+        // Compliance con estado pending sin motivo.
+        $btype = get_user_meta( $vendor_id, 'ltms_business_type', true );
+        if ( 'tourism' !== $btype ) {
+            return;
+        }
+
         global $wpdb;
         $exists = (int) $wpdb->get_var(
             $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}lt_tourism_compliance WHERE vendor_id = %d", $vendor_id )
