@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class LTMS_Booking_Policy_Handler {
 
+    use LTMS_Logger_Aware;
+
     private static bool $initialized = false;
 
     public static function init(): void {
@@ -188,12 +190,12 @@ class LTMS_Booking_Policy_Handler {
             ] );
 
             if ( is_wp_error( $refund ) ) {
-                error_log( 'LTMS refund error booking #' . $booking_id . ': ' . $refund->get_error_message() );
+                self::log_warning_static( 'booking', 'refund error booking #' . $booking_id . ': ' . $refund->get_error_message() );
             } else {
                 do_action( 'ltms_booking_refund_processed', $booking_id, $refund_amount, $refund );
             }
         } catch ( \Throwable $e ) {
-            error_log( 'LTMS process_cancellation_refund: ' . $e->getMessage() );
+            self::log_warning_static( 'booking', 'process_cancellation_refund exception: ' . $e->getMessage() );
         }
     }
 
