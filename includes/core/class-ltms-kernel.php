@@ -669,6 +669,20 @@ final class LTMS_Core_Kernel {
     }
 
 
+        // M-QA-RNT-01: Cron diario de vencimiento RNT/SECTUR.
+        // check_rnt_expiry() existía pero nunca se programaba — los registros
+        // verificados con rnt_expiry_date pasada permanecían como 'verified' indefinidamente.
+        add_action( 'ltms_check_rnt_expiry', static function(): void {
+            if ( class_exists( 'LTMS_Business_Tourism_Compliance' ) ) {
+                LTMS_Business_Tourism_Compliance::check_rnt_expiry();
+            }
+        } );
+        if ( ! wp_next_scheduled( 'ltms_check_rnt_expiry' ) ) {
+            wp_schedule_event( strtotime( 'tomorrow midnight' ), 'daily', 'ltms_check_rnt_expiry' );
+        }
+    }
+
+
     /**
      * Registra los endpoints de la API REST.
      *
