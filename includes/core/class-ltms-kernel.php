@@ -568,6 +568,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Admin_Product_Meta' ) ) {
             LTMS_Admin_Product_Meta::init();
         }
+
+        // QA-booking-01: Metabox de configuración de reserva (turismo/booking) en el editor de producto WC
+        if ( class_exists( 'LTMS_Admin_Bookable_Meta' ) ) {
+            LTMS_Admin_Bookable_Meta::init();
+        }
     }
 
     /**
