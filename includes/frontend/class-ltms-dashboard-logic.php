@@ -40,6 +40,8 @@ final class LTMS_Dashboard_Logic {
         add_shortcode( 'ltms_vendor_wallet',    [ $instance, 'render_wallet_shortcode' ] );
         add_shortcode( 'ltms_vendor_kyc',       [ $instance, 'render_kyc_shortcode' ] );
         add_shortcode( 'ltms_vendor_insurance', [ $instance, 'render_insurance_shortcode' ] );
+        add_shortcode( 'ltms_vendor_bookings',  [ $instance, 'render_bookings_shortcode' ] );  // M-QA-PAGES-01
+        add_shortcode( 'ltms_vendor_rnt',       [ $instance, 'render_rnt_shortcode' ] );       // M-QA-PAGES-01
 
         // AJAX handlers autenticados
         add_action( 'wp_ajax_ltms_get_dashboard_data',    [ $instance, 'ajax_get_dashboard_data' ] );
@@ -114,6 +116,34 @@ final class LTMS_Dashboard_Logic {
         if ( file_exists( $view_path ) ) include $view_path;
         return ob_get_clean();
     }
+    /**
+     * Shortcode [ltms_vendor_bookings] — M-QA-PAGES-01
+     * Renderiza view-bookings.php directamente (sin pasar por el SPA del dashboard).
+     * Útil si el admin crea una página con este shortcode como acceso directo.
+     */
+    public function render_bookings_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-bookings.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    /**
+     * Shortcode [ltms_vendor_rnt] — M-QA-PAGES-01
+     * Renderiza el formulario RNT/SECTUR de LTMS_Business_Tourism_Compliance.
+     */
+    public function render_rnt_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        if ( class_exists( 'LTMS_Business_Tourism_Compliance' ) ) {
+            LTMS_Business_Tourism_Compliance::render_account_rnt_form();
+        }
+        return ob_get_clean();
+    }
+
     public function render_dashboard_shortcode( array $atts = [] ): string {
         // Verificar que el usuario esté autenticado y sea vendedor
         if ( ! is_user_logged_in() ) {
