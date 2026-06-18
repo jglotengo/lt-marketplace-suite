@@ -80,7 +80,15 @@ $summary  = $wpdb->get_row( "SELECT COUNT(*) as total, SUM(rnt_verified=1) as ve
                 <td>
                     <?php $rnt = $row['rnt_number'] ?: $row['sectur_folio'] ?: ''; ?>
                     <?php if ( $rnt ) : ?>
+                        <?php if ( 'CO' === ( $row['country_code'] ?? 'CO' ) ) : ?>
+                        <a href="https://rnt.confecamaras.co/establecimientos?q=<?php echo rawurlencode( $rnt ); ?>" target="_blank" rel="noopener"
+                           title="<?php esc_attr_e( 'Verificar en CONFECÁMARAS', 'ltms' ); ?>"
+                           style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:3px;font-size:12px;color:#1d4ed8;text-decoration:none;">
+                            <?php echo esc_html( $rnt ); ?> &#8599;
+                        </a>
+                        <?php else : ?>
                         <code style="background:#f3f4f6;padding:2px 6px;border-radius:3px;font-size:12px;"><?php echo esc_html( $rnt ); ?></code>
+                        <?php endif; ?>
                     <?php else : ?>
                         <span style="color:#9ca3af;">—</span>
                     <?php endif; ?>
@@ -150,7 +158,13 @@ $summary  = $wpdb->get_row( "SELECT COUNT(*) as total, SUM(rnt_verified=1) as ve
             ?>
             <tr>
                 <td><strong><?php echo esc_html( $row['display_name'] ?? '#' . $row['vendor_id'] ); ?></strong></td>
-                <td><code style="background:#f3f4f6;padding:2px 6px;border-radius:3px;font-size:12px;"><?php echo esc_html( $row['rnt_number'] ); ?></code></td>
+                <td>
+                    <a href="https://rnt.confecamaras.co/establecimientos?q=<?php echo rawurlencode( $row['rnt_number'] ); ?>" target="_blank" rel="noopener"
+                       title="<?php esc_attr_e( 'Verificar en CONFECÁMARAS', 'ltms' ); ?>"
+                       style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:3px;font-size:12px;color:#1d4ed8;text-decoration:none;">
+                        <?php echo esc_html( $row['rnt_number'] ); ?> &#8599;
+                    </a>
+                </td>
                 <td>
                     <span class="ltms-badge <?php echo $row['country_code'] === 'CO' ? 'ltms-badge-warning' : 'ltms-badge-success'; ?>">
                         <?php echo esc_html( $row['country_code'] ); ?>
