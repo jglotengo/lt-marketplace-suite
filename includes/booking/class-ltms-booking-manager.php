@@ -19,6 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class LTMS_Booking_Manager {
 
+    use LTMS_Logger_Aware;
+
     private static bool $initialized = false;
 
     public static function init(): void {
@@ -107,10 +109,15 @@ class LTMS_Booking_Manager {
                     'zapsign_doc_token'  => sanitize_text_field( $meta['zapsign_doc_token'] ?? '' ),
                     'insurance_quote_id' => sanitize_text_field( $meta['insurance_quote_id'] ?? '' ),
                     'notes'              => sanitize_textarea_field( $meta['notes'] ?? '' ),
+                    'booking_type'       => sanitize_key( $meta['booking_type'] ?? 'accommodation' ),
+                    'checkin_time'       => sanitize_text_field( $meta['checkin_time'] ?? '' ),
+                    'checkout_time'      => sanitize_text_field( $meta['checkout_time'] ?? '' ),
+                    'ip_address'         => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
                     'created_at'         => current_time( 'mysql' ),
                     'updated_at'         => current_time( 'mysql' ),
                 ],
-                [ '%d','%d','%d','%d','%s','%s','%d','%f','%f','%f','%s','%s','%s','%d','%s','%s','%s','%s','%s' ]
+                // 19 campos originales + 4 nuevos (booking_type, checkin_time, checkout_time, ip_address) = 23
+                [ '%d','%d','%d','%d','%s','%s','%d','%f','%f','%f','%s','%s','%s','%d','%s','%s','%s','%s','%s','%s','%s','%s','%s' ]
             );
 
             if ( ! $wpdb->insert_id ) {
@@ -143,7 +150,7 @@ class LTMS_Booking_Manager {
 
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' );
-            error_log( 'LTMS Booking create error: ' . $e->getMessage() );
+            self::log_warning_static( 'booking', 'create_booking exception: ' . $e->getMessage() );
             return new \WP_Error( 'booking_exception', $e->getMessage() );
         }
     }
@@ -188,13 +195,14 @@ class LTMS_Booking_Manager {
             $wpdb->update(
                 $wpdb->prefix . 'lt_bookings',
                 [
-                    'status'       => 'cancelled',
-                    'cancelled_by' => sanitize_text_field( $cancelled_by ),
-                    'cancel_notes' => sanitize_textarea_field( $notes ),
-                    'updated_at'   => current_time( 'mysql' ),
+                    'status'              => 'cancelled',
+                    'cancelled_by'        => sanitize_text_field( $cancelled_by ),
+                    'cancel_notes'        => sanitize_textarea_field( $notes ),
+                    'cancellation_reason' => sanitize_textarea_field( $notes ),
+                    'updated_at'          => current_time( 'mysql' ),
                 ],
                 [ 'id' => $booking_id ],
-                [ '%s', '%s', '%s', '%s' ],
+                [ '%s', '%s', '%s', '%s', '%s' ],
                 [ '%d' ]
             );
 
@@ -222,7 +230,7 @@ class LTMS_Booking_Manager {
 
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' );
-            error_log( 'LTMS cancel_booking error: ' . $e->getMessage() );
+            self::log_warning_static( 'booking', 'cancel_booking exception: ' . $e->getMessage() );
             return new \WP_Error( 'cancel_exception', $e->getMessage() );
         }
     }
@@ -332,7 +340,7 @@ class LTMS_Booking_Manager {
 
                 if ( ! $checkin_date || ! $checkout_date ) continue;
 
-                $vendor_id = (int) get_post_meta( $product->get_id(), '_vendor_id', true );
+                $vendor_id = (int) get_post_meta( $product->get_id(), '_ltms_vendor_id', true );
 
                 self::create_booking(
                     $product->get_id(),
@@ -347,11 +355,14 @@ class LTMS_Booking_Manager {
                         'payment_mode'    => $product->get_payment_mode(),
                         'deposit_pct'     => $product->get_deposit_pct(),
                         'instant_booking' => (int) $product->is_instant_booking(),
+                        'booking_type'    => method_exists( $product, 'get_booking_type' )  ? $product->get_booking_type()  : 'accommodation',
+                        'checkin_time'    => method_exists( $product, 'get_checkin_time' )  ? $product->get_checkin_time()  : '',
+                        'checkout_time'   => method_exists( $product, 'get_checkout_time' ) ? $product->get_checkout_time() : '',
                     ]
                 );
             }
         } catch ( \Throwable $e ) {
-            error_log( 'LTMS create_booking_from_order: ' . $e->getMessage() );
+            self::log_warning_static( 'booking', 'create_booking_from_order exception: ' . $e->getMessage() );
         }
     }
 
@@ -369,7 +380,7 @@ class LTMS_Booking_Manager {
                 self::cancel_booking( (int) $b['id'], 'woocommerce', 'Order ' . $order_id . ' cancelled' );
             }
         } catch ( \Throwable $e ) {
-            error_log( 'LTMS on_order_cancelled: ' . $e->getMessage() );
+            self::log_warning_static( 'booking', 'on_order_cancelled exception: ' . $e->getMessage() );
         }
     }
 
