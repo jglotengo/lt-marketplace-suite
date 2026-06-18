@@ -490,6 +490,20 @@ final class LTMS_Core_Activator {
                 'content' => '[ltms_vendor_insurance]',
                 'slug'    => 'mis-seguros',
             ],
+            // M-QA-PAGES-01: Páginas añadidas en v2.8 (reservas y compliance turístico).
+            // La pestaña Reservas del panel vendedor no requiere página propia (vive en el SPA),
+            // pero se registra aquí para que el admin la vea en el panel de páginas.
+            // La de turismo apunta al endpoint /mi-cuenta/ltms-rnt/ vía shortcode redireccionador.
+            'ltms-bookings'        => [
+                'title'   => 'Mis Reservas',
+                'content' => '[ltms_vendor_bookings]',
+                'slug'    => 'mis-reservas',
+            ],
+            'ltms-rnt'             => [
+                'title'   => 'RNT / Turismo',
+                'content' => '[ltms_vendor_rnt]',
+                'slug'    => 'rnt-turismo',
+            ],
         ];
 
         // ltms_installed_pages puede ser un array indexado (legado) o asociativo (nuevo).
