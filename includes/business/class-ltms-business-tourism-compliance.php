@@ -100,7 +100,7 @@ class LTMS_Business_Tourism_Compliance {
                 $wpdb->prefix . 'lt_tourism_compliance',
                 $payload,
                 [ 'vendor_id' => $vendor_id ],
-                null,
+                [ '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%s' ],
                 [ '%d' ]
             );
         }
@@ -123,14 +123,14 @@ class LTMS_Business_Tourism_Compliance {
         $wpdb->update(
             $wpdb->prefix . 'lt_tourism_compliance',
             [
-                'rnt_verified' => $approved ? 1 : 0,
-                'status'       => $approved ? 'verified' : 'rejected',
-                'admin_notes'  => sanitize_textarea_field( $notes ),
+                'rnt_verified'    => $approved ? 1 : 0,
+                'status'          => $approved ? 'verified' : 'rejected',
+                'admin_notes'     => sanitize_textarea_field( $notes ),
                 'rnt_verified_at' => $approved ? current_time( 'mysql' ) : null,
-                'updated_at'   => current_time( 'mysql' ),
+                'updated_at'      => current_time( 'mysql' ),
             ],
             [ 'vendor_id' => $vendor_id ],
-            null,
+            [ '%d', '%s', '%s', '%s', '%s' ],
             [ '%d' ]
         );
 
@@ -247,7 +247,7 @@ class LTMS_Business_Tourism_Compliance {
             $('[name=country_code]').on('change', toggleFields).trigger('change');
             form.on('submit', function(e){
                 e.preventDefault();
-                $.post(wc_add_to_cart_params.ajax_url, { action:'ltms_save_rnt', nonce:'<?php echo esc_js( $nonce ); ?>', data:form.serialize() }, function(r){
+                $.post(( typeof wc_add_to_cart_params !== 'undefined' ? wc_add_to_cart_params.ajax_url : ajaxurl ), { action:'ltms_save_rnt', nonce:'<?php echo esc_js( $nonce ); ?>', data:form.serialize() }, function(r){
                     r.success ? location.reload() : alert(r.data);
                 });
             });
@@ -270,6 +270,10 @@ class LTMS_Business_Tourism_Compliance {
             ];
             $vendor_id = get_current_user_id();
             if ( ! $vendor_id ) { wp_send_json_error( __( 'No autenticado.', 'ltms' ) ); return; }
+            // Guard: solo vendedores activos pueden registrar compliance turístico.
+            if ( class_exists( 'LTMS_Utils' ) && ! LTMS_Utils::is_ltms_vendor( $vendor_id ) && ! current_user_can( 'manage_options' ) ) {
+                wp_send_json_error( __( 'Acceso denegado.', 'ltms' ) ); return;
+            }
             self::save_rnt( $vendor_id, $data );
             wp_send_json_success( __( 'Información guardada. Pendiente de verificación por el administrador.', 'ltms' ) );
         } catch ( \Throwable $e ) {
