@@ -277,8 +277,9 @@ final class LTMS_Public_Auth_Handler {
             'sagrilaft_accepted' => ! empty( $_POST['accept_sagrilaft'] ), // phpcs:ignore
             // M-MX-1: país declarado por el vendedor (CO o MX).
             'vendor_country'     => strtoupper( sanitize_text_field( wp_unslash( $_POST['vendor_country'] ?? '' ) ) ), // phpcs:ignore
-            // M-MX-1: país del vendedor — CO o MX según selección en el form.
-            'vendor_country'     => strtoupper( sanitize_text_field( wp_unslash( $_POST['vendor_country'] ?? '' ) ) ), // phpcs:ignore
+
+            // M-TURISMO-01: tipo de negocio declarado en el registro.
+            'business_type'      => sanitize_key( wp_unslash( $_POST['business_type'] ?? 'physical' ) ), // phpcs:ignore
         ];
 
         // M-10: errors estructurados por campo.
@@ -360,6 +361,12 @@ final class LTMS_Public_Auth_Handler {
                 ? $data['vendor_country']
                 : LTMS_Core_Config::get_country();
             update_user_meta( $user_id, 'ltms_country', $vendor_country );
+            // M-TURISMO-01: tipo de negocio principal del vendedor.
+            $allowed_btypes = [ 'physical', 'digital', 'services', 'tourism' ];
+            $btype = in_array( $data['business_type'] ?? '', $allowed_btypes, true )
+                ? $data['business_type']
+                : 'physical';
+            update_user_meta( $user_id, 'ltms_business_type', $btype );
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
             update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
             update_user_meta( $user_id, 'ltms_email_verified', 0 );
