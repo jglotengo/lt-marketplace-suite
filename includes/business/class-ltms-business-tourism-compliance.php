@@ -329,7 +329,14 @@ class LTMS_Business_Tourism_Compliance {
                             <input type="text" id="ltms-rnt-number" name="rnt_number"
                                    value="<?php echo esc_attr( $record['rnt_number'] ?? '' ); ?>"
                                    placeholder="Ej: CO-BOG-12345678">
-                            <span class="hint"><?php esc_html_e( 'Consúltalo en el portal FONTUR: fontur.com.co → Registro Nacional de Turismo.', 'ltms' ); ?></span>
+                            <span class="hint">
+                                <?php esc_html_e( 'Búscalo en el portal oficial de CONFECÁMARAS:', 'ltms' ); ?>
+                                <a href="https://rnt.confecamaras.co/establecimientos" target="_blank" rel="noopener"
+                                   style="color:#2563eb;"><?php esc_html_e( 'Consultar RNT', 'ltms' ); ?></a>.
+                                <?php esc_html_e( '¿Aún no tienes RNT?', 'ltms' ); ?>
+                                <a href="https://rnt.confecamaras.co/registrar" target="_blank" rel="noopener"
+                                   style="color:#2563eb;"><?php esc_html_e( 'Regístralo aquí', 'ltms' ); ?></a>.
+                            </span>
                         </div>
                     </div>
                     <div id="ltms-rnt-mx-fields" style="display:none;">
