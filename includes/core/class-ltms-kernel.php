@@ -666,8 +666,6 @@ final class LTMS_Core_Kernel {
                 }
             }
         } );
-    }
-
 
         // M-QA-RNT-01: Cron diario de vencimiento RNT/SECTUR.
         // check_rnt_expiry() existía pero nunca se programaba — los registros
