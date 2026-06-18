@@ -111,6 +111,44 @@ $country = LTMS_Core_Config::get_country();
 
         <!-- Paso 2: Tienda -->
         <div class="ltms-wizard-page" data-page="2" style="display:none;">
+
+            <!-- M-TURISMO-01: tipo de negocio — determina si el vendedor entra en el
+                 flujo de Compliance RNT/SECTUR. Solo los de 'tourism' crean registro
+                 en bkr_lt_tourism_compliance al aprobarse el KYC. -->
+            <div class="ltms-form-group">
+                <label><?php esc_html_e( '¿Qué tipo de productos o servicios ofreces? *', 'ltms' ); ?></label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
+                    <?php
+                    $business_types = [
+                        'physical'  => [ 'icon' => '📦', 'label' => 'Productos físicos',   'hint' => 'Ropa, electrónica, accesorios…' ],
+                        'digital'   => [ 'icon' => '💻', 'label' => 'Productos digitales',  'hint' => 'Cursos, software, diseños…' ],
+                        'services'  => [ 'icon' => '🛠️', 'label' => 'Servicios',            'hint' => 'Consultoría, reparaciones…' ],
+                        'tourism'   => [ 'icon' => '🏨', 'label' => 'Turismo / Alojamiento','hint' => 'Hoteles, hostales, tours, glamping…' ],
+                    ];
+                    foreach ( $business_types as $val => $bt ) :
+                    ?>
+                    <label style="display:flex;flex-direction:column;gap:4px;padding:12px 14px;
+                                  border:1.5px solid #d1d5db;border-radius:10px;cursor:pointer;
+                                  background:#fafafa;transition:all .15s;"
+                           class="ltms-btype-lbl" id="ltms-btype-lbl-<?php echo esc_attr($val); ?>">
+                        <span style="font-size:1.4rem;"><?php echo esc_html($bt['icon']); ?></span>
+                        <span style="font-weight:600;font-size:.875rem;color:#1d2327;">
+                            <?php echo esc_html($bt['label']); ?>
+                        </span>
+                        <span style="font-size:.75rem;color:#6b7280;">
+                            <?php echo esc_html($bt['hint']); ?>
+                        </span>
+                        <input type="radio" name="business_type" value="<?php echo esc_attr($val); ?>"
+                               id="ltms-btype-<?php echo esc_attr($val); ?>"
+                               style="position:absolute;opacity:0;pointer-events:none;" required>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+                <small class="ltms-field-hint" style="margin-top:6px;display:block;">
+                    <?php esc_html_e( 'Puedes ofrecer más de un tipo — elige el principal. Podrás ajustarlo desde tu panel luego.', 'ltms' ); ?>
+                </small>
+            </div>
+
             <div class="ltms-form-group">
                 <label for="ltms-reg-store-name"><?php esc_html_e( 'Nombre de tu Tienda *', 'ltms' ); ?></label>
                 <input type="text" id="ltms-reg-store-name" name="store_name" class="ltms-form-control" required placeholder="<?php esc_attr_e( 'Mi Tienda Genial', 'ltms' ); ?>">
