@@ -532,6 +532,12 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Admin' ) ) {
             LTMS_Admin::init();
         }
+        // M-QA-PAGES-01: registrar el handler de admin-post aquí (no en la vista)
+        // para que esté disponible cuando WordPress procesa admin_post_ltms_recreate_pages,
+        // que ocurre ANTES de que se cargue html-admin-pages.php.
+        if ( class_exists( 'LTMS_Core_Activator' ) ) {
+            LTMS_Core_Activator::register_hooks();
+        }
         if ( class_exists( 'LTMS_Admin_Settings' ) ) {
             LTMS_Admin_Settings::init();
         }
