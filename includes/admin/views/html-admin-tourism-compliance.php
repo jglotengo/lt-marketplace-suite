@@ -70,6 +70,7 @@ $summary  = $wpdb->get_row( "SELECT COUNT(*) as total, SUM(rnt_verified=1) as ve
                 <th><?php esc_html_e( 'País', 'ltms' ); ?></th>
                 <th><?php esc_html_e( 'Decl. Jurada', 'ltms' ); ?></th>
                 <th><?php esc_html_e( 'Fecha envío', 'ltms' ); ?></th>
+                <th><?php esc_html_e( 'Vence RNT', 'ltms' ); ?></th>
                 <th><?php esc_html_e( 'Acciones', 'ltms' ); ?></th>
             </tr></thead>
             <tbody>
@@ -97,6 +98,13 @@ $summary  = $wpdb->get_row( "SELECT COUNT(*) as total, SUM(rnt_verified=1) as ve
                     <?php endif; ?>
                 </td>
                 <td style="white-space:nowrap;font-size:12px;color:#6b7280;"><?php echo esc_html( $row['created_at'] ?? '—' ); ?></td>
+                <td style="white-space:nowrap;font-size:12px;">
+                    <?php if ( ! empty( $row['rnt_expiry_date'] ) ) : ?>
+                        <?php echo esc_html( $row['rnt_expiry_date'] ); ?>
+                    <?php else : ?>
+                        <span style="color:#9ca3af;">—</span>
+                    <?php endif; ?>
+                </td>
                 <td style="display:flex;gap:6px;">
                     <button class="ltms-btn ltms-btn-success ltms-btn-sm ltms-approve-rnt"
                             data-vendor="<?php echo esc_attr( $row['vendor_id'] ); ?>"
@@ -159,26 +167,61 @@ $summary  = $wpdb->get_row( "SELECT COUNT(*) as total, SUM(rnt_verified=1) as ve
 
 </div>
 
+<div id="ltms-reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;padding:28px;width:440px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <h3 style="margin:0 0 12px;font-size:16px;">✗ <?php esc_html_e( 'Rechazar solicitud RNT', 'ltms' ); ?></h3>
+        <p style="color:#6b7280;font-size:13px;margin-bottom:16px;"><?php esc_html_e( 'Indica el motivo del rechazo. El vendedor verá este mensaje en su panel.', 'ltms' ); ?></p>
+        <textarea id="ltms-reject-notes" rows="4" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;resize:vertical;" placeholder="<?php esc_attr_e( 'Ej: El número RNT no pudo ser verificado en el registro FONTUR…', 'ltms' ); ?>"></textarea>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button id="ltms-reject-cancel" class="button"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            <button id="ltms-reject-confirm" class="button button-primary" style="background:#dc2626;border-color:#dc2626;"><?php esc_html_e( 'Confirmar rechazo', 'ltms' ); ?></button>
+        </div>
+    </div>
+</div>
+
+<div id="ltms-approve-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;padding:28px;width:380px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <h3 style="margin:0 0 12px;font-size:16px;">✓ <?php esc_html_e( 'Aprobar RNT', 'ltms' ); ?></h3>
+        <p style="color:#6b7280;font-size:13px;margin-bottom:20px;"><?php esc_html_e( 'El vendedor quedará verificado y podrá publicar alojamientos.', 'ltms' ); ?></p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button id="ltms-approve-cancel" class="button"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            <button id="ltms-approve-confirm" class="button button-primary" style="background:#16a34a;border-color:#16a34a;"><?php esc_html_e( 'Confirmar aprobación', 'ltms' ); ?></button>
+        </div>
+    </div>
+</div>
+
 <script type="text/javascript">
-/* global jQuery */
+/* global jQuery, ajaxurl */
 jQuery( function( $ ) {
+    var pendingVendor = 0, pendingNonce = '';
+
     $( '.ltms-approve-rnt' ).on( 'click', function() {
-        var approved = $( this ).data( 'approved' );
-        var msg = approved
-            ? '<?php echo esc_js( __( "¿Aprobar este RNT?", "ltms" ) ); ?>'
-            : '<?php echo esc_js( __( "¿Rechazar este RNT?", "ltms" ) ); ?>';
-        if ( ! confirm( msg ) ) return;
-        var notes = approved ? '' : ( prompt( '<?php echo esc_js( __( "Motivo del rechazo (opcional):", "ltms" ) ); ?>' ) || '' );
-        var $btn = $( this ).prop( 'disabled', true );
+        pendingVendor = $( this ).data( 'vendor' );
+        pendingNonce  = $( this ).data( 'nonce' );
+        var approved  = parseInt( $( this ).data( 'approved' ), 10 );
+        if ( approved ) {
+            $( '#ltms-approve-modal' ).css( 'display', 'flex' );
+        } else {
+            $( '#ltms-reject-notes' ).val( '' );
+            $( '#ltms-reject-modal' ).css( 'display', 'flex' );
+        }
+    } );
+
+    function doVerify( approved, notes ) {
         $.post( ajaxurl, {
             action:    'ltms_admin_verify_rnt',
-            vendor_id: $btn.data( 'vendor' ),
+            vendor_id: pendingVendor,
             approved:  approved,
             notes:     notes,
-            nonce:     $btn.data( 'nonce' )
+            nonce:     pendingNonce
         }, function( r ) {
             r.success ? location.reload() : alert( r.data );
         } );
-    } );
+    }
+
+    $( '#ltms-approve-confirm' ).on( 'click', function() { doVerify( 1, '' ); } );
+    $( '#ltms-approve-cancel'  ).on( 'click', function() { $( '#ltms-approve-modal' ).hide(); } );
+    $( '#ltms-reject-confirm'  ).on( 'click', function() { doVerify( 0, $( '#ltms-reject-notes' ).val() ); } );
+    $( '#ltms-reject-cancel'   ).on( 'click', function() { $( '#ltms-reject-modal' ).hide(); } );
 } );
 </script>
