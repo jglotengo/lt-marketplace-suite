@@ -22,6 +22,8 @@ $required_pages = [
     'ltms-wallet'          => [ 'title' => __( 'Mi Billetera',              'ltms' ), 'slug' => 'mi-billetera',         'icon' => '💳' ],
     'ltms-kyc'             => [ 'title' => __( 'Verificacion de Identidad', 'ltms' ), 'slug' => 'verificacion-identidad','icon' => '🪪' ],
     'ltms-insurance'       => [ 'title' => __( 'Mis Seguros',               'ltms' ), 'slug' => 'mis-seguros',          'icon' => '🛡' ],
+    'ltms-bookings'        => [ 'title' => __( 'Mis Reservas',              'ltms' ), 'slug' => 'mis-reservas',         'icon' => '🏨' ],
+    'ltms-rnt'             => [ 'title' => __( 'RNT / Turismo',             'ltms' ), 'slug' => 'rnt-turismo',          'icon' => '🏔' ],
 ];
 
 $installed = get_option( 'ltms_installed_pages', [] );
@@ -154,7 +156,7 @@ $ok      = $total - $missing_count;
             <?php endif; ?>
         </form>
         <p style="margin-top:10px;font-size:0.8rem;color:#9ca3af;">
-            <?php esc_html_e( 'LTMS crea estas paginas automaticamente al activarse. Si alguna fue borrada, usa el boton para recrearla.', 'ltms' ); ?>
+            <?php esc_html_e( 'LTMS crea estas 10 páginas automáticamente al activarse. Si alguna fue borrada, usa el botón para recrearla. Las páginas Mis Reservas y RNT / Turismo se crearon en la versión 2.8.0 — si no aparecen como "Existe", haz clic en Recrear.', 'ltms' ); ?>
         </p>
     </div>
 
