@@ -453,6 +453,9 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Payout_Handler' ) ) {
             LTMS_Frontend_Payout_Handler::init();
         }
+        if ( class_exists( 'LTMS_Frontend_Booking_Handler' ) ) {
+            LTMS_Frontend_Booking_Handler::init();
+        }
         if ( class_exists( 'LTMS_Vendor_Settings_Saver' ) ) {
             LTMS_Vendor_Settings_Saver::init();
         }
