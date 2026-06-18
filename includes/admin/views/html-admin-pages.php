@@ -9,10 +9,6 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! current_user_can( 'manage_options' ) ) wp_die( esc_html__( 'No tienes permiso para acceder a esta pagina.', 'ltms' ) );
 
-if ( class_exists( 'LTMS_Core_Activator' ) ) {
-    LTMS_Core_Activator::register_hooks();
-}
-
 $required_pages = [
     'ltms-vendor-register' => [ 'title' => __( 'Registro de Vendedor',      'ltms' ), 'slug' => 'registro-vendedor',    'icon' => '📝' ],
     'ltms-dashboard'       => [ 'title' => __( 'Panel del Vendedor',        'ltms' ), 'slug' => 'panel-vendedor',       'icon' => '📊' ],
