@@ -28,6 +28,7 @@ $nav_items = [
     [ 'view' => 'products', 'icon' => '🛍️', 'label' => __( 'Productos', 'ltms' ) ],
     [ 'view' => 'envios',        'icon' => '🚚', 'label' => __( 'Envíos', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
+    [ 'view' => 'bookings', 'icon' => '🏨', 'label' => __( 'Reservas', 'ltms' ) ],
     [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
 ];
 
@@ -150,6 +151,10 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 
         <div class="ltms-view-section" id="ltms-view-ordenes-compra" style="display:none;">
             <?php include __DIR__ . '/view-ordenes-compra.php'; ?>
+        </div>
+
+        <div class="ltms-view-section" id="ltms-view-bookings" style="display:none;">
+            <?php include __DIR__ . '/view-bookings.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">
