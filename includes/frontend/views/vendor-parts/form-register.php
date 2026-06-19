@@ -43,10 +43,14 @@ $country = LTMS_Core_Config::get_country();
         // M-2: se eliminó wp_nonce_field duplicado que era código muerto.
         ?>
 
-        <!-- C-5: Honeypot anti-bot. Campo oculto que humanos no rellenan. -->
-        <div class="ltms-hp-field" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
-            <label for="ltms-hp-email">Email (do not fill)</label>
-            <input type="text" name="ltms_hp_email" id="ltms-hp-email" tabindex="-1" autocomplete="off" value="">
+        <!-- C-5: Honeypot anti-bot. Campo oculto que humanos no rellenan.
+             M-AUDIT-REG-05: se cambió de position:absolute;left:-9999px (que algunos
+             gestores de contraseñas sí rellenan si el name contiene "email") a
+             display:none, y se renombró el campo a ltms_hp_website para que los
+             autocomplete heurísticos no lo reconozcan como un campo de correo. -->
+        <div class="ltms-hp-field" aria-hidden="true" style="display:none;">
+            <label for="ltms-hp-website">Website (do not fill)</label>
+            <input type="text" name="ltms_hp_website" id="ltms-hp-website" tabindex="-1" autocomplete="off" value="">
         </div>
 
         <!-- Paso 1: Datos personales -->
