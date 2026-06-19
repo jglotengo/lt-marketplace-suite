@@ -18,6 +18,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </button>
     </div>
 
+    <!-- M-AUDIT-REG-07: banner de onboarding — oculto por defecto, lo llena
+         renderOnboardingBanner() en ltms-dashboard.js si quedan pasos pendientes. -->
+    <div id="ltms-onboarding-banner" style="display:none;margin-bottom:24px;"></div>
+
     <!-- Métricas -->
     <div class="ltms-metrics-grid">
         <div class="ltms-metric">
