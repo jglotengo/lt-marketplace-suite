@@ -170,7 +170,7 @@ $country = LTMS_Core_Config::get_country();
                 $muni_options = LTMS_Business_Dane_Catalog::get_options( true );
                 if ( count( $muni_options ) > 1 ) :
             ?>
-            <div class="ltms-form-group">
+            <div class="ltms-form-group" id="ltms-municipality-wrap">
                 <label for="ltms-reg-municipality"><?php esc_html_e( 'Municipio de tu tienda *', 'ltms' ); ?></label>
                 <select id="ltms-reg-municipality" name="municipality_code" class="ltms-form-control" required>
                     <?php foreach ( $muni_options as $code => $label ) : ?>
@@ -287,6 +287,9 @@ $country = LTMS_Core_Config::get_country();
         ]
     };
 
+    var municipioWrap = document.getElementById('ltms-municipality-wrap');
+    var municipioSel  = document.getElementById('ltms-reg-municipality');
+
     function updateCountry(country) {
         if (phone) phone.placeholder = country === 'MX' ? '+52 55 0000 0000' : '+57 300 000 0000';
         if (docSel) {
@@ -294,6 +297,15 @@ $country = LTMS_Core_Config::get_country();
             docSel.innerHTML = opts.map(function(o){
                 return '<option value="'+o.v+'">'+o.l+'</option>';
             }).join('');
+        }
+        // M-AUDIT-REG-06: ocultar campo municipio DANE para vendedores MX (solo aplica a CO).
+        // El campo se renderiza en PHP si el servidor es CO, así que siempre estará en el
+        // DOM con required. Si el vendedor elige MX en el select, lo ocultamos y le quitamos
+        // required para que no bloquee el wizard ni el submit del registro.
+        if (municipioWrap) {
+            var isCO = country === 'CO';
+            municipioWrap.style.display = isCO ? '' : 'none';
+            if (municipioSel) municipioSel.required = isCO;
         }
     }
 
