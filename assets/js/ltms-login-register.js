@@ -19,6 +19,8 @@
         init() {
             this.bindLoginForm();
             this.bindRegisterForm();
+            this.bindBusinessTypeCards();
+            this.bindVendorCountryToggle();
             this.initPasswordStrength();
             this.initTogglePassword();
         },
@@ -88,11 +90,30 @@
                 const $form     = $btn.closest('form');
                 const $curPage  = $btn.closest('.ltms-wizard-page');
 
-                // Validate required fields in current page before advancing
+                // M-AUDIT-REG-02: Validate required fields in current page before advancing.
+                // Radio groups need special handling — jQuery's .val() on a single radio
+                // element always returns its literal value="" attribute regardless of
+                // whether it's checked, so the old check never caught an unselected group.
+                // We also skip fields that are currently hidden (e.g. country-conditional
+                // blocks toggled via JS) so a required-but-invisible field never blocks
+                // the wizard.
                 let valid = true;
-                $curPage.find('[required]').each(function () {
+                const seenRadioGroups = {};
+
+                $curPage.find('[required]:visible').each(function () {
                     const $field = $(this);
-                    if ($field.is(':checkbox')) {
+
+                    if ($field.is(':radio')) {
+                        const groupName = $field.attr('name');
+                        if (seenRadioGroups[groupName]) return; // ya validado este grupo
+                        seenRadioGroups[groupName] = true;
+
+                        const $group  = $curPage.find('input[name="' + groupName + '"]');
+                        const checked = $group.filter(':checked').length > 0;
+                        const $wrap   = $field.closest('.ltms-form-group');
+                        if (!checked) { valid = false; $wrap.addClass('ltms-field-error'); }
+                        else { $wrap.removeClass('ltms-field-error'); }
+                    } else if ($field.is(':checkbox')) {
                         if (!$field.is(':checked')) { valid = false; $field.closest('.ltms-form-group').addClass('ltms-field-error'); }
                         else { $field.closest('.ltms-form-group').removeClass('ltms-field-error'); }
                     } else {
@@ -189,12 +210,19 @@
                                 fieldErrors.forEach(function (err) {
                                     const $field = $form.find('[name="' + err.field + '"]');
                                     if (!$field.length) return;
-                                    if ($field.is(':checkbox')) {
+                                    // M-AUDIT-REG-02: los radios (p. ej. business_type) no son
+                                    // :checkbox para jQuery — sin esta rama, addClass() caía en
+                                    // los inputs ocultos (opacity:0) sin ningún efecto visible.
+                                    if ($field.is(':checkbox') || $field.is(':radio')) {
                                         $field.closest('.ltms-form-group').addClass('ltms-field-error');
                                     } else {
                                         $field.addClass('ltms-input-error');
                                     }
-                                    if (!firstField) firstField = $field;
+                                    // No enfocar un radio invisible (opacity:0) — preferir el
+                                    // primer elemento visible/enfocable real del campo en error.
+                                    if (!firstField) {
+                                        firstField = $field.is(':radio') ? $field.eq(0) : $field;
+                                    }
                                 });
 
                                 if (firstField) {
@@ -225,6 +253,44 @@
                     },
                 });
             });
+        },
+
+        bindBusinessTypeCards() {
+            // M-AUDIT-REG-04: Las tarjetas de tipo de negocio (📦💻🛠️🏨) no tenían
+            // ningún manejador JS. El radio se marcaba por comportamiento nativo del
+            // <label>, pero sin cambio visual el vendedor no veía confirmación de
+            // su elección y asumía que la plataforma no respondía.
+            $(document).on('change', 'input[name="business_type"]', function () {
+                const $allLabels = $(this).closest('.ltms-form-group').find('.ltms-btype-lbl');
+                $allLabels.css({ 'border-color': '#d1d5db', background: '#fafafa', 'box-shadow': 'none' });
+                $(this).closest('.ltms-btype-lbl').css({
+                    'border-color': '#2563eb',
+                    background: '#eff6ff',
+                    'box-shadow': '0 0 0 3px rgba(37,99,235,.15)',
+                });
+            });
+            // Inicializar el estado visual si ya hay un radio prechecked (p.ej. recarga)
+            $('input[name="business_type"]:checked').trigger('change');
+        },
+
+        bindVendorCountryToggle() {
+            // M-AUDIT-REG-03: El bloque SAGRILAFT se renderizaba en PHP según el
+            // país GLOBAL del servidor, no según la elección del vendedor en el
+            // select de país. En esta plataforma el default es 'CO', por lo que el
+            // checkbox siempre aparecía aunque el vendedor eligiera México.
+            // Ahora se muestra/oculta dinámicamente y el atributo required se ajusta
+            // en consecuencia para que el formulario nunca bloquee por un campo invisible.
+            function toggleSagrilaft() {
+                const $sel = $('#ltms-reg-vendor-country');
+                if (!$sel.length) return;
+                const isCO = $sel.val() === 'CO';
+                const $wrap = $('input[name="accept_sagrilaft"]').closest('.ltms-form-group');
+                $wrap.toggle(isCO);
+                $wrap.find('input[name="accept_sagrilaft"]').prop('required', isCO);
+            }
+            $(document).on('change', '#ltms-reg-vendor-country', toggleSagrilaft);
+            // Ejecutar al cargar por si el select ya tiene un valor (p.ej. MX preseleccionado)
+            toggleSagrilaft();
         },
 
         initPasswordStrength() {
