@@ -664,6 +664,53 @@ final class LTMS_Dashboard_Logic {
             'commission_rate_summary' => class_exists( 'LTMS_Commission_Strategy' )
                 ? LTMS_Commission_Strategy::get_rate_summary( $vendor_id )
                 : [],
+            'onboarding'          => $this->get_onboarding_status( $vendor_id ),
+        ];
+    }
+
+    /**
+     * M-AUDIT-REG-07: estado de onboarding del vendedor para el banner
+     * informativo del home. Puramente de lectura — no bloquea nada.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return array{
+     *     email_verified: bool,
+     *     kyc_status: string,
+     *     kyc_url: string,
+     *     has_products: bool,
+     *     all_done: bool
+     * }
+     */
+    private function get_onboarding_status( int $vendor_id ): array {
+        global $wpdb;
+
+        $email_verified = (bool) get_user_meta( $vendor_id, 'ltms_email_verified', true );
+
+        $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $kyc_status = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT status FROM `{$kyc_table}` WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
+                $vendor_id
+            )
+        );
+        $kyc_status = $kyc_status ?: 'none';
+
+        $has_products = (bool) count_user_posts( $vendor_id, 'product', true );
+
+        $pages   = get_option( 'ltms_installed_pages', [] );
+        $kyc_url = ! empty( $pages['ltms-kyc'] )
+            ? get_permalink( $pages['ltms-kyc'] )
+            : wc_get_account_endpoint_url( 'ltms-kyc' );
+
+        $all_done = $email_verified && 'approved' === $kyc_status && $has_products;
+
+        return [
+            'email_verified' => $email_verified,
+            'kyc_status'     => $kyc_status,
+            'kyc_url'        => $kyc_url,
+            'has_products'   => $has_products,
+            'all_done'       => $all_done,
         ];
     }
 
