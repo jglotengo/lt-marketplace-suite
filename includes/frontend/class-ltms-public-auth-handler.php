@@ -353,7 +353,12 @@ final class LTMS_Public_Auth_Handler {
             $encrypted_doc = LTMS_Core_Security::encrypt( $data['document'] );
             update_user_meta( $user_id, 'ltms_document', $encrypted_doc );
             if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::log_vault_access( $user_id, 'ltms_document', 'write', 'registration' );
+                // M-FIX-REG-04: log_vault_access() requiere $accessor_id (int) como segundo
+                // parámetro — pasar el tipo de documento ahí causaba un TypeError fatal
+                // (capturado por el catch de abajo, produciendo el MISMO rollback que el
+                // bug original). El propio vendedor es quien declara su documento al
+                // registrarse, así que accessor_id = user_id.
+                LTMS_Legal_Compliance::log_vault_access( $user_id, $user_id, 'ltms_document', 'write', 'registration' );
             }
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
             // M-MX-1: guardar país del vendedor para routing fiscal y wallet.
