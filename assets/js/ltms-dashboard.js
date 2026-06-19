@@ -138,11 +138,97 @@
             this.updateMetric('.ltms-metric-commissions', data.monthly_commissions, true);
             this.updateMetric('.ltms-metric-balance', data.wallet_balance, true);
 
+            // M-AUDIT-REG-07: banner de onboarding (puramente informativo, no bloquea nada).
+            this.renderOnboardingBanner(data.onboarding);
+
             // Cargar gráfica de ventas
             this.loadSalesChart();
 
             // Mostrar la sección
             this.showSection('#ltms-view-home');
+        },
+
+        /**
+         * Renderiza (o esconde) el banner de checklist de onboarding del vendedor.
+         * No bloquea ninguna acción — solo informa qué pasos faltan.
+         *
+         * @param {Object} ob Datos de onboarding (email_verified, kyc_status, kyc_url, has_products, all_done).
+         */
+        renderOnboardingBanner(ob) {
+            const $banner = $('#ltms-onboarding-banner');
+            if (!$banner.length) return;
+
+            if (!ob || ob.all_done) {
+                $banner.hide().empty();
+                return;
+            }
+
+            const kycLabels = {
+                none: { text: 'Pendiente de iniciar', color: '#9ca3af' },
+                pending: { text: 'En revisión', color: '#f59e0b' },
+                approved: { text: 'Aprobado', color: '#10b981' },
+                rejected: { text: 'Rechazado — corrige y reenvía', color: '#ef4444' },
+                expired: { text: 'Expirado — renueva', color: '#6b7280' },
+            };
+            const kyc = kycLabels[ob.kyc_status] || kycLabels.none;
+            const kycDone = ob.kyc_status === 'approved';
+
+            const steps = [
+                {
+                    done: !!ob.email_verified,
+                    icon: '✉️',
+                    title: 'Verifica tu email',
+                    detail: ob.email_verified ? 'Verificado' : 'Revisa tu bandeja de entrada (y spam) para confirmar tu cuenta.',
+                    action: null,
+                },
+                {
+                    done: kycDone,
+                    icon: '🪪',
+                    title: 'Completa tu verificación de identidad (KYC)',
+                    detail: kyc.text,
+                    action: kycDone ? null : { label: 'Completar KYC', url: ob.kyc_url },
+                },
+                {
+                    done: !!ob.has_products,
+                    icon: '🛍️',
+                    title: 'Publica tu primer producto',
+                    detail: ob.has_products ? 'Ya tienes productos publicados' : 'Tu tienda aún no tiene productos visibles.',
+                    action: ob.has_products ? null : { label: 'Agregar producto', view: 'products' },
+                },
+            ];
+
+            const stepsHtml = steps.map((s, i) => `
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;${i < steps.length - 1 ? 'border-bottom:1px solid #e5e7eb;' : ''}">
+                    <span style="font-size:1.3rem;flex-shrink:0;">${s.done ? '✅' : s.icon}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:.9rem;color:#111827;${s.done ? 'text-decoration:line-through;color:#9ca3af;' : ''}">${s.title}</div>
+                        <div style="font-size:.8rem;color:#6b7280;">${s.detail}</div>
+                    </div>
+                    ${s.action ? `<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-onboarding-action" data-view="${s.action.view || ''}" data-url="${s.action.url || ''}">${s.action.label}</button>` : ''}
+                </div>
+            `).join('');
+
+            $banner.html(`
+                <div class="ltms-card" style="padding:20px;border-left:4px solid #2563eb;">
+                    <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:4px;">
+                        👋 ¡Bienvenido a Lo Tengo!
+                    </div>
+                    <div style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">
+                        Completa estos pasos para aprovechar al máximo tu tienda.
+                    </div>
+                    ${stepsHtml}
+                </div>
+            `).show();
+
+            $banner.find('.ltms-onboarding-action').off('click').on('click', function () {
+                const view = $(this).data('view');
+                const url = $(this).data('url');
+                if (view) {
+                    LTMS.Dashboard.loadView(view);
+                } else if (url) {
+                    window.location.href = url;
+                }
+            });
         },
 
         /**
