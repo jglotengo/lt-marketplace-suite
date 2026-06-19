@@ -347,13 +347,13 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_municipality', $data['municipality_code'] );
             }
             update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
-            // L-1: cifrar documento con log de vault (Habeas Data — Ley 1581/2012).
+            // L-1: cifrar documento (Habeas Data — Ley 1581/2012).
+            // M-FIX-REG-01: LTMS_Legal_Compliance::encrypt_and_log() no existe — usar
+            // LTMS_Core_Security::encrypt() directamente y log_vault_access() por separado.
+            $encrypted_doc = LTMS_Core_Security::encrypt( $data['document'] );
+            update_user_meta( $user_id, 'ltms_document', $encrypted_doc );
             if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                update_user_meta( $user_id, 'ltms_document',
-                    LTMS_Legal_Compliance::encrypt_and_log( $data['document'], $user_id, 'ltms_document', 'registration' )
-                );
-            } else {
-                update_user_meta( $user_id, 'ltms_document', LTMS_Core_Security::encrypt( $data['document'] ) );
+                LTMS_Legal_Compliance::log_vault_access( $user_id, 'ltms_document', 'write', 'registration' );
             }
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
             // M-MX-1: guardar país del vendedor para routing fiscal y wallet.
@@ -376,8 +376,9 @@ final class LTMS_Public_Auth_Handler {
             }
 
             // L-6: guardar consentimiento explícito de datos (Ley 1581/2012 art. 9).
+            // M-FIX-REG-02: save_consent() no existe — usar log_consent() con los parámetros reales.
             if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::save_consent( 'registration', $user_id, true );
+                LTMS_Legal_Compliance::log_consent( $user_id, 'terms_and_conditions', true, '1.0', 'web' );
             }
 
             // C-3: token de verificación de email (48h).
@@ -392,15 +393,13 @@ final class LTMS_Public_Auth_Handler {
             // Disparar listeners (Affiliates genera ltms_referral_code, Alegra crea contacto).
             do_action( 'ltms_vendor_registered', $user_id, $data['referral_code'] ?? '' );
 
-            // L-2 FIX: Registrar consentimiento de tratamiento de datos en el registro.
-            // Ley 1581/2012, art. 9 — el consentimiento debe quedar registrado con IP y timestamp.
+            // L-2 FIX: Registrar consentimiento de tratamiento de datos (Ley 1581/2012, art. 9).
+            // M-FIX-REG-03: PURPOSE_REGISTRATION constante no existe — usar string literal.
             if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::log_consent(
-                    $user_id,
-                    LTMS_Legal_Compliance::PURPOSE_REGISTRATION,
-                    'Vendor registration — ' . sanitize_email( $data['email'] ?? '' ),
-                    true
-                );
+                LTMS_Legal_Compliance::log_consent( $user_id, 'data_treatment', true, '1.0', 'web' );
+                if ( ! empty( $data['sagrilaft_accepted'] ) ) {
+                    LTMS_Legal_Compliance::log_consent( $user_id, 'sagrilaft', true, '1.0', 'web' );
+                }
             }
 
             // C-2: enviar email de bienvenida con link de verificación.
