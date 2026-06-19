@@ -235,7 +235,7 @@ final class LTMS_Public_Auth_Handler {
 
     public function ajax_vendor_register(): void {
         // C-5: Honeypot — campo invisible que solo los bots rellenan.
-        if ( ! empty( $_POST['ltms_hp_email'] ) ) { // phpcs:ignore
+        if ( ! empty( $_POST['ltms_hp_website'] ) ) { // phpcs:ignore — M-AUDIT-REG-05: campo renombrado para evitar autocompletado de gestores de contraseñas
             LTMS_Core_Logger::security(
                 'REGISTER_HONEYPOT',
                 sprintf( 'Honeypot disparado desde IP %s', LTMS_Utils::get_ip() )
