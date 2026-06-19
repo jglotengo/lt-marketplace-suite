@@ -160,7 +160,13 @@ final class LTMS_Frontend_Assets {
         // Dashboard del vendedor (SPA) + páginas de panel independientes
         // ltms_vendor_orders, ltms_vendor_wallet, ltms_vendor_kyc, ltms_vendor_insurance, ltms_vendor_store
         // necesitan los mismos assets que el SPA para hacer sus llamadas AJAX.
-        $vendor_panel_pages = [ 'ltms-dashboard', 'ltms-orders', 'ltms-wallet', 'ltms-kyc', 'ltms-insurance' ];
+        // M-FIX-BOOKINGS-01: 'ltms-bookings' (slug mis-reservas) y 'ltms-rnt' (slug rnt-turismo)
+        // se crearon en M-QA-PAGES-01 pero nunca se agregaron aquí — sus shortcodes
+        // dependen del objeto global `ltmsDashboard` (ajax_url/nonce) que solo se
+        // localiza cuando enqueue_dashboard_assets() corre. Sin esto, la tabla de
+        // reservas se queda en "Cargando reservas..." indefinidamente (ltmsDashboard
+        // queda undefined y el script inline muere antes de disparar el AJAX).
+        $vendor_panel_pages = [ 'ltms-dashboard', 'ltms-orders', 'ltms-wallet', 'ltms-kyc', 'ltms-insurance', 'ltms-bookings', 'ltms-rnt' ];
         $is_vendor_panel    = false;
         foreach ( $vendor_panel_pages as $key ) {
             if ( $page_id === (int) ( $pages[ $key ] ?? 0 ) ) {
@@ -172,7 +178,7 @@ final class LTMS_Frontend_Assets {
         // con las páginas reales (slug existe pero key no apunta), detectar por contenido.
         if ( ! $is_vendor_panel && $page_id > 0 ) {
             $post = get_post( $page_id );
-            $dashboard_shortcodes = [ 'ltms_vendor_dashboard', 'ltms_vendor_orders', 'ltms_vendor_wallet', 'ltms_vendor_kyc', 'ltms_vendor_insurance', 'ltms_vendor_store' ];
+            $dashboard_shortcodes = [ 'ltms_vendor_dashboard', 'ltms_vendor_orders', 'ltms_vendor_wallet', 'ltms_vendor_kyc', 'ltms_vendor_insurance', 'ltms_vendor_store', 'ltms_vendor_bookings', 'ltms_vendor_rnt' ];
             if ( $post ) {
                 foreach ( $dashboard_shortcodes as $sc ) {
                     if ( has_shortcode( $post->post_content, $sc ) ) {
@@ -184,7 +190,7 @@ final class LTMS_Frontend_Assets {
         }
         // M-56b: fallback por slug — cubre páginas Elementor donde post_content no tiene shortcode.
         if ( ! $is_vendor_panel && $page_id > 0 ) {
-            $vendor_slugs = [ 'panel-vendedor', 'mis-pedidos', 'mi-billetera', 'verificacion-identidad', 'mi-seguro', 'panel-vendedor-2' ];
+            $vendor_slugs = [ 'panel-vendedor', 'mis-pedidos', 'mi-billetera', 'verificacion-identidad', 'mi-seguro', 'panel-vendedor-2', 'mis-reservas', 'rnt-turismo' ];
             $current_post = get_post( $page_id );
             if ( $current_post && in_array( $current_post->post_name, $vendor_slugs, true ) ) {
                 $is_vendor_panel = true;
