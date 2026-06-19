@@ -61,22 +61,12 @@ final class LTMS_Frontend_Customer_Bookings {
 
     public function enqueue_assets(): void {
         if ( ! is_account_page() ) return;
-        wp_enqueue_script(
-            'ltms-customer-bookings',
-            LTMS_PLUGIN_URL . 'assets/js/ltms-customer-bookings.js',
-            [ 'jquery' ],
-            LTMS_VERSION,
-            true
-        );
-        wp_localize_script( 'ltms-customer-bookings', 'ltmsCustomerBookings', [
-            'ajax_url' => admin_url( 'admin-ajax.php' ),
-            'nonce'    => wp_create_nonce( 'ltms_customer_bookings' ),
-            'i18n'     => [
-                'cancel_confirm' => __( '¿Seguro que quieres cancelar esta reserva? Esta acción no se puede deshacer.', 'ltms' ),
-                'cancelling'     => __( 'Cancelando…', 'ltms' ),
-                'loading'        => __( 'Cargando…', 'ltms' ),
-            ],
-        ] );
+        // M-FIX-BOOKINGS-02: la vista se renderiza enteramente en PHP (render_page())
+        // y el botón de cancelar usa un <script> inline auto-contenido — no hay
+        // ningún consumidor real de un archivo JS externo hoy. El enqueue previo
+        // apuntaba a assets/js/ltms-customer-bookings.js, que nunca se creó (404
+        // silencioso en cada carga de Mi Cuenta). Se retira hasta que exista un
+        // caso de uso real (ej. refresco en vivo vía ajax_get_bookings()).
     }
 
     // ─── Page render ─────────────────────────────────────────────────────────
