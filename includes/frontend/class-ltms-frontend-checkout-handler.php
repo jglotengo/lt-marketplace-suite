@@ -80,6 +80,11 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_checkout_terms_and_conditions', [ __CLASS__, 'remove_wc_native_checkboxes' ], 1 );
         $instance = new self();
 
+        // P-02: Validar que el carrito solo tenga productos de un mismo vendedor.
+        // Evita que el método de pickup muestre la dirección incorrecta y que
+        // las comisiones se asignen al vendedor equivocado en pedidos mixtos.
+        add_filter( 'woocommerce_add_to_cart_validation', [ __CLASS__, 'validate_single_vendor_cart' ], 10, 2 );
+
         // Proceso de pago — solo usuarios logueados
         add_action( 'wp_ajax_ltms_process_checkout',        [ $instance, 'ajax_process_checkout' ] );
 
@@ -673,6 +678,62 @@ final class LTMS_Frontend_Checkout_Handler {
         }
         return $items;
     }
+
+    /**
+     * P-02: Valida que el carrito solo tenga productos del mismo vendedor.
+     *
+     * Evita que el método de pickup muestre la dirección del vendedor A cuando
+     * el carrito también contiene productos del vendedor B, y previene que las
+     * comisiones del pedido se asignen incorrectamente a un único vendedor.
+     *
+     * @param bool $passed   Resultado de validaciones anteriores.
+     * @param int  $product_id ID del producto que se intenta agregar.
+     * @return bool
+     */
+    public static function validate_single_vendor_cart( bool $passed, int $product_id ): bool {
+        if ( ! $passed || WC()->cart->is_empty() ) {
+            return $passed;
+        }
+
+        $new_vendor_id = (int) get_post_meta( $product_id, '_ltms_vendor_id', true );
+        if ( ! $new_vendor_id ) {
+            // Fallback: usar post_author si no tiene meta de vendedor
+            $new_vendor_id = (int) get_post_field( 'post_author', $product_id );
+        }
+
+        if ( ! $new_vendor_id ) {
+            return $passed; // Sin vendedor identificable, no bloquear
+        }
+
+        foreach ( WC()->cart->get_cart() as $item ) {
+            $pid            = (int) ( $item['product_id'] ?? 0 );
+            $cart_vendor_id = (int) get_post_meta( $pid, '_ltms_vendor_id', true );
+            if ( ! $cart_vendor_id ) {
+                $cart_vendor_id = (int) get_post_field( 'post_author', $pid );
+            }
+
+            if ( $cart_vendor_id && $cart_vendor_id !== $new_vendor_id ) {
+                $cart_vendor_name = get_user_meta( $cart_vendor_id, 'ltms_store_name', true )
+                    ?: get_userdata( $cart_vendor_id )->display_name ?? '';
+                $new_vendor_name  = get_user_meta( $new_vendor_id, 'ltms_store_name', true )
+                    ?: get_userdata( $new_vendor_id )->display_name ?? '';
+
+                wc_add_notice(
+                    sprintf(
+                        /* translators: %1$s: nombre tienda en carrito, %2$s: nombre tienda del producto nuevo */
+                        __( 'Tu carrito ya tiene productos de <strong>%1$s</strong>. Para agregar productos de <strong>%2$s</strong> debes vaciar el carrito primero.', 'ltms' ),
+                        esc_html( $cart_vendor_name ),
+                        esc_html( $new_vendor_name )
+                    ),
+                    'error'
+                );
+                return false;
+            }
+        }
+
+        return $passed;
+    }
+
     /**
      * FIX CHECKOUT-01: Eliminar checkboxes nativos de WooCommerce (duplicados con LTMS).
      */
