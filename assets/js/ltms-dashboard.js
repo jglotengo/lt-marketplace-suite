@@ -336,6 +336,7 @@
 
         /**
          * Renderiza la tabla de pedidos del vendedor.
+         * P-01: columna de tipo de envío, badge pickup diferenciado, etiquetas en español.
          *
          * @param {Array} orders Lista de pedidos.
          */
@@ -350,13 +351,27 @@
 
             orders.forEach(order => {
                 const statusClass = this.getOrderStatusClass(order.status);
+                const statusLabel = this.getOrderStatusLabel(order.status);
+
+                // Columna de tipo de envío: ícono de tienda para pickup, texto normal para el resto
+                let shippingCell = '';
+                if (order.is_pickup) {
+                    const addr = order.store_info && order.store_info.address
+                        ? `<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">${this.escapeHtml(order.store_info.address)}</div>`
+                        : '';
+                    shippingCell = `<span style="color:#1a5276;font-weight:600;">🏪 Recogida</span>${addr}`;
+                } else {
+                    shippingCell = `<span style="color:#6b7280;font-size:.85rem;">${this.escapeHtml(order.shipping_label || '—')}</span>`;
+                }
+
                 $tbody.append(`
                     <tr>
                         <td>#${order.number}</td>
                         <td>${this.escapeHtml(order.customer)}</td>
                         <td>${order.items_count} item(s)</td>
                         <td><strong>${order.formatted}</strong></td>
-                        <td><span class="ltms-badge ${statusClass}">${order.status}</span></td>
+                        <td>${shippingCell}</td>
+                        <td><span class="ltms-badge ${statusClass}">${statusLabel}</span></td>
                         <td>${order.date}</td>
                     </tr>
                 `);
@@ -792,7 +807,7 @@
         loadOrdersFiltered(status) {
             const self = this;
             const $tbody = $('#ltms-orders-tbody');
-            $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">Cargando...</td></tr>');
+            $tbody.html('<tr><td colspan="7" class="ltms-empty-cell">Cargando...</td></tr>');
             $.ajax({
                 url: ltmsDashboard.ajax_url,
                 method: 'POST',
@@ -1803,15 +1818,43 @@
          * @param {string} status Estado del pedido.
          * @returns {string}
          */
+        /**
+         * Obtiene la clase CSS para el estado de un pedido.
+         * P-01: incluye ready-for-pickup con su propio badge y etiquetas en español.
+         *
+         * @param {string} status Estado WC del pedido.
+         * @returns {string}
+         */
         getOrderStatusClass(status) {
             const map = {
-                completed:  'ltms-badge-success',
-                processing: 'ltms-badge-info',
-                pending:    'ltms-badge-warning',
-                cancelled:  'ltms-badge-danger',
-                refunded:   'ltms-badge-pending',
+                completed:        'ltms-badge-success',
+                processing:       'ltms-badge-info',
+                pending:          'ltms-badge-warning',
+                cancelled:        'ltms-badge-danger',
+                refunded:         'ltms-badge-pending',
+                'ready-for-pickup': 'ltms-badge-pickup',
             };
             return map[status] || 'ltms-badge-pending';
+        },
+
+        /**
+         * Devuelve la etiqueta legible en español para un estado de pedido.
+         * P-01: evita mostrar el slug crudo (ej. "ready-for-pickup") en la tabla.
+         *
+         * @param {string} status Estado WC.
+         * @returns {string}
+         */
+        getOrderStatusLabel(status) {
+            const map = {
+                pending:            'Pendiente',
+                processing:         'Procesando',
+                'ready-for-pickup': '📦 Listo para Recoger',
+                completed:          'Completado',
+                cancelled:          'Cancelado',
+                refunded:           'Reembolsado',
+                'on-hold':          'En espera',
+            };
+            return map[status] || status;
         },
 
         /**
