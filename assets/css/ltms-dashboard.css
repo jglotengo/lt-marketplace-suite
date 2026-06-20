@@ -606,6 +606,8 @@
 .ltms-badge-danger   { background: #fee2e2; color: #991b1b; }
 .ltms-badge-primary  { background: #ede9fe; color: #5b21b6; }
 .ltms-badge-pending  { background: #f3f4f6; color: #374151; }
+/* P-01: badge para pedidos listos para recoger */
+.ltms-badge-pickup   { background: #e0f2fe; color: #075985; font-weight: 700; }
 
 /* ═══════════════════════════════════════════════════════════════
    BUG M-9 FIX: .ltms-toast (notificaciones flotantes)
