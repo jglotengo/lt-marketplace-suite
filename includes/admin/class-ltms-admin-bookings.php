@@ -28,6 +28,8 @@ class LTMS_Admin_Bookings {
         add_action( 'wp_ajax_ltms_admin_booking_action', [ self::class, 'handle_ajax' ] );
         add_action( 'wp_ajax_ltms_admin_verify_rnt',     [ self::class, 'ajax_verify_rnt' ] );
         add_action( 'admin_post_ltms_export_bookings_csv', [ self::class, 'export_csv' ] );
+        // M-BOOKING-UI-01: endpoint que alimenta el calendario FullCalendar con eventos reales.
+        add_action( 'wp_ajax_ltms_admin_calendar_events', [ self::class, 'ajax_calendar_events' ] );
     }
 
     public static function add_menu_pages(): void {
@@ -65,8 +67,123 @@ class LTMS_Admin_Bookings {
 
     public static function render_booking_calendar(): void {
         wp_enqueue_script( 'fullcalendar', 'https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.10/index.global.min.js', [], '6.1.10', true );
-        echo '<div class="wrap"><h1>' . esc_html__( 'Calendario de Reservas', 'ltms' ) . '</h1><div id="ltms-admin-booking-calendar" style="max-width:1100px"></div></div>';
-        wp_add_inline_script( 'fullcalendar', "document.addEventListener('DOMContentLoaded',function(){var el=document.getElementById('ltms-admin-booking-calendar');if(!el)return;new FullCalendar.Calendar(el,{initialView:'dayGridMonth',locale:'es',height:700,headerToolbar:{left:'prev,next today',center:'title',right:'dayGridMonth,timeGridWeek,listWeek'}}).render();});" );
+        $nonce    = wp_create_nonce( 'ltms_admin_calendar' );
+        $ajax_url = admin_url( 'admin-ajax.php' );
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Calendario de Reservas', 'ltms' ); ?></h1>
+            <p style="color:#646970;">
+                <?php esc_html_e( 'Colores: amarillo = pendiente, verde = confirmada, azul = pagada, gris = cancelada.', 'ltms' ); ?>
+            </p>
+            <div id="ltms-admin-booking-calendar" style="max-width:1100px;background:#fff;padding:16px;border:1px solid #dcdcde;border-radius:6px;"></div>
+            <div id="ltms-cal-event-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;">
+                <div style="background:#fff;border-radius:8px;padding:24px;max-width:420px;width:90%;">
+                    <div id="ltms-cal-event-body"></div>
+                    <button type="button" id="ltms-cal-event-close" class="button" style="margin-top:16px;"><?php esc_html_e( 'Cerrar', 'ltms' ); ?></button>
+                </div>
+            </div>
+        </div>
+        <?php
+        wp_add_inline_script( 'fullcalendar', "document.addEventListener('DOMContentLoaded',function(){
+            var el = document.getElementById('ltms-admin-booking-calendar');
+            if (!el) return;
+            var modal = document.getElementById('ltms-cal-event-modal');
+            var body  = document.getElementById('ltms-cal-event-body');
+            var cal = new FullCalendar.Calendar(el, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                height: 700,
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
+                events: function(info, success, failure) {
+                    var body2 = new URLSearchParams();
+                    body2.append('action', 'ltms_admin_calendar_events');
+                    body2.append('nonce', '" . esc_js( $nonce ) . "');
+                    body2.append('start', info.startStr);
+                    body2.append('end', info.endStr);
+                    fetch('" . esc_js( $ajax_url ) . "', { method: 'POST', body: body2 })
+                        .then(function(r){ return r.json(); })
+                        .then(function(r){ r.success ? success(r.data) : failure(r.data); })
+                        .catch(failure);
+                },
+                eventClick: function(info) {
+                    var p = info.event.extendedProps;
+                    body.innerHTML = '<p><strong>' + info.event.title + '</strong></p>' +
+                        '<p>Check-in: ' + p.checkin + ' &mdash; Check-out: ' + p.checkout + '</p>' +
+                        '<p>Estado: ' + p.status + '</p>' +
+                        '<p>Huéspedes: ' + p.guests + '</p>' +
+                        '<p>Total: ' + p.total + '</p>';
+                    modal.style.display = 'flex';
+                }
+            });
+            cal.render();
+            document.getElementById('ltms-cal-event-close').addEventListener('click', function(){ modal.style.display = 'none'; });
+            modal.addEventListener('click', function(e){ if (e.target === modal) modal.style.display = 'none'; });
+        });" );
+    }
+
+    /**
+     * M-BOOKING-UI-01: devuelve las reservas en el rango visible del calendario,
+     * en formato de evento de FullCalendar.
+     */
+    public static function ajax_calendar_events(): void {
+        try {
+            check_ajax_referer( 'ltms_admin_calendar', 'nonce' );
+            if ( ! current_user_can( 'manage_options' ) ) {
+                wp_send_json_error( __( 'Sin permiso.', 'ltms' ) );
+                return;
+            }
+            global $wpdb;
+            $start = sanitize_text_field( wp_unslash( $_POST['start'] ?? '' ) );
+            $end   = sanitize_text_field( wp_unslash( $_POST['end']   ?? '' ) );
+            if ( ! $start || ! $end ) {
+                wp_send_json_error( __( 'Rango de fechas inválido.', 'ltms' ) );
+                return;
+            }
+
+            $colors = [
+                'pending'   => '#f59e0b',
+                'confirmed' => '#10b981',
+                'paid'      => '#2563eb',
+                'cancelled' => '#9ca3af',
+                'completed' => '#6366f1',
+            ];
+
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT b.id, b.status, b.checkin_date, b.checkout_date, b.guests, b.total_price, b.currency,
+                            p.post_title AS product_name
+                     FROM {$wpdb->prefix}lt_bookings b
+                     LEFT JOIN {$wpdb->posts} p ON p.ID = b.product_id
+                     WHERE b.checkin_date < %s AND b.checkout_date > %s
+                     ORDER BY b.checkin_date ASC",
+                    $end,
+                    $start
+                ),
+                ARRAY_A
+            );
+
+            $events = [];
+            foreach ( (array) $rows as $r ) {
+                $events[] = [
+                    'id'    => (int) $r['id'],
+                    'title' => ( $r['product_name'] ?: __( 'Reserva', 'ltms' ) ) . ' (#' . $r['id'] . ')',
+                    'start' => $r['checkin_date'],
+                    'end'   => $r['checkout_date'],
+                    'color' => $colors[ $r['status'] ] ?? '#6b7280',
+                    'extendedProps' => [
+                        'status'   => $r['status'],
+                        'checkin'  => $r['checkin_date'],
+                        'checkout' => $r['checkout_date'],
+                        'guests'   => $r['guests'] ?? '—',
+                        'total'    => number_format( (float) $r['total_price'], 0, ',', '.' ) . ' ' . ( $r['currency'] ?: 'COP' ),
+                    ],
+                ];
+            }
+
+            wp_send_json_success( $events );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( $e->getMessage() );
+        }
     }
 
     public static function render_compliance_panel(): void {
