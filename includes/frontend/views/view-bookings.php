@@ -119,56 +119,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </div>
     </div>
 
-</div>
-
-<!-- Modal: Detalle de reserva -->
-<div id="ltms-modal-booking-detail" class="ltms-modal-overlay" style="display:none;">
-    <div class="ltms-modal" style="max-width:560px;">
-        <div class="ltms-modal-header">
-            <h3 id="ltms-bk-modal-title"><?php esc_html_e( 'Detalle de Reserva', 'ltms' ); ?></h3>
-            <button type="button" class="ltms-modal-close" data-close-modal="ltms-modal-booking-detail">✕</button>
-        </div>
-        <div class="ltms-modal-body" id="ltms-bk-modal-body" style="font-size:0.9rem;line-height:1.7;"></div>
-        <div class="ltms-modal-footer">
-            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" data-close-modal="ltms-modal-booking-detail">
-                <?php esc_html_e( 'Cerrar', 'ltms' ); ?>
-            </button>
-            <button type="button" class="ltms-btn ltms-btn-sm" style="background:#dc2626;color:#fff;" id="ltms-bk-cancel-btn">
-                <?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?>
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal: Confirmar cancelación -->
-<div id="ltms-modal-booking-cancel" class="ltms-modal-overlay" style="display:none;">
-    <div class="ltms-modal" style="max-width:440px;">
-        <div class="ltms-modal-header">
-            <h3><?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?></h3>
-            <button type="button" class="ltms-modal-close" data-close-modal="ltms-modal-booking-cancel">✕</button>
-        </div>
-        <div class="ltms-modal-body">
-            <p style="color:#6b7280;margin-bottom:12px;">
-                <?php esc_html_e( 'Esta acción generará un reembolso según la política de cancelación del producto y notificará al huésped.', 'ltms' ); ?>
-            </p>
-            <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">
-                <?php esc_html_e( 'Motivo de cancelación', 'ltms' ); ?>
-            </label>
-            <textarea id="ltms-bk-cancel-reason" rows="3"
-                      placeholder="<?php esc_attr_e( 'Ej: Mantenimiento programado, overbooking, etc.', 'ltms' ); ?>"
-                      style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:0.875rem;resize:vertical;"></textarea>
-            <div id="ltms-bk-cancel-notice" style="margin-top:8px;font-size:0.82rem;"></div>
-        </div>
-        <div class="ltms-modal-footer">
-            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" data-close-modal="ltms-modal-booking-cancel">
-                <?php esc_html_e( 'Volver', 'ltms' ); ?>
-            </button>
-            <button type="button" class="ltms-btn ltms-btn-sm" style="background:#dc2626;color:#fff;" id="ltms-bk-confirm-cancel-btn">
-                <?php esc_html_e( 'Confirmar Cancelación', 'ltms' ); ?>
-            </button>
-        </div>
-    </div>
-
     </div><!-- #ltms-bk-reservas -->
 
     <!-- TAB 2: Temporadas (M-BOOKING-PLAN-02) -->
@@ -180,7 +130,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </button>
         </div>
         <p style="font-size:.85rem;color:#6b7280;margin-bottom:16px;">
-            <?php esc_html_e( 'Define períodos con precios distintos para uno de tus alojamientos. Modificador 1.50 = +50%; 0.80 = −20%.', 'ltms' ); ?>
+            <?php esc_html_e( 'Define períodos con precios distintos para un alojamiento específico, o para todos a la vez. Modificador 1.50 = +50%; 0.80 = −20%.', 'ltms' ); ?>
         </p>
         <div class="ltms-card" style="margin-bottom:20px;overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;">
@@ -204,9 +154,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             <input type="hidden" id="ltms-season-id" value="0">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
                 <div style="grid-column:span 2;">
-                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Alojamiento *', 'ltms' ); ?></label>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Alojamiento', 'ltms' ); ?></label>
                     <select id="ltms-season-product" class="ltms-form-control">
-                        <option value="0"><?php esc_html_e( '— Cargando alojamientos... —', 'ltms' ); ?></option>
+                        <option value=""><?php esc_html_e( '— Cargando alojamientos... —', 'ltms' ); ?></option>
                     </select>
                 </div>
                 <div>
@@ -289,7 +239,80 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </div>
         </div>
     </div><!-- #ltms-bk-policies -->
+</div><!-- .ltms-view-pad -->
+
+<!-- Modal: Detalle de reserva -->
+<div class="ltms-modal" id="ltms-modal-booking-detail">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <h3 id="ltms-bk-modal-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Detalle de Reserva', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+        </div>
+        <div id="ltms-bk-modal-body" style="font-size:0.9rem;line-height:1.7;"></div>
+        <p id="ltms-bk-cancel-unavailable-note" style="display:none;font-size:0.8rem;color:#9ca3af;margin-top:14px;margin-bottom:0;">
+            <?php esc_html_e( 'Esta reserva ya no se puede cancelar desde aquí porque está completada o ya fue cancelada.', 'ltms' ); ?>
+        </p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-modal-close">
+                <?php esc_html_e( 'Cerrar', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-sm" style="background:#dc2626;color:#fff;" id="ltms-bk-cancel-btn">
+                <?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
 </div>
+
+<!-- Modal: Confirmar cancelación de reserva -->
+<div class="ltms-modal" id="ltms-modal-booking-cancel">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:440px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+        </div>
+        <p style="color:#6b7280;margin-bottom:12px;">
+            <?php esc_html_e( 'Esta acción generará un reembolso según la política de cancelación del producto y notificará al huésped.', 'ltms' ); ?>
+        </p>
+        <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px;">
+            <?php esc_html_e( 'Motivo de cancelación', 'ltms' ); ?>
+        </label>
+        <textarea id="ltms-bk-cancel-reason" rows="3"
+                  placeholder="<?php esc_attr_e( 'Ej: Mantenimiento programado, overbooking, etc.', 'ltms' ); ?>"
+                  style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:0.875rem;resize:vertical;"></textarea>
+        <div id="ltms-bk-cancel-notice" style="margin-top:8px;font-size:0.82rem;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-modal-close">
+                <?php esc_html_e( 'Volver', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-sm" style="background:#dc2626;color:#fff;" id="ltms-bk-confirm-cancel-btn">
+                <?php esc_html_e( 'Confirmar Cancelación', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar eliminación (reutilizable para Temporada y Política) -->
+<div class="ltms-modal" id="ltms-modal-booking-confirm-delete">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:400px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <h3 id="ltms-bk-confirm-delete-title" style="margin:0;font-size:1.05rem;"><?php esc_html_e( '¿Eliminar?', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+        </div>
+        <p id="ltms-bk-confirm-delete-body" style="color:#6b7280;margin:0;"></p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-modal-close">
+                <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-sm" style="background:#dc2626;color:#fff;" id="ltms-bk-confirm-delete-btn">
+                <?php esc_html_e( 'Sí, eliminar', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function($){
     'use strict';
@@ -427,6 +450,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 var b = res.data;
                 var canCancel = (b.status === 'pending' || b.status === 'confirmed');
                 $('#ltms-bk-cancel-btn').toggle(canCancel);
+                $('#ltms-bk-cancel-unavailable-note').toggle(!canCancel);
 
                 var nights = 0;
                 if (b.checkin_date && b.checkout_date && b.checkin_date !== '0000-00-00') {
@@ -610,14 +634,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         $.post(ltmsDashboard.ajax_url, { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce }, function(res) {
             productsLoaded = true;
             var $sel = $('#ltms-season-product').empty();
-            if (!res.success || !res.data.products.length) {
-                $sel.append('<option value="0">Sin alojamientos publicados</option>');
-                return;
+            $sel.append('<option value="0">— Todos mis alojamientos —</option>');
+            if (res.success && res.data.products.length) {
+                res.data.products.forEach(function(p) {
+                    $sel.append('<option value="' + p.id + '">' + $('<span/>').text(p.name).html() + '</option>');
+                });
             }
-            $sel.append('<option value="0">— Selecciona un alojamiento —</option>');
-            res.data.products.forEach(function(p) {
-                $sel.append('<option value="' + p.id + '">' + $('<span/>').text(p.name).html() + '</option>');
-            });
         });
     }
 
@@ -640,10 +662,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                     '<td style="padding:10px 12px;font-size:.85rem;">' + s.date_from + '</td>' +
                     '<td style="padding:10px 12px;font-size:.85rem;">' + s.date_to + '</td>' +
                     '<td style="padding:10px 12px;">' + modHtml + '</td>' +
-                    '<td style="padding:10px 12px;"><button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-season-edit" data-id="' + s.id + '"' +
+                    '<td style="padding:10px 12px;"><button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-season-edit" data-id="' + s.id + '" aria-label="<?php echo esc_js( __( 'Editar temporada', 'ltms' ) ); ?>"' +
                     ' data-name="' + encodeURIComponent(s.season_name) + '" data-from="' + s.date_from + '" data-to="' + s.date_to + '"' +
                     ' data-mod="' + s.price_modifier + '" data-pid="' + (s.product_id || 0) + '">✏️</button> ' +
-                    '<button class="ltms-btn ltms-btn-sm ltms-season-del" data-id="' + s.id + '" style="background:#fee2e2;color:#991b1b;">🗑️</button></td></tr>';
+                    '<button class="ltms-btn ltms-btn-sm ltms-season-del" data-id="' + s.id + '" aria-label="<?php echo esc_js( __( 'Eliminar temporada', 'ltms' ) ); ?>" style="background:#fee2e2;color:#991b1b;">🗑️</button></td></tr>';
             }).join('');
             $('#ltms-seasons-tbody').html(html);
         });
@@ -668,7 +690,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         var name = $('#ltms-season-name').val().trim(), from = $('#ltms-season-from').val(), to = $('#ltms-season-to').val();
         var pid = $('#ltms-season-product').val();
         if (!name || !from || !to) { ltmsSeasonNotice('El nombre y las fechas son obligatorios.', 'error'); return; }
-        if (!pid || pid === '0') { ltmsSeasonNotice('Selecciona un alojamiento.', 'error'); return; }
+        if (pid === '' || pid === null) { ltmsSeasonNotice('Espera a que carguen tus alojamientos e intenta de nuevo.', 'error'); return; }
         $(this).prop('disabled', true).text('Guardando...');
         $.post(ltmsDashboard.ajax_url, { action: 'ltms_save_vendor_season', nonce: ltmsDashboard.nonce,
             rule_id: $('#ltms-season-id').val(), season_name: name, date_from: from, date_to: to,
@@ -682,10 +704,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     });
     $(document).on('click', '#ltms-season-cancel-btn', function() { $('#ltms-season-form').hide(); });
     $(document).on('click', '.ltms-season-del', function() {
-        if (!confirm('¿Eliminar esta temporada?')) return;
-        $.post(ltmsDashboard.ajax_url, { action: 'ltms_delete_vendor_season', nonce: ltmsDashboard.nonce, rule_id: $(this).data('id') },
-        function(res) { if (res.success) { $('#ltms-seasons-tbody').removeData('loaded'); ltmsLoadSeasons(); }
-            else { alert(res.data || 'Error al eliminar.'); } });
+        ltmsConfirmDelete('season', $(this).data('id'), '<?php echo esc_js( __( '¿Eliminar esta temporada? Esta acción no se puede deshacer.', 'ltms' ) ); ?>');
     });
 
     function ltmsLoadPolicies() {
@@ -709,7 +728,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                     '<button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-policy-edit" data-id="' + p.id + '" data-name="' + encodeURIComponent(p.name) + '"' +
                     ' data-type="' + p.policy_type + '" data-free="' + p.free_cancel_hours + '" data-pct="' + p.partial_refund_pct + '"' +
                     ' data-phours="' + p.partial_refund_hours + '" data-default="' + p.is_default + '">✏️ Editar</button>' +
-                    '<button class="ltms-btn ltms-btn-sm ltms-policy-del" data-id="' + p.id + '" style="background:#fee2e2;color:#991b1b;">🗑️</button>' +
+                    '<button class="ltms-btn ltms-btn-sm ltms-policy-del" data-id="' + p.id + '" aria-label="<?php echo esc_js( __( 'Eliminar política', 'ltms' ) ); ?>" style="background:#fee2e2;color:#991b1b;">🗑️</button>' +
                     '</div></div></div>';
             }).join('');
             $('#ltms-policies-list').html(html);
@@ -749,11 +768,49 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     });
     $(document).on('click', '#ltms-policy-cancel-btn', function() { $('#ltms-policy-form').hide(); });
     $(document).on('click', '.ltms-policy-del', function() {
-        if (!confirm('¿Eliminar esta política?')) return;
-        $.post(ltmsDashboard.ajax_url, { action: 'ltms_delete_vendor_policy', nonce: ltmsDashboard.nonce, policy_id: $(this).data('id') },
-        function(res) { if (res.success) { $('#ltms-policies-list').removeData('loaded'); ltmsLoadPolicies(); }
-            else { alert(res.data || 'Error al eliminar.'); } });
+        ltmsConfirmDelete('policy', $(this).data('id'), '<?php echo esc_js( __( '¿Eliminar esta política de cancelación? Los productos que la usan quedarán sin política asignada.', 'ltms' ) ); ?>');
+    });
+
+    // ── Confirmación de eliminación (Temporada / Política), modal compartido ──
+    var pendingDelete = null; // { type: 'season'|'policy', id: number }
+
+    function ltmsConfirmDelete(type, id, message) {
+        pendingDelete = { type: type, id: id };
+        var title = type === 'season'
+            ? '<?php echo esc_js( __( 'Eliminar temporada', 'ltms' ) ); ?>'
+            : '<?php echo esc_js( __( 'Eliminar política', 'ltms' ) ); ?>';
+        $('#ltms-bk-confirm-delete-title').text(title);
+        $('#ltms-bk-confirm-delete-body').text(message);
+        $('#ltms-bk-confirm-delete-btn').prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
+        LTMS.Modal.open('ltms-modal-booking-confirm-delete');
+    }
+
+    $('#ltms-bk-confirm-delete-btn').on('click', function() {
+        if (!pendingDelete) return;
+        var $btn = $(this).prop('disabled', true).text('<?php echo esc_js( __( 'Eliminando…', 'ltms' ) ); ?>');
+        var action = pendingDelete.type === 'season' ? 'ltms_delete_vendor_season' : 'ltms_delete_vendor_policy';
+        var data = { action: action, nonce: ltmsDashboard.nonce };
+        if (pendingDelete.type === 'season') { data.rule_id = pendingDelete.id; } else { data.policy_id = pendingDelete.id; }
+
+        $.post(ltmsDashboard.ajax_url, data, function(res) {
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
+            if (res.success) {
+                LTMS.Modal.close('ltms-modal-booking-confirm-delete');
+                if (pendingDelete.type === 'season') {
+                    $('#ltms-seasons-tbody').removeData('loaded'); ltmsLoadSeasons();
+                } else {
+                    $('#ltms-policies-list').removeData('loaded'); ltmsLoadPolicies();
+                }
+            } else {
+                alert(res.data || '<?php echo esc_js( __( 'Error al eliminar.', 'ltms' ) ); ?>');
+            }
+            pendingDelete = null;
+        }).fail(function() {
+            $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
+            alert('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+        });
     });
 
 })(jQuery);
 </script>
+
