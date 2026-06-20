@@ -11,7 +11,21 @@
         init: function() {
             if ( typeof ltmsShipping === 'undefined' ) return;
             $(document.body).on('updated_checkout', this.onCheckoutUpdate.bind(this));
-            $(document.body).on('init_checkout', this.onCheckoutUpdate.bind(this));
+            $(document.body).on('init_checkout',    this.onCheckoutUpdate.bind(this));
+
+            // P-03: mostrar/ocultar tarjeta de tienda según el radio seleccionado
+            $(document.body).on('change', 'input[name^="shipping_method"]', this.togglePickupCard.bind(this));
+            $(document.body).on('updated_checkout', this.togglePickupCard.bind(this));
+        },
+
+        /**
+         * P-03: Muestra la tarjeta de info de tienda cuando el radio de pickup
+         * está seleccionado; la oculta cuando se elige otro método.
+         */
+        togglePickupCard: function() {
+            var $selected = $('input[name^="shipping_method"]:checked');
+            var isPickup  = $selected.length && $selected.val().indexOf('ltms_pickup') !== -1;
+            $('.ltms-pickup-card').toggle( isPickup );
         },
 
         onCheckoutUpdate: function() {
