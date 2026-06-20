@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.5.0';
+    private const CURRENT_VERSION = '2.6.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -64,6 +64,7 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.5.0', '<' ) ) {
             self::migrate_2_5_0();
+            self::migrate_2_6_0();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -2001,5 +2002,75 @@ final class LTMS_DB_Migrations {
             }
         }
     }
+
+    /**
+     * Migración 2.6.0: Recrea lt_deposits con el esquema correcto para depósitos manuales.
+     *
+     * El DDL original de lt_deposits era para garantías de torneo (type ENUM held/released).
+     * LTMS_Deposit (módulo de recarga de wallet) necesita columnas distintas: method,
+     * reference, receipt_url, approved_by/at, rejected_by/at/reason, wallet_tx_id.
+     *
+     * Acción: si la tabla lt_deposits existe pero SIN la columna `method`, se renombra
+     * a lt_deposits_garantias (para no perder datos) y se crea la tabla correcta.
+     *
+     * @return void
+     */
+    private static function migrate_2_6_0(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+
+        $col = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'method'",
+            DB_NAME, $p . 'lt_deposits'
+        ) );
+
+        if ( empty( $col ) ) {
+            // Tabla existe con esquema de garantías — renombrar para preservar datos
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME, $p . 'lt_deposits'
+            ) );
+
+            if ( $existing ) {
+                $wpdb->query( "RENAME TABLE `{$p}lt_deposits` TO `{$p}lt_deposits_garantias`" ); // phpcs:ignore
+                LTMS_Core_Logger::info( 'DB_MIGRATE', 'lt_deposits → lt_deposits_garantias (2.6.0)' );
+            }
+
+            $sql = "CREATE TABLE `{$p}lt_deposits` (
+                `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `vendor_id`     BIGINT UNSIGNED NOT NULL,
+                `amount`        DECIMAL(15,2) NOT NULL,
+                `currency`      CHAR(3) NOT NULL DEFAULT 'COP',
+                `method`        VARCHAR(30) NOT NULL COMMENT 'pse|nequi|transferencia',
+                `reference`     VARCHAR(120) NOT NULL DEFAULT '',
+                `receipt_url`   VARCHAR(500) NOT NULL DEFAULT '',
+                `notes`         TEXT,
+                `status`        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+                `ip_address`    VARCHAR(45) NOT NULL DEFAULT '',
+                `created_by`    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                `approved_by`   BIGINT UNSIGNED DEFAULT NULL,
+                `approved_at`   DATETIME DEFAULT NULL,
+                `admin_notes`   TEXT,
+                `wallet_tx_id`  BIGINT UNSIGNED DEFAULT NULL,
+                `rejected_by`   BIGINT UNSIGNED DEFAULT NULL,
+                `rejected_at`   DATETIME DEFAULT NULL,
+                `reject_reason` TEXT,
+                `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_vendor`     (`vendor_id`),
+                KEY `idx_status`     (`status`),
+                KEY `idx_created_at` (`created_at`)
+            ) {$charset}";
+
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            dbDelta( $sql );
+            LTMS_Core_Logger::info( 'DB_MIGRATE', 'lt_deposits recreada con esquema de depósitos manuales (2.6.0)' );
+        } else {
+            LTMS_Core_Logger::info( 'DB_MIGRATE', 'lt_deposits ya tiene columna method — skip 2.6.0' );
+        }
+    }
+
 
 }
