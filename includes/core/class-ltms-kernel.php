@@ -224,6 +224,13 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Booking_Season_Manager' ) ) {
             LTMS_Booking_Season_Manager::init();
         }
+        // M-BOOKING-UI-03: notificaciones por email del ciclo de vida de una
+        // reserva (nueva al vendedor, confirmada/cancelada al comprador).
+        // Los templates en templates/emails/email-booking-*.php existían
+        // desde antes pero nunca se cargaban en ningún punto del código.
+        if ( class_exists( 'LTMS_Booking_Notifications' ) ) {
+            LTMS_Booking_Notifications::init();
+        }
 
         // Listeners de eventos de dominio
         if ( class_exists( 'LTMS_Order_Paid_Listener' ) ) {
