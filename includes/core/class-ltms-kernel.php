@@ -224,6 +224,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Booking_Season_Manager' ) ) {
             LTMS_Booking_Season_Manager::init();
         }
+        // M-BOOKING-PLAN-03: Booking Policy Handler tiene AJAX en init() — faltaba boot en kernel.
+        if ( class_exists( 'LTMS_Booking_Policy_Handler' ) ) {
+            LTMS_Booking_Policy_Handler::init();
+        }
         // M-BOOKING-UI-03: notificaciones por email del ciclo de vida de una
         // reserva (nueva al vendedor, confirmada/cancelada al comprador).
         // Los templates en templates/emails/email-booking-*.php existían
