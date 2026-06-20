@@ -125,8 +125,10 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         $this->assertContains('admin_post_ltms_export_bookings_csv', $hooks);
     }
 
-    public function test_init_registers_four_hooks(): void
+    public function test_init_registers_five_hooks(): void
     {
+        // M-BOOKING-UI-01: se agregó wp_ajax_ltms_admin_calendar_events (5to hook)
+        // para alimentar el calendario FullCalendar con eventos reales.
         $count = 0;
         Functions\when('add_action')->alias(
             static function() use (&$count): void { $count++; }
@@ -134,7 +136,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
         \LTMS_Admin_Bookings::init();
 
-        $this->assertSame(4, $count);
+        $this->assertSame(5, $count);
     }
 
     // ── SECCIÓN 3: add_menu_pages() ───────────────────────────────────────────
@@ -299,6 +301,8 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
     {
         Functions\when('wp_enqueue_script')->alias(static function(): void {});
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
+        Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
+        Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
@@ -314,6 +318,8 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
             static function(string $handle) use (&$enqueued): void { $enqueued[] = $handle; }
         );
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
+        Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
+        Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
@@ -326,6 +332,8 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
     {
         Functions\when('wp_enqueue_script')->alias(static function(): void {});
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
+        Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
+        Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
