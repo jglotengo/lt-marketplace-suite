@@ -26,6 +26,11 @@ class LTMS_Booking_Season_Manager {
         self::$initialized = true;
 
         add_filter( 'ltms_booking_price_for_dates', [ self::class, 'apply_season_modifier' ], 10, 3 );
+
+        // M-BOOKING-PLAN-02: AJAX del panel de vendedor (tab Temporadas).
+        add_action( 'wp_ajax_ltms_get_vendor_seasons',   [ self::class, 'ajax_get_vendor_seasons' ] );
+        add_action( 'wp_ajax_ltms_save_vendor_season',   [ self::class, 'ajax_save_vendor_season' ] );
+        add_action( 'wp_ajax_ltms_delete_vendor_season', [ self::class, 'ajax_delete_vendor_season' ] );
     }
 
     /**
@@ -166,5 +171,125 @@ class LTMS_Booking_Season_Manager {
             return new \WP_Error( 'db_error', __( 'Error al guardar la regla de temporada.', 'ltms' ) );
         }
         return (int) $wpdb->insert_id;
+    }
+
+    /**
+     * Elimina una regla de temporada.
+     */
+    public static function delete_rule( int $id ): bool {
+        global $wpdb;
+        return (bool) $wpdb->delete( $wpdb->prefix . 'lt_booking_season_rules', [ 'id' => $id ] );
+    }
+
+    /**
+     * IDs de producto publicados por un vendedor (para validar ownership).
+     */
+    private static function get_vendor_product_ids( int $vendor_id ): array {
+        $query = new \WP_Query( [
+            'post_type'      => 'product',
+            'post_status'    => [ 'publish', 'pending', 'draft' ],
+            'author'         => $vendor_id,
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+        ] );
+        return array_map( 'intval', $query->posts );
+    }
+
+    /**
+     * Reglas de temporada de los productos de un vendedor (excluye reglas globales).
+     */
+    public static function get_vendor_rules( int $vendor_id ): array {
+        global $wpdb;
+
+        $product_ids = self::get_vendor_product_ids( $vendor_id );
+        if ( ! $product_ids ) return [];
+
+        $placeholders = implode( ',', array_fill( 0, count( $product_ids ), '%d' ) );
+
+        $rows = $wpdb->get_results(
+            // phpcs:ignore WordPress.DB.PreparedSQL
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}lt_booking_season_rules
+                 WHERE product_id IN ($placeholders) ORDER BY date_from ASC",
+                ...$product_ids
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        foreach ( $rows as &$row ) {
+            $row['product_name'] = get_the_title( (int) $row['product_id'] );
+        }
+        unset( $row );
+
+        return $rows;
+    }
+
+    // ── AJAX (panel de vendedor) ────────────────────────────────────────
+
+    public static function ajax_get_vendor_seasons(): void {
+        check_ajax_referer( 'ltms_nonce', 'nonce' );
+        wp_send_json_success( self::get_vendor_rules( get_current_user_id() ) );
+    }
+
+    public static function ajax_save_vendor_season(): void {
+        check_ajax_referer( 'ltms_nonce', 'nonce' );
+
+        $vendor_id  = get_current_user_id();
+        $rule_id    = absint( $_POST['rule_id'] ?? 0 );
+        $product_id = absint( $_POST['product_id'] ?? 0 );
+        $name       = sanitize_text_field( wp_unslash( $_POST['season_name'] ?? '' ) );
+        $from       = sanitize_text_field( $_POST['date_from'] ?? '' );
+        $to         = sanitize_text_field( $_POST['date_to'] ?? '' );
+        $modifier   = (float) ( $_POST['price_modifier'] ?? 1.0 );
+
+        if ( ! $name || ! $from || ! $to ) {
+            wp_send_json_error( __( 'El nombre y las fechas son obligatorios.', 'ltms' ) );
+        }
+        if ( strtotime( $from ) >= strtotime( $to ) ) {
+            wp_send_json_error( __( 'La fecha de inicio debe ser anterior a la de fin.', 'ltms' ) );
+        }
+        if ( ! $product_id ) {
+            wp_send_json_error( __( 'Selecciona un alojamiento.', 'ltms' ) );
+        }
+        if ( (int) get_post_field( 'post_author', $product_id ) !== $vendor_id ) {
+            wp_send_json_error( __( 'No tienes permiso sobre ese producto.', 'ltms' ) );
+        }
+        if ( $rule_id ) {
+            $existing = $wpdb_row = self::get_vendor_rules( $vendor_id );
+            $owned    = wp_list_pluck( $existing, 'id' );
+            if ( ! in_array( (string) $rule_id, array_map( 'strval', $owned ), true ) ) {
+                wp_send_json_error( __( 'No tienes permiso sobre esa regla.', 'ltms' ) );
+            }
+        }
+
+        $result = self::save_rule( [
+            'id'             => $rule_id,
+            'product_id'     => $product_id,
+            'season_name'    => $name,
+            'price_modifier' => max( 0.1, $modifier ),
+            'date_from'      => $from,
+            'date_to'        => $to,
+        ] );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Temporada guardada correctamente.', 'ltms' ), 'id' => $result ] );
+    }
+
+    public static function ajax_delete_vendor_season(): void {
+        check_ajax_referer( 'ltms_nonce', 'nonce' );
+
+        $vendor_id = get_current_user_id();
+        $rule_id   = absint( $_POST['rule_id'] ?? 0 );
+        $owned     = wp_list_pluck( self::get_vendor_rules( $vendor_id ), 'id' );
+
+        if ( ! $rule_id || ! in_array( (string) $rule_id, array_map( 'strval', $owned ), true ) ) {
+            wp_send_json_error( __( 'No tienes permiso sobre esa regla.', 'ltms' ) );
+        }
+
+        self::delete_rule( $rule_id );
+        wp_send_json_success( [ 'message' => __( 'Temporada eliminada.', 'ltms' ) ] );
     }
 }
