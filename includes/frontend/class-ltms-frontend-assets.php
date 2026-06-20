@@ -492,6 +492,10 @@ final class LTMS_Frontend_Assets {
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
             'rest_url'      => rest_url( 'ltms/v1' ),
             'nonce'         => wp_create_nonce( 'ltms_dashboard_nonce' ),
+            // M-BOOKING-UI-02: nonce dedicado para la descarga GET de exportación
+            // CSV de reservas (check_admin_referer exige acción exacta, distinta
+            // del nonce AJAX genérico de arriba).
+            'export_nonce'  => wp_create_nonce( 'ltms_export_vendor_bookings' ),
             'currency'      => LTMS_Core_Config::get_currency(),
             'country'       => LTMS_Core_Config::get_country(),
             'user_id'       => $user_id,
