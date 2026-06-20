@@ -742,15 +742,38 @@ final class LTMS_Dashboard_Logic {
         $orders       = [];
 
         foreach ( $orders_query as $order ) {
+            // P-01: detectar si el método de envío es pickup para mostrar icono y datos de tienda.
+            $is_pickup      = false;
+            $shipping_label = '';
+            foreach ( $order->get_shipping_methods() as $method ) {
+                if ( str_contains( $method->get_method_id(), 'ltms_pickup' ) ) {
+                    $is_pickup      = true;
+                    $shipping_label = __( 'Recogida en Tienda', 'ltms' );
+                    break;
+                }
+                $shipping_label = $method->get_name();
+            }
+
+            $store_info = [];
+            if ( $is_pickup ) {
+                $vendor_id  = (int) $order->get_meta( '_ltms_vendor_id' );
+                $store_info = $vendor_id
+                    ? LTMS_Business_Pickup_Handler::get_vendor_store_info( $vendor_id )
+                    : [];
+            }
+
             $orders[] = [
-                'id'         => $order->get_id(),
-                'number'     => $order->get_order_number(),
-                'status'     => $order->get_status(),
-                'total'      => (float) $order->get_total(),
-                'formatted'  => LTMS_Utils::format_money( (float) $order->get_total() ),
-                'customer'   => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                'date'       => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
-                'items_count' => count( $order->get_items() ),
+                'id'             => $order->get_id(),
+                'number'         => $order->get_order_number(),
+                'status'         => $order->get_status(),
+                'total'          => (float) $order->get_total(),
+                'formatted'      => LTMS_Utils::format_money( (float) $order->get_total() ),
+                'customer'       => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'date'           => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
+                'items_count'    => count( $order->get_items() ),
+                'is_pickup'      => $is_pickup,
+                'shipping_label' => $shipping_label ?: __( 'Envío estándar', 'ltms' ),
+                'store_info'     => $store_info,
             ];
         }
 
