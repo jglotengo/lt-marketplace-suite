@@ -73,37 +73,81 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
 </div>
 
-    <!-- Depósitos Manuales pendientes -->
+    <!-- Historial de Depósitos Manuales -->
     <?php
-    $my_deposits = LTMS_Deposit::get_by_vendor( $vendor_id, 'pending', 5, 0 );
-    if ( ! empty( $my_deposits ) ) :
+    $my_deposits = LTMS_Deposit::get_by_vendor( $vendor_id, '', 10, 0 );
     ?>
     <div class="ltms-card" style="margin-top:20px;">
-        <div class="ltms-card-header">⏳ <?php esc_html_e( 'Depósitos Pendientes', 'ltms' ); ?></div>
+        <div class="ltms-card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>💳 <?php esc_html_e( 'Mis Depósitos', 'ltms' ); ?></span>
+            <button type="button" class="ltms-btn ltms-btn-secondary ltms-btn-sm"
+                    data-ltms-modal-open="ltms-modal-deposit">
+                + <?php esc_html_e( 'Nuevo depósito', 'ltms' ); ?>
+            </button>
+        </div>
         <div class="ltms-card-body" style="padding:0;">
+            <?php if ( empty( $my_deposits ) ) : ?>
+            <p style="text-align:center;padding:24px;color:#9ca3af;margin:0;">
+                <?php esc_html_e( 'Aún no tienes depósitos registrados.', 'ltms' ); ?>
+            </p>
+            <?php else : ?>
             <table class="ltms-dtable" style="width:100%;">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
-                        <th><?php esc_html_e( 'Monto', 'ltms' ); ?></th>
-                        <th><?php esc_html_e( 'Método', 'ltms' ); ?></th>
-                        <th><?php esc_html_e( 'Referencia', 'ltms' ); ?></th>
-                    </tr>
-                </thead>
+                <thead><tr>
+                    <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Monto', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Método', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Referencia', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
+                    <th><?php esc_html_e( 'Comprobante', 'ltms' ); ?></th>
+                </tr></thead>
                 <tbody>
-                <?php foreach ( $my_deposits as $dep ) : ?>
+                <?php
+                $dep_badge = [
+                    'pending'  => 'style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:.75rem;"',
+                    'approved' => 'style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-size:.75rem;"',
+                    'rejected' => 'style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:.75rem;"',
+                ];
+                $dep_label = [
+                    'pending'  => '⏳ ' . __( 'Pendiente', 'ltms' ),
+                    'approved' => '✅ ' . __( 'Aprobado', 'ltms' ),
+                    'rejected' => '❌ ' . __( 'Rechazado', 'ltms' ),
+                ];
+                foreach ( $my_deposits as $dep ) :
+                    $st  = $dep['status'] ?? 'pending';
+                    $bdg = $dep_badge[ $st ] ?? '';
+                    $lbl = $dep_label[ $st ] ?? esc_html( $st );
+                ?>
                     <tr>
-                        <td><?php echo esc_html( substr( $dep['created_at'], 0, 10 ) ); ?></td>
+                        <td style="white-space:nowrap;font-size:.82rem;"><?php echo esc_html( substr( $dep['created_at'], 0, 10 ) ); ?></td>
                         <td><strong><?php echo esc_html( LTMS_Utils::format_money( (float) $dep['amount'] ) ); ?></strong></td>
-                        <td><?php echo esc_html( strtoupper( $dep['method'] ) ); ?></td>
-                        <td><?php echo esc_html( $dep['reference'] ?: '—' ); ?></td>
+                        <td style="font-size:.82rem;"><?php echo esc_html( strtoupper( $dep['method'] ) ); ?></td>
+                        <td style="font-size:.82rem;"><?php echo esc_html( $dep['reference'] ?: '—' ); ?></td>
+                        <td>
+                            <span <?php echo $bdg; ?>><?php echo esc_html( $lbl ); ?></span>
+                            <?php if ( $st === 'rejected' && ! empty( $dep['reject_reason'] ) ) : ?>
+                            <br><small style="color:#6b7280;font-size:.72rem;"
+                                       title="<?php echo esc_attr( $dep['reject_reason'] ); ?>">
+                                ℹ️ <?php esc_html_e( 'Ver motivo', 'ltms' ); ?>
+                            </small>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( ! empty( $dep['receipt_url'] ) ) : ?>
+                            <a href="<?php echo esc_url( $dep['receipt_url'] ); ?>" target="_blank" rel="noopener"
+                               style="font-size:.8rem;color:#2563eb;">
+                                📎 <?php esc_html_e( 'Ver', 'ltms' ); ?>
+                            </a>
+                            <?php else : ?>
+                            <span style="color:#9ca3af;font-size:.78rem;">—</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php endif; ?>
         </div>
     </div>
-    <?php endif; ?>
 
 
 <!-- Modal de Retiro -->
@@ -254,11 +298,11 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
         var formData = new FormData();
         formData.append('action', 'ltms_upload_receipt');
-        formData.append('nonce', ltms_vars.frontend_nonce);
+        formData.append('nonce', ltmsDashboard.nonce);
         formData.append('receipt', file);
 
         $.ajax({
-            url: ltms_vars.ajax_url,
+            url: ltmsDashboard.ajax_url,
             type: 'POST',
             data: formData,
             processData: false,
@@ -297,9 +341,9 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
         btn.prop('disabled', true).text('Enviando...');
 
-        $.post(ltms_vars.ajax_url, {
+        $.post(ltmsDashboard.ajax_url, {
             action:      'ltms_create_deposit',
-            nonce:       ltms_vars.frontend_nonce,
+            nonce:       ltmsDashboard.nonce,
             amount:      amount,
             method:      method,
             reference:   reference,
