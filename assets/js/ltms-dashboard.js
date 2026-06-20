@@ -306,12 +306,28 @@
         },
 
         /**
-         * Carga la vista de Pedidos.
-         *
-         * @param {boolean} forceRefresh
+         * Estado de la vista de Pedidos: página/filtro actuales, para que
+         * paginación y filtro trabajen sobre el mismo estado en vez de
+         * mandar siempre page:1 (bug de la versión anterior).
          */
-        loadOrdersView(forceRefresh = false) {
+        ordersState: { page: 1, perPage: 20, status: '', totalPages: 1 },
+
+        /**
+         * Carga la vista de Pedidos (primera carga / al navegar al tab).
+         */
+        loadOrdersView() {
+            this.ordersState = { page: 1, perPage: 20, status: '', totalPages: 1 };
+            this.fetchOrders();
+        },
+
+        /**
+         * Hace la petición AJAX real usando el estado actual (página/filtro)
+         * y renderiza tabla + controles de paginación.
+         */
+        fetchOrders() {
             const self = this;
+            const $tbody = $('#ltms-orders-tbody');
+            $tbody.html('<tr><td colspan="7" class="ltms-empty-cell">' + (ltmsDashboard.i18n.loading || 'Cargando...') + '</td></tr>');
 
             $.ajax({
                 url: ltmsDashboard.ajax_url,
@@ -319,24 +335,28 @@
                 data: {
                     action: 'ltms_get_orders_data',
                     nonce: ltmsDashboard.nonce,
-                    page: 1,
-                    per_page: 20,
+                    page: self.ordersState.page,
+                    per_page: self.ordersState.perPage,
+                    status: self.ordersState.status,
                 },
                 success(response) {
                     if (response.success) {
+                        self.ordersState.totalPages = response.data.total_pages || 1;
                         self.renderOrdersTable(response.data.orders);
+                        self.renderOrdersPagination(response.data);
                         self.showSection('#ltms-view-orders');
                     } else {
-                        self.showError('#ltms-view-orders', response.data);
+                        $tbody.html('<tr><td colspan="7" class="ltms-empty-cell">' + (response.data || ltmsDashboard.i18n.error) + '</td></tr>');
                     }
                 },
-                error: () => self.showError('#ltms-view-orders', ltmsDashboard.i18n.error),
+                error: () => $tbody.html('<tr><td colspan="7" class="ltms-empty-cell">' + ltmsDashboard.i18n.error + '</td></tr>'),
             });
         },
 
         /**
          * Renderiza la tabla de pedidos del vendedor.
          * P-01: columna de tipo de envío, badge pickup diferenciado, etiquetas en español.
+         * audit-pedidos: filas clicables que abren el modal de detalle.
          *
          * @param {Array} orders Lista de pedidos.
          */
@@ -365,7 +385,7 @@
                 }
 
                 $tbody.append(`
-                    <tr>
+                    <tr class="ltms-order-row" data-order-id="${order.id}" style="cursor:pointer;" tabindex="0" role="button" aria-label="Ver detalle del pedido #${order.number}">
                         <td>#${order.number}</td>
                         <td>${this.escapeHtml(order.customer)}</td>
                         <td>${order.items_count} item(s)</td>
@@ -376,6 +396,34 @@
                     </tr>
                 `);
             });
+        },
+
+        /**
+         * Renderiza los controles de paginación (Anterior / página X de Y / Siguiente)
+         * debajo de la tabla de pedidos.
+         *
+         * @param {Object} data Respuesta de ltms_get_orders_data (total, page, total_pages).
+         */
+        renderOrdersPagination(data) {
+            let $pager = $('#ltms-orders-pagination');
+            if (!$pager.length) {
+                $pager = $('<div id="ltms-orders-pagination" style="display:flex;justify-content:space-between;align-items:center;padding:14px 4px;font-size:.85rem;color:#6b7280;"></div>');
+                $('#ltms-orders-tbody').closest('.ltms-card').after($pager);
+            }
+
+            const page = data.page || 1;
+            const totalPages = data.total_pages || 1;
+            const total = data.total || 0;
+
+            if (total === 0) { $pager.empty(); return; }
+
+            $pager.html(`
+                <span>Página ${page} de ${totalPages} · ${total} pedido(s)</span>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-prev" ${page <= 1 ? 'disabled' : ''} aria-label="Página anterior">‹ Anterior</button>
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-next" ${page >= totalPages ? 'disabled' : ''} aria-label="Página siguiente">Siguiente ›</button>
+                </div>
+            `);
         },
 
         /**
@@ -789,47 +837,184 @@
         },
 
         /**
-         * BUG M-8 FIX: Vincula el select de filtro de estado de pedidos.
-         * Antes no tenía listener — filtrar nunca hacía nada.
+         * Vincula el select de filtro de estado de pedidos.
          */
         bindOrderFilter() {
             const self = this;
             $(document).on('change', '#ltms-order-status-filter', function () {
-                const status = $(this).val();
-                self.loadOrdersFiltered(status);
+                self.ordersState.status = $(this).val() === 'all' ? '' : $(this).val();
+                self.ordersState.page = 1;
+                self.fetchOrders();
+            });
+
+            // Paginación
+            $(document).on('click', '#ltms-orders-prev', function () {
+                if (self.ordersState.page > 1) {
+                    self.ordersState.page -= 1;
+                    self.fetchOrders();
+                }
+            });
+            $(document).on('click', '#ltms-orders-next', function () {
+                if (self.ordersState.page < self.ordersState.totalPages) {
+                    self.ordersState.page += 1;
+                    self.fetchOrders();
+                }
+            });
+
+            // Fila clicable → abre modal de detalle (clic o Enter/Espacio por accesibilidad)
+            $(document).on('click', '.ltms-order-row', function () {
+                self.openOrderDetail($(this).data('order-id'));
+            });
+            $(document).on('keydown', '.ltms-order-row', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    self.openOrderDetail($(this).data('order-id'));
+                }
+            });
+
+            // Cambiar estado desde el modal de detalle
+            $(document).on('click', '.ltms-order-status-action', function () {
+                const orderId = $('#ltms-modal-order-detail').data('order-id');
+                const newStatus = $(this).data('status');
+                self.updateOrderStatus(orderId, newStatus);
             });
         },
 
         /**
-         * Recarga pedidos filtrando por estado.
-         * @param {string} status Estado a filtrar ('all' o WC status).
+         * Abre el modal de detalle de un pedido y carga su información completa.
+         *
+         * @param {number} orderId
          */
-        loadOrdersFiltered(status) {
+        openOrderDetail(orderId) {
             const self = this;
-            const $tbody = $('#ltms-orders-tbody');
-            $tbody.html('<tr><td colspan="7" class="ltms-empty-cell">Cargando...</td></tr>');
+            const $modal = $('#ltms-modal-order-detail');
+            $modal.data('order-id', orderId);
+            $('#ltms-order-detail-body').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Cargando...</div>');
+
+            if (typeof LTMS.Modal !== 'undefined' && typeof LTMS.Modal.open === 'function') {
+                LTMS.Modal.open('ltms-modal-order-detail');
+            }
+
             $.ajax({
                 url: ltmsDashboard.ajax_url,
                 method: 'POST',
-                data: {
-                    action: 'ltms_get_orders_data',
-                    nonce: ltmsDashboard.nonce,
-                    page: 1,
-                    per_page: 20,
-                    status: status && status !== 'all' ? status : '',
-                },
+                data: { action: 'ltms_get_order_detail', nonce: ltmsDashboard.nonce, order_id: orderId },
                 success(response) {
                     if (response.success) {
-                        self.renderOrdersTable(response.data.orders);
+                        self.renderOrderDetail(response.data);
                     } else {
-                        $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">' + (response.data || ltmsDashboard.i18n.error) + '</td></tr>');
+                        $('#ltms-order-detail-body').html('<div style="text-align:center;padding:30px;color:#dc2626;">' + (response.data || 'Error al cargar el pedido.') + '</div>');
                     }
                 },
-                error: () => $tbody.html('<tr><td colspan="6" class="ltms-empty-cell">' + ltmsDashboard.i18n.error + '</td></tr>'),
+                error: () => $('#ltms-order-detail-body').html('<div style="text-align:center;padding:30px;color:#dc2626;">' + ltmsDashboard.i18n.error + '</div>'),
             });
         },
 
+        /**
+         * Renderiza el contenido del modal de detalle de pedido.
+         *
+         * @param {Object} d Datos devueltos por ltms_get_order_detail.
+         */
+        renderOrderDetail(d) {
+            const itemsHtml = d.items.map(it => `
+                <tr>
+                    <td>${this.escapeHtml(it.name)}${it.sku ? `<div style="font-size:.75rem;color:#9ca3af;">SKU: ${this.escapeHtml(it.sku)}</div>` : ''}</td>
+                    <td style="text-align:center;">${it.qty}</td>
+                    <td style="text-align:right;">${it.total}</td>
+                </tr>
+            `).join('');
 
+            const storeHtml = d.is_pickup && d.store_info && d.store_info.address
+                ? `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.85rem;">
+                       🏪 <strong>Recogida en tienda</strong><br>${this.escapeHtml(d.store_info.address)}
+                   </div>`
+                : '';
+
+            const transitionsHtml = (d.allowed_transitions || []).map(status => {
+                const label = this.getOrderStatusLabel(status);
+                return `<button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm ltms-order-status-action" data-status="${status}">${label}</button>`;
+            }).join(' ');
+
+            const notesHtml = (d.notes || []).length
+                ? d.notes.map(n => `<div style="font-size:.8rem;color:#6b7280;border-left:2px solid #e5e7eb;padding-left:8px;margin-bottom:6px;">${this.escapeHtml(n.content)} <span style="color:#9ca3af;">· ${n.date}</span></div>`).join('')
+                : '<div style="font-size:.8rem;color:#9ca3af;">Sin notas.</div>';
+
+            $('#ltms-order-detail-body').html(`
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0;">Pedido #${d.number}</h3>
+                        <span style="font-size:.85rem;color:#6b7280;">${d.date}</span>
+                    </div>
+                    <span class="ltms-badge ${this.getOrderStatusClass(d.status)}">${d.status_label}</span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;font-size:.85rem;">
+                    <div>
+                        <strong>Cliente</strong><br>
+                        ${this.escapeHtml(d.customer)}<br>
+                        ${d.customer_email ? this.escapeHtml(d.customer_email) + '<br>' : ''}
+                        ${d.customer_phone ? this.escapeHtml(d.customer_phone) : ''}
+                    </div>
+                    <div>
+                        <strong>Envío</strong><br>
+                        ${this.escapeHtml(d.shipping_label)}
+                        ${storeHtml}
+                    </div>
+                </div>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+                    <thead><tr style="font-size:.78rem;color:#9ca3af;border-bottom:1px solid #e5e7eb;">
+                        <th style="text-align:left;padding:6px 0;">Producto</th>
+                        <th style="text-align:center;padding:6px 0;">Cant.</th>
+                        <th style="text-align:right;padding:6px 0;">Total</th>
+                    </tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                    <tfoot>
+                        <tr><td colspan="2" style="text-align:right;padding-top:8px;color:#6b7280;">Subtotal</td><td style="text-align:right;padding-top:8px;">${d.subtotal}</td></tr>
+                        <tr><td colspan="2" style="text-align:right;color:#6b7280;">Envío</td><td style="text-align:right;">${d.shipping_total}</td></tr>
+                        <tr><td colspan="2" style="text-align:right;font-weight:700;">Total</td><td style="text-align:right;font-weight:700;">${d.total}</td></tr>
+                    </tfoot>
+                </table>
+
+                ${d.customer_note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.85rem;"><strong>Nota del cliente:</strong> ${this.escapeHtml(d.customer_note)}</div>` : ''}
+
+                <div style="margin-bottom:14px;">
+                    <strong style="font-size:.85rem;">Notas del pedido</strong>
+                    <div style="margin-top:6px;">${notesHtml}</div>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        ${transitionsHtml || '<span style="font-size:.8rem;color:#9ca3af;">Sin acciones disponibles para este estado.</span>'}
+                    </div>
+                    <a href="${d.edit_url}" target="_blank" rel="noopener" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="Ver pedido completo en WordPress">Ver en WordPress ↗</a>
+                </div>
+            `);
+        },
+
+        /**
+         * Cambia el estado de un pedido (acción del vendedor desde el modal de detalle).
+         *
+         * @param {number} orderId
+         * @param {string} newStatus
+         */
+        updateOrderStatus(orderId, newStatus) {
+            const self = this;
+            $.ajax({
+                url: ltmsDashboard.ajax_url,
+                method: 'POST',
+                data: { action: 'ltms_update_order_status', nonce: ltmsDashboard.nonce, order_id: orderId, status: newStatus },
+                success(response) {
+                    if (response.success) {
+                        self.openOrderDetail(orderId); // recarga el modal con el nuevo estado
+                        self.fetchOrders(); // refresca la tabla detrás
+                    } else {
+                        alert(response.data || 'No se pudo cambiar el estado.');
+                    }
+                },
+                error: () => alert(ltmsDashboard.i18n.error),
+            });
+        },
         loadProductsView(forceRefresh = false) {
             const self = this;
             self.showViewLoader();
