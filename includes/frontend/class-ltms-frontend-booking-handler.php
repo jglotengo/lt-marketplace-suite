@@ -34,6 +34,8 @@ final class LTMS_Frontend_Booking_Handler {
         add_action( 'wp_ajax_ltms_get_vendor_bookings',       [ $instance, 'ajax_get_vendor_bookings' ] );
         add_action( 'wp_ajax_ltms_get_vendor_booking_detail', [ $instance, 'ajax_get_vendor_booking_detail' ] );
         add_action( 'wp_ajax_ltms_vendor_cancel_booking',     [ $instance, 'ajax_vendor_cancel_booking' ] );
+        // M-BOOKING-UI-02: exportación CSV de reservas, filtrada al vendedor logueado.
+        add_action( 'wp_ajax_ltms_export_vendor_bookings_csv', [ $instance, 'export_vendor_bookings_csv' ] );
     }
 
     // ── Helpers privados ───────────────────────────────────────────────────
@@ -236,5 +238,66 @@ final class LTMS_Frontend_Booking_Handler {
         }
 
         wp_send_json_success( __( 'Reserva cancelada correctamente.', 'ltms' ) );
+    }
+
+    // ── Exportar CSV ───────────────────────────────────────────────────────
+
+    /**
+     * M-BOOKING-UI-02: exporta las reservas del vendedor logueado a CSV,
+     * respetando los mismos filtros (status/date_from/date_to) que la tabla.
+     * Usa nonce vía GET porque es una descarga directa (no AJAX/JSON).
+     */
+    public function export_vendor_bookings_csv(): void {
+        if ( ! $this->is_ltms_vendor() ) {
+            wp_die( esc_html__( 'Sin permiso.', 'ltms' ), '', [ 'response' => 403 ] );
+        }
+        check_admin_referer( 'ltms_export_vendor_bookings', 'nonce' );
+
+        global $wpdb;
+        $vendor_id = $this->get_vendor_id();
+        $status    = sanitize_text_field( wp_unslash( $_GET['status']    ?? '' ) );
+        $date_from = sanitize_text_field( wp_unslash( $_GET['date_from'] ?? '' ) );
+        $date_to   = sanitize_text_field( wp_unslash( $_GET['date_to']   ?? '' ) );
+
+        $conds  = [ 'b.vendor_id = %d' ];
+        $params = [ $vendor_id ];
+        if ( $status && in_array( $status, [ 'pending', 'confirmed', 'checked_in', 'completed', 'cancelled' ], true ) ) {
+            $conds[]  = 'b.status = %s';
+            $params[] = $status;
+        }
+        if ( $date_from ) {
+            $conds[]  = 'b.checkin_date >= %s';
+            $params[] = $date_from;
+        }
+        if ( $date_to ) {
+            $conds[]  = 'b.checkout_date <= %s';
+            $params[] = $date_to;
+        }
+        $where = implode( ' AND ', $conds );
+        $table = $wpdb->prefix . 'lt_bookings';
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+        $bookings = $wpdb->get_results( $wpdb->prepare(
+            "SELECT b.id, b.wc_order_id, p.post_title AS product_name, u.display_name AS customer_name,
+                    b.checkin_date, b.checkout_date, b.guests, b.total_price, b.vendor_net,
+                    b.status, b.payment_mode, b.currency, b.created_at
+             FROM {$table} b
+             LEFT JOIN {$wpdb->posts} p ON p.ID = b.product_id
+             LEFT JOIN {$wpdb->users} u ON u.ID = b.customer_id
+             WHERE {$where}
+             ORDER BY b.created_at DESC",
+            ...$params
+        ), ARRAY_A ) ?: [];
+
+        nocache_headers();
+        header( 'Content-Type: text/csv; charset=UTF-8' );
+        header( 'Content-Disposition: attachment; filename="mis-reservas-' . gmdate( 'Y-m-d' ) . '.csv"' );
+        $out = fopen( 'php://output', 'w' );
+        fputcsv( $out, [ 'ID', 'Orden WC', 'Producto', 'Huésped', 'Check-in', 'Check-out', 'Huéspedes', 'Total', 'Neto', 'Estado', 'Modo Pago', 'Moneda', 'Creada' ] );
+        foreach ( $bookings as $row ) {
+            fputcsv( $out, array_values( $row ) );
+        }
+        fclose( $out );
+        exit;
     }
 }
