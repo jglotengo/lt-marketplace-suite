@@ -13,6 +13,29 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 ?>
 <div class="ltms-view-pad">
 
+    <!-- M-BOOKING-PLAN-02/03: tabs ──────────────────────────────── -->
+    <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid #e5e7eb;">
+        <button type="button" class="ltms-booking-tab ltms-booking-tab-active"
+                data-target="ltms-bk-reservas"
+                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
+                       cursor:pointer;color:#1a5276;border-bottom:2px solid #1a5276;margin-bottom:-2px;">
+            📅 <?php esc_html_e( 'Mis Reservas', 'ltms' ); ?>
+        </button>
+        <button type="button" class="ltms-booking-tab"
+                data-target="ltms-bk-seasons"
+                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
+                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+            🌤 <?php esc_html_e( 'Temporadas', 'ltms' ); ?>
+        </button>
+        <button type="button" class="ltms-booking-tab"
+                data-target="ltms-bk-policies"
+                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
+                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+            📋 <?php esc_html_e( 'Políticas', 'ltms' ); ?>
+        </button>
+    </div>
+    <div id="ltms-bk-reservas">
+
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Mis Reservas', 'ltms' ); ?></h2>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -145,8 +168,128 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </button>
         </div>
     </div>
-</div>
 
+    </div><!-- #ltms-bk-reservas -->
+
+    <!-- TAB 2: Temporadas (M-BOOKING-PLAN-02) -->
+    <div id="ltms-bk-seasons" style="display:none;">
+        <div class="ltms-view-header" style="margin-bottom:16px;">
+            <h2><?php esc_html_e( 'Temporadas y modificadores de precio', 'ltms' ); ?></h2>
+            <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" id="ltms-season-add-btn">
+                + <?php esc_html_e( 'Nueva temporada', 'ltms' ); ?>
+            </button>
+        </div>
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:16px;">
+            <?php esc_html_e( 'Define períodos con precios distintos para uno de tus alojamientos. Modificador 1.50 = +50%; 0.80 = −20%.', 'ltms' ); ?>
+        </p>
+        <div class="ltms-card" style="margin-bottom:20px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead><tr style="background:#f9fafb;font-size:.8rem;color:#374151;">
+                    <th style="padding:10px 12px;text-align:left;"><?php esc_html_e( 'Nombre', 'ltms' ); ?></th>
+                    <th style="padding:10px 12px;text-align:left;"><?php esc_html_e( 'Producto', 'ltms' ); ?></th>
+                    <th style="padding:10px 12px;text-align:left;"><?php esc_html_e( 'Desde', 'ltms' ); ?></th>
+                    <th style="padding:10px 12px;text-align:left;"><?php esc_html_e( 'Hasta', 'ltms' ); ?></th>
+                    <th style="padding:10px 12px;text-align:left;"><?php esc_html_e( 'Modificador', 'ltms' ); ?></th>
+                    <th style="padding:10px 12px;"></th>
+                </tr></thead>
+                <tbody id="ltms-seasons-tbody">
+                    <tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;">
+                        <?php esc_html_e( 'Cargando...', 'ltms' ); ?>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="ltms-season-form" class="ltms-card" style="display:none;padding:20px;margin-bottom:20px;">
+            <h4 id="ltms-season-form-title" style="margin:0 0 16px;font-size:.95rem;"><?php esc_html_e( 'Nueva temporada', 'ltms' ); ?></h4>
+            <input type="hidden" id="ltms-season-id" value="0">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                <div style="grid-column:span 2;">
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Alojamiento *', 'ltms' ); ?></label>
+                    <select id="ltms-season-product" class="ltms-form-control">
+                        <option value="0"><?php esc_html_e( '— Cargando alojamientos... —', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Nombre *', 'ltms' ); ?></label>
+                    <input type="text" id="ltms-season-name" class="ltms-form-control" placeholder="<?php esc_attr_e( 'Ej: Semana Santa', 'ltms' ); ?>">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Modificador *', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-season-modifier" class="ltms-form-control" step="0.05" min="0.1" max="10" value="1.50">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Fecha inicio *', 'ltms' ); ?></label>
+                    <input type="date" id="ltms-season-from" class="ltms-form-control">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Fecha fin *', 'ltms' ); ?></label>
+                    <input type="date" id="ltms-season-to" class="ltms-form-control">
+                </div>
+            </div>
+            <div id="ltms-season-notice" style="display:none;margin-bottom:12px;padding:10px;border-radius:6px;font-size:.85rem;"></div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-season-save-btn"><?php esc_html_e( 'Guardar', 'ltms' ); ?></button>
+                <button type="button" class="ltms-btn ltms-btn-outline" id="ltms-season-cancel-btn"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            </div>
+        </div>
+    </div><!-- #ltms-bk-seasons -->
+
+    <!-- TAB 3: Políticas de cancelación (M-BOOKING-PLAN-03) -->
+    <div id="ltms-bk-policies" style="display:none;">
+        <div class="ltms-view-header" style="margin-bottom:16px;">
+            <h2><?php esc_html_e( 'Políticas de cancelación', 'ltms' ); ?></h2>
+            <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" id="ltms-policy-add-btn">
+                + <?php esc_html_e( 'Nueva política', 'ltms' ); ?>
+            </button>
+        </div>
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:16px;">
+            <?php esc_html_e( 'Define qué porcentaje se reembolsa según cuándo cancela el huésped. La política marcada "Por defecto" se aplica si el producto no tiene una asignada.', 'ltms' ); ?>
+        </p>
+        <div id="ltms-policies-list" style="display:grid;gap:14px;margin-bottom:20px;">
+            <div style="text-align:center;padding:30px;color:#9ca3af;"><?php esc_html_e( 'Cargando...', 'ltms' ); ?></div>
+        </div>
+        <div id="ltms-policy-form" class="ltms-card" style="display:none;padding:20px;">
+            <h4 id="ltms-policy-form-title" style="margin:0 0 16px;font-size:.95rem;"><?php esc_html_e( 'Nueva política', 'ltms' ); ?></h4>
+            <input type="hidden" id="ltms-policy-id" value="0">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Nombre *', 'ltms' ); ?></label>
+                    <input type="text" id="ltms-policy-name" class="ltms-form-control" placeholder="<?php esc_attr_e( 'Ej: Flexible, Estricta', 'ltms' ); ?>">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Tipo', 'ltms' ); ?></label>
+                    <select id="ltms-policy-type" class="ltms-form-control">
+                        <option value="flexible"><?php esc_html_e( 'Flexible', 'ltms' ); ?></option>
+                        <option value="moderate"><?php esc_html_e( 'Moderada', 'ltms' ); ?></option>
+                        <option value="strict"><?php esc_html_e( 'Estricta', 'ltms' ); ?></option>
+                        <option value="non_refundable"><?php esc_html_e( 'Sin reembolso', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Cancelación gratuita (horas)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-policy-free-hours" class="ltms-form-control" min="0" step="1" value="24">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( '% reembolso parcial', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-policy-partial-pct" class="ltms-form-control" min="0" max="100" step="1" value="50">
+                </div>
+                <div>
+                    <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Ventana reembolso parcial (horas)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-policy-partial-hours" class="ltms-form-control" min="0" step="1" value="48">
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
+                    <input type="checkbox" id="ltms-policy-default" value="1">
+                    <label for="ltms-policy-default" style="font-size:.85rem;cursor:pointer;"><?php esc_html_e( 'Política por defecto', 'ltms' ); ?></label>
+                </div>
+            </div>
+            <div id="ltms-policy-notice" style="display:none;margin-bottom:12px;padding:10px;border-radius:6px;font-size:.85rem;"></div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-policy-save-btn"><?php esc_html_e( 'Guardar', 'ltms' ); ?></button>
+                <button type="button" class="ltms-btn ltms-btn-outline" id="ltms-policy-cancel-btn"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            </div>
+        </div>
+    </div><!-- #ltms-bk-policies -->
+</div>
 <script>
 (function($){
     'use strict';
@@ -428,6 +571,189 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     if ( $('[data-view="bookings"]').length === 0 ) {
         loadBookings();
     }
+
+})(jQuery);
+</script>
+
+<script>
+/* global jQuery, ltmsDashboard */
+(function($) {
+    'use strict';
+
+    var productsLoaded = false;
+
+    $(document).on('click', '.ltms-booking-tab', function() {
+        var target = $(this).data('target');
+        $('.ltms-booking-tab').css({ color: '#6b7280', 'border-bottom-color': 'transparent' }).removeClass('ltms-booking-tab-active');
+        $(this).css({ color: '#1a5276', 'border-bottom-color': '#1a5276' }).addClass('ltms-booking-tab-active');
+        $('#ltms-bk-reservas, #ltms-bk-seasons, #ltms-bk-policies').hide();
+        $('#' + target).show();
+        if (target === 'ltms-bk-seasons') {
+            if (!productsLoaded) ltmsLoadVendorProducts();
+            if (!$('#ltms-seasons-tbody').data('loaded')) ltmsLoadSeasons();
+        }
+        if (target === 'ltms-bk-policies' && !$('#ltms-policies-list').data('loaded')) ltmsLoadPolicies();
+    });
+
+    function ltmsSeasonNotice(msg, type) {
+        var ok = type === 'success';
+        $('#ltms-season-notice').css({ background: ok ? '#f0fdf4' : '#fef2f2', color: ok ? '#166534' : '#991b1b',
+            border: '1px solid ' + (ok ? '#86efac' : '#fca5a5'), 'border-radius': '6px' }).text(msg).show();
+    }
+    function ltmsPolicyNotice(msg, type) {
+        var ok = type === 'success';
+        $('#ltms-policy-notice').css({ background: ok ? '#f0fdf4' : '#fef2f2', color: ok ? '#166534' : '#991b1b',
+            border: '1px solid ' + (ok ? '#86efac' : '#fca5a5'), 'border-radius': '6px' }).text(msg).show();
+    }
+
+    function ltmsLoadVendorProducts() {
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce }, function(res) {
+            productsLoaded = true;
+            var $sel = $('#ltms-season-product').empty();
+            if (!res.success || !res.data.products.length) {
+                $sel.append('<option value="0">Sin alojamientos publicados</option>');
+                return;
+            }
+            $sel.append('<option value="0">— Selecciona un alojamiento —</option>');
+            res.data.products.forEach(function(p) {
+                $sel.append('<option value="' + p.id + '">' + $('<span/>').text(p.name).html() + '</option>');
+            });
+        });
+    }
+
+    function ltmsLoadSeasons() {
+        $('#ltms-seasons-tbody').html('<tr><td colspan="6" style="text-align:center;padding:20px;color:#9ca3af;">Cargando...</td></tr>');
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_get_vendor_seasons', nonce: ltmsDashboard.nonce }, function(res) {
+            $('#ltms-seasons-tbody').data('loaded', true);
+            if (!res.success || !res.data.length) {
+                $('#ltms-seasons-tbody').html('<tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;">Sin temporadas. Crea una para aplicar precios especiales a un alojamiento.</td></tr>');
+                return;
+            }
+            var html = res.data.map(function(s) {
+                var mod = parseFloat(s.price_modifier || 1).toFixed(2);
+                var pct = Math.round((mod - 1) * 100);
+                var modHtml = pct > 0 ? '<span style="color:#16a34a;">+' + pct + '% (' + mod + 'x)</span>'
+                    : (pct < 0 ? '<span style="color:#dc2626;">' + pct + '% (' + mod + 'x)</span>'
+                                : '<span style="color:#6b7280;">Sin cambio</span>');
+                return '<tr style="border-top:1px solid #f3f4f6;"><td style="padding:10px 12px;">' + $('<span/>').text(s.season_name).html() + '</td>' +
+                    '<td style="padding:10px 12px;font-size:.82rem;color:#6b7280;">' + (s.product_name ? $('<span/>').text(s.product_name).html() : '—') + '</td>' +
+                    '<td style="padding:10px 12px;font-size:.85rem;">' + s.date_from + '</td>' +
+                    '<td style="padding:10px 12px;font-size:.85rem;">' + s.date_to + '</td>' +
+                    '<td style="padding:10px 12px;">' + modHtml + '</td>' +
+                    '<td style="padding:10px 12px;"><button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-season-edit" data-id="' + s.id + '"' +
+                    ' data-name="' + encodeURIComponent(s.season_name) + '" data-from="' + s.date_from + '" data-to="' + s.date_to + '"' +
+                    ' data-mod="' + s.price_modifier + '" data-pid="' + (s.product_id || 0) + '">✏️</button> ' +
+                    '<button class="ltms-btn ltms-btn-sm ltms-season-del" data-id="' + s.id + '" style="background:#fee2e2;color:#991b1b;">🗑️</button></td></tr>';
+            }).join('');
+            $('#ltms-seasons-tbody').html(html);
+        });
+    }
+
+    $(document).on('click', '#ltms-season-add-btn', function() {
+        $('#ltms-season-id').val('0');
+        $('#ltms-season-name,#ltms-season-from,#ltms-season-to').val('');
+        $('#ltms-season-modifier').val('1.50'); $('#ltms-season-product').val('0');
+        $('#ltms-season-form-title').text('Nueva temporada'); $('#ltms-season-notice').hide();
+        $('#ltms-season-form').show(); $('#ltms-season-name').focus();
+    });
+    $(document).on('click', '.ltms-season-edit', function() {
+        var $b = $(this);
+        $('#ltms-season-id').val($b.data('id')); $('#ltms-season-name').val(decodeURIComponent($b.data('name')));
+        $('#ltms-season-from').val($b.data('from')); $('#ltms-season-to').val($b.data('to'));
+        $('#ltms-season-modifier').val($b.data('mod')); $('#ltms-season-product').val($b.data('pid') || '0');
+        $('#ltms-season-form-title').text('Editar temporada'); $('#ltms-season-notice').hide();
+        $('#ltms-season-form').show(); $('#ltms-season-name').focus();
+    });
+    $(document).on('click', '#ltms-season-save-btn', function() {
+        var name = $('#ltms-season-name').val().trim(), from = $('#ltms-season-from').val(), to = $('#ltms-season-to').val();
+        var pid = $('#ltms-season-product').val();
+        if (!name || !from || !to) { ltmsSeasonNotice('El nombre y las fechas son obligatorios.', 'error'); return; }
+        if (!pid || pid === '0') { ltmsSeasonNotice('Selecciona un alojamiento.', 'error'); return; }
+        $(this).prop('disabled', true).text('Guardando...');
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_save_vendor_season', nonce: ltmsDashboard.nonce,
+            rule_id: $('#ltms-season-id').val(), season_name: name, date_from: from, date_to: to,
+            price_modifier: $('#ltms-season-modifier').val(), product_id: pid },
+        function(res) {
+            $('#ltms-season-save-btn').prop('disabled', false).text('Guardar');
+            if (res.success) { ltmsSeasonNotice('✅ ' + res.data.message, 'success'); $('#ltms-seasons-tbody').removeData('loaded');
+                setTimeout(function() { $('#ltms-season-form').hide(); ltmsLoadSeasons(); }, 1200); }
+            else { ltmsSeasonNotice('✗ ' + (res.data || 'Error'), 'error'); }
+        });
+    });
+    $(document).on('click', '#ltms-season-cancel-btn', function() { $('#ltms-season-form').hide(); });
+    $(document).on('click', '.ltms-season-del', function() {
+        if (!confirm('¿Eliminar esta temporada?')) return;
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_delete_vendor_season', nonce: ltmsDashboard.nonce, rule_id: $(this).data('id') },
+        function(res) { if (res.success) { $('#ltms-seasons-tbody').removeData('loaded'); ltmsLoadSeasons(); }
+            else { alert(res.data || 'Error al eliminar.'); } });
+    });
+
+    function ltmsLoadPolicies() {
+        $('#ltms-policies-list').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Cargando...</div>');
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_get_vendor_policies', nonce: ltmsDashboard.nonce }, function(res) {
+            $('#ltms-policies-list').data('loaded', true);
+            if (!res.success || !res.data.length) {
+                $('#ltms-policies-list').html('<div style="text-align:center;padding:30px;color:#9ca3af;">Sin políticas. Crea una para asignarla a tus alojamientos.</div>');
+                return;
+            }
+            var tl = { flexible: 'Flexible ✅', moderate: 'Moderada ⚖️', strict: 'Estricta 🔒', non_refundable: 'Sin reembolso ❌' };
+            var tc = { flexible: '#16a34a', moderate: '#f59e0b', strict: '#ef4444', non_refundable: '#6b7280' };
+            var html = res.data.map(function(p) {
+                return '<div class="ltms-card" style="padding:16px;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">' +
+                    '<div><div style="font-weight:700;font-size:.95rem;">' + $('<span/>').text(p.name).html() +
+                    (p.is_default == 1 ? ' <span style="font-size:.72rem;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:99px;margin-left:6px;">Por defecto</span>' : '') + '</div>' +
+                    '<div style="font-size:.8rem;color:' + (tc[p.policy_type]||'#6b7280') + ';margin-top:4px;">' + (tl[p.policy_type]||p.policy_type) + '</div>' +
+                    '<div style="font-size:.8rem;color:#6b7280;margin-top:6px;">Gratis hasta ' + p.free_cancel_hours + 'h · ' + p.partial_refund_pct + '% dentro de ' + p.partial_refund_hours + 'h</div></div>' +
+                    '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+                    '<button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-policy-edit" data-id="' + p.id + '" data-name="' + encodeURIComponent(p.name) + '"' +
+                    ' data-type="' + p.policy_type + '" data-free="' + p.free_cancel_hours + '" data-pct="' + p.partial_refund_pct + '"' +
+                    ' data-phours="' + p.partial_refund_hours + '" data-default="' + p.is_default + '">✏️ Editar</button>' +
+                    '<button class="ltms-btn ltms-btn-sm ltms-policy-del" data-id="' + p.id + '" style="background:#fee2e2;color:#991b1b;">🗑️</button>' +
+                    '</div></div></div>';
+            }).join('');
+            $('#ltms-policies-list').html(html);
+        });
+    }
+
+    $(document).on('click', '#ltms-policy-add-btn', function() {
+        $('#ltms-policy-id').val('0'); $('#ltms-policy-name').val(''); $('#ltms-policy-type').val('flexible');
+        $('#ltms-policy-free-hours').val('24'); $('#ltms-policy-partial-pct').val('50');
+        $('#ltms-policy-partial-hours').val('48'); $('#ltms-policy-default').prop('checked', false);
+        $('#ltms-policy-form-title').text('Nueva política de cancelación'); $('#ltms-policy-notice').hide();
+        $('#ltms-policy-form').show(); $('#ltms-policy-name').focus();
+    });
+    $(document).on('click', '.ltms-policy-edit', function() {
+        var $b = $(this);
+        $('#ltms-policy-id').val($b.data('id')); $('#ltms-policy-name').val(decodeURIComponent($b.data('name')));
+        $('#ltms-policy-type').val($b.data('type')); $('#ltms-policy-free-hours').val($b.data('free'));
+        $('#ltms-policy-partial-pct').val($b.data('pct')); $('#ltms-policy-partial-hours').val($b.data('phours'));
+        $('#ltms-policy-default').prop('checked', $b.data('default') == 1);
+        $('#ltms-policy-form-title').text('Editar política'); $('#ltms-policy-notice').hide();
+        $('#ltms-policy-form').show(); $('#ltms-policy-name').focus();
+    });
+    $(document).on('click', '#ltms-policy-save-btn', function() {
+        var name = $('#ltms-policy-name').val().trim();
+        if (!name) { ltmsPolicyNotice('El nombre es obligatorio.', 'error'); return; }
+        $(this).prop('disabled', true).text('Guardando...');
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_save_vendor_policy', nonce: ltmsDashboard.nonce,
+            policy_id: $('#ltms-policy-id').val(), policy_name: name, policy_type: $('#ltms-policy-type').val(),
+            free_cancel_hours: $('#ltms-policy-free-hours').val(), partial_refund_pct: $('#ltms-policy-partial-pct').val(),
+            partial_refund_hours: $('#ltms-policy-partial-hours').val(), is_default: $('#ltms-policy-default').is(':checked') ? 1 : 0 },
+        function(res) {
+            $('#ltms-policy-save-btn').prop('disabled', false).text('Guardar');
+            if (res.success) { ltmsPolicyNotice('✅ ' + res.data.message, 'success'); $('#ltms-policies-list').removeData('loaded');
+                setTimeout(function() { $('#ltms-policy-form').hide(); ltmsLoadPolicies(); }, 1200); }
+            else { ltmsPolicyNotice('✗ ' + (res.data || 'Error'), 'error'); }
+        });
+    });
+    $(document).on('click', '#ltms-policy-cancel-btn', function() { $('#ltms-policy-form').hide(); });
+    $(document).on('click', '.ltms-policy-del', function() {
+        if (!confirm('¿Eliminar esta política?')) return;
+        $.post(ltmsDashboard.ajax_url, { action: 'ltms_delete_vendor_policy', nonce: ltmsDashboard.nonce, policy_id: $(this).data('id') },
+        function(res) { if (res.success) { $('#ltms-policies-list').removeData('loaded'); ltmsLoadPolicies(); }
+            else { alert(res.data || 'Error al eliminar.'); } });
+    });
 
 })(jQuery);
 </script>
