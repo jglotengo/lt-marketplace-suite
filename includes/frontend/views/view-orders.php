@@ -47,5 +47,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </table>
         </div>
     </div>
+    <div id="ltms-orders-pagination" style="display:flex;justify-content:space-between;align-items:center;padding:14px 4px;font-size:.85rem;color:#6b7280;"></div>
 
+</div>
+
+<!-- Modal de detalle de pedido (patrón canónico: .ltms-modal + backdrop + inner) -->
+<div id="ltms-modal-order-detail" class="ltms-modal" style="display:none;">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" style="max-width:640px;">
+        <div style="display:flex;justify-content:flex-end;">
+            <button type="button" class="ltms-modal-close" aria-label="Cerrar detalle de pedido" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+        </div>
+        <div id="ltms-order-detail-body"></div>
+    </div>
 </div>
