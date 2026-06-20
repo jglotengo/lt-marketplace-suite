@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.3.0';
+    private const CURRENT_VERSION = '2.4.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -56,6 +56,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.3.0', '<' ) ) {
             self::migrate_2_3_0();
+        }
+
+        if ( version_compare( $installed_version, '2.4.0', '<' ) ) {
+            self::migrate_2_4_0();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -1935,5 +1939,33 @@ final class LTMS_DB_Migrations {
         }
     }
 
+
+
+    /**
+     * Migración 2.4.0
+     */
+    private static function migrate_2_4_0(): void {
+        global $wpdb;
+        $p = $wpdb->prefix;
+
+        $col = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'vendor_id'",
+            DB_NAME, $p . 'lt_booking_season_rules'
+        ) );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$p}lt_booking_season_rules` ADD COLUMN `vendor_id` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Vendedor dueno de la regla' AFTER `product_id`, ADD INDEX `idx_vendor_id` (`vendor_id`)" );
+            $wpdb->query( "UPDATE `{$p}lt_booking_season_rules` AS sr JOIN `{$p}posts` AS p ON p.ID = sr.product_id SET sr.vendor_id = p.post_author WHERE sr.product_id > 0 AND sr.vendor_id = 0" );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::info( 'MIGRATION', '2.4.0: vendor_id en lt_booking_season_rules OK.' );
+        }
+
+        $col2 = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'policy_id'",
+            DB_NAME, $p . 'lt_bookings'
+        ) );
+        if ( empty( $col2 ) ) {
+            $wpdb->query( "ALTER TABLE `{$p}lt_bookings` ADD COLUMN `policy_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a bkr_lt_booking_policies' AFTER `vendor_net`, ADD INDEX `idx_policy_id` (`policy_id`)" );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::info( 'MIGRATION', '2.4.0: policy_id en lt_bookings OK.' );
+        }
+    }
 
 }
