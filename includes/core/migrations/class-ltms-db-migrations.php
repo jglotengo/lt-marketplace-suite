@@ -23,7 +23,7 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      */
-    private const CURRENT_VERSION = '2.4.0';
+    private const CURRENT_VERSION = '2.5.0';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -60,6 +60,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.4.0', '<' ) ) {
             self::migrate_2_4_0();
+        }
+
+        if ( version_compare( $installed_version, '2.5.0', '<' ) ) {
+            self::migrate_2_5_0();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -1965,6 +1969,36 @@ final class LTMS_DB_Migrations {
         if ( empty( $col2 ) ) {
             $wpdb->query( "ALTER TABLE `{$p}lt_bookings` ADD COLUMN `policy_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a bkr_lt_booking_policies' AFTER `vendor_net`, ADD INDEX `idx_policy_id` (`policy_id`)" );
             if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::info( 'MIGRATION', '2.4.0: policy_id en lt_bookings OK.' );
+        }
+    }
+
+
+    /**
+     * Migración 2.5.0 — Agrega vendor_net a lt_bookings si no existe.
+     *
+     * La columna fue definida en el DDL pero la tabla pudo haberse creado
+     * con una versión anterior que no la incluia. dbDelta no agrega columnas
+     * nuevas; este ALTER TABLE lo hace de forma idempotente.
+     */
+    private static function migrate_2_5_0(): void {
+        global $wpdb;
+        $p = $wpdb->prefix;
+
+        $col = $wpdb->get_results( $wpdb->prepare(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = 'vendor_net'",
+            DB_NAME, $p . 'lt_bookings'
+        ) );
+
+        if ( empty( $col ) ) {
+            $wpdb->query(
+                "ALTER TABLE `{$p}lt_bookings`
+                 ADD COLUMN `vendor_net` DECIMAL(15,2) DEFAULT 0.00
+                 COMMENT 'Neto al vendedor tras comision'
+                 AFTER `balance_amount`"
+            );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info( 'MIGRATION', '2.5.0: vendor_net agregado a lt_bookings.' );
+            }
         }
     }
 
