@@ -46,6 +46,8 @@ final class LTMS_Dashboard_Logic {
         // AJAX handlers autenticados
         add_action( 'wp_ajax_ltms_get_dashboard_data',    [ $instance, 'ajax_get_dashboard_data' ] );
         add_action( 'wp_ajax_ltms_get_orders_data',       [ $instance, 'ajax_get_orders_data' ] );
+        add_action( 'wp_ajax_ltms_get_order_detail',      [ $instance, 'ajax_get_order_detail' ] );
+        add_action( 'wp_ajax_ltms_update_order_status',   [ $instance, 'ajax_update_order_status' ] );
         // NOTE M-6 FIX: ltms_get_wallet_data y ltms_request_payout ya están registrados
         // en LTMS_Frontend_Payout_Handler (handler completo). Eliminados aquí para evitar conflicto.
         add_action( 'wp_ajax_ltms_get_notifications',     [ $instance, 'ajax_get_notifications' ] );
@@ -732,19 +734,24 @@ final class LTMS_Dashboard_Logic {
             'orderby'     => 'date',
             'order'       => 'DESC',
             'type'        => 'shop_order',
+            // BUGFIX (audit pedidos): 'paginate' => true hace que WC devuelva un objeto
+            // con el total REAL de resultados que cumplen el filtro (no solo los de la
+            // página actual), necesario para construir paginación real en el frontend.
+            'paginate'    => true,
         ];
 
         if ( $status ) {
             $args['status'] = sanitize_text_field( $status );
         }
 
-        $orders_query = wc_get_orders( $args );
+        $result       = wc_get_orders( $args );
+        $orders_query = $result->orders ?? [];
         $orders       = [];
 
         foreach ( $orders_query as $order ) {
             // P-01: detectar si el método de envío es pickup para mostrar icono y datos de tienda.
-            $is_pickup      = false;
-            $shipping_label = '';
+            $is_pickup       = false;
+            $shipping_label  = '';
             foreach ( $order->get_shipping_methods() as $method ) {
                 if ( str_contains( $method->get_method_id(), 'ltms_pickup' ) ) {
                     $is_pickup      = true;
@@ -754,13 +761,16 @@ final class LTMS_Dashboard_Logic {
                 $shipping_label = $method->get_name();
             }
 
-            $store_info = [];
-            if ( $is_pickup ) {
-                $vendor_id  = (int) $order->get_meta( '_ltms_vendor_id' );
-                $store_info = $vendor_id
-                    ? LTMS_Business_Pickup_Handler::get_vendor_store_info( $vendor_id )
-                    : [];
-            }
+            // BUGFIX (audit pedidos): usar una variable propia en vez de reasignar el
+            // parámetro $vendor_id de la función dentro del loop (code smell/riesgo latente).
+            $order_vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+            $store_info      = ( $is_pickup && $order_vendor_id )
+                ? LTMS_Business_Pickup_Handler::get_vendor_store_info( $order_vendor_id )
+                : [];
+
+            // BUGFIX (audit pedidos): trim + fallback cuando billing_first/last_name
+            // vienen vacíos (compra como invitado sin datos completos).
+            $customer_name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
 
             $orders[] = [
                 'id'             => $order->get_id(),
@@ -768,7 +778,7 @@ final class LTMS_Dashboard_Logic {
                 'status'         => $order->get_status(),
                 'total'          => (float) $order->get_total(),
                 'formatted'      => LTMS_Utils::format_money( (float) $order->get_total() ),
-                'customer'       => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'customer'       => $customer_name !== '' ? $customer_name : __( 'Cliente sin nombre', 'ltms' ),
                 'date'           => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
                 'items_count'    => count( $order->get_items() ),
                 'is_pickup'      => $is_pickup,
@@ -777,12 +787,153 @@ final class LTMS_Dashboard_Logic {
             ];
         }
 
+        $total_results = (int) ( $result->total ?? count( $orders ) );
+
         return [
-            'orders'  => $orders,
-            'total'   => count( $orders_query ),
-            'page'    => $page,
-            'per_page' => $per_page,
+            'orders'        => $orders,
+            'total'         => $total_results,
+            'page'          => $page,
+            'per_page'      => $per_page,
+            'total_pages'   => (int) ( $result->max_num_pages ?? max( 1, (int) ceil( $total_results / max( 1, $per_page ) ) ) ),
         ];
+    }
+
+    /**
+     * AJAX: Detalle completo de un pedido del vendedor (para el modal de detalle).
+     *
+     * Verifica ownership (el pedido debe pertenecer al vendedor autenticado)
+     * antes de devolver ítems, direcciones, totales y notas.
+     *
+     * @return void
+     */
+    public function ajax_get_order_detail(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $user_id  = get_current_user_id();
+        $order_id = absint( $_POST['order_id'] ?? 0 ); // phpcs:ignore
+
+        if ( ! $order_id || ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( __( 'Acceso denegado.', 'ltms' ), 403 );
+        }
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order || (int) $order->get_meta( '_ltms_vendor_id' ) !== $user_id ) {
+            wp_send_json_error( __( 'Pedido no encontrado o no te pertenece.', 'ltms' ), 404 );
+        }
+
+        $items = [];
+        foreach ( $order->get_items() as $item ) {
+            $product = $item->get_product();
+            $items[] = [
+                'name'     => $item->get_name(),
+                'qty'      => $item->get_quantity(),
+                'subtotal' => LTMS_Utils::format_money( (float) $item->get_subtotal() ),
+                'total'    => LTMS_Utils::format_money( (float) $item->get_total() ),
+                'sku'      => $product ? $product->get_sku() : '',
+            ];
+        }
+
+        $is_pickup      = false;
+        $shipping_label = '';
+        foreach ( $order->get_shipping_methods() as $method ) {
+            if ( str_contains( $method->get_method_id(), 'ltms_pickup' ) ) {
+                $is_pickup      = true;
+                $shipping_label = __( 'Recogida en Tienda', 'ltms' );
+                break;
+            }
+            $shipping_label = $method->get_name();
+        }
+        $store_info = $is_pickup ? LTMS_Business_Pickup_Handler::get_vendor_store_info( $user_id ) : [];
+
+        $customer_name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
+
+        // Notas del pedido visibles al cliente (no las internas/privadas del admin).
+        $notes = [];
+        foreach ( wc_get_order_notes( [ 'order_id' => $order_id, 'type' => 'customer' ] ) as $note ) {
+            $notes[] = [
+                'content' => $note->content,
+                'date'    => $note->date_created ? $note->date_created->date( 'Y-m-d H:i' ) : '',
+            ];
+        }
+
+        wp_send_json_success( [
+            'id'              => $order->get_id(),
+            'number'          => $order->get_order_number(),
+            'status'          => $order->get_status(),
+            'status_label'    => wc_get_order_status_name( $order->get_status() ),
+            'date'            => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
+            'customer'        => $customer_name !== '' ? $customer_name : __( 'Cliente sin nombre', 'ltms' ),
+            'customer_email'  => $order->get_billing_email(),
+            'customer_phone'  => $order->get_billing_phone(),
+            'billing_address' => trim( $order->get_formatted_billing_address() ?: '' ),
+            'shipping_address'=> trim( $order->get_formatted_shipping_address() ?: '' ),
+            'is_pickup'       => $is_pickup,
+            'shipping_label'  => $shipping_label ?: __( 'Envío estándar', 'ltms' ),
+            'store_info'      => $store_info,
+            'items'           => $items,
+            'subtotal'        => LTMS_Utils::format_money( (float) $order->get_subtotal() ),
+            'shipping_total'  => LTMS_Utils::format_money( (float) $order->get_shipping_total() ),
+            'total'           => LTMS_Utils::format_money( (float) $order->get_total() ),
+            'customer_note'   => $order->get_customer_note(),
+            'notes'           => $notes,
+            'allowed_transitions' => $this->get_allowed_status_transitions( $order->get_status() ),
+            'edit_url'        => $order->get_edit_order_url(),
+        ] );
+    }
+
+    /**
+     * Transiciones de estado que un vendedor puede aplicar manualmente desde el panel.
+     * Whitelist intencionalmente conservadora: nunca permite saltar a 'refunded' ni
+     * reabrir un pedido 'completed'/'cancelled' (eso requiere flujo de reembolso aparte).
+     *
+     * @param string $current_status Estado actual del pedido (sin prefijo 'wc-').
+     * @return array<string> Estados destino permitidos.
+     */
+    private function get_allowed_status_transitions( string $current_status ): array {
+        $map = [
+            'pending'           => [ 'processing', 'cancelled' ],
+            'on-hold'           => [ 'processing', 'cancelled' ],
+            'processing'        => [ 'completed', 'cancelled' ],
+            'ready-for-pickup'  => [ 'completed', 'cancelled' ],
+        ];
+
+        return $map[ $current_status ] ?? [];
+    }
+
+    /**
+     * AJAX: Cambiar el estado de un pedido propio, respetando la whitelist
+     * de transiciones permitidas (ver get_allowed_status_transitions()).
+     *
+     * @return void
+     */
+    public function ajax_update_order_status(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $user_id    = get_current_user_id();
+        $order_id   = absint( $_POST['order_id'] ?? 0 );    // phpcs:ignore
+        $new_status = sanitize_text_field( $_POST['status'] ?? '' ); // phpcs:ignore
+
+        if ( ! $order_id || ! $new_status || ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( __( 'Datos inválidos.', 'ltms' ) );
+        }
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order || (int) $order->get_meta( '_ltms_vendor_id' ) !== $user_id ) {
+            wp_send_json_error( __( 'Pedido no encontrado o no te pertenece.', 'ltms' ), 404 );
+        }
+
+        $allowed = $this->get_allowed_status_transitions( $order->get_status() );
+        if ( ! in_array( $new_status, $allowed, true ) ) {
+            wp_send_json_error( __( 'Esa transición de estado no está permitida desde el estado actual.', 'ltms' ) );
+        }
+
+        $order->update_status( $new_status, __( 'Cambiado por el vendedor desde el panel.', 'ltms' ) );
+
+        wp_send_json_success( [
+            'message'      => __( 'Estado actualizado.', 'ltms' ),
+            'status'       => $order->get_status(),
+            'status_label' => wc_get_order_status_name( $order->get_status() ),
+        ] );
     }
 
     /**
