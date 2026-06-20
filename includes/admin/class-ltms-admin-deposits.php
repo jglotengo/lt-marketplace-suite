@@ -54,15 +54,11 @@ final class LTMS_Admin_Deposits {
         $pages = (int) ceil( $total / $per_page );
         $nonce = wp_create_nonce( 'ltms_admin_nonce' );
 
-        // Stats globales
-        $pending_count  = LTMS_Deposit::count_pending();
-        $all_data       = LTMS_Deposit::get_all( [ 'per_page' => 9999, 'paged' => 1 ] );
-        $all_items      = $all_data['items'] ?? [];
-        $approved_count = 0; $rejected_count = 0; $total_approved = 0.0;
-        foreach ( $all_items as $d ) {
-            if ( $d['status'] === 'approved' ) { $approved_count++; $total_approved += (float) $d['amount']; }
-            if ( $d['status'] === 'rejected' ) { $rejected_count++; }
-        }
+        // Stats globales — por status (sin traer todos los rows)
+        $pending_count  = LTMS_Deposit::count_by_status( 'pending' );
+        $approved_count = LTMS_Deposit::count_by_status( 'approved' );
+        $rejected_count = LTMS_Deposit::count_by_status( 'rejected' );
+        $total_approved = LTMS_Deposit::sum_approved();
 
         $status_badge = [
             'pending'  => 'ltms-badge-warning',
@@ -236,9 +232,16 @@ final class LTMS_Admin_Deposits {
                                     <?php printf( esc_html__( 'Admin #%d', 'ltms' ), (int) $d['approved_by'] ); ?>
                                 </span>
                                 <?php elseif ( $st === 'rejected' ) : ?>
-                                <span style="font-size:11px;color:#dc2626;" title="<?php echo esc_attr( $d['reject_reason'] ?? '' ); ?>">
-                                    <?php esc_html_e( 'Ver motivo', 'ltms' ); ?>
-                                </span>
+                                <?php if ( ! empty( $d['reject_reason'] ) ) : ?>
+                                <details style="font-size:11px;color:#dc2626;cursor:pointer;">
+                                    <summary style="list-style:none;cursor:pointer;">🔴 <?php esc_html_e( 'Ver motivo', 'ltms' ); ?></summary>
+                                    <p style="margin:4px 0 0;font-size:11px;background:#fee2e2;padding:4px 8px;border-radius:4px;color:#991b1b;max-width:200px;word-wrap:break-word;">
+                                        <?php echo esc_html( $d['reject_reason'] ); ?>
+                                    </p>
+                                </details>
+                                <?php else : ?>
+                                <span style="font-size:11px;color:#dc2626;">❌ <?php esc_html_e( 'Rechazado', 'ltms' ); ?></span>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -260,7 +263,31 @@ final class LTMS_Admin_Deposits {
             </div><!-- .ltms-table-wrap -->
         </div><!-- .ltms-admin-wrap -->
 
-        <!-- Modal rechazo LTMS -->
+        <!-- Modal aprobación LTMS -->
+        <div id="ltms-approve-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:28px;border-radius:8px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+                <h2 style="margin:0 0 8px;font-size:16px;font-weight:700;">✅ <?php esc_html_e( 'Aprobar depósito', 'ltms' ); ?></h2>
+                <p style="margin:0 0 16px;font-size:13px;color:#6b7280;"><?php esc_html_e( 'Se acreditará el monto en la billetera del vendedor. Esta acción no se puede deshacer.', 'ltms' ); ?></p>
+                <input type="hidden" id="ltms-approve-deposit-id" value="">
+                <input type="hidden" id="ltms-approve-deposit-nonce" value="">
+                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">
+                    <?php esc_html_e( 'Notas del admin (opcional):', 'ltms' ); ?>
+                </label>
+                <textarea id="ltms-approve-notes" rows="3"
+                          style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:16px;resize:vertical;"
+                          placeholder="<?php esc_attr_e( 'Ej: Verificado contra extracto bancario...', 'ltms' ); ?>"></textarea>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button class="ltms-btn ltms-btn-outline" id="ltms-approve-cancel">
+                        <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
+                    </button>
+                    <button class="ltms-btn ltms-btn-success" id="ltms-approve-confirm">
+                        ✓ <?php esc_html_e( 'Confirmar aprobación', 'ltms' ); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+                <!-- Modal rechazo LTMS -->
         <div id="ltms-reject-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
             <div style="background:#fff;padding:28px;border-radius:8px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
                 <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;">&#x274C; <?php esc_html_e( 'Rechazar depósito', 'ltms' ); ?></h2>
@@ -286,15 +313,28 @@ final class LTMS_Admin_Deposits {
         /* global jQuery, ajaxurl */
         ( function( $ ) {
             // Aprobar
+            // Abrir modal de aprobación
             $( document ).on( 'click', '.ltms-approve-deposit', function() {
-                if ( ! confirm( '<?php echo esc_js( __( "¿Confirmar aprobación? Se acreditará el monto en la billetera del vendedor.", "ltms" ) ); ?>' ) ) return;
+                $( '#ltms-approve-deposit-id' ).val( $( this ).data( 'id' ) );
+                $( '#ltms-approve-deposit-nonce' ).val( $( this ).data( 'nonce' ) );
+                $( '#ltms-approve-notes' ).val( '' );
+                $( '#ltms-approve-modal' ).css( 'display', 'flex' );
+            } );
+
+            // Cancelar modal aprobación
+            $( '#ltms-approve-cancel' ).on( 'click', function() { $( '#ltms-approve-modal' ).hide(); } );
+            $( '#ltms-approve-modal' ).on( 'click', function( e ) { if ( $( e.target ).is( this ) ) $( this ).hide(); } );
+
+            // Confirmar aprobación
+            $( '#ltms-approve-confirm' ).on( 'click', function() {
+                var id    = $( '#ltms-approve-deposit-id' ).val();
+                var nonce = $( '#ltms-approve-deposit-nonce' ).val();
+                var notes = $( '#ltms-approve-notes' ).val().trim();
                 var $btn  = $( this ).prop( 'disabled', true ).text( '<?php echo esc_js( __( "Procesando...", "ltms" ) ); ?>' );
-                var id    = $btn.data( 'id' );
-                var nonce = $btn.data( 'nonce' );
-                var notes = prompt( '<?php echo esc_js( __( "Notas del admin (opcional):", "ltms" ) ); ?>' ) || '';
                 $.post( ajaxurl, { action: 'ltms_approve_deposit', deposit_id: id, admin_notes: notes, nonce: nonce }, function( res ) {
-                    if ( res.success ) { alert( '✅ ' + res.data.message ); location.reload(); }
-                    else { alert( '❌ ' + ( res.data || '<?php echo esc_js( __( "Error desconocido", "ltms" ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✓ <?php echo esc_js( __( "Aprobar", "ltms" ) ); ?>' ); }
+                    $( '#ltms-approve-modal' ).hide();
+                    if ( res.success ) { location.reload(); }
+                    else { alert( '❌ ' + ( res.data || '<?php echo esc_js( __( "Error desconocido", "ltms" ) ); ?>' ) ); $btn.prop( 'disabled', false ).text( '✓ <?php echo esc_js( __( "Confirmar", "ltms" ) ); ?>' ); }
                 } );
             } );
 
