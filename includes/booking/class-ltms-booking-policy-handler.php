@@ -135,29 +135,34 @@ class LTMS_Booking_Policy_Handler {
         $deposit             = (float) ( $booking['deposit_amount'] ?? 0 );
         $paid                = 'deposit' === $booking['payment_mode'] ? $deposit : $total;
 
-        $free_cancel_hours   = (int) $policy['free_cancel_hours'];
-        $partial_hours       = isset( $policy['partial_refund_hours'] ) ? (int) $policy['partial_refund_hours'] : 0;
+        $free_cancel_hours = (int) $policy['free_cancel_hours'];
+        $partial_hours     = isset( $policy['partial_refund_hours'] ) ? (int) $policy['partial_refund_hours'] : 0;
 
-        // Windows must be checked from largest to smallest:
-        // partial_refund_hours >= free_cancel_hours >= 0
-        // If partial_refund_hours > free_cancel_hours: order is partial → full refund check.
-        // i.e. cancel very early (>= partial) → partial refund; cancel closer (>= free_cancel but < partial) → full; cancel last minute → 0.
-        // The semantic: free_cancel_hours = window inside which you get FULL refund with no questions.
-        //               partial_refund_hours = wider outer window where you get PARTIAL refund.
-        // Correct order: check >= partial_refund_hours first, then >= free_cancel_hours.
-
-        if ( $partial_hours > 0 && $hours_until_checkin >= $partial_hours ) {
-            // Cancelled far in advance — partial refund window.
-            return round( $paid * (float) $policy['partial_refund_pct'] / 100, 2 );
-        }
+        // Orden de ventanas (de más cercana al check-in a más lejana):
+        //   >= free_cancel_hours → reembolso completo (cancelación gratuita).
+        //   >= partial_hours     → reembolso parcial (ventana exterior).
+        //   < partial_hours      → sin reembolso (o non_refundable_pct).
+        //
+        // Ejemplo con free_cancel_hours=24, partial_hours=48:
+        //   Cancela con 50h de anticipación → cae fuera de la ventana gratuita (50h > 48h > 24h)
+        //     pero como 50h >= free_cancel(24h): reembolso completo.   ← este caso
+        //   Cancela con 30h de anticipación → 30h >= free_cancel(24h): reembolso completo.
+        //   Cancela con 10h de anticipación → 10h < 24h: sin reembolso (o parcial si partial_hours < 24).
+        //
+        // Este orden es consistente con estimate_refund() en LTMS_Frontend_Customer_Bookings.
 
         if ( $hours_until_checkin >= $free_cancel_hours ) {
-            // Within free-cancel window — full refund.
+            // Cancelación gratuita — reembolso completo.
             return $paid;
         }
 
+        if ( $partial_hours > 0 && $hours_until_checkin >= $partial_hours ) {
+            // Dentro de la ventana de reembolso parcial.
+            return round( $paid * (float) $policy['partial_refund_pct'] / 100, 2 );
+        }
+
         if ( isset( $policy['non_refundable_pct'] ) && (float) $policy['non_refundable_pct'] > 0 ) {
-            // Non-refundable portion stays with vendor.
+            // Porción no reembolsable del vendedor.
             $refund_pct = 100 - (float) $policy['non_refundable_pct'];
             return round( $paid * $refund_pct / 100, 2 );
         }
