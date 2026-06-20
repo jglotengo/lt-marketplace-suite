@@ -14,7 +14,7 @@
  *
  * @package    LTMS
  * @subpackage LTMS/includes/frontend
- * @version    1.0.0
+ * @version    1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -43,6 +43,19 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
     }
 
     /**
+     * Determina si el catálogo DANE tiene datos reales cargados (más que solo
+     * el placeholder "— Selecciona tu municipio —"). Se usa tanto para decidir
+     * si el campo se convierte en <select> como para decidir si la validación
+     * estricta de código de 5 dígitos aplica — ambas piezas deben degradarse
+     * juntas (M-204, fix de incidente: bloqueaba el 100% del checkout CO).
+     *
+     * @return bool
+     */
+    private function catalog_is_loaded(): bool {
+        return count( LTMS_Business_Dane_Catalog::get_options( true ) ) > 1;
+    }
+
+    /**
      * Reemplaza el input billing_city con un select del catálogo DANE.
      * Conserva la key `billing_city` para no romper plugins de envío/correo.
      *
@@ -50,8 +63,7 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
      * @return array
      */
     public function modify_billing_city_field( array $fields ): array {
-        $options = LTMS_Business_Dane_Catalog::get_options( true );
-        if ( count( $options ) <= 1 ) {
+        if ( ! $this->catalog_is_loaded() ) {
             // Sin catálogo cargado, deja el campo original (degradación segura).
             return $fields;
         }
@@ -65,7 +77,7 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
             'required'    => true,
             'class'       => array_unique( array_merge( $existing_class, [ 'ltms-billing-municipality' ] ) ),
             'priority'    => $existing_priority,
-            'options'     => $options,
+            'options'     => LTMS_Business_Dane_Catalog::get_options( true ),
             'default'     => '',
             'placeholder' => __( 'Selecciona tu municipio', 'ltms' ),
             'input_class' => [ 'ltms-municipality-select' ],
@@ -77,6 +89,13 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
     /**
      * Valida que el value enviado sea un código DANE de 5 dígitos.
      *
+     * M-204: si el catálogo DANE no está cargado en bkr_lt_co_dane_municipalities,
+     * modify_billing_city_field() deja billing_city como texto libre — un campo
+     * de texto libre nunca puede producir un código de 5 dígitos exacto, así que
+     * exigirlo aquí bloqueaba el 100% de los checkouts CO sin excepción. La
+     * validación estricta solo aplica cuando el catálogo realmente ofrece un
+     * select con códigos reales para elegir.
+     *
      * @return void
      */
     public function validate_municipality(): void {
@@ -85,6 +104,14 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
             wc_add_notice( __( 'Por favor selecciona tu municipio.', 'ltms' ), 'error' );
             return;
         }
+
+        if ( ! $this->catalog_is_loaded() ) {
+            // Degradación segura: catálogo vacío → campo de texto libre → no se
+            // puede exigir formato de código DANE. Se acepta el texto tal cual,
+            // igual que el comportamiento nativo de WooCommerce sin este módulo.
+            return;
+        }
+
         $code = sanitize_text_field( wp_unslash( (string) $raw ) );
         if ( ! preg_match( '/^\d{5}$/', $code ) ) {
             wc_add_notice( __( 'Selecciona un municipio válido del listado.', 'ltms' ), 'error' );
@@ -93,6 +120,9 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
 
     /**
      * Guarda el código DANE en order meta y reemplaza billing_city por el nombre legible.
+     * Si el catálogo está degradado (texto libre), no hay código DANE que guardar —
+     * el pedido se crea igual, solo sin el meta de territorialidad ReteICA hasta que
+     * el catálogo se pueble.
      *
      * @param int $order_id ID del pedido WooCommerce.
      * @return void
