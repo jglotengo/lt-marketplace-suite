@@ -470,6 +470,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Customer_Bookings' ) ) {
             LTMS_Frontend_Customer_Bookings::init();
         }
+        // v2.4.0 — Notificaciones in-app del panel de vendedor.
+        if ( class_exists( 'LTMS_Frontend_Notifications' ) ) {
+            LTMS_Frontend_Notifications::init();
+        }
         if ( class_exists( 'LTMS_Vendor_Settings_Saver' ) ) {
             LTMS_Vendor_Settings_Saver::init();
         }
