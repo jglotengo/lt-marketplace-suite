@@ -400,5 +400,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         setTimeout(loadBookings, 400);
     }
 
+    // M-FIX-BOOKINGS-03: en la página standalone /mis-reservas/ no existe ningún
+    // elemento [data-view="bookings"] en el que el vendedor pueda hacer clic —
+    // esta vista ES la página completa, no una pestaña del SPA — así que
+    // loadBookings() nunca se disparaba y la tabla quedaba pegada en
+    // "Cargando reservas..." indefinidamente. Si no hay nav del SPA en el DOM,
+    // cargamos de una vez. Dentro de /panel-vendedor/ esta condición es falsa
+    // (el nav sí existe) y se preserva la carga perezosa al hacer clic.
+    if ( $('[data-view="bookings"]').length === 0 ) {
+        loadBookings();
+    }
+
 })(jQuery);
 </script>
