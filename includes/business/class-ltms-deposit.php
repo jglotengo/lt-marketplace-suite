@@ -537,4 +537,32 @@ final class LTMS_Deposit {
             );
         }
     }
+    /**
+     * Cuenta depósitos por estado.
+     *
+     * @param string $status pending|approved|rejected
+     * @return int
+     */
+    public static function count_by_status( string $status ): int {
+        global $wpdb;
+        return (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT COUNT(*) FROM `" . self::table() . "` WHERE status = %s",
+            $status
+        ) );
+    }
+
+    /**
+     * Suma total de depósitos aprobados (para el widget de stats del admin).
+     *
+     * @return float
+     */
+    public static function sum_approved(): float {
+        global $wpdb;
+        $val = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT COALESCE(SUM(amount), 0) FROM `" . self::table() . "` WHERE status = 'approved'"
+        );
+        return (float) $val;
+    }
+
+
 }
