@@ -303,6 +303,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
         Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
         Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
+        Functions\when('esc_html_e')->alias(static function(string $text): void { echo $text; });
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
@@ -320,6 +321,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
         Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
         Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
+        Functions\when('esc_html_e')->alias(static function(string $text): void { echo $text; });
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
@@ -334,6 +336,7 @@ class AdminBookingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         Functions\when('wp_add_inline_script')->alias(static function(): void {});
         Functions\when('wp_create_nonce')->justReturn('test_nonce_123');
         Functions\when('admin_url')->justReturn('http://example.test/wp-admin/admin-ajax.php');
+        Functions\when('esc_html_e')->alias(static function(string $text): void { echo $text; });
 
         ob_start();
         \LTMS_Admin_Bookings::render_booking_calendar();
