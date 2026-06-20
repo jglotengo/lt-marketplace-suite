@@ -43,7 +43,7 @@ final class LTMS_Frontend_Deposit_Handler {
      * @return void
      */
     public function ajax_create_deposit(): void {
-        check_ajax_referer( 'ltms_frontend_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( __( 'Debes iniciar sesión.', 'ltms' ), 401 );
@@ -92,7 +92,7 @@ final class LTMS_Frontend_Deposit_Handler {
      * @return void
      */
     public function ajax_upload_receipt(): void {
-        check_ajax_referer( 'ltms_frontend_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( __( 'Debes iniciar sesión.', 'ltms' ), 401 );
@@ -142,7 +142,7 @@ final class LTMS_Frontend_Deposit_Handler {
      * @return void
      */
     public function ajax_get_my_deposits(): void {
-        check_ajax_referer( 'ltms_frontend_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( __( 'No autenticado.', 'ltms' ), 401 );
