@@ -32,6 +32,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                    class="ltms-btn ltms-btn-outline ltms-btn-sm"
                    placeholder="<?php esc_attr_e( 'Hasta', 'ltms' ); ?>"
                    style="cursor:pointer;">
+            <a href="#" id="ltms-bk-export-csv" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="text-decoration:none;">
+                📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
+            </a>
         </div>
     </div>
 
@@ -388,6 +391,21 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     $('#ltms-bk-status-filter, #ltms-bk-date-from, #ltms-bk-date-to').on('change', function(){
         clearTimeout(filterTimer);
         filterTimer = setTimeout(function(){ BK.page = 1; loadBookings(); }, 300);
+    });
+
+    // M-BOOKING-UI-02: exportar CSV respetando los filtros activos.
+    $('#ltms-bk-export-csv').on('click', function(e){
+        e.preventDefault();
+        var params = new URLSearchParams();
+        params.append('action', 'ltms_export_vendor_bookings_csv');
+        params.append('nonce', ltmsDashboard.export_nonce || ltmsDashboard.nonce);
+        var status = $('#ltms-bk-status-filter').val();
+        var from   = $('#ltms-bk-date-from').val();
+        var to     = $('#ltms-bk-date-to').val();
+        if (status) params.append('status', status);
+        if (from)   params.append('date_from', from);
+        if (to)     params.append('date_to', to);
+        window.location.href = ltmsDashboard.ajax_url + '?' + params.toString();
     });
 
     // ── Inicialización al entrar en la pestaña ─────────────────────────────
