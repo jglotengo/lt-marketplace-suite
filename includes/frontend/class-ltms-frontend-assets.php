@@ -334,8 +334,8 @@ final class LTMS_Frontend_Assets {
 
         // Openpay JS SDK
         if ( $country === 'CO' ) {
-            wp_enqueue_script( 'openpay-js',   'https://js.openpay.co/openpay.v1.min.js',      [], '1.0', true );
-            wp_enqueue_script( 'openpay-data', 'https://js.openpay.co/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
+            wp_enqueue_script( 'openpay-js',   'https://resources.openpay.co/openpay.v1.min.js',      [], '1.0', true );
+            wp_enqueue_script( 'openpay-data', 'https://resources.openpay.co/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
         } elseif ( $country === 'MX' ) {
             wp_enqueue_script( 'openpay-js',   'https://js.openpay.mx/openpay.v1.min.js',      [], '1.0', true );
             wp_enqueue_script( 'openpay-data', 'https://js.openpay.mx/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
