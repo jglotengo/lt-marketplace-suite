@@ -37,7 +37,16 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
 
         $instance = new self();
 
-        add_filter( 'woocommerce_billing_fields',             [ $instance, 'modify_billing_city_field' ], 20, 1 );
+        // M-205: prioridad 1000 — debe ejecutarse DESPUÉS del plugin de terceros
+        // "WooCommerce Checkout Manager" (QuadLayers, namespace WOOCCM), que
+        // también engancha woocommerce_billing_fields en prioridad 999 y
+        // sobrescribe billing_city según su propia configuración guardada
+        // (tipo "Text" por defecto). Con prioridad 20, LTMS corría primero y
+        // QuadLayers pisaba el <select> de vuelta a <input> de texto libre,
+        // dejando el campo imposible de validar contra el código DANE exigido
+        // en validate_municipality(). No bajar de 999 sin verificar primero
+        // si WOOCCM sigue activo y en qué prioridad corre.
+        add_filter( 'woocommerce_billing_fields',             [ $instance, 'modify_billing_city_field' ], 1000, 1 );
         add_action( 'woocommerce_checkout_process',           [ $instance, 'validate_municipality' ] );
         add_action( 'woocommerce_checkout_update_order_meta', [ $instance, 'save_municipality_meta' ], 10, 1 );
     }
