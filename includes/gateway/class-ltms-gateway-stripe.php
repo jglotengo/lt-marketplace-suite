@@ -53,6 +53,37 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
     }
 
     /**
+     * Determina si el gateway está disponible en el checkout actual.
+     *
+     * Además del comportamiento estándar de WooCommerce (enabled +
+     * needs_setup), respeta los checkboxes "Habilitar para Colombia" /
+     * "Habilitar para México" — que antes se guardaban en la BD pero
+     * nunca se consultaban, por lo que el gateway aparecía en ambos
+     * países sin importar la configuración.
+     *
+     * @return bool
+     */
+    public function is_available(): bool {
+        if ( ! parent::is_available() ) {
+            return false;
+        }
+
+        $country     = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+        $enable_co   = 'yes' === $this->get_option( 'enable_co', 'yes' );
+        $enable_mx   = 'yes' === $this->get_option( 'enable_mx', 'yes' );
+
+        if ( 'CO' === $country && ! $enable_co ) {
+            return false;
+        }
+
+        if ( 'MX' === $country && ! $enable_mx ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Define los campos de configuración del panel de administración.
      *
      * @return void
