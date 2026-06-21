@@ -12,9 +12,19 @@
  *
  * Solo activo en storefronts CO (`ltms_country = 'CO'`).
  *
+ * Estrategia de enganche (M-205 / M-206):
+ *   woocommerce_billing_fields NO funciona contra WooCommerce Checkout Manager
+ *   (QuadLayers/WOOCCM), ya que ese plugin reconstruye los campos desde su propia
+ *   configuración en BD ignorando el array $fields que recibe — independientemente
+ *   de la prioridad del filtro. La solución correcta es `woocommerce_form_field`
+ *   (alias `woocommerce_form_field_{type}`), que dispara sobre el HTML renderizado
+ *   del campo justo antes de imprimirlo, después de que WOOCCM ya terminó. LTMS
+ *   intercepta billing_city ahí y reemplaza el HTML completo por un <select> con
+ *   las opciones del catálogo DANE.
+ *
  * @package    LTMS
  * @subpackage LTMS/includes/frontend
- * @version    1.1.0
+ * @version    1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -37,26 +47,22 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
 
         $instance = new self();
 
-        // M-205: prioridad 1000 — debe ejecutarse DESPUÉS del plugin de terceros
-        // "WooCommerce Checkout Manager" (QuadLayers, namespace WOOCCM), que
-        // también engancha woocommerce_billing_fields en prioridad 999 y
-        // sobrescribe billing_city según su propia configuración guardada
-        // (tipo "Text" por defecto). Con prioridad 20, LTMS corría primero y
-        // QuadLayers pisaba el <select> de vuelta a <input> de texto libre,
-        // dejando el campo imposible de validar contra el código DANE exigido
-        // en validate_municipality(). No bajar de 999 sin verificar primero
-        // si WOOCCM sigue activo y en qué prioridad corre.
-        add_filter( 'woocommerce_billing_fields',             [ $instance, 'modify_billing_city_field' ], 1000, 1 );
+        // M-206: woocommerce_form_field dispara sobre el HTML renderizado, DESPUÉS
+        // de que WOOCCM (QuadLayers) ya construyó el campo desde su propia BD.
+        // El filtro recibe ($field_html, $key, $args, $value) y devuelve el HTML
+        // final que se imprimirá. Al interceptar billing_city aquí, el <select>
+        // de LTMS siempre gana — no importa qué haya hecho WOOCCM antes.
+        //
+        // woocommerce_billing_fields se mantiene como fallback para instalaciones
+        // sin WOOCCM, pero ya NO es la ruta principal.
+        add_filter( 'woocommerce_form_field',          [ $instance, 'override_city_field_html' ], 9999, 4 );
+        add_filter( 'woocommerce_billing_fields',      [ $instance, 'modify_billing_city_field' ], 1000, 1 );
         add_action( 'woocommerce_checkout_process',           [ $instance, 'validate_municipality' ] );
         add_action( 'woocommerce_checkout_update_order_meta', [ $instance, 'save_municipality_meta' ], 10, 1 );
     }
 
     /**
-     * Determina si el catálogo DANE tiene datos reales cargados (más que solo
-     * el placeholder "— Selecciona tu municipio —"). Se usa tanto para decidir
-     * si el campo se convierte en <select> como para decidir si la validación
-     * estricta de código de 5 dígitos aplica — ambas piezas deben degradarse
-     * juntas (M-204, fix de incidente: bloqueaba el 100% del checkout CO).
+     * Determina si el catálogo DANE tiene datos reales cargados.
      *
      * @return bool
      */
@@ -65,15 +71,67 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
     }
 
     /**
-     * Reemplaza el input billing_city con un select del catálogo DANE.
-     * Conserva la key `billing_city` para no romper plugins de envío/correo.
+     * Intercepta el HTML renderizado de billing_city y lo reemplaza por un <select>
+     * con el catálogo DANE. Dispara vía woocommerce_form_field, DESPUÉS de WOOCCM.
+     *
+     * @param string $field_html HTML generado por woocommerce_form_field().
+     * @param string $key        Clave del campo (ej. 'billing_city').
+     * @param array  $args       Argumentos del campo.
+     * @param mixed  $value      Valor actual del campo.
+     * @return string
+     */
+    public function override_city_field_html( string $field_html, string $key, array $args, $value ): string {
+        if ( $key !== 'billing_city' ) {
+            return $field_html;
+        }
+        if ( ! $this->catalog_is_loaded() ) {
+            return $field_html;
+        }
+
+        // Construir el <select> de municipios con el catálogo DANE.
+        $options     = LTMS_Business_Dane_Catalog::get_options( true );
+        $required    = ! empty( $args['required'] );
+        $label       = $args['label'] ?? __( 'Municipio', 'ltms' );
+        $label_class = ! empty( $args['label_class'] ) ? implode( ' ', (array) $args['label_class'] ) : '';
+        $input_class = ! empty( $args['input_class'] ) ? implode( ' ', (array) $args['input_class'] ) : '';
+        $wrap_class  = ! empty( $args['class'] ) ? implode( ' ', (array) $args['class'] ) : 'form-row-wide';
+        $current_val = $value ?: '';
+
+        $select_html  = '<p class="form-row ltms-municipality-row ' . esc_attr( $wrap_class ) . '"';
+        $select_html .= ' id="billing_city_field">';
+        $select_html .= '<label for="billing_city" class="' . esc_attr( $label_class ) . '">';
+        $select_html .= esc_html( $label );
+        if ( $required ) {
+            $select_html .= ' <abbr class="required" title="' . esc_attr__( 'requerido', 'ltms' ) . '">*</abbr>';
+        }
+        $select_html .= '</label>';
+        $select_html .= '<select name="billing_city" id="billing_city"';
+        $select_html .= ' class="ltms-municipality-select select ' . esc_attr( $input_class ) . '"';
+        if ( $required ) {
+            $select_html .= ' required';
+        }
+        $select_html .= '>';
+        foreach ( $options as $code => $label_opt ) {
+            $select_html .= '<option value="' . esc_attr( $code ) . '"'
+                . selected( $current_val, $code, false ) . '>'
+                . esc_html( $label_opt ) . '</option>';
+        }
+        $select_html .= '</select>';
+        $select_html .= '</p>';
+
+        return $select_html;
+    }
+
+    /**
+     * Fallback: reemplaza el campo billing_city con un select en el array de campos.
+     * Funciona cuando WOOCCM NO está instalado. Cuando WOOCCM sí está activo,
+     * override_city_field_html() toma el control en la capa de renderizado.
      *
      * @param array $fields Campos de facturación WooCommerce.
      * @return array
      */
     public function modify_billing_city_field( array $fields ): array {
         if ( ! $this->catalog_is_loaded() ) {
-            // Sin catálogo cargado, deja el campo original (degradación segura).
             return $fields;
         }
 
@@ -98,12 +156,8 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
     /**
      * Valida que el value enviado sea un código DANE de 5 dígitos.
      *
-     * M-204: si el catálogo DANE no está cargado en bkr_lt_co_dane_municipalities,
-     * modify_billing_city_field() deja billing_city como texto libre — un campo
-     * de texto libre nunca puede producir un código de 5 dígitos exacto, así que
-     * exigirlo aquí bloqueaba el 100% de los checkouts CO sin excepción. La
-     * validación estricta solo aplica cuando el catálogo realmente ofrece un
-     * select con códigos reales para elegir.
+     * M-204: si el catálogo DANE no está cargado, la validación estricta se omite
+     * para no bloquear el checkout (degradación segura).
      *
      * @return void
      */
@@ -115,9 +169,6 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
         }
 
         if ( ! $this->catalog_is_loaded() ) {
-            // Degradación segura: catálogo vacío → campo de texto libre → no se
-            // puede exigir formato de código DANE. Se acepta el texto tal cual,
-            // igual que el comportamiento nativo de WooCommerce sin este módulo.
             return;
         }
 
@@ -129,9 +180,6 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
 
     /**
      * Guarda el código DANE en order meta y reemplaza billing_city por el nombre legible.
-     * Si el catálogo está degradado (texto libre), no hay código DANE que guardar —
-     * el pedido se crea igual, solo sin el meta de territorialidad ReteICA hasta que
-     * el catálogo se pueble.
      *
      * @param int $order_id ID del pedido WooCommerce.
      * @return void
