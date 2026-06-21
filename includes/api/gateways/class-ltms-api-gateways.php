@@ -399,6 +399,26 @@ class LTMS_Api_Gateway_Addi extends WC_Payment_Gateway {
         $this->enabled     = $this->get_option( 'enabled', 'yes' );
 
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
+        add_action( 'admin_notices', [ $this, 'maybe_show_credentials_notice' ] );
+    }
+
+    /**
+     * Aviso de admin si faltan las credenciales de Addi.
+     */
+    public function maybe_show_credentials_notice(): void {
+        if ( 'yes' !== $this->enabled ) {
+            return;
+        }
+        if ( empty( $this->get_option( 'client_id' ) ) || empty( $this->get_option( 'client_secret' ) ) ) {
+            $url = admin_url( 'admin.php?page=wc-settings&tab=checkout&section=' . $this->id );
+            echo '<div class="notice notice-error"><p>';
+            printf(
+                /* translators: %s URL */
+                wp_kses_post( __( '<strong>LTMS — Addi:</strong> Faltan las credenciales (Client ID / Secret). <a href="%s">Configurar ahora →</a>', 'ltms' ) ),
+                esc_url( $url )
+            );
+            echo '</p></div>';
+        }
     }
 
     public function init_form_fields(): void {
@@ -752,3 +772,4 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
         return [];
     }
 }
+
