@@ -105,7 +105,7 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
         }
 
         $country = LTMS_Core_Config::get_country();
-        $sdk_url = $country === 'MX' ? 'https://js.openpay.mx/' : 'https://js.openpay.co/';
+        $sdk_url = $country === 'MX' ? 'https://js.openpay.mx/' : 'https://resources.openpay.co/';
 
         if ( ! wp_script_is( 'openpay-js', 'enqueued' ) ) {
             wp_enqueue_script( 'openpay-js',   $sdk_url . 'openpay.v1.min.js',      [], '1.0', true );
@@ -725,8 +725,8 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
         }
 
         if ( ! wp_script_is( 'openpay-js', 'enqueued' ) ) {
-            wp_enqueue_script( 'openpay-js',   'https://js.openpay.co/openpay.v1.min.js',      [], '1.0', true );
-            wp_enqueue_script( 'openpay-data', 'https://js.openpay.co/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
+            wp_enqueue_script( 'openpay-js',   'https://resources.openpay.co/openpay.v1.min.js',      [], '1.0', true );
+            wp_enqueue_script( 'openpay-data', 'https://resources.openpay.co/openpay-data.v1.min.js', [ 'openpay-js' ], '1.0', true );
         }
     }
 
