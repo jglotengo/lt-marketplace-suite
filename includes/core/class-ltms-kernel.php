@@ -430,8 +430,12 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Api_Gateway_PSE' ) ) {
             $gateways[] = 'LTMS_Api_Gateway_PSE';
         }
-        // v1.7.5 — Openpay MX gateway (registrado directamente; autoloader resuelve la clase)
-        $gateways[] = 'LTMS_Api_Gateway_Openpay_MX';
+        // v1.7.5 — Openpay MX gateway — solo se registra en instalaciones de México.
+        // En lo-tengo.com.co (CO) este gateway está incompleto (falta ltms-openpay-mx.js)
+        // y no debe aparecer en el checkout colombiano.
+        if ( class_exists( 'LTMS_Api_Gateway_Openpay_MX' ) && 'MX' === LTMS_Core_Config::get_country() ) {
+            $gateways[] = 'LTMS_Api_Gateway_Openpay_MX';
+        }
         return $gateways;
     }
 
@@ -733,4 +737,5 @@ final class LTMS_Core_Kernel {
         throw new \RuntimeException( 'No se puede deserializar un Singleton.' );
     }
 }
+
 
