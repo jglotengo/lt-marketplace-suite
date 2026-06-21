@@ -7,7 +7,7 @@
  * then re-submits the form so process_payment() can charge it server-side.
  *
  * @package LTMS
- * @version 1.0.0
+ * @version 1.1.0
  */
 ( function ( $ ) {
 	'use strict';
@@ -40,19 +40,25 @@
 	function showError( msg ) {
 		var $err = $( '#ltms-openpay-card-errors' );
 		$err.text( msg ).show();
-		$( 'html, body' ).animate( { scrollTop: $err.offset().top - 80 }, 200 );
+		if ( $err.length ) {
+			$( 'html, body' ).animate( { scrollTop: $err.offset().top - 80 }, 200 );
+		}
 	}
 
 	function hideError() {
 		$( '#ltms-openpay-card-errors' ).hide();
 	}
 
+	function isOpenpaySelected() {
+		var val = $( 'input[name="payment_method"]:checked' ).val();
+		return val === 'ltms_openpay';
+	}
+
 	/**
-	 * WooCommerce fires checkout_place_order_ltms_openpay when the user
-	 * clicks "Place Order" with this gateway selected.
-	 * Returning false stops WC; we re-submit after async tokenization.
+	 * Core tokenization logic — shared by both the WC event and the submit fallback.
+	 * Returns false to stop submission; re-submits after async tokenization.
 	 */
-	$( document ).on( 'checkout_place_order_ltms_openpay', function () {
+	function handleCheckout() {
 		// Token already set (re-submit after tokenization) → let WC proceed.
 		if ( $( '#ltms_openpay_token' ).val() ) {
 			return true;
@@ -82,7 +88,7 @@
 			return false;
 		}
 
-		var $form = $( 'form.woocommerce-checkout' );
+		var $form = $( 'form.woocommerce-checkout, form.checkout' ).first();
 
 		$form.block( { message: null, overlayCSS: { background: '#fff', opacity: 0.6 } } );
 
@@ -116,7 +122,32 @@
 			}
 		);
 
-		return false; // Stop WC; we'll re-submit after tokenization
+		return false; // Stop WC; we\'ll re-submit after tokenization
+	}
+
+	/**
+	 * Primary listener: WooCommerce fires checkout_place_order_ltms_openpay
+	 * when the user clicks "Place Order" with this gateway selected.
+	 */
+	$( document ).on( 'checkout_place_order_ltms_openpay', function () {
+		return handleCheckout();
+	} );
+
+	/**
+	 * Fallback listener: some page-builders / checkout plugins (e.g. WOOCCM)
+	 * may intercept the checkout form submit before WooCommerce\'s checkout.js
+	 * fires checkout_place_order_* events. This catches that case.
+	 */
+	$( document ).on( 'submit', 'form.woocommerce-checkout, form.checkout', function ( e ) {
+		if ( ! isOpenpaySelected() ) {
+			return true; // other gateway — don\'t interfere
+		}
+		var proceed = handleCheckout();
+		if ( ! proceed ) {
+			e.preventDefault();
+			e.stopPropagation();
+			return false;
+		}
 	} );
 
 	// Reset token on WC AJAX checkout refresh (e.g. shipping update)
