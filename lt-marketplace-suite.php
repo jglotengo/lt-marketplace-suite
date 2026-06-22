@@ -794,6 +794,9 @@ function ltms_emergency_dashboard_page(): void {
 
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-commission-writer.php';
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-backfill-kyc.php';
+// v2.8.0 — Vitrina pública del vendedor — cargado directamente para sobrevivir
+// si el kernel lanza excepción antes de llegar a boot_frontend().
+require_once plugin_dir_path(__FILE__).'includes/frontend/class-ltms-vendor-storefront.php';
 
 // ============================================================
 // FIX UX-01: Ocultar admin bar en el frontend para no-admins
