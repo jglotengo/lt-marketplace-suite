@@ -189,6 +189,28 @@ class LTMS_Vendor_Storefront {
             [],
             LTMS_VERSION
         );
+
+        // Habilita los botones "Agregar al carrito" de la grilla sin recargar
+        // la página — mismo script nativo que usa cualquier loop de WooCommerce.
+        if ( function_exists( 'wc_enqueue_js' ) || class_exists( 'WC_Frontend_Scripts' ) ) {
+            wp_enqueue_script( 'wc-add-to-cart' );
+            wp_localize_script( 'wc-add-to-cart', 'wc_add_to_cart_params', [
+                'ajax_url'                => admin_url( 'admin-ajax.php' ),
+                'wc_ajax_url'              => \WC_AJAX::get_endpoint( '%%endpoint%%' ),
+                'i18n_view_cart'           => esc_attr__( 'Ver carrito', 'ltms' ),
+                'cart_url'                 => apply_filters( 'woocommerce_add_to_cart_redirect', wc_get_cart_url(), null ),
+                'is_cart'                  => is_cart(),
+                'cart_redirect_after_add'  => get_option( 'woocommerce_cart_redirect_after_add' ),
+            ] );
+        }
+
+        wp_enqueue_script(
+            'ltms-storefront',
+            LTMS_ASSETS_URL . 'js/ltms-storefront.js',
+            [ 'jquery', 'wc-add-to-cart' ],
+            LTMS_VERSION,
+            true
+        );
     }
 
     private static function render( object $vendor ): void {
@@ -336,12 +358,24 @@ class LTMS_Vendor_Storefront {
                             global $product;
                             $product = wc_get_product( get_the_ID() );
                             if ( ! $product ) continue;
+
+                            $gallery_ids   = $product->get_gallery_image_ids();
+                            $hover_img_id  = $gallery_ids ? $gallery_ids[0] : 0;
+                            $avg_rating    = (float) $product->get_average_rating();
+                            $rating_count  = (int) $product->get_rating_count();
+                            $is_new        = ( strtotime( get_the_date( 'c' ) ) > strtotime( '-15 days' ) );
+                            $discount_pct  = 0;
+                            if ( $product->is_on_sale() && $product->get_regular_price() > 0 ) {
+                                $discount_pct = round( ( ( $product->get_regular_price() - $product->get_sale_price() ) / $product->get_regular_price() ) * 100 );
+                            }
                         ?>
                             <article class="ltms-sf-card" itemscope itemtype="https://schema.org/Product">
-                                <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-card-link">
-                                    <div class="ltms-sf-card-img">
+
+                                <div class="ltms-sf-card-img">
+                                    <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-card-img-link" aria-label="<?php echo esc_attr( get_the_title() ); ?>">
                                         <?php if ( has_post_thumbnail() ) : ?>
-                                            <?php the_post_thumbnail( 'woocommerce_thumbnail', [
+                                            <?php echo wp_get_attachment_image( get_post_thumbnail_id(), 'woocommerce_thumbnail', false, [
+                                                'class'    => 'ltms-sf-img-main',
                                                 'itemprop' => 'image',
                                                 'loading'  => 'lazy',
                                                 'alt'      => esc_attr( get_the_title() ),
@@ -350,27 +384,90 @@ class LTMS_Vendor_Storefront {
                                             <div class="ltms-sf-card-no-img">Sin imagen</div>
                                         <?php endif; ?>
 
-                                        <?php if ( $product->is_on_sale() ) : ?>
-                                            <span class="ltms-sf-badge-sale">OFERTA</span>
+                                        <?php if ( $hover_img_id ) : ?>
+                                            <?php echo wp_get_attachment_image( $hover_img_id, 'woocommerce_thumbnail', false, [
+                                                'class'   => 'ltms-sf-img-hover',
+                                                'loading' => 'lazy',
+                                                'alt'     => '',
+                                            ] ); ?>
+                                        <?php endif; ?>
+                                    </a>
+
+                                    <!-- Badges -->
+                                    <div class="ltms-sf-badges">
+                                        <?php if ( $discount_pct > 0 ) : ?>
+                                            <span class="ltms-badge ltms-badge--pct">-<?php echo esc_html( $discount_pct ); ?>%</span>
+                                        <?php elseif ( $product->is_on_sale() ) : ?>
+                                            <span class="ltms-badge ltms-badge--sale">OFERTA</span>
+                                        <?php endif; ?>
+                                        <?php if ( $is_new ) : ?>
+                                            <span class="ltms-badge ltms-badge--new">NUEVO</span>
+                                        <?php endif; ?>
+                                        <?php if ( ! $product->is_in_stock() ) : ?>
+                                            <span class="ltms-badge ltms-badge--soldout">AGOTADO</span>
                                         <?php endif; ?>
                                     </div>
 
-                                    <div class="ltms-sf-card-body">
-                                        <p class="ltms-sf-card-cat">
-                                            <?php
-                                            $cats = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
-                                            echo $cats ? esc_html( $cats[0]->name ) : '';
-                                            ?>
-                                        </p>
-                                        <h2 class="ltms-sf-card-name" itemprop="name">
-                                            <?php echo esc_html( get_the_title() ); ?>
-                                        </h2>
-                                        <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
-                                            <meta itemprop="priceCurrency" content="COP">
-                                            <?php echo wp_kses_post( $product->get_price_html() ); ?>
-                                        </div>
+                                    <!-- Acciones (wishlist / vista rápida / comparar) -->
+                                    <div class="ltms-sf-card-actions">
+                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-wishlist"
+                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
+                                                aria-label="Agregar a favoritos">
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                        </button>
+                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-quickview"
+                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
+                                                aria-label="Vista rápida">
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        </button>
+                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-compare"
+                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
+                                                aria-label="Comparar">
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                        </button>
                                     </div>
-                                </a>
+                                </div><!-- .ltms-sf-card-img -->
+
+                                <div class="ltms-sf-card-body">
+                                    <p class="ltms-sf-card-cat">
+                                        <?php
+                                        $cats = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
+                                        echo $cats ? esc_html( $cats[0]->name ) : esc_html( $vendor->name );
+                                        ?>
+                                    </p>
+
+                                    <h2 class="ltms-sf-card-name" itemprop="name">
+                                        <a href="<?php echo esc_url( get_permalink() ); ?>"><?php echo esc_html( get_the_title() ); ?></a>
+                                    </h2>
+
+                                    <?php if ( $rating_count > 0 ) : ?>
+                                        <div class="ltms-sf-card-rating" aria-label="<?php echo esc_attr( $avg_rating ); ?> de 5 estrellas">
+                                            <span class="ltms-sf-stars" style="--rating: <?php echo esc_attr( ( $avg_rating / 5 ) * 100 ); ?>%;" aria-hidden="true">★★★★★</span>
+                                            <span class="ltms-sf-rating-count">(<?php echo esc_html( $rating_count ); ?>)</span>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                                        <meta itemprop="priceCurrency" content="COP">
+                                        <?php echo wp_kses_post( $product->get_price_html() ); ?>
+                                    </div>
+
+                                    <?php if ( $product->is_purchasable() && ( $product->is_in_stock() || $product->backorders_allowed() ) ) : ?>
+                                        <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
+                                           data-quantity="1"
+                                           class="ltms-sf-add-to-cart button ajax_add_to_cart add_to_cart_button"
+                                           data-product_id="<?php echo esc_attr( $product->get_id() ); ?>"
+                                           data-product_sku="<?php echo esc_attr( $product->get_sku() ); ?>"
+                                           aria-label="Agregar &laquo;<?php echo esc_attr( get_the_title() ); ?>&raquo; al carrito"
+                                           rel="nofollow">
+                                            Agregar al carrito
+                                        </a>
+                                    <?php else : ?>
+                                        <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-add-to-cart ltms-sf-view-product">
+                                            Ver producto
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
                             </article>
                         <?php endwhile; wp_reset_postdata(); ?>
                     </div><!-- .ltms-sf-grid -->
