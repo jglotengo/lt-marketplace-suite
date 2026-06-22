@@ -798,6 +798,22 @@ require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-backfill-kyc.p
 // si el kernel lanza excepción antes de llegar a boot_frontend().
 require_once plugin_dir_path(__FILE__).'includes/frontend/class-ltms-vendor-storefront.php';
 
+// Registrar el rewrite rule de /vendedor/{slug}/ desde aquí (a nivel del archivo
+// principal del plugin) para que funcione incluso si el kernel falla por OPcache.
+// El guard class_exists evita duplicación si la clase ya lo registró por su cuenta.
+add_action( 'init', static function() {
+    if ( ! defined( 'LTMS_VENDOR_REWRITE_REGISTERED' ) ) {
+        define( 'LTMS_VENDOR_REWRITE_REGISTERED', true );
+        add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?ltms_vendor_slug=$matches[1]', 'top' );
+    }
+}, 5 ); // prioridad 5 — antes de que WooCommerce registre sus propias reglas (10)
+add_filter( 'query_vars', static function( array $vars ): array {
+    if ( ! in_array( 'ltms_vendor_slug', $vars, true ) ) {
+        $vars[] = 'ltms_vendor_slug';
+    }
+    return $vars;
+} );
+
 // ============================================================
 // FIX UX-01: Ocultar admin bar en el frontend para no-admins
 // La barra de herramientas de WordPress contamina visualmente
