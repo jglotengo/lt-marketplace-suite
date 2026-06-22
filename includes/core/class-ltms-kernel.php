@@ -530,6 +530,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Geo_Detector' ) ) {
             LTMS_Geo_Detector::init();
         }
+
+        // v2.8.0 — Vitrina pública del vendedor (/vendedores/{slug})
+        if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
+            LTMS_Vendor_Storefront::init();
+        }
     }
 
     /**
