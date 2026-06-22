@@ -29,6 +29,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class LTMS_Commission_Writer {
 
+    use LTMS_Logger_Aware;
+
     // ── Constantes de plataforma ─────────────────────────────────────────────
     const PLATFORM_NAME    = 'Lo-Tengo.com.co';
     const PLATFORM_METHOD  = 'wallet_marketplace'; // método de pago de la plataforma (Frac. II f-iv-c)
@@ -186,7 +188,7 @@ class LTMS_Commission_Writer {
                 $wpdb->insert( self::LTMS_TABLE, $data );
             }
 
-            // Log forense en lt_logs
+            // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
             $this->log_fiscal_write( $order_id, $vendor_id, $data );
         }
     }
@@ -305,29 +307,27 @@ class LTMS_Commission_Writer {
     }
 
     /**
-     * Escribe un registro en lt_logs para trazabilidad forense.
+     * Escribe un registro de auditoría forense vía LTMS_Core_Logger.
      */
     private function log_fiscal_write( $order_id, $vendor_id, $data ) {
-        global $wpdb;
-
-        $table = $wpdb->prefix . 'lt_logs';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) return;
-
-        $wpdb->insert( $table, [
-            'event_type'   => 'fiscal_fields_written',
-            'object_id'    => $order_id,
-            'object_type'  => 'order',
-            'user_id'      => $vendor_id,
-            'message'      => wp_json_encode( [
-                'order_id'      => $order_id,
-                'vendor_id'     => $vendor_id,
-                'service_type'  => $data['service_type'] ?? '',
-                'pm_buyer'      => $data['payment_method_buyer'] ?? '',
-                'pm_vendor'     => $data['payment_method_vendor'] ?? '',
-                'pm_platform'   => $data['payment_method_platform'] ?? '',
-            ] ),
-            'created_at'   => current_time( 'mysql' ),
-        ] );
+        // M-LOGS-01: antes hacía un $wpdb->insert() directo a una tabla
+        // 'lt_logs' huérfana (esquema level/module/message/details, sin
+        // las columnas event_type/object_id/object_type/user_id que este
+        // método esperaba) — generaba "Unknown column" en cada checkout.
+        // Se reemplaza por el logger oficial del proyecto (LTMS_Core_Logger
+        // vía el trait LTMS_Logger_Aware), que persiste en bkr_lt_audit_logs.
+        $this->log_info(
+            'FISCAL_FIELDS_WRITTEN',
+            sprintf( 'Campos fiscales escritos para order #%d (vendor #%d)', $order_id, $vendor_id ),
+            [
+                'order_id'     => $order_id,
+                'vendor_id'    => $vendor_id,
+                'service_type' => $data['service_type'] ?? '',
+                'pm_buyer'     => $data['payment_method_buyer'] ?? '',
+                'pm_vendor'    => $data['payment_method_vendor'] ?? '',
+                'pm_platform'  => $data['payment_method_platform'] ?? '',
+            ]
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════════
