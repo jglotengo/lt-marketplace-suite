@@ -12,9 +12,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class LTMS_Vendor_Storefront {
 
-    const QUERY_VAR = 'ltms_geo_vendedores';
+    const QUERY_VAR = 'ltms_tienda_slug';
 
     public static function init(): void {
+        // Registrar rewrite rule /tienda/{slug}/ (separada de /vendedores/, que usa geo-detección)
+        add_rewrite_rule( '^tienda/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
+        add_filter( 'query_vars', static function( array $vars ): array {
+            $vars[] = self::QUERY_VAR;
+            return $vars;
+        } );
         add_action( 'template_redirect', [ __CLASS__, 'maybe_render' ] );
         add_filter( 'document_title_parts', [ __CLASS__, 'filter_title' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
@@ -134,7 +140,7 @@ class LTMS_Vendor_Storefront {
         $vendor_cats = self::get_vendor_categories( $vendor->id );
 
         // Ruta base para paginación/filtros
-        $base_url = home_url( '/vendedores/' . $vendor->slug . '/' );
+        $base_url = home_url( '/tienda/' . $vendor->slug . '/' );
 
         // Renderizar HTML
         get_header();
