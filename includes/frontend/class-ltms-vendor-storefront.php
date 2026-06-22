@@ -2,7 +2,25 @@
 /**
  * LTMS Vendor Storefront — Vitrina pública del vendedor
  *
- * Sirve /vendedores/{slug} con perfil + grid de productos.
+ * Sirve /vendedor/{slug} con perfil + grid de productos.
+ *
+ * v2.8.1: la ruta cambió de /tienda/{slug}/ a /vendedor/{slug}/ porque
+ * "tienda" ya es el slug base de la tienda de WooCommerce (configuración
+ * en español) — esa regla de WooCommerce capturaba la URL antes que la
+ * nuestra, sin importar la prioridad 'top' del add_rewrite_rule().
+ *
+ * También se hizo robusto el lookup de vendedor: muchos vendedores legacy
+ * tienen user_login con caracteres no aptos para URL (ej. "marco@dominio.com",
+ * "Nombre Con Espacios"), así que ahora:
+ *   1. Se busca primero por meta ltms_store_slug (la fuente de verdad).
+ *   2. Si no existe, se intenta login exacto (compatibilidad histórica).
+ *   3. Si tampoco, se compara el slug sanitizado del nombre de tienda/login
+ *      contra vendedores sin slug guardado, y se persiste el match — así
+ *      cada vendedor termina con un slug estable después de su primera visita.
+ *
+ * deploy/ltms-backfill-store-slugs.php hace este mismo trabajo de una sola
+ * vez para todos los vendedores existentes, sin depender de que alguien
+ * visite su URL primero.
  *
  * @package LTMS
  * @since   2.8.0
@@ -12,11 +30,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class LTMS_Vendor_Storefront {
 
-    const QUERY_VAR = 'ltms_tienda_slug';
+    const QUERY_VAR = 'ltms_vendor_slug';
 
     public static function init(): void {
-        // Registrar rewrite rule /tienda/{slug}/ (separada de /vendedores/, que usa geo-detección)
-        add_rewrite_rule( '^tienda/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
+        // Registrar rewrite rule /vendedor/{slug}/ — singular, distinto de:
+        //   - /vendedores/{ciudad}/ (geo-detección, LTMS_Geo_Detector)
+        //   - /tienda/ (slug base del shop de WooCommerce en este sitio)
+        add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
         add_filter( 'query_vars', static function( array $vars ): array {
             $vars[] = self::QUERY_VAR;
             return $vars;
@@ -30,7 +50,7 @@ class LTMS_Vendor_Storefront {
         $slug = get_query_var( self::QUERY_VAR );
         if ( ! $slug ) return;
 
-        $vendor = self::get_vendor_by_slug( sanitize_title( $slug ) );
+        $vendor = self::get_vendor_by_slug( $slug );
         if ( ! $vendor ) {
             global $wp_query;
             $wp_query->set_404();
@@ -44,8 +64,17 @@ class LTMS_Vendor_Storefront {
         exit;
     }
 
-    private static function get_vendor_by_slug( string $slug ): ?object {
-        // Buscar por ltms_store_slug o por user_login
+    /**
+     * Resuelve un vendedor a partir del slug de la URL.
+     *
+     * Tres niveles de búsqueda, en orden de costo creciente — ver docblock
+     * de la clase para el razonamiento completo.
+     */
+    private static function get_vendor_by_slug( string $raw_slug ): ?object {
+        $slug = sanitize_title( $raw_slug );
+        if ( '' === $slug ) return null;
+
+        // Nivel 1 — fuente de verdad: meta ltms_store_slug.
         $users = get_users( [
             'meta_key'   => 'ltms_store_slug',
             'meta_value' => $slug,
@@ -53,11 +82,31 @@ class LTMS_Vendor_Storefront {
             'role'       => 'ltms_vendor',
         ] );
 
+        // Nivel 2 — compatibilidad histórica: login exacto (solo funciona
+        // si el login ya era un slug válido, ej. "tiendaejemplo").
         if ( ! $users ) {
-            // Fallback: buscar por user_login
             $user = get_user_by( 'login', $slug );
             if ( $user && in_array( 'ltms_vendor', (array) $user->roles, true ) ) {
                 $users = [ $user ];
+            }
+        }
+
+        // Nivel 3 — vendedores legacy sin slug guardado: comparar el slug
+        // sanitizado de su nombre de tienda o login. Acotado a 300 filas
+        // para no degradar rendimiento; el backfill cubre el resto de una vez.
+        if ( ! $users ) {
+            $legacy = get_users( [ 'role' => 'ltms_vendor', 'number' => 300 ] );
+            foreach ( $legacy as $v ) {
+                if ( get_user_meta( $v->ID, 'ltms_store_slug', true ) ) continue;
+
+                $store_name = get_user_meta( $v->ID, 'ltms_store_name', true ) ?: $v->display_name ?: $v->user_login;
+                $candidates = [ sanitize_title( $store_name ), sanitize_title( $v->user_login ) ];
+
+                if ( in_array( $slug, $candidates, true ) ) {
+                    update_user_meta( $v->ID, 'ltms_store_slug', $slug ); // se estabiliza para la próxima visita
+                    $users = [ $v ];
+                    break;
+                }
             }
         }
 
@@ -79,10 +128,43 @@ class LTMS_Vendor_Storefront {
         ];
     }
 
+    /**
+     * Genera un slug único para un vendedor a partir del nombre de su tienda.
+     * Usado tanto en el registro de vendedores nuevos como en el backfill
+     * de vendedores existentes (deploy/ltms-backfill-store-slugs.php).
+     */
+    public static function generate_unique_slug( string $store_name, int $exclude_user_id = 0 ): string {
+        $base = sanitize_title( $store_name );
+        if ( '' === $base ) {
+            $base = 'tienda-' . ( $exclude_user_id ?: wp_rand( 1000, 9999 ) );
+        }
+
+        $slug = $base;
+        $i    = 2;
+        while ( self::slug_taken( $slug, $exclude_user_id ) ) {
+            $slug = $base . '-' . $i;
+            $i++;
+        }
+        return $slug;
+    }
+
+    private static function slug_taken( string $slug, int $exclude_user_id ): bool {
+        $args = [
+            'meta_key'   => 'ltms_store_slug',
+            'meta_value' => $slug,
+            'number'     => 1,
+            'fields'     => 'ID',
+        ];
+        if ( $exclude_user_id ) {
+            $args['exclude'] = [ $exclude_user_id ];
+        }
+        return ! empty( get_users( $args ) );
+    }
+
     public static function filter_title( array $parts ): array {
         $slug = get_query_var( self::QUERY_VAR );
         if ( ! $slug ) return $parts;
-        $vendor = self::get_vendor_by_slug( sanitize_title( $slug ) );
+        $vendor = self::get_vendor_by_slug( $slug );
         if ( $vendor ) {
             $parts['title'] = esc_html( $vendor->name ) . ' — Lo Tengo';
         }
@@ -140,7 +222,7 @@ class LTMS_Vendor_Storefront {
         $vendor_cats = self::get_vendor_categories( $vendor->id );
 
         // Ruta base para paginación/filtros
-        $base_url = home_url( '/tienda/' . $vendor->slug . '/' );
+        $base_url = home_url( '/vendedor/' . $vendor->slug . '/' );
 
         // Renderizar HTML
         get_header();
