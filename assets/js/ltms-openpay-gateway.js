@@ -63,11 +63,15 @@
 		var expiry = $( '#ltms-card-expiry' ).val().split( '/' );
 		var year   = ( expiry[1] || '' ).trim();
 
+		// Openpay espera expiration_year en 2 dígitos (ej. "28"), no 4 ("2028").
+		// Ver ejemplo oficial: https://documents.openpay.co/openpay-js/ usa "expiration_year":"20".
+		var year2 = year.length === 4 ? year.substring( 2 ) : year;
+
 		var cardData = {
 			card_number:      $( '#ltms-card-number' ).val().replace( /\s/g, '' ),
 			holder_name:      $( '#ltms-card-name' ).val().trim(),
 			expiration_month: ( expiry[0] || '' ).trim(),
-			expiration_year:  year.length === 2 ? '20' + year : year,
+			expiration_year:  year2,
 			cvv2:             $( '#ltms-card-cvv' ).val(),
 		};
 
@@ -101,6 +105,9 @@
 					3003: ltmsOpenpay.i18n.insufficient_funds,
 					3005: ltmsOpenpay.i18n.card_blocked,
 				};
+				if ( window.console && console.error ) {
+					console.error( 'Openpay token error:', err );
+				}
 				showError( messages[ code ] || ltmsOpenpay.i18n.card_error );
 				$form.unblock();
 			}
