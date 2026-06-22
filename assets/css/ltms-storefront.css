@@ -184,6 +184,8 @@
   border-radius: var(--sf-radius);
   overflow: hidden;
   transition: box-shadow 0.2s, transform 0.2s;
+  display: flex;
+  flex-direction: column;
 }
 
 .ltms-sf-card:hover {
@@ -191,55 +193,150 @@
   transform: translateY(-2px);
 }
 
-.ltms-sf-card-link {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-}
-
+/* ---- Imagen + overlay ---- */
 .ltms-sf-card-img {
   aspect-ratio: 1 / 1;
   background: var(--sf-bg);
   position: relative;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.ltms-sf-card-img img {
+.ltms-sf-card-img-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ltms-sf-img-main,
+.ltms-sf-img-hover {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
   padding: 12px;
-  transition: transform 0.3s;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-.ltms-sf-card:hover .ltms-sf-card-img img {
+.ltms-sf-img-hover {
+  opacity: 0;
+}
+
+.ltms-sf-card:hover .ltms-sf-img-main {
+  opacity: 0;
+}
+
+.ltms-sf-card:hover .ltms-sf-img-hover {
+  opacity: 1;
+}
+
+.ltms-sf-card:hover .ltms-sf-img-main,
+.ltms-sf-card:hover .ltms-sf-img-hover {
   transform: scale(1.04);
 }
 
 .ltms-sf-card-no-img {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   color: var(--sf-muted);
 }
 
-.ltms-sf-badge-sale {
+/* ---- Badges (apilados, esquina sup. izq.) ---- */
+.ltms-sf-badges {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  background: #EABE12;
-  color: #1A1A1A;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 2;
 }
 
+.ltms-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+.ltms-badge--sale    { background: var(--sf-badge-sale, #EABE12); color: #1A1A1A; }
+.ltms-badge--pct      { background: var(--sf-brand); color: var(--sf-white); }
+.ltms-badge--new      { background: #27AE60; color: var(--sf-white); }
+.ltms-badge--soldout  { background: var(--sf-muted); color: var(--sf-white); }
+
+/* ---- Overlay de acciones (wishlist / quickview / comparar) ---- */
+.ltms-sf-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.ltms-sf-card:hover .ltms-sf-card-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ltms-sf-action-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--sf-white);
+  color: var(--sf-text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.ltms-sf-action-btn:hover {
+  background: var(--sf-brand);
+  color: var(--sf-white);
+  transform: scale(1.08);
+}
+
+.ltms-sf-action-btn.is-active {
+  background: var(--sf-brand);
+  color: var(--sf-white);
+}
+
+/* En mobile, las acciones siempre están visibles (no hay hover real) */
+@media (max-width: 767px) {
+  .ltms-sf-card-actions {
+    opacity: 1;
+    transform: none;
+  }
+  .ltms-sf-action-btn {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+/* ---- Cuerpo de la tarjeta ---- */
 .ltms-sf-card-body {
   padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .ltms-sf-card-cat {
@@ -253,8 +350,7 @@
 .ltms-sf-card-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--sf-text);
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -262,10 +358,53 @@
   overflow: hidden;
 }
 
+.ltms-sf-card-name a {
+  color: var(--sf-text);
+  text-decoration: none;
+}
+
+.ltms-sf-card-name a:hover {
+  color: var(--sf-brand);
+}
+
+/* ---- Rating ---- */
+.ltms-sf-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.ltms-sf-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--sf-border);
+  line-height: 1;
+}
+
+.ltms-sf-stars::before {
+  content: '★★★★★';
+  position: absolute;
+  inset: 0;
+  width: var(--rating, 0%);
+  overflow: hidden;
+  color: #F5A623;
+  white-space: nowrap;
+}
+
+.ltms-sf-rating-count {
+  font-size: 11px;
+  color: var(--sf-muted);
+}
+
+/* ---- Precio ---- */
 .ltms-sf-card-price {
   font-size: 15px;
   font-weight: 700;
   color: var(--sf-brand);
+  margin-bottom: 10px;
 }
 
 .ltms-sf-card-price del {
@@ -273,6 +412,58 @@
   font-weight: 400;
   font-size: 13px;
   margin-right: 4px;
+  text-decoration: line-through;
+}
+
+.ltms-sf-card-price ins {
+  text-decoration: none;
+}
+
+/* ---- Botón Agregar al carrito ---- */
+.ltms-sf-add-to-cart {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: var(--sf-radius);
+  border: 1px solid var(--sf-brand);
+  background: var(--sf-white);
+  color: var(--sf-brand);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ltms-sf-add-to-cart:hover {
+  background: var(--sf-brand);
+  color: var(--sf-white);
+}
+
+.ltms-sf-add-to-cart.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.ltms-sf-add-to-cart.added::after {
+  content: ' ✓';
+}
+
+.ltms-sf-view-product {
+  border-color: var(--sf-border);
+  color: var(--sf-muted);
+}
+
+.ltms-sf-view-product:hover {
+  background: var(--sf-text);
+  border-color: var(--sf-text);
+  color: var(--sf-white);
 }
 
 /* ---- Paginación ---- */
