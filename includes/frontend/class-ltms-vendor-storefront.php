@@ -194,18 +194,12 @@ class LTMS_Vendor_Storefront {
             LTMS_VERSION
         );
 
-        // Habilita los botones "Agregar al carrito" de la grilla sin recargar
-        // la página — mismo script nativo que usa cualquier loop de WooCommerce.
+        // Habilita los botones "Agregar al carrito" sin recargar la página.
+        // NO se re-localiza wc_add_to_cart_params: sobreescribirlo rompía el
+        // drawer del carrito del tema (close button quedaba congelado).
+        // WooCommerce ya lo localiza correctamente por su cuenta.
         if ( function_exists( 'wc_enqueue_js' ) || class_exists( 'WC_Frontend_Scripts' ) ) {
             wp_enqueue_script( 'wc-add-to-cart' );
-            wp_localize_script( 'wc-add-to-cart', 'wc_add_to_cart_params', [
-                'ajax_url'                => admin_url( 'admin-ajax.php' ),
-                'wc_ajax_url'              => \WC_AJAX::get_endpoint( '%%endpoint%%' ),
-                'i18n_view_cart'           => esc_attr__( 'Ver carrito', 'ltms' ),
-                'cart_url'                 => apply_filters( 'woocommerce_add_to_cart_redirect', wc_get_cart_url(), null ),
-                'is_cart'                  => is_cart(),
-                'cart_redirect_after_add'  => get_option( 'woocommerce_cart_redirect_after_add' ),
-            ] );
         }
 
         wp_enqueue_script(
