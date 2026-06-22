@@ -29,8 +29,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class LTMS_Commission_Writer {
 
-    use LTMS_Logger_Aware;
-
     // ── Constantes de plataforma ─────────────────────────────────────────────
     const PLATFORM_NAME    = 'Lo-Tengo.com.co';
     const PLATFORM_METHOD  = 'wallet_marketplace'; // método de pago de la plataforma (Frac. II f-iv-c)
@@ -310,24 +308,34 @@ class LTMS_Commission_Writer {
      * Escribe un registro de auditoría forense vía LTMS_Core_Logger.
      */
     private function log_fiscal_write( $order_id, $vendor_id, $data ) {
-        // M-LOGS-01: antes hacía un $wpdb->insert() directo a una tabla
-        // 'lt_logs' huérfana (esquema level/module/message/details, sin
-        // las columnas event_type/object_id/object_type/user_id que este
-        // método esperaba) — generaba "Unknown column" en cada checkout.
-        // Se reemplaza por el logger oficial del proyecto (LTMS_Core_Logger
-        // vía el trait LTMS_Logger_Aware), que persiste en bkr_lt_audit_logs.
-        $this->log_info(
-            'FISCAL_FIELDS_WRITTEN',
-            sprintf( 'Campos fiscales escritos para order #%d (vendor #%d)', $order_id, $vendor_id ),
-            [
-                'order_id'     => $order_id,
-                'vendor_id'    => $vendor_id,
-                'service_type' => $data['service_type'] ?? '',
-                'pm_buyer'     => $data['payment_method_buyer'] ?? '',
-                'pm_vendor'    => $data['payment_method_vendor'] ?? '',
-                'pm_platform'  => $data['payment_method_platform'] ?? '',
-            ]
-        );
+        // M-LOGS-01: el insert directo original a 'lt_logs' (esquema
+        // level/module/message/details, sin las columnas event_type/
+        // object_id/object_type/user_id que este método esperaba) causaba
+        // "Unknown column" en cada checkout.
+        //
+        // IMPORTANTE: este archivo se carga vía require_once directo desde
+        // lt-marketplace-suite.php (fuera del kernel), en un punto donde el
+        // eager-load de traits (core/traits/trait-ltms-logger-aware.php) aún
+        // no ha corrido. Declarar `use LTMS_Logger_Aware;` en la clase rompe
+        // el sitio con un fatal "Trait not found" en tiempo de parseo.
+        // Por eso se llama a LTMS_Core_Logger::log() directamente (resuelve
+        // en tiempo de ejecución del hook, no de declaración de clase) en
+        // vez de usar el trait.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::log(
+                'FISCAL_FIELDS_WRITTEN',
+                sprintf( 'Campos fiscales escritos para order #%d (vendor #%d)', $order_id, $vendor_id ),
+                [
+                    'order_id'     => $order_id,
+                    'vendor_id'    => $vendor_id,
+                    'service_type' => $data['service_type'] ?? '',
+                    'pm_buyer'     => $data['payment_method_buyer'] ?? '',
+                    'pm_vendor'    => $data['payment_method_vendor'] ?? '',
+                    'pm_platform'  => $data['payment_method_platform'] ?? '',
+                ],
+                'INFO'
+            );
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
