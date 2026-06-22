@@ -392,6 +392,8 @@ function ltms_load_autoloader(): void {
                 // v2.9 — Aveonline Onboarding (registro de vendedores)
                 'ltms-api-aveonline-onboarding'          => 'api/class-ltms-api-aveonline-onboarding.php',
                 'ltms-aveonline-onboarding-ajax'         => 'business/class-ltms-aveonline-onboarding-ajax.php',
+                // v2.8.0 — Vitrina pública del vendedor (/vendedores/{slug})
+                'ltms-vendor-storefront'                 => 'frontend/class-ltms-vendor-storefront.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
