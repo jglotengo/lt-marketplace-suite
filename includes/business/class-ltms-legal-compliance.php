@@ -27,6 +27,7 @@ class LTMS_Legal_Compliance {
     const PRIVACY_VERSION  = '1.2';
     const SAGRILAFT_VERSION = '2.0';
     const KYC_VERSION      = '1.0';
+    const PURPOSE_KYC      = 'kyc';
 
     // K-02 FIX: constantes de operación para log_vault_access() — evitan strings mágicos
     // y el Fatal Error que ocurría al referenciar LTMS_Legal_Compliance::VAULT_OP_UPLOAD.
