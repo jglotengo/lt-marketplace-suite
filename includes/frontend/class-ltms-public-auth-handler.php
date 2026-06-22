@@ -339,6 +339,13 @@ final class LTMS_Public_Auth_Handler {
             update_user_meta( $user_id, 'ltms_store_name', $data['store_name'] );
             update_user_meta( $user_id, 'ltms_store_description', $data['store_description'] );
 
+            // v2.8.1: slug estable para la vitrina pública (/vendedor/{slug}/).
+            // No usar el login directamente — puede tener "@", espacios, etc.
+            if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
+                $store_slug = LTMS_Vendor_Storefront::generate_unique_slug( $data['store_name'], $user_id );
+                update_user_meta( $user_id, 'ltms_store_slug', $store_slug );
+            }
+
             // M-200: municipio DANE del vendedor (territorialidad ReteICA).
             // Si el catálogo no está cargado o el código no es válido, dejamos vacío y Order_Split
             // resuelve con fallback. Validación estricta solo si llegó algo en el POST.
