@@ -188,15 +188,19 @@ class LTMS_Vendor_Storefront {
     public static function enqueue_assets(): void {
         if ( ! get_query_var( self::QUERY_VAR ) ) return;
 
-        // Elementor's frontend.min.js crashes with "elementorFrontendConfig is not defined"
-        // on non-Elementor pages (like this storefront) because it reads that global before
-        // checking if it exists. We inject a minimal stub so the script initializes safely
-        // and the theme's cart drawer close button keeps working.
-        wp_add_inline_script(
-            'elementor-frontend',
-            'if(typeof elementorFrontendConfig==="undefined"){window.elementorFrontendConfig={environmentMode:{edit:false,wpPreview:false,isScriptDebug:false},i18n:{},is_rtl:false,version:"",urls:{assets:""},settings:{page:{},editorPreferences:{}},kit:{},post:{id:0}};}',
-            'before'
-        );
+        // Elementor's frontend.min.js throws "elementorFrontendConfig is not defined"
+        // and later "elementorModules is not defined" on this page, because the storefront
+        // is rendered with get_header()/get_footer() but is NOT an Elementor-built page —
+        // Elementor's own localized globals never get printed, so its script crashes on
+        // load. That JS error halts the rest of the script queue on the page, which is why
+        // the theme's cart-drawer close button (and any other inline script) stops working.
+        //
+        // A partial stub (elementorFrontendConfig only) is not enough — frontend.min.js also
+        // needs the full elementorModules class system, which is impractical to fake. The
+        // correct fix is to not load Elementor's frontend bundle here at all, since nothing
+        // on this page actually needs it.
+        add_action( 'wp_print_scripts', [ __CLASS__, 'dequeue_elementor_frontend' ], 100 );
+        add_action( 'wp_print_styles', [ __CLASS__, 'dequeue_elementor_frontend' ], 100 );
 
         wp_enqueue_style(
             'ltms-storefront',
@@ -220,6 +224,34 @@ class LTMS_Vendor_Storefront {
             LTMS_VERSION,
             true
         );
+    }
+
+    /**
+     * Quita los bundles de frontend de Elementor en la vitrina del vendedor.
+     *
+     * Esta página no se construye con Elementor (usa get_header()/get_footer()
+     * del tema directamente), así que el script/estilo de Elementor nunca tiene
+     * sus globals localizados y crashea al cargar — rompiendo en cascada otros
+     * scripts del tema que corren después en la cola (ej. el botón de cerrar
+     * del carrito lateral).
+     */
+    public static function dequeue_elementor_frontend(): void {
+        if ( ! get_query_var( self::QUERY_VAR ) ) return;
+
+        $handles = [
+            'elementor-frontend',
+            'elementor-frontend-modules',
+            'elementor-waypoints',
+            'elementor-sticky',
+            'elementor-pro-frontend',
+        ];
+
+        foreach ( $handles as $handle ) {
+            wp_dequeue_script( $handle );
+            wp_deregister_script( $handle );
+            wp_dequeue_style( $handle );
+            wp_deregister_style( $handle );
+        }
     }
 
     private static function render( object $vendor ): void {
