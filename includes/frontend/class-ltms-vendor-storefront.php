@@ -33,10 +33,13 @@ class LTMS_Vendor_Storefront {
     const QUERY_VAR = 'ltms_vendor_slug';
 
     public static function init(): void {
-        // Registrar rewrite rule /vendedor/{slug}/ — singular, distinto de:
-        //   - /vendedores/{ciudad}/ (geo-detección, LTMS_Geo_Detector)
-        //   - /tienda/ (slug base del shop de WooCommerce en este sitio)
-        add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
+        // IMPORTANTE: add_rewrite_rule() usa $wp_rewrite internamente, que
+        // WordPress crea recién en el hook 'init' — no antes. El kernel
+        // ejecuta este init() en un punto previo (boot_frontend()), así que
+        // llamarlo aquí directo causa "Call to a member function add_rule()
+        // on null". Por eso se difiere a register_rewrite_rule(), igual
+        // patrón que ya usa LTMS_Geo_Detector::register_city_rewrite_rules().
+        add_action( 'init', [ __CLASS__, 'register_rewrite_rule' ] );
         add_filter( 'query_vars', static function( array $vars ): array {
             $vars[] = self::QUERY_VAR;
             return $vars;
@@ -44,6 +47,13 @@ class LTMS_Vendor_Storefront {
         add_action( 'template_redirect', [ __CLASS__, 'maybe_render' ] );
         add_filter( 'document_title_parts', [ __CLASS__, 'filter_title' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+    }
+
+    public static function register_rewrite_rule(): void {
+        // /vendedor/{slug}/ — singular, distinto de:
+        //   - /vendedores/{ciudad}/ (geo-detección, LTMS_Geo_Detector)
+        //   - /tienda/ (slug base del shop de WooCommerce en este sitio)
+        add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
     }
 
     public static function maybe_render(): void {
