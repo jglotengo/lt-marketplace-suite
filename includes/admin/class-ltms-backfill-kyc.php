@@ -347,18 +347,23 @@ class LTMS_KYC_Guard {
      * Registra el bloqueo en bkr_lt_logs.
      */
     private static function log_kyc_block( int $vendor_id, int $product_id, array $missing ): void {
-        global $wpdb;
-        $table = $wpdb->prefix . 'lt_logs';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
-            return;
+        // M-LOGS-02: el insert directo a lt_logs (esquema level/module/message/details)
+        // con columnas event_type/user_id/object_id provocaba "Unknown column" en cada
+        // bloqueo de publicación. Se usa LTMS_Core_Logger::log() con class_exists()
+        // por el mismo motivo que commission-writer.php: esta clase se carga via
+        // require_once directo (fuera del kernel), antes del eager-load de traits.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::log(
+                'KYC_BLOCK',
+                sprintf( 'Publicación bloqueada para producto #%d (vendor #%d). Campos faltantes: %s', $product_id, $vendor_id, implode( ', ', array_keys( $missing ) ) ),
+                [
+                    'vendor_id'  => $vendor_id,
+                    'product_id' => $product_id,
+                    'missing'    => array_keys( $missing ),
+                ],
+                'WARNING'
+            );
         }
-        $wpdb->insert( $table, [
-            'event_type' => 'kyc_block',
-            'user_id'    => $vendor_id,
-            'object_id'  => $product_id,
-            'message'    => 'Publicación bloqueada. Campos KYC faltantes: ' . implode( ', ', array_keys( $missing ) ),
-            'created_at' => current_time( 'mysql', true ),
-        ] );
     }
 }
 
