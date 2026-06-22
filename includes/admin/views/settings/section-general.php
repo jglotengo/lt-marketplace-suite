@@ -24,6 +24,13 @@ $fields = [
         'desc'    => 'Si está activo, los productos creados por vendedores se publican directamente (sin revisión). Si está inactivo, quedan en "Pendiente de revisión" hasta que el admin los apruebe.',
     ],
 ];
+
+// Campos bancarios de la plataforma (mostrados en el modal de depósito del vendedor)
+$bank_fields = [
+    'ltms_bank_name'    => [ 'label' => 'Banco receptor de depósitos',       'type' => 'text', 'default' => 'Bancolombia', 'desc' => 'Ej: Bancolombia, Davivienda, Nequi...' ],
+    'ltms_bank_account' => [ 'label' => 'Número de cuenta bancaria',         'type' => 'text', 'default' => '', 'desc' => 'Número de cuenta de ahorros o corriente de Lo Tengo Colombia S.A.S.' ],
+    'ltms_company_nit'  => [ 'label' => 'NIT de la empresa',                 'type' => 'text', 'default' => '', 'desc' => 'Ej: 900.123.456-7. Aparece en el modal de depósito del vendedor.' ],
+];
 ?>
 <div class="ltms-settings-section">
     <h2 style="margin-top:24px;">⚙️ Configuración General</h2>
@@ -51,6 +58,30 @@ $fields = [
                        class="regular-text">
                 <?php if ( ! empty( $field['desc'] ) ) : ?><p class="description"><?php echo esc_html( $field['desc'] ); ?></p><?php endif; ?>
             <?php endif; ?>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <h2 style="margin-top:32px;">🏦 Datos Bancarios de la Plataforma</h2>
+    <p class="description" style="margin-bottom:16px;">
+        Estos datos aparecen en el modal de "Depositar" del panel del vendedor para que sepa a dónde hacer la transferencia.
+    </p>
+    <table class="form-table" role="presentation">
+        <tbody>
+        <?php foreach ( $bank_fields as $key => $field ) :
+            $value = get_option( $key, $field['default'] ?? '' );
+        ?>
+        <tr>
+            <th scope="row"><label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $field['label'] ); ?></label></th>
+            <td>
+                <input type="text"
+                       id="<?php echo esc_attr( $key ); ?>"
+                       name="<?php echo esc_attr( $key ); ?>"
+                       value="<?php echo esc_attr( $value ); ?>"
+                       class="regular-text">
+                <?php if ( ! empty( $field['desc'] ) ) : ?><p class="description"><?php echo esc_html( $field['desc'] ); ?></p><?php endif; ?>
             </td>
         </tr>
         <?php endforeach; ?>
