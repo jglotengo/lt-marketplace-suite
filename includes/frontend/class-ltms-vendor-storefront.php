@@ -33,6 +33,10 @@ class LTMS_Vendor_Storefront {
     const QUERY_VAR = 'ltms_vendor_slug';
 
     public static function init(): void {
+        static $initialized = false;
+        if ( $initialized ) return;
+        $initialized = true;
+
         // IMPORTANTE: add_rewrite_rule() usa $wp_rewrite internamente, que
         // WordPress crea recién en el hook 'init' — no antes. El kernel
         // ejecuta este init() en un punto previo (boot_frontend()), así que
@@ -514,3 +518,14 @@ class LTMS_Vendor_Storefront {
         return is_array( $results ) ? $results : [];
     }
 }
+
+// Auto-registrar si el kernel no booteo exitosamente.
+// Mismo patrón que commission-writer y backfill-kyc.
+add_action( 'plugins_loaded', function() {
+    static $sf_done = false;
+    if ( $sf_done ) return;
+    $sf_done = true;
+    if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
+        LTMS_Vendor_Storefront::init();
+    }
+}, 20 );
