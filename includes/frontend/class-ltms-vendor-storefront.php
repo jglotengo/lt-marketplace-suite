@@ -187,6 +187,17 @@ class LTMS_Vendor_Storefront {
 
     public static function enqueue_assets(): void {
         if ( ! get_query_var( self::QUERY_VAR ) ) return;
+
+        // Elementor's frontend.min.js crashes with "elementorFrontendConfig is not defined"
+        // on non-Elementor pages (like this storefront) because it reads that global before
+        // checking if it exists. We inject a minimal stub so the script initializes safely
+        // and the theme's cart drawer close button keeps working.
+        wp_add_inline_script(
+            'elementor-frontend',
+            'if(typeof elementorFrontendConfig==="undefined"){window.elementorFrontendConfig={environmentMode:{edit:false,wpPreview:false,isScriptDebug:false},i18n:{},is_rtl:false,version:"",urls:{assets:""},settings:{page:{},editorPreferences:{}},kit:{},post:{id:0}};}',
+            'before'
+        );
+
         wp_enqueue_style(
             'ltms-storefront',
             LTMS_ASSETS_URL . 'css/ltms-storefront.css',
