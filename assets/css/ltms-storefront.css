@@ -557,6 +557,112 @@
   box-sizing: border-box;
 }
 
+/* ---- Reset defensivo: neutralizar estilos del tema (WoodMart) y WooCommerce
+   que se filtran via wp_head() y pueden pisar las cards de la vitrina.
+   WoodMart inyecta estilos sobre ul.products li.product, .product-inner,
+   .product-image-wrapper, etc. aunque el <article> no tenga clase "product",
+   el tema puede seleccionarlo con selectores de hermanos o con herencia.
+   Todos los overrides usan .ltms-storefront-page para no afectar el resto
+   del sitio. ---- */
+
+/* Asegurar que el grid nunca adopte layout de lista de WooCommerce */
+.ltms-storefront-page .ltms-sf-grid,
+.ltms-storefront-page ul.products {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+@media (min-width: 768px) {
+  .ltms-storefront-page .ltms-sf-grid,
+  .ltms-storefront-page ul.products {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* Neutralizar estilos internos del tema sobre la card y su contenido */
+.ltms-storefront-page .ltms-sf-card,
+.ltms-storefront-page .ltms-sf-card * {
+  /* El tema puede poner text-align:center, float, etc. sobre .product */
+  text-align: left;
+  float: none;
+}
+
+/* La imagen de la card debe quedarse en su contenedor posicionado */
+.ltms-storefront-page .ltms-sf-card .ltms-sf-card-img {
+  aspect-ratio: 1 / 1 !important;
+  position: relative !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Evitar que el tema inyecte padding/margin sobre el wrapper de imagen */
+.ltms-storefront-page .ltms-sf-card .ltms-sf-card-img-link {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* La imagen principal debe llenar el contenedor */
+.ltms-storefront-page .ltms-sf-card .ltms-sf-img-main,
+.ltms-storefront-page .ltms-sf-card .ltms-sf-img-hover {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* El cuerpo de la card no debe heredar text-align:center del tema */
+.ltms-storefront-page .ltms-sf-card .ltms-sf-card-body {
+  padding: 12px 14px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  text-align: left !important;
+}
+
+.ltms-storefront-page .ltms-sf-card .ltms-sf-card-name {
+  text-align: left !important;
+  font-size: 14px !important;
+}
+
+.ltms-storefront-page .ltms-sf-card .ltms-sf-card-price {
+  text-align: left !important;
+}
+
+/* Botón: anular cualquier estilo de .button del tema */
+.ltms-storefront-page .ltms-sf-add-to-cart.button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 8px 10px !important;
+  border-radius: var(--sf-radius) !important;
+  border: 1px solid var(--sf-brand) !important;
+  background: var(--sf-white) !important;
+  color: var(--sf-brand) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  box-shadow: none !important;
+  margin-top: auto !important;
+}
+
+.ltms-storefront-page .ltms-sf-add-to-cart.button:hover {
+  background: var(--sf-brand) !important;
+  color: var(--sf-white) !important;
+}
+
 /* ---- Topbar propio ---- */
 .ltms-sf-topbar {
   background: var(--sf-white);
