@@ -244,13 +244,28 @@ class LTMS_Vendor_Storefront {
         );
 
         // Elementor (Free o Pro) encola sus bundles en cualquier página.
-        // En este contexto no hay post-context de Elementor, así que los
-        // bundles explotan con elementorModules/elementorFrontendConfig
-        // ReferenceError — lo que rompe el botón de cierre del carrito.
-        // strip_elementor_assets() quita cualquier handle que contenga
-        // "elementor" de la cola real, sin importar la versión instalada.
+        // En este contexto no hay post-context de Elementor, así que sus
+        // scripts explotan con "elementorModules is not defined" /
+        // "elementorFrontendConfig is not defined" — lo que puede romper
+        // otros scripts que esperan que la cola JS esté limpia.
+        //
+        // Estrategia de doble capa:
+        // 1. Desencolar todos los handles de Elementor antes de imprimir.
+        // 2. Inyectar un stub JS mínimo que define los globales que
+        //    Elementor espera, por si algún bundle ya fue inyectado
+        //    antes de que podamos desencolarlo (p.ej. via wp_head inline).
         add_action( 'wp_print_scripts', [ __CLASS__, 'strip_elementor_assets' ], 1 );
         add_action( 'wp_print_styles',  [ __CLASS__, 'strip_elementor_assets' ], 1 );
+
+        // Stub: garantiza que los globales de Elementor existan aunque
+        // algún bundle se haya colado — evita el ReferenceError.
+        wp_add_inline_script(
+            'jquery-core',
+            'window.elementorModules = window.elementorModules || {};'
+            . 'window.elementorFrontend = window.elementorFrontend || { hooks: { addAction: function(){}, doAction: function(){} }, isEditMode: function(){ return false; } };'
+            . 'window.elementorFrontendConfig = window.elementorFrontendConfig || { environmentMode: { edit: false }, is_rtl: false };',
+            'before'
+        );
     }
 
     public static function strip_elementor_assets(): void {
