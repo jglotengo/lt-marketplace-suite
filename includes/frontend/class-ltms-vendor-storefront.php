@@ -216,16 +216,18 @@ class LTMS_Vendor_Storefront {
             true
         );
 
-        // Elementor's frontend.min.js (enqueued by WoodMart theme) reads
-        // window.elementorFrontendConfig before its own localization runs on
-        // this synthetic rewrite-rule page — causing an uncaught ReferenceError
-        // that breaks the page in DevTools. We inject a minimal stub so the
-        // bundle initialises safely without needing the full Elementor context.
-        wp_add_inline_script(
-            'ltms-storefront',
-            'window.elementorFrontendConfig = window.elementorFrontendConfig || { isEditMode: false, urls: {}, settings: { page: {}, general: {} }, kit: {}, post: { id: 0 } };',
-            'before'
-        );
+        // Elementor's frontend bundle (loaded by WoodMart on every page) requires
+        // both window.elementorFrontendConfig and window.elementorModules to be
+        // defined before it runs. On this synthetic rewrite-rule page neither
+        // global is localized by Elementor (no real Elementor post context), so
+        // the bundle throws uncaught ReferenceErrors. Dequeue only the JS bundle
+        // (not the stylesheet, which is harmless and depended on by post CSS like
+        // elementor-post-13743). The stylesheet notice in debug.log is cosmetic
+        // and does not affect rendering.
+        add_action( 'wp_print_scripts', static function() {
+            wp_dequeue_script( 'elementor-frontend' );
+            wp_deregister_script( 'elementor-frontend' );
+        }, 100 );
     }
 
     /**
