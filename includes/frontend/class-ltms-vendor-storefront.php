@@ -55,14 +55,29 @@ class LTMS_Vendor_Storefront {
     }
 
     public static function register_rewrite_rule(): void {
-        // /vendedor/{slug}/ — singular, distinto de:
-        //   - /vendedores/{ciudad}/ (geo-detección, LTMS_Geo_Detector)
-        //   - /tienda/ (slug base del shop de WooCommerce en este sitio)
         add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
     }
 
+    /**
+     * Lee el slug del vendedor desde REQUEST_URI directamente si
+     * get_query_var() no lo resuelve — inmune a caché de objeto, OPcache
+     * o CDN de borde de SiteGround que desincronicen rewrite_rules.
+     */
+    private static function detect_request_slug(): ?string {
+        $qv = get_query_var( self::QUERY_VAR );
+        if ( $qv ) {
+            return sanitize_title( (string) $qv );
+        }
+        $uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+        $path = trim( (string) wp_parse_url( $uri, PHP_URL_PATH ), '/' );
+        if ( preg_match( '#^vendedor/([\w-]+)$#', $path, $m ) ) {
+            return sanitize_title( $m[1] );
+        }
+        return null;
+    }
+
     public static function maybe_render(): void {
-        $slug = get_query_var( self::QUERY_VAR );
+        $slug = self::detect_request_slug();
         if ( ! $slug ) return;
 
         $vendor = self::get_vendor_by_slug( $slug );
@@ -177,7 +192,7 @@ class LTMS_Vendor_Storefront {
     }
 
     public static function filter_title( array $parts ): array {
-        $slug = get_query_var( self::QUERY_VAR );
+        $slug = self::detect_request_slug();
         if ( ! $slug ) return $parts;
         $vendor = self::get_vendor_by_slug( $slug );
         if ( $vendor ) {
@@ -187,7 +202,7 @@ class LTMS_Vendor_Storefront {
     }
 
     public static function enqueue_assets(): void {
-        if ( ! get_query_var( self::QUERY_VAR ) ) return;
+        if ( ! self::detect_request_slug() ) return;
 
         wp_enqueue_style(
             'ltms-storefront',
@@ -216,18 +231,26 @@ class LTMS_Vendor_Storefront {
             true
         );
 
-        // Elementor's frontend bundle (loaded by WoodMart on every page) requires
-        // both window.elementorFrontendConfig and window.elementorModules to be
-        // defined before it runs. On this synthetic rewrite-rule page neither
-        // global is localized by Elementor (no real Elementor post context), so
-        // the bundle throws uncaught ReferenceErrors. Dequeue only the JS bundle
-        // (not the stylesheet, which is harmless and depended on by post CSS like
-        // elementor-post-13743). The stylesheet notice in debug.log is cosmetic
-        // and does not affect rendering.
-        add_action( 'wp_print_scripts', static function() {
-            wp_dequeue_script( 'elementor-frontend' );
-            wp_deregister_script( 'elementor-frontend' );
-        }, 100 );
+        // Elementor (Free o Pro) encola sus bundles en cualquier página.
+        // En este contexto no hay post-context de Elementor, así que los
+        // bundles explotan con elementorModules/elementorFrontendConfig
+        // ReferenceError — lo que rompe el botón de cierre del carrito.
+        // strip_elementor_assets() quita cualquier handle que contenga
+        // "elementor" de la cola real, sin importar la versión instalada.
+        add_action( 'wp_print_scripts', [ __CLASS__, 'strip_elementor_assets' ], 1 );
+        add_action( 'wp_print_styles',  [ __CLASS__, 'strip_elementor_assets' ], 1 );
+    }
+
+    public static function strip_elementor_assets(): void {
+        global $wp_scripts, $wp_styles;
+        foreach ( [ $wp_scripts, $wp_styles ] as $reg ) {
+            if ( ! $reg || empty( $reg->queue ) ) continue;
+            foreach ( array_values( $reg->queue ) as $handle ) {
+                if ( false !== stripos( (string) $handle, 'elementor' ) ) {
+                    $reg->dequeue( $handle );
+                }
+            }
+        }
     }
 
     /**
