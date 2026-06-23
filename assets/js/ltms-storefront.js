@@ -41,3 +41,29 @@
 	});
 
 })(jQuery);
+
+	// Fix: imágenes <img loading="lazy"> que quedan en blanco al volver con
+	// el botón "Atrás" del navegador (restauración desde el back-forward
+	// cache). Chrome no siempre re-dispara la carga de imágenes lazy que
+	// ya estaban "en curso" cuando la página se congeló — el navegador las
+	// restaura en un estado intermedio sin pintarlas. La señal correcta
+	// para esto es el evento 'pageshow' con event.persisted === true.
+	window.addEventListener('pageshow', function (event) {
+		if (!event.persisted) {
+			return; // navegación normal, no venía del bfcache — no hace falta nada
+		}
+
+		document.querySelectorAll('.ltms-sf-card-img img').forEach(function (img) {
+			if (img.complete && img.naturalWidth > 0) {
+				return; // ya cargó bien, no tocar
+			}
+			// Forzar al navegador a re-evaluar esta imagen como si fuera nueva:
+			// reasignar el mismo src dispara un nuevo intento de carga.
+			var src = img.getAttribute('src');
+			if (src) {
+				img.removeAttribute('loading');
+				img.src = src;
+			}
+		});
+	});
+
