@@ -51,6 +51,7 @@ class LTMS_Vendor_Storefront {
         add_action( 'template_redirect', [ __CLASS__, 'maybe_render' ] );
         add_filter( 'document_title_parts', [ __CLASS__, 'filter_title' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+        add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'cart_count_fragment' ] );
     }
 
     public static function register_rewrite_rule(): void {
@@ -188,20 +189,6 @@ class LTMS_Vendor_Storefront {
     public static function enqueue_assets(): void {
         if ( ! get_query_var( self::QUERY_VAR ) ) return;
 
-        // Elementor's frontend.min.js throws "elementorFrontendConfig is not defined"
-        // and later "elementorModules is not defined" on this page, because the storefront
-        // is rendered with get_header()/get_footer() but is NOT an Elementor-built page —
-        // Elementor's own localized globals never get printed, so its script crashes on
-        // load. That JS error halts the rest of the script queue on the page, which is why
-        // the theme's cart-drawer close button (and any other inline script) stops working.
-        //
-        // A partial stub (elementorFrontendConfig only) is not enough — frontend.min.js also
-        // needs the full elementorModules class system, which is impractical to fake. The
-        // correct fix is to not load Elementor's frontend bundle here at all, since nothing
-        // on this page actually needs it.
-        add_action( 'wp_print_scripts', [ __CLASS__, 'dequeue_elementor_frontend' ], 100 );
-        add_action( 'wp_print_styles', [ __CLASS__, 'dequeue_elementor_frontend' ], 100 );
-
         wp_enqueue_style(
             'ltms-storefront',
             LTMS_ASSETS_URL . 'css/ltms-storefront.css',
@@ -210,11 +197,15 @@ class LTMS_Vendor_Storefront {
         );
 
         // Habilita los botones "Agregar al carrito" sin recargar la página.
-        // NO se re-localiza wc_add_to_cart_params: sobreescribirlo rompía el
-        // drawer del carrito del tema (close button quedaba congelado).
-        // WooCommerce ya lo localiza correctamente por su cuenta.
         if ( function_exists( 'wc_enqueue_js' ) || class_exists( 'WC_Frontend_Scripts' ) ) {
             wp_enqueue_script( 'wc-add-to-cart' );
+        }
+
+        // Actualiza el contador del carrito de nuestro mini-header propio
+        // (ver print_topbar()) sin recargar la página — independiente de
+        // cualquier drawer/plugin de carrito del tema.
+        if ( function_exists( 'WC' ) ) {
+            wp_enqueue_script( 'wc-cart-fragments' );
         }
 
         wp_enqueue_script(
@@ -227,31 +218,70 @@ class LTMS_Vendor_Storefront {
     }
 
     /**
-     * Quita los bundles de frontend de Elementor en la vitrina del vendedor.
-     *
-     * Esta página no se construye con Elementor (usa get_header()/get_footer()
-     * del tema directamente), así que el script/estilo de Elementor nunca tiene
-     * sus globals localizados y crashea al cargar — rompiendo en cascada otros
-     * scripts del tema que corren después en la cola (ej. el botón de cerrar
-     * del carrito lateral).
+     * Refresca el contador del carrito en nuestro mini-header vía
+     * woocommerce_add_to_cart_fragments — el mecanismo estándar y
+     * theme-agnostic de WooCommerce, sin depender de ningún drawer
+     * o markup propio del tema.
      */
-    public static function dequeue_elementor_frontend(): void {
-        if ( ! get_query_var( self::QUERY_VAR ) ) return;
-
-        $handles = [
-            'elementor-frontend',
-            'elementor-frontend-modules',
-            'elementor-waypoints',
-            'elementor-sticky',
-            'elementor-pro-frontend',
-        ];
-
-        foreach ( $handles as $handle ) {
-            wp_dequeue_script( $handle );
-            wp_deregister_script( $handle );
-            wp_dequeue_style( $handle );
-            wp_deregister_style( $handle );
+    public static function cart_count_fragment( array $fragments ): array {
+        if ( function_exists( 'WC' ) && WC()->cart ) {
+            $count = WC()->cart->get_cart_contents_count();
+            $fragments['span.ltms-sf-cart-count'] = '<span class="ltms-sf-cart-count">' . esc_html( $count ) . '</span>';
         }
+        return $fragments;
+    }
+
+    /**
+     * Documento HTML propio para la vitrina — ver nota en render() sobre
+     * por qué esta página no usa get_header() del tema.
+     */
+    private static function print_head( object $vendor ): void {
+        ?>
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+<meta charset="<?php bloginfo( 'charset' ); ?>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<?php wp_head(); ?>
+</head>
+<body <?php body_class( 'ltms-storefront-page' ); ?>>
+<header class="ltms-sf-topbar">
+    <div class="ltms-sf-topbar-inner">
+        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
+            <?php
+            $logo_id = get_theme_mod( 'custom_logo' );
+            $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+            if ( $logo_url ) {
+                echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
+            } else {
+                echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
+            }
+            ?>
+        </a>
+        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back">&larr; Volver a la tienda</a>
+        <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
+           class="ltms-sf-topbar-cart" aria-label="Ver carrito">
+            🛒 <span class="ltms-sf-cart-count"><?php
+                echo function_exists( 'WC' ) && WC()->cart ? (int) WC()->cart->get_cart_contents_count() : 0;
+            ?></span>
+        </a>
+    </div>
+</header>
+        <?php
+    }
+
+    private static function print_foot(): void {
+        ?>
+<footer class="ltms-sf-footer">
+    <div class="ltms-sf-footer-inner">
+        <p>&copy; <?php echo esc_html( gmdate( 'Y' ) ); ?> Lo Tengo &middot;
+           <a href="<?php echo esc_url( home_url( '/' ) ); ?>">Volver a la tienda</a></p>
+    </div>
+</footer>
+<?php wp_footer(); ?>
+</body>
+</html>
+        <?php
     }
 
     private static function render( object $vendor ): void {
@@ -297,8 +327,15 @@ class LTMS_Vendor_Storefront {
         // Ruta base para paginación/filtros
         $base_url = home_url( '/vendedor/' . $vendor->slug . '/' );
 
-        // Renderizar HTML
-        get_header();
+        // Renderizar HTML — documento propio, SIN get_header()/get_footer().
+        // El header/footer del tema están construidos con Elementor Theme Builder;
+        // esta URL no es una página "real" de Elementor (es una ruta sintética vía
+        // rewrite rule), así que sus templates nunca localizan sus globals JS
+        // correctamente y rompen en cascada (carrito que no cierra, CSS de otros
+        // widgets del header sin aplicar). Por eso esta vitrina usa su propio
+        // documento mínimo, con wp_head()/wp_footer() para que WooCommerce y SEO
+        // sigan funcionando, pero sin las plantillas del Theme Builder.
+        self::print_head( $vendor );
         ?>
         <div class="ltms-storefront" itemscope itemtype="https://schema.org/Store">
             <meta itemprop="name" content="<?php echo esc_attr( $vendor->name ); ?>">
@@ -534,7 +571,7 @@ class LTMS_Vendor_Storefront {
             </div><!-- .ltms-sf-products -->
         </div><!-- .ltms-storefront -->
         <?php
-        get_footer();
+        self::print_foot();
     }
 
     private static function get_vendor_categories( int $vendor_id ): array {
