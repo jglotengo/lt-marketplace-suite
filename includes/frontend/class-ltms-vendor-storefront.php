@@ -215,6 +215,17 @@ class LTMS_Vendor_Storefront {
             LTMS_VERSION,
             true
         );
+
+        // Elementor's frontend.min.js (enqueued by WoodMart theme) reads
+        // window.elementorFrontendConfig before its own localization runs on
+        // this synthetic rewrite-rule page — causing an uncaught ReferenceError
+        // that breaks the page in DevTools. We inject a minimal stub so the
+        // bundle initialises safely without needing the full Elementor context.
+        wp_add_inline_script(
+            'ltms-storefront',
+            'window.elementorFrontendConfig = window.elementorFrontendConfig || { isEditMode: false, urls: {}, settings: { page: {}, general: {} }, kit: {}, post: { id: 0 } };',
+            'before'
+        );
     }
 
     /**
@@ -603,3 +614,4 @@ add_action( 'plugins_loaded', function() {
         LTMS_Vendor_Storefront::init();
     }
 }, 20 );
+
