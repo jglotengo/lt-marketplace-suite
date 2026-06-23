@@ -478,7 +478,16 @@ class LTMS_Vendor_Storefront {
                                         <?php if ( $hover_img_id ) : ?>
                                             <?php echo wp_get_attachment_image( $hover_img_id, 'woocommerce_thumbnail', false, [
                                                 'class'   => 'ltms-sf-img-hover',
-                                                'loading' => 'lazy',
+                                                // Sin loading="lazy" a propósito: esta imagen vive superpuesta
+                                                // (position:absolute) sobre la principal y solo se revela en
+                                                // :hover/CSS. El navegador la trata como "fuera de viewport" y
+                                                // nunca dispara su carga -- al restaurar la página desde el
+                                                // back-forward cache (botón Atrás), Chrome re-evalúa el lazy
+                                                // loading de ambas imágenes superpuestas y deja la principal
+                                                // en blanco también. Es una imagen secundaria y liviana del
+                                                // mismo thumbnail de WooCommerce, así que cargarla eager no
+                                                // tiene costo real y evita el conflicto.
+                                                'loading' => 'eager',
                                                 'alt'     => '',
                                             ] ); ?>
                                         <?php endif; ?>
