@@ -90,6 +90,18 @@ class LTMS_Vendor_Storefront {
             exit;
         }
 
+        // WordPress ya marcó esta respuesta como 404 dentro de WP::main()
+        // (la query var ltms_vendor_slug no resuelve a ningún post real,
+        // así que handle_404() corre y fija $wp_query->is_404 = true ANTES
+        // de que este hook 'template_redirect' se ejecute). El código de
+        // estado HTTP ya se decidió en send_headers(), que corre antes en
+        // el ciclo — por eso el navegador recibe 404 aunque el HTML que
+        // sigue sea el correcto. Hay que revertir ese estado explícitamente
+        // cuando el vendedor sí existe.
+        global $wp_query;
+        $wp_query->is_404 = false;
+        status_header( 200 );
+
         self::render( $vendor );
         exit;
     }
