@@ -54,8 +54,26 @@ class LTMS_Booking_Policy_Handler {
                 'name'                => __( 'Flexible', 'ltms' ),
                 'policy_type'         => 'flexible',
                 'free_cancel_hours'   => 24,
-                'partial_refund_pct'  => 100,
-                'partial_refund_hours'=> 48,
+                // Sin ventana de reembolso parcial: el valor anterior
+                // (partial_refund_hours=48) era MAYOR que free_cancel_hours
+                // (24), lo que invertía el orden que calculate_refund_amount()
+                // espera (free_cancel_hours debe ser el límite SUPERIOR de la
+                // ventana parcial, no el inferior — ver el seed de "Moderada"
+                // más abajo: free=168, partial=72, ventana 72h-168h). Con el
+                // orden invertido, esa rama nunca se ejecutaba: toda
+                // cancelación con >=24h ya resolvía 100% en el primer if, y
+                // cualquier otra caía directo a 0%, saltándose el tramo
+                // intermedio por completo.
+                //
+                // En vez de solo corregir el orden, se elimina el tramo:
+                // esto replica la política "Flexible" estándar de la
+                // industria (Airbnb Flexible = reembolso completo hasta 24h
+                // antes del check-in, sin reembolso después, sin tramo
+                // parcial intermedio). El tramo parcial sigue existiendo y
+                // funcionando correctamente en "Moderada", que es donde el
+                // mercado sí lo usa.
+                'partial_refund_pct'  => 0,
+                'partial_refund_hours'=> 0,
                 'non_refundable_pct'  => 0,
                 'is_default'          => 1,
             ],
