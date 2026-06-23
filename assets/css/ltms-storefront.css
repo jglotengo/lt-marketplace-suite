@@ -623,3 +623,38 @@
 @media (max-width: 480px) {
   .ltms-sf-topbar-back { display: none; }
 }
+
+
+/* ============================================================
+   TEMA WOODMART — ocultar accesos del tema en la vitrina
+   ============================================================ */
+/* La vitrina ya tiene su propio topbar (logo + volver + carrito), con
+   su propio acceso al carrito. Los botones "VENDER" / "MI CUENTA" que
+   el tema inyecta vía wp_head() compiten visualmente con ese topbar y
+   no aportan nada a un comprador navegando el catálogo de un vendedor
+   ("VENDER" es un CTA para prospectos a vendedor, fuera de contexto
+   aquí). Se ocultan solo en esta página — el resto del sitio no se ve
+   afectado porque el selector exige .ltms-storefront-page en el body. */
+.ltms-storefront-page #ltms-header-access,
+.ltms-storefront-page .ltms-nav-btn,
+.ltms-storefront-page .ltms-header-access {
+  display: none !important;
+}
+
+/* Por si el tema renderiza su propio header/masthead vía wp_head() en
+   algún punto — la vitrina ya construye el suyo, así que cualquier
+   resto del tema se oculta para evitar dos headers apilados. */
+.ltms-storefront-page .woodmart-header-holder,
+.ltms-storefront-page .site-header,
+.ltms-storefront-page #masthead,
+.ltms-storefront-page header.header-main {
+  display: none !important;
+}
+
+/* El topbar propio siempre debe quedar como única barra superior visible. */
+.ltms-storefront-page .ltms-sf-topbar {
+  display: block !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+}
