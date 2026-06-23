@@ -1,6 +1,6 @@
 /* ============================================================
    LTMS Vendor Storefront — Vitrina pública del vendedor
-   v2.9.0 — usa get_header()/get_footer() del tema
+   v2.8.0
    ============================================================ */
 
 :root {
@@ -15,7 +15,7 @@
   --sf-shadow:    0 2px 12px rgba(0,0,0,0.08);
 }
 
-/* ---- Layout principal (dentro del tema) ---- */
+/* ---- Layout ---- */
 .ltms-storefront {
   max-width: 1280px;
   margin: 0 auto;
@@ -25,10 +25,10 @@
 /* ---- Banner ---- */
 .ltms-sf-banner {
   background: var(--sf-brand) center/cover no-repeat;
-  border-radius: var(--sf-radius);
+  border-radius: 0 0 var(--sf-radius) var(--sf-radius);
   min-height: 220px;
   position: relative;
-  margin-bottom: 32px;
+  margin: 0 -16px 32px;
 }
 
 .ltms-sf-banner-overlay {
@@ -67,10 +67,6 @@
   font-size: 32px;
   font-weight: 700;
   flex-shrink: 0;
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  border: 3px solid var(--sf-white);
 }
 
 /* ---- Meta ---- */
@@ -140,58 +136,6 @@
   flex-wrap: wrap;
 }
 
-/* ---- Búsqueda interna ---- */
-.ltms-sf-search-wrap {
-  flex: 1;
-  min-width: 200px;
-  max-width: 400px;
-  order: -1;
-}
-
-.ltms-sf-search-form {
-  display: flex;
-  align-items: center;
-  border: 1.5px solid var(--sf-border);
-  border-radius: var(--sf-radius);
-  overflow: hidden;
-  background: var(--sf-white);
-  transition: border-color 0.2s;
-}
-
-.ltms-sf-search-form:focus-within {
-  border-color: var(--sf-brand);
-}
-
-.ltms-sf-search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--sf-text);
-  background: transparent;
-  min-width: 0;
-}
-
-.ltms-sf-search-input::placeholder { color: var(--sf-muted); }
-
-.ltms-sf-search-btn {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--sf-muted);
-  transition: color 0.15s;
-}
-
-.ltms-sf-search-btn:hover { color: var(--sf-brand); }
-
-/* ---- Tabs de categorías ---- */
 .ltms-sf-cats {
   display: flex;
   gap: 8px;
@@ -218,27 +162,25 @@
 }
 
 .ltms-sf-order select {
-  padding: 8px 12px;
+  padding: 6px 12px;
   border: 1px solid var(--sf-border);
   border-radius: var(--sf-radius);
   font-size: 13px;
   color: var(--sf-text);
   background: var(--sf-white);
   cursor: pointer;
-  height: 44px;
 }
 
-/* ---- Grid de productos — igual que columns-4 de WooCommerce ---- */
-.ltms-sf-grid.products {
+/* ---- Grid ---- */
+/* 4 columnas en desktop para igualar la densidad visual de la tienda
+   principal de WooCommerce (columns-4) — ver tablet/móvil más abajo. */
+.ltms-sf-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
-/* ---- Card — igual que .product de WooCommerce + Elementor ---- */
+/* ---- Card ---- */
 .ltms-sf-card {
   background: var(--sf-white);
   border-radius: var(--sf-radius);
@@ -246,7 +188,6 @@
   transition: box-shadow 0.2s, transform 0.2s;
   display: flex;
   flex-direction: column;
-  padding: 0;
 }
 
 .ltms-sf-card:hover {
@@ -264,8 +205,8 @@
 
 .ltms-sf-card-img-link {
   display: block;
-  text-decoration: none;
-  color: inherit;
+  width: 100%;
+  height: 100%;
 }
 
 .ltms-sf-img-main,
@@ -283,7 +224,7 @@
   opacity: 0;
 }
 
-.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main {
+.ltms-sf-card:hover .ltms-sf-img-main {
   opacity: 0;
 }
 
@@ -306,7 +247,7 @@
   color: var(--sf-muted);
 }
 
-/* ---- Badges ---- */
+/* ---- Badges (apilados, esquina sup. izq.) ---- */
 .ltms-sf-badges {
   position: absolute;
   top: 10px;
@@ -330,12 +271,12 @@
   line-height: 1.6;
 }
 
-.ltms-badge--sale    { background: #EABE12; color: #1A1A1A; }
-.ltms-badge--pct     { background: var(--sf-brand); color: var(--sf-white); }
-.ltms-badge--new     { background: #27AE60; color: var(--sf-white); }
-.ltms-badge--soldout { background: var(--sf-muted); color: var(--sf-white); }
+.ltms-badge--sale    { background: var(--sf-badge-sale, #EABE12); color: #1A1A1A; }
+.ltms-badge--pct      { background: var(--sf-brand); color: var(--sf-white); }
+.ltms-badge--new      { background: #27AE60; color: var(--sf-white); }
+.ltms-badge--soldout  { background: var(--sf-muted); color: var(--sf-white); }
 
-/* ---- Acciones rápidas ---- */
+/* ---- Overlay de acciones (wishlist / quickview / comparar) ---- */
 .ltms-sf-card-actions {
   position: absolute;
   top: 10px;
@@ -380,7 +321,7 @@
   color: var(--sf-white);
 }
 
-/* En mobile, siempre visibles */
+/* En mobile, las acciones siempre están visibles (no hay hover real) */
 @media (max-width: 767px) {
   .ltms-sf-card-actions {
     opacity: 1;
@@ -393,10 +334,10 @@
 }
 
 /* ---- Cuerpo de la tarjeta ---- */
-.ltms-sf-card .woocommerce-LoopProduct-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
+.ltms-sf-card-body {
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
   flex: 1;
 }
 
@@ -405,32 +346,70 @@
   color: var(--sf-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin: 10px 14px 4px;
+  margin: 0 0 4px;
 }
 
-.ltms-sf-card-name,
-.ltms-sf-card .woocommerce-loop-product__title {
+.ltms-sf-card-name {
   font-size: 14px;
   font-weight: 600;
-  margin: 0 14px 6px;
+  margin: 0 0 6px;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: var(--sf-text);
 }
 
-.ltms-sf-card-price,
-.ltms-sf-card .price {
-  display: block;
+.ltms-sf-card-name a {
+  color: var(--sf-text);
+  text-decoration: none;
+}
+
+.ltms-sf-card-name a:hover {
+  color: var(--sf-brand);
+}
+
+/* ---- Rating ---- */
+.ltms-sf-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.ltms-sf-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--sf-border);
+  line-height: 1;
+}
+
+.ltms-sf-stars::before {
+  content: '★★★★★';
+  position: absolute;
+  inset: 0;
+  width: var(--rating, 0%);
+  overflow: hidden;
+  color: #F5A623;
+  white-space: nowrap;
+}
+
+.ltms-sf-rating-count {
+  font-size: 11px;
+  color: var(--sf-muted);
+}
+
+/* ---- Precio ---- */
+.ltms-sf-card-price {
   font-size: 15px;
   font-weight: 700;
   color: var(--sf-brand);
-  margin: 0 14px 10px;
+  margin-bottom: 10px;
 }
 
-.ltms-sf-card .price del {
+.ltms-sf-card-price del {
   color: var(--sf-muted);
   font-weight: 400;
   font-size: 13px;
@@ -438,16 +417,13 @@
   text-decoration: line-through;
 }
 
-.ltms-sf-card .price ins {
+.ltms-sf-card-price ins {
   text-decoration: none;
 }
 
 /* ---- Botón Agregar al carrito ---- */
-.ltms-sf-card .woocommerce-loop-product__buttons {
-  padding: 0 14px 14px;
-}
-
 .ltms-sf-add-to-cart {
+  margin-top: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -465,7 +441,6 @@
   text-decoration: none;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
-  box-sizing: border-box;
 }
 
 .ltms-sf-add-to-cart:hover {
@@ -479,7 +454,7 @@
 }
 
 .ltms-sf-add-to-cart.added::after {
-  content: ' \2713';
+  content: ' ✓';
 }
 
 .ltms-sf-view-product {
@@ -493,32 +468,21 @@
   color: var(--sf-white);
 }
 
-/* ---- Paginación — igual que WooCommerce ---- */
+/* ---- Paginación ---- */
 .ltms-sf-pagination {
-  margin-top: 40px;
-}
-
-.ltms-sf-pagination .page-numbers {
   display: flex;
   gap: 8px;
   justify-content: center;
+  margin-top: 40px;
   flex-wrap: wrap;
-  list-style: none;
-  padding: 0;
-  margin: 0;
 }
 
-.ltms-sf-pagination .page-numbers li {
-  margin: 0;
-}
-
-.ltms-sf-pagination .page-numbers a,
-.ltms-sf-pagination .page-numbers span {
+.ltms-sf-page-btn {
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
   border-radius: var(--sf-radius);
   border: 1px solid var(--sf-border);
   font-size: 14px;
@@ -528,8 +492,8 @@
   transition: all 0.15s;
 }
 
-.ltms-sf-pagination .page-numbers a:hover,
-.ltms-sf-pagination .page-numbers .current {
+.ltms-sf-page-btn:hover,
+.ltms-sf-page-btn.active {
   background: var(--sf-brand);
   border-color: var(--sf-brand);
   color: var(--sf-white);
@@ -545,45 +509,158 @@
 
 /* ---- Responsive ---- */
 @media (max-width: 1199px) {
-  .ltms-sf-grid.products { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .ltms-sf-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
 }
 
 @media (max-width: 991px) {
-  .ltms-sf-grid.products { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
 }
 
 @media (max-width: 767px) {
-  .ltms-sf-banner { min-height: 180px; margin-bottom: 24px; }
+  .ltms-sf-banner { min-height: 180px; margin: 0 -16px 24px; }
   .ltms-sf-banner-overlay { padding: 16px; }
   .ltms-sf-logo { width: 64px; height: 64px; }
   .ltms-sf-logo-placeholder { width: 64px; height: 64px; font-size: 24px; }
   .ltms-sf-name { font-size: 18px; }
-  .ltms-sf-grid.products { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .ltms-sf-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
-  .ltms-sf-search-wrap { max-width: 100%; order: 0; }
-  .ltms-sf-cats { order: 1; }
-  .ltms-sf-order { order: 2; }
+  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .ltms-sf-toolbar { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 400px) {
+  .ltms-sf-grid { gap: 8px; }
+  .ltms-sf-card-body { padding: 10px 10px 12px; }
+}
+
+/* ---- Reset mínimo (esta página no usa get_header()/get_footer() del tema) ---- */
+.ltms-storefront-page {
+  margin: 0;
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  color: var(--sf-text);
+  background: var(--sf-white);
+}
+
+/* ---- Topbar propio ---- */
+.ltms-sf-topbar {
+  background: var(--sf-white);
+  border-bottom: 1px solid var(--sf-border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.ltms-sf-topbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ltms-sf-topbar-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--sf-text);
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.ltms-sf-topbar-logo img {
+  max-height: 32px;
+  width: auto;
+  display: block;
+}
+
+.ltms-sf-topbar-back {
+  color: var(--sf-muted);
+  text-decoration: none;
+  font-size: 13px;
+  flex: 1;
+}
+
+.ltms-sf-topbar-back:hover { color: var(--sf-brand); }
+
+.ltms-sf-topbar-cart {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--sf-text);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.ltms-sf-cart-count {
+  background: var(--sf-brand);
+  color: var(--sf-white);
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+/* ---- Footer propio ---- */
+.ltms-sf-footer {
+  border-top: 1px solid var(--sf-border);
+  margin-top: 40px;
+}
+
+.ltms-sf-footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--sf-muted);
+  font-size: 13px;
+}
+
+.ltms-sf-footer-inner a {
+  color: var(--sf-brand);
+  text-decoration: none;
 }
 
 @media (max-width: 480px) {
-  .ltms-sf-grid.products { gap: 8px; }
-  .ltms-sf-card .woocommerce-loop-product__buttons { padding: 0 10px 12px; }
-  .ltms-sf-add-to-cart {
-    font-size: 11px;
-    letter-spacing: 0.03em;
-    padding: 9px 8px;
-  }
+  .ltms-sf-topbar-back { display: none; }
 }
 
-/* ---- Ocultar el topbar propio (ya no se usa en v2.9.0) ---- */
-.ltms-sf-topbar,
-.ltms-sf-footer {
+
+/* ============================================================
+   TEMA WOODMART — ocultar accesos del tema en la vitrina
+   ============================================================ */
+/* La vitrina ya tiene su propio topbar (logo + volver + carrito), con
+   su propio acceso al carrito. Los botones "VENDER" / "MI CUENTA" que
+   el tema inyecta vía wp_head() compiten visualmente con ese topbar y
+   no aportan nada a un comprador navegando el catálogo de un vendedor
+   ("VENDER" es un CTA para prospectos a vendedor, fuera de contexto
+   aquí). Se ocultan solo en esta página — el resto del sitio no se ve
+   afectado porque el selector exige .ltms-storefront-page en el body. */
+.ltms-storefront-page #ltms-header-access,
+.ltms-storefront-page .ltms-nav-btn,
+.ltms-storefront-page .ltms-header-access {
   display: none !important;
 }
 
-/* ---- Compatibilidad: cuando el tema NO cargue get_header() correctamente
-        (fallback de seguridad) ---- */
-body.ltms-storefront-page .ltms-sf-topbar {
-  display: block !important;
+/* Por si el tema renderiza su propio header/masthead vía wp_head() en
+   algún punto — la vitrina ya construye el suyo, así que cualquier
+   resto del tema se oculta para evitar dos headers apilados. */
+.ltms-storefront-page .woodmart-header-holder,
+.ltms-storefront-page .site-header,
+.ltms-storefront-page #masthead,
+.ltms-storefront-page header.header-main {
+  display: none !important;
 }
 
+/* El topbar propio siempre debe quedar como única barra superior visible. */
+.ltms-storefront-page .ltms-sf-topbar {
+  display: block !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 9999 !important;
+}
