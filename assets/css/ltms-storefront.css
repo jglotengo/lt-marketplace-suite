@@ -222,7 +222,10 @@
   opacity: 0;
 }
 
-.ltms-sf-card:hover .ltms-sf-img-main {
+/* Solo ocultar la imagen principal si EXISTE una imagen hover como hermana.
+   Usar :has() (soportado Chrome 105+, Safari 15.4+, Firefox 121+ - año 2026 OK).
+   Sin :has(), tarjetas sin imagen secundaria quedarían en blanco al hover. */
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main {
   opacity: 0;
 }
 
@@ -657,4 +660,114 @@
   position: sticky !important;
   top: 0 !important;
   z-index: 9999 !important;
+}
+
+/* ---- Barra de búsqueda dentro de la tienda ---- */
+.ltms-sf-search-wrap {
+  width: 100%;
+  order: -1;
+  margin-bottom: 12px;
+}
+
+.ltms-sf-search-form {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--sf-border);
+  border-radius: var(--sf-radius, 8px);
+  overflow: hidden;
+  background: var(--sf-white);
+  transition: border-color 0.2s;
+}
+
+.ltms-sf-search-form:focus-within {
+  border-color: var(--sf-brand);
+}
+
+.ltms-sf-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--sf-text);
+  background: transparent;
+  min-width: 0;
+}
+
+.ltms-sf-search-input::placeholder { color: var(--sf-muted); }
+
+.ltms-sf-search-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sf-muted);
+  transition: color 0.15s;
+}
+
+.ltms-sf-search-btn:hover { color: var(--sf-brand); }
+
+/* ---- Mejoras responsive del toolbar ---- */
+.ltms-sf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .ltms-sf-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .ltms-sf-cats { order: 1; }
+  .ltms-sf-order { order: 2; }
+  .ltms-sf-search-wrap { order: 0; margin-bottom: 0; }
+}
+
+/* ---- Fix AGREGAR AL CARRITO en mobile ---- */
+@media (max-width: 600px) {
+  .ltms-sf-add-to-cart {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 9px 8px;
+  }
+}
+
+/* ---- Carrito topbar más visible ---- */
+.ltms-sf-topbar-cart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sf-brand);
+  color: white !important;
+  border: none;
+  border-radius: var(--sf-radius, 8px);
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+  min-height: 44px;
+}
+
+.ltms-sf-topbar-cart:hover { background: var(--sf-brand-dk, #B01212); }
+
+.ltms-sf-cart-count {
+  background: white;
+  color: var(--sf-brand);
+  border-radius: 999px;
+  min-width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 4px;
 }
