@@ -344,6 +344,8 @@ class LTMS_Vendor_Storefront {
             default      => [ 'orderby' => 'date',           'order' => 'DESC' ],
         };
 
+        $search_query = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+
         $args = array_merge( [
             'post_type'      => 'product',
             'post_status'    => 'publish',
@@ -351,6 +353,7 @@ class LTMS_Vendor_Storefront {
             'paged'          => $paged,
             'author'         => $vendor->id,
             'tax_query'      => $tax_query,
+            's'              => $search_query,
         ], $wc_order );
 
         $query = new WP_Query( $args );
@@ -431,6 +434,23 @@ class LTMS_Vendor_Storefront {
 
             <!-- FILTROS -->
             <div class="ltms-sf-toolbar">
+                <!-- Barra de búsqueda dentro de la tienda del vendedor -->
+                <div class="ltms-sf-search-wrap">
+                    <form method="get" action="" class="ltms-sf-search-form" role="search">
+                        <input type="hidden" name="vendor_id" value="<?php echo esc_attr( $vendor->id ); ?>">
+                        <input
+                            type="search"
+                            name="s"
+                            class="ltms-sf-search-input"
+                            placeholder="Buscar en esta tienda…"
+                            value="<?php echo esc_attr( get_search_query() ); ?>"
+                            aria-label="Buscar productos en <?php echo esc_attr( $vendor->name ); ?>">
+                        <button type="submit" class="ltms-sf-search-btn" aria-label="Buscar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </button>
+                    </form>
+                </div>
+
                 <div class="ltms-sf-cats">
                     <a href="<?php echo esc_url( $base_url ); ?>"
                        class="ltms-sf-cat-tab <?php echo ! $cat_slug ? 'active' : ''; ?>">
