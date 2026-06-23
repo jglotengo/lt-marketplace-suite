@@ -224,7 +224,9 @@
   opacity: 0;
 }
 
-.ltms-sf-card:hover .ltms-sf-img-main {
+/* Solo ocultar la imagen principal si la card tiene imagen hover real en el DOM.
+   Sin :has(), productos sin segunda foto de galería se quedaban en blanco al hacer hover. */
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main {
   opacity: 0;
 }
 
