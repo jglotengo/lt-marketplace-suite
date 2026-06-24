@@ -232,9 +232,9 @@ html.wp-toolbar {
 
 /* ═══════════════════════════════════════════════════════════════
    HF-08: Product Cards — UX/UI mejorado para el loop del homepage
-   Selectores: .elementor-wc-products ul.products li.product
-   Approach: wrapper ::before padding-top para ratio 1:1 (compatible
-   con WoodMart lazyload que usa img absoluta dentro del link wrapper)
+   HTML real: <a.woocommerce-LoopProduct-link> contiene img + h2 + .price
+   La imagen tiene width=300 height=300 → browser reserva ratio 1:1 solo
+   NO usar ::before en el link porque rompe el flujo del título y precio
    ═══════════════════════════════════════════════════════════════ */
 
 /* --- Card base --- */
@@ -256,42 +256,35 @@ html.wp-toolbar {
     transform: translateY(-3px) !important;
 }
 
-/* --- Wrapper del link principal (contiene imagen) ---
-   WoodMart usa .woocommerce-LoopProduct-link como wrapper de imagen.
-   Le damos el ::before para el ratio 1:1. La imagen lazyloaded
-   estará en position:absolute llenando el espacio. */
+/* --- Link wrapper: display block, sin position relative ni ::before --- */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link {
     display: block !important;
-    position: relative !important;
-    overflow: hidden !important;
-    background: #F7F7F7 !important;
     text-decoration: none !important;
+    color: inherit !important;
+    flex: 1 !important;
 }
 
-/* Ratio 1:1 via padding-top hack — NO usar en el img directamente */
-.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link::before,
-.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link::before {
-    content: '' !important;
-    display: block !important;
-    padding-top: 100% !important;
-}
-
-/* Imagen: absolute para llenar el wrapper ratio --- */
+/* --- Imagen: ratio 1:1 via aspect-ratio (los atributos width/height 300x300
+   ya están en el HTML así que el browser reserva el espacio automáticamente,
+   pero forzamos aquí para garantizarlo con object-fit) --- */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    display: block !important;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
     object-fit: contain !important;
-    padding: 10px !important;
+    padding: 12px !important;
     box-sizing: border-box !important;
     background: #F7F7F7 !important;
     max-width: none !important;
     max-height: none !important;
     transition: transform .3s ease !important;
+    /* Anular cualquier position:absolute del lazyload anterior */
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
 }
 
 .elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img,
@@ -299,7 +292,7 @@ html.wp-toolbar {
     transform: scale(1.04) !important;
 }
 
-/* --- Título --- */
+/* --- Título (está DENTRO del <a>) --- */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
     font-size: 13px !important;
     font-weight: 600 !important;
@@ -315,13 +308,13 @@ html.wp-toolbar {
     min-height: 2.7em !important;
 }
 
-/* --- Precio --- */
+/* --- Precio (está DENTRO del <a>) --- */
 .elementor-wc-products ul.products li.product .price {
     display: block !important;
     font-size: 15px !important;
     font-weight: 700 !important;
     color: #E80001 !important;
-    margin: 0 12px 10px !important;
+    margin: 0 12px 12px !important;
     padding: 0 !important;
     text-align: left !important;
     line-height: 1.2 !important;
@@ -339,7 +332,7 @@ html.wp-toolbar {
     color: #E80001 !important;
 }
 
-/* --- Botón Añadir al carrito --- */
+/* --- Botón Añadir al carrito (fuera del <a>, en .woocommerce-loop-product__buttons) --- */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
     padding: 0 12px 12px !important;
     margin-top: auto !important;
@@ -410,7 +403,7 @@ html.wp-toolbar {
     }
     .elementor-wc-products ul.products li.product .price {
         font-size: 13px !important;
-        margin: 0 10px 8px !important;
+        margin: 0 10px 10px !important;
     }
     .elementor-wc-products ul.products li.product .button.add_to_cart_button,
     .elementor-wc-products ul.products li.product a.button {
