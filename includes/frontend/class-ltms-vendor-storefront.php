@@ -243,6 +243,31 @@ class LTMS_Vendor_Storefront {
             true
         );
 
+        // wp_add_inline_style garantiza que el CSS crítico llegue al browser
+        // aunque SiteGround Optimizer combine/cachee el archivo .css externo.
+        // Los inline styles nunca son combinados por SG Optimizer.
+        wp_add_inline_style( 'ltms-storefront', <<<'LTMS_CSS'
+/* LTMS Storefront critical — inline, no cacheable por SG Optimizer */
+.ltms-sf-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+@media(min-width:768px){.ltms-sf-grid{grid-template-columns:repeat(4,1fr)!important;gap:20px!important}}
+.ltms-sf-card{display:flex!important;flex-direction:column!important;background:#fff!important;border-radius:8px!important;overflow:hidden!important;text-align:left!important;float:none!important;width:auto!important;margin:0!important;padding:0!important}
+.ltms-sf-card .ltms-sf-card-img{position:relative!important;width:100%!important;height:0!important;padding-bottom:100%!important;overflow:hidden!important;background:#F8F8F8!important}
+.ltms-sf-card .ltms-sf-card-img-link{display:block!important;position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important}
+.ltms-sf-card .ltms-sf-img-main,.ltms-sf-card .ltms-sf-img-hover{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:contain!important;padding:12px!important;max-width:none!important;max-height:none!important;display:block!important}
+.ltms-sf-card .ltms-sf-img-hover{opacity:0!important}
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main{opacity:0!important}
+.ltms-sf-card:hover .ltms-sf-img-hover{opacity:1!important}
+.ltms-sf-card .ltms-sf-card-body{padding:12px 14px 16px!important;display:flex!important;flex-direction:column!important;flex:1 1 auto!important;text-align:left!important}
+.ltms-sf-card .ltms-sf-card-cat{font-size:11px!important;color:#767676!important;text-transform:uppercase!important;margin:0 0 4px!important;text-align:left!important}
+.ltms-sf-card .ltms-sf-card-name{font-size:14px!important;font-weight:600!important;margin:0 0 6px!important;line-height:1.3!important;text-align:left!important;color:#242424!important}
+.ltms-sf-card .ltms-sf-card-name a{color:#242424!important;text-decoration:none!important}
+.ltms-sf-card .ltms-sf-card-name a:hover{color:#E80001!important}
+.ltms-sf-card .ltms-sf-card-price{font-size:15px!important;font-weight:700!important;color:#E80001!important;margin-bottom:10px!important;text-align:left!important}
+.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:38px!important;padding:8px 10px!important;border-radius:8px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:13px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.04em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:normal!important;line-height:1.25!important;cursor:pointer!important}
+.ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important}
+LTMS_CSS
+        );
+
         // Elementor (Free o Pro) encola sus bundles en cualquier página.
         // En este contexto no hay post-context de Elementor, así que sus
         // scripts explotan con "elementorModules is not defined" /
