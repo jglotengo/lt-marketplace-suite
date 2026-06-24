@@ -51,6 +51,26 @@ class LTMS_Vendor_Storefront {
         add_action( 'template_redirect', [ __CLASS__, 'maybe_render' ] );
         add_filter( 'document_title_parts', [ __CLASS__, 'filter_title' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+
+        // SiteGround Optimizer combina todos los CSS del tema en un archivo externo
+        // que se carga ANTES del nuestro, rompiendo la cascada. Estos filtros se
+        // registran en 'init' (no en wp_enqueue_scripts) para que SG los vea antes
+        // de procesar la combinación. Excluyen la URL /vendedor/* de todas las
+        // optimizaciones de página (CSS combine, JS combine, HTML minify).
+        if ( self::detect_request_slug() ) {
+            add_filter( 'sgo_css_combine_exclude_ids',    [ __CLASS__, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_js_combine_exclude_ids',     [ __CLASS__, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_css_minify_exclude_ids',     [ __CLASS__, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_js_minify_exclude_ids',      [ __CLASS__, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_html_minify_exclude',        [ __CLASS__, 'sg_optimizer_exclude_url' ] );
+            add_filter( 'sgo_critical_css_exclude_list',  [ __CLASS__, 'sg_optimizer_exclude_url' ] );
+            // Forzar SG a no combinar CSS en esta request
+            add_filter( 'sgo_css_combine',    '__return_false' );
+            add_filter( 'sgo_js_combine',     '__return_false' );
+            add_filter( 'sgo_css_minify',     '__return_false' );
+            add_filter( 'sgo_js_minify',      '__return_false' );
+            add_filter( 'sgo_html_minify',    '__return_false' );
+        }
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'cart_count_fragment' ] );
     }
 
@@ -317,6 +337,22 @@ LTMS_CSS
      */
     public static function sg_optimizer_exclude( array $exclude_list ): array {
         $exclude_list[] = 'ltms-storefront';
+        return $exclude_list;
+    }
+
+    /**
+     * Devuelve todos los IDs de handles registrados para excluirlos de SG Optimizer.
+     * Se usa cuando SG ignora los filtros por nombre de handle y necesitamos
+     * desactivar la combinación completamente en la vitrina.
+     */
+    public static function sg_exclude_all_ids( array $exclude_list ): array {
+        global $wp_styles, $wp_scripts;
+        $reg = current_filter() && strpos( current_filter(), 'js' ) !== false ? $wp_scripts : $wp_styles;
+        if ( $reg && ! empty( $reg->registered ) ) {
+            foreach ( array_keys( $reg->registered ) as $handle ) {
+                $exclude_list[] = $handle;
+            }
+        }
         return $exclude_list;
     }
 
