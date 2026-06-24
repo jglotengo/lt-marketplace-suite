@@ -239,4 +239,47 @@
         }
     });
 
+    /* ── HF-08: Product Card Image Fix ───────────────────────────── */
+    /* Fuerza que las imágenes del loop de productos llenen el card.   */
+    /* lazysizes.js de SiteGround restringe tamaño con el attr sizes.  */
+    function fixProductCardImages() {
+        var imgs = document.querySelectorAll(
+            '.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img, ' +
+            '.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img'
+        );
+        imgs.forEach(function (img) {
+            // Eliminar restricción de sizes que limita a 300px
+            img.removeAttribute('sizes');
+            // Forzar estilo inline para ganar cualquier especificidad residual
+            img.style.setProperty('width', '100%', 'important');
+            img.style.setProperty('height', 'auto', 'important');
+            img.style.setProperty('aspect-ratio', '1 / 1', 'important');
+            img.style.setProperty('object-fit', 'contain', 'important');
+            img.style.setProperty('display', 'block', 'important');
+            img.style.setProperty('max-width', '100%', 'important');
+            img.style.setProperty('position', 'static', 'important');
+        });
+    }
+
+    ready(function () {
+        // Aplicar en carga inicial (imágenes ya visibles)
+        fixProductCardImages();
+
+        // Aplicar después de que lazysizes carga cada imagen
+        document.addEventListener('lazyloaded', function (e) {
+            var img = e.target;
+            if (img && img.closest &&
+                img.closest('.elementor-wc-products ul.products li.product')) {
+                img.removeAttribute('sizes');
+                img.style.setProperty('width', '100%', 'important');
+                img.style.setProperty('height', 'auto', 'important');
+                img.style.setProperty('aspect-ratio', '1 / 1', 'important');
+                img.style.setProperty('object-fit', 'contain', 'important');
+                img.style.setProperty('display', 'block', 'important');
+                img.style.setProperty('max-width', '100%', 'important');
+                img.style.setProperty('position', 'static', 'important');
+            }
+        });
+    });
+
 })();
