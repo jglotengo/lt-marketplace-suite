@@ -330,6 +330,15 @@ LTMS_CSS
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+/* Elementor globals stub — debe ejecutarse ANTES de wp_head() para que
+   los bundles de Elementor que se inyectan ahí no generen ReferenceError.
+   La vitrina no usa Elementor pero el tema lo encola en todas las páginas. */
+window.elementorModules=window.elementorModules||{};
+window.elementorFrontend=window.elementorFrontend||{hooks:{addAction:function(){},doAction:function(){},addFilter:function(){return arguments[2];},applyFilters:function(){return arguments[2];}},isEditMode:function(){return false;},utils:{},storage:{},config:{}};
+window.elementorFrontendConfig=window.elementorFrontendConfig||{environmentMode:{edit:false,wpPreview:false},is_rtl:false,i18n:{},urls:{},settings:{},kit:{},post:{},user:{},rich_editing:false};
+window.elementor=window.elementor||{modules:{}};
+</script>
 <?php wp_head(); ?>
 <style id="ltms-sf-critical">
 /* Critical overrides — deben ir DESPUÉS de wp_head() para ganar en cascada
