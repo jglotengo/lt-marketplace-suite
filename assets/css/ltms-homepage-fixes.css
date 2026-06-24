@@ -233,100 +233,73 @@ html.wp-toolbar {
 /* ═══════════════════════════════════════════════════════════════
    HF-08: Product Cards — UX/UI mejorado para el loop del homepage
    Selectores: .elementor-wc-products ul.products li.product
+   Approach: wrapper ::before padding-top para ratio 1:1 (compatible
+   con WoodMart lazyload que usa img absoluta dentro del link wrapper)
    ═══════════════════════════════════════════════════════════════ */
 
-/* --- Reset base de la tarjeta --- */
+/* --- Card base --- */
 .elementor-wc-products ul.products li.product {
-    background: #ffffff;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,.07);
-    transition: box-shadow .22s ease, transform .22s ease;
-    display: flex;
-    flex-direction: column;
+    background: #ffffff !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07) !important;
+    transition: box-shadow .22s ease, transform .22s ease !important;
+    display: flex !important;
+    flex-direction: column !important;
     padding: 0 !important;
     margin: 0 !important;
-    position: relative;
+    position: relative !important;
 }
 
 .elementor-wc-products ul.products li.product:hover {
-    box-shadow: 0 6px 24px rgba(0,0,0,.13);
-    transform: translateY(-3px);
+    box-shadow: 0 6px 24px rgba(0,0,0,.13) !important;
+    transform: translateY(-3px) !important;
 }
 
-/* --- Imagen: ratio cuadrado, object-fit cover --- */
+/* --- Wrapper del link principal (contiene imagen) ---
+   WoodMart usa .woocommerce-LoopProduct-link como wrapper de imagen.
+   Le damos el ::before para el ratio 1:1. La imagen lazyloaded
+   estará en position:absolute llenando el espacio. */
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link {
-    display: flex;
-    flex-direction: column;
-    text-decoration: none !important;
-    color: inherit !important;
-    flex: 1;
-}
-
-.elementor-wc-products ul.products li.product img {
-    width: 100% !important;
-    height: 0 !important;
-    padding-bottom: 100% !important;
-    object-fit: contain !important;
-    position: relative !important;
     display: block !important;
-    background: #F7F7F7;
-    transition: transform .3s ease;
-    max-width: none !important;
-    max-height: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+    background: #F7F7F7 !important;
+    text-decoration: none !important;
 }
 
-/* lazyload: la imagen real está en data-src, el placeholder es un gif 1x1 */
-.elementor-wc-products ul.products li.product .woocommerce-loop-product__link {
-    position: relative;
-    overflow: hidden;
-    display: block;
-    background: #F7F7F7;
+/* Ratio 1:1 via padding-top hack — NO usar en el img directamente */
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link::before,
+.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link::before {
+    content: '' !important;
+    display: block !important;
+    padding-top: 100% !important;
 }
 
-.elementor-wc-products ul.products li.product img.lazyload,
-.elementor-wc-products ul.products li.product img.lazyloaded {
+/* Imagen: absolute para llenar el wrapper ratio --- */
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
+.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    padding: 0 !important;
     object-fit: contain !important;
     padding: 10px !important;
-}
-
-/* Wrapper de imagen con ratio fijo */
-.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link {
-    display: block;
-    position: relative;
-    overflow: hidden;
-    background: #F7F7F7;
-}
-
-.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link::before {
-    content: '';
-    display: block;
-    padding-top: 100%;
-}
-
-.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img {
-    position: absolute !important;
-    top: 0 !important; left: 0 !important;
-    width: 100% !important; height: 100% !important;
-    padding: 10px !important;
-    object-fit: contain !important;
-    background: #F7F7F7;
+    box-sizing: border-box !important;
+    background: #F7F7F7 !important;
     max-width: none !important;
     max-height: none !important;
-    transition: transform .3s ease;
+    transition: transform .3s ease !important;
 }
 
-.elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img {
-    transform: scale(1.04);
+.elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img,
+.elementor-wc-products ul.products li.product:hover a.woocommerce-loop-product__link img {
+    transform: scale(1.04) !important;
 }
 
-/* --- Título del producto --- */
+/* --- Título --- */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
     font-size: 13px !important;
     font-weight: 600 !important;
@@ -339,7 +312,7 @@ html.wp-toolbar {
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
-    min-height: 2.7em;
+    min-height: 2.7em !important;
 }
 
 /* --- Precio --- */
@@ -376,6 +349,7 @@ html.wp-toolbar {
 .elementor-wc-products ul.products li.product a.button {
     display: block !important;
     width: 100% !important;
+    box-sizing: border-box !important;
     text-align: center !important;
     padding: 9px 10px !important;
     background: #ffffff !important;
@@ -402,12 +376,11 @@ html.wp-toolbar {
     text-decoration: none !important;
 }
 
-/* --- Badge "Añadido" estado loading --- */
 .elementor-wc-products ul.products li.product .button.loading::after {
     border-color: #E80001 transparent #E80001 transparent !important;
 }
 
-/* --- Badge de oferta de WC --- */
+/* --- Badge oferta --- */
 .elementor-wc-products ul.products li.product .onsale {
     position: absolute !important;
     top: 10px !important;
@@ -424,16 +397,16 @@ html.wp-toolbar {
     min-width: unset !important;
 }
 
-/* --- Grid responsive: mantener proporciones en mobile --- */
+/* --- Responsive mobile --- */
 @media (max-width: 767px) {
     .elementor-wc-products ul.products.columns-2 li.product,
     .elementor-wc-products ul.products.elementor-grid.columns-2 li.product {
-        border-radius: 8px;
+        border-radius: 8px !important;
     }
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
         font-size: 12px !important;
         margin: 8px 10px 4px !important;
-        min-height: unset;
+        min-height: unset !important;
     }
     .elementor-wc-products ul.products li.product .price {
         font-size: 13px !important;
