@@ -232,9 +232,20 @@ html.wp-toolbar {
 
 /* ═══════════════════════════════════════════════════════════════
    HF-08: Product Cards — UX/UI mejorado para el loop del homepage
-   HTML real: <a.woocommerce-LoopProduct-link> contiene img + h2 + .price
-   La imagen tiene width=300 height=300 → browser reserva ratio 1:1 solo
-   NO usar ::before en el link porque rompe el flujo del título y precio
+   
+   HTML real del loop WooCommerce + WoodMart:
+   <li class="product">
+     <a class="woocommerce-LoopProduct-link woocommerce-loop-product__link">
+       <img class="lazyload" src="gif_1x1" data-src="real.webp" width="300" height="300">
+       <h2 class="woocommerce-loop-product__title">...</h2>
+       <span class="price">...</span>
+     </a>
+     <div class="woocommerce-loop-product__buttons">...</div>
+   </li>
+   
+   ESTRATEGIA: CSS Grid en el <a> para separar imagen / título / precio
+   sin depender de posicionamiento ni del comportamiento de lazysizes.
+   La imagen es un grid item cuyo tamaño forzamos vía grid-template.
    ═══════════════════════════════════════════════════════════════ */
 
 /* --- Card base --- */
@@ -256,44 +267,61 @@ html.wp-toolbar {
     transform: translateY(-3px) !important;
 }
 
-/* --- Link wrapper: display block, sin position relative ni ::before --- */
+/* --- Link: display grid con 3 filas (img / titulo / precio) --- */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link {
-    display: block !important;
+    display: grid !important;
+    grid-template-rows: auto auto auto !important;
     text-decoration: none !important;
     color: inherit !important;
     flex: 1 !important;
 }
 
-/* --- Imagen: ratio 1:1 via aspect-ratio (los atributos width/height 300x300
-   ya están en el HTML así que el browser reserva el espacio automáticamente,
-   pero forzamos aquí para garantizarlo con object-fit) --- */
+/* --- Contenedor de imagen: cuadrado via padding-bottom trick en el grid row ---
+   Usamos un wrapper via el pseudo-elemento ::before del <a> NO — 
+   mejor: la propia img con aspect-ratio forzado como grid item.
+   
+   Como grid item, la img recibe el ancho completo del grid (100% del card).
+   Le damos height: 0 + padding-bottom: 100% via un wrapper, pero como
+   no hay wrapper real, usamos la técnica de align-self:stretch en el grid
+   y dejamos que aspect-ratio haga el trabajo.
+   --- */
+
+/* La imagen como primer grid item: ocupa todo el ancho, ratio 1:1 */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
-    display: block !important;
+    /* Grid item: ocupa columna completa */
+    grid-row: 1 !important;
     width: 100% !important;
-    height: auto !important;
+    /* Forzar altura cuadrada: 100% del ancho del contenedor */
+    /* Usamos aspect-ratio con un fallback */
     aspect-ratio: 1 / 1 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    /* Imagen */
     object-fit: contain !important;
     padding: 12px !important;
     box-sizing: border-box !important;
     background: #F7F7F7 !important;
-    max-width: none !important;
+    display: block !important;
+    /* Reset de cualquier override de lazysizes o tema */
+    max-width: 100% !important;
     max-height: none !important;
-    transition: transform .3s ease !important;
-    /* Anular cualquier position:absolute del lazyload anterior */
     position: static !important;
     top: auto !important;
     left: auto !important;
+    float: none !important;
+    transition: transform .3s ease !important;
 }
 
 .elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img,
 .elementor-wc-products ul.products li.product:hover a.woocommerce-loop-product__link img {
-    transform: scale(1.04) !important;
+    transform: scale(1.03) !important;
 }
 
-/* --- Título (está DENTRO del <a>) --- */
+/* --- Título (segundo grid item) --- */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
+    grid-row: 2 !important;
     font-size: 13px !important;
     font-weight: 600 !important;
     color: #1a1a1a !important;
@@ -306,10 +334,12 @@ html.wp-toolbar {
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     min-height: 2.7em !important;
+    align-self: start !important;
 }
 
-/* --- Precio (está DENTRO del <a>) --- */
+/* --- Precio (tercer grid item) --- */
 .elementor-wc-products ul.products li.product .price {
+    grid-row: 3 !important;
     display: block !important;
     font-size: 15px !important;
     font-weight: 700 !important;
@@ -318,6 +348,7 @@ html.wp-toolbar {
     padding: 0 !important;
     text-align: left !important;
     line-height: 1.2 !important;
+    align-self: start !important;
 }
 
 .elementor-wc-products ul.products li.product .price del {
@@ -332,7 +363,7 @@ html.wp-toolbar {
     color: #E80001 !important;
 }
 
-/* --- Botón Añadir al carrito (fuera del <a>, en .woocommerce-loop-product__buttons) --- */
+/* --- Botón (fuera del <a>, en su propio div) --- */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
     padding: 0 12px 12px !important;
     margin-top: auto !important;
@@ -390,7 +421,7 @@ html.wp-toolbar {
     min-width: unset !important;
 }
 
-/* --- Responsive mobile --- */
+/* --- Mobile --- */
 @media (max-width: 767px) {
     .elementor-wc-products ul.products.columns-2 li.product,
     .elementor-wc-products ul.products.elementor-grid.columns-2 li.product {
