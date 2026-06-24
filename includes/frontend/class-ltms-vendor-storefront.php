@@ -301,10 +301,6 @@ LTMS_CSS
         // Desactivar la combinación de critical inline CSS (SG puede extraer <style> tags)
         add_filter( 'sgo_critical_css_exclude_list',  [ __CLASS__, 'sg_optimizer_exclude_url' ] );
 
-        // Desregistrar TODOS los estilos del tema WoodMart y WooCommerce
-        // que no son necesarios en la vitrina (página standalone con su propio CSS).
-        // Se hace en wp_print_styles con prioridad 1 para interceptar antes de imprimir.
-        add_action( 'wp_print_styles', [ __CLASS__, 'strip_theme_styles' ], 1 );
 
         // Elementor (Free o Pro) encola sus bundles en cualquier página.
         // En este contexto no hay post-context de Elementor, así que sus
@@ -363,25 +359,6 @@ LTMS_CSS
     public static function sg_optimizer_exclude_url( array $exclude_list ): array {
         $exclude_list[] = home_url( '/vendedor/' );
         return $exclude_list;
-    }
-
-    /**
-     * Desencola todos los estilos del tema WoodMart y WooCommerce.
-     * La vitrina tiene su propio CSS completo — los estilos del tema
-     * solo causan conflictos y aumentan el tiempo de carga.
-     */
-    public static function strip_theme_styles(): void {
-        global $wp_styles;
-        if ( ! $wp_styles || empty( $wp_styles->queue ) ) return;
-        $keep = [
-            'ltms-storefront',   // nuestro CSS principal
-            'wc-block-style',    // WC necesario para add-to-cart
-        ];
-        foreach ( array_values( $wp_styles->queue ) as $handle ) {
-            if ( in_array( $handle, $keep, true ) ) continue;
-            // Desencolar todo lo que NO sea nuestro CSS
-            $wp_styles->dequeue( $handle );
-        }
     }
 
     public static function strip_elementor_assets(): void {
