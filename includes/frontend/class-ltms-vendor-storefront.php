@@ -268,6 +268,19 @@ class LTMS_Vendor_Storefront {
 LTMS_CSS
         );
 
+        // Deshabilitar SiteGround Optimizer en la vitrina.
+        // SG Optimizer extrae los <style> inline del <head> y los combina en su
+        // archivo CSS externo, rompiendo el orden de cascada. Los filtros de abajo
+        // usan la API oficial de SG Optimizer para desactivar la combinación/minificación
+        // de CSS y JS únicamente en las páginas de vitrina.
+        add_filter( 'sgo_css_combine_exclude',        [ __CLASS__, 'sg_optimizer_exclude' ] );
+        add_filter( 'sgo_javascript_combine_exclude', [ __CLASS__, 'sg_optimizer_exclude' ] );
+        add_filter( 'sgo_css_minify_exclude',         [ __CLASS__, 'sg_optimizer_exclude' ] );
+        add_filter( 'sgo_js_minify_exclude',          [ __CLASS__, 'sg_optimizer_exclude' ] );
+        add_filter( 'sgo_html_minify_exclude',        [ __CLASS__, 'sg_optimizer_exclude_url' ] );
+        // Desactivar la combinación de critical inline CSS (SG puede extraer <style> tags)
+        add_filter( 'sgo_critical_css_exclude_list',  [ __CLASS__, 'sg_optimizer_exclude_url' ] );
+
         // Desregistrar TODOS los estilos del tema WoodMart y WooCommerce
         // que no son necesarios en la vitrina (página standalone con su propio CSS).
         // Se hace en wp_print_styles con prioridad 1 para interceptar antes de imprimir.
@@ -296,6 +309,24 @@ LTMS_CSS
             . 'window.elementorFrontendConfig = window.elementorFrontendConfig || { environmentMode: { edit: false }, is_rtl: false };',
             'before'
         );
+    }
+
+    /**
+     * Excluye handles de CSS/JS de la combinación de SiteGround Optimizer.
+     * Devuelve la lista con nuestro handle añadido — SG no combinará ltms-storefront.
+     */
+    public static function sg_optimizer_exclude( array $exclude_list ): array {
+        $exclude_list[] = 'ltms-storefront';
+        return $exclude_list;
+    }
+
+    /**
+     * Excluye la URL de la vitrina de las optimizaciones de página completa de SG Optimizer
+     * (HTML minify, critical CSS extraction).
+     */
+    public static function sg_optimizer_exclude_url( array $exclude_list ): array {
+        $exclude_list[] = home_url( '/vendedor/' );
+        return $exclude_list;
     }
 
     /**
