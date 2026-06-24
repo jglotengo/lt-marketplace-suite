@@ -229,3 +229,222 @@ html.wp-toolbar {
         bottom: 16px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   HF-08: Product Cards — UX/UI mejorado para el loop del homepage
+   Selectores: .elementor-wc-products ul.products li.product
+   ═══════════════════════════════════════════════════════════════ */
+
+/* --- Reset base de la tarjeta --- */
+.elementor-wc-products ul.products li.product {
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    transition: box-shadow .22s ease, transform .22s ease;
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: relative;
+}
+
+.elementor-wc-products ul.products li.product:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,.13);
+    transform: translateY(-3px);
+}
+
+/* --- Imagen: ratio cuadrado, object-fit cover --- */
+.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none !important;
+    color: inherit !important;
+    flex: 1;
+}
+
+.elementor-wc-products ul.products li.product img {
+    width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 100% !important;
+    object-fit: contain !important;
+    position: relative !important;
+    display: block !important;
+    background: #F7F7F7;
+    transition: transform .3s ease;
+    max-width: none !important;
+    max-height: none !important;
+}
+
+/* lazyload: la imagen real está en data-src, el placeholder es un gif 1x1 */
+.elementor-wc-products ul.products li.product .woocommerce-loop-product__link {
+    position: relative;
+    overflow: hidden;
+    display: block;
+    background: #F7F7F7;
+}
+
+.elementor-wc-products ul.products li.product img.lazyload,
+.elementor-wc-products ul.products li.product img.lazyloaded {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    object-fit: contain !important;
+    padding: 10px !important;
+}
+
+/* Wrapper de imagen con ratio fijo */
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    background: #F7F7F7;
+}
+
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link::before {
+    content: '';
+    display: block;
+    padding-top: 100%;
+}
+
+.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img {
+    position: absolute !important;
+    top: 0 !important; left: 0 !important;
+    width: 100% !important; height: 100% !important;
+    padding: 10px !important;
+    object-fit: contain !important;
+    background: #F7F7F7;
+    max-width: none !important;
+    max-height: none !important;
+    transition: transform .3s ease;
+}
+
+.elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img {
+    transform: scale(1.04);
+}
+
+/* --- Título del producto --- */
+.elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1a1a1a !important;
+    line-height: 1.35 !important;
+    margin: 10px 12px 6px !important;
+    padding: 0 !important;
+    text-align: left !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    min-height: 2.7em;
+}
+
+/* --- Precio --- */
+.elementor-wc-products ul.products li.product .price {
+    display: block !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #E80001 !important;
+    margin: 0 12px 10px !important;
+    padding: 0 !important;
+    text-align: left !important;
+    line-height: 1.2 !important;
+}
+
+.elementor-wc-products ul.products li.product .price del {
+    color: #aaa !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    margin-right: 4px !important;
+}
+
+.elementor-wc-products ul.products li.product .price ins {
+    text-decoration: none !important;
+    color: #E80001 !important;
+}
+
+/* --- Botón Añadir al carrito --- */
+.elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
+    padding: 0 12px 12px !important;
+    margin-top: auto !important;
+}
+
+.elementor-wc-products ul.products li.product .button.add_to_cart_button,
+.elementor-wc-products ul.products li.product a.button {
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    padding: 9px 10px !important;
+    background: #ffffff !important;
+    color: #E80001 !important;
+    border: 1.5px solid #E80001 !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .04em !important;
+    text-decoration: none !important;
+    transition: background .18s, color .18s !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.elementor-wc-products ul.products li.product .button.add_to_cart_button:hover,
+.elementor-wc-products ul.products li.product a.button:hover {
+    background: #E80001 !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+/* --- Badge "Añadido" estado loading --- */
+.elementor-wc-products ul.products li.product .button.loading::after {
+    border-color: #E80001 transparent #E80001 transparent !important;
+}
+
+/* --- Badge de oferta de WC --- */
+.elementor-wc-products ul.products li.product .onsale {
+    position: absolute !important;
+    top: 10px !important;
+    left: 10px !important;
+    background: #E80001 !important;
+    color: #fff !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border-radius: 4px !important;
+    padding: 3px 8px !important;
+    z-index: 2 !important;
+    line-height: 1.4 !important;
+    min-height: unset !important;
+    min-width: unset !important;
+}
+
+/* --- Grid responsive: mantener proporciones en mobile --- */
+@media (max-width: 767px) {
+    .elementor-wc-products ul.products.columns-2 li.product,
+    .elementor-wc-products ul.products.elementor-grid.columns-2 li.product {
+        border-radius: 8px;
+    }
+    .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
+        font-size: 12px !important;
+        margin: 8px 10px 4px !important;
+        min-height: unset;
+    }
+    .elementor-wc-products ul.products li.product .price {
+        font-size: 13px !important;
+        margin: 0 10px 8px !important;
+    }
+    .elementor-wc-products ul.products li.product .button.add_to_cart_button,
+    .elementor-wc-products ul.products li.product a.button {
+        font-size: 11px !important;
+        padding: 8px 6px !important;
+    }
+    .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
+        padding: 0 10px 10px !important;
+    }
+}
