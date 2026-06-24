@@ -306,6 +306,38 @@ class LTMS_Vendor_Storefront {
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <?php wp_head(); ?>
+<style id="ltms-sf-critical">
+/* Critical overrides — deben ir DESPUÉS de wp_head() para ganar en cascada
+   sobre cualquier estilo del tema WoodMart o WooCommerce. NO usar en el
+   archivo .css externo donde el orden de carga no está garantizado. */
+
+/* Grid: siempre 2 columnas en móvil, 4 en desktop */
+.ltms-sf-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important;list-style:none!important;margin:0!important;padding:0!important}
+@media(min-width:768px){.ltms-sf-grid{grid-template-columns:repeat(4,1fr)!important;gap:20px!important}}
+
+/* Card: flex column, sin herencia de float/text-align del tema */
+.ltms-sf-card{display:flex!important;flex-direction:column!important;background:#fff!important;border-radius:8px!important;overflow:hidden!important;text-align:left!important;float:none!important;width:auto!important;margin:0!important;padding:0!important}
+
+/* Contenedor de imagen: padding-bottom hack 1:1 indestructible */
+.ltms-sf-card .ltms-sf-card-img{position:relative!important;width:100%!important;height:0!important;padding-bottom:100%!important;overflow:hidden!important;background:#F8F8F8!important}
+.ltms-sf-card .ltms-sf-card-img-link{display:block!important;position:absolute!important;inset:0!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important}
+.ltms-sf-card .ltms-sf-img-main,.ltms-sf-card .ltms-sf-img-hover{position:absolute!important;inset:0!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:contain!important;padding:12px!important;max-width:none!important;max-height:none!important;display:block!important}
+.ltms-sf-card .ltms-sf-img-hover{opacity:0!important}
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main{opacity:0!important}
+.ltms-sf-card:hover .ltms-sf-img-hover{opacity:1!important}
+
+/* Cuerpo: texto izquierda, colores correctos */
+.ltms-sf-card .ltms-sf-card-body{padding:12px 14px 16px!important;display:flex!important;flex-direction:column!important;flex:1!important;text-align:left!important}
+.ltms-sf-card .ltms-sf-card-cat{font-size:11px!important;color:#767676!important;text-transform:uppercase!important;margin:0 0 4px!important;text-align:left!important}
+.ltms-sf-card .ltms-sf-card-name{font-size:14px!important;font-weight:600!important;margin:0 0 6px!important;line-height:1.3!important;text-align:left!important;color:#242424!important}
+.ltms-sf-card .ltms-sf-card-name a{color:#242424!important;text-decoration:none!important}
+.ltms-sf-card .ltms-sf-card-name a:hover{color:#E80001!important}
+.ltms-sf-card .ltms-sf-card-price{font-size:15px!important;font-weight:700!important;color:#E80001!important;margin-bottom:10px!important;text-align:left!important}
+
+/* Botón: anular .button del tema completamente */
+.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:38px!important;padding:8px 10px!important;border-radius:8px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:13px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.04em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:normal!important;line-height:1.25!important;cursor:pointer!important}
+.ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important;text-decoration:none!important}
+</style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
 <header class="ltms-sf-topbar">
