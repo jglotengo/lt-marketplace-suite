@@ -440,6 +440,10 @@ html.wp-toolbar {
     .elementor-wc-products ul.products li.product a.button {
         font-size: 11px !important;
         padding: 8px 6px !important;
+        white-space: normal !important;
+        text-overflow: unset !important;
+        overflow: visible !important;
+        line-height: 1.3 !important;
     }
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
         padding: 0 10px 10px !important;
