@@ -268,6 +268,11 @@ class LTMS_Vendor_Storefront {
 LTMS_CSS
         );
 
+        // Desregistrar TODOS los estilos del tema WoodMart y WooCommerce
+        // que no son necesarios en la vitrina (página standalone con su propio CSS).
+        // Se hace en wp_print_styles con prioridad 1 para interceptar antes de imprimir.
+        add_action( 'wp_print_styles', [ __CLASS__, 'strip_theme_styles' ], 1 );
+
         // Elementor (Free o Pro) encola sus bundles en cualquier página.
         // En este contexto no hay post-context de Elementor, así que sus
         // scripts explotan con "elementorModules is not defined" /
@@ -291,6 +296,25 @@ LTMS_CSS
             . 'window.elementorFrontendConfig = window.elementorFrontendConfig || { environmentMode: { edit: false }, is_rtl: false };',
             'before'
         );
+    }
+
+    /**
+     * Desencola todos los estilos del tema WoodMart y WooCommerce.
+     * La vitrina tiene su propio CSS completo — los estilos del tema
+     * solo causan conflictos y aumentan el tiempo de carga.
+     */
+    public static function strip_theme_styles(): void {
+        global $wp_styles;
+        if ( ! $wp_styles || empty( $wp_styles->queue ) ) return;
+        $keep = [
+            'ltms-storefront',   // nuestro CSS principal
+            'wc-block-style',    // WC necesario para add-to-cart
+        ];
+        foreach ( array_values( $wp_styles->queue ) as $handle ) {
+            if ( in_array( $handle, $keep, true ) ) continue;
+            // Desencolar todo lo que NO sea nuestro CSS
+            $wp_styles->dequeue( $handle );
+        }
     }
 
     public static function strip_elementor_assets(): void {
