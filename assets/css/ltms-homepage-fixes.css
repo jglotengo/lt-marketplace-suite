@@ -232,23 +232,30 @@ html.wp-toolbar {
 
 /* ═══════════════════════════════════════════════════════════════
    HF-08: Product Cards — UX/UI mejorado para el loop del homepage
-   
+   v3.0.0 — Carrusel scroll-snap en móvil, grid en desktop
+
    HTML real del loop WooCommerce + WoodMart:
    <li class="product">
      <a class="woocommerce-LoopProduct-link woocommerce-loop-product__link">
-       <img class="lazyload" src="gif_1x1" data-src="real.webp" width="300" height="300">
+       <img class="lazyload" ...>
        <h2 class="woocommerce-loop-product__title">...</h2>
        <span class="price">...</span>
      </a>
      <div class="woocommerce-loop-product__buttons">...</div>
    </li>
-   
-   ESTRATEGIA: CSS Grid en el <a> para separar imagen / título / precio
-   sin depender de posicionamiento ni del comportamiento de lazysizes.
-   La imagen es un grid item cuyo tamaño forzamos vía grid-template.
+
+   ESTRATEGIA MÓVIL:
+   - El <ul.products> se convierte en contenedor de scroll horizontal
+     con scroll-snap-type para que cada card encaje perfectamente.
+   - Cada <li.product> tiene ancho fijo (42vw) y scroll-snap-align:start.
+   - El JS (HF-08-CAR) inyecta un hint visual "desliza →" la primera vez.
+   - Sin librerías externas, sin JS para el scroll, CSS puro.
+
+   ESTRATEGIA DESKTOP:
+   - Grid de 4 columnas estándar, sin cambios respecto a v2.
    ═══════════════════════════════════════════════════════════════ */
 
-/* --- Card base --- */
+/* ── DESKTOP: card base (igual que antes) ─────────────────────── */
 .elementor-wc-products ul.products li.product {
     background: #ffffff !important;
     border-radius: 12px !important;
@@ -267,44 +274,28 @@ html.wp-toolbar {
     transform: translateY(-3px) !important;
 }
 
-/* --- Link: display grid con 3 filas (img / titulo / precio) --- */
+/* Link: flexbox vertical para que imagen ocupe espacio fijo */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link {
-    display: grid !important;
-    grid-template-rows: auto auto auto !important;
+    display: flex !important;
+    flex-direction: column !important;
     text-decoration: none !important;
     color: inherit !important;
     flex: 1 !important;
 }
 
-/* --- Contenedor de imagen: cuadrado via padding-bottom trick en el grid row ---
-   Usamos un wrapper via el pseudo-elemento ::before del <a> NO — 
-   mejor: la propia img con aspect-ratio forzado como grid item.
-   
-   Como grid item, la img recibe el ancho completo del grid (100% del card).
-   Le damos height: 0 + padding-bottom: 100% via un wrapper, pero como
-   no hay wrapper real, usamos la técnica de align-self:stretch en el grid
-   y dejamos que aspect-ratio haga el trabajo.
-   --- */
-
-/* La imagen como primer grid item: ocupa todo el ancho, ratio 1:1 */
+/* Imagen: cuadrado 1:1 con aspect-ratio */
 .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
 .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
-    /* Grid item: ocupa columna completa */
-    grid-row: 1 !important;
     width: 100% !important;
-    /* Forzar altura cuadrada: 100% del ancho del contenedor */
-    /* Usamos aspect-ratio con un fallback */
     aspect-ratio: 1 / 1 !important;
     height: auto !important;
     min-height: 0 !important;
-    /* Imagen */
     object-fit: contain !important;
-    padding: 12px !important;
+    padding: 10px !important;
     box-sizing: border-box !important;
     background: #F7F7F7 !important;
     display: block !important;
-    /* Reset de cualquier override de lazysizes o tema */
     max-width: 100% !important;
     max-height: none !important;
     position: static !important;
@@ -312,6 +303,7 @@ html.wp-toolbar {
     left: auto !important;
     float: none !important;
     transition: transform .3s ease !important;
+    flex-shrink: 0 !important;
 }
 
 .elementor-wc-products ul.products li.product:hover .woocommerce-LoopProduct-link img,
@@ -319,9 +311,8 @@ html.wp-toolbar {
     transform: scale(1.03) !important;
 }
 
-/* --- Título (segundo grid item) --- */
+/* Título */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
-    grid-row: 2 !important;
     font-size: 13px !important;
     font-weight: 600 !important;
     color: #1a1a1a !important;
@@ -334,21 +325,18 @@ html.wp-toolbar {
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     min-height: 2.7em !important;
-    align-self: start !important;
 }
 
-/* --- Precio (tercer grid item) --- */
+/* Precio */
 .elementor-wc-products ul.products li.product .price {
-    grid-row: 3 !important;
     display: block !important;
     font-size: 15px !important;
     font-weight: 700 !important;
     color: #E80001 !important;
-    margin: 0 12px 12px !important;
+    margin: 0 12px 10px !important;
     padding: 0 !important;
     text-align: left !important;
     line-height: 1.2 !important;
-    align-self: start !important;
 }
 
 .elementor-wc-products ul.products li.product .price del {
@@ -363,7 +351,7 @@ html.wp-toolbar {
     color: #E80001 !important;
 }
 
-/* --- Botón (fuera del <a>, en su propio div) --- */
+/* Botón */
 .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
     padding: 0 12px 12px !important;
     margin-top: auto !important;
@@ -388,13 +376,10 @@ html.wp-toolbar {
     transition: background .18s, color .18s !important;
     box-shadow: none !important;
     cursor: pointer !important;
-    /* HF-08-DSK-01: white-space:nowrap + overflow:hidden + text-overflow:ellipsis
-       causaban "AÑAD..." en todos los breakpoints donde la card era angosta.
-       Se permite wrap para que el texto siempre sea legible. */
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
     min-height: 36px !important;
 }
 
@@ -409,7 +394,7 @@ html.wp-toolbar {
     border-color: #E80001 transparent #E80001 transparent !important;
 }
 
-/* --- Badge oferta --- */
+/* Badge oferta */
 .elementor-wc-products ul.products li.product .onsale {
     position: absolute !important;
     top: 10px !important;
@@ -426,52 +411,130 @@ html.wp-toolbar {
     min-width: unset !important;
 }
 
-/* --- Mobile --- */
+/* ── MÓVIL: carrusel horizontal scroll-snap ────────────────────
+   HF-08-CAR: En pantallas ≤767px el grid de 2 columnas se
+   convierte en un carrusel deslizable con scroll-snap.
+
+   El truco clave: el <ul.products> necesita display:flex +
+   overflow-x:scroll para que los <li> se dispongan en fila.
+   Pero Elementor y WooCommerce inyectan display:grid o display:flex
+   con flex-wrap:wrap — hay que forzar con !important en TODOS
+   los selectores posibles que el tema pueda usar.
+   ─────────────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
-    .elementor-wc-products ul.products.columns-2 li.product,
-    .elementor-wc-products ul.products.elementor-grid.columns-2 li.product {
-        border-radius: 8px !important;
+
+    /* Wrapper: necesita overflow visible para que el carrusel
+       desborde horizontalmente más allá del padding del tema */
+    .elementor-wc-products,
+    .elementor-wc-products .elementor-widget-container {
+        overflow: visible !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
+
+    /* El <ul> se convierte en scroll container horizontal */
+    .elementor-wc-products ul.products,
+    .elementor-wc-products ul.products.columns-2,
+    .elementor-wc-products ul.products.columns-4,
+    .elementor-wc-products ul.products.elementor-grid {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        scroll-snap-type: x mandatory !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important; /* Firefox */
+        -ms-overflow-style: none !important;
+        gap: 10px !important;
+        padding: 8px 16px 12px !important;
+        margin: 0 -16px !important; /* Sangría negativa para llegar al borde */
+        width: calc(100% + 32px) !important;
+        box-sizing: border-box !important;
+        /* Anular grid del tema */
+        grid-template-columns: unset !important;
+        list-style: none !important;
+        align-items: stretch !important;
+    }
+
+    /* Ocultar scrollbar en WebKit */
+    .elementor-wc-products ul.products::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    /* Cada card: ancho fijo para que se vean 2.3 cards (el .3 da
+       el "peek" que indica que hay más para deslizar) */
+    .elementor-wc-products ul.products li.product {
+        flex: 0 0 42vw !important;
+        min-width: 42vw !important;
+        max-width: 42vw !important;
+        width: 42vw !important;
+        scroll-snap-align: start !important;
+        scroll-snap-stop: normal !important;
+        border-radius: 10px !important;
+        /* Anular cualquier width que venga del tema */
+        float: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Última card: padding-right extra para que no quede pegada al borde */
+    .elementor-wc-products ul.products li.product:last-child {
+        margin-right: 6px !important;
+    }
+
+    /* Card: imagen más compacta en cards angostas */
+    .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
+    .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
+        padding: 8px !important;
+    }
+
+    /* Título: más compacto */
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__title {
-        font-size: 12px !important;
-        margin: 8px 10px 4px !important;
+        font-size: 11px !important;
+        margin: 8px 8px 4px !important;
         min-height: unset !important;
+        -webkit-line-clamp: 2 !important;
     }
+
+    /* Precio */
     .elementor-wc-products ul.products li.product .price {
         font-size: 13px !important;
-        margin: 0 10px 10px !important;
+        margin: 0 8px 8px !important;
     }
-    /* HF-08-MOB-01: Botón "AÑADIR AL CARRITO" — mostrar texto completo en móvil.
-       El texto se cortaba ("AÑAD...") porque el ancho de la card en grid de 2 col
-       era insuficiente para la combinación font-size 11px + padding 8px 6px.
-       Solución: reducir font-size a 10px, usar padding compacto y forzar wrap. */
+
+    /* Botón: nowrap para que quepa en 1 línea dentro de la card de 42vw.
+       "AÑADIR AL CARRITO" a 11px cabe en ~160px (42vw de ~390px = ~164px).
+       Si el texto fuera más largo, el ellipsis lo corta limpiamente. */
     .elementor-wc-products ul.products li.product .button.add_to_cart_button,
     .elementor-wc-products ul.products li.product a.button {
-        font-size: 10px !important;
-        padding: 7px 4px !important;
-        white-space: normal !important;
-        text-overflow: unset !important;
-        overflow: visible !important;
-        line-height: 1.25 !important;
+        font-size: 11px !important;
+        padding: 8px 6px !important;
         letter-spacing: 0.02em !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
         min-height: 34px !important;
     }
+
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
         padding: 0 8px 10px !important;
     }
-    /* HF-08-MOB-02: Imagen — reducir padding interior para que ocupe más espacio
-       visual dentro del cuadrado 1:1 en cards angostas de móvil. */
-    .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
-    .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
-        padding: 6px !important;
+
+    /* Hint visual "desliza →" — inyectado por JS (HF-08-CAR) */
+    .ltms-carousel-hint {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        font-size: 11px !important;
+        color: #767676 !important;
+        padding: 4px 16px 0 !important;
+        margin-top: 2px !important;
     }
-    /* HF-08-MOB-03: Producto solitario al final del grid impar — centrarlo
-       en lugar de dejarlo pegado a la izquierda (UX más limpia). */
-    .elementor-wc-products ul.products li.product:last-child:nth-child(odd) {
-        grid-column: 1 / -1 !important;
-        max-width: 50% !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        justify-self: center !important;
+
+    .ltms-carousel-hint svg {
+        width: 14px !important;
+        height: 14px !important;
+        flex-shrink: 0 !important;
     }
 }
