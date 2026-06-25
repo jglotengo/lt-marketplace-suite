@@ -229,6 +229,7 @@
             injectTrustBar();
             hideQAProducts();
             fixTruncatedTexts();
+            injectCarouselHint();
         }
 
         // QA products en cualquier página de tienda
@@ -238,6 +239,44 @@
             hideQAProducts();
         }
     });
+
+    /* ══════════════════════════════════════════════════════════════
+       HF-08-CAR: Carousel hint
+       Inyecta un hint "Desliza para ver más →" debajo del carrusel
+       de productos en móvil, solo la primera vez (sessionStorage).
+       Solo se muestra en viewport ≤767px.
+       ══════════════════════════════════════════════════════════════ */
+    function injectCarouselHint() {
+        if (window.innerWidth > 767) return;
+        if (sessionStorage.getItem('ltms_car_hint_shown')) return;
+
+        var lists = document.querySelectorAll('.elementor-wc-products ul.products');
+        lists.forEach(function (ul) {
+            // Solo inyectar si hay más de 2 productos
+            var items = ul.querySelectorAll('li.product');
+            if (items.length <= 2) return;
+
+            var hint = document.createElement('div');
+            hint.className = 'ltms-carousel-hint';
+            hint.setAttribute('aria-hidden', 'true');
+            hint.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M5 12h14M12 5l7 7-7 7"/>' +
+                '</svg>' +
+                '<span>Desliza para ver más</span>';
+
+            // Insertar después del <ul>
+            ul.parentNode.insertBefore(hint, ul.nextSibling);
+
+            // Ocultar cuando el usuario empieza a deslizar
+            ul.addEventListener('scroll', function hideHint() {
+                hint.style.display = 'none';
+                ul.removeEventListener('scroll', hideHint);
+            }, { once: true });
+        });
+
+        sessionStorage.setItem('ltms_car_hint_shown', '1');
+    }
 
     /* ── HF-08: Product Card Image Fix ───────────────────────────── */
     /* Fuerza que las imágenes del loop de productos llenen el card.   */
