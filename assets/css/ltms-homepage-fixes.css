@@ -436,16 +436,37 @@ html.wp-toolbar {
         font-size: 13px !important;
         margin: 0 10px 10px !important;
     }
+    /* HF-08-MOB-01: Botón "AÑADIR AL CARRITO" — mostrar texto completo en móvil.
+       El texto se cortaba ("AÑAD...") porque el ancho de la card en grid de 2 col
+       era insuficiente para la combinación font-size 11px + padding 8px 6px.
+       Solución: reducir font-size a 10px, usar padding compacto y forzar wrap. */
     .elementor-wc-products ul.products li.product .button.add_to_cart_button,
     .elementor-wc-products ul.products li.product a.button {
-        font-size: 11px !important;
-        padding: 8px 6px !important;
+        font-size: 10px !important;
+        padding: 7px 4px !important;
         white-space: normal !important;
         text-overflow: unset !important;
         overflow: visible !important;
-        line-height: 1.3 !important;
+        line-height: 1.25 !important;
+        letter-spacing: 0.02em !important;
+        min-height: 34px !important;
     }
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
-        padding: 0 10px 10px !important;
+        padding: 0 8px 10px !important;
+    }
+    /* HF-08-MOB-02: Imagen — reducir padding interior para que ocupe más espacio
+       visual dentro del cuadrado 1:1 en cards angostas de móvil. */
+    .elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img,
+    .elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img {
+        padding: 6px !important;
+    }
+    /* HF-08-MOB-03: Producto solitario al final del grid impar — centrarlo
+       en lugar de dejarlo pegado a la izquierda (UX más limpia). */
+    .elementor-wc-products ul.products li.product:last-child:nth-child(odd) {
+        grid-column: 1 / -1 !important;
+        max-width: 50% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        justify-self: center !important;
     }
 }
