@@ -388,9 +388,14 @@ html.wp-toolbar {
     transition: background .18s, color .18s !important;
     box-shadow: none !important;
     cursor: pointer !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    /* HF-08-DSK-01: white-space:nowrap + overflow:hidden + text-overflow:ellipsis
+       causaban "AÑAD..." en todos los breakpoints donde la card era angosta.
+       Se permite wrap para que el texto siempre sea legible. */
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.25 !important;
+    min-height: 36px !important;
 }
 
 .elementor-wc-products ul.products li.product .button.add_to_cart_button:hover,
