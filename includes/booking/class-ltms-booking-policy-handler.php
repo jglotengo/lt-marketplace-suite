@@ -309,12 +309,12 @@ class LTMS_Booking_Policy_Handler {
     // ── AJAX (panel de vendedor) ────────────────────────────────────────
 
     public static function ajax_get_vendor_policies(): void {
-        check_ajax_referer( 'ltms_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
         wp_send_json_success( self::get_vendor_policies( get_current_user_id() ) );
     }
 
     public static function ajax_save_vendor_policy(): void {
-        check_ajax_referer( 'ltms_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
         $result    = self::save_policy( [
@@ -336,7 +336,7 @@ class LTMS_Booking_Policy_Handler {
     }
 
     public static function ajax_delete_vendor_policy(): void {
-        check_ajax_referer( 'ltms_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
         $policy_id = absint( $_POST['policy_id'] ?? 0 );

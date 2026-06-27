@@ -307,12 +307,12 @@ class LTMS_Booking_Season_Manager {
 	// ── AJAX (panel de vendedor) ────────────────────────────────────────
 
 	public static function ajax_get_vendor_seasons(): void {
-		check_ajax_referer( 'ltms_nonce', 'nonce' );
+		check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 		wp_send_json_success( self::get_vendor_rules( get_current_user_id() ) );
 	}
 
 	public static function ajax_save_vendor_season(): void {
-		check_ajax_referer( 'ltms_nonce', 'nonce' );
+		check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
 		$vendor_id  = get_current_user_id();
 		$rule_id    = absint( $_POST['rule_id'] ?? 0 );
@@ -384,7 +384,7 @@ class LTMS_Booking_Season_Manager {
 	}
 
 	public static function ajax_delete_vendor_season(): void {
-		check_ajax_referer( 'ltms_nonce', 'nonce' );
+		check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
 		$vendor_id = get_current_user_id();
 		$rule_id   = absint( $_POST['rule_id'] ?? 0 );
