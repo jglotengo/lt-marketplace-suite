@@ -92,7 +92,8 @@ final class LTMS_Core_Kernel {
             // Siempre escribir en error_log de PHP (visible en cPanel/hosting).
             // Esto permite diagnosticar el error sin re-lanzar la excepción.
             error_log( 'LTMS KERNEL BOOT ERROR: ' . $e->getMessage()
-                . ' in ' . $e->getFile() . ':' . $e->getLine() );
+                . ' in ' . $e->getFile() . ':' . $e->getLine()
+                . "\nTrace: " . $e->getTraceAsString() );
 
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::log(
