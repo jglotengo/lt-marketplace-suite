@@ -53,24 +53,25 @@ class LTMS_Vendor_Storefront {
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 
         // SiteGround Optimizer combina todos los CSS del tema en un archivo externo
-        // que se carga ANTES del nuestro, rompiendo la cascada. Estos filtros se
-        // registran en 'init' (no en wp_enqueue_scripts) para que SG los vea antes
-        // de procesar la combinación. Excluyen la URL /vendedor/* de todas las
-        // optimizaciones de página (CSS combine, JS combine, HTML minify).
-        if ( self::detect_request_slug() ) {
-            add_filter( 'sgo_css_combine_exclude_ids',    [ __CLASS__, 'sg_exclude_all_ids' ] );
-            add_filter( 'sgo_js_combine_exclude_ids',     [ __CLASS__, 'sg_exclude_all_ids' ] );
-            add_filter( 'sgo_css_minify_exclude_ids',     [ __CLASS__, 'sg_exclude_all_ids' ] );
-            add_filter( 'sgo_js_minify_exclude_ids',      [ __CLASS__, 'sg_exclude_all_ids' ] );
-            add_filter( 'sgo_html_minify_exclude',        [ __CLASS__, 'sg_optimizer_exclude_url' ] );
-            add_filter( 'sgo_critical_css_exclude_list',  [ __CLASS__, 'sg_optimizer_exclude_url' ] );
-            // Forzar SG a no combinar CSS en esta request
+        // que se carga ANTES del nuestro, rompiendo la cascada. Se registran en
+        // 'wp' (no en init) para que $wp_query ya exista y detect_request_slug()
+        // pueda usar get_query_var() de forma segura.
+        add_action( 'wp', static function(): void {
+            if ( ! self::detect_request_slug() ) {
+                return;
+            }
+            add_filter( 'sgo_css_combine_exclude_ids',    [ self::class, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_js_combine_exclude_ids',     [ self::class, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_css_minify_exclude_ids',     [ self::class, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_js_minify_exclude_ids',      [ self::class, 'sg_exclude_all_ids' ] );
+            add_filter( 'sgo_html_minify_exclude',        [ self::class, 'sg_optimizer_exclude_url' ] );
+            add_filter( 'sgo_critical_css_exclude_list',  [ self::class, 'sg_optimizer_exclude_url' ] );
             add_filter( 'sgo_css_combine',    '__return_false' );
             add_filter( 'sgo_js_combine',     '__return_false' );
             add_filter( 'sgo_css_minify',     '__return_false' );
             add_filter( 'sgo_js_minify',      '__return_false' );
             add_filter( 'sgo_html_minify',    '__return_false' );
-        }
+        } );
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'cart_count_fragment' ] );
     }
 
