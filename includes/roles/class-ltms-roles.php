@@ -137,11 +137,12 @@ final class LTMS_Roles {
         // Registrar filtro de capacidades dinámicas.
         add_filter( 'user_has_cap', [ __CLASS__, 'dynamic_capabilities' ], 10, 4 );
 
-        // Auto-healing: si el administrador perdió caps LTMS (migración de BD,
-        // activación fallida, restauración de backup), las re-añade una vez por
-        // versión del plugin. Se ejecuta en cada request pero la escritura real
-        // solo ocurre cuando faltan caps, y el transient la previene en subsiguientes.
+        // Auto-healing del ROL: corre en 'init' prioridad 1 (sin sesión aún, solo rol global).
         add_action( 'init', [ __CLASS__, 'ensure_admin_caps' ], 1 );
+
+        // Auto-healing del USUARIO: corre en 'wp_loaded' donde ya está la sesión activa.
+        // Repara caps del usuario logueado si el rol las tiene pero el usermeta no.
+        add_action( 'wp_loaded', [ __CLASS__, 'ensure_current_user_caps' ], 1 );
     }
 
     /**
@@ -190,7 +191,11 @@ final class LTMS_Roles {
     public static function ensure_admin_caps(): void {
         $transient_key = 'ltms_admin_caps_ok_' . md5( LTMS_VERSION );
 
-        // 1. Reparar el ROL administrator si le faltan caps.
+        if ( get_transient( $transient_key ) ) {
+            return;
+        }
+
+        // Reparar el ROL administrator si le faltan caps.
         $role    = get_role( 'administrator' );
         $missing = [];
 
@@ -201,9 +206,6 @@ final class LTMS_Roles {
             );
 
             if ( ! empty( $missing ) ) {
-                // Hay caps faltantes en el rol → invalida transient y repara.
-                delete_transient( $transient_key );
-
                 foreach ( $missing as $cap ) {
                     $role->add_cap( $cap, true );
                 }
@@ -221,40 +223,57 @@ final class LTMS_Roles {
             }
         }
 
-        // 2. Reparar también el USUARIO actual si es administrador.
-        // Las caps del rol se propagan a usuarios nuevos, pero usuarios existentes
-        // pueden tener su propio usermeta que no incluye las caps LTMS.
-        if ( is_user_logged_in() ) {
-            $user = wp_get_current_user();
-            if ( $user && in_array( 'administrator', (array) $user->roles, true ) ) {
-                $user_missing = array_filter(
-                    self::ADMIN_CAPABILITIES,
-                    fn( string $cap ) => ! $user->has_cap( $cap )
+        set_transient( $transient_key, true, DAY_IN_SECONDS );
+    }
+
+    /**
+     * Repara las caps del usuario administrador actualmente logueado.
+     *
+     * Se ejecuta en 'wp_loaded' donde la sesión ya está cargada.
+     * Cubre el caso donde el usermeta del usuario existente no tiene
+     * las caps LTMS (no hereda automáticamente las del rol global).
+     *
+     * @return void
+     */
+    public static function ensure_current_user_caps(): void {
+        if ( ! is_user_logged_in() ) {
+            return;
+        }
+
+        $user = wp_get_current_user();
+        if ( ! $user || ! in_array( 'administrator', (array) $user->roles, true ) ) {
+            return;
+        }
+
+        $transient_key = 'ltms_user_caps_ok_' . md5( LTMS_VERSION . '_' . $user->ID );
+        if ( get_transient( $transient_key ) ) {
+            return;
+        }
+
+        $user_missing = array_filter(
+            self::ADMIN_CAPABILITIES,
+            fn( string $cap ) => ! $user->has_cap( $cap )
+        );
+
+        if ( ! empty( $user_missing ) ) {
+            foreach ( $user_missing as $cap ) {
+                $user->add_cap( $cap, true );
+            }
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'CAPS_AUTOHEALED_USER',
+                    sprintf(
+                        'Auto-heal usuario #%d: %d caps añadidas: %s',
+                        $user->ID,
+                        count( $user_missing ),
+                        implode( ', ', $user_missing )
+                    )
                 );
-                if ( ! empty( $user_missing ) ) {
-                    delete_transient( $transient_key );
-                    foreach ( $user_missing as $cap ) {
-                        $user->add_cap( $cap, true );
-                    }
-                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                        LTMS_Core_Logger::info(
-                            'CAPS_AUTOHEALED_USER',
-                            sprintf(
-                                'Auto-heal usuario #%d: %d caps añadidas: %s',
-                                $user->ID,
-                                count( $user_missing ),
-                                implode( ', ', $user_missing )
-                            )
-                        );
-                    }
-                }
             }
         }
 
-        // 3. Solo marcar como verificado cuando no hubo cambios.
-        if ( empty( $missing ) && ! get_transient( $transient_key ) ) {
-            set_transient( $transient_key, true, DAY_IN_SECONDS );
-        }
+        set_transient( $transient_key, true, DAY_IN_SECONDS );
     }
 
     /**
