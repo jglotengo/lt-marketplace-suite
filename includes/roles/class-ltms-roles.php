@@ -188,42 +188,73 @@ final class LTMS_Roles {
      * @return void
      */
     public static function ensure_admin_caps(): void {
-        // El transient se invalida cuando cambia la versión del plugin.
         $transient_key = 'ltms_admin_caps_ok_' . md5( LTMS_VERSION );
 
-        if ( get_transient( $transient_key ) ) {
-            return; // Ya verificado en este ciclo de versión.
-        }
+        // 1. Reparar el ROL administrator si le faltan caps.
+        $role    = get_role( 'administrator' );
+        $missing = [];
 
-        $role = get_role( 'administrator' );
-        if ( ! $role ) {
-            return;
-        }
+        if ( $role ) {
+            $missing = array_filter(
+                self::ADMIN_CAPABILITIES,
+                fn( string $cap ) => ! $role->has_cap( $cap )
+            );
 
-        $missing = array_filter(
-            self::ADMIN_CAPABILITIES,
-            fn( string $cap ) => ! $role->has_cap( $cap )
-        );
+            if ( ! empty( $missing ) ) {
+                // Hay caps faltantes en el rol → invalida transient y repara.
+                delete_transient( $transient_key );
 
-        if ( ! empty( $missing ) ) {
-            foreach ( $missing as $cap ) {
-                $role->add_cap( $cap, true );
+                foreach ( $missing as $cap ) {
+                    $role->add_cap( $cap, true );
+                }
+
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::info(
+                        'CAPS_AUTOHEALED',
+                        sprintf(
+                            'Auto-heal rol: %d caps añadidas al rol administrator: %s',
+                            count( $missing ),
+                            implode( ', ', $missing )
+                        )
+                    );
+                }
             }
+        }
 
-            if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                LTMS_Core_Logger::info(
-                    'CAPS_AUTOHEALED',
-                    sprintf(
-                        'Auto-heal: %d caps añadidas al rol administrator: %s',
-                        count( $missing ),
-                        implode( ', ', $missing )
-                    )
+        // 2. Reparar también el USUARIO actual si es administrador.
+        // Las caps del rol se propagan a usuarios nuevos, pero usuarios existentes
+        // pueden tener su propio usermeta que no incluye las caps LTMS.
+        if ( is_user_logged_in() ) {
+            $user = wp_get_current_user();
+            if ( $user && in_array( 'administrator', (array) $user->roles, true ) ) {
+                $user_missing = array_filter(
+                    self::ADMIN_CAPABILITIES,
+                    fn( string $cap ) => ! $user->has_cap( $cap )
                 );
+                if ( ! empty( $user_missing ) ) {
+                    delete_transient( $transient_key );
+                    foreach ( $user_missing as $cap ) {
+                        $user->add_cap( $cap, true );
+                    }
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::info(
+                            'CAPS_AUTOHEALED_USER',
+                            sprintf(
+                                'Auto-heal usuario #%d: %d caps añadidas: %s',
+                                $user->ID,
+                                count( $user_missing ),
+                                implode( ', ', $user_missing )
+                            )
+                        );
+                    }
+                }
             }
         }
 
-        // Marcar como verificado para esta versión (24 horas).
-        set_transient( $transient_key, true, DAY_IN_SECONDS );
+        // 3. Solo marcar como verificado cuando no hubo cambios.
+        if ( empty( $missing ) && ! get_transient( $transient_key ) ) {
+            set_transient( $transient_key, true, DAY_IN_SECONDS );
+        }
     }
 
     /**
