@@ -693,14 +693,21 @@
   display: flex;
   align-items: center;
   text-decoration: none;
-  color: var(--sf-text);
+  color: var(--sf-white);
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
+  /* fix(storefront): el topbar propio es blanco, pero el logo del sitio
+     está pensado para el header rojo del tema (logo/texto en blanco).
+     Sin este fondo, el logo queda invisible (blanco sobre blanco). */
+  background: var(--sf-brand);
+  padding: 6px 12px;
+  border-radius: 999px;
+  line-height: 1;
 }
 
 .ltms-sf-topbar-logo img {
-  max-height: 32px;
+  max-height: 22px;
   width: auto;
   display: block;
 }
@@ -760,6 +767,12 @@
 
 @media (max-width: 480px) {
   .ltms-sf-topbar-back { display: none; }
+}
+
+/* fix(storefront): carrito demasiado chico como target de clic en desktop */
+@media (min-width: 992px) {
+  .ltms-sf-topbar-cart { font-size: 22px; gap: 8px; }
+  .ltms-sf-cart-count { min-width: 20px; height: 20px; font-size: 12px; }
 }
 
 
