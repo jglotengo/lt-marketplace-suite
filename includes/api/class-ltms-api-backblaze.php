@@ -173,6 +173,7 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
             'Location' => $this->api_url . $path,
             'Bucket'   => $bucket,
             'Key'      => $key,
+            'Location' => $this->api_url . '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' ),
         ];
     }
 
