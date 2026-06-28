@@ -74,7 +74,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
             ]],
         ];
 
-        $response = $this->perform_request( 'POST', '/partners/' . $this->partner_code . '/quotes/', $payload );
+        $response = $this->execute_http_request( 'POST', '/partners/' . $this->partner_code . '/quotes/', $payload );
 
         return $response['quotes'] ?? [];
     }
@@ -100,7 +100,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
             'purchase_date' => LTMS_Utils::now_utc(),
         ];
 
-        $response = $this->perform_request(
+        $response = $this->execute_http_request(
             'POST',
             '/partners/' . $this->partner_code . '/policies/',
             $payload
@@ -121,7 +121,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_policy( string $policy_id ): array {
-        return $this->perform_request( 'GET', '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/' );
+        return $this->execute_http_request( 'GET', '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/' );
     }
 
     /**
@@ -133,7 +133,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      */
     public function cancel_policy( string $policy_id, string $reason ): array {
         $payload  = [ 'reason' => sanitize_text_field( $reason ) ];
-        $response = $this->perform_request(
+        $response = $this->execute_http_request(
             'DELETE',
             '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/',
             $payload
@@ -150,7 +150,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      */
     public function health_check(): array {
         try {
-            $response = $this->perform_request( 'GET', '/partners/' . $this->partner_code . '/' );
+            $response = $this->execute_http_request( 'GET', '/partners/' . $this->partner_code . '/' );
             return [
                 'status'  => isset( $response['partnerCode'] ) ? 'ok' : 'error',
                 'message' => 'XCover API conectado',
