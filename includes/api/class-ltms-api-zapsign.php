@@ -80,33 +80,6 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Override perform_request to ensure api_url is always set, even if OPcache
-     * served an old version of this class without the constructor assignment.
-     * OPcache-bust: 2026-06-28 (forces FPM recompile after validate_timestamps=0 stale cache).
-     *
-     * {@inheritdoc}
-     */
-    public function perform_request(
-        string $method,
-        string $endpoint,
-        array  $data    = [],
-        array  $headers = [],
-        bool   $retry   = true
-    ): array {
-        // M-66 definitive fix: always force api_url and Authorization header at call time.
-        // OPcache on some servers serves stale bytecode that skips the constructor assignment,
-        // leaving api_url empty. Using the constant here is immune to that.
-        $this->api_url = self::API_BASE;
-
-        // Also ensure auth token header is always present even if default_headers was empty.
-        if ( ! empty( $this->api_token ) && empty( $headers['Authorization'] ) ) {
-            $headers['Authorization'] = 'Bearer ' . $this->api_token;
-        }
-
-        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
-    }
-
-    /**
      * Crea un documento para firma y envía invitaciones a los firmantes.
      *
      * @param array $document_data Datos del documento y firmantes.
