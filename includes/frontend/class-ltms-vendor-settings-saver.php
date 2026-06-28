@@ -91,6 +91,9 @@ class LTMS_Vendor_Settings_Saver {
         update_user_meta( $vendor_id, 'ltms_store_banner_id',  $attachment_id );
         // M-47: también guardar la URL directamente para que get_vendor_settings la retorne sin una consulta extra.
         update_user_meta( $vendor_id, 'ltms_store_banner_url', $banner_url );
+        // fix(storefront): el storefront público lee 'ltms_store_banner' (class-ltms-vendor-storefront.php),
+        // no 'ltms_store_banner_url'. Sin esta línea el banner se sube pero nunca se refleja en /vendedor/{slug}/.
+        update_user_meta( $vendor_id, 'ltms_store_banner',     $banner_url );
 
         wp_send_json_success( [
             'attachment_id' => $attachment_id,
