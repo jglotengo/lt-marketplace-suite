@@ -60,7 +60,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
         $this->api_url   = ( 'yes' === $sandbox )
             ? 'https://api.siigo.com' // Nota: Siigo no tiene sandbox público separado por URL,
                                        // el sandbox se activa con credenciales de prueba en el mismo host.
-                                       // Mantener igual pero marcar env header en execute_http_request.
+                                       // Mantener igual pero marcar env header en perform_request.
             : 'https://api.siigo.com';
         $this->timeout   = 60; // Las operaciones de Siigo pueden ser lentas
 
@@ -136,7 +136,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
     public function create_invoice( array $invoice_data ): array {
         $this->ensure_authenticated();
 
-        $response = $this->execute_http_request( 'POST', '/v1/invoices', $invoice_data );
+        $response = $this->perform_request( 'POST', '/v1/invoices', $invoice_data );
 
         LTMS_Core_Logger::info(
             'SIIGO_INVOICE_CREATED',
@@ -155,7 +155,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
      */
     public function create_credit_note( array $credit_note_data ): array {
         $this->ensure_authenticated();
-        return $this->execute_http_request( 'POST', '/v1/credit-notes', $credit_note_data );
+        return $this->perform_request( 'POST', '/v1/credit-notes', $credit_note_data );
     }
 
     /**
@@ -173,7 +173,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
         // Buscar por NIT/identificación
         if ( ! empty( $nit ) ) {
             try {
-                $search = $this->execute_http_request( 'GET', "/v1/customers?identification={$nit}&page=1&page_size=1" );
+                $search = $this->perform_request( 'GET', "/v1/customers?identification={$nit}&page=1&page_size=1" );
                 if ( ! empty( $search['results'][0] ) ) {
                     return $search['results'][0];
                 }
@@ -210,7 +210,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             'fiscal_responsibilities' => [ [ 'code' => 'R-99-PN' ] ], // No responsable de IVA por defecto
         ];
 
-        return $this->execute_http_request( 'POST', '/v1/customers', $payload );
+        return $this->perform_request( 'POST', '/v1/customers', $payload );
     }
 
     /**
@@ -223,7 +223,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
         $this->ensure_authenticated();
 
         try {
-            $response = $this->execute_http_request( 'GET', "/v1/products?code={$code}&page=1&page_size=1" );
+            $response = $this->perform_request( 'GET', "/v1/products?code={$code}&page=1&page_size=1" );
             return $response['results'][0] ?? null;
         } catch ( \Throwable $e ) {
             return null;
@@ -321,7 +321,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
      *
      * @inheritDoc
      */
-    protected function execute_http_request(
+    protected function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
@@ -330,7 +330,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
     ): array {
         $headers['Authorization'] = 'Bearer ' . $this->access_token;
         $headers['Partner-Id']    = 'ltms';
-        return parent::execute_http_request( $method, $endpoint, $data, $headers, $retry );
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
     }
 
     /**
