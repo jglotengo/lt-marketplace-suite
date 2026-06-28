@@ -80,6 +80,26 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * {@inheritdoc}
+     * Declared public explicitly to match abstract base class visibility.
+     * Required because PHP-FPM OPcache may serve stale bytecode with protected visibility.
+     */
+    public function perform_request(
+        string $method,
+        string $endpoint,
+        array  $data    = [],
+        array  $headers = [],
+        bool   $retry   = true
+    ): array {
+        // Ensure api_url and auth header are always set (M-66 fix).
+        $this->api_url = self::API_BASE;
+        if ( ! empty( $this->api_token ) && empty( $headers['Authorization'] ) ) {
+            $headers['Authorization'] = 'Bearer ' . $this->api_token;
+        }
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
+    }
+
+    /**
      * Crea un documento para firma y envía invitaciones a los firmantes.
      *
      * @param array $document_data Datos del documento y firmantes.
