@@ -146,7 +146,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             ];
         }
 
-        return $this->execute_http_request( 'POST', '/contacts', $payload );
+        return $this->perform_request( 'POST', '/contacts', $payload );
     }
 
     /**
@@ -199,7 +199,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         foreach ( $queries as $q ) {
             try {
                 $endpoint = '/contacts?' . http_build_query( [ 'query' => $q, 'limit' => 50, 'start' => 0 ] );
-                $response = $this->execute_http_request( 'GET', $endpoint, [], [], false );
+                $response = $this->perform_request( 'GET', $endpoint, [], [], false );
                 $contacts = is_array( $response ) ? ( $response['data'] ?? $response ) : [];
 
                 if ( is_array( $contacts ) ) {
@@ -227,7 +227,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         for ( $page = 0; $page < $max_pages; $page++ ) {
             try {
                 $endpoint = '/contacts?start=' . $start . '&limit=' . $limit;
-                $response = $this->execute_http_request( 'GET', $endpoint, [], [], false );
+                $response = $this->perform_request( 'GET', $endpoint, [], [], false );
             } catch ( \RuntimeException $e ) {
                 break;
             }
@@ -364,7 +364,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['description'] = substr( sanitize_textarea_field( $item_data['description'] ), 0, 500 );
         }
 
-        return $this->execute_http_request( 'POST', '/items', $payload );
+        return $this->perform_request( 'POST', '/items', $payload );
     }
 
     /**
@@ -380,7 +380,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             'price' => isset( $item_data['price'] ) ? (float) $item_data['price'] : null,
         ] );
 
-        return $this->execute_http_request( 'PUT', '/items/' . $alegra_item_id, $payload );
+        return $this->perform_request( 'PUT', '/items/' . $alegra_item_id, $payload );
     }
 
     // ── FACTURAS ───────────────────────────────────────────────────
@@ -435,7 +435,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             ];
         }
 
-        return $this->execute_http_request( 'POST', '/invoices', $payload );
+        return $this->perform_request( 'POST', '/invoices', $payload );
     }
 
     /**
@@ -445,7 +445,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_invoice( int $invoice_id ): array {
-        return $this->execute_http_request( 'GET', '/invoices/' . $invoice_id );
+        return $this->perform_request( 'GET', '/invoices/' . $invoice_id );
     }
 
     /**
@@ -463,7 +463,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             throw new \InvalidArgumentException( '[Alegra] Ningún email válido para enviar la factura.' );
         }
 
-        return $this->execute_http_request( 'POST', '/invoices/' . $invoice_id . '/email', [
+        return $this->perform_request( 'POST', '/invoices/' . $invoice_id . '/email', [
             'emails'          => array_values( $valid_emails ),
             'sendCopyToUser'  => $copy_user,
         ] );
@@ -485,7 +485,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         ] );
 
         $endpoint = '/invoices?' . http_build_query( $params );
-        return $this->execute_http_request( 'GET', $endpoint );
+        return $this->perform_request( 'GET', $endpoint );
     }
 
     // ── PAGOS ──────────────────────────────────────────────────────
@@ -517,7 +517,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['observations'] = substr( sanitize_textarea_field( $payment_data['observations'] ), 0, 500 );
         }
 
-        return $this->execute_http_request( 'POST', '/payments', $payload );
+        return $this->perform_request( 'POST', '/payments', $payload );
     }
 
     // ── NUMERACIONES ───────────────────────────────────────────────
@@ -528,7 +528,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @return array Lista de numeraciones.
      */
     public function get_number_templates(): array {
-        $response = $this->execute_http_request( 'GET', '/number-templates?documentType=invoice' );
+        $response = $this->perform_request( 'GET', '/number-templates?documentType=invoice' );
         return is_array( $response ) ? $response : [];
     }
 
@@ -540,7 +540,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_company(): array {
-        return $this->execute_http_request( 'GET', '/company' );
+        return $this->perform_request( 'GET', '/company' );
     }
 
     // ── WEBHOOKS ───────────────────────────────────────────────────
@@ -588,46 +588,46 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['observations'] = substr( sanitize_textarea_field( $data['observations'] ), 0, 500 );
         }
 
-        return $this->execute_http_request( 'POST', '/credit-notes', $payload );
+        return $this->perform_request( 'POST', '/credit-notes', $payload );
     }
 
     public function get_credit_note( int $id ): array {
-        return $this->execute_http_request( 'GET', '/credit-notes/' . $id );
+        return $this->perform_request( 'GET', '/credit-notes/' . $id );
     }
 
     public function list_credit_notes( int $start = 0, int $limit = 30, array $filters = [] ): array {
         $params   = array_merge( $filters, [ 'start' => $start, 'limit' => min( $limit, 30 ) ] );
         $endpoint = '/credit-notes?' . http_build_query( $params );
-        return $this->execute_http_request( 'GET', $endpoint );
+        return $this->perform_request( 'GET', $endpoint );
     }
 
     public function register_webhook( string $event, string $url ): array {
-        return $this->execute_http_request( 'POST', '/webhooks/subscriptions', [
+        return $this->perform_request( 'POST', '/webhooks/subscriptions', [
             'event' => $event,
             'url'   => esc_url_raw( $url ),
         ] );
     }
 
     public function list_webhooks(): array {
-        return $this->execute_http_request( 'GET', '/webhooks/subscriptions' );
+        return $this->perform_request( 'GET', '/webhooks/subscriptions' );
     }
 
     public function delete_webhook( int $subscription_id ): array {
-        return $this->execute_http_request( 'DELETE', '/webhooks/subscriptions/' . $subscription_id );
+        return $this->perform_request( 'DELETE', '/webhooks/subscriptions/' . $subscription_id );
     }
 
     public function get_bank_accounts(): array {
-        $response = $this->execute_http_request( 'GET', '/bank-accounts?status=active&limit=50' );
+        $response = $this->perform_request( 'GET', '/bank-accounts?status=active&limit=50' );
         return is_array( $response ) ? $response : [];
     }
 
     public function get_taxes(): array {
-        $response = $this->execute_http_request( 'GET', '/taxes?limit=100' );
+        $response = $this->perform_request( 'GET', '/taxes?limit=100' );
         return is_array( $response ) ? ( $response['data'] ?? $response ) : [];
     }
 
     public function get_categories(): array {
-        $response = $this->execute_http_request( 'GET', '/categories?limit=200' );
+        $response = $this->perform_request( 'GET', '/categories?limit=200' );
         return is_array( $response ) ? ( $response['data'] ?? $response ) : [];
     }
 
@@ -659,12 +659,12 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     // ── Overrides de la clase abstracta ───────────────────────────
 
     /**
-     * Sobrescribe execute_http_request para inyectar HTTP Basic Auth de Alegra.
+     * Sobrescribe perform_request para inyectar HTTP Basic Auth de Alegra.
      * Alegra usa base64(email:token) como Authorization header.
      *
      * @inheritDoc
      */
-    protected function execute_http_request(
+    protected function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
@@ -672,7 +672,7 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         bool   $retry   = true
     ): array {
         $headers['Authorization'] = 'Basic ' . base64_encode( $this->email . ':' . $this->api_token );
-        return parent::execute_http_request( $method, $endpoint, $data, $headers, $retry );
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
     }
 
     // ── Helpers privados ──────────────────────────────────────────
