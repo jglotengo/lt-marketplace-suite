@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Extiende LTMS_Abstract_API_Client pero delega las llamadas HTTP
  * al SDK oficial de Stripe (que ya maneja reintentos y autenticación).
- * perform_request() no se usa; en su lugar se llaman directamente los
+ * execute_http_request() no se usa; en su lugar se llaman directamente los
  * métodos del SDK dentro de bloques try/catch.
  */
 final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
