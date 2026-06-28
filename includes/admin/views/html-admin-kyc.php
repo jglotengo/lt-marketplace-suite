@@ -279,15 +279,13 @@ $total_kyc = array_sum( $count_map );
             // Recolectar todas las URLs de documentos del response
             var d    = res.data;
             var docs = [];
-            var fields = [ 'doc_url_cedula', 'doc_url_rut', 'doc_url_camara', 'doc_url_selfie', 'doc_url_nit', 'doc_url_banco' ];
-            $.each( fields, function( i, key ) {
-                if ( d[ key ] && d[ key ] !== '#' && d[ key ] !== '' ) {
-                    docs.push( d[ key ] );
-                }
-            } );
-            // También soportar formato array docs[] si existe
-            if ( d.docs && Array.isArray( d.docs ) ) {
-                $.each( d.docs, function( i, u ) { if ( u && u !== '#' ) docs.push( u ); } );
+            // El handler devuelve res.data.docs como objeto { cedula, rut, camara, selfie, nit, banco }
+            if ( d.docs && typeof d.docs === 'object' ) {
+                $.each( d.docs, function( key, url ) {
+                    if ( url && url !== '#' && url !== '' ) {
+                        docs.push( url );
+                    }
+                } );
             }
             ltmsRenderKycDocs( docs );
         } ).fail( function() {
