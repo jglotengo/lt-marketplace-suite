@@ -153,12 +153,14 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
 
         $status = wp_remote_retrieve_response_code( $response );
         if ( $status < 200 || $status >= 300 ) {
+            $body = wp_remote_retrieve_body( $response );
             throw new \RuntimeException(
                 sprintf(
-                    '[backblaze] Error HTTP %d al subir archivo "%s/%s".',
+                    '[backblaze] Error HTTP %d al subir archivo "%s/%s". Respuesta: %s',
                     $status,
                     $bucket,
-                    $key
+                    $key,
+                    substr( $body, 0, 500 )
                 ),
                 $status
             );
