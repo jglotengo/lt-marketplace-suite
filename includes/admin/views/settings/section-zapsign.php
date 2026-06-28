@@ -12,7 +12,7 @@ $kyc_enabled        = get_option( 'ltms_kyc_zapsign_enabled', 'no' );
 $template_id        = get_option( 'ltms_zapsign_vendor_template_id', '' );
 $contract_pdf_url   = get_option( 'ltms_zapsign_contract_pdf_url', '' );
 $attachment_id      = get_option( 'ltms_zapsign_contract_attachment_id', '' );
-$sandbox            = get_option( 'ltms_zapsign_sandbox', '' );
+$sandbox            = get_option( 'ltms_zapsign_sandbox', 'no' );
 $webhook_url        = home_url( '/wp-json/ltms/v1/webhooks/zapsign' );
 $is_configured      = ! empty( $api_token ) && $api_token !== '';
 ?>
@@ -60,7 +60,7 @@ $is_configured      = ! empty( $api_token ) && $api_token !== '';
         <th scope="row"><?php esc_html_e( 'Modo Sandbox', 'ltms' ); ?></th>
         <td>
             <label>
-                <input type="checkbox" name="ltms_zapsign_sandbox" value="1" <?php checked( $sandbox, '1' ); ?>>
+                <input type="checkbox" name="ltms_zapsign_sandbox" value="yes" <?php checked( $sandbox, 'yes' ); ?>>
                 <?php esc_html_e( 'Usar sandbox (pruebas — los documentos NO tienen validez legal)', 'ltms' ); ?>
             </label>
             <p class="description"><?php esc_html_e( 'Desactiva en producción para que los contratos sean legalmente vinculantes.', 'ltms' ); ?></p>
