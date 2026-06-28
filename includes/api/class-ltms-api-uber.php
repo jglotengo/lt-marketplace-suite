@@ -97,7 +97,7 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
 
         $endpoint = sprintf( '/v1/customers/%s/delivery_quotes', rawurlencode( $this->customer_id ) );
 
-        return $this->perform_request( 'POST', $endpoint, $quote_data );
+        return $this->execute_http_request( 'POST', $endpoint, $quote_data );
     }
 
     /**
@@ -127,7 +127,7 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
             [ 'quote_id' => $quote_id ]
         );
 
-        return $this->perform_request( 'POST', $endpoint, $payload );
+        return $this->execute_http_request( 'POST', $endpoint, $payload );
     }
 
     /**
@@ -146,7 +146,7 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
             rawurlencode( $delivery_id )
         );
 
-        return $this->perform_request( 'GET', $endpoint );
+        return $this->execute_http_request( 'GET', $endpoint );
     }
 
     /**
@@ -165,7 +165,7 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
             rawurlencode( $delivery_id )
         );
 
-        return $this->perform_request( 'POST', $endpoint );
+        return $this->execute_http_request( 'POST', $endpoint );
     }
 
     /**
