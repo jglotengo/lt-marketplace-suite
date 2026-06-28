@@ -129,9 +129,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 + <?php esc_html_e( 'Nueva temporada', 'ltms' ); ?>
             </button>
         </div>
-        <p style="font-size:.85rem;color:#6b7280;margin-bottom:16px;">
-            <?php esc_html_e( 'Define períodos con precios distintos para un alojamiento específico, o para todos a la vez. Modificador 1.50 = +50%; 0.80 = −20%.', 'ltms' ); ?>
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:8px;">
+            <?php esc_html_e( 'Define períodos donde tus precios suben o bajan automáticamente según la época del año.', 'ltms' ); ?>
         </p>
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;color:#0369a1;line-height:1.6;">
+            💡 <strong><?php esc_html_e( 'Ejemplos:', 'ltms' ); ?></strong>
+            <?php esc_html_e( 'Semana Santa → Modificador 1.50 (precios +50% más caros). Temporada baja → Modificador 0.80 (precios 20% más baratos). Sin cambio → Modificador 1.00.', 'ltms' ); ?>
+        </div>
         <div class="ltms-card" style="margin-bottom:20px;overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;">
                 <thead><tr style="background:#f9fafb;font-size:.8rem;color:#374151;">
@@ -166,6 +170,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 <div>
                     <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Modificador *', 'ltms' ); ?></label>
                     <input type="number" id="ltms-season-modifier" class="ltms-form-control" step="0.05" min="0.1" max="10" value="1.50">
+                    <span style="font-size:.75rem;color:#6b7280;margin-top:4px;display:block;"><?php esc_html_e( '1.50 = +50% · 0.80 = −20% · 1.00 = sin cambio', 'ltms' ); ?></span>
                 </div>
                 <div>
                     <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Fecha inicio *', 'ltms' ); ?></label>
