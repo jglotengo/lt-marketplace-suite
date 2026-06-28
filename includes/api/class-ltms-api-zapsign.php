@@ -383,6 +383,42 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         return file_exists( $local ) ? $local : null;
     }
 
+
+    /**
+     * Crea un documento en ZapSign a partir de una plantilla (template_id).
+     * Usa el endpoint /models/{template_id}/create-doc/ que ZapSign expone
+     * para documentos basados en modelos pre-configurados.
+     *
+     * El payload puede incluir: name, external_id, lang, send_automatic_email,
+     * y un array 'signers' con los firmantes y sus campos de datos ('data').
+     *
+     * @param string $template_id ID de la plantilla ZapSign.
+     * @param array  $payload     Cuerpo del documento a crear.
+     * @return array{success: bool, doc_token: string, sign_url: string, open_id: string, status: string}
+     */
+    public function create_document_from_template( string $template_id, array $payload ): array {
+        $response = $this->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
+
+        if ( empty( $response['token'] ) ) {
+            return [
+                'success'   => false,
+                'doc_token' => '',
+                'sign_url'  => '',
+                'open_id'   => '',
+                'status'    => 'error',
+                'error'     => $response['error'] ?? wp_json_encode( $response ),
+            ];
+        }
+
+        return [
+            'success'   => true,
+            'doc_token' => $response['token'],
+            'sign_url'  => $response['signers'][0]['sign_url'] ?? '',
+            'open_id'   => $response['open_id'] ?? '',
+            'status'    => $response['status'] ?? 'pending',
+        ];
+    }
+
     // ── Helpers privados ──────────────────────────────────────────
 
     /**
