@@ -100,7 +100,7 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * Sube un archivo al bucket especificado.
      *
      * Usa wp_remote_request directamente para manejar el cuerpo binario crudo,
-     * ya que perform_request codifica el body como JSON.
+     * ya que wp_remote_request permite manejar el cuerpo binario crudo directamente.
      *
      * @param string $bucket   Nombre del bucket de destino.
      * @param string $key      Clave (ruta) del objeto en el bucket.
@@ -244,7 +244,22 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         $path           = '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' );
         $signed_headers = $this->sign_request( 'DELETE', $path, [], '' );
 
-        $this->perform_request( 'DELETE', $path, [], $signed_headers );
+        $response_del = wp_remote_request(
+            $this->api_url . $path,
+            [
+                'method'    => 'DELETE',
+                'headers'   => $signed_headers,
+                'timeout'   => $this->timeout,
+                'sslverify' => LTMS_Core_Config::is_production(),
+            ]
+        );
+        if ( is_wp_error( $response_del ) ) {
+            throw new \RuntimeException( '[backblaze] Error de red al eliminar: ' . $response_del->get_error_message() );
+        }
+        $del_status = wp_remote_retrieve_response_code( $response_del );
+        if ( $del_status < 200 || $del_status >= 300 ) {
+            throw new \RuntimeException( sprintf( '[backblaze] Error HTTP %d al eliminar.', $del_status ), $del_status );
+        }
 
         return true;
     }
@@ -265,7 +280,26 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         // Firmamos la ruta canónica (path + query string)
         $signed_headers = $this->sign_request( 'GET', $path, [], '', 's3', $qs );
 
-        return $this->perform_request( 'GET', $endpoint, [], $signed_headers );
+        $response_list = wp_remote_get(
+            $this->api_url . $endpoint,
+            [
+                'headers'   => $signed_headers,
+                'timeout'   => $this->timeout,
+                'sslverify' => LTMS_Core_Config::is_production(),
+            ]
+        );
+        if ( is_wp_error( $response_list ) ) {
+            throw new \RuntimeException( '[backblaze] Error de red al listar: ' . $response_list->get_error_message() );
+        }
+        $list_status = wp_remote_retrieve_response_code( $response_list );
+        if ( $list_status < 200 || $list_status >= 300 ) {
+            $list_body = wp_remote_retrieve_body( $response_list );
+            throw new \RuntimeException(
+                sprintf( '[backblaze] Error HTTP %d al listar. Respuesta: %s', $list_status, substr( $list_body, 0, 400 ) ),
+                $list_status
+            );
+        }
+        return [ 'raw' => wp_remote_retrieve_body( $response_list ), 'status' => $list_status ];
     }
 
     /**
