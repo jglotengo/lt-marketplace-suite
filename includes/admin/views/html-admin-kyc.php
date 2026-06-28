@@ -94,8 +94,14 @@ $total_kyc = array_sum( $count_map );
         }
         $make_signed_url = static function( string $key ) use ( $b2_client, $kyc_bucket ): string {
             if ( empty( $key ) ) return '';
-            // Si ya es una URL completa (http/https) devolverla tal cual
-            if ( str_starts_with( $key, 'http' ) ) return $key;
+            // Convertir URLs legacy ltms-vault a key B2 relativa
+            if ( str_starts_with( $key, 'http' ) ) {
+                if ( str_contains( $key, '/ltms-vault/' ) ) {
+                    $key = preg_replace( '#^.*/ltms-vault/#', '', $key );
+                } else {
+                    return $key; // URL externa real
+                }
+            }
             // Generar URL pre-firmada — TTL 3600 s (1 hora)
             if ( $b2_client ) {
                 try { return $b2_client->get_signed_url( $kyc_bucket, $key, 3600 ); } catch ( \Throwable $e ) {}
