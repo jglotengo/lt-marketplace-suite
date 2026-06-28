@@ -482,7 +482,16 @@ final class LTMS_Admin_Payouts {
         $b2_bucket = LTMS_Core_Config::get( 'ltms_b2_kyc_bucket', 'lotengo-kyc-docs' );
         $sign_doc  = static function( string $path ) use ( $b2_bucket ): string {
             if ( empty( $path ) ) return '';
-            if ( filter_var( $path, FILTER_VALIDATE_URL ) ) return $path;
+            // Convertir URLs legacy ltms-vault a key B2 relativa
+            // Ej: https://lo-tengo.com.co/ltms-vault/kyc/168/file.pdf → kyc/168/file.pdf
+            if ( filter_var( $path, FILTER_VALIDATE_URL ) ) {
+                if ( str_contains( $path, '/ltms-vault/' ) ) {
+                    $path = preg_replace( '#^.*/ltms-vault/#', '', $path );
+                } else {
+                    // URL externa real (ya es una URL pública/firmada) — devolverla tal cual
+                    return $path;
+                }
+            }
             if ( class_exists( 'LTMS_Api_Factory' ) ) {
                 try {
                     $b2  = LTMS_Api_Factory::get( 'backblaze' );
