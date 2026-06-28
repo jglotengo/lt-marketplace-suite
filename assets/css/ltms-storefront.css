@@ -809,3 +809,12 @@
   top: 0 !important;
   z-index: 9999 !important;
 }
+
+/* ── Fix bubble WhatsApp (plugin Click to Chat / HasThemes) ───────────────
+   En la vitrina el bubble queda sobre los íconos de comparar/wishlist de la
+   segunda columna del grid. Lo movemos a la esquina inferior-izquierda solo
+   dentro de .ltms-storefront-page; el resto del sitio no se toca. */
+.ltms-storefront-page #ht-ctc-chat {
+  right: auto !important;
+  left: 15px   !important;
+}
