@@ -82,6 +82,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
     /**
      * Override perform_request to ensure api_url is always set, even if OPcache
      * served an old version of this class without the constructor assignment.
+     * OPcache-bust: 2026-06-28 (forces FPM recompile after validate_timestamps=0 stale cache).
      *
      * {@inheritdoc}
      */
