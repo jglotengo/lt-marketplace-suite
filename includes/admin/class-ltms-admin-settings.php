@@ -215,6 +215,8 @@ final class LTMS_Admin_Settings {
             'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled', 'ltms_deprisa_enabled',
             'ltms_ordenes_compra_enabled',
             'ltms_stripe_enabled', 'ltms_mlm_enabled',
+            // ZapSign
+            'ltms_zapsign_sandbox',
             // KYC / Compliance
             'ltms_kyc_zapsign_enabled', 'ltms_kyc_require_document',
             // Seguridad
