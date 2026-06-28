@@ -98,7 +98,7 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
      * @return array Respuesta decodificada como array.
      * @throws \RuntimeException En errores de red o HTTP no-2xx.
      */
-    public function perform_request(
+    protected function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
