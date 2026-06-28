@@ -187,7 +187,8 @@ $total_kyc = array_sum( $count_map );
                 <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                     <?php if ( ! empty( $docs ) ) : ?>
                     <button class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-kyc-view-docs"
-                            data-docs="<?php echo esc_attr( json_encode( $docs ) ); ?>">
+                            data-kyc-id="<?php echo esc_attr( $kyc['id'] ); ?>"
+                            data-nonce="<?php echo esc_attr( $nonce ); ?>">
                         &#x1F50D; <?php esc_html_e( 'Ver docs', 'ltms' ); ?>
                     </button>
                     <?php endif; ?>
@@ -229,35 +230,70 @@ $total_kyc = array_sum( $count_map );
 (function( $ ) {
     'use strict';
 
-    // Modal docs
-    $( document ).on( 'click', '.ltms-kyc-view-docs', function() {
-        var raw  = $( this ).data( 'docs' );
-        var docs = [];
-        try {
-            docs = ( typeof raw === 'string' ) ? JSON.parse( raw ) : ( Array.isArray( raw ) ? raw : [] );
-        } catch(e) { docs = []; }
+    // Modal docs — carga URLs pre-firmadas via AJAX para evitar links caducados
+    function ltmsRenderKycDocs( docs ) {
         var html = '';
-        if ( ! docs.length ) {
+        if ( ! docs || ! docs.length ) {
             html = '<p style="color:#6b7280;">No hay documentos disponibles.</p>';
         } else {
             $.each( docs, function( i, url ) {
+                if ( ! url || url === '#' ) return;
                 var ext = url.split('.').pop().toLowerCase().split('?')[0];
                 var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
+                var label = decodeURIComponent( url.split('/').pop().split('?')[0] );
                 html += '<div style="flex:1;min-width:200px;margin-bottom:8px;">';
                 if ( isImg ) {
                     html += '<a href="' + url + '" target="_blank">' +
                         '<img src="' + url + '" style="width:100%;border-radius:6px;border:1px solid #e5e7eb;" ' +
                         'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\';"/>' +
-                        '<span style="display:none;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">&#x1F4C4; ' + url.split('/').pop().split('?')[0] + '</span>' +
+                        '<span style="display:none;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">&#x1F4C4; ' + label + '</span>' +
                         '</a>';
                 } else {
-                    html += '<a href="' + url + '" target="_blank" style="display:inline-block;padding:8px 12px;background:#f3f4f6;border-radius:4px;font-size:12px;text-decoration:none;color:#1d4ed8;">&#x1F4C4; ' + url.split('/').pop().split('?')[0] + '</a>';
+                    html += '<a href="' + url + '" target="_blank" style="display:inline-block;padding:8px 12px;background:#f3f4f6;border-radius:4px;font-size:12px;text-decoration:none;color:#1d4ed8;">&#x1F4C4; ' + label + '</a>';
                 }
                 html += '</div>';
             } );
         }
         $( '#ltms-kyc-modal-content' ).html( html );
         $( '#ltms-kyc-modal' ).removeAttr( 'style' ).css({ display: 'flex', position: 'fixed', inset: '0', background: 'rgba(0,0,0,.6)', zIndex: '99999', alignItems: 'center', justifyContent: 'center' });
+    }
+
+    $( document ).on( 'click', '.ltms-kyc-view-docs', function() {
+        var $btn   = $( this ).prop( 'disabled', true );
+        var kycId  = $btn.data( 'kyc-id' );
+        var nonce  = $btn.data( 'nonce' );
+
+        $( '#ltms-kyc-modal-content' ).html( '<p style="color:#6b7280;padding:24px;text-align:center;">&#x23F3; Cargando documentos...</p>' );
+        $( '#ltms-kyc-modal' ).removeAttr( 'style' ).css({ display: 'flex', position: 'fixed', inset: '0', background: 'rgba(0,0,0,.6)', zIndex: '99999', alignItems: 'center', justifyContent: 'center' });
+
+        $.post( ajaxurl, {
+            action: 'ltms_get_kyc_details',
+            kyc_id: kycId,
+            nonce:  nonce
+        }, function( res ) {
+            $btn.prop( 'disabled', false );
+            if ( ! res.success ) {
+                $( '#ltms-kyc-modal-content' ).html( '<p style="color:#dc2626;">Error: ' + ( res.data && res.data.message ? res.data.message : 'No se pudieron cargar los documentos.' ) + '</p>' );
+                return;
+            }
+            // Recolectar todas las URLs de documentos del response
+            var d    = res.data;
+            var docs = [];
+            var fields = [ 'doc_url_cedula', 'doc_url_rut', 'doc_url_camara', 'doc_url_selfie', 'doc_url_nit', 'doc_url_banco' ];
+            $.each( fields, function( i, key ) {
+                if ( d[ key ] && d[ key ] !== '#' && d[ key ] !== '' ) {
+                    docs.push( d[ key ] );
+                }
+            } );
+            // También soportar formato array docs[] si existe
+            if ( d.docs && Array.isArray( d.docs ) ) {
+                $.each( d.docs, function( i, u ) { if ( u && u !== '#' ) docs.push( u ); } );
+            }
+            ltmsRenderKycDocs( docs );
+        } ).fail( function() {
+            $btn.prop( 'disabled', false );
+            $( '#ltms-kyc-modal-content' ).html( '<p style="color:#dc2626;">Error de conexión. Intente nuevamente.</p>' );
+        } );
     } );
     $( '#ltms-kyc-modal-close, #ltms-kyc-modal' ).on( 'click', function( e ) {
         if ( e.target === this ) $( '#ltms-kyc-modal' ).hide();
