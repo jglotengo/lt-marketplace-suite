@@ -128,7 +128,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             $payload['device_session_id'] = $device_id;
         }
 
-        $response = $this->execute_http_request(
+        $response = $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges",
             $payload
@@ -187,7 +187,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        return $this->execute_http_request(
+        return $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges",
             $payload
@@ -226,7 +226,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        return $this->execute_http_request( 'POST', "/{$this->merchant_id}/charges", $payload );
+        return $this->perform_request( 'POST', "/{$this->merchant_id}/charges", $payload );
     }
 
     /**
@@ -260,7 +260,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        return $this->execute_http_request(
+        return $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges",
             $payload
@@ -283,7 +283,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             $payload['amount'] = $this->format_amount( $amount );
         }
 
-        return $this->execute_http_request(
+        return $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges/{$charge_id}/refund",
             $payload
@@ -297,7 +297,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_charge( string $charge_id ): array {
-        return $this->execute_http_request(
+        return $this->perform_request(
             'GET',
             "/{$this->merchant_id}/charges/{$charge_id}"
         );
@@ -322,7 +322,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         }
 
         try {
-            $result = $this->execute_http_request( 'GET', "/{$this->merchant_id}/pse/banks", [], [], false );
+            $result = $this->perform_request( 'GET', "/{$this->merchant_id}/pse/banks", [], [], false );
             if ( ! empty( $result ) && is_array( $result ) ) {
                 set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
                 return $result;
@@ -338,7 +338,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         $start = microtime( true );
 
         try {
-            $response = $this->execute_http_request(
+            $response = $this->perform_request(
                 'GET',
                 "/{$this->merchant_id}/charges",
                 [],
@@ -400,7 +400,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        $response = $this->execute_http_request(
+        $response = $this->perform_request(
             'POST',
             "/{$this->merchant_id}/payouts",
             $payload
@@ -466,11 +466,11 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
     }
 
     /**
-     * Sobrescribe execute_http_request para agregar autenticación HTTP Basic.
+     * Sobrescribe perform_request para agregar autenticación HTTP Basic.
      *
      * @inheritDoc
      */
-    protected function execute_http_request(
+    protected function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
@@ -481,7 +481,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         $auth_header = 'Basic ' . base64_encode( $this->private_key . ':' );
         $headers['Authorization'] = $auth_header;
 
-        return parent::execute_http_request( $method, $endpoint, $data, $headers, $retry );
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
     }
 
     /**
