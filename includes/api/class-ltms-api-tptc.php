@@ -72,7 +72,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             'country'      => LTMS_Core_Config::get_country(),
         ];
 
-        $response = $this->perform_request( 'POST', '/affiliates', $payload );
+        $response = $this->execute_http_request( 'POST', '/affiliates', $payload );
 
         if ( ! empty( $response['affiliate_id'] ) ) {
             // Guardar IDs de TPTC en el perfil del vendedor
@@ -109,7 +109,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             'product_type' => $sale_data['product_type'] ?? 'physical',
         ];
 
-        $response = $this->perform_request( 'POST', '/sales', $payload );
+        $response = $this->execute_http_request( 'POST', '/sales', $payload );
 
         return [
             'success'         => isset( $response['transaction_id'] ),
@@ -130,7 +130,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             return [ 'status' => 'not_registered', 'points' => 0, 'rank' => '' ];
         }
 
-        $response = $this->perform_request( 'GET', '/affiliates/' . $affiliate_id . '/status' );
+        $response = $this->execute_http_request( 'GET', '/affiliates/' . $affiliate_id . '/status' );
 
         return [
             'status' => $response['status'] ?? 'unknown',
@@ -153,7 +153,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             return [];
         }
 
-        return $this->perform_request( 'GET', '/affiliates/' . $affiliate_id . '/volume/' . $period );
+        return $this->execute_http_request( 'GET', '/affiliates/' . $affiliate_id . '/volume/' . $period );
     }
 
     /**
@@ -161,7 +161,7 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
      */
     public function health_check(): array {
         try {
-            $response = $this->perform_request( 'GET', '/health' );
+            $response = $this->execute_http_request( 'GET', '/health' );
             return [
                 'status'  => ( $response['status'] ?? '' ) === 'ok' ? 'ok' : 'error',
                 'message' => 'TPTC API conectado',
