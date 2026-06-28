@@ -47,6 +47,14 @@ final class LTMS_ZapSign_Manager {
         // Enviar contrato cuando admin aprueba KYC manualmente y falta la firma
         add_action( 'ltms_kyc_approved_requires_signature', [ $instance, 'send_contract' ], 10, 1 );
 
+        // M-ZAPSIGN-GAP-01: ltms_vendor_approved se dispara tanto en aprobación manual
+        // (class-ltms-admin-payouts.php) como en aprobación automática vía webhook
+        // (class-ltms-zapsign-webhook-handler.php). La aprobación manual nunca disparaba
+        // el envío del contrato porque este listener no existía — on_vendor_approved()
+        // solo actúa si el vendedor aún no tiene ltms_contract_token, así que es un no-op
+        // seguro cuando la aprobación ya vino de una firma (el token ya existe).
+        add_action( 'ltms_vendor_approved', [ $instance, 'on_vendor_approved' ], 30 );
+
         // AJAX: reenviar contrato desde el dashboard del vendedor
         add_action( 'wp_ajax_ltms_resend_contract', [ $instance, 'ajax_resend_contract' ] );
 
@@ -81,6 +89,37 @@ final class LTMS_ZapSign_Manager {
         } catch ( \Throwable $e ) {
             $this->log_warning( 'zapsign_contract_failed',
                 sprintf( 'No se pudo enviar contrato a vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * M-ZAPSIGN-GAP-01: cubre la aprobación manual de KYC desde el panel admin
+     * (ajax_approve_kyc / ajax_quick_approve_kyc en class-ltms-admin-payouts.php),
+     * que dispara 'ltms_vendor_approved' pero nunca enviaba el contrato.
+     *
+     * No-op seguro cuando 'ltms_vendor_approved' llega desde el webhook de ZapSign
+     * (el vendedor ya firmó y ya tiene ltms_contract_token).
+     */
+    public function on_vendor_approved( int $vendor_id ): void {
+        if ( get_user_meta( $vendor_id, 'ltms_contract_token', true ) ) {
+            return;
+        }
+
+        try {
+            $result = $this->send_contract( $vendor_id );
+            if ( $result['success'] ) {
+                update_user_meta( $vendor_id, 'ltms_kyc_status', 'pending_signature' );
+                $this->log_info( 'zapsign_contract_sent',
+                    sprintf( 'Contrato enviado a vendedor #%d tras aprobación manual de KYC', $vendor_id ) );
+            } else {
+                $this->log_warning( 'zapsign_contract_failed',
+                    sprintf( 'No se pudo enviar contrato a vendedor #%d tras aprobación manual: %s',
+                        $vendor_id, $result['error'] ?? 'error desconocido' ) );
+            }
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'zapsign_contract_failed',
+                sprintf( 'Excepción enviando contrato a vendedor #%d tras aprobación manual: %s',
+                    $vendor_id, $e->getMessage() ) );
         }
     }
 
@@ -352,3 +391,4 @@ final class LTMS_ZapSign_Manager {
         }
     }
 }
+
