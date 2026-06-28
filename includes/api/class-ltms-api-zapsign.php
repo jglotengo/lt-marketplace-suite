@@ -85,7 +85,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      *
      * {@inheritdoc}
      */
-    protected function perform_request(
+    public function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
