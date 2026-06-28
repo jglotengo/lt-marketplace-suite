@@ -221,7 +221,7 @@ final class LTMS_ZapSign_Manager {
             ]],
         ];
 
-        $response = $client->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
+        $response = $client->create_document_from_template( $template_id, $payload );
 
         if ( empty( $response['token'] ) ) {
             return [
