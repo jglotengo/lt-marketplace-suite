@@ -229,6 +229,28 @@ final class LTMS_Frontend_Assets {
                 $is_auth_page = true;
             }
         }
+        // M-REG-02: fallback por slug y por datos de Elementor. Cubre el caso en que
+        // la página de registro/login fue creada con Elementor (el shortcode vive en
+        // _elementor_data, no en post_content) o no está registrada en ltms_pages.
+        if ( ! $is_auth_page && $page_id > 0 ) {
+            $post = $post ?? get_post( $page_id );
+            $auth_slugs = [
+                'registro-vendedor', 'registro-de-vendedor', 'vendor-register',
+                'vendor-registro', 'registro', 'login-vendedor', 'vendor-login',
+            ];
+            if ( $post && in_array( $post->post_name, $auth_slugs, true ) ) {
+                $is_auth_page = true;
+            }
+            if ( ! $is_auth_page && $post ) {
+                $el_data = get_post_meta( $page_id, '_elementor_data', true );
+                if ( $el_data && (
+                    str_contains( $el_data, 'ltms_vendor_register' ) ||
+                    str_contains( $el_data, 'ltms_vendor_login' )
+                ) ) {
+                    $is_auth_page = true;
+                }
+            }
+        }
         if ( $is_auth_page ) {
             $this->enqueue_auth_assets( $url, $ver, $suffix );
         }
