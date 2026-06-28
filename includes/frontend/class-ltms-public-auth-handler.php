@@ -273,6 +273,8 @@ final class LTMS_Public_Auth_Handler {
             'document'           => sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ), // phpcs:ignore
             // M-7: normalizar referral code a uppercase.
             'referral_code'      => strtoupper( sanitize_text_field( wp_unslash( $_POST['referral_code'] ?? '' ) ) ), // phpcs:ignore
+            'store_address'      => sanitize_text_field( wp_unslash( $_POST['store_address'] ?? '' ) ), // phpcs:ignore — dirección fiscal para contrato
+            'tax_regime'         => sanitize_key( wp_unslash( $_POST['tax_regime'] ?? '' ) ), // phpcs:ignore — régimen tributario para contrato
             'terms_accepted'     => ! empty( $_POST['accept_terms'] ), // phpcs:ignore
             'sagrilaft_accepted' => ! empty( $_POST['accept_sagrilaft'] ), // phpcs:ignore
             // M-MX-1: país declarado por el vendedor (CO o MX).
@@ -354,6 +356,12 @@ final class LTMS_Public_Auth_Handler {
                 update_user_meta( $user_id, 'ltms_municipality', $data['municipality_code'] );
             }
             update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $data['phone'] ) );
+            if ( ! empty( $data['store_address'] ) ) {
+                update_user_meta( $user_id, 'billing_address_1', $data['store_address'] );
+            }
+            if ( ! empty( $data['tax_regime'] ) ) {
+                update_user_meta( $user_id, 'ltms_tax_regime', $data['tax_regime'] );
+            }
             // L-1: cifrar documento (Habeas Data — Ley 1581/2012).
             // M-FIX-REG-01: LTMS_Legal_Compliance::encrypt_and_log() no existe — usar
             // LTMS_Core_Security::encrypt() directamente y log_vault_access() por separado.
@@ -610,6 +618,15 @@ final class LTMS_Public_Auth_Handler {
         }
         if ( empty( $data['document'] ) ) {
             $errors[] = [ 'field' => 'document_number', 'message' => __( 'El número de documento es requerido.', 'ltms' ) ];
+        }
+        if ( empty( $data['phone'] ) ) {
+            $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono es requerido.', 'ltms' ) ];
+        }
+        if ( empty( $data['store_address'] ) ) {
+            $errors[] = [ 'field' => 'store_address', 'message' => __( 'La dirección es requerida para el contrato de vinculación.', 'ltms' ) ];
+        }
+        if ( 'CO' === ( $data['vendor_country'] ?? 'CO' ) && empty( $data['tax_regime'] ) ) {
+            $errors[] = [ 'field' => 'tax_regime', 'message' => __( 'El régimen tributario es requerido.', 'ltms' ) ];
         }
         if ( ! $data['terms_accepted'] ) {
             $errors[] = [ 'field' => 'accept_terms', 'message' => __( 'Debes aceptar los términos y condiciones.', 'ltms' ) ];
