@@ -196,6 +196,7 @@ final class LTMS_ZapSign_Manager {
             'external_id'          => (string) $vendor_id,
             'lang'                 => 'es',
             'send_automatic_email' => true,
+            'sandbox'              => $client->is_sandbox(),
             'signers'              => [[
                 'name'        => $user->display_name,
                 'email'       => $user->user_email,
