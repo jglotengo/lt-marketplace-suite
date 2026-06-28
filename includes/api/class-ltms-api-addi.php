@@ -110,7 +110,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        $response = $this->execute_http_request( 'POST', '/v1/applications', $payload, [
+        $response = $this->perform_request( 'POST', '/v1/applications', $payload, [
             'Authorization' => 'Bearer ' . $token,
         ]);
 
@@ -129,7 +129,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
      */
     public function get_application_status( string $application_id ): array {
         $token    = $this->get_access_token();
-        $response = $this->execute_http_request( 'GET', '/v1/applications/' . $application_id, [], [
+        $response = $this->perform_request( 'GET', '/v1/applications/' . $application_id, [], [
             'Authorization' => 'Bearer ' . $token,
         ]);
 
@@ -148,7 +148,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
      */
     public function cancel_application( string $application_id ): bool {
         $token    = $this->get_access_token();
-        $response = $this->execute_http_request( 'POST', '/v1/applications/' . $application_id . '/cancel', [], [
+        $response = $this->perform_request( 'POST', '/v1/applications/' . $application_id . '/cancel', [], [
             'Authorization' => 'Bearer ' . $token,
         ]);
 
@@ -189,7 +189,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
             return $cached;
         }
 
-        $response = $this->execute_http_request( 'POST', '/v1/oauth/token', [
+        $response = $this->perform_request( 'POST', '/v1/oauth/token', [
             'grant_type'    => 'client_credentials',
             'client_id'     => $this->client_id,
             'client_secret' => $this->client_secret,
