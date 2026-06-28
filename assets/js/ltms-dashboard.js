@@ -1600,10 +1600,31 @@
                     <span class="ltms-profile-msg" style="margin-left:10px;display:none;"></span>
                 </div>
                 <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-                    <h4 style="margin-bottom:15px;">Banner de la Tienda</h4>
-                    <input type="file" id="ltms-banner-file" accept="image/*" style="margin-bottom:10px;">
-                    <button type="button" class="ltms-btn ltms-btn-outline ltms-upload-banner-btn">🖼️ Subir Banner</button>
-                    <span class="ltms-banner-msg" style="margin-left:10px;display:none;"></span>
+                    <h4 style="margin-bottom:4px;">🖼️ Banner de la Tienda</h4>
+                    <p style="font-size:.8rem;color:#6b7280;margin:0 0 12px;">
+                        Esta imagen aparece como fondo del encabezado de tu página pública en
+                        <strong>lo-tengo.com.co/vendedor/tu-tienda</strong>.
+                    </p>
+                    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;color:#0369a1;line-height:1.6;">
+                        <strong>📐 Tamaño recomendado:</strong> 1440 × 320 píxeles (relación 4.5:1)<br>
+                        <strong>📱 En móvil</strong> se recorta al centro — pon lo importante en el medio.<br>
+                        <strong>⚖️ Peso máximo:</strong> 3 MB · Formatos: JPG, PNG, WebP<br>
+                        <strong>💡 Consejo:</strong> fondos sólidos, degradados o fotos con poco texto funcionan mejor.
+                    </div>
+                    <div id="ltms-banner-preview-wrap" style="display:none;margin-bottom:12px;">
+                        <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Vista previa (proporcional):</p>
+                        <img id="ltms-banner-preview" src="" alt="Preview banner"
+                             style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <label style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1.5px solid #d1d5db;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:.85rem;font-weight:500;">
+                            📂 Seleccionar imagen
+                            <input type="file" id="ltms-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                        </label>
+                        <button type="button" class="ltms-btn ltms-btn-primary ltms-upload-banner-btn">🖼️ Subir Banner</button>
+                        <span class="ltms-banner-msg" style="font-size:.85rem;display:none;"></span>
+                    </div>
+                    <p id="ltms-banner-filename" style="font-size:.78rem;color:#6b7280;margin:6px 0 0;display:none;"></p>
                 </div>
                 <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
                     <h4 style="margin-bottom:15px;">Zona de Despacho</h4>
@@ -1680,10 +1701,34 @@
                 });
             });
 
+            // Handler: preview al seleccionar archivo
+            $(document).off('change','#ltms-banner-file').on('change','#ltms-banner-file', function() {
+                const file = this.files[0];
+                if (!file) return;
+                const maxMB = 3;
+                if (file.size > maxMB * 1024 * 1024) {
+                    const m = $('.ltms-banner-msg');
+                    m.text('La imagen pesa ' + (file.size/1024/1024).toFixed(1) + ' MB. El máximo es ' + maxMB + ' MB.').css('color','#ef4444').show();
+                    this.value = '';
+                    $('#ltms-banner-preview-wrap').hide();
+                    $('#ltms-banner-filename').hide();
+                    return;
+                }
+                $('.ltms-banner-msg').hide();
+                $('#ltms-banner-filename').text('📄 ' + file.name + ' — ' + (file.size/1024).toFixed(0) + ' KB').show();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#ltms-banner-preview').attr('src', e.target.result);
+                    $('#ltms-banner-preview-wrap').show();
+                };
+                reader.readAsDataURL(file);
+            });
+
             // Handler: subir banner (ltms_upload_store_banner — Vendor_Settings_Saver)
             $(document).off('click','.ltms-upload-banner-btn').on('click','.ltms-upload-banner-btn', function() {
                 const file = $('#ltms-banner-file')[0].files[0];
-                if (!file) { alert('Selecciona una imagen primero.'); return; }
+                const m = $('.ltms-banner-msg');
+                if (!file) { m.text('Selecciona una imagen primero.').css('color','#ef4444').show(); return; }
                 const btn=$(this); btn.prop('disabled',true).text('Subiendo...');
                 const fd = new FormData();
                 fd.append('action','ltms_upload_store_banner');
@@ -1692,11 +1737,13 @@
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST', data:fd,
                     processData:false, contentType:false,
                     success(r){ btn.prop('disabled',false).text('🖼️ Subir Banner');
-                        const m=$('.ltms-banner-msg');
-                        m.text(r.success?'✓ Banner actualizado':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
-                        setTimeout(()=>m.hide(),4000);
+                        m.text(r.success?'✅ Banner actualizado correctamente':'❌ Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        if (r.success) { $('#ltms-banner-file').val(''); $('#ltms-banner-filename').hide(); }
+                        setTimeout(()=>m.hide(),5000);
                     },
-                    error(){ btn.prop('disabled',false).text('🖼️ Subir Banner'); }
+                    error(){ btn.prop('disabled',false).text('🖼️ Subir Banner');
+                        m.text('❌ Error de red, intente de nuevo.').css('color','#ef4444').show();
+                    }
                 });
             });
 
