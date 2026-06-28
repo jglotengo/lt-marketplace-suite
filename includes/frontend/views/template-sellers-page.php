@@ -14,17 +14,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Encolar CSS necesario si no está encolado aún
-add_action( 'wp_head', function() {
+add_action( 'wp_enqueue_scripts', function() {
     $url = LTMS_ASSETS_URL;
     $ver = LTMS_VERSION;
+
     if ( ! wp_style_is( 'ltms-dashboard', 'enqueued' ) ) {
         wp_enqueue_style( 'ltms-dashboard', $url . 'css/ltms-dashboard.css', [], $ver );
     }
     if ( ! wp_style_is( 'ltms-frontend-extensions', 'enqueued' ) ) {
         wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
     }
+
+    // M-REG-01: el template bypass (M-73) no pasaba por enqueue_auth_assets(), así que
+    // ltmsAuth.nonce nunca se generaba → check_ajax_referer() retornaba 403 → "Sesión
+    // expirada". Encolar JS + localize aquí garantiza que el nonce siempre esté disponible
+    // independientemente de cómo WordPress seleccione el template.
     if ( ! wp_style_is( 'ltms-login-register', 'enqueued' ) ) {
         wp_enqueue_style( 'ltms-login-register', $url . 'css/ltms-login-register.css', [ 'ltms-dashboard' ], $ver );
+    }
+    if ( ! wp_script_is( 'ltms-login-register', 'enqueued' ) ) {
+        $suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+        // El .min puede no existir en todos los entornos; usamos el no-minificado como fallback seguro.
+        $js_url = $url . 'js/ltms-login-register.js';
+        wp_enqueue_script( 'ltms-login-register', $js_url, [ 'jquery' ], $ver, true );
+        wp_localize_script( 'ltms-login-register', 'ltmsAuth', [
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'ltms_auth_nonce' ),
+            'i18n'     => [
+                'password_mismatch' => __( 'Las contraseñas no coinciden.', 'ltms' ),
+                'required_fields'   => __( 'Por favor completa todos los campos requeridos.', 'ltms' ),
+                'processing'        => __( 'Procesando...', 'ltms' ),
+            ],
+        ] );
     }
 }, 5 );
 
