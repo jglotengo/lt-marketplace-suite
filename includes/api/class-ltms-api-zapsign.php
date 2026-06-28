@@ -84,7 +84,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * Declared public explicitly to match abstract base class visibility.
      * Required because PHP-FPM OPcache may serve stale bytecode with protected visibility.
      */
-    public function execute_http_request(
+    public function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
@@ -96,7 +96,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         if ( ! empty( $this->api_token ) && empty( $headers['Authorization'] ) ) {
             $headers['Authorization'] = 'Bearer ' . $this->api_token;
         }
-        return parent::execute_http_request( $method, $endpoint, $data, $headers, $retry );
+        return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
     }
 
     /**
@@ -152,7 +152,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             throw new \RuntimeException( '[zapsign] create_document requiere pdf_url o pdf_base64.' );
         }
 
-        $response = $this->execute_http_request( 'POST', '/docs/', $payload );
+        $response = $this->perform_request( 'POST', '/docs/', $payload );
 
         if ( empty( $response['token'] ) ) {
             return [
@@ -181,7 +181,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array{status: string, signers: array}
      */
     public function get_document_status( string $doc_token ): array {
-        $response = $this->execute_http_request( 'GET', '/docs/' . $doc_token . '/' );
+        $response = $this->perform_request( 'GET', '/docs/' . $doc_token . '/' );
 
         $signers = [];
         foreach ( ( $response['signers'] ?? [] ) as $signer ) {
@@ -209,7 +209,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return string Base64 del PDF firmado.
      */
     public function download_signed_document( string $doc_token ): string {
-        $response = $this->execute_http_request( 'GET', '/docs/' . $doc_token . '/download/' );
+        $response = $this->perform_request( 'GET', '/docs/' . $doc_token . '/download/' );
         return $response['base64_pdf'] ?? '';
     }
 
@@ -220,7 +220,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return bool
      */
     public function delete_document( string $doc_token ): bool {
-        $response = $this->execute_http_request( 'DELETE', '/docs/' . $doc_token . '/' );
+        $response = $this->perform_request( 'DELETE', '/docs/' . $doc_token . '/' );
         return empty( $response ) || isset( $response['deleted'] );
     }
 
@@ -313,7 +313,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             if ( $this->sandbox ) {
                 // En sandbox: listar documentos con ?sandbox=true
                 // Una lista vacía [] también es respuesta válida (200)
-                $response  = $this->execute_http_request( 'GET', '/docs/' );
+                $response  = $this->perform_request( 'GET', '/docs/' );
                 // ZapSign devuelve array con 'results' o directamente un array
                 $connected = is_array( $response ) && ! isset( $response['code'] );
                 return [
@@ -325,7 +325,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             }
 
             // Producción: GET /users/ requiere plan API
-            $response  = $this->execute_http_request( 'GET', '/users/' );
+            $response  = $this->perform_request( 'GET', '/users/' );
             $connected = is_array( $response ) && ! isset( $response['code'] );
             return [
                 'connected' => $connected,
@@ -391,7 +391,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array{success: bool, doc_token: string, sign_url: string, open_id: string, status: string}
      */
     public function create_document_from_template( string $template_id, array $payload ): array {
-        $response = $this->execute_http_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
+        $response = $this->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
 
         if ( empty( $response['token'] ) ) {
             return [
