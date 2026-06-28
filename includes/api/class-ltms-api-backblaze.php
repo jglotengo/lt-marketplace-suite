@@ -100,7 +100,7 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * Sube un archivo al bucket especificado.
      *
      * Usa wp_remote_request directamente para manejar el cuerpo binario crudo,
-     * ya que execute_http_request codifica el body como JSON.
+     * ya que perform_request codifica el body como JSON.
      *
      * @param string $bucket   Nombre del bucket de destino.
      * @param string $key      Clave (ruta) del objeto en el bucket.
@@ -244,7 +244,7 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         $path           = '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' );
         $signed_headers = $this->sign_request( 'DELETE', $path, [], '' );
 
-        $this->execute_http_request( 'DELETE', $path, [], $signed_headers );
+        $this->perform_request( 'DELETE', $path, [], $signed_headers );
 
         return true;
     }
@@ -265,7 +265,7 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         // Firmamos la ruta canónica (path + query string)
         $signed_headers = $this->sign_request( 'GET', $path, [], '', 's3', $qs );
 
-        return $this->execute_http_request( 'GET', $endpoint, [], $signed_headers );
+        return $this->perform_request( 'GET', $endpoint, [], $signed_headers );
     }
 
     /**
