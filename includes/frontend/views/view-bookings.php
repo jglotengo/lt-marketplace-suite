@@ -192,9 +192,27 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 + <?php esc_html_e( 'Nueva política', 'ltms' ); ?>
             </button>
         </div>
-        <p style="font-size:.85rem;color:#6b7280;margin-bottom:16px;">
-            <?php esc_html_e( 'Define qué porcentaje se reembolsa según cuándo cancela el huésped. La política marcada "Por defecto" se aplica si el producto no tiene una asignada.', 'ltms' ); ?>
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:8px;">
+            <?php esc_html_e( 'Define cuándo y cuánto le devuelves al huésped si cancela su reserva.', 'ltms' ); ?>
+            <?php esc_html_e( 'La política marcada "Por defecto" aplica a alojamientos sin política asignada.', 'ltms' ); ?>
         </p>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem;line-height:1.7;">
+            <strong style="color:#15803d;display:block;margin-bottom:6px;">💡 <?php esc_html_e( '¿Qué tipo elegir?', 'ltms' ); ?></strong>
+            <table style="width:100%;border-collapse:collapse;">
+                <tr>
+                    <td style="padding:3px 8px 3px 0;font-weight:600;white-space:nowrap;color:#374151;"><?php esc_html_e( 'Flexible', 'ltms' ); ?></td>
+                    <td style="padding:3px 0;color:#6b7280;"><?php esc_html_e( 'Reembolso completo si cancela con +24h. Sin reembolso después. Atrae más reservas.', 'ltms' ); ?></td>
+                </tr>
+                <tr>
+                    <td style="padding:3px 8px 3px 0;font-weight:600;white-space:nowrap;color:#374151;"><?php esc_html_e( 'Moderada', 'ltms' ); ?></td>
+                    <td style="padding:3px 0;color:#6b7280;"><?php esc_html_e( 'Reembolso completo con +72h, parcial entre 24–72h. Balance entre flexibilidad e ingresos.', 'ltms' ); ?></td>
+                </tr>
+                <tr>
+                    <td style="padding:3px 8px 3px 0;font-weight:600;white-space:nowrap;color:#374151;"><?php esc_html_e( 'Estricta', 'ltms' ); ?></td>
+                    <td style="padding:3px 0;color:#6b7280;"><?php esc_html_e( 'Sin reembolso o solo con muchos días de anticipación. Protege ingresos en temporada alta.', 'ltms' ); ?></td>
+                </tr>
+            </table>
+        </div>
         <div id="ltms-policies-list" style="display:grid;gap:14px;margin-bottom:20px;">
             <div style="text-align:center;padding:30px;color:#9ca3af;"><?php esc_html_e( 'Cargando...', 'ltms' ); ?></div>
         </div>
@@ -218,10 +236,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 <div>
                     <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Cancelación gratuita (horas)', 'ltms' ); ?></label>
                     <input type="number" id="ltms-policy-free-hours" class="ltms-form-control" min="0" step="1" value="24">
+                    <span style="font-size:.75rem;color:#6b7280;margin-top:4px;display:block;"><?php esc_html_e( 'Ej: 24 = reembolso completo si cancela con más de 24h de anticipación.', 'ltms' ); ?></span>
                 </div>
                 <div>
                     <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( '% reembolso parcial', 'ltms' ); ?></label>
                     <input type="number" id="ltms-policy-partial-pct" class="ltms-form-control" min="0" max="100" step="1" value="50">
+                    <span style="font-size:.75rem;color:#6b7280;margin-top:4px;display:block;"><?php esc_html_e( 'Ej: 50 = devuelve la mitad. 0 = sin reembolso parcial (política Flexible).', 'ltms' ); ?></span>
                 </div>
                 <div>
                     <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:5px;"><?php esc_html_e( 'Ventana reembolso parcial (horas)', 'ltms' ); ?></label>
