@@ -83,7 +83,7 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
             $payload['account_id'] = $this->account_id;
         }
 
-        return $this->perform_request( 'POST', '/v1/rates', $payload );
+        return $this->execute_http_request( 'POST', '/v1/rates', $payload );
     }
 
     /**
@@ -110,7 +110,7 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
             $data['account_id'] = $this->account_id;
         }
 
-        $response = $this->perform_request( 'POST', '/v1/shipments', $data );
+        $response = $this->execute_http_request( 'POST', '/v1/shipments', $data );
 
         if ( ! empty( $response['tracking_number'] ) ) {
             LTMS_Core_Logger::info(
@@ -142,7 +142,7 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
         $tracking_number = sanitize_text_field( $tracking_number );
         $endpoint        = '/v1/shipments/track/' . rawurlencode( $tracking_number );
 
-        return $this->perform_request( 'GET', $endpoint );
+        return $this->execute_http_request( 'GET', $endpoint );
     }
 
     /**
@@ -156,7 +156,7 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
         $start = microtime( true );
 
         try {
-            $this->perform_request( 'GET', '/v1/health', [], [], false );
+            $this->execute_http_request( 'GET', '/v1/health', [], [], false );
             $latency = (int) round( ( microtime( true ) - $start ) * 1000 );
 
             return [
