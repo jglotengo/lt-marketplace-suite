@@ -298,6 +298,8 @@ function ltms_load_autoloader(): void {
                 'ltms-core-security'            => 'core/class-ltms-security.php',
                 // Frontend — Google OAuth vive en frontend/ con nombre que incluye 'google-'
                 'ltms-google-oauth'             => 'frontend/class-ltms-google-oauth.php',
+                // Business — generador dinámico de PDF (DOMPDF)
+                'ltms-contract-pdf-generator'   => 'business/class-ltms-contract-pdf-generator.php',
                 'ltms-core-firewall'            => 'core/class-ltms-firewall.php',
                 'ltms-core-activator'           => 'core/services/class-ltms-activator.php',
                 'ltms-core-deactivator'         => 'core/services/class-ltms-deactivator.php',
