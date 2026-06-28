@@ -46,6 +46,20 @@ class LTMS_Zapsign_Webhook_Handler {
             update_user_meta( $vendor_id, '_ltms_zapsign_doc_token', $doc_token );
             update_user_meta( $vendor_id, '_ltms_zapsign_signed_at', gmdate( 'Y-m-d H:i:s' ) );
 
+            // BC-01: respaldar el PDF firmado en Backblaze B2 (continuidad de negocio).
+            // No-bloqueante: cualquier fallo se loguea dentro del método y nunca debe
+            // impedir que el KYC avance a 'approved' más abajo.
+            if ( class_exists( 'LTMS_ZapSign_Manager' ) ) {
+                try {
+                    LTMS_ZapSign_Manager::backup_signed_contract( $vendor_id, $doc_token );
+                } catch ( \Throwable $e ) {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::warning( 'B2_CONTRACT_BACKUP_UNEXPECTED',
+                            sprintf( 'Excepción inesperada respaldando contrato de vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
+                    }
+                }
+            }
+
             // Avanzar KYC si el documento era el contrato de vendedor
             $doc_type = sanitize_key( $body['document_type'] ?? 'vendor_contract' );
             if ( 'vendor_contract' === $doc_type ) {
