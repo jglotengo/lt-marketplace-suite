@@ -51,7 +51,7 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
         }
 
         // Modo sandbox: si no hay plan de pago, usar sandbox=true en dev
-        $this->sandbox = (bool) LTMS_Core_Config::get( 'ltms_zapsign_sandbox', false );
+        $this->sandbox = ( 'yes' === LTMS_Core_Config::get( 'ltms_zapsign_sandbox', 'no' ) );
 
         // ZapSign usa Bearer token en Authorization header
         $this->default_headers['Authorization'] = 'Bearer ' . $this->api_token;
