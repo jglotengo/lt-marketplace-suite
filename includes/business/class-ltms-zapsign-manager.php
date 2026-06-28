@@ -274,44 +274,65 @@ final class LTMS_ZapSign_Manager {
     }
 
     /**
-     * Genera la URL pública del PDF del contrato para enviarlo a ZapSign.
-     * Usa el adjunto de WordPress si existe, o genera HTML on-the-fly.
+     * BC-01 (Continuidad de negocio): respalda el PDF firmado en Backblaze B2.
+     *
+     * ZapSign es la fuente operativa para firmar, pero el documento final
+     * NUNCA se guardaba en infraestructura propia — si ZapSign pierde acceso
+     * a la cuenta, se cae el servicio, o hay una disputa legal con un vendedor,
+     * no había ninguna copia recuperable del contrato firmado.
+     *
+     * Se llama desde el webhook al recibir 'doc_signed'. Es no-bloqueante:
+     * cualquier fallo se loguea pero nunca debe interrumpir el flujo de
+     * aprobación de KYC del vendedor.
+     *
+     * @param int    $vendor_id ID del vendedor.
+     * @param string $doc_token Token del documento en ZapSign.
+     * @return void
      */
-    /**
-     * Sube un PDF de contrato al bucket lotengo-contratos en Backblaze B2.
-     * Retorna la URL pública temporal del archivo.
-     */
-    private function upload_contract_to_b2( string $pdf_path ): string {
+    public static function backup_signed_contract( int $vendor_id, string $doc_token ): void {
+        if ( LTMS_Core_Config::get( 'ltms_backblaze_enabled', 'no' ) !== 'yes' ) {
+            LTMS_Core_Logger::info( 'B2_CONTRACT_BACKUP_SKIPPED',
+                sprintf( 'Backblaze B2 desactivado — contrato de vendedor #%d no respaldado.', $vendor_id ) );
+            return;
+        }
+
         try {
+            $zapsign_client = LTMS_Api_Factory::get( 'zapsign' );
+            $pdf_base64     = $zapsign_client->download_signed_document( $doc_token );
+
+            if ( empty( $pdf_base64 ) ) {
+                LTMS_Core_Logger::warning( 'B2_CONTRACT_BACKUP_EMPTY',
+                    sprintf( 'ZapSign no devolvió PDF para doc_token=%s (vendedor #%d).', $doc_token, $vendor_id ) );
+                return;
+            }
+
+            $pdf_binary = base64_decode( $pdf_base64, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+            if ( false === $pdf_binary ) {
+                LTMS_Core_Logger::warning( 'B2_CONTRACT_BACKUP_DECODE_FAIL',
+                    sprintf( 'base64 inválido para doc_token=%s (vendedor #%d).', $doc_token, $vendor_id ) );
+                return;
+            }
+
             $b2     = LTMS_Api_Factory::get( 'backblaze' );
             $bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' );
-            $key    = 'contratos/' . gmdate( 'Y/m' ) . '/' . wp_generate_uuid4() . '.pdf';
-            $b2->upload_file( $bucket, $key, $pdf_path, 'application/pdf' );
-            // Retornar URL firmada de 7 días (suficiente para que ZapSign descargue)
-            return $b2->get_signed_url( $bucket, $key, 7 * DAY_IN_SECONDS );
+            $key    = sprintf( 'contratos/%s/vendedor-%d-%s.pdf', gmdate( 'Y/m' ), $vendor_id, $doc_token );
+
+            $b2->upload_file( $bucket, $key, $pdf_binary, 'application/pdf', [
+                'vendor_id' => (string) $vendor_id,
+                'doc_token' => $doc_token,
+            ] );
+
+            update_user_meta( $vendor_id, 'ltms_contract_b2_bucket', $bucket );
+            update_user_meta( $vendor_id, 'ltms_contract_b2_key', $key );
+            update_user_meta( $vendor_id, 'ltms_contract_backed_up_at', LTMS_Utils::now_utc() );
+
+            LTMS_Core_Logger::info( 'B2_CONTRACT_BACKUP_OK',
+                sprintf( 'Contrato de vendedor #%d respaldado en B2: %s/%s', $vendor_id, $bucket, $key ) );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning( 'B2_CONTRACT_UPLOAD_FAIL', $e->getMessage() );
-            return '';
+            LTMS_Core_Logger::warning( 'B2_CONTRACT_BACKUP_FAIL',
+                sprintf( 'No se pudo respaldar contrato de vendedor #%d (doc_token=%s): %s',
+                    $vendor_id, $doc_token, $e->getMessage() ) );
         }
-    }
-
-    private function generate_contract_pdf_url( int $vendor_id ): string {
-        // 1. PDF cargado en media library
-        $attachment_id = (int) LTMS_Core_Config::get( 'ltms_zapsign_contract_attachment_id', 0 );
-        if ( $attachment_id ) {
-            $url = wp_get_attachment_url( $attachment_id );
-            if ( $url ) {
-                return $url;
-            }
-        }
-
-        // 2. URL REST que genera el contrato dinámicamente con los datos del vendedor
-        $rest_url = rest_url( 'ltms/v1/vendor-contract/' . $vendor_id );
-        if ( filter_var( $rest_url, FILTER_VALIDATE_URL ) ) {
-            return $rest_url;
-        }
-
-        return '';
     }
 
     // ── AJAX handlers ─────────────────────────────────────────────
