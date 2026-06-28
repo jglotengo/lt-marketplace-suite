@@ -396,6 +396,8 @@ function ltms_load_autoloader(): void {
                 'ltms-aveonline-onboarding-ajax'         => 'business/class-ltms-aveonline-onboarding-ajax.php',
                 // v2.8.0 — Vitrina pública del vendedor (/vendedores/{slug})
                 'ltms-vendor-storefront'                 => 'frontend/class-ltms-vendor-storefront.php',
+                // ZapSign Manager vive en business/ (subdir 'zapsign' no existe)
+                'ltms-zapsign-manager'                   => 'business/class-ltms-zapsign-manager.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
