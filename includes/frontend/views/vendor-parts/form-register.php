@@ -81,8 +81,9 @@ $country = LTMS_Core_Config::get_country();
             </div>
 
             <div class="ltms-form-group">
-                <label for="ltms-reg-phone"><?php esc_html_e( 'Teléfono', 'ltms' ); ?></label>
-                <input type="tel" id="ltms-reg-phone" name="phone" class="ltms-form-control" placeholder="<?php echo 'CO' === $country ? '+57 300 000 0000' : '+52 55 0000 0000'; ?>">
+                <label for="ltms-reg-phone"><?php esc_html_e( 'Teléfono *', 'ltms' ); ?></label>
+                <input type="tel" id="ltms-reg-phone" name="phone" class="ltms-form-control" required placeholder="<?php echo 'CO' === $country ? '+57 300 000 0000' : '+52 55 0000 0000'; ?>">
+                <small class="ltms-field-hint"><?php esc_html_e( 'Requerido para el contrato de vinculación.', 'ltms' ); ?></small>
             </div>
 
             <div class="ltms-form-group">
@@ -182,6 +183,27 @@ $country = LTMS_Core_Config::get_country();
                 </small>
             </div>
             <?php endif; endif; ?>
+
+            <div class="ltms-form-group">
+                <label for="ltms-reg-address"><?php esc_html_e( 'Dirección de la tienda / domicilio *', 'ltms' ); ?></label>
+                <input type="text" id="ltms-reg-address" name="store_address" class="ltms-form-control" required
+                       placeholder="<?php esc_attr_e( 'Calle 10 # 5-23, Barrio Centro', 'ltms' ); ?>">
+                <small class="ltms-field-hint"><?php esc_html_e( 'Dirección fiscal que aparecerá en el contrato de vinculación.', 'ltms' ); ?></small>
+            </div>
+
+            <?php if ( 'CO' === $country ) : ?>
+            <div class="ltms-form-group">
+                <label for="ltms-reg-tax-regime"><?php esc_html_e( 'Régimen tributario *', 'ltms' ); ?></label>
+                <select id="ltms-reg-tax-regime" name="tax_regime" class="ltms-form-control" required>
+                    <option value=""><?php esc_html_e( 'Seleccionar...', 'ltms' ); ?></option>
+                    <option value="no_responsable_iva">Persona Natural — No responsable de IVA</option>
+                    <option value="responsable_iva">Persona Natural — Responsable de IVA</option>
+                    <option value="persona_juridica">Persona Jurídica — Responsable de IVA</option>
+                    <option value="simplificado">Régimen Simple de Tributación (SIMPLE)</option>
+                </select>
+                <small class="ltms-field-hint"><?php esc_html_e( 'Determina las retenciones aplicables a tus pagos. Consulta tu RUT si tienes dudas.', 'ltms' ); ?></small>
+            </div>
+            <?php endif; ?>
 
             <div class="ltms-form-group">
                 <label for="ltms-reg-referral-code"><?php esc_html_e( 'Código de Referido', 'ltms' ); ?></label>
