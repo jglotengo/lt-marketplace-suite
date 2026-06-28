@@ -144,22 +144,53 @@ final class LTMS_ZapSign_Manager {
             // ── A. Crear desde plantilla (método preferido) ──────────
             $result = $this->create_from_template( $client, $template_id, $user, $vendor_id );
         } else {
-            // ── B. Crear desde URL de PDF estático ───────────────────
-            $pdf_url = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
-
-            if ( empty( $pdf_url ) ) {
-                // Intentar generar PDF dinámico como último recurso
-                $pdf_url = $this->generate_contract_pdf_url( $vendor_id );
+            // ── B. Generación dinámica de PDF con datos del vendedor ──────
+            // Usa LTMS_Contract_PDF_Generator (DOMPDF) para producir el PDF
+            // con todos los datos KYC del vendedor (comisión personalizada,
+            // régimen tributario, DANE, etc.) y enviarlo a ZapSign como
+            // base64_pdf — sin necesidad de URL pública ni bucket S3.
+            try {
+                $generator  = new LTMS_Contract_PDF_Generator();
+                $pdf_base64 = $generator->generate_base64( $vendor_id );
+            } catch ( \Throwable $e ) {
+                $this->log_warning( 'zapsign_pdf_gen_failed',
+                    sprintf( 'DOMPDF falló para vendedor #%d: %s. Usando fallback URL.', $vendor_id, $e->getMessage() ) );
+                $pdf_base64 = '';
             }
 
-            if ( empty( $pdf_url ) ) {
-                return [
-                    'success' => false,
-                    'error'   => 'No hay template_id ni PDF URL configurado. Ve a Configuración → ZapSign.',
-                ];
-            }
+            if ( ! empty( $pdf_base64 ) ) {
+                // PDF dinámico generado correctamente — enviar como base64
+                $result = $client->create_document( [
+                    'name'       => sprintf( 'Contrato Vendedor - %s - %s', $user->display_name, gmdate( 'Y' ) ),
+                    'pdf_base64' => $pdf_base64,
+                    'signers'    => [
+                        [
+                            'name'        => $user->display_name,
+                            'email'       => $user->user_email,
+                            'phone'       => preg_replace( '/\D/', '', (string) get_user_meta( $vendor_id, 'ltms_phone', true ) ?: get_user_meta( $vendor_id, 'billing_phone', true ) ?: '' ),
+                            'external_id' => (string) $vendor_id,
+                            'auth_mode'   => 'assinaturaTela',
+                        ],
+                    ],
+                    'lang'                 => 'es',
+                    'send_automatic_email' => true,
+                    'sandbox'              => $client->is_sandbox(),
+                    'external_id'          => (string) $vendor_id,
+                    'folder'               => 'Contratos/' . gmdate( 'Y' ),
+                ] );
+            } else {
+                // Fallback: PDF URL estático configurado en ajustes
+                $pdf_url = LTMS_Core_Config::get( 'ltms_zapsign_contract_pdf_url', '' );
 
-            $result = $client->send_vendor_contract( $vendor_id, $pdf_url );
+                if ( empty( $pdf_url ) ) {
+                    return [
+                        'success' => false,
+                        'error'   => 'No se pudo generar el PDF y no hay PDF URL configurado. Ve a Configuración → ZapSign.',
+                    ];
+                }
+
+                $result = $client->send_vendor_contract( $vendor_id, $pdf_url );
+            }
         }
 
         if ( $result['success'] ) {
