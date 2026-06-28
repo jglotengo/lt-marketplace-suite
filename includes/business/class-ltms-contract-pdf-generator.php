@@ -142,16 +142,21 @@ class LTMS_Contract_PDF_Generator {
 
 		$cc_number = get_user_meta( $vendor_id, 'ltms_camara_comercio_number', true ) ?: '';
 
-		// Teléfono
+		// Teléfono — ltms_phone es el guardado por el handler de registro (formato E.164)
 		$phone = get_user_meta( $vendor_id, 'ltms_phone', true )
 				?: get_user_meta( $vendor_id, 'billing_phone', true )
+				?: get_user_meta( $vendor_id, 'ltms_store_phone', true )
 				?: '';
 
-		// Dirección
+		// Dirección — billing_address_1 es la que guarda el registro (store_address → billing_address_1)
 		$address = get_user_meta( $vendor_id, 'billing_address_1', true ) ?: '';
 		$addr2   = get_user_meta( $vendor_id, 'billing_address_2', true );
 		if ( $addr2 ) {
 			$address .= ' ' . $addr2;
+		}
+		// Fallback: ltms_store_address (campo antiguo, por compatibilidad)
+		if ( empty( $address ) ) {
+			$address = get_user_meta( $vendor_id, 'ltms_store_address', true ) ?: '';
 		}
 
 		// Fecha en español
