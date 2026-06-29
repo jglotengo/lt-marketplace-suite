@@ -1611,6 +1611,17 @@
                         <strong>⚖️ Peso máximo:</strong> 3 MB · Formatos: JPG, PNG, WebP<br>
                         <strong>💡 Consejo:</strong> fondos sólidos, degradados o fotos con poco texto funcionan mejor.
                     </div>
+                    <div id="ltms-banner-current-wrap" style="${store.store_banner_url ? '' : 'display:none;'}margin-bottom:14px;">
+                        <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Banner actual:</p>
+                        <div style="position:relative;display:inline-block;width:100%;">
+                            <img id="ltms-banner-current" src="${this.escapeHtml(store.store_banner_url||'')}" alt="Banner actual"
+                                 style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;">
+                            <button type="button" class="ltms-btn ltms-delete-banner-btn"
+                                    style="position:absolute;top:6px;right:6px;background:rgba(239,68,68,.9);color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:.78rem;cursor:pointer;">
+                                🗑️ Eliminar banner
+                            </button>
+                        </div>
+                    </div>
                     <div id="ltms-banner-preview-wrap" style="display:none;margin-bottom:12px;">
                         <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Vista previa (proporcional):</p>
                         <img id="ltms-banner-preview" src="" alt="Preview banner"
@@ -1738,11 +1749,41 @@
                     processData:false, contentType:false,
                     success(r){ btn.prop('disabled',false).text('🖼️ Subir Banner');
                         m.text(r.success?'✅ Banner actualizado correctamente':'❌ Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
-                        if (r.success) { $('#ltms-banner-file').val(''); $('#ltms-banner-filename').hide(); }
+                        if (r.success && r.data && r.data.url) {
+                            $('#ltms-banner-current').attr('src', r.data.url);
+                            $('#ltms-banner-current-wrap').show();
+                            $('#ltms-banner-file').val('');
+                            $('#ltms-banner-filename').hide();
+                            $('#ltms-banner-preview-wrap').hide();
+                        }
                         setTimeout(()=>m.hide(),5000);
                     },
                     error(){ btn.prop('disabled',false).text('🖼️ Subir Banner');
                         m.text('❌ Error de red, intente de nuevo.').css('color','#ef4444').show();
+                    }
+                });
+            });
+
+            // Handler: eliminar banner (ltms_delete_store_banner — Vendor_Settings_Saver)
+            $(document).off('click','.ltms-delete-banner-btn').on('click','.ltms-delete-banner-btn', function() {
+                if (!confirm('¿Eliminar el banner actual? Esta acción no se puede deshacer.')) return;
+                const btn=$(this); btn.prop('disabled',true).text('Eliminando...');
+                const m=$('.ltms-banner-msg');
+                $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
+                    data:{ action:'ltms_delete_store_banner', nonce:ltmsDashboard.nonce },
+                    success(r){ btn.prop('disabled',false);
+                        if (r.success) {
+                            $('#ltms-banner-current-wrap').hide();
+                            $('#ltms-banner-current').attr('src','');
+                            m.text('✅ Banner eliminado correctamente').css('color','#10b981').show();
+                        } else {
+                            btn.text('🗑️ Eliminar banner');
+                            m.text('❌ Error: '+(r.data||'intente de nuevo')).css('color','#ef4444').show();
+                        }
+                        setTimeout(()=>m.hide(),5000);
+                    },
+                    error(){ btn.prop('disabled',false).text('🗑️ Eliminar banner');
+                        m.text('❌ Error de red.').css('color','#ef4444').show();
                     }
                 });
             });
