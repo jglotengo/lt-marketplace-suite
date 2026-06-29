@@ -1611,16 +1611,16 @@
                         <strong>⚖️ Peso máximo:</strong> 3 MB · Formatos: JPG, PNG, WebP<br>
                         <strong>💡 Consejo:</strong> fondos sólidos, degradados o fotos con poco texto funcionan mejor.
                     </div>
-                    <div id="ltms-banner-current-wrap" style="display:none;margin-bottom:14px;">
-                        <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Banner actual:</p>
-                        <div style="position:relative;display:inline-block;width:100%;">
-                            <img id="ltms-banner-current" src="${this.escapeHtml(store.store_banner_url||'')}" alt="Banner actual"
-                                 style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;">
-                            <button type="button" class="ltms-btn ltms-delete-banner-btn"
-                                    style="position:absolute;top:6px;right:6px;background:rgba(239,68,68,.9);color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:.78rem;cursor:pointer;">
-                                🗑️ Eliminar banner
+                    <div id="ltms-banner-current-wrap" style="display:none;margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <p style="font-size:.78rem;font-weight:600;color:#374151;margin:0;">🖼️ Banner actual</p>
+                            <button type="button" class="ltms-delete-banner-btn"
+                                    style="display:inline-flex;align-items:center;gap:5px;background:#fff;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;">
+                                🗑️ Eliminar
                             </button>
                         </div>
+                        <img id="ltms-banner-current" src="" alt="Banner actual"
+                             style="width:100%;max-height:130px;object-fit:cover;border-radius:8px;border:1.5px solid #e5e7eb;display:block;">
                     </div>
                     <div id="ltms-banner-preview-wrap" style="display:none;margin-bottom:12px;">
                         <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Vista previa (proporcional):</p>
