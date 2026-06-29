@@ -1611,7 +1611,7 @@
                         <strong>⚖️ Peso máximo:</strong> 3 MB · Formatos: JPG, PNG, WebP<br>
                         <strong>💡 Consejo:</strong> fondos sólidos, degradados o fotos con poco texto funcionan mejor.
                     </div>
-                    <div id="ltms-banner-current-wrap" style="${store.store_banner_url ? '' : 'display:none;'}margin-bottom:14px;">
+                    <div id="ltms-banner-current-wrap" style="display:none;margin-bottom:14px;">
                         <p style="font-size:.75rem;color:#9ca3af;margin:0 0 4px;">Banner actual:</p>
                         <div style="position:relative;display:inline-block;width:100%;">
                             <img id="ltms-banner-current" src="${this.escapeHtml(store.store_banner_url||'')}" alt="Banner actual"
@@ -1663,6 +1663,13 @@
                 analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>';
                 analyticsHtml += '<span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span></div>';
                 document.getElementById('ltms-view-settings') && (document.getElementById('ltms-view-settings').insertAdjacentHTML('beforeend', analyticsHtml));
+            }
+
+            // Inicializar banner actual si existe
+            const bannerUrl = store.store_banner_url || '';
+            if (bannerUrl) {
+                $('#ltms-banner-current').attr('src', bannerUrl);
+                $('#ltms-banner-current-wrap').show();
             }
 
             // Handler: guardar configuración básica (products-ajax)
