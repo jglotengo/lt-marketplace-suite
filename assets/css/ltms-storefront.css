@@ -24,9 +24,13 @@
 
 /* ---- Banner ---- */
 .ltms-sf-banner {
-  background: var(--sf-brand) center/cover no-repeat;
+  background-color: var(--sf-brand);
+  background-image: none; /* sobreescrito por inline style */
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
   border-radius: 0 0 var(--sf-radius) var(--sf-radius);
-  min-height: 220px;
+  min-height: 280px;
   position: relative;
   margin: 0 -16px 32px;
 }
@@ -531,9 +535,10 @@
 
 @media (max-width: 767px) {
   .ltms-sf-banner {
-    min-height: 160px;
+    min-height: 180px;
     margin: 0 -16px 0;
     border-radius: 0;
+    background-position: center top;
   }
   .ltms-sf-banner-overlay {
     background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.70) 100%);
