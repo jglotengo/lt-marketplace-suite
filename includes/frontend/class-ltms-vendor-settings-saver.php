@@ -13,6 +13,7 @@ class LTMS_Vendor_Settings_Saver {
         add_action( 'wp_ajax_ltms_save_vendor_profile',    [ $instance, 'save_profile' ] );
         add_action( 'wp_ajax_ltms_upload_store_banner',    [ $instance, 'upload_banner' ] );
         add_action( 'wp_ajax_ltms_save_delivery_zone',     [ $instance, 'save_delivery_zone' ] );
+        add_action( 'wp_ajax_ltms_delete_store_banner',    [ $instance, 'delete_banner' ] );
         add_action( 'wp_ajax_ltms_get_vendor_settings',    [ $instance, 'get_vendor_settings' ] );
     }
 
@@ -180,6 +181,33 @@ class LTMS_Vendor_Settings_Saver {
             ],
         ] );
     }
+    /**
+     * AJAX: elimina el banner de la tienda.
+     *
+     * @return void
+     */
+    public function delete_banner(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        $vendor_id = get_current_user_id();
+        if ( ! $vendor_id ) {
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        }
+
+        $attachment_id = (int) get_user_meta( $vendor_id, 'ltms_store_banner_id', true );
+        if ( $attachment_id ) {
+            wp_delete_attachment( $attachment_id, true );
+        }
+
+        delete_user_meta( $vendor_id, 'ltms_store_banner_id' );
+        delete_user_meta( $vendor_id, 'ltms_store_banner_url' );
+        delete_user_meta( $vendor_id, 'ltms_store_banner' );
+
+        $this->log_info( 'VENDOR_BANNER_DELETED', "Banner eliminado por vendedor #{$vendor_id}." );
+
+        wp_send_json_success( [ 'message' => __( 'Banner eliminado correctamente.', 'ltms' ) ] );
+    }
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,3 +223,4 @@ class LTMS_Vendor_Settings_Saver {
  *
  * URL: /ltms-download/?token=XXXX
  */
+
