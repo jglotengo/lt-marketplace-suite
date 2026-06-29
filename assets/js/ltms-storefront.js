@@ -1,69 +1,59 @@
 /**
- * LTMS Vendor Storefront — interacciones de la grilla de productos
- *
- * Usa el ciclo de eventos nativo de WooCommerce (wc-add-to-cart.js) para
- * el "Agregar al carrito" — este script solo añade feedback visual
- * (loading / added) sobre los botones .ltms-sf-add-to-cart.
- *
- * El botón de "Vista rápida" y "Comparar" quedan como placeholders sin
- * backend propio todavía (no existe ese módulo en LTMS) — solo evitan
- * el comportamiento por defecto para no romper el layout.
- *
- * @package LTMS
- * @since   2.9.0
+ * LTMS Vendor Storefront — interacciones
+ * @since 2.9.2
  */
 (function ($) {
 	'use strict';
 
+	/* ── Feedback botones "Agregar al carrito" ── */
 	$(document).on('click', '.ltms-sf-add-to-cart.ajax_add_to_cart', function () {
 		$(this).removeClass('added').addClass('loading');
 	});
-
-	$(document.body).on('added_to_cart', function (event, fragments, cart_hash, $button) {
-		if ($button && $button.hasClass('ltms-sf-add-to-cart')) {
-			$button.removeClass('loading').addClass('added');
-			setTimeout(function () {
-				$button.removeClass('added');
-			}, 2200);
+	$(document.body).on('added_to_cart', function (event, fragments, hash, $btn) {
+		if ($btn && $btn.hasClass('ltms-sf-add-to-cart')) {
+			$btn.removeClass('loading').addClass('added');
+			setTimeout(function () { $btn.removeClass('added'); }, 2200);
 		}
 	});
 
-	// Vista rápida / Comparar: sin backend propio aún — placeholder no disruptivo.
+	/* ── Navegar al producto al hacer clic en imagen ── */
+	$(document).on('click.ltms-card-nav', '.ltms-sf-card-img-link', function (e) {
+		var href = $(this).attr('href');
+		if (href && href !== '#') {
+			e.stopImmediatePropagation();
+			window.location.href = href;
+		}
+	});
+
+	/* ── Botones decorativos ── */
 	$(document).on('click', '.ltms-sf-action-quickview, .ltms-sf-action-compare', function (e) {
 		e.preventDefault();
 	});
-
-	// Wishlist: estado visual local únicamente (no persiste entre sesiones
-	// ni dispositivos — falta el endpoint de wishlist en el backend de LTMS).
 	$(document).on('click', '.ltms-sf-action-wishlist', function (e) {
 		e.preventDefault();
 		$(this).toggleClass('is-active');
 	});
 
-})(jQuery);
+	/* ── Collapsible filtros del sidebar ── */
+	$(document).on('click', '.ltms-sf-filter-heading', function () {
+		var $btn  = $(this);
+		var $body = $btn.next('.ltms-sf-filter-body');
+		var expanded = $btn.attr('aria-expanded') === 'true';
+		$btn.attr('aria-expanded', String(!expanded));
+		$body.toggleClass('is-collapsed', expanded);
+	});
 
-	// Fix: imágenes <img loading="lazy"> que quedan en blanco al volver con
-	// el botón "Atrás" del navegador (restauración desde el back-forward
-	// cache). Chrome no siempre re-dispara la carga de imágenes lazy que
-	// ya estaban "en curso" cuando la página se congeló — el navegador las
-	// restaura en un estado intermedio sin pintarlas. La señal correcta
-	// para esto es el evento 'pageshow' con event.persisted === true.
-	window.addEventListener('pageshow', function (event) {
-		if (!event.persisted) {
-			return; // navegación normal, no venía del bfcache — no hace falta nada
-		}
+	/* ── Toggle sidebar en mobile ── */
+	$(document).on('click', '#ltms-sf-sidebar-toggle', function () {
+		$('#ltms-sf-sidebar').toggleClass('is-open');
+	});
 
-		document.querySelectorAll('.ltms-sf-card-img img').forEach(function (img) {
-			if (img.complete && img.naturalWidth > 0) {
-				return; // ya cargó bien, no tocar
-			}
-			// Forzar al navegador a re-evaluar esta imagen como si fuera nueva:
-			// reasignar el mismo src dispara un nuevo intento de carga.
-			var src = img.getAttribute('src');
-			if (src) {
-				img.removeAttribute('loading');
-				img.src = src;
-			}
+	/* ── Reactivar imágenes lazy al volver con botón Atrás (bfcache) ── */
+	window.addEventListener('pageshow', function (e) {
+		if (!e.persisted) return;
+		document.querySelectorAll('.ltms-sf-img-main').forEach(function (img) {
+			if (img.naturalWidth === 0) { var s = img.src; img.src = ''; img.src = s; }
 		});
 	});
 
+})(jQuery);
