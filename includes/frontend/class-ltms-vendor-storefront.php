@@ -483,13 +483,19 @@ window.elementor=window.elementor||{modules:{}};
     }
 
     private static function render( object $vendor ): void {
-        // Productos del vendedor
-        $paged    = max( 1, (int) ( $_GET['pg'] ?? 1 ) );
-        $per_page = 12;
-        $cat_slug = sanitize_title( $_GET['cat'] ?? '' );
-        $orderby  = in_array( $_GET['order'] ?? '', [ 'price', 'price-desc', 'date' ], true )
-                    ? sanitize_text_field( $_GET['order'] )
-                    : 'date';
+        // ── Parámetros de filtro/orden/paginación ──
+        $paged      = max( 1, (int) ( $_GET['pg'] ?? 1 ) );
+        $per_page   = 12;
+        $cat_slug   = sanitize_title( $_GET['cat'] ?? '' );
+        $orderby    = in_array( $_GET['order'] ?? '', [ 'price', 'price-desc', 'date' ], true )
+                      ? sanitize_text_field( $_GET['order'] ) : 'date';
+        $search_q   = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+        $in_stock   = ! empty( $_GET['instock'] );
+        $view_mode  = in_array( $_GET['view'] ?? '', [ 'grid', 'list' ], true ) ? $_GET['view'] : 'grid';
+
+        // Filtros de edad (multi-select checkboxes) — almacenados como meta _ltms_age_range
+        $ages_raw = isset( $_GET['age'] ) && is_array( $_GET['age'] )
+                    ? array_map( 'sanitize_text_field', $_GET['age'] ) : [];
 
         $tax_query = [];
         if ( $cat_slug ) {
@@ -506,7 +512,13 @@ window.elementor=window.elementor||{modules:{}};
             default      => [ 'orderby' => 'date',           'order' => 'DESC' ],
         };
 
-        $search_query = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+        $meta_query = [];
+        if ( $in_stock ) {
+            $meta_query[] = [ 'key' => '_stock_status', 'value' => 'instock' ];
+        }
+        if ( $ages_raw ) {
+            $meta_query[] = [ 'key' => '_ltms_age_range', 'value' => $ages_raw, 'compare' => 'IN' ];
+        }
 
         $args = array_merge( [
             'post_type'      => 'product',
@@ -515,27 +527,19 @@ window.elementor=window.elementor||{modules:{}};
             'paged'          => $paged,
             'author'         => $vendor->id,
             'tax_query'      => $tax_query,
-            's'              => $search_query,
+            'meta_query'     => $meta_query ?: [],
+            's'              => $search_q,
         ], $wc_order );
 
-        $query = new WP_Query( $args );
-        $total = $query->found_posts;
-        $pages = $query->max_num_pages;
-
-        // Categorías del vendedor (para tabs)
+        $query     = new WP_Query( $args );
+        $total     = $query->found_posts;
+        $pages     = $query->max_num_pages;
         $vendor_cats = self::get_vendor_categories( $vendor->id );
+        $base_url  = home_url( '/vendedor/' . $vendor->slug . '/' );
 
-        // Ruta base para paginación/filtros
-        $base_url = home_url( '/vendedor/' . $vendor->slug . '/' );
+        // Filtros activos para la pastilla de "Limpiar todo"
+        $active_filters = array_filter( [ $cat_slug, $in_stock, $ages_raw, $search_q ] );
 
-        // Renderizar HTML — documento propio, SIN get_header()/get_footer().
-        // El header/footer del tema están construidos con Elementor Theme Builder;
-        // esta URL no es una página "real" de Elementor (es una ruta sintética vía
-        // rewrite rule), así que sus templates nunca localizan sus globals JS
-        // correctamente y rompen en cascada (carrito que no cierra, CSS de otros
-        // widgets del header sin aplicar). Por eso esta vitrina usa su propio
-        // documento mínimo, con wp_head()/wp_footer() para que WooCommerce y SEO
-        // sigan funcionando, pero sin las plantillas del Theme Builder.
         self::print_head( $vendor );
         ?>
         <div class="ltms-storefront" itemscope itemtype="https://schema.org/Store">
@@ -568,7 +572,6 @@ window.elementor=window.elementor||{modules:{}};
                                     <span class="ltms-sf-verified" title="Vendedor verificado">✓</span>
                                 <?php endif; ?>
                             </h1>
-
                             <div class="ltms-sf-meta-row">
                                 <?php if ( $vendor->city ) : ?>
                                     <span class="ltms-sf-city">
@@ -576,17 +579,14 @@ window.elementor=window.elementor||{modules:{}};
                                         <?php echo esc_html( $vendor->city ); ?>
                                     </span>
                                 <?php endif; ?>
-
                                 <?php if ( $vendor->rnt ) : ?>
                                     <span class="ltms-sf-rnt">RNT <?php echo esc_html( $vendor->rnt ); ?></span>
                                 <?php endif; ?>
-
                                 <span class="ltms-sf-count">
                                     <?php echo esc_html( number_format_i18n( $total ) ); ?>
-                                    <?php echo $total === 1 ? 'producto' : 'productos'; ?>
+                                    <?php echo 1 === $total ? 'producto' : 'productos'; ?>
                                 </span>
                             </div>
-
                             <?php if ( $vendor->description ) : ?>
                                 <p class="ltms-sf-description" itemprop="description">
                                     <?php echo esc_html( wp_trim_words( $vendor->description, 25 ) ); ?>
@@ -597,208 +597,292 @@ window.elementor=window.elementor||{modules:{}};
                 </div>
             </div><!-- .ltms-sf-banner -->
 
-            <!-- FILTROS -->
-            <div class="ltms-sf-toolbar">
-                <!-- Barra de búsqueda dentro de la tienda del vendedor -->
-                <div class="ltms-sf-search-wrap">
-                    <form method="get" action="" class="ltms-sf-search-form" role="search">
-                        <input type="hidden" name="vendor_id" value="<?php echo esc_attr( $vendor->id ); ?>">
-                        <input
-                            type="search"
-                            name="s"
-                            class="ltms-sf-search-input"
-                            placeholder="Buscar en esta tienda…"
-                            value="<?php echo esc_attr( get_search_query() ); ?>"
-                            aria-label="Buscar productos en <?php echo esc_attr( $vendor->name ); ?>">
-                        <button type="submit" class="ltms-sf-search-btn" aria-label="Buscar">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <!-- BARRA DE BÚSQUEDA -->
+            <div class="ltms-sf-searchbar">
+                <form method="get" action="" class="ltms-sf-search-form" role="search">
+                    <input type="hidden" name="vendor_id" value="<?php echo esc_attr( $vendor->id ); ?>">
+                    <svg class="ltms-sf-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="search" name="s" class="ltms-sf-search-input"
+                           placeholder="Buscar producto"
+                           value="<?php echo esc_attr( $search_q ); ?>"
+                           aria-label="Buscar en <?php echo esc_attr( $vendor->name ); ?>">
+                </form>
+            </div>
+
+            <!-- LAYOUT PRINCIPAL: sidebar + contenido -->
+            <div class="ltms-sf-layout">
+
+                <!-- SIDEBAR DE FILTROS -->
+                <aside class="ltms-sf-sidebar" id="ltms-sf-sidebar" aria-label="Filtros">
+
+                    <!-- Categoría -->
+                    <div class="ltms-sf-filter-group">
+                        <button class="ltms-sf-filter-heading" aria-expanded="true" aria-controls="ltms-filter-cat">
+                            Categoría
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
                         </button>
-                    </form>
-                </div>
+                        <div class="ltms-sf-filter-body" id="ltms-filter-cat">
+                            <label class="ltms-sf-filter-option">
+                                <input type="radio" name="ltms_cat" value=""
+                                    <?php checked( ! $cat_slug ); ?>
+                                    onchange="location.href='<?php echo esc_js( $base_url ); ?>'">
+                                Todos
+                                <span class="ltms-sf-filter-count"><?php echo esc_html( $total ); ?></span>
+                            </label>
+                            <?php foreach ( $vendor_cats as $cat ) :
+                                $cat_url = add_query_arg( 'cat', $cat->slug, $base_url ); ?>
+                                <label class="ltms-sf-filter-option">
+                                    <input type="radio" name="ltms_cat" value="<?php echo esc_attr( $cat->slug ); ?>"
+                                        <?php checked( $cat_slug, $cat->slug ); ?>
+                                        onchange="location.href='<?php echo esc_js( $cat_url ); ?>'">
+                                    <?php echo esc_html( $cat->name ); ?>
+                                    <span class="ltms-sf-filter-count"><?php echo esc_html( $cat->count ?? '' ); ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
 
-                <div class="ltms-sf-cats">
-                    <a href="<?php echo esc_url( $base_url ); ?>"
-                       class="ltms-sf-cat-tab <?php echo ! $cat_slug ? 'active' : ''; ?>">
-                        Todos
-                    </a>
-                    <?php foreach ( $vendor_cats as $cat ) : ?>
-                        <a href="<?php echo esc_url( add_query_arg( 'cat', $cat->slug, $base_url ) ); ?>"
-                           class="ltms-sf-cat-tab <?php echo $cat_slug === $cat->slug ? 'active' : ''; ?>">
-                            <?php echo esc_html( $cat->name ); ?>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
+                    <!-- Disponibilidad -->
+                    <div class="ltms-sf-filter-group">
+                        <button class="ltms-sf-filter-heading" aria-expanded="true" aria-controls="ltms-filter-stock">
+                            Disponibilidad
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                        </button>
+                        <div class="ltms-sf-filter-body" id="ltms-filter-stock">
+                            <?php
+                            $stock_url = add_query_arg( array_merge(
+                                [ 'cat' => $cat_slug ?: null, 'order' => $orderby !== 'date' ? $orderby : null ],
+                                $in_stock ? [] : [ 'instock' => '1' ]
+                            ), $base_url );
+                            ?>
+                            <label class="ltms-sf-filter-option">
+                                <input type="checkbox" name="instock" value="1"
+                                    <?php checked( $in_stock ); ?>
+                                    onchange="location.href='<?php echo esc_js( $stock_url ); ?>'">
+                                En stock
+                            </label>
+                        </div>
+                    </div>
 
-                <div class="ltms-sf-order">
-                    <select onchange="location.href=this.value" aria-label="Ordenar por">
-                        <?php
-                        $order_options = [
-                            'date'       => 'Más recientes',
-                            'price'      => 'Precio: menor a mayor',
-                            'price-desc' => 'Precio: mayor a menor',
-                        ];
-                        foreach ( $order_options as $val => $label ) :
-                            $url = add_query_arg( [ 'order' => $val, 'cat' => $cat_slug ?: null ], $base_url );
-                        ?>
-                            <option value="<?php echo esc_url( $url ); ?>"
-                                <?php selected( $orderby, $val ); ?>>
-                                <?php echo esc_html( $label ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div><!-- .ltms-sf-toolbar -->
+                    <!-- Botones de acción -->
+                    <div class="ltms-sf-filter-actions">
+                        <?php if ( $active_filters ) : ?>
+                            <a href="<?php echo esc_url( $base_url ); ?>" class="ltms-sf-btn-clear">Limpiar todo ×</a>
+                        <?php endif; ?>
+                    </div>
 
-            <!-- GRID DE PRODUCTOS -->
-            <div class="ltms-sf-products">
-                <?php if ( $query->have_posts() ) : ?>
-                    <div class="ltms-sf-grid">
-                        <?php while ( $query->have_posts() ) : $query->the_post();
-                            global $product;
-                            $product = wc_get_product( get_the_ID() );
-                            if ( ! $product ) continue;
+                </aside><!-- .ltms-sf-sidebar -->
 
-                            $gallery_ids   = $product->get_gallery_image_ids();
-                            $hover_img_id  = $gallery_ids ? $gallery_ids[0] : 0;
-                            $avg_rating    = (float) $product->get_average_rating();
-                            $rating_count  = (int) $product->get_rating_count();
-                            $is_new        = ( strtotime( get_the_date( 'c' ) ) > strtotime( '-15 days' ) );
-                            $discount_pct  = 0;
-                            if ( $product->is_on_sale() && $product->get_regular_price() > 0 ) {
-                                $discount_pct = round( ( ( $product->get_regular_price() - $product->get_sale_price() ) / $product->get_regular_price() ) * 100 );
-                            }
-                        ?>
-                            <article class="ltms-sf-card" itemscope itemtype="https://schema.org/Product">
+                <!-- CONTENIDO PRINCIPAL -->
+                <div class="ltms-sf-content">
 
-                                <div class="ltms-sf-card-img">
-                                    <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-card-img-link" aria-label="<?php echo esc_attr( get_the_title() ); ?>">
-                                        <?php if ( has_post_thumbnail() ) : ?>
-                                            <?php echo wp_get_attachment_image( get_post_thumbnail_id(), 'woocommerce_thumbnail', false, [
-                                                'class'    => 'ltms-sf-img-main',
-                                                'itemprop' => 'image',
-                                                'loading'  => 'lazy',
-                                                'alt'      => esc_attr( get_the_title() ),
-                                            ] ); ?>
-                                        <?php else : ?>
-                                            <div class="ltms-sf-card-no-img">Sin imagen</div>
-                                        <?php endif; ?>
+                    <!-- BARRA SUPERIOR: conteo + orden + toggle vista -->
+                    <div class="ltms-sf-topbar-content">
+                        <span class="ltms-sf-result-count">
+                            <?php echo esc_html( number_format_i18n( $total ) ); ?>
+                            <?php echo 1 === $total ? 'producto' : 'productos'; ?>
+                        </span>
 
-                                        <?php if ( $hover_img_id ) : ?>
-                                            <?php echo wp_get_attachment_image( $hover_img_id, 'woocommerce_thumbnail', false, [
-                                                'class'   => 'ltms-sf-img-hover',
-                                                // Sin loading="lazy" a propósito: esta imagen vive superpuesta
-                                                // (position:absolute) sobre la principal y solo se revela en
-                                                // :hover/CSS. El navegador la trata como "fuera de viewport" y
-                                                // nunca dispara su carga -- al restaurar la página desde el
-                                                // back-forward cache (botón Atrás), Chrome re-evalúa el lazy
-                                                // loading de ambas imágenes superpuestas y deja la principal
-                                                // en blanco también. Es una imagen secundaria y liviana del
-                                                // mismo thumbnail de WooCommerce, así que cargarla eager no
-                                                // tiene costo real y evita el conflicto.
-                                                'loading' => 'eager',
-                                                'alt'     => '',
-                                            ] ); ?>
-                                        <?php endif; ?>
-                                    </a>
-
-                                    <!-- Badges -->
-                                    <div class="ltms-sf-badges">
-                                        <?php if ( $discount_pct > 0 ) : ?>
-                                            <span class="ltms-badge ltms-badge--pct">-<?php echo esc_html( $discount_pct ); ?>%</span>
-                                        <?php elseif ( $product->is_on_sale() ) : ?>
-                                            <span class="ltms-badge ltms-badge--sale">OFERTA</span>
-                                        <?php endif; ?>
-                                        <?php if ( $is_new ) : ?>
-                                            <span class="ltms-badge ltms-badge--new">NUEVO</span>
-                                        <?php endif; ?>
-                                        <?php if ( ! $product->is_in_stock() ) : ?>
-                                            <span class="ltms-badge ltms-badge--soldout">AGOTADO</span>
-                                        <?php endif; ?>
-                                    </div>
-
-                                    <!-- Acciones (wishlist / vista rápida / comparar) -->
-                                    <div class="ltms-sf-card-actions">
-                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-wishlist"
-                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
-                                                aria-label="Agregar a favoritos">
-                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                                        </button>
-                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-quickview"
-                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
-                                                aria-label="Vista rápida">
-                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                        </button>
-                                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-compare"
-                                                data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
-                                                aria-label="Comparar">
-                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                                        </button>
-                                    </div>
-                                </div><!-- .ltms-sf-card-img -->
-
-                                <div class="ltms-sf-card-body">
-                                    <p class="ltms-sf-card-cat">
-                                        <?php
-                                        $cats = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
-                                        echo $cats ? esc_html( $cats[0]->name ) : esc_html( $vendor->name );
-                                        ?>
-                                    </p>
-
-                                    <h2 class="ltms-sf-card-name" itemprop="name">
-                                        <a href="<?php echo esc_url( get_permalink() ); ?>"><?php echo esc_html( get_the_title() ); ?></a>
-                                    </h2>
-
-                                    <?php if ( $rating_count > 0 ) : ?>
-                                        <div class="ltms-sf-card-rating" aria-label="<?php echo esc_attr( $avg_rating ); ?> de 5 estrellas">
-                                            <span class="ltms-sf-stars" style="--rating: <?php echo esc_attr( ( $avg_rating / 5 ) * 100 ); ?>%;" aria-hidden="true">★★★★★</span>
-                                            <span class="ltms-sf-rating-count">(<?php echo esc_html( $rating_count ); ?>)</span>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
-                                        <meta itemprop="priceCurrency" content="COP">
-                                        <?php echo wp_kses_post( $product->get_price_html() ); ?>
-                                    </div>
-
-                                    <?php if ( $product->is_purchasable() && ( $product->is_in_stock() || $product->backorders_allowed() ) ) : ?>
-                                        <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
-                                           data-quantity="1"
-                                           class="ltms-sf-add-to-cart button ajax_add_to_cart add_to_cart_button"
-                                           data-product_id="<?php echo esc_attr( $product->get_id() ); ?>"
-                                           data-product_sku="<?php echo esc_attr( $product->get_sku() ); ?>"
-                                           aria-label="Agregar &laquo;<?php echo esc_attr( get_the_title() ); ?>&raquo; al carrito"
-                                           rel="nofollow">
-                                            Agregar al carrito
-                                        </a>
-                                    <?php else : ?>
-                                        <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-add-to-cart ltms-sf-view-product">
-                                            Ver producto
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </article>
-                        <?php endwhile; wp_reset_postdata(); ?>
-                    </div><!-- .ltms-sf-grid -->
-
-                    <?php if ( $pages > 1 ) : ?>
-                        <nav class="ltms-sf-pagination" aria-label="Paginación">
-                            <?php for ( $p = 1; $p <= $pages; $p++ ) : ?>
-                                <a href="<?php echo esc_url( add_query_arg( [ 'pg' => $p, 'cat' => $cat_slug ?: null, 'order' => $orderby !== 'date' ? $orderby : null ], $base_url ) ); ?>"
-                                   class="ltms-sf-page-btn <?php echo $p === $paged ? 'active' : ''; ?>"
-                                   aria-label="Página <?php echo esc_attr( $p ); ?>"
-                                   <?php echo $p === $paged ? 'aria-current="page"' : ''; ?>>
-                                    <?php echo esc_html( $p ); ?>
+                        <!-- Filtros activos como chips removibles -->
+                        <?php if ( $active_filters ) : ?>
+                        <div class="ltms-sf-chips">
+                            <?php if ( $cat_slug ) :
+                                $cat_obj = get_term_by( 'slug', $cat_slug, 'product_cat' );
+                                $rm_cat = remove_query_arg( 'cat', add_query_arg( $_GET, $base_url ) );
+                            ?>
+                                <a href="<?php echo esc_url( $rm_cat ); ?>" class="ltms-sf-chip">
+                                    <?php echo esc_html( $cat_obj ? $cat_obj->name : $cat_slug ); ?> ×
                                 </a>
-                            <?php endfor; ?>
-                        </nav>
+                            <?php endif; ?>
+                            <?php if ( $in_stock ) :
+                                $rm_stock = remove_query_arg( 'instock', add_query_arg( $_GET, $base_url ) );
+                            ?>
+                                <a href="<?php echo esc_url( $rm_stock ); ?>" class="ltms-sf-chip">En stock ×</a>
+                            <?php endif; ?>
+                            <?php if ( $active_filters ) : ?>
+                                <a href="<?php echo esc_url( $base_url ); ?>" class="ltms-sf-chip ltms-sf-chip--clear">Limpiar todo ×</a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="ltms-sf-topbar-right">
+                            <!-- Selector de orden -->
+                            <select class="ltms-sf-order-select" onchange="location.href=this.value" aria-label="Ordenar por">
+                                <?php
+                                $order_opts = [
+                                    'date'       => 'Más recientes',
+                                    'price'      => 'Precio: menor a mayor',
+                                    'price-desc' => 'Precio: mayor a menor',
+                                ];
+                                foreach ( $order_opts as $val => $label ) :
+                                    $url = add_query_arg( [ 'order' => $val, 'cat' => $cat_slug ?: null ], $base_url );
+                                ?>
+                                    <option value="<?php echo esc_url( $url ); ?>" <?php selected( $orderby, $val ); ?>>
+                                        <?php echo esc_html( $label ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+
+                            <!-- Toggle grid / lista -->
+                            <div class="ltms-sf-view-toggle" role="group" aria-label="Vista">
+                                <a href="<?php echo esc_url( add_query_arg( 'view', 'grid', add_query_arg( $_GET, $base_url ) ) ); ?>"
+                                   class="ltms-sf-view-btn <?php echo 'list' !== $view_mode ? 'active' : ''; ?>"
+                                   aria-label="Vista cuadrícula">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                                </a>
+                                <a href="<?php echo esc_url( add_query_arg( 'view', 'list', add_query_arg( $_GET, $base_url ) ) ); ?>"
+                                   class="ltms-sf-view-btn <?php echo 'list' === $view_mode ? 'active' : ''; ?>"
+                                   aria-label="Vista lista">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div><!-- .ltms-sf-topbar-content -->
+
+                    <!-- GRID / LISTA DE PRODUCTOS -->
+                    <?php if ( $query->have_posts() ) : ?>
+                        <div class="ltms-sf-grid ltms-sf-view-<?php echo esc_attr( $view_mode ); ?>">
+                            <?php while ( $query->have_posts() ) : $query->the_post();
+                                global $product;
+                                $product = wc_get_product( get_the_ID() );
+                                if ( ! $product ) continue;
+
+                                $gallery_ids  = $product->get_gallery_image_ids();
+                                $hover_img_id = $gallery_ids ? $gallery_ids[0] : 0;
+                                $avg_rating   = (float) $product->get_average_rating();
+                                $rating_count = (int) $product->get_rating_count();
+                                $is_new       = ( strtotime( get_the_date( 'c' ) ) > strtotime( '-15 days' ) );
+                                $discount_pct = 0;
+                                if ( $product->is_on_sale() && $product->get_regular_price() > 0 ) {
+                                    $discount_pct = round( ( ( $product->get_regular_price() - $product->get_sale_price() ) / $product->get_regular_price() ) * 100 );
+                                }
+                                $cats = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
+                            ?>
+                                <article class="ltms-sf-card" itemscope itemtype="https://schema.org/Product">
+                                    <div class="ltms-sf-card-img">
+                                        <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-card-img-link" aria-label="<?php echo esc_attr( get_the_title() ); ?>">
+                                            <?php if ( has_post_thumbnail() ) : ?>
+                                                <?php echo wp_get_attachment_image( get_post_thumbnail_id(), 'woocommerce_thumbnail', false, [
+                                                    'class'    => 'ltms-sf-img-main',
+                                                    'itemprop' => 'image',
+                                                    'loading'  => 'lazy',
+                                                    'alt'      => esc_attr( get_the_title() ),
+                                                ] ); ?>
+                                            <?php else : ?>
+                                                <div class="ltms-sf-card-no-img">Sin imagen</div>
+                                            <?php endif; ?>
+                                            <?php if ( $hover_img_id ) : ?>
+                                                <?php echo wp_get_attachment_image( $hover_img_id, 'woocommerce_thumbnail', false, [
+                                                    'class'   => 'ltms-sf-img-hover',
+                                                    'loading' => 'eager',
+                                                    'alt'     => '',
+                                                ] ); ?>
+                                            <?php endif; ?>
+                                        </a>
+
+                                        <!-- Badges -->
+                                        <div class="ltms-sf-badges">
+                                            <?php if ( $discount_pct > 0 ) : ?>
+                                                <span class="ltms-badge ltms-badge--pct">-<?php echo esc_html( $discount_pct ); ?>%</span>
+                                            <?php elseif ( $product->is_on_sale() ) : ?>
+                                                <span class="ltms-badge ltms-badge--sale">OFERTA</span>
+                                            <?php endif; ?>
+                                            <?php if ( $is_new ) : ?>
+                                                <span class="ltms-badge ltms-badge--new">NUEVO</span>
+                                            <?php endif; ?>
+                                            <?php if ( ! $product->is_in_stock() ) : ?>
+                                                <span class="ltms-badge ltms-badge--soldout">AGOTADO</span>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <!-- Acciones hover -->
+                                        <div class="ltms-sf-card-actions">
+                                            <button type="button" class="ltms-sf-action-btn ltms-sf-action-wishlist"
+                                                    data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
+                                                    aria-label="Favoritos">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                            </button>
+                                            <button type="button" class="ltms-sf-action-btn ltms-sf-action-quickview"
+                                                    data-product-id="<?php echo esc_attr( get_the_ID() ); ?>"
+                                                    aria-label="Vista rápida">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            </button>
+                                        </div>
+                                    </div><!-- .ltms-sf-card-img -->
+
+                                    <div class="ltms-sf-card-body">
+                                        <p class="ltms-sf-card-cat">
+                                            <?php echo $cats ? esc_html( $cats[0]->name ) : esc_html( $vendor->name ); ?>
+                                        </p>
+                                        <h2 class="ltms-sf-card-name" itemprop="name">
+                                            <a href="<?php echo esc_url( get_permalink() ); ?>"><?php echo esc_html( get_the_title() ); ?></a>
+                                        </h2>
+                                        <?php if ( $rating_count > 0 ) : ?>
+                                            <div class="ltms-sf-card-rating" aria-label="<?php echo esc_attr( $avg_rating ); ?> de 5">
+                                                <span class="ltms-sf-stars" style="--rating:<?php echo esc_attr( ( $avg_rating / 5 ) * 100 ); ?>%" aria-hidden="true">★★★★★</span>
+                                                <span class="ltms-sf-rating-count">(<?php echo esc_html( $rating_count ); ?>)</span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                                            <meta itemprop="priceCurrency" content="COP">
+                                            <?php echo wp_kses_post( $product->get_price_html() ); ?>
+                                        </div>
+                                        <?php if ( $product->is_purchasable() && ( $product->is_in_stock() || $product->backorders_allowed() ) ) : ?>
+                                            <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
+                                               data-quantity="1"
+                                               class="ltms-sf-add-to-cart button ajax_add_to_cart add_to_cart_button"
+                                               data-product_id="<?php echo esc_attr( $product->get_id() ); ?>"
+                                               data-product_sku="<?php echo esc_attr( $product->get_sku() ); ?>"
+                                               aria-label="Agregar al carrito"
+                                               rel="nofollow">
+                                                Agregar al carrito
+                                            </a>
+                                        <?php else : ?>
+                                            <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-add-to-cart ltms-sf-view-product">
+                                                Ver producto
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endwhile; wp_reset_postdata(); ?>
+                        </div><!-- .ltms-sf-grid -->
+
+                        <?php if ( $pages > 1 ) : ?>
+                            <nav class="ltms-sf-pagination" aria-label="Paginación">
+                                <?php if ( $paged > 1 ) : ?>
+                                    <a href="<?php echo esc_url( add_query_arg( 'pg', $paged - 1, add_query_arg( $_GET, $base_url ) ) ); ?>" class="ltms-sf-page-btn ltms-sf-page-prev" aria-label="Anterior">‹</a>
+                                <?php endif; ?>
+                                <?php for ( $p = 1; $p <= $pages; $p++ ) :
+                                    // Mostrar solo primeras 2, últimas 2, y alrededor de la actual
+                                    $show = ( $p <= 2 || $p >= $pages - 1 || abs( $p - $paged ) <= 1 );
+                                    if ( ! $show ) {
+                                        if ( $p === 3 || $p === $pages - 2 ) echo '<span class="ltms-sf-page-ellipsis">…</span>';
+                                        continue;
+                                    }
+                                ?>
+                                    <a href="<?php echo esc_url( add_query_arg( [ 'pg' => $p, 'cat' => $cat_slug ?: null, 'order' => $orderby !== 'date' ? $orderby : null ], $base_url ) ); ?>"
+                                       class="ltms-sf-page-btn <?php echo $p === $paged ? 'active' : ''; ?>"
+                                       aria-label="Página <?php echo esc_attr( $p ); ?>"
+                                       <?php echo $p === $paged ? 'aria-current="page"' : ''; ?>>
+                                        <?php echo esc_html( $p ); ?>
+                                    </a>
+                                <?php endfor; ?>
+                                <?php if ( $paged < $pages ) : ?>
+                                    <a href="<?php echo esc_url( add_query_arg( 'pg', $paged + 1, add_query_arg( $_GET, $base_url ) ) ); ?>" class="ltms-sf-page-btn ltms-sf-page-next" aria-label="Siguiente">›</a>
+                                <?php endif; ?>
+                            </nav>
+                        <?php endif; ?>
+
+                    <?php else : ?>
+                        <div class="ltms-sf-empty">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <p>No encontramos productos con esos filtros.</p>
+                            <a href="<?php echo esc_url( $base_url ); ?>" class="ltms-sf-btn-clear">Ver todos los productos</a>
+                        </div>
                     <?php endif; ?>
 
-                <?php else : ?>
-                    <div class="ltms-sf-empty">
-                        <p>Esta tienda aún no tiene productos publicados.</p>
-                    </div>
-                <?php endif; ?>
-            </div><!-- .ltms-sf-products -->
+                </div><!-- .ltms-sf-content -->
+            </div><!-- .ltms-sf-layout -->
         </div><!-- .ltms-storefront -->
         <?php
         self::print_foot();
