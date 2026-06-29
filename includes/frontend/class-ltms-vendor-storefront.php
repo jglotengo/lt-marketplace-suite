@@ -542,11 +542,14 @@ window.elementor=window.elementor||{modules:{}};
             <meta itemprop="name" content="<?php echo esc_attr( $vendor->name ); ?>">
 
             <!-- BANNER -->
-            <div class="ltms-sf-banner" style="<?php
-                if ( $vendor->banner ) {
-                    echo 'background-image:url(' . esc_url( $vendor->banner ) . ');';
-                }
-            ?>">
+            <div class="ltms-sf-banner">
+                <?php if ( $vendor->banner ) : ?>
+                <img class="ltms-sf-banner-img"
+                     src="<?php echo esc_url( $vendor->banner ); ?>"
+                     alt="<?php echo esc_attr( $vendor->name ); ?>"
+                     loading="eager"
+                     decoding="async">
+                <?php endif; ?>
                 <div class="ltms-sf-banner-overlay">
                     <div class="ltms-sf-header">
                         <?php if ( $vendor->logo ) : ?>
