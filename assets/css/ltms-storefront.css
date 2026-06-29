@@ -30,21 +30,24 @@
   background-position: center center;
   background-repeat: no-repeat;
   border-radius: 0 0 var(--sf-radius) var(--sf-radius);
-  /* aspect-ratio 2.25:1 para imagen 1881x836, con tope máximo */
-  aspect-ratio: 2.25 / 1;
-  max-height: 420px;
-  min-height: 160px;
+  /* Truco padding-bottom para ratio 836/1881 = 44.44% — funciona con position:relative */
   position: relative;
+  width: 100%;
+  padding-bottom: 44.44%;
+  max-height: 440px;
+  overflow: hidden;
   margin: 0 -16px 32px;
 }
 
 .ltms-sf-banner-overlay {
   background: linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%);
-  min-height: inherit;
   border-radius: inherit;
   display: flex;
   align-items: flex-end;
   padding: 24px;
+  /* Absoluto para no interferir con padding-bottom del padre */
+  position: absolute;
+  inset: 0;
 }
 
 .ltms-sf-header {
@@ -538,9 +541,8 @@
 
 @media (max-width: 767px) {
   .ltms-sf-banner {
-    aspect-ratio: 2.25 / 1;
+    padding-bottom: 44.44%;
     max-height: 200px;
-    min-height: 120px;
     margin: 0 -16px 0;
     border-radius: 0;
     background-position: center center;
