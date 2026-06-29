@@ -25,17 +25,22 @@
 /* ---- Banner ---- */
 .ltms-sf-banner {
   background-color: var(--sf-brand);
-  background-image: none; /* sobreescrito por inline style */
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
   border-radius: 0 0 var(--sf-radius) var(--sf-radius);
   position: relative;
   width: 100%;
-  /* clamp: a 960px de ancho → 44.44vw = 426px (imagen completa sin recorte) */
-  height: clamp(200px, 44.44vw, 500px);
   overflow: hidden;
   margin: 0 -16px 32px;
+  /* Altura determinada por la imagen — sin min-height fija */
+  min-height: 120px;
+}
+
+/* Imagen del banner: ocupa todo el ancho, altura proporcional automática */
+.ltms-sf-banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  max-height: 500px;
 }
 
 .ltms-sf-banner-overlay {
@@ -540,12 +545,13 @@
 
 @media (max-width: 767px) {
   .ltms-sf-banner {
-    /* a 412px: 44.44vw = 183px — muestra imagen completa */
-    height: clamp(140px, 44.44vw, 220px);
     margin: 0 -16px 0;
     border-radius: 0;
-    background-size: cover;
-    background-position: center center;
+    min-height: 100px;
+  }
+  .ltms-sf-banner-img {
+    max-height: 220px;
+    object-position: center center;
   }
   .ltms-sf-banner-overlay {
     background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.70) 100%);
