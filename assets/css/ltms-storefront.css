@@ -39,8 +39,7 @@
   display: block;
   width: 100%;
   height: auto;
-  object-fit: cover;
-  max-height: 500px;
+  /* Sin object-fit ni max-height: la imagen se muestra completa siempre */
 }
 
 .ltms-sf-banner-overlay {
@@ -549,10 +548,7 @@
     border-radius: 0;
     min-height: 100px;
   }
-  .ltms-sf-banner-img {
-    max-height: 220px;
-    object-position: center center;
-  }
+  /* En mobile la imagen se autoajusta — sin recorte */
   .ltms-sf-banner-overlay {
     background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.70) 100%);
     padding: 12px 16px 16px;
