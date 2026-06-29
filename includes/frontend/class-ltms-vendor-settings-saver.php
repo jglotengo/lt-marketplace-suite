@@ -171,7 +171,8 @@ class LTMS_Vendor_Settings_Saver {
                 'store_address'     => get_user_meta( $vendor_id, 'ltms_store_address',     true ),
                 'store_schedule'    => get_user_meta( $vendor_id, 'ltms_store_schedule',    true ),
                 'store_categories'  => get_user_meta( $vendor_id, 'ltms_store_categories',  true ),
-                'store_banner_url'  => get_user_meta( $vendor_id, 'ltms_store_banner_url',  true ),
+                'store_banner_url'  => get_user_meta( $vendor_id, 'ltms_store_banner_url',  true )
+                                        ?: get_user_meta( $vendor_id, 'ltms_store_banner',      true ),
                 // Zona de despacho
                 'delivery_zone'        => $zone,
             'vendor_ga4_enabled'   => get_option( 'ltms_vendor_ga4_enabled', 'yes' ) === 'yes',
