@@ -1,788 +1,82 @@
-/* ============================================================
-   LTMS Vendor Storefront — Vitrina pública del vendedor
-   v2.8.0
-   ============================================================ */
-
 :root {
   --sf-brand:     #E80001;
-  --sf-brand-dk:  #B01212;
+  --sf-brand-dk:  #B90001;
   --sf-text:      #242424;
   --sf-muted:     #767676;
-  --sf-border:    #E9E9E9;
-  --sf-bg:        #F8F8F8;
-  --sf-white:     #FFFFFF;
-  --sf-radius:    8px;
-  --sf-shadow:    0 2px 12px rgba(0,0,0,0.08);
+  --sf-border:    #E8E8E8;
+  --sf-bg:        #F5F5F5;
+  --sf-white:     #ffffff;
+  --sf-radius:    10px;
+  --sf-shadow:    0 2px 8px rgba(0,0,0,0.08);
+  --font-body:    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* ---- Layout ---- */
-.ltms-storefront {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 16px 60px;
-}
-
-/* ---- Banner ---- */
-.ltms-sf-banner {
-  background-color: var(--sf-brand);
-  border-radius: 0 0 var(--sf-radius) var(--sf-radius);
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  margin: 0 -16px 32px;
-  /* Altura determinada por la imagen — sin min-height fija */
-  min-height: 120px;
-}
-
-/* Imagen del banner: ocupa todo el ancho, altura proporcional automática */
-.ltms-sf-banner-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  /* Sin object-fit ni max-height: la imagen se muestra completa siempre */
-}
-
-.ltms-sf-banner-overlay {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 100%);
-  border-radius: inherit;
-  display: flex;
-  align-items: flex-end;
-  padding: 24px;
-  /* Absoluto para no interferir con padding-bottom del padre */
-  position: absolute;
-  inset: 0;
-}
-
-.ltms-sf-header {
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  width: 100%;
-}
-
-/* ---- Logo ---- */
-.ltms-sf-logo {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  border: 3px solid var(--sf-white);
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--sf-white);
-}
-
-.ltms-sf-logo-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sf-brand-dk);
-  color: var(--sf-white);
-  font-size: 32px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-/* ---- Meta ---- */
-.ltms-sf-meta { flex: 1; min-width: 0; }
-
-.ltms-sf-name {
-  font-size: clamp(20px, 4vw, 28px);
-  font-weight: 700;
-  color: var(--sf-white);
-  margin: 0 0 8px;
-  line-height: 1.2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ltms-sf-verified {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #27AE60;
-  color: var(--sf-white);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.ltms-sf-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.ltms-sf-city,
-.ltms-sf-rnt,
-.ltms-sf-count {
-  font-size: 13px;
-  color: rgba(255,255,255,0.85);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.ltms-sf-rnt {
-  background: rgba(255,255,255,0.15);
-  padding: 2px 8px;
-  border-radius: 99px;
-}
-
-.ltms-sf-description {
-  font-size: 14px;
-  color: rgba(255,255,255,0.8);
+/* ============================================================
+   RESET & DOCUMENTO PROPIO
+   ============================================================ */
+.ltms-storefront-page {
   margin: 0;
+  font-family: var(--font-body);
+  color: var(--sf-text);
+  background: var(--sf-bg);
+  font-size: 14px;
   line-height: 1.5;
 }
 
-/* ---- Toolbar ---- */
-.ltms-sf-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.ltms-sf-cats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ltms-sf-cat-tab {
-  padding: 6px 16px;
-  border-radius: 99px;
-  border: 1px solid var(--sf-border);
-  font-size: 13px;
-  color: var(--sf-muted);
-  text-decoration: none;
-  background: var(--sf-white);
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.ltms-sf-cat-tab:hover,
-.ltms-sf-cat-tab.active {
-  background: var(--sf-brand);
-  border-color: var(--sf-brand);
-  color: var(--sf-white);
-}
-
-.ltms-sf-order select {
-  padding: 6px 12px;
-  border: 1px solid var(--sf-border);
-  border-radius: var(--sf-radius);
-  font-size: 13px;
-  color: var(--sf-text);
-  background: var(--sf-white);
-  cursor: pointer;
-}
-
-/* ---- Grid ---- */
-/* 4 columnas en desktop para igualar la densidad visual de la tienda
-   principal de WooCommerce (columns-4) — ver tablet/móvil más abajo. */
-.ltms-sf-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-
-/* ---- Card ---- */
-.ltms-sf-card {
-  background: var(--sf-white);
-  border-radius: var(--sf-radius);
-  overflow: hidden;
-  transition: box-shadow 0.2s, transform 0.2s;
-  display: flex;
-  flex-direction: column;
-}
-
-.ltms-sf-card:hover {
-  box-shadow: var(--sf-shadow);
-  transform: translateY(-2px);
-}
-
-/* ---- Imagen + overlay ---- */
-.ltms-sf-card-img {
-  /* Padding-bottom trick: ratio 1:1 indestructible vs cualquier tema.
-     aspect-ratio: 1/1 puede ser pisado por height del tema; este método
-     no puede porque depende solo del width del elemento padre. */
-  position: relative !important;
-  width: 100% !important;
-  height: 0 !important;
-  padding-bottom: 100% !important;
-  background: var(--sf-bg) !important;
-  overflow: hidden !important;
-}
-
-.ltms-sf-card-img-link {
-  display: block !important;
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.ltms-sf-img-main,
-.ltms-sf-img-hover {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  padding: 12px;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.ltms-sf-img-hover {
-  opacity: 0;
-}
-
-/* Solo ocultar la imagen principal si la card tiene imagen hover real en el DOM.
-   Sin :has(), productos sin segunda foto de galería se quedaban en blanco al hacer hover. */
-.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main {
-  opacity: 0;
-}
-
-.ltms-sf-card:hover .ltms-sf-img-hover {
-  opacity: 1;
-}
-
-.ltms-sf-card:hover .ltms-sf-img-main,
-.ltms-sf-card:hover .ltms-sf-img-hover {
-  transform: scale(1.04);
-}
-
-.ltms-sf-card-no-img {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--sf-muted);
-}
-
-/* ---- Badges (apilados, esquina sup. izq.) ---- */
-.ltms-sf-badges {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  z-index: 2;
-}
-
-.ltms-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.6;
-}
-
-.ltms-badge--sale    { background: var(--sf-badge-sale, #EABE12); color: #1A1A1A; }
-.ltms-badge--pct      { background: var(--sf-brand); color: var(--sf-white); }
-.ltms-badge--new      { background: #27AE60; color: var(--sf-white); }
-.ltms-badge--soldout  { background: var(--sf-muted); color: var(--sf-white); }
-
-/* ---- Overlay de acciones (wishlist / quickview / comparar) ---- */
-.ltms-sf-card-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 2;
-  opacity: 0;
-  transform: translateX(6px);
-  transition: opacity 0.2s, transform 0.2s;
-}
-
-.ltms-sf-card:hover .ltms-sf-card-actions {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.ltms-sf-action-btn {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: none;
-  background: var(--sf-white);
-  color: var(--sf-text);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, transform 0.15s;
-}
-
-.ltms-sf-action-btn:hover {
-  background: var(--sf-brand);
-  color: var(--sf-white);
-  transform: scale(1.08);
-}
-
-.ltms-sf-action-btn.is-active {
-  background: var(--sf-brand);
-  color: var(--sf-white);
-}
-
-/* En mobile, las acciones siempre están visibles (no hay hover real) */
-@media (max-width: 767px) {
-  .ltms-sf-card-actions {
-    opacity: 1;
-    transform: none;
-  }
-  .ltms-sf-action-btn {
-    width: 30px;
-    height: 30px;
-  }
-}
-
-/* ---- Cuerpo de la tarjeta ---- */
-.ltms-sf-card-body {
-  padding: 12px 14px 16px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.ltms-sf-card-cat {
-  font-size: 11px;
-  color: var(--sf-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 4px;
-}
-
-.ltms-sf-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 6px;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ltms-sf-card-name a {
-  color: var(--sf-text);
-  text-decoration: none;
-}
-
-.ltms-sf-card-name a:hover {
-  color: var(--sf-brand);
-}
-
-/* ---- Rating ---- */
-.ltms-sf-card-rating {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 6px;
-}
-
-.ltms-sf-stars {
-  position: relative;
-  display: inline-block;
-  font-size: 12px;
-  letter-spacing: 1px;
-  color: var(--sf-border);
-  line-height: 1;
-}
-
-.ltms-sf-stars::before {
-  content: '★★★★★';
-  position: absolute;
-  inset: 0;
-  width: var(--rating, 0%);
-  overflow: hidden;
-  color: #F5A623;
-  white-space: nowrap;
-}
-
-.ltms-sf-rating-count {
-  font-size: 11px;
-  color: var(--sf-muted);
-}
-
-/* ---- Precio ---- */
-.ltms-sf-card-price {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--sf-brand);
-  margin-bottom: 10px;
-}
-
-.ltms-sf-card-price del {
-  color: var(--sf-muted);
-  font-weight: 400;
-  font-size: 13px;
-  margin-right: 4px;
-  text-decoration: line-through;
-}
-
-.ltms-sf-card-price ins {
-  text-decoration: none;
-}
-
-/* ---- Botón Agregar al carrito ---- */
-.ltms-sf-add-to-cart {
-  margin-top: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 38px;
-  padding: 8px 10px;
-  border-radius: var(--sf-radius);
-  border: 1px solid var(--sf-brand);
-  background: var(--sf-white);
-  color: var(--sf-brand);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  cursor: pointer;
-  text-align: center;
-  white-space: normal;
-  line-height: 1.25;
-  transition: background 0.15s, color 0.15s;
-}
-
-.ltms-sf-add-to-cart:hover {
-  background: var(--sf-brand);
-  color: var(--sf-white);
-}
-
-.ltms-sf-add-to-cart.loading {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.ltms-sf-add-to-cart.added::after {
-  content: ' ✓';
-}
-
-.ltms-sf-view-product {
-  border-color: var(--sf-border);
-  color: var(--sf-muted);
-}
-
-.ltms-sf-view-product:hover {
-  background: var(--sf-text);
-  border-color: var(--sf-text);
-  color: var(--sf-white);
-}
-
-/* ---- Paginación ---- */
-.ltms-sf-pagination {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 40px;
-  flex-wrap: wrap;
-}
-
-.ltms-sf-page-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--sf-radius);
-  border: 1px solid var(--sf-border);
-  font-size: 14px;
-  color: var(--sf-text);
-  text-decoration: none;
-  background: var(--sf-white);
-  transition: all 0.15s;
-}
-
-.ltms-sf-page-btn:hover,
-.ltms-sf-page-btn.active {
-  background: var(--sf-brand);
-  border-color: var(--sf-brand);
-  color: var(--sf-white);
-}
-
-/* ---- Vacío ---- */
-.ltms-sf-empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--sf-muted);
-  font-size: 15px;
-}
-
-/* ---- Responsive ---- */
-@media (max-width: 1199px) {
-  .ltms-sf-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-}
-
-@media (max-width: 991px) {
-  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
-}
-
-@media (max-width: 767px) {
-  .ltms-sf-banner {
-    margin: 0 -16px 0;
-    border-radius: 0;
-    min-height: 100px;
-  }
-  /* En mobile la imagen se autoajusta — sin recorte */
-  .ltms-sf-banner-overlay {
-    background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.70) 100%);
-    padding: 12px 16px 16px;
-    align-items: flex-end;
-  }
-  .ltms-sf-header {
-    gap: 12px;
-    align-items: flex-end;
-  }
-  .ltms-sf-logo {
-    width: 60px;
-    height: 60px;
-    border: 2.5px solid rgba(255,255,255,0.9);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-    flex-shrink: 0;
-  }
-  .ltms-sf-logo-placeholder {
-    width: 60px;
-    height: 60px;
-    font-size: 22px;
-    border: 2.5px solid rgba(255,255,255,0.9);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-    flex-shrink: 0;
-  }
-  .ltms-sf-name {
-    font-size: 17px;
-    margin-bottom: 4px;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-  }
-  .ltms-sf-meta-row {
-    font-size: 11.5px;
-    gap: 8px;
-  }
-  .ltms-sf-description { display: none; }
-  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .ltms-sf-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-    margin-top: 16px;
-  }
-}
-
-@media (max-width: 400px) {
-  .ltms-sf-grid { gap: 8px; }
-  .ltms-sf-card-body { padding: 10px 10px 12px; }
-  .ltms-sf-add-to-cart { font-size: 11.5px; letter-spacing: 0.02em; padding: 8px 6px; }
-}
-
-/* ---- Reset mínimo (esta página no usa get_header()/get_footer() del tema) ---- */
-.ltms-storefront-page {
-  margin: 0;
-  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-  color: var(--sf-text);
-  background: var(--sf-white);
-}
-
-/* Sin box-sizing: border-box, width:100% + padding (ej. en
-   .ltms-sf-add-to-cart) suma el padding POR ENCIMA del 100% del
-   contenedor en vez de restarlo — eso es lo que causaba el botón
-   "Agregar al carrito" desbordándose de la card en pantallas angostas. */
-.ltms-storefront-page,
-.ltms-storefront-page *,
-.ltms-storefront-page *::before,
-.ltms-storefront-page *::after {
-  box-sizing: border-box;
-}
-
-/* ---- Reset defensivo: neutralizar estilos del tema (WoodMart) y WooCommerce
-   que se filtran via wp_head() y pueden pisar las cards de la vitrina.
-   WoodMart inyecta estilos sobre ul.products li.product, .product-inner,
-   .product-image-wrapper, etc. aunque el <article> no tenga clase "product",
-   el tema puede seleccionarlo con selectores de hermanos o con herencia.
-   Todos los overrides usan .ltms-storefront-page para no afectar el resto
-   del sitio. ---- */
-
-/* Asegurar que el grid nunca adopte layout de lista de WooCommerce */
-.ltms-storefront-page .ltms-sf-grid,
-.ltms-storefront-page ul.products {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  list-style: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-@media (min-width: 768px) {
-  .ltms-storefront-page .ltms-sf-grid,
-  .ltms-storefront-page ul.products {
-    grid-template-columns: repeat(4, 1fr) !important;
-  }
-}
-
-/* Neutralizar estilos internos del tema sobre la card y su contenido */
-.ltms-storefront-page .ltms-sf-card,
-.ltms-storefront-page .ltms-sf-card * {
-  /* El tema puede poner text-align:center, float, etc. sobre .product */
-  text-align: left;
-  float: none;
-}
-
-/* La imagen de la card: padding-bottom hack garantiza cuadrado perfecto */
-.ltms-storefront-page .ltms-sf-card .ltms-sf-card-img {
-  position: relative !important;
-  width: 100% !important;
-  height: 0 !important;
-  padding-bottom: 100% !important;
-  overflow: hidden !important;
-}
-
-.ltms-storefront-page .ltms-sf-card .ltms-sf-card-img-link {
-  display: block !important;
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* La imagen principal debe llenar el contenedor */
-.ltms-storefront-page .ltms-sf-card .ltms-sf-img-main,
-.ltms-storefront-page .ltms-sf-card .ltms-sf-img-hover {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important;
-  max-width: none !important;
-  max-height: none !important;
-}
-
-/* El cuerpo de la card no debe heredar text-align:center del tema */
-.ltms-storefront-page .ltms-sf-card .ltms-sf-card-body {
-  padding: 12px 14px 16px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 !important;
-  text-align: left !important;
-}
-
-.ltms-storefront-page .ltms-sf-card .ltms-sf-card-name {
-  text-align: left !important;
-  font-size: 14px !important;
-}
-
-.ltms-storefront-page .ltms-sf-card .ltms-sf-card-price {
-  text-align: left !important;
-}
-
-/* Botón: anular cualquier estilo de .button del tema */
-.ltms-storefront-page .ltms-sf-add-to-cart.button {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  min-height: 38px !important;
-  padding: 8px 10px !important;
-  border-radius: var(--sf-radius) !important;
-  border: 1px solid var(--sf-brand) !important;
-  background: var(--sf-white) !important;
-  color: var(--sf-brand) !important;
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
-  box-shadow: none !important;
-  margin-top: auto !important;
-}
-
-.ltms-storefront-page .ltms-sf-add-to-cart.button:hover {
-  background: var(--sf-brand) !important;
-  color: var(--sf-white) !important;
-}
-
-/* ---- Topbar propio ---- */
+/* ============================================================
+   TOPBAR
+   ============================================================ */
 .ltms-sf-topbar {
   background: var(--sf-white);
   border-bottom: 1px solid var(--sf-border);
   position: sticky;
   top: 0;
   z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-
 .ltms-sf-topbar-inner {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 0 16px;
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 16px;
 }
-
 .ltms-sf-topbar-logo {
   display: flex;
   align-items: center;
   text-decoration: none;
-  color: var(--sf-white);
+  color: var(--sf-text);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
   flex-shrink: 0;
-  /* fix(storefront): el topbar propio es blanco, pero el logo del sitio
-     está pensado para el header rojo del tema (logo/texto en blanco).
-     Sin este fondo, el logo queda invisible (blanco sobre blanco). */
-  background: var(--sf-brand);
-  padding: 6px 12px;
-  border-radius: 999px;
-  line-height: 1;
 }
-
-.ltms-sf-topbar-logo img {
-  max-height: 22px;
-  width: auto;
-  display: block;
-}
-
+.ltms-sf-topbar-logo img { max-height: 28px; width: auto; display: block; }
 .ltms-sf-topbar-back {
   color: var(--sf-muted);
   text-decoration: none;
   font-size: 13px;
   flex: 1;
+  white-space: nowrap;
 }
-
 .ltms-sf-topbar-back:hover { color: var(--sf-brand); }
-
 .ltms-sf-topbar-cart {
   display: flex;
   align-items: center;
   gap: 6px;
   text-decoration: none;
   color: var(--sf-text);
-  font-size: 14px;
+  font-size: 20px;
   flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
 }
-
+.ltms-sf-topbar-cart:hover { background: var(--sf-border); }
 .ltms-sf-cart-count {
   background: var(--sf-brand);
   color: var(--sf-white);
@@ -795,78 +89,676 @@
   font-size: 11px;
   font-weight: 700;
   padding: 0 4px;
+  font-family: var(--font-body);
 }
 
-/* ---- Footer propio ---- */
-.ltms-sf-footer {
-  border-top: 1px solid var(--sf-border);
-  margin-top: 40px;
+/* ============================================================
+   WRAPPER PRINCIPAL
+   ============================================================ */
+.ltms-storefront {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px 60px;
 }
 
+/* ============================================================
+   BANNER
+   ============================================================ */
+.ltms-sf-banner {
+  background-color: var(--sf-brand);
+  border-radius: 0 0 var(--sf-radius) var(--sf-radius);
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  margin: 0 -16px 24px;
+  width: calc(100% + 32px);
+  min-height: 140px;
+}
+.ltms-sf-banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
+  object-position: center;
+}
+.ltms-sf-banner-overlay {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.60) 100%);
+  border-radius: inherit;
+  display: flex;
+  align-items: flex-end;
+  padding: 20px 24px;
+  position: absolute;
+  inset: 0;
+}
+.ltms-sf-header { display: flex; align-items: flex-end; gap: 16px; width: 100%; }
+
+/* Logo */
+.ltms-sf-logo {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 3px solid var(--sf-white);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--sf-white);
+}
+.ltms-sf-logo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sf-brand-dk);
+  color: var(--sf-white);
+  font-size: 28px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Meta */
+.ltms-sf-meta { flex: 1; min-width: 0; }
+.ltms-sf-name {
+  font-size: clamp(18px, 3.5vw, 26px);
+  font-weight: 700;
+  color: var(--sf-white);
+  margin: 0 0 6px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ltms-sf-verified {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #27AE60;
+  color: var(--sf-white);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ltms-sf-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.ltms-sf-city, .ltms-sf-rnt, .ltms-sf-count {
+  font-size: 12px;
+  color: rgba(255,255,255,0.88);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ltms-sf-description {
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ============================================================
+   BARRA DE BÚSQUEDA
+   ============================================================ */
+.ltms-sf-searchbar {
+  margin-bottom: 20px;
+}
+.ltms-sf-search-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--sf-white);
+  border: 1.5px solid var(--sf-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.ltms-sf-search-form:focus-within { border-color: var(--sf-brand); }
+.ltms-sf-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--sf-muted);
+  pointer-events: none;
+}
+.ltms-sf-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 10px 12px 10px 36px;
+  font-size: 14px;
+  color: var(--sf-text);
+  background: transparent;
+  width: 100%;
+}
+
+/* ============================================================
+   LAYOUT PRINCIPAL (sidebar + content)
+   ============================================================ */
+.ltms-sf-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.ltms-sf-sidebar {
+  background: var(--sf-white);
+  border-radius: var(--sf-radius);
+  border: 1px solid var(--sf-border);
+  overflow: hidden;
+  position: sticky;
+  top: 72px;
+}
+.ltms-sf-filter-group {
+  border-bottom: 1px solid var(--sf-border);
+}
+.ltms-sf-filter-group:last-of-type { border-bottom: none; }
+.ltms-sf-filter-heading {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sf-text);
+  cursor: pointer;
+  text-align: left;
+  gap: 8px;
+}
+.ltms-sf-filter-heading:hover { color: var(--sf-brand); }
+.ltms-sf-filter-heading svg { transition: transform 0.2s; flex-shrink: 0; }
+.ltms-sf-filter-heading[aria-expanded="false"] svg { transform: rotate(180deg); }
+.ltms-sf-filter-body {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ltms-sf-filter-body.is-collapsed { display: none; }
+.ltms-sf-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sf-text);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.ltms-sf-filter-option input[type="radio"],
+.ltms-sf-filter-option input[type="checkbox"] {
+  accent-color: var(--sf-brand);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.ltms-sf-filter-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--sf-muted);
+}
+.ltms-sf-filter-actions {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ltms-sf-btn-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1.5px solid var(--sf-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sf-muted);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+.ltms-sf-btn-clear:hover { border-color: var(--sf-brand); color: var(--sf-brand); }
+
+/* ============================================================
+   CONTENT AREA
+   ============================================================ */
+.ltms-sf-content { min-width: 0; }
+
+/* Barra superior del contenido */
+.ltms-sf-topbar-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  min-height: 40px;
+}
+.ltms-sf-result-count {
+  font-size: 13px;
+  color: var(--sf-muted);
+  white-space: nowrap;
+}
+
+/* Chips de filtros activos */
+.ltms-sf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+.ltms-sf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #FFF0F0;
+  border: 1px solid #FFCCCC;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--sf-brand);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.ltms-sf-chip:hover { background: #FFE0E0; }
+.ltms-sf-chip--clear {
+  background: var(--sf-border);
+  border-color: #ccc;
+  color: var(--sf-muted);
+}
+.ltms-sf-chip--clear:hover { background: #ddd; }
+
+/* Derecha: orden + toggle */
+.ltms-sf-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.ltms-sf-order-select {
+  font-size: 13px;
+  color: var(--sf-text);
+  border: 1.5px solid var(--sf-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--sf-white);
+  cursor: pointer;
+  outline: none;
+}
+.ltms-sf-order-select:focus { border-color: var(--sf-brand); }
+.ltms-sf-view-toggle {
+  display: flex;
+  border: 1.5px solid var(--sf-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ltms-sf-view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--sf-muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.ltms-sf-view-btn:hover { background: var(--sf-border); color: var(--sf-text); }
+.ltms-sf-view-btn.active { background: var(--sf-brand); color: var(--sf-white); }
+
+/* ============================================================
+   GRID DE PRODUCTOS
+   ============================================================ */
+.ltms-sf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1024px) { .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* Vista lista */
+.ltms-sf-view-list { display: flex; flex-direction: column; gap: 12px; }
+.ltms-sf-view-list .ltms-sf-card {
+  flex-direction: row;
+  align-items: center;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ltms-sf-view-list .ltms-sf-card-img {
+  width: 120px;
+  min-width: 120px;
+  padding-bottom: 0 !important;
+  height: 120px !important;
+}
+.ltms-sf-view-list .ltms-sf-card-img-link {
+  position: static !important;
+  display: flex !important;
+  width: 120px;
+  height: 120px;
+}
+.ltms-sf-view-list .ltms-sf-img-main,
+.ltms-sf-view-list .ltms-sf-img-hover {
+  position: static !important;
+  width: 120px !important;
+  height: 120px !important;
+  inset: auto !important;
+}
+.ltms-sf-view-list .ltms-sf-card-body { padding: 16px 20px; }
+.ltms-sf-view-list .ltms-sf-add-to-cart { width: auto !important; padding: 8px 20px !important; }
+
+/* ============================================================
+   CARD
+   ============================================================ */
+.ltms-sf-card {
+  background: var(--sf-white);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sf-border);
+  transition: box-shadow 0.2s, transform 0.2s;
+  position: relative;
+}
+.ltms-sf-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+  transform: translateY(-2px);
+}
+
+/* Imagen */
+.ltms-sf-card-img {
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%;
+  overflow: hidden;
+  background: #F8F8F8;
+}
+.ltms-sf-card-img-link {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+.ltms-sf-img-main, .ltms-sf-img-hover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 10px;
+  transition: opacity 0.3s;
+}
+.ltms-sf-img-hover { opacity: 0; }
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main { opacity: 0; }
+.ltms-sf-card:hover .ltms-sf-img-hover { opacity: 1; }
+.ltms-sf-card-no-img {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--sf-muted);
+}
+
+/* Badges */
+.ltms-sf-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+.ltms-badge {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.4;
+}
+.ltms-badge--pct    { background: var(--sf-brand); color: #fff; }
+.ltms-badge--sale   { background: #FF6B00; color: #fff; }
+.ltms-badge--new    { background: #27AE60; color: #fff; }
+.ltms-badge--soldout{ background: #999; color: #fff; }
+
+/* Botones de acción hover */
+.ltms-sf-card-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateX(8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.ltms-sf-card:hover .ltms-sf-card-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+.ltms-sf-action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--sf-border);
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--sf-text);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.ltms-sf-action-btn:hover { background: var(--sf-brand); color: #fff; border-color: var(--sf-brand); }
+.ltms-sf-action-wishlist.is-active { background: var(--sf-brand); color: #fff; border-color: var(--sf-brand); }
+
+/* Body de la card */
+.ltms-sf-card-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.ltms-sf-card-cat {
+  font-size: 10px;
+  color: var(--sf-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin: 0 0 4px;
+}
+.ltms-sf-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ltms-sf-card-name a { color: var(--sf-text); text-decoration: none; }
+.ltms-sf-card-name a:hover { color: var(--sf-brand); }
+
+/* Rating */
+.ltms-sf-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.ltms-sf-stars {
+  font-size: 13px;
+  background: linear-gradient(90deg, #F5A623 var(--rating), #D8D8D8 var(--rating));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 1px;
+}
+.ltms-sf-rating-count { font-size: 11px; color: var(--sf-muted); }
+
+/* Precio */
+.ltms-sf-card-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sf-brand);
+  margin-bottom: 10px;
+}
+.ltms-sf-card-price del { font-size: 12px; color: var(--sf-muted); font-weight: 400; margin-right: 4px; }
+
+/* Botón agregar */
+.ltms-sf-add-to-cart, a.ltms-sf-add-to-cart.button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  padding: 7px 10px !important;
+  border-radius: 7px !important;
+  border: 1.5px solid var(--sf-brand) !important;
+  background: var(--sf-white) !important;
+  color: var(--sf-brand) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .04em !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  margin-top: auto !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+  line-height: 1.2 !important;
+  white-space: normal !important;
+}
+.ltms-sf-add-to-cart:hover, a.ltms-sf-add-to-cart.button:hover {
+  background: var(--sf-brand) !important;
+  color: #fff !important;
+}
+.ltms-sf-add-to-cart.loading { opacity: 0.6; pointer-events: none; }
+.ltms-sf-add-to-cart.added { background: var(--sf-brand) !important; color: #fff !important; }
+.ltms-sf-view-product {
+  background: var(--sf-border) !important;
+  border-color: var(--sf-border) !important;
+  color: var(--sf-muted) !important;
+}
+
+/* ============================================================
+   PAGINACIÓN
+   ============================================================ */
+.ltms-sf-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.ltms-sf-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--sf-border);
+  background: var(--sf-white);
+  color: var(--sf-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ltms-sf-page-btn:hover { border-color: var(--sf-brand); color: var(--sf-brand); }
+.ltms-sf-page-btn.active {
+  background: var(--sf-brand);
+  border-color: var(--sf-brand);
+  color: #fff;
+}
+.ltms-sf-page-prev, .ltms-sf-page-next { font-size: 18px; }
+.ltms-sf-page-ellipsis { font-size: 13px; color: var(--sf-muted); padding: 0 4px; }
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.ltms-sf-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--sf-muted);
+  background: var(--sf-white);
+  border-radius: var(--sf-radius);
+  border: 1px solid var(--sf-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ltms-sf-empty p { margin: 0; font-size: 14px; }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.ltms-sf-footer { border-top: 1px solid var(--sf-border); margin-top: 40px; background: var(--sf-white); }
 .ltms-sf-footer-inner {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 20px 16px;
   text-align: center;
   color: var(--sf-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
-
-.ltms-sf-footer-inner a {
-  color: var(--sf-brand);
-  text-decoration: none;
-}
-
-@media (max-width: 480px) {
-  .ltms-sf-topbar-back { display: none; }
-}
-
-/* fix(storefront): carrito demasiado chico como target de clic en desktop */
-@media (min-width: 992px) {
-  .ltms-sf-topbar-cart { font-size: 22px; gap: 8px; }
-  .ltms-sf-cart-count { min-width: 20px; height: 20px; font-size: 12px; }
-}
-
+.ltms-sf-footer-inner a { color: var(--sf-brand); text-decoration: none; }
 
 /* ============================================================
-   TEMA WOODMART — ocultar accesos del tema en la vitrina
+   RESPONSIVE MOBILE (≤ 767px): sin sidebar, layout vertical
    ============================================================ */
-/* La vitrina ya tiene su propio topbar (logo + volver + carrito), con
-   su propio acceso al carrito. Los botones "VENDER" / "MI CUENTA" que
-   el tema inyecta vía wp_head() compiten visualmente con ese topbar y
-   no aportan nada a un comprador navegando el catálogo de un vendedor
-   ("VENDER" es un CTA para prospectos a vendedor, fuera de contexto
-   aquí). Se ocultan solo en esta página — el resto del sitio no se ve
-   afectado porque el selector exige .ltms-storefront-page en el body. */
-.ltms-storefront-page #ltms-header-access,
-.ltms-storefront-page .ltms-nav-btn,
-.ltms-storefront-page .ltms-header-access {
-  display: none !important;
+@media (max-width: 767px) {
+  .ltms-sf-layout { grid-template-columns: 1fr; }
+
+  .ltms-sf-sidebar {
+    position: static;
+    display: none; /* oculto por defecto, se muestra con JS o toggle */
+  }
+  .ltms-sf-sidebar.is-open { display: block; }
+
+  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .ltms-sf-banner-img { max-height: 160px; }
+  .ltms-sf-logo { width: 60px; height: 60px; }
+  .ltms-sf-name { font-size: 18px; }
+  .ltms-sf-topbar-back { display: none; }
+
+  .ltms-sf-topbar-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .ltms-sf-topbar-right { width: 100%; justify-content: space-between; }
 }
 
-/* Por si el tema renderiza su propio header/masthead vía wp_head() en
-   algún punto — la vitrina ya construye el suyo, así que cualquier
-   resto del tema se oculta para evitar dos headers apilados. */
-.ltms-storefront-page .woodmart-header-holder,
-.ltms-storefront-page .site-header,
-.ltms-storefront-page #masthead,
-.ltms-storefront-page header.header-main {
-  display: none !important;
+@media (max-width: 400px) {
+  .ltms-sf-grid { grid-template-columns: 1fr; }
 }
 
-/* El topbar propio siempre debe quedar como única barra superior visible. */
-.ltms-storefront-page .ltms-sf-topbar {
-  display: block !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 9999 !important;
-}
-
-/* ── Fix bubble WhatsApp (plugin Click to Chat / HasThemes) ───────────────
-   En la vitrina el bubble queda sobre los íconos de comparar/wishlist de la
-   segunda columna del grid. Lo movemos a la esquina inferior-izquierda solo
-   dentro de .ltms-storefront-page; el resto del sitio no se toca. */
-.ltms-storefront-page #ht-ctc-chat {
-  right: auto !important;
-  left: 15px   !important;
-}
+/* ============================================================
+   CRITICAL OVERRIDES (anular WoodMart/WooCommerce)
+   ============================================================ */
+.ltms-sf-card { float: none !important; width: auto !important; margin: 0 !important; }
+.ltms-sf-card .ltms-sf-card-img { height: 0 !important; }
+.ltms-sf-card .ltms-sf-card-img-link { position: absolute !important; inset: 0 !important; padding: 0 !important; margin: 0 !important; }
+.ltms-sf-card .ltms-sf-img-main,
+.ltms-sf-card .ltms-sf-img-hover { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; }
+.ltms-sf-card .ltms-sf-img-hover { opacity: 0 !important; }
+.ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main { opacity: 0 !important; }
+.ltms-sf-card:hover .ltms-sf-img-hover { opacity: 1 !important; }
+.ltms-sf-grid { list-style: none !important; }
