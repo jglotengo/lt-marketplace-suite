@@ -314,7 +314,7 @@ final class LTMS_ZapSign_Manager {
             }
 
             $b2     = LTMS_Api_Factory::get( 'backblaze' );
-            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' );
+            $bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' ) ?: 'lotengo-contratos'; // BC-01-FIX: opcion guardada vacia en BD no debe pasar isset()
             $key    = sprintf( 'contratos/%s/vendedor-%d-%s.pdf', gmdate( 'Y/m' ), $vendor_id, $doc_token );
 
             $b2->upload_file( $bucket, $key, $pdf_binary, 'application/pdf', [
