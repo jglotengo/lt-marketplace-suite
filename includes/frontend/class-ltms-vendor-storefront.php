@@ -557,7 +557,7 @@ window.elementor=window.elementor||{modules:{}};
                      loading="eager"
                      decoding="async">
                 <?php endif; ?>
-                <div class="ltms-sf-banner-overlay">
+                <div class="ltms-sf-banner-overlay<?php echo $vendor->banner ? ' ltms-sf-has-banner' : ''; ?>">
                     <div class="ltms-sf-header">
                         <?php if ( $vendor->logo ) : ?>
                             <img class="ltms-sf-logo" src="<?php echo esc_url( $vendor->logo ); ?>"
@@ -569,7 +569,7 @@ window.elementor=window.elementor||{modules:{}};
                         <?php endif; ?>
 
                         <div class="ltms-sf-meta">
-                            <h1 class="ltms-sf-name" itemprop="name">
+                            <h1 class="ltms-sf-name<?php echo $vendor->banner ? ' ltms-sf-sr-only' : ''; ?>" itemprop="name">
                                 <?php echo esc_html( $vendor->name ); ?>
                                 <?php if ( 'approved' === $vendor->kyc_status ) : ?>
                                     <span class="ltms-sf-verified" title="Vendedor verificado">✓</span>
