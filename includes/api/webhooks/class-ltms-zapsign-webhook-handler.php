@@ -36,6 +36,25 @@ class LTMS_Zapsign_Webhook_Handler {
 
         $req_token = $request->get_header( 'x-zapsign-token' ) ?: '';
         if ( $expected_token && ! hash_equals( $expected_token, $req_token ) ) {
+            // BC-01-DEBUG: log enmascarado para diagnosticar mismatch de token sin exponer el secreto completo.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                $mask = static function ( string $s ): string {
+                    $len = strlen( $s );
+                    if ( $len === 0 ) { return '(vacio)'; }
+                    if ( $len <= 8 ) { return str_repeat( '*', $len ) . " (len={$len})"; }
+                    return substr( $s, 0, 4 ) . str_repeat( '*', $len - 8 ) . substr( $s, -4 ) . " (len={$len})";
+                };
+                $all_headers = $request->get_headers();
+                $header_keys = array_keys( $all_headers );
+                LTMS_Core_Logger::warning( 'ZAPSIGN_WEBHOOK_401_DEBUG', sprintf(
+                    'expected_token=%s | received_token=%s | source=%s | headers_recibidos=%s | body_keys=%s',
+                    $mask( $expected_token ),
+                    $mask( $req_token ),
+                    $webhook_secret ? 'ltms_zapsign_webhook_secret' : 'ltms_zapsign_api_token(fallback)',
+                    wp_json_encode( $header_keys ),
+                    wp_json_encode( array_keys( (array) $body ) )
+                ) );
+            }
             return new WP_REST_Response( [ 'error' => 'Invalid token' ], 401 );
         }
 
