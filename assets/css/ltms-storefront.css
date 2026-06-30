@@ -133,6 +133,30 @@
 }
 .ltms-sf-header { display: flex; align-items: flex-end; gap: 16px; width: 100%; }
 
+/* Cuando el vendedor tiene banner propio: el banner ya comunica marca/nombre
+   visualmente, así que ocultamos logo/nombre/contador para no duplicar.
+   El <h1> se mantiene accesible (SEO, schema.org, lectores de pantalla)
+   vía sr-only en vez de display:none. */
+.ltms-sf-banner-overlay.ltms-sf-has-banner {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+.ltms-sf-banner-overlay.ltms-sf-has-banner .ltms-sf-logo,
+.ltms-sf-banner-overlay.ltms-sf-has-banner .ltms-sf-meta-row,
+.ltms-sf-banner-overlay.ltms-sf-has-banner .ltms-sf-description {
+  display: none;
+}
+.ltms-sf-sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Logo */
 .ltms-sf-logo {
   width: 80px; height: 80px;
@@ -739,10 +763,11 @@
 
   .ltms-sf-banner-img { max-height: 130px; }
 
-  /* El overlay deja de cargar el header encima de la imagen en mobile:
-     la imagen queda solo decorativa, y el header del vendor se muestra
-     como franja sólida aparte para que nunca se superponga al fondo. */
-  .ltms-sf-banner-overlay {
+  /* Sin banner propio: el header (logo+nombre+contador) se muestra como franja
+     sólida aparte, debajo de la imagen genérica/placeholder.
+     Con banner propio (.ltms-sf-has-banner): el banner ya comunica la marca,
+     así que el header permanece oculto/transparente (ver regla global arriba). */
+  .ltms-sf-banner-overlay:not(.ltms-sf-has-banner) {
     position: static;
     background: var(--sf-brand-dk);
     align-items: center;
