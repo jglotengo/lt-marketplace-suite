@@ -11,6 +11,34 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 global $wpdb;
 $nonce = wp_create_nonce( 'ltms_admin_nonce' );
 
+if ( current_user_can( 'manage_options' ) ) :
+?>
+<div class="notice notice-info" style="padding:12px;">
+    <p style="margin:0 0 8px;"><strong>Diagnóstico:</strong> Reset de OPcache (proceso PHP-FPM web real)</p>
+    <button type="button" id="ltms-opcache-reset-btn" class="ltms-btn ltms-btn-outline ltms-btn-sm">Limpiar OPcache</button>
+    <span id="ltms-opcache-reset-result" style="margin-left:8px;font-size:12px;"></span>
+</div>
+<script>
+(function($){
+    $('#ltms-opcache-reset-btn').on('click', function(){
+        var $btn = $(this), $res = $('#ltms-opcache-reset-result');
+        $btn.prop('disabled', true);
+        $res.text('Procesando...');
+        $.post(ajaxurl, {
+            action: 'ltms_opcache_reset',
+            nonce: '<?php echo esc_js( $nonce ); ?>'
+        }).done(function(resp){
+            $res.text(resp.success ? 'OK — OPcache reiniciado.' : 'Error: ' + (resp.data || ''));
+        }).fail(function(){
+            $res.text('Error de red.');
+        }).always(function(){
+            $btn.prop('disabled', false);
+        });
+    });
+})(jQuery);
+</script>
+<?php endif; ?>
+
 // Acciones manuales
 if ( isset( $_POST['ltms_block_ip'] ) && check_admin_referer( 'ltms_security_action' ) ) {
     $ip_to_block = sanitize_text_field( $_POST['block_ip'] ?? '' );
