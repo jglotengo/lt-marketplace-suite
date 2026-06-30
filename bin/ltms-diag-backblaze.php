@@ -68,6 +68,23 @@ try {
     echo "❌ FALLÓ: " . $e->getMessage() . "\n";
 }
 
+echo "\n── Prueba 4: usando \$bucket desde LTMS_Core_Config::get(), como hace el QA ──\n";
+$config_bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' );
+echo "Bucket desde config: '" . $config_bucket . "' (longitud: " . strlen( $config_bucket ) . ", hex: " . bin2hex( $config_bucket ) . ")\n";
+$key4 = sprintf( 'contratos/%s/vendedor-999999-diag4-%s.pdf', gmdate( 'Y/m' ), date( 'His' ) );
+try {
+    $result = $b2->upload_file( $config_bucket, $key4, $test_content, 'application/pdf', [
+        'vendor_id' => '999999',
+        'doc_token' => 'diag4',
+        'qa_test'   => '1',
+    ] );
+    echo "✅ OK — subida exitosa. ETag: " . ( $result['ETag'] ?? 'n/a' ) . "\n";
+    $b2->delete_file( $config_bucket, $key4 );
+    echo "   (cleanup OK)\n";
+} catch ( Throwable $e ) {
+    echo "❌ FALLÓ: " . $e->getMessage() . "\n";
+}
+
 echo "\n── Config actual ──\n";
 echo 'Key ID guardada: ' . LTMS_Core_Config::get( 'ltms_backblaze_key_id', '(vacío)' ) . "\n";
 echo 'Endpoint: ' . LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '(vacío)' ) . "\n";
