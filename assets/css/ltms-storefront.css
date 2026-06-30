@@ -737,9 +737,16 @@
 
   .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
-  .ltms-sf-banner-img { max-height: 160px; }
-  .ltms-sf-logo { width: 60px; height: 60px; }
-  .ltms-sf-name { font-size: 18px; }
+  .ltms-sf-banner-img { max-height: 190px; }
+  .ltms-sf-banner-overlay { padding: 16px 16px 18px; align-items: center; }
+  .ltms-sf-header { gap: 12px; align-items: center; }
+  .ltms-sf-logo { width: 56px; height: 56px; }
+  .ltms-sf-logo-placeholder { font-size: 22px; }
+  .ltms-sf-name { font-size: 16px; gap: 6px; margin-bottom: 4px; }
+  .ltms-sf-verified { width: 16px; height: 16px; font-size: 9px; }
+  .ltms-sf-meta-row { gap: 6px; margin-bottom: 0; }
+  .ltms-sf-city, .ltms-sf-rnt, .ltms-sf-count { font-size: 11px; }
+  .ltms-sf-description { display: none; }
   .ltms-sf-topbar-back { display: none; }
 
   .ltms-sf-topbar-content {
