@@ -284,7 +284,8 @@ class LTMS_Vendor_Storefront {
 .ltms-sf-card .ltms-sf-card-name a{color:#242424!important;text-decoration:none!important}
 .ltms-sf-card .ltms-sf-card-name a:hover{color:#E80001!important}
 .ltms-sf-card .ltms-sf-card-price{font-size:15px!important;font-weight:700!important;color:#E80001!important;margin-bottom:10px!important;text-align:left!important}
-.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:38px!important;padding:8px 10px!important;border-radius:8px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:13px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.04em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:normal!important;line-height:1.25!important;cursor:pointer!important}
+.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;box-sizing:border-box!important;min-height:34px!important;padding:7px 4px!important;border-radius:7px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:10.5px!important;font-weight:700!important;text-transform:none!important;letter-spacing:-0.01em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.2!important;cursor:pointer!important}
+@media(min-width:768px){.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{min-height:38px!important;padding:8px 10px!important;font-size:12.5px!important;letter-spacing:0!important}}
 .ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important}
 LTMS_CSS
         );
@@ -437,8 +438,10 @@ window.elementor=window.elementor||{modules:{}};
 .ltms-sf-card .ltms-sf-card-name a:hover{color:#E80001!important}
 .ltms-sf-card .ltms-sf-card-price{font-size:15px!important;font-weight:700!important;color:#E80001!important;margin-bottom:10px!important;text-align:left!important}
 
-/* Botón: anular .button del tema completamente */
-.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:38px!important;padding:8px 10px!important;border-radius:8px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:13px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.04em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:normal!important;line-height:1.25!important;cursor:pointer!important}
+/* Botón: anular .button del tema completamente. box-sizing:border-box es crítico
+   para que width:100%+padding nunca exceda el ancho de la card en mobile. */
+.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;box-sizing:border-box!important;min-height:34px!important;padding:7px 4px!important;border-radius:7px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:10.5px!important;font-weight:700!important;text-transform:none!important;letter-spacing:-0.01em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.2!important;cursor:pointer!important}
+@media(min-width:768px){.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{min-height:38px!important;padding:8px 10px!important;font-size:12.5px!important;letter-spacing:0!important}}
 .ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important;text-decoration:none!important}
 </style>
 </head>
