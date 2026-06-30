@@ -34,6 +34,9 @@ final class LTMS_Admin {
         add_filter( 'plugin_action_links_' . LTMS_PLUGIN_BASENAME, [ $instance, 'add_plugin_links' ] );
         add_action( 'admin_notices', [ $instance, 'render_admin_notices' ] );
 
+        // Diagnóstico: reset de OPcache (solo manage_options + nonce)
+        add_action( 'wp_ajax_ltms_opcache_reset', [ $instance, 'ajax_opcache_reset' ] );
+
         // Tasa de comisión negociada por contrato — campo en perfil de usuario
         add_action( 'show_user_profile',   [ $instance, 'render_vendor_commission_field' ] );
         add_action( 'edit_user_profile',   [ $instance, 'render_vendor_commission_field' ] );
@@ -360,6 +363,26 @@ final class LTMS_Admin {
      * @param array $links Links actuales.
      * @return array
      */
+    /**
+     * Ejecuta opcache_reset() en el proceso PHP-FPM real que atiende esta petición.
+     * Restringido a usuarios con manage_options y nonce válido.
+     *
+     * @return void
+     */
+    public function ajax_opcache_reset(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'forbidden', 403 );
+        }
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+
+        if ( ! function_exists( 'opcache_reset' ) ) {
+            wp_send_json_error( 'opcache_not_available' );
+        }
+
+        $ok = opcache_reset();
+        wp_send_json_success( [ 'opcache_reset' => $ok, 'time' => current_time( 'mysql' ) ] );
+    }
+
     public function add_plugin_links( array $links ): array {
         $plugin_links = [
             '<a href="' . esc_url( admin_url( 'admin.php?page=ltms-settings' ) ) . '">' .
