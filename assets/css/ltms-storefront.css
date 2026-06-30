@@ -569,6 +569,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
 }
 .ltms-sf-card-cat {
   font-size: 10px;
@@ -747,10 +748,44 @@
     gap: 8px;
   }
   .ltms-sf-topbar-right { width: 100%; justify-content: space-between; }
+
+  /* Card: padding y tipografía reducidos para evitar desbordes en 2 columnas */
+  .ltms-sf-card-body { padding: 10px 10px 12px; }
+  .ltms-sf-card-cat { font-size: 9px; margin-bottom: 3px; }
+  .ltms-sf-card-name { font-size: 12.5px; margin-bottom: 5px; }
+  .ltms-sf-card-price { font-size: 14px; margin-bottom: 8px; }
+  .ltms-sf-card-price del { font-size: 11px; }
+  .ltms-sf-card-rating { margin-bottom: 5px; }
+
+  /* Botón agregar: nunca se desborda de la card */
+  .ltms-sf-add-to-cart, a.ltms-sf-add-to-cart.button {
+    font-size: 10.5px !important;
+    padding: 7px 4px !important;
+    min-height: 32px !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  /* Acciones hover (wishlist/quick view) siempre visibles en touch, más chicas */
+  .ltms-sf-card-actions {
+    opacity: 1;
+    transform: none;
+  }
+  .ltms-sf-action-btn { width: 28px; height: 28px; }
+
+  .ltms-sf-searchbar { margin-bottom: 14px; }
+  .ltms-sf-search-input { padding: 9px 12px 9px 34px; font-size: 13px; }
 }
 
 @media (max-width: 400px) {
-  .ltms-sf-grid { grid-template-columns: 1fr; }
+  .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .ltms-sf-card-body { padding: 8px 8px 10px; }
+  .ltms-sf-card-name { font-size: 12px; }
+  .ltms-sf-card-price { font-size: 13px; }
+  .ltms-sf-add-to-cart, a.ltms-sf-add-to-cart.button {
+    font-size: 9.5px !important;
+    padding: 6px 3px !important;
+    letter-spacing: -0.015em !important;
+  }
 }
 
 /* ============================================================
