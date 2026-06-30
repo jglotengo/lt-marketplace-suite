@@ -201,27 +201,38 @@ final class LTMS_Admin_Settings {
 
         // M-116 + FIX: los checkboxes desmarcados no se envían en el POST — resetear a 'no'
         // antes de guardar los valores recibidos para que un checkbox desmarcado persista.
-        $checkbox_keys = [
-            // Alegra
-            'ltms_alegra_enabled', 'ltms_alegra_auto_invoice',
-            'ltms_alegra_auto_payment', 'ltms_alegra_sandbox',
-            'ltms_alegra_invoice_on_processing', 'ltms_alegra_send_invoice_email',
-            // XCover
-            'ltms_xcover_parcel_protection', 'ltms_xcover_purchase_protection',
-            // Pasarelas / APIs
-            'ltms_siigo_enabled', 'ltms_siigo_sandbox', 'ltms_siigo_auto_invoice',
-            'ltms_openpay_enabled', 'ltms_addi_enabled',
-            'ltms_tptc_enabled', 'ltms_uber_direct_enabled', 'ltms_heka_enabled',
-            'ltms_aveonline_enabled', 'ltms_zapsign_enabled', 'ltms_backblaze_enabled', 'ltms_deprisa_enabled',
-            'ltms_ordenes_compra_enabled',
-            'ltms_stripe_enabled', 'ltms_mlm_enabled',
-            // ZapSign
-            'ltms_zapsign_sandbox',
-            // KYC / Compliance
-            'ltms_kyc_zapsign_enabled', 'ltms_kyc_require_document',
-            // Seguridad
-            'ltms_waf_enabled', 'ltms_rate_limit_enabled',
+        //
+        // BUG CRÍTICO CORREGIDO: $checkbox_keys agrupaba TODAS las casillas de TODAS
+        // las secciones del plugin. Como el formulario solo envía los campos de la
+        // pestaña activa, guardar cualquier sección (ej. "zapsign") reseteaba a 'no'
+        // los checkboxes de TODAS las demás secciones (ej. "backblaze") que no estaban
+        // presentes en ese POST — aunque esas otras casillas estuvieran marcadas 'yes'
+        // en la base de datos. Esto causaba que un toggle activado en una pestaña se
+        // revirtiera silenciosamente al guardar cualquier otra pestaña.
+        //
+        // Fix: agrupar por sección y solo resetear los checkboxes que pertenecen a la
+        // sección que realmente se está guardando ($section).
+        $checkbox_keys_by_section = [
+            'general'     => [ 'ltms_waf_enabled', 'ltms_rate_limit_enabled', 'ltms_ordenes_compra_enabled' ],
+            'payments'    => [ 'ltms_openpay_enabled', 'ltms_addi_enabled', 'ltms_tptc_enabled', 'ltms_stripe_enabled' ],
+            'siigo'       => [ 'ltms_siigo_enabled', 'ltms_siigo_sandbox', 'ltms_siigo_auto_invoice' ],
+            'kyc'         => [ 'ltms_kyc_zapsign_enabled', 'ltms_kyc_require_document' ],
+            'mlm'         => [ 'ltms_mlm_enabled' ],
+            'security'    => [ 'ltms_waf_enabled', 'ltms_rate_limit_enabled' ],
+            'backblaze'   => [ 'ltms_backblaze_enabled' ],
+            'uber_direct' => [ 'ltms_uber_direct_enabled' ],
+            'heka'        => [ 'ltms_heka_enabled' ],
+            'aveonline'   => [ 'ltms_aveonline_enabled' ],
+            'xcover'      => [ 'ltms_xcover_parcel_protection', 'ltms_xcover_purchase_protection' ],
+            'alegra'      => [
+                'ltms_alegra_enabled', 'ltms_alegra_auto_invoice',
+                'ltms_alegra_auto_payment', 'ltms_alegra_sandbox',
+                'ltms_alegra_invoice_on_processing', 'ltms_alegra_send_invoice_email',
+            ],
+            'zapsign'     => [ 'ltms_zapsign_enabled', 'ltms_zapsign_sandbox' ],
+            'deprisa'     => [ 'ltms_deprisa_enabled' ],
         ];
+        $checkbox_keys = $checkbox_keys_by_section[ $section ] ?? [];
         foreach ( $checkbox_keys as $cb_key ) {
             if ( ! array_key_exists( $cb_key, $data ) ) {
                 update_option( $cb_key, 'no' );
