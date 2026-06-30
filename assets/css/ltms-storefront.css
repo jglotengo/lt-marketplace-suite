@@ -737,8 +737,18 @@
 
   .ltms-sf-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
-  .ltms-sf-banner-img { max-height: 190px; }
-  .ltms-sf-banner-overlay { padding: 16px 16px 18px; align-items: center; }
+  .ltms-sf-banner-img { max-height: 130px; }
+
+  /* El overlay deja de cargar el header encima de la imagen en mobile:
+     la imagen queda solo decorativa, y el header del vendor se muestra
+     como franja sólida aparte para que nunca se superponga al fondo. */
+  .ltms-sf-banner-overlay {
+    position: static;
+    background: var(--sf-brand-dk);
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 0 0 var(--sf-radius) var(--sf-radius);
+  }
   .ltms-sf-header { gap: 12px; align-items: center; }
   .ltms-sf-logo { width: 56px; height: 56px; }
   .ltms-sf-logo-placeholder { font-size: 22px; }
