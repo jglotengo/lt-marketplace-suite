@@ -106,7 +106,7 @@ if ( file_exists( $webhook_file ) ) {
 qa_section( 'T-02 · Configuración (gate de activación)' );
 
 $b2_enabled = LTMS_Core_Config::get( 'ltms_backblaze_enabled', 'no' );
-$bucket     = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' );
+$bucket     = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' ) ?: 'lotengo-contratos'; // BC-01-FIX
 
 if ( 'yes' === $b2_enabled ) {
     qa_ok( $qa, "ltms_backblaze_enabled = 'yes'", 'El respaldo se ejecutará en producción' );
