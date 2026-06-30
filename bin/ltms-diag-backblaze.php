@@ -53,6 +53,21 @@ try {
     echo "❌ FALLÓ: " . $e->getMessage() . "\n";
 }
 
+echo "\n── Prueba 3: misma ruta EXACTA que usa el QA original (contratos/AAAA/MM/...) ──\n";
+$qa_style_key = sprintf( 'contratos/%s/vendedor-999999-diag-%s.pdf', gmdate( 'Y/m' ), date( 'His' ) );
+echo "Key: {$qa_style_key}\n";
+try {
+    $result = $b2->upload_file( 'lotengo-contratos', $qa_style_key, $test_content, 'application/pdf', [
+        'vendor_id' => '999999',
+        'doc_token' => 'diag-test',
+    ] );
+    echo "✅ OK — subida exitosa. ETag: " . ( $result['ETag'] ?? 'n/a' ) . "\n";
+    $b2->delete_file( 'lotengo-contratos', $qa_style_key );
+    echo "   (cleanup OK)\n";
+} catch ( Throwable $e ) {
+    echo "❌ FALLÓ: " . $e->getMessage() . "\n";
+}
+
 echo "\n── Config actual ──\n";
 echo 'Key ID guardada: ' . LTMS_Core_Config::get( 'ltms_backblaze_key_id', '(vacío)' ) . "\n";
 echo 'Endpoint: ' . LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '(vacío)' ) . "\n";
