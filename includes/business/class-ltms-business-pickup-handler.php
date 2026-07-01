@@ -9,6 +9,40 @@ class LTMS_Business_Pickup_Handler {
         add_action( 'woocommerce_order_status_processing', [ __CLASS__, 'maybe_set_ready_for_pickup' ], 20 );
         add_filter( 'wc_order_statuses', [ __CLASS__, 'add_order_status_label' ] );
         add_filter( 'ltms_after_tax_calculate', [ __CLASS__, 'adjust_ica_for_pickup' ], 10, 4 );
+        add_action( 'wp_ajax_ltms_mark_pickup_completed', [ __CLASS__, 'ajax_mark_pickup_completed' ] );
+    }
+
+    /**
+     * AJAX (admin): marca un pedido de recogida como completado/entregado.
+     *
+     * Reubicado desde LTMS_Admin_Redi (chore/pickup): este handler pertenece
+     * al módulo de pickup, no a ReDi. Ver includes/admin/views/html-admin-pickup-orders.php
+     * para el botón "Marcar Entregado" que lo invoca.
+     *
+     * @return void
+     */
+    public static function ajax_mark_pickup_completed(): void {
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'ltms_view_all_orders' ) ) {
+            wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
+        }
+
+        $order_id = absint( $_POST['order_id'] ?? 0 ); // phpcs:ignore
+        $order    = wc_get_order( $order_id );
+
+        if ( ! $order ) {
+            wp_send_json_error( __( 'Pedido no encontrado.', 'ltms' ) );
+        }
+
+        $order->update_status( 'completed', __( 'Recogido por el cliente.', 'ltms' ) );
+
+        LTMS_Core_Logger::info(
+            'PICKUP_MARKED_COMPLETED',
+            sprintf( 'Order #%d marked completed (pickup) by admin #%d', $order_id, get_current_user_id() )
+        );
+
+        wp_send_json_success( [ 'message' => __( 'Pedido marcado como completado.', 'ltms' ) ] );
     }
 
     public static function register_order_status(): void {
