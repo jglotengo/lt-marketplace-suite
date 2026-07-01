@@ -9,7 +9,6 @@ class LTMS_Admin_Redi {
         add_action( 'wp_ajax_ltms_approve_redi_agreement',  [ $instance, 'ajax_approve_agreement' ] );
         add_action( 'wp_ajax_ltms_revoke_redi_agreement',   [ $instance, 'ajax_revoke_agreement' ] );
         add_action( 'wp_ajax_ltms_export_redi_commissions', [ $instance, 'ajax_export_redi_commissions' ] );
-        add_action( 'wp_ajax_ltms_mark_pickup_completed',   [ $instance, 'ajax_mark_pickup_completed' ] );
     }
 
     public function ajax_approve_agreement(): void {
@@ -70,17 +69,5 @@ class LTMS_Admin_Redi {
             ] ) . "\n";
         }
         wp_send_json_success( [ 'csv' => $csv ] );
-    }
-
-    public function ajax_mark_pickup_completed( ): void {
-        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-        if ( ! current_user_can( 'ltms_view_all_orders' ) ) {
-            wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
-        }
-        $order_id = absint( $_POST['order_id'] ?? 0 ); // phpcs:ignore
-        $order    = wc_get_order( $order_id );
-        if ( ! $order ) { wp_send_json_error( __( 'Pedido no encontrado.', 'ltms' ) ); }
-        $order->update_status( 'completed', __( 'Recogido por el cliente.', 'ltms' ) );
-        wp_send_json_success( [ 'message' => __( 'Pedido marcado como completado.', 'ltms' ) ] );
     }
 }
