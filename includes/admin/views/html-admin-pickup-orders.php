@@ -25,7 +25,7 @@ $pending_count = count( wc_get_orders( [
 
 // Contar completados hoy
 $completed_today = count( wc_get_orders( [
-    'status'       => [ 'wc-completed', 'wc-picked-up' ],
+    'status'       => [ 'wc-completed' ],
     'limit'        => -1,
     'return'       => 'ids',
     'date_created' => gmdate( 'Y-m-d' ) . '...' . gmdate( 'Y-m-d', strtotime( '+1 day' ) ),
@@ -42,7 +42,7 @@ $query_args = [
 if ( $tab === 'pending' ) {
     $query_args['status'] = 'wc-ready-for-pickup';
 } else {
-    $query_args['status'] = [ 'wc-completed', 'wc-picked-up' ];
+    $query_args['status'] = [ 'wc-completed' ];
     if ( $date_from ) $query_args['date_created'] = $date_from . ( $date_to ? '...' . $date_to : '' );
 }
 if ( $search ) $query_args['customer'] = $search;
