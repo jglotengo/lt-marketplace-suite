@@ -279,44 +279,6 @@ final class LTMS_Core_Security {
     }
 
     /**
-     * Deriva la clave de cifrado desde la sal de WordPress.
-     * SEC-BUG-2 FIX: Result is cached in static + transient to avoid PBKDF2 on every call.
-     *
-     * @param string $salt Salt personalizado (opcional).
-     * @return string Clave derivada de 32 bytes.
-     */
-    private static $cached_key = null;
-    private static function derive_key( string $salt = '' ): string {
-        if ( self::$cached_key !== null && $salt === '' ) {
-            return self::$cached_key;
-        }
-
-        // Check transient cache (survives page loads)
-        $transient_key = 'ltms_encryption_key_v2';
-        if ( $salt === '' ) {
-            $cached = get_transient( $transient_key );
-            if ( $cached && strlen( $cached ) === 32 ) {
-                self::$cached_key = $cached;
-                return $cached;
-            }
-        }
-
-        $wp_salt = defined( 'LOGGED_IN_KEY' ) ? LOGGED_IN_KEY : 'ltms-fallback-key';
-        $wp_auth = defined( 'AUTH_SALT' ) ? AUTH_SALT : 'ltms-fallback-salt';
-        $material = $wp_salt . $salt . $wp_auth;
-
-        // PBKDF2 with 600,000 iterations (NIST-aligned for SHA-256)
-        $key = hash_pbkdf2( 'sha256', $material, 'ltms-key-derivation', 600000, 32, true );
-
-        if ( $salt === '' ) {
-            self::$cached_key = $key;
-            set_transient( $transient_key, $key, DAY_IN_SECONDS );
-        }
-
-        return $key;
-    }
-
-    /**
      * Genera un hash seguro usando SHA-256 con salt del sitio.
      *
      * @param string $value  Valor a hashear.
