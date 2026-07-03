@@ -392,6 +392,7 @@
                         <td><strong>${order.formatted}</strong></td>
                         <td>${shippingCell}</td>
                         <td><span class="ltms-badge ${statusClass}">${statusLabel}</span></td>
+                        <td>${order.is_redi ? '<span style="background:#E80001;color:#fff;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:600;">ReDi ' + (order.redi_role === 'origin' ? '📍' : '🔁') + '</span>' : '<span style="color:#ccc;">—</span>'}</td>
                         <td>${order.date}</td>
                     </tr>
                 `);
@@ -987,9 +988,34 @@
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         ${transitionsHtml || '<span style="font-size:.8rem;color:#9ca3af;">Sin acciones disponibles para este estado.</span>'}
                     </div>
-                    <a href="${d.edit_url}" target="_blank" rel="noopener" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="Ver pedido completo en WordPress">Ver en WordPress ↗</a>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        ${d.is_redi ? `<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" onclick="LTMS.Dashboard.openIncidentModal(${d.id})" style="border-color:#E80001;color:#E80001;">⚠️ Abrir Novedad</button>` : ''}
+                        <a href="${d.edit_url}" target="_blank" rel="noopener" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="Ver pedido completo en WordPress">Ver en WordPress ↗</a>
+                    </div>
                 </div>
             `);
+        },
+
+        /**
+         * AUDIT-REDI-UX-GAPS GAP-11: Abre el modal de crear incidente
+         * desde el detalle de un pedido ReDi.
+         */
+        openIncidentModal(orderId) {
+            // Navegar a la vista de Novedades + abrir el modal de creación.
+            this.loadView('incidents');
+            // Esperar a que la vista cargue, luego abrir el modal con el order_id prellenado.
+            setTimeout(function() {
+                if (typeof LTMSIncidents !== 'undefined' && LTMSIncidents.openNewModal) {
+                    LTMSIncidents.openNewModal(orderId);
+                } else {
+                    // Fallback: mostrar un prompt simple.
+                    var $ = jQuery;
+                    if ($('#ltms-incident-new-modal').length) {
+                        $('#ltms-incident-order-id').val(orderId);
+                        $('#ltms-incident-new-modal').show();
+                    }
+                }
+            }, 500);
         },
 
         /**

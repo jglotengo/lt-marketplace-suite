@@ -126,7 +126,14 @@
                     $select.find('option:disabled').remove();
                     if (response.success && response.data.banks) {
                         response.data.banks.forEach(bank => {
-                            $select.append(`<option value="${bank.id}">${bank.name}</option>`);
+                            // CHK-XSS-1 FIX — Avoid string concatenation when
+                            // interpolating bank.id / bank.name into <option>.
+                            // Use jQuery .val() / .text() which set DOM
+                            // properties and are immune to HTML injection.
+                            // Previously: $select.append(`<option value="${bank.id}">${bank.name}</option>`);
+                            // — if a bank name contained quotes or HTML, it
+                            // would break out of the attribute / inject markup.
+                            $('<option>').val(bank.id).text(bank.name).appendTo($select);
                         });
                     }
                 },
@@ -329,14 +336,50 @@
         /**
          * Serializa los campos del formulario de checkout.
          *
+         * Task 67-A / CHK-SERIALIZE-1 FIX: previously called `$(this).val()`
+         * for every input unconditionally. For checkboxes that returns the
+         * `value` attribute regardless of `checked` state (so the
+         * `ltms_privacy_consent` checkbox was always sent as `'1'` even when
+         * the user did NOT tick it), and for radio groups it returns the
+         * value of the last-iterated radio rather than the `:checked` one.
+         * Both broke the consent compliance flow (CHK-CONSENT-1) and any
+         * radio-based field (shipping method, PSE person type, etc.).
+         *
+         * We now honor the DOM's checked state:
+         *  - checkbox  → only sent when checked
+         *  - radio     → only the :checked radio in the group is sent
+         *  - everything else → use `$(this).val()` as before
+         *
+         * The pre-existing filter that excludes payment method and card data
+         * fields is preserved (those are sent separately via submitToServer /
+         * OpenPay tokenization).
+         *
          * @returns {Object}
          */
         serializeCheckoutForm() {
             const data = {};
             $('#ltms-checkout-form').find('input, select, textarea').each(function () {
-                const name = $(this).attr('name');
-                if (name && !name.includes('payment_method') && !name.includes('ltms_card')) {
-                    data[name] = $(this).val();
+                const el = this;
+                const name = $(el).attr('name');
+                if (!name) return;
+                // Exclude payment method (sent separately) and card data
+                // (tokenized via OpenPay, never sent to the server in plain).
+                if (name.includes('payment_method') || name.includes('ltms_card')) {
+                    return;
+                }
+
+                if (el.type === 'checkbox') {
+                    // Only include the consent / toggle when actually checked.
+                    if (el.checked) {
+                        data[name] = el.value || '1';
+                    }
+                } else if (el.type === 'radio') {
+                    // Only the selected radio in the group should be sent.
+                    if (el.checked) {
+                        data[name] = $(el).val();
+                    }
+                } else {
+                    data[name] = $(el).val();
                 }
             });
             return data;
