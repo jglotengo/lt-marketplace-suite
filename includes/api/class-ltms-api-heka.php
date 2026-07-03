@@ -110,7 +110,13 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
             $data['account_id'] = $this->account_id;
         }
 
-        $response = $this->perform_request( 'POST', '/v1/shipments', $data );
+        $response = $this->perform_request( 'POST', '/v1/shipments', $data, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key by external_reference —
+            // Heka dedupes shipment creation when 5xx retries fire after the first
+            // request already created the shipment server-side. Key scoped to the
+            // WooCommerce order reference for traceability.
+            'Idempotency-Key' => 'ltms_shipment_' . ( $data['external_reference'] ?? md5( wp_json_encode( $data ) ) ),
+        ] );
 
         if ( ! empty( $response['tracking_number'] ) ) {
             LTMS_Core_Logger::info(
@@ -143,6 +149,27 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
         $endpoint        = '/v1/shipments/track/' . rawurlencode( $tracking_number );
 
         return $this->perform_request( 'GET', $endpoint );
+    }
+
+    /**
+     * Cancela un envío activo en Heka Entrega por su número de tracking.
+     *
+     * HK-BUG-3 FIX: faltaba este método. Cuando un admin cancela un pedido en WC,
+     * el envío en Heka seguía activo → costo logístico sin reversar. Este método
+     * delega en el endpoint POST /v1/shipments/cancel de Heka, enviando el
+     * tracking_number para que Heka identifique el envío a cancelar.
+     *
+     * @param string $tracking_number Número de guía asignado por Heka al crear el envío.
+     * @return array Respuesta de Heka con el estado de la cancelación
+     *               (típicamente: status, cancelled_at, refund_amount).
+     * @throws \RuntimeException Si la cancelación falla o el envío no es cancelable.
+     */
+    public function cancel_shipment( string $tracking_number ): array {
+        $tracking_number = sanitize_text_field( $tracking_number );
+
+        return $this->perform_request( 'POST', '/shipments/cancel', [
+            'tracking_number' => $tracking_number,
+        ] );
     }
 
     /**

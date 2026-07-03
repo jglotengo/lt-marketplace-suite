@@ -196,7 +196,12 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'numeroFactura'   => $shipment_data['numero_factura'] ?? '',
         ];
 
-        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload );
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload, [
+            // AO-BUG-10 FIX: Idempotency-Key determinista por orden_compra (o hash
+            // del payload) para que un doble-clic en "Generar guía" no cree dos
+            // guías en Aveonline. La API v2 ignora el header si no lo soporta.
+            'Idempotency-Key' => 'ltms_ave_generar_guia_' . ( $shipment_data['orden_compra'] ?? md5( wp_json_encode( $shipment_data ) ) ),
+        ] );
 
         // La guía llega en resultado.guia
         $guia = $response['resultado']['guia'] ?? [];
@@ -406,7 +411,12 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $response = wp_remote_post(
             $this->api_url . self::ENDPOINT_AGENTES,
             [
-                'headers' => [ 'Content-Type' => 'application/json' ],
+                'headers' => [
+                    'Content-Type'    => 'application/json',
+                    // AO-BUG-10 FIX: Idempotency-Key por NIT/correo del agente —
+                    // un retry no debe crear dos agentes idénticos en Aveonline.
+                    'Idempotency-Key' => 'ltms_ave_crear_agente_' . md5( (string) ( $agent_data['idnit'] ?? '' ) . (string) ( $agent_data['correo'] ?? '' ) ),
+                ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
             ]
@@ -608,7 +618,11 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $response = wp_remote_post(
             $this->api_url . self::ENDPOINT_AGENTES,
             [
-                'headers' => [ 'Content-Type' => 'application/json' ],
+                'headers' => [
+                    'Content-Type'    => 'application/json',
+                    // AO-BUG-10 FIX: Idempotency-Key por login del usuario agente.
+                    'Idempotency-Key' => 'ltms_ave_crear_usuario_agente_' . md5( (string) ( $user_data['login'] ?? '' ) . (string) ( $user_data['correo'] ?? '' ) ),
+                ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
             ]
@@ -785,16 +799,18 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
     /**
      * Realiza una petición POST a la API de Aveonline y decodifica la respuesta.
      *
-     * @param string $endpoint Ruta relativa (ej. self::ENDPOINT_GUIA).
-     * @param array  $payload  Cuerpo de la petición.
+     * @param string $endpoint      Ruta relativa (ej. self::ENDPOINT_GUIA).
+     * @param array  $payload       Cuerpo de la petición.
+     * @param array  $extra_headers Headers adicionales (ej. Idempotency-Key).
      * @return array Respuesta decodificada.
      * @throws \RuntimeException En error de red o status=error de la API.
      */
-    private function aveonline_request( string $endpoint, array $payload ): array {
-        $url = $this->api_url . $endpoint;
+    private function aveonline_request( string $endpoint, array $payload, array $extra_headers = [] ): array {
+        $url     = $this->api_url . $endpoint;
+        $headers = array_merge( [ 'Content-Type' => 'application/json' ], $extra_headers );
 
         $raw = wp_remote_post( $url, [
-            'headers' => [ 'Content-Type' => 'application/json' ],
+            'headers' => $headers,
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30,
         ]);
@@ -816,7 +832,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             $payload['token'] = $this->get_token();
 
             $raw  = wp_remote_post( $url, [
-                'headers' => [ 'Content-Type' => 'application/json' ],
+                'headers' => $headers,
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
             ]);
@@ -1066,7 +1082,13 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'guias'         => $guias,
         ];
 
-        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload );
+        // AO-BUG-10 FIX: Idempotency-Key determinista para evitar duplicados de
+        // relación de envíos en caso de retry por timeout de red.
+        $idem_key = 'ltms_ave_relacion_' . $transportadora . '_' . md5( $guias );
+
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload, [
+            'Idempotency-Key' => $idem_key,
+        ] );
         $success  = ( $response['status'] ?? '' ) === 'ok';
 
         return [
@@ -1161,8 +1183,11 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
 
         $raw = wp_remote_post( $url, [
             'headers' => [
-                'Content-Type'  => 'application/json',
-                'Authorization' => $token,
+                'Content-Type'     => 'application/json',
+                'Authorization'    => $token,
+                // AO-BUG-10 FIX: Idempotency-Key determinista por número de
+                // relación para que un retry no elimine dos veces.
+                'Idempotency-Key'  => 'ltms_ave_eliminar_relacion_' . $numero_relacion,
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 20,
@@ -1221,5 +1246,159 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'status'        => 'ok',
             'destinatarios' => $body['destinatarios'] ?? [],
         ];
+    }
+
+    // ── Reimpresión y recogidas ─────────────────────────────────────────────────
+
+    /**
+     * Reimprime los documentos (rótulo/sticker) de una o varias guías.
+     *
+     * Endpoint: POST /nal/v1.0/generarGuiaTransporteNacional.php  tipo:"imprimirGuia"
+     *
+     * AO-BUG-3 FIX: el manager de guías llamaba `$api->reprint_guides()` que no
+     * existía en el cliente, produciendo un PHP \Error fatal (HTTP 500). Este
+     * método expone la operación con el nombre esperado por el manager.
+     *
+     * @param int       $idoperador ID de la transportadora en Aveonline.
+     * @param int       $idcliente  ID de empresa (`ltms_aveonline_idempresa`).
+     * @param string[]  $guias      Lista de números de guía.
+     * @return array {
+     *   @type string $status     'ok' | 'error'.
+     *   @type array  $resultado  Lista de documentos por guía (rutaguia, rotulo, sticker).
+     *   @type string $message    Mensaje de la API.
+     * }
+     * @throws \RuntimeException En error de red.
+     */
+    public function reprint_guides( int $idoperador, int $idcliente, array $guias ): array {
+        $guias_clean = array_values( array_filter( array_map( 'strval', $guias ) ) );
+        if ( empty( $idoperador ) || empty( $idcliente ) || empty( $guias_clean ) ) {
+            return [
+                'status'    => 'error',
+                'resultado' => [],
+                'message'   => 'idoperador, idcliente y guías son obligatorios.',
+            ];
+        }
+
+        $token = $this->get_token();
+
+        $payload = [
+            'tipo'          => 'imprimirGuia',
+            'token'         => $token,
+            'idempresa'     => $idcliente,
+            'idtransportador' => $idoperador,
+            'guias'         => implode( ',', $guias_clean ),
+        ];
+
+        // AO-BUG-10 FIX: Idempotency-Key determinista — reimpresión de la misma
+        // lista de guías no debería generar solicitudes duplicadas en Aveonline.
+        $idem_key = 'ltms_ave_reimprimir_' . $idoperador . '_' . md5( implode( ',', $guias_clean ) );
+
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload, [
+            'Idempotency-Key' => $idem_key,
+        ] );
+
+        return [
+            'status'    => ( $response['status'] ?? '' ) === 'ok' ? 'ok' : 'error',
+            'resultado' => $response['resultado'] ?? $response['guias'] ?? [],
+            'message'   => $response['message'] ?? '',
+        ];
+    }
+
+    /**
+     * Solicita la recogida de paquetes para una o varias guías.
+     *
+     * Endpoint: POST /nal/v1.0/generarGuiaTransporteNacional.php  tipo:"solicitarRecogida"
+     *
+     * AO-BUG-4 FIX: el manager de guías llamaba `$api->request_pickup()` que no
+     * existía en el cliente, produciendo un PHP \Error fatal (HTTP 500).
+     *
+     * @param string[] $guias Lista de números de guía.
+     * @param string   $dscom  Comentarios adicionales (opcional).
+     * @return array {
+     *   @type string $status  'ok' | 'error'.
+     *   @type string $message Mensaje de la API.
+     * }
+     * @throws \RuntimeException En error de red.
+     */
+    public function request_pickup( array $guias, string $dscom = '' ): array {
+        $guias_clean = array_values( array_filter( array_map( 'strval', $guias ) ) );
+        if ( empty( $guias_clean ) ) {
+            return [
+                'status'  => 'error',
+                'message' => 'Se requiere al menos un número de guía.',
+            ];
+        }
+
+        $token = $this->get_token();
+
+        $payload = [
+            'tipo'      => 'solicitarRecogida',
+            'token'     => $token,
+            'idempresa' => $this->idempresa,
+            'guias'     => implode( ',', $guias_clean ),
+            'dscom'     => $dscom,
+        ];
+
+        // AO-BUG-10 FIX: Idempotency-Key determinista — una doble solicitación
+        // de recogida para las mismas guías no debe generar dos turnos.
+        $idem_key = 'ltms_ave_recogida_' . md5( implode( ',', $guias_clean ) );
+
+        $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload, [
+            'Idempotency-Key' => $idem_key,
+        ] );
+
+        return [
+            'status'  => ( $response['status'] ?? '' ) === 'ok' ? 'ok' : 'error',
+            'message' => $response['message'] ?? '',
+        ];
+    }
+
+    // ── Órdenes de Compra ───────────────────────────────────────────────────────
+
+    /**
+     * Lista los proveedores disponibles para OC en Aveonline.
+     *
+     * Endpoint: POST /nal/v2.0/ordendeCompra.php  tipo:"listarproveedores"
+     *
+     * AO-BUG-9 FIX: el manager de OC usaba `wp_remote_post()` directo, sin pasar
+     * por este cliente. Eso omitía logging, reintentos, y verificación SSL del
+     * abstract client. Centralizamos la llamada aquí.
+     *
+     * @return array Respuesta decodificada (agentes/proveedores + status).
+     * @throws \RuntimeException En error de red.
+     */
+    public function list_proveedores_oc(): array {
+        $payload = [
+            'tipo'      => 'listarproveedores',
+            'idempresa' => $this->idempresa,
+        ];
+
+        return $this->aveonline_request( '/nal/v2.0/ordendeCompra.php', $payload );
+    }
+
+    /**
+     * Crea una orden de compra en Aveonline.
+     *
+     * Endpoint: POST /nal/v2.0/ordendeCompra.php  tipo:"generarorden"
+     *
+     * AO-BUG-9 FIX: centraliza la generación de OC en el cliente de API para que
+     * aproveche reintentos, logging y verificación SSL del abstract client.
+     * AO-BUG-10 FIX: incluye header `Idempotency-Key` determinista por número de
+     * OC para que un doble-submit no cree dos OC en Aveonline.
+     *
+     * @param array $payload Datos de la OC (idproveedor, ordencompra, detalle, ...).
+     * @return array Respuesta decodificada.
+     * @throws \RuntimeException En error de red.
+     */
+    public function crear_orden_compra( array $payload ): array {
+        $payload['token']     = $this->get_token();
+        $payload['idempresa'] = $this->idempresa;
+
+        $ordencompra = (string) ( $payload['ordencompra'] ?? '' );
+        $idem_key    = 'ltms_ave_crear_oc_' . ( $ordencompra !== '' ? $ordencompra : md5( wp_json_encode( $payload ) ) );
+
+        return $this->aveonline_request( '/nal/v2.0/ordendeCompra.php', $payload, [
+            'Idempotency-Key' => $idem_key,
+        ] );
     }
 }

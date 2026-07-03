@@ -114,8 +114,16 @@ class LTMS_Coupon_Attribution_Listener {
      * @return int User ID o 0.
      */
     private static function get_user_by_referral_code( string $code ): int {
+        // REG-BUG-1 FIX (regresión de LS-BUG-5 / Task 53-C): el meta de USUARIO
+        // para referral codes es 'ltms_referral_code' (sin underscore), verificado
+        // en class-ltms-api-tptc.php::register_affiliate() y
+        // class-ltms-affiliates.php. El anterior '_ltms_referral_code' (con
+        // underscore) no matcheaba ningún usuario → las comisiones de referido
+        // nunca se acreditaban. NOTA: el ORDER meta '_ltms_referral_code' (con
+        // underscore, ver save_attribution() arriba) SÍ es correcto — solo este
+        // lookup de USER meta estaba mal.
         $users = get_users( [
-            'meta_key'   => '_ltms_referral_code',
+            'meta_key'   => 'ltms_referral_code',
             'meta_value' => sanitize_text_field( $code ),
             'number'     => 1,
             'fields'     => 'ID',

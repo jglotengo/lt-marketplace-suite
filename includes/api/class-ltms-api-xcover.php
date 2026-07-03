@@ -100,10 +100,18 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
             'purchase_date' => LTMS_Utils::now_utc(),
         ];
 
+        // API-BUG-9 FIX: deterministic Idempotency-Key on POST prevents duplicate
+        // policy creation if the abstract client retries after a 5xx whose response
+        // was lost. The key is scoped to (operation, order_id) — same order retried
+        // → same key → XCover dedupes the second request server-side.
+        $entity_id       = $policy_data['order_id'] ?? $quote_id;
+        $idempotency_key = 'ltms_policy_order_' . $entity_id;
+
         $response = $this->perform_request(
             'POST',
             '/partners/' . $this->partner_code . '/policies/',
-            $payload
+            $payload,
+            [ 'Idempotency-Key' => $idempotency_key ]
         );
 
         return [

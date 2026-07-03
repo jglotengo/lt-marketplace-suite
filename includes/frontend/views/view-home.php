@@ -22,6 +22,39 @@ if ( ! defined( 'ABSPATH' ) ) exit;
          renderOnboardingBanner() en ltms-dashboard.js si quedan pasos pendientes. -->
     <div id="ltms-onboarding-banner" style="display:none;margin-bottom:24px;"></div>
 
+    <!-- AUDIT-REDI-UX-GAPS GAP-2 FIX: banner de onboarding ReDi.
+         Se muestra si ReDi está habilitado globalmente y el vendor no
+         tiene productos ReDi origin ni adopciones como reseller. -->
+    <?php
+    $redi_enabled = get_option( 'ltms_redi_enabled', 'no' ) === 'yes';
+    $has_origin   = class_exists( 'LTMS_Business_Redi_Manager' ) && LTMS_Business_Redi_Manager::count_origin_products_for_vendor( $user_id ) > 0;
+    $has_reseller = false;
+    if ( class_exists( 'LTMS_Business_Redi_Manager' ) ) {
+        global $wpdb;
+        $has_reseller = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$wpdb->prefix}lt_redi_agreements` WHERE reseller_vendor_id = %d AND status = 'active'",
+            $user_id
+        ) ) > 0;
+    }
+    if ( $redi_enabled && ! $has_origin && ! $has_reseller ) :
+    ?>
+    <div style="background:linear-gradient(135deg,#1A1A4E,#2D2D6E);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px;display:flex;align-items:center;gap:20px;">
+        <div style="font-size:2.5rem;flex-shrink:0;">🔁</div>
+        <div style="flex:1;">
+            <h3 style="margin:0 0 4px;color:#fff;font-size:1.1rem;">¡Programa ReDi disponible!</h3>
+            <p style="margin:0;font-size:0.85rem;opacity:0.9;line-height:1.5;">
+                <?php esc_html_e( 'ReDi (Re-venta Directa) te permite distribuir tus productos a través de otros vendedores (origin) o revender productos de otros (reseller). Gana comisiones automáticas en cada venta.', 'ltms' ); ?>
+            </p>
+        </div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
+            <button type="button" class="ltms-btn ltms-btn-primary" style="white-space:nowrap;"
+                    onclick="LTMS.Dashboard.loadView('redi');">
+                <?php esc_html_e( 'Explorar ReDi', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Métricas -->
     <div class="ltms-metrics-grid">
         <div class="ltms-metric">

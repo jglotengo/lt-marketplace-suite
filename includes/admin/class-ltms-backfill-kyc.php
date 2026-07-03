@@ -268,10 +268,19 @@ class LTMS_KYC_Guard {
             return; // KYC completo — OK
         }
 
-        // Forzar a "pending" en lugar de "publish"
-        remove_action( 'transition_post_status', [ __CLASS__, 'block_publish_without_kyc' ], 10 );
+        // Forzar a "pending" en lugar de "publish".
+        // M-10 FIX: previously used remove_action/wp_update_post/add_action
+        // which is a recursion anti-pattern — if another callback on
+        // `transition_post_status` also runs wp_update_post, the reentrancy
+        // guard is bypassed. A static flag inside this method is the standard
+        // WP idiom for "do not re-enter myself while I am mutating the post".
+        static $in_progress = false;
+        if ( $in_progress ) {
+            return;
+        }
+        $in_progress = true;
         wp_update_post( [ 'ID' => $post->ID, 'post_status' => 'pending' ] );
-        add_action( 'transition_post_status', [ __CLASS__, 'block_publish_without_kyc' ], 10, 3 );
+        $in_progress = false;
 
         // Registrar en bkr_lt_logs
         self::log_kyc_block( $vendor_id, $post->ID, $missing );

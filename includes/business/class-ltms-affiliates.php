@@ -39,7 +39,7 @@ class LTMS_Affiliates {
     public static function init(): void {
         $instance = self::get_instance();
         add_action( 'ltms_vendor_registered', [ $instance, 'on_vendor_registered' ], 10, 2 );
-        add_action( 'ltms_payout_completed',  [ $instance, 'on_payout_completed' ],  10, 2 );
+        add_action( 'ltms_payout_completed',  [ $instance, 'on_payout_completed' ],  10, 3 );
 
         // REST endpoint para estadísticas de afiliados
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
@@ -83,12 +83,14 @@ class LTMS_Affiliates {
      *
      * @param int   $vendor_id  ID del vendedor que recibió el pago.
      * @param float $net_amount Monto neto del pago.
+     * @param int   $payout_id  ID del payout (FU2 fix, 0 si no disponible).
      */
-    public function on_payout_completed( int $vendor_id, float $net_amount ): void {
+    public function on_payout_completed( int $vendor_id, float $net_amount, int $payout_id = 0 ): void {
         // Solo registrar el evento; las comisiones MLM se distribuyen en order_split.
         $this->log_info( 'payout_completed', 'Payout completed for affiliate chain', [
             'vendor_id'  => $vendor_id,
             'net_amount' => $net_amount,
+            'payout_id'  => $payout_id,
         ] );
     }
 
@@ -97,16 +99,44 @@ class LTMS_Affiliates {
     /**
      * Genera un código de referido único.
      *
+     * AF-1 FIX (AUDIT-BATCH2): Si tras 10 intentos el código sigue existiendo
+     * (entropía débil de generate_code() basada en time()+vendor_id), el código
+     * original RETORNABA el último duplicado — causando que dos vendedores
+     * terminaran con el mismo `ltms_referral_code`. Esto rompía `get_vendor_by_code()`
+     * (que retorna el primer match) → comisiones MLM se acreditarían al primero
+     * encontrado, no al sponsor real. Ahora, si persiste la colisión, se
+     * anexa un suffix aleatorio de 4 chars garantizando unicidad.
+     *
      * @param  int    $vendor_id
      * @return string
      */
     public function generate_unique_code( int $vendor_id ): string {
         $attempts = 0;
+        $code     = '';
 
         do {
             $code = $this->generate_code( $vendor_id, $attempts );
             $attempts++;
         } while ( $this->code_exists( $code ) && $attempts < 10 );
+
+        // AF-1: Si tras 10 intentos sigue duplicado, forzar unicidad con suffix.
+        if ( $this->code_exists( $code ) ) {
+            $extra = strtoupper( substr( wp_generate_password( 8, false ), 0, 4 ) );
+            $code  = substr( $code, 0, self::CODE_LENGTH - 4 ) . $extra;
+            // Última verificación — si por casualidad sigue duplicado, append
+            // de vendor_id (siempre único) hasta llenar CODE_LENGTH.
+            $suffix_iter = 0;
+            while ( $this->code_exists( $code ) && $suffix_iter < 20 ) {
+                $suffix_iter++;
+                $extra = strtoupper( substr( wp_generate_password( 12, false ), 0, 4 ) );
+                $code  = substr( $code, 0, self::CODE_LENGTH - 4 ) . $extra;
+            }
+            $this->log_warning(
+                'referral_code_collision_recovered',
+                sprintf( 'Colisión de código de referido tras 10 intentos para vendor #%d — suffix aleatorio aplicado: %s', $vendor_id, $code ),
+                [ 'vendor_id' => $vendor_id, 'final_code' => $code ]
+            );
+        }
 
         return strtoupper( $code );
     }
@@ -151,6 +181,21 @@ class LTMS_Affiliates {
     /**
      * Vincula un vendedor nuevo a su sponsor usando el código de referido.
      *
+     * AF-2 FIX (AUDIT-BATCH2): NO existía validación de auto-referencia. Un
+     * usuario con cuenta A (y código X) podía crear cuenta B usando X como
+     * referral_code → su sponsor_id sería el mismo usuario A. Pero lo más
+     * grave: si un usuario obtenía su PROPIO código (p.ej. tras re-registrarse
+     * con el mismo email tras borrar la cuenta, o por bug de flushing de
+     * user_meta), `link_to_sponsor($uid, $uid_code)` lo vinculaba a sí mismo,
+     * creando un ciclo en lt_referral_network donde ancestor_path contiene al
+     * propio vendor_id → `get_sponsor_chain()` retorna al vendor como su propio
+     * sponsor → `distribute_commissions()` le paga comisión a sí mismo por sus
+     * propias ventas (auto-comisión fraudulenta).
+     *
+     * Ahora se valida explícitamente que `$sponsor_id !== $vendor_id`. Si coincide,
+     * se rechaza, se loguea como warning (posible fraude/bug) y se registra el
+     * nodo sin sponsor (raíz).
+     *
      * @param  int    $vendor_id
      * @param  string $referral_code
      * @return bool
@@ -167,8 +212,26 @@ class LTMS_Affiliates {
             return false;
         }
 
+        // AF-2: Auto-referencia — rechazar.
+        if ( $sponsor_id === $vendor_id ) {
+            $this->log_warning(
+                'self_referral_blocked',
+                sprintf( 'Vendedor #%d intentó usar su propio código de referido — auto-referencia bloqueada', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'referral_code' => $referral_code ]
+            );
+            // Registrar como nodo raíz (sin sponsor) para no bloquear el onboarding.
+            LTMS_Referral_Tree::register_node( $vendor_id, '' );
+            return false;
+        }
+
         update_user_meta( $vendor_id, 'ltms_sponsor_id', $sponsor_id );
-        LTMS_Referral_Tree::register_node( $vendor_id, $referral_code );
+        $registered = LTMS_Referral_Tree::register_node( $vendor_id, $referral_code );
+
+        // AF-2: Si register_node detectó ciclo y rechazó, revertir el meta.
+        if ( ! $registered ) {
+            delete_user_meta( $vendor_id, 'ltms_sponsor_id' );
+            return false;
+        }
 
         $this->log_info( 'vendor_linked', 'Vendor linked to sponsor', [
             'vendor_id'  => $vendor_id,

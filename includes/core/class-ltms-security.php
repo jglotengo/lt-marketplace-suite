@@ -21,18 +21,24 @@ final class LTMS_Core_Security {
 
     /**
      * Algoritmo de cifrado.
+     * SEC-BUG-1 FIX: v2 uses aes-256-gcm (authenticated encryption, no padding oracle).
+     * v1 (aes-256-cbc) kept for backward-compat decrypt of legacy data.
      */
     private const CIPHER_ALGO = 'aes-256-cbc';
+    private const CIPHER_ALGO_GCM = 'aes-256-gcm';
+    private const GCM_TAG_LENGTH = 16;
 
     /**
-     * Longitud del IV para AES-256-CBC.
+     * Longitud del IV para AES-256-CBC/GCM.
      */
     private const IV_LENGTH = 16;
 
     /**
-     * Versión del esquema de cifrado (para migración futura).
+     * Versión del esquema de cifrado.
+     * v1 = legacy CBC (no auth), v2 = GCM (authenticated).
      */
     private const ENCRYPTION_VERSION = 'v1';
+    private const ENCRYPTION_VERSION_GCM = 'v2';
 
     /**
      * Inicializa hooks de seguridad.
@@ -74,14 +80,20 @@ final class LTMS_Core_Security {
         }
 
         // HSTS: sólo en HTTPS y producción para evitar romper entornos locales.
+        // SEC-16 FIX (v2.9.26): añadido `preload` para permitir HSTS preload list.
         if ( is_ssl() && LTMS_Core_Config::is_production() && ! headers_sent() ) {
-            // max-age=31536000 (1 año); includeSubDomains opcional según infraestructura.
-            header( 'Strict-Transport-Security: max-age=31536000; includeSubDomains' );
+            header( 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload' );
         }
 
         // Ocultar versión de PHP si aún aparece.
         if ( ! headers_sent() ) {
             header_remove( 'X-Powered-By' );
+        }
+
+        // SEC-17 FIX (v2.9.26): X-XSS-Protection para navegadores legacy (IE/old Edge).
+        // No reemplaza CSP pero añade capa de defensa para navegadores que no soportan CSP.
+        if ( ! headers_sent() ) {
+            header( 'X-XSS-Protection: 1; mode=block' );
         }
 
         // Referrer policy: no enviar referrer a terceros.
@@ -139,6 +151,33 @@ final class LTMS_Core_Security {
         $key = self::derive_key( LTMS_Core_Config::get_encryption_key() );
         $iv  = random_bytes( self::IV_LENGTH );
 
+        // SEC-BUG-1 FIX: Use AES-256-GCM (authenticated encryption) if available.
+        // GCM provides integrity + authenticity (no padding oracle attack).
+        if ( in_array( 'aes-256-gcm', openssl_get_cipher_methods(), true ) ) {
+            $tag = ''; // filled by reference
+            $encrypted = openssl_encrypt(
+                $plaintext,
+                self::CIPHER_ALGO_GCM,
+                $key,
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag,
+                '',
+                self::GCM_TAG_LENGTH
+            );
+
+            if ( $encrypted === false ) {
+                throw new \RuntimeException( 'LTMS: Error al cifrar con OpenSSL GCM: ' . openssl_error_string() );
+            }
+
+            // Formato v2: version:base64(iv):base64(tag):base64(ciphertext)
+            return self::ENCRYPTION_VERSION_GCM . ':' .
+                   base64_encode( $iv ) . ':' .
+                   base64_encode( $tag ) . ':' .
+                   base64_encode( $encrypted );
+        }
+
+        // Fallback: legacy CBC (should not happen on modern PHP 7.2+)
         $encrypted = openssl_encrypt(
             $plaintext,
             self::CIPHER_ALGO,
@@ -151,7 +190,6 @@ final class LTMS_Core_Security {
             throw new \RuntimeException( 'LTMS: Error al cifrar con OpenSSL: ' . openssl_error_string() );
         }
 
-        // Formato: version:base64(iv):base64(ciphertext)
         return self::ENCRYPTION_VERSION . ':' .
                base64_encode( $iv ) . ':' .
                base64_encode( $encrypted );
@@ -170,19 +208,54 @@ final class LTMS_Core_Security {
             return '';
         }
 
-        $parts = explode( ':', $ciphertext, 3 );
+        $parts = explode( ':', $ciphertext, 4 );
 
-        if ( count( $parts ) !== 3 ) {
+        if ( count( $parts ) < 3 ) {
             throw new \InvalidArgumentException( 'LTMS: Formato de datos cifrados inválido.' );
         }
 
-        [ $version, $iv_b64, $cipher_b64 ] = $parts;
+        $version = $parts[0];
+        $key     = self::derive_key( LTMS_Core_Config::get_encryption_key() );
 
+        // SEC-BUG-1 FIX: v2 = GCM (authenticated), v1 = legacy CBC (backward-compat)
+        if ( $version === self::ENCRYPTION_VERSION_GCM ) {
+            if ( count( $parts ) !== 4 ) {
+                throw new \InvalidArgumentException( 'LTMS: Formato GCM inválido (esperados 4 partes).' );
+            }
+            [ $version, $iv_b64, $tag_b64, $cipher_b64 ] = $parts;
+
+            $iv        = base64_decode( $iv_b64, true );
+            $tag       = base64_decode( $tag_b64, true );
+            $encrypted = base64_decode( $cipher_b64, true );
+
+            if ( $iv === false || $tag === false || $encrypted === false ) {
+                throw new \InvalidArgumentException( 'LTMS: Los datos cifrados están corruptos (Base64 inválido).' );
+            }
+
+            $decrypted = openssl_decrypt(
+                $encrypted,
+                self::CIPHER_ALGO_GCM,
+                $key,
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag
+            );
+
+            if ( $decrypted === false ) {
+                // SEC-BUG-1: GCM tag verification failed = tampered ciphertext
+                throw new \RuntimeException( 'LTMS: Verificación de autenticidad fallida (datos manipulados).' );
+            }
+
+            return $decrypted;
+        }
+
+        // Legacy v1 (CBC) — backward-compat for data encrypted before SEC-BUG-1 fix
         if ( $version !== self::ENCRYPTION_VERSION ) {
             throw new \InvalidArgumentException( "LTMS: Versión de cifrado desconocida: {$version}" );
         }
 
-        $key       = self::derive_key( LTMS_Core_Config::get_encryption_key() );
+        [ $version, $iv_b64, $cipher_b64 ] = $parts;
+
         $iv        = base64_decode( $iv_b64, true );
         $encrypted = base64_decode( $cipher_b64, true );
 
@@ -203,6 +276,44 @@ final class LTMS_Core_Security {
         }
 
         return $decrypted;
+    }
+
+    /**
+     * Deriva la clave de cifrado desde la sal de WordPress.
+     * SEC-BUG-2 FIX: Result is cached in static + transient to avoid PBKDF2 on every call.
+     *
+     * @param string $salt Salt personalizado (opcional).
+     * @return string Clave derivada de 32 bytes.
+     */
+    private static $cached_key = null;
+    private static function derive_key( string $salt = '' ): string {
+        if ( self::$cached_key !== null && $salt === '' ) {
+            return self::$cached_key;
+        }
+
+        // Check transient cache (survives page loads)
+        $transient_key = 'ltms_encryption_key_v2';
+        if ( $salt === '' ) {
+            $cached = get_transient( $transient_key );
+            if ( $cached && strlen( $cached ) === 32 ) {
+                self::$cached_key = $cached;
+                return $cached;
+            }
+        }
+
+        $wp_salt = defined( 'LOGGED_IN_KEY' ) ? LOGGED_IN_KEY : 'ltms-fallback-key';
+        $wp_auth = defined( 'AUTH_SALT' ) ? AUTH_SALT : 'ltms-fallback-salt';
+        $material = $wp_salt . $salt . $wp_auth;
+
+        // PBKDF2 with 600,000 iterations (NIST-aligned for SHA-256)
+        $key = hash_pbkdf2( 'sha256', $material, 'ltms-key-derivation', 600000, 32, true );
+
+        if ( $salt === '' ) {
+            self::$cached_key = $key;
+            set_transient( $transient_key, $key, DAY_IN_SECONDS );
+        }
+
+        return $key;
     }
 
     /**
@@ -252,6 +363,35 @@ final class LTMS_Core_Security {
      */
     public static function generate_token( int $length = 32 ): string {
         return bin2hex( random_bytes( $length ) );
+    }
+
+    /**
+     * WH3 FIX (v2.8.9): Resuelve la IP del cliente de forma segura.
+     *
+     * Solo confía en X-Forwarded-For si el request viene de un proxy confiable
+     * (configurable via ltms_trusted_proxies CSV). Antes, los webhook handlers
+     * usaban X-Forwarded-For sin validar el proxy → spoofing de IP para
+     * bypassear rate limits (cada IP spoofed tenía su propio counter).
+     *
+     * @return string IP del cliente (no spoofable si no hay proxy confiable).
+     */
+    public static function get_client_ip_safe(): string {
+        $remote_addr = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+
+        // Solo confiar en X-Forwarded-For si REMOTE_ADDR es un proxy confiable.
+        $trusted_proxies_str = trim( (string) get_option( 'ltms_trusted_proxies', '' ) );
+        if ( $trusted_proxies_str !== '' ) {
+            $trusted_proxies = array_filter( array_map( 'trim', explode( ',', $trusted_proxies_str ) ) );
+            if ( in_array( $remote_addr, $trusted_proxies, true ) && ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+                $forwarded = array_filter( array_map( 'trim', explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) ) ) );
+                if ( ! empty( $forwarded ) ) {
+                    return end( $forwarded );
+                }
+            }
+        }
+
+        // Sin proxy confiable: REMOTE_ADDR no es spoofable.
+        return $remote_addr;
     }
 
     /**

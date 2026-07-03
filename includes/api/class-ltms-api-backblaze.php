@@ -141,7 +141,12 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
                 'headers'   => $signed_headers,
                 'body'      => $payload,
                 'timeout'   => $this->timeout,
-                'sslverify' => LTMS_Core_Config::is_production(),
+                // API-BUG-3 FIX: SSL verification must ALWAYS be true. The previous
+                // `is_production()` check disabled SSL in sandbox/staging/dev,
+                // enabling MITM attacks against non-prod environments. B2 sandbox
+                // endpoints use valid public certs — there is no reason to disable
+                // verification. To override locally, define LTMS_DISABLE_SSL_VERIFY.
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -251,7 +256,8 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
                 'method'    => 'DELETE',
                 'headers'   => $signed_headers,
                 'timeout'   => $this->timeout,
-                'sslverify' => LTMS_Core_Config::is_production(),
+                // API-BUG-3 FIX: SSL verification must ALWAYS be true (see upload_file).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
         if ( is_wp_error( $response_del ) ) {
@@ -286,7 +292,8 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
             [
                 'headers'   => $signed_headers,
                 'timeout'   => $this->timeout,
-                'sslverify' => LTMS_Core_Config::is_production(),
+                // API-BUG-3 FIX: SSL verification must ALWAYS be true (see upload_file).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
         if ( is_wp_error( $response_list ) ) {

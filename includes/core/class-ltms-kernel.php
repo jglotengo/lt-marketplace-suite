@@ -201,10 +201,18 @@ final class LTMS_Core_Kernel {
         }
 
         // Scheduler de pagos
+        // CR-1 FIX (Task 57-E): De-nested class_exists blocks. Previously
+        // LTMS_Shipping_Mode was nested INSIDE the LTMS_Payout_Scheduler
+        // if-block, so if Payout_Scheduler was missing it wouldn't initialize.
+        // Each component must boot independently.
+        // M-6 FIX: removed dead `if ( class_exists( 'LTMS_Accounting' ) )`
+        // block — LTMS_Accounting never existed (only LTMS_Accounting_Compliance,
+        // which is booted separately below at v2.9.12).
         if ( class_exists( 'LTMS_Payout_Scheduler' ) ) {
             LTMS_Payout_Scheduler::init();
-        if ( class_exists( 'LTMS_Accounting' ) ) { LTMS_Accounting::init(); }
-        if ( class_exists( 'LTMS_Shipping_Mode' ) ) { LTMS_Shipping_Mode::init(); }
+        }
+        if ( class_exists( 'LTMS_Shipping_Mode' ) ) {
+            LTMS_Shipping_Mode::init();
         }
 
         // Protección al consumidor / vesting
@@ -248,6 +256,193 @@ final class LTMS_Core_Kernel {
             LTMS_Coupon_Attribution_Listener::init();
         }
 
+        // v2.8.3 — Shipping Cost Ledger & Reconciliation Engine.
+        if ( class_exists( 'LTMS_Shipping_Cost_Ledger' ) ) {
+            LTMS_Shipping_Cost_Ledger::init();
+        }
+
+        // v2.8.3 — Admin UI para el ledger (solo en backend).
+        if ( class_exists( 'LTMS_Admin_Shipping_Ledger' ) && is_admin() ) {
+            LTMS_Admin_Shipping_Ledger::init();
+        }
+
+        // v2.9.2 — Product Page Enhancements (Trust Badges, Cart Drawer, Bundles, Comparison, Video).
+        if ( class_exists( 'LTMS_Trust_Badges' ) ) {
+            LTMS_Trust_Badges::init();
+        }
+        if ( class_exists( 'LTMS_Cart_Drawer' ) ) {
+            LTMS_Cart_Drawer::init();
+        }
+        if ( class_exists( 'LTMS_Product_Bundles' ) ) {
+            LTMS_Product_Bundles::init();
+            // Crear tabla si no existe (idempotente).
+            if ( is_admin() && ! wp_next_scheduled( 'ltms_create_bundles_table' ) ) {
+                LTMS_Product_Bundles::create_table();
+            }
+        }
+        if ( class_exists( 'LTMS_Comparison_Table' ) ) {
+            LTMS_Comparison_Table::init();
+        }
+        if ( class_exists( 'LTMS_Product_Video' ) ) {
+            LTMS_Product_Video::init();
+        }
+
+        // v2.9.4 — WoodMart-inspired features (Quick View, Wishlist, Product Tabs, Rating Summary).
+        if ( class_exists( 'LTMS_Quick_View' ) ) {
+            LTMS_Quick_View::init();
+        }
+        if ( class_exists( 'LTMS_Wishlist' ) ) {
+            LTMS_Wishlist::init();
+        }
+        if ( class_exists( 'LTMS_Product_Tabs' ) ) {
+            LTMS_Product_Tabs::init();
+        }
+        if ( class_exists( 'LTMS_Rating_Summary' ) ) {
+            LTMS_Rating_Summary::init();
+        }
+
+        // v2.9.5 — Amazon-inspired features (Delivery Promise, Verified Purchase, Add-on Items, Gift Options, Browsing History).
+        if ( class_exists( 'LTMS_Amazon_Enhancements' ) ) {
+            LTMS_Amazon_Enhancements::init();
+        }
+
+        // v2.9.6 — Compliance Guardian (Meta policies + Ley 1581 + LFPDPPP + PLD).
+        if ( class_exists( 'LTMS_Compliance_Guardian' ) ) {
+            LTMS_Compliance_Guardian::init();
+        }
+
+        // v2.9.8 — Fiscal Online Access (Art. 30-B CFF SAT + E.T. 437-2 DIAN).
+        if ( class_exists( 'LTMS_Fiscal_Online_Access' ) ) {
+            LTMS_Fiscal_Online_Access::init();
+            // Hook: guardar datos fiscales del vendor al aprobar KYC.
+            add_action( 'ltms_vendor_approved', [ 'LTMS_Fiscal_Online_Access', 'on_kyc_approved' ], 5, 1 );
+        }
+
+        // v2.9.9 — Tourism Compliance Extension (NT-3 a NT-6).
+        if ( class_exists( 'LTMS_Tourism_Compliance_Ext' ) ) {
+            LTMS_Tourism_Compliance_Ext::init();
+        }
+
+        // v2.9.10 — MLM Compliance Guardian (NA-1 a NA-5: disclaimer, anti-pirámide, consent, no-compra, reporte anual).
+        if ( class_exists( 'LTMS_MLM_Compliance_Guardian' ) ) {
+            LTMS_MLM_Compliance_Guardian::init();
+        }
+
+        // v2.9.11 — Fiscal Annual Close (LF-3: GMF 4x1000 + LF-4: certificado retenciones + LF-5: PAC CFDI).
+        if ( class_exists( 'LTMS_Fiscal_Annual_Close' ) ) {
+            LTMS_Fiscal_Annual_Close::init();
+        }
+
+        // v2.9.12 — Accounting Compliance (NC-1: ReteIVA/ReteICA en factura + NC-2: FX gain/loss + NC-3: DIAN resolución + NC-4: cierre mensual + NC-6: conciliación AR/AP).
+        if ( class_exists( 'LTMS_Accounting_Compliance' ) ) {
+            LTMS_Accounting_Compliance::init();
+        }
+
+        // v2.9.13 — Privacy Toolkit (PR-2: WordPress data exporter + PR-3: extended eraser + PR-5: retention cron).
+        if ( class_exists( 'LTMS_Privacy_Toolkit' ) ) {
+            LTMS_Privacy_Toolkit::init();
+        }
+
+        // v2.9.14 — Restaurant Compliance (RT-1: alcohol age + RT-2: sanitary reg + RT-3: alérgenos + RT-4: horarios + RT-5: propina + RT-6: impoconsumo bug + RT-7: cold chain).
+        if ( class_exists( 'LTMS_Restaurant_Compliance' ) ) {
+            LTMS_Restaurant_Compliance::init();
+        }
+
+        // v2.9.15 — Physical Products Compliance (PP-1: warranty + PP-2: country of origin + PP-3: hazmat + PP-4: certifications + PP-5: textile labeling + PP-6: ICE/IEPS + PP-7: batch + PP-8: FTA customs).
+        if ( class_exists( 'LTMS_Physical_Products_Compliance' ) ) {
+            LTMS_Physical_Products_Compliance::init();
+        }
+
+        // v2.9.16 — Fintech Compliance (FT-1: SOS reports + FT-2: sanctions screening + FT-3: operational limits + FT-4: Travel Rule + FT-5: PCI DSS + FT-6: 2FA vendors + FT-7: CRS/FATCA + FT-8: PLD MX UMA).
+        if ( class_exists( 'LTMS_Fintech_Compliance' ) ) {
+            LTMS_Fintech_Compliance::init();
+        }
+
+        // v2.9.17 — Logistics Compliance (LT-1: Carta Porte CFDI + LT-2: RNT CO + LT-3: SCT MX + LT-4: pesos/dimensiones + LT-5: RC transportista + LT-6: ISO 17712 + LT-7: GPS + LT-8: DVA + LT-9: Deprisa bug).
+        if ( class_exists( 'LTMS_Logistics_Compliance' ) ) {
+            LTMS_Logistics_Compliance::init();
+        }
+
+        // v2.9.18 — Cross-Border Compliance (CB-1: cert origin + CB-2: incoterms 2020 + CB-3: IOSS UE + CB-4: AES US + CB-5: FX declaration + CB-6: non-resident IVA + CB-7: VUCE + CB-8: EUR.1/ATR.1/Form A + CB-9: de minimis currency bug).
+        if ( class_exists( 'LTMS_Cross_Border_Compliance' ) ) {
+            LTMS_Cross_Border_Compliance::init();
+        }
+
+        // v2.9.20 — Authorities Compliance (AC-1: counterfeit IP + AC-2: PQR formal + AC-3: PPC SIC + AC-4: ICA fitosanitario + AC-5: RESPEL/RAEE + AC-6: conciliación SIC + AC-7: RUT/CC DIAN + AC-8: INVIMA anual + AC-9: competencia desleal).
+        if ( class_exists( 'LTMS_Authorities_Compliance' ) ) {
+            LTMS_Authorities_Compliance::init();
+        }
+
+        // v2.9.21 — Data Protection Compliance (HD-1: CSP + HD-2: registro SIC + HD-3: transfer int + HD-4: aviso simplif vs integral + HD-5: DPIA + HD-6: DPO + HD-7: bitácora + HD-8: cifrado PII + HD-9: rotación claves + HD-10: brechas + HD-11: capacitación + HD-12: menores).
+        if ( class_exists( 'LTMS_Data_Protection_Compliance' ) ) {
+            LTMS_Data_Protection_Compliance::init();
+        }
+
+        // v2.9.22 — SEO Enhanced (Sprint 1: 7 RSS feeds + Schema.org ampliado + llms.txt AEO + sitemap index + robots.txt + Core Web Vitals hints).
+        if ( class_exists( 'LTMS_SEO_Enhanced' ) ) {
+            LTMS_SEO_Enhanced::init();
+        }
+
+        // v2.9.23 — Foundation Compliance (FN-1: RTE + FN-2: límite deducibilidad + FN-3: reporte DIAN 1737 + FN-4: screening AML donantes + FN-5: consentimiento donante + FN-6: verificación cuenta + FN-7: transparencia ESAL + FN-8: donaciones cross-border).
+        if ( class_exists( 'LTMS_Foundation_Compliance' ) ) {
+            LTMS_Foundation_Compliance::init();
+        }
+
+        // v2.9.24 — Jurisprudence Compliance (JU-1: takedown 48h + JU-2: retracto irrenunciable + JU-3: PQR vendor + JU-4: defensa filtros + JU-5: vigilancia PI + JU-6: publicidad comparativa + JU-7: Nutri-Score + JU-8: cooperación judicial).
+        if ( class_exists( 'LTMS_Jurisprudence_Compliance' ) ) {
+            LTMS_Jurisprudence_Compliance::init();
+        }
+
+        // v2.9.27 — TOTP 2FA (SEC-15: implementación real RFC 6238).
+        if ( class_exists( 'LTMS_TOTP_2FA' ) ) {
+            LTMS_TOTP_2FA::init();
+        }
+
+        // v2.9.28 — Sales Booster (SB-1: carrito abandonado + SB-2: flash sales + SB-3: push notifications + SB-4: upsell/cross-sell + SB-5: social proof).
+        if ( class_exists( 'LTMS_Sales_Booster' ) ) {
+            LTMS_Sales_Booster::init();
+        }
+
+        // v2.9.29 — Traffic Booster (TB-1: Google Shopping Feed + TB-2: Social Commerce + TB-3: Newsletter + TB-4: City Pages + TB-5: GBP).
+        if ( class_exists( 'LTMS_Traffic_Booster' ) ) {
+            LTMS_Traffic_Booster::init();
+        }
+
+        // v2.9.30 — Branding Engine (BR-1: logo Google Knowledge Panel + BR-2: favicon meta + BR-3: psicología color CSS + BR-4: OG logo + BR-5: trust signals + BR-6: loss aversion + BR-7: reciprocidad + BR-8: anclaje).
+        if ( class_exists( 'LTMS_Branding_Engine' ) ) {
+            LTMS_Branding_Engine::init();
+        }
+
+        // Encolar CSS + JS de product enhancements en frontend.
+        add_action( 'wp_enqueue_scripts', function() {
+            $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '2.9.2';
+            $url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '';
+            wp_enqueue_style( 'ltms-product-enhancements', $url . 'css/ltms-product-enhancements.css', [], $ver );
+            wp_enqueue_script( 'ltms-product-enhancements', $url . 'js/ltms-product-enhancements.js', [ 'jquery' ], $ver, true );
+            wp_localize_script( 'ltms-product-enhancements', 'ltmsDrawerData', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'ltms_drawer_nonce' ),
+                'i18n'    => [
+                    'remove'           => __( 'Quitar', 'ltms' ),
+                    'empty'            => __( 'Tu carrito está vacío', 'ltms' ),
+                    'subtotal'         => __( 'Subtotal', 'ltms' ),
+                    'checkout'         => __( 'Finalizar compra', 'ltms' ),
+                    'viewCart'         => __( 'Ver carrito completo', 'ltms' ),
+                    'upsells'          => __( 'También te puede interesar', 'ltms' ),
+                    'add'              => __( 'Agregar', 'ltms' ),
+                    'adding'           => __( 'Agregando...', 'ltms' ),
+                    'error'            => __( 'Error', 'ltms' ),
+                    'reserved'         => __( 'Tu carrito está reservado por', 'ltms' ),
+                    'reservedExpired'  => __( 'Tiempo de reserva agotado. Los precios pueden haber cambiado.', 'ltms' ),
+                    'tncText'          => __( 'Acepto los', 'ltms' ),
+                    'tncLink'          => __( 'Términos y Condiciones', 'ltms' ),
+                    'tncWarning'       => __( 'Debes aceptar los Términos y Condiciones para continuar.', 'ltms' ),
+                    'inWishlist'       => __( 'En tu wishlist', 'ltms' ),
+                    'addToWishlist'    => __( 'Agregar a wishlist', 'ltms' ),
+                ],
+            ] );
+        } );
+
         // v1.6.0 — Módulos Enterprise
         if ( class_exists( 'LTMS_Media_Guard' ) ) {
             LTMS_Media_Guard::init();
@@ -264,6 +459,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Redi_Order_Listener' ) ) {
             LTMS_Redi_Order_Listener::init();
         }
+        // AUDIT-REDI-UX-GAPS GAP-9 FIX: Incident Manager para el modelo ReDi.
+        if ( class_exists( 'LTMS_Business_Redi_Incident' ) ) {
+            LTMS_Business_Redi_Incident::init();
+        }
         // v2.9.2 — Ave-Hub: reporta a Aveonline el estado de envíos propios (domiciliario, pickup, etc.)
         if ( class_exists( 'LTMS_Aveonline_Hub_Listener' ) ) {
             LTMS_Aveonline_Hub_Listener::init();
@@ -275,6 +474,15 @@ final class LTMS_Core_Kernel {
         // v2.1.0 — Sincronización contable con Alegra
         if ( class_exists( 'LTMS_Alegra_Sync' ) ) {
             LTMS_Alegra_Sync::init();
+        }
+
+        // v3.0.0 — Motor de Donaciones (Task 60-B): donaciones automáticas a
+        // fundación desde comisión de plataforma. Loose-coupling: si la clase
+        // no existe (motor deshabilitado o no cargado), el hook
+        // 'ltms_order_paid_after_split' disparado por Order_Split simplemente
+        // no tiene listeners y es un no-op.
+        if ( class_exists( 'LTMS_Donation_Manager' ) ) {
+            LTMS_Donation_Manager::init();
         }
 
         // v2.2.0 — Agentes Aveonline por vendedor
@@ -323,6 +531,26 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_ZapSign_Manager' ) ) {
             LTMS_ZapSign_Manager::init();
         }
+
+        // v3.1.0 — Cross-Border motor (Task 63-A/B): Currency Manager,
+        // FX Rate Provider and Customs Calculator. These are stateless
+        // utility classes (no init() method required) — we just verify
+        // their presence so the autoloader loads them eagerly on boot
+        // and downstream callers (Order_Split, Checkout_Handler, Alegra)
+        // can rely on them being available. The Tax_Engine::init() call
+        // above already registers US/EU/BR strategies defensively.
+        if ( class_exists( 'LTMS_FX_Rate_Provider' ) ) {
+            // Stateless — no init() required. Class existence check
+            // forces autoload so the class is available for the rest
+            // of the request lifecycle.
+            LTMS_FX_Rate_Provider::get_supported_currencies();
+        }
+        if ( class_exists( 'LTMS_Currency_Manager' ) ) {
+            // Stateless — verify presence + warm autoloader.
+            LTMS_Currency_Manager::get_base_currency();
+        }
+        // LTMS_Customs_Calculator is invoked on-demand by Order_Split
+        // and Checkout_Handler — no boot-time initialisation needed.
     }
 
     /**
@@ -572,7 +800,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Admin_Payouts' ) ) {
             LTMS_Admin_Payouts::init();
         }
-        if ( class_exists( 'LTMS_Admin_Accounting' ) ) { LTMS_Admin_Accounting::init(); }
+        // M-6 FIX: removed dead `if ( class_exists( 'LTMS_Admin_Accounting' ) )`
+        // line — LTMS_Admin_Accounting never existed. No accounting-specific
+        // admin class is booted here; accounting concerns are handled by
+        // LTMS_Accounting_Compliance (booted in boot_business()) and the
+        // generic LTMS_Admin_Settings/LTMS_Admin_Payouts panels above.
         if ( class_exists( 'LTMS_Admin_Shipping' ) ) { LTMS_Admin_Shipping::init(); }
         // F-05: Panel admin depósitos manuales
         if ( class_exists( 'LTMS_Admin_Deposits' ) ) {
@@ -639,67 +871,15 @@ final class LTMS_Core_Kernel {
             LTMS_Core_Cron_Manager::init();
         }
 
-        // M-32: ltms_update_tracking was scheduled in the activator but had no handler.
-        // Poll all shipping APIs (Heka, Aveonline, Uber) for orders still in transit.
-        add_action( 'ltms_update_tracking', static function(): void {
-            global $wpdb;
-
-            // Find orders in transit with a tracking number assigned by LTMS.
-            $order_ids = $wpdb->get_col(
-                "SELECT DISTINCT p.ID FROM {$wpdb->posts} p
-                 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-                 WHERE p.post_type   = 'shop_order'
-                   AND p.post_status IN ('wc-processing','wc-shipped')
-                   AND pm.meta_key   = '_ltms_tracking_number'
-                   AND pm.meta_value != ''"
-            );
-
-            if ( empty( $order_ids ) ) {
-                return;
-            }
-
-            foreach ( $order_ids as $order_id ) {
-                try {
-                    $order           = wc_get_order( (int) $order_id );
-                    $tracking_number = $order ? $order->get_meta( '_ltms_tracking_number' ) : '';
-                    $carrier         = $order ? $order->get_meta( '_ltms_shipping_carrier' ) : '';
-
-                    if ( ! $order || ! $tracking_number ) {
-                        continue;
-                    }
-
-                    $status = '';
-
-                    if ( class_exists( 'LTMS_Api_Factory' ) ) {
-                        if ( in_array( $carrier, [ 'heka', '' ], true ) && class_exists( 'LTMS_Api_Heka' ) ) {
-                            $api    = LTMS_Api_Factory::get( 'heka' );
-                            $result = $api->track_shipment( $tracking_number );
-                            $status = $result['status'] ?? '';
-                        } elseif ( $carrier === 'aveonline' && class_exists( 'LTMS_Api_Aveonline' ) ) {
-                            $api    = LTMS_Api_Factory::get( 'aveonline' );
-                            $result = $api->track_shipment( $tracking_number );
-                            $status = $result['status'] ?? '';
-                        }
-                    }
-
-                    if ( $status ) {
-                        $order->update_meta_data( '_ltms_tracking_status', sanitize_text_field( $status ) );
-                        $order->update_meta_data( '_ltms_tracking_updated_at', gmdate( 'c' ) );
-                        $order->save();
-
-                        // Mark delivered orders as completed.
-                        if ( in_array( strtolower( $status ), [ 'delivered', 'entregado', 'delivered_final' ], true ) ) {
-                            $order->update_status( 'completed', __( 'Entregado — actualizado automáticamente por tracking.', 'ltms' ) );
-                        }
-                    }
-                } catch ( \Throwable $e ) {
-                    LTMS_Core_Logger::warning(
-                        'TRACKING_UPDATE_FAILED',
-                        sprintf( 'Order #%d: %s', $order_id, $e->getMessage() )
-                    );
-                }
-            }
-        } );
+        // CR-2 FIX (Task 57-E): Removed duplicate `ltms_update_tracking` closure.
+        // Previously the kernel registered an anonymous closure for the
+        // `ltms_update_tracking` action while the Cron Manager ALSO registered
+        // `LTMS_Core_Cron_Manager::update_tracking` for the SAME hook. Both
+        // handlers fired on every cron tick → duplicated Heka/Aveonline API
+        // calls and duplicated order status updates. The Cron Manager handler
+        // (class-ltms-core-cron-manager.php:34, 370-436) is canonical and more
+        // complete (handles Uber Direct, Aveonline + Heka via WC_Order_Query).
+        // The kernel closure has been removed.
 
         // M-QA-RNT-01: Cron diario de vencimiento RNT/SECTUR.
         // check_rnt_expiry() existía pero nunca se programaba — los registros
@@ -711,6 +891,21 @@ final class LTMS_Core_Kernel {
         } );
         if ( ! wp_next_scheduled( 'ltms_check_rnt_expiry' ) ) {
             wp_schedule_event( strtotime( 'tomorrow midnight' ), 'daily', 'ltms_check_rnt_expiry' );
+        }
+
+        // v3.1.0 — Cross-Border motor (Task 63-D): daily FX rate refresh.
+        // The FX_Rate_Provider caches rates for 6h (transient). This daily
+        // cron forces a cache flush once a day so rates never get stale by
+        // more than 24h even on low-traffic stores (the cache would otherwise
+        // be refreshed organically by customer traffic). Stateless — if the
+        // cross-border motor is not loaded, the action is a no-op.
+        add_action( 'ltms_refresh_fx_rates', static function(): void {
+            if ( class_exists( 'LTMS_FX_Rate_Provider' ) ) {
+                LTMS_FX_Rate_Provider::refresh_rates();
+            }
+        } );
+        if ( ! wp_next_scheduled( 'ltms_refresh_fx_rates' ) ) {
+            wp_schedule_event( strtotime( 'tomorrow 02:00' ), 'daily', 'ltms_refresh_fx_rates' );
         }
     }
 

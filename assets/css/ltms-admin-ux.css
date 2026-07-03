@@ -1,0 +1,764 @@
+/**
+ * LT Marketplace Suite - Admin UX Enhancements
+ * ─────────────────────────────────────────────────────────────
+ * Capa overlay de mejoras de UX para el panel de administración
+ * de WordPress (backend). Aplica design tokens modernos sobre
+ * las vistas de admin de LTMS sin romper la funcionalidad existente.
+ *
+ * Carga solo en admin (is_admin()) después de ltms-admin.css.
+ *
+ * Versión: 2.0.0
+ * ─────────────────────────────────────────────────────────────
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   1. DESIGN TOKENS — Refinamiento de variables admin
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+    /* Paleta refinada (alineada con frontend) */
+    --ltms-primary:     #0F4C75;
+    --ltms-primary-600: #1a5276;
+    --ltms-primary-700: #0B3D5F;
+    --ltms-secondary:   #3282B8;
+    --ltms-accent:      #F39C12;
+
+    /* Estados semánticos */
+    --ltms-success:     #16A34A;
+    --ltms-success-bg:  #DCFCE7;
+    --ltms-warning:     #F59E0B;
+    --ltms-warning-bg:  #FEF3C7;
+    --ltms-danger:      #DC2626;
+    --ltms-danger-bg:   #FEE2E2;
+    --ltms-info:        #2563EB;
+    --ltms-info-bg:     #DBEAFE;
+
+    /* Neutros */
+    --ltms-gray-900: #111827;
+    --ltms-gray-800: #1F2937;
+    --ltms-gray-700: #374151;
+    --ltms-gray-600: #4B5563;
+    --ltms-gray-500: #6B7280;
+    --ltms-gray-400: #9CA3AF;
+    --ltms-gray-300: #D1D5DB;
+    --ltms-gray-200: #E5E7EB;
+    --ltms-gray-100: #F3F4F6;
+    --ltms-gray-50:  #F9FAFB;
+
+    /* Espaciado */
+    --ltms-space-1: 4px;
+    --ltms-space-2: 8px;
+    --ltms-space-3: 12px;
+    --ltms-space-4: 16px;
+    --ltms-space-5: 20px;
+    --ltms-space-6: 24px;
+
+    /* Radios */
+    --ltms-radius-sm: 6px;
+    --ltms-radius:    10px;
+    --ltms-radius-lg: 14px;
+
+    /* Sombras */
+    --ltms-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --ltms-shadow:    0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
+    --ltms-shadow-md: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+    --ltms-shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+
+    /* Transiciones */
+    --ltms-ease:        cubic-bezier(0.4, 0, 0.2, 1);
+    --ltms-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --ltms-transition:  0.18s var(--ltms-ease);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2. LAYOUT BASE — Contenedor admin modernizado
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-wrap {
+    margin: 20px 20px 20px 0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif !important;
+}
+
+.ltms-admin-wrap .ltms-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 0 20px !important;
+    border-bottom: 2px solid var(--ltms-primary) !important;
+    margin-bottom: 28px !important;
+    background: linear-gradient(180deg, transparent 0%, rgba(15,76,117,0.02) 100%);
+}
+
+.ltms-admin-wrap .ltms-header h1 {
+    font-size: 1.65rem !important;
+    font-weight: 800 !important;
+    color: var(--ltms-primary) !important;
+    margin: 0 !important;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--ltms-primary), var(--ltms-secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. STATS CARDS — KPIs modernizados
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-stats-grid {
+    gap: 16px !important;
+    margin-bottom: 28px !important;
+}
+
+.ltms-stat-card {
+    background: #fff !important;
+    border: 1px solid var(--ltms-gray-200) !important;
+    border-radius: var(--ltms-radius-lg) !important;
+    padding: 22px !important;
+    box-shadow: var(--ltms-shadow-sm) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    transition: all var(--ltms-transition) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.ltms-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ltms-primary), var(--ltms-secondary));
+    opacity: 0;
+    transition: opacity var(--ltms-transition);
+}
+
+.ltms-stat-card:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: var(--ltms-shadow-md) !important;
+    border-color: transparent !important;
+}
+
+.ltms-stat-card:hover::before {
+    opacity: 1;
+}
+
+.ltms-stat-card .ltms-stat-label {
+    font-size: 0.72rem !important;
+    color: var(--ltms-gray-500) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+}
+
+.ltms-stat-card .ltms-stat-value {
+    font-size: 1.8rem !important;
+    font-weight: 800 !important;
+    color: var(--ltms-gray-900) !important;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 !important;
+}
+
+.ltms-stat-card .ltms-stat-meta {
+    font-size: 0.78rem !important;
+    color: var(--ltms-gray-500) !important;
+    margin: 0 !important;
+}
+
+/* Stat card variants by color */
+.ltms-stat-card.ltms-stat-success::before { background: linear-gradient(90deg, var(--ltms-success), #0F9D58); }
+.ltms-stat-card.ltms-stat-warning::before { background: linear-gradient(90deg, var(--ltms-warning), var(--ltms-accent)); }
+.ltms-stat-card.ltms-stat-danger::before  { background: linear-gradient(90deg, var(--ltms-danger), #B91C1C); }
+.ltms-stat-card.ltms-stat-info::before    { background: linear-gradient(90deg, var(--ltms-info), var(--ltms-secondary)); }
+
+/* ═══════════════════════════════════════════════════════════════
+   4. CARDS — Contenedores generales
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-card,
+.ltms-admin-card {
+    background: #fff !important;
+    border: 1px solid var(--ltms-gray-200) !important;
+    border-radius: var(--ltms-radius-lg) !important;
+    box-shadow: var(--ltms-shadow-sm) !important;
+    overflow: hidden;
+    transition: all var(--ltms-transition);
+}
+
+.ltms-card:hover,
+.ltms-admin-card:hover {
+    box-shadow: var(--ltms-shadow) !important;
+}
+
+.ltms-card-header,
+.ltms-admin-card-header {
+    padding: 18px 22px !important;
+    border-bottom: 1px solid var(--ltms-gray-200) !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    color: var(--ltms-gray-900) !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--ltms-gray-50);
+    letter-spacing: -0.01em;
+}
+
+.ltms-card-body,
+.ltms-admin-card-body {
+    padding: 22px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. TABLAS — Estilo moderno consistente
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-table,
+.ltms-admin-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 0.875rem !important;
+}
+
+.ltms-table thead th,
+.ltms-admin-table thead th {
+    background: var(--ltms-gray-50) !important;
+    color: var(--ltms-gray-700) !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    font-weight: 700 !important;
+    padding: 12px 16px !important;
+    border-bottom: 2px solid var(--ltms-gray-200) !important;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.ltms-table tbody td,
+.ltms-admin-table tbody td {
+    padding: 14px 16px !important;
+    border-bottom: 1px solid var(--ltms-gray-100) !important;
+    color: var(--ltms-gray-700) !important;
+    vertical-align: middle !important;
+}
+
+.ltms-table tbody tr,
+.ltms-admin-table tbody tr {
+    transition: background var(--ltms-transition);
+}
+
+.ltms-table tbody tr:hover,
+.ltms-admin-table tbody tr:hover {
+    background: var(--ltms-gray-50) !important;
+}
+
+.ltms-table tbody tr:last-child td,
+.ltms-admin-table tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. BADGES & STATUS — Indicadores de estado modernos
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-badge,
+.ltms-status-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 3px 10px !important;
+    border-radius: 999px !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    line-height: 1.5 !important;
+}
+
+.ltms-badge::before,
+.ltms-status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.ltms-badge-success,
+.ltms-badge.ltms-badge-success,
+.ltms-status-badge.approved,
+.ltms-status-badge.completed,
+.ltms-status-badge.paid,
+.ltms-status-badge.active {
+    background: var(--ltms-success-bg) !important;
+    color: var(--ltms-success) !important;
+    border: 1px solid transparent !important;
+}
+
+.ltms-badge-warning,
+.ltms-badge.ltms-badge-warning,
+.ltms-status-badge.pending,
+.ltms-status-badge.processing {
+    background: var(--ltms-warning-bg) !important;
+    color: var(--ltms-warning) !important;
+    border: 1px solid transparent !important;
+}
+
+.ltms-badge-danger,
+.ltms-badge.ltms-badge-danger,
+.ltms-status-badge.rejected,
+.ltms-status-badge.cancelled,
+.ltms-status-badge.failed,
+.ltms-status-badge.suspended {
+    background: var(--ltms-danger-bg) !important;
+    color: var(--ltms-danger) !important;
+    border: 1px solid transparent !important;
+}
+
+.ltms-badge-info,
+.ltms-badge.ltms-badge-info {
+    background: var(--ltms-info-bg) !important;
+    color: var(--ltms-info) !important;
+    border: 1px solid transparent !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. BOTONES — Estilo moderno
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-wrap .button,
+.ltms-btn,
+.ltms-admin-btn {
+    border-radius: var(--ltms-radius-sm) !important;
+    font-weight: 600 !important;
+    transition: all var(--ltms-transition) !important;
+    cursor: pointer !important;
+    letter-spacing: -0.01em;
+}
+
+.ltms-admin-wrap .button-primary,
+.ltms-btn-primary,
+.ltms-admin-btn-primary {
+    background: linear-gradient(135deg, var(--ltms-primary), var(--ltms-secondary)) !important;
+    border-color: var(--ltms-primary) !important;
+    box-shadow: 0 2px 8px rgba(15,76,117,0.25) !important;
+    color: #fff !important;
+}
+
+.ltms-admin-wrap .button-primary:hover,
+.ltms-btn-primary:hover,
+.ltms-admin-btn-primary:hover {
+    box-shadow: 0 4px 14px rgba(15,76,117,0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+.ltms-admin-wrap .button-primary:active,
+.ltms-btn-primary:active,
+.ltms-admin-btn-primary:active {
+    transform: translateY(0) !important;
+}
+
+.ltms-btn-success,
+.ltms-admin-btn-success {
+    background: linear-gradient(135deg, var(--ltms-success), #0F9D58) !important;
+    border-color: var(--ltms-success) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(22,163,74,0.25) !important;
+}
+
+.ltms-btn-danger,
+.ltms-admin-btn-danger {
+    background: linear-gradient(135deg, var(--ltms-danger), #B91C1C) !important;
+    border-color: var(--ltms-danger) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(220,38,38,0.25) !important;
+}
+
+.ltms-btn-outline,
+.ltms-admin-btn-outline {
+    background: transparent !important;
+    border: 1.5px solid var(--ltms-gray-300) !important;
+    color: var(--ltms-gray-700) !important;
+}
+
+.ltms-btn-outline:hover,
+.ltms-admin-btn-outline:hover {
+    border-color: var(--ltms-primary) !important;
+    color: var(--ltms-primary) !important;
+    background: rgba(15,76,117,0.04) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. FORMULARIOS — Inputs y selects modernos
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-wrap input[type="text"],
+.ltms-admin-wrap input[type="email"],
+.ltms-admin-wrap input[type="number"],
+.ltms-admin-wrap input[type="password"],
+.ltms-admin-wrap input[type="tel"],
+.ltms-admin-wrap input[type="url"],
+.ltms-admin-wrap select,
+.ltms-admin-wrap textarea {
+    border-radius: var(--ltms-radius-sm) !important;
+    border: 1.5px solid var(--ltms-gray-300) !important;
+    transition: all var(--ltms-transition) !important;
+    font-size: 0.9rem !important;
+}
+
+.ltms-admin-wrap input:focus,
+.ltms-admin-wrap select:focus,
+.ltms-admin-wrap textarea:focus {
+    border-color: var(--ltms-primary) !important;
+    box-shadow: 0 0 0 3px rgba(15,76,117,0.1) !important;
+    outline: none !important;
+}
+
+.ltms-admin-wrap label {
+    font-weight: 600 !important;
+    color: var(--ltms-gray-700) !important;
+    font-size: 0.85rem !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   9. NAV TABS — Pestañas de navegación admin
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-nav-tabs,
+.ltms-admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--ltms-gray-200);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ltms-nav-tabs a,
+.ltms-admin-tabs a,
+.ltms-nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px !important;
+    text-decoration: none !important;
+    color: var(--ltms-gray-500) !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    margin-bottom: -2px !important;
+    background: transparent !important;
+    transition: all var(--ltms-transition) !important;
+    white-space: nowrap;
+}
+
+.ltms-nav-tabs a:hover,
+.ltms-admin-tabs a:hover,
+.ltms-nav-tab:hover {
+    color: var(--ltms-gray-700) !important;
+    background: var(--ltms-gray-50) !important;
+}
+
+.ltms-nav-tabs a.active,
+.ltms-admin-tabs a.active,
+.ltms-nav-tab.nav-tab-active {
+    color: var(--ltms-primary) !important;
+    border-bottom-color: var(--ltms-primary) !important;
+    background: transparent !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   10. ALERTAS & NOTICES — Mensajes del sistema
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-notice,
+.ltms-alert {
+    padding: 14px 18px !important;
+    border-radius: var(--ltms-radius-sm) !important;
+    margin-bottom: 16px !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    font-size: 0.875rem !important;
+    border-left: 4px solid !important;
+    animation: ltms-notice-in 0.3s var(--ltms-ease-out);
+}
+
+@keyframes ltms-notice-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.ltms-notice.ltms-notice-success,
+.ltms-alert.ltms-alert-success {
+    background: var(--ltms-success-bg) !important;
+    border-color: var(--ltms-success) !important;
+    color: #166534 !important;
+}
+
+.ltms-notice.ltms-notice-error,
+.ltms-alert.ltms-alert-error {
+    background: var(--ltms-danger-bg) !important;
+    border-color: var(--ltms-danger) !important;
+    color: #991B1B !important;
+}
+
+.ltms-notice.ltms-notice-warning,
+.ltms-alert.ltms-alert-warning {
+    background: var(--ltms-warning-bg) !important;
+    border-color: var(--ltms-warning) !important;
+    color: #92400E !important;
+}
+
+.ltms-notice.ltms-notice-info,
+.ltms-alert.ltms-alert-info {
+    background: var(--ltms-info-bg) !important;
+    border-color: var(--ltms-info) !important;
+    color: #1E40AF !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   11. EMPTY STATES — Estados vacíos modernos
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-empty-state,
+.ltms-admin-empty {
+    text-align: center;
+    padding: 60px 24px !important;
+    color: var(--ltms-gray-400);
+}
+
+.ltms-empty-state .ltms-empty-icon,
+.ltms-admin-empty .ltms-empty-icon {
+    font-size: 4rem !important;
+    margin-bottom: 16px !important;
+    opacity: 0.5;
+    animation: ltms-float 3s ease-in-out infinite;
+}
+
+@keyframes ltms-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}
+
+.ltms-empty-state h3,
+.ltms-admin-empty h3 {
+    font-size: 1.1rem !important;
+    color: var(--ltms-gray-700) !important;
+    margin: 0 0 8px !important;
+    font-weight: 600 !important;
+}
+
+.ltms-empty-state p,
+.ltms-admin-empty p {
+    font-size: 0.9rem !important;
+    color: var(--ltms-gray-500) !important;
+    max-width: 400px;
+    margin: 0 auto 20px !important;
+    line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   12. MODALES ADMIN — Estilo consistente con frontend
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-modal {
+    background: #fff;
+    border-radius: var(--ltms-radius-lg);
+    box-shadow: var(--ltms-shadow-lg);
+    overflow: hidden;
+    max-width: 600px;
+    width: 100%;
+}
+
+.ltms-admin-modal-header {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--ltms-gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--ltms-gray-50);
+}
+
+.ltms-admin-modal-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ltms-gray-900);
+}
+
+.ltms-admin-modal-body {
+    padding: 22px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.ltms-admin-modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--ltms-gray-200);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    background: var(--ltms-gray-50);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   13. UTILIDADES — Helpers reutilizables
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-flex { display: flex !important; }
+.ltms-flex-col { flex-direction: column !important; }
+.ltms-items-center { align-items: center !important; }
+.ltms-justify-between { justify-content: space-between !important; }
+.ltms-gap-2 { gap: 8px !important; }
+.ltms-gap-3 { gap: 12px !important; }
+.ltms-gap-4 { gap: 16px !important; }
+
+.ltms-text-sm { font-size: 0.8rem !important; }
+.ltms-text-xs { font-size: 0.72rem !important; }
+.ltms-text-muted { color: var(--ltms-gray-500) !important; }
+.ltms-text-bold { font-weight: 700 !important; }
+
+.ltms-mt-2 { margin-top: 8px !important; }
+.ltms-mt-3 { margin-top: 12px !important; }
+.ltms-mt-4 { margin-top: 16px !important; }
+.ltms-mb-2 { margin-bottom: 8px !important; }
+.ltms-mb-3 { margin-bottom: 12px !important; }
+.ltms-mb-4 { margin-bottom: 16px !important; }
+
+.ltms-hidden { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   14. RESPONSIVE — Adaptaciones móviles admin
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 782px) {
+    .ltms-admin-wrap {
+        margin: 12px 8px 12px 0 !important;
+    }
+
+    .ltms-admin-wrap .ltms-header {
+        padding: 16px 0 !important;
+    }
+
+    .ltms-admin-wrap .ltms-header h1 {
+        font-size: 1.3rem !important;
+    }
+
+    .ltms-stats-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+    }
+
+    .ltms-stat-card {
+        padding: 16px !important;
+    }
+
+    .ltms-stat-card .ltms-stat-value {
+        font-size: 1.4rem !important;
+    }
+
+    .ltms-table thead th,
+    .ltms-admin-table thead th {
+        padding: 10px 12px !important;
+        font-size: 0.7rem !important;
+    }
+
+    .ltms-table tbody td,
+    .ltms-admin-table tbody td {
+        padding: 10px 12px !important;
+        font-size: 0.8rem !important;
+    }
+
+    .ltms-nav-tabs a,
+    .ltms-admin-tabs a {
+        padding: 10px 14px !important;
+        font-size: 0.8rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .ltms-stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   15. SCROLLBAR — Estilización moderna
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-wrap ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ltms-admin-wrap ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ltms-admin-wrap ::-webkit-scrollbar-thumb {
+    background: var(--ltms-gray-300);
+    border-radius: 999px;
+}
+
+.ltms-admin-wrap ::-webkit-scrollbar-thumb:hover {
+    background: var(--ltms-gray-400);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   16. LOADING — Skeletons y spinners
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-skeleton {
+    background: linear-gradient(90deg,
+        var(--ltms-gray-100) 25%,
+        var(--ltms-gray-200) 50%,
+        var(--ltms-gray-100) 75%) !important;
+    background-size: 200% 100% !important;
+    animation: ltms-skeleton 1.4s ease-in-out infinite !important;
+    border-radius: var(--ltms-radius-sm) !important;
+}
+
+@keyframes ltms-skeleton {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.ltms-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(15,76,117,0.2);
+    border-top-color: var(--ltms-primary);
+    border-radius: 50%;
+    animation: ltms-spin 0.7s linear infinite;
+}
+
+@keyframes ltms-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   17. ACCESIBILIDAD — Focus states
+   ═══════════════════════════════════════════════════════════════ */
+
+.ltms-admin-wrap :focus-visible {
+    outline: 2px solid var(--ltms-secondary);
+    outline-offset: 2px;
+    border-radius: var(--ltms-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ltms-admin-wrap *,
+    .ltms-admin-wrap *::before,
+    .ltms-admin-wrap *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

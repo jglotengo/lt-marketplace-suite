@@ -64,6 +64,8 @@ final class LTMS_Frontend_Booking_Handler {
     // ── AJAX: lista de reservas ───────────────────────────────────────────
 
     public function ajax_get_vendor_bookings(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! $this->is_ltms_vendor() ) {
@@ -191,6 +193,8 @@ final class LTMS_Frontend_Booking_Handler {
     // ── AJAX: cancelar reserva propia ─────────────────────────────────────
 
     public function ajax_vendor_cancel_booking(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! $this->is_ltms_vendor() ) {

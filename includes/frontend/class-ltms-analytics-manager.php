@@ -77,8 +77,24 @@ class LTMS_Analytics_Manager {
         try {
             $pixel_id = LTMS_Core_Config::get( 'ltms_meta_pixel_id', '' );
             if ( ! $pixel_id ) return;
+
+            // M3 FIX (v2.9.6): Consent gating — NO disparar Pixel sin consentimiento.
+            $consent = $_COOKIE['ltms_cookie_consent'] ?? '';
+            if ( $consent !== 'full' ) return;
+
+            // M2 FIX: Advanced Matching — hash email del usuario logueado.
+            $advanced_matching = '';
+            $user_id = get_current_user_id();
+            if ( $user_id > 0 ) {
+                $user = get_userdata( $user_id );
+                if ( $user && $user->user_email ) {
+                    $email_hash = hash( 'sha256', strtolower( trim( $user->user_email ) ) );
+                    $advanced_matching = ",{em:'{$email_hash}'}";
+                }
+            }
+
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            echo "<!-- Meta Pixel -->\n<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','" . esc_js( $pixel_id ) . "');fbq('track','PageView');</script>\n<!-- End Meta Pixel -->\n";
+            echo "<!-- Meta Pixel (consent-gated v2.9.6) -->\n<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('consent','grant');fbq('init','" . esc_js( $pixel_id ) . "'" . esc_js( $advanced_matching ) . ");fbq('track','PageView');</script>\n<!-- End Meta Pixel -->\n";
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Analytics: Meta Pixel failed — ' . $e->getMessage() );
         }

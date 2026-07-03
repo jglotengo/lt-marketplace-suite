@@ -22,8 +22,12 @@ final class LTMS_DB_Migrations {
 
     /**
      * Versión actual del esquema de BD.
+     *
+     * Bumped 2.8.1 → 2.8.2 (AUDIT-REDI-UX-GAPS GAP-9) para forzar la
+     * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
+     * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.6.0';
+    private const CURRENT_VERSION = '2.9.13';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -67,6 +71,38 @@ final class LTMS_DB_Migrations {
             self::migrate_2_6_0();
         }
 
+        if ( version_compare( $installed_version, '2.7.0', '<' ) ) {
+            self::migrate_2_7_0_donations();
+        }
+
+        if ( version_compare( $installed_version, '2.7.1', '<' ) ) {
+            self::migrate_2_7_1_fintech_fixes();
+        }
+
+        if ( version_compare( $installed_version, '2.8.0', '<' ) ) {
+            self::migrate_2_8_0_cross_border();
+        }
+
+        if ( version_compare( $installed_version, '2.8.1', '<' ) ) {
+            self::migrate_2_8_1_wallet_multicurrency();
+        }
+
+        if ( version_compare( $installed_version, '2.8.3', '<' ) ) {
+            self::migrate_2_8_3_shipping_cost_ledger();
+        }
+
+        if ( version_compare( $installed_version, '2.9.1', '<' ) ) {
+            self::migrate_2_9_1_forensic_retention_tables();
+        }
+
+        if ( version_compare( $installed_version, '2.9.8', '<' ) ) {
+            self::migrate_2_9_8_fiscal_30b_columns();
+        }
+
+        if ( version_compare( $installed_version, '2.9.13', '<' ) ) {
+            self::migrate_2_9_13_consent_log_schema_fix();
+        }
+
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
@@ -92,9 +128,12 @@ final class LTMS_DB_Migrations {
         $sqls = [];
 
         // lt_vendor_wallets
+        // NOTE: vendor_id is BIGINT (signed) to allow the foundation wallet sentinel
+        // value of -1 (LTMS_Donation_Manager::FOUNDATION_VENDOR_ID). BIGINT UNSIGNED
+        // would reject INSERTs with vendor_id=-1 on strict MySQL (INT-BUG-1 / Task 62-C).
         $sqls[] = "CREATE TABLE `{$p}lt_vendor_wallets` (
             `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `vendor_id`         BIGINT UNSIGNED NOT NULL,
+            `vendor_id`         BIGINT NOT NULL,
             `balance`           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `balance_pending`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             `balance_reserved`  DECIMAL(15,2) NOT NULL DEFAULT 0.00,
@@ -108,14 +147,17 @@ final class LTMS_DB_Migrations {
             `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             `checksum`          CHAR(64) DEFAULT NULL,
             PRIMARY KEY (`id`),
-            UNIQUE KEY `udx_vendor_id` (`vendor_id`)
+            UNIQUE KEY `udx_vendor_currency` (`vendor_id`, `currency`)
         ) {$charset}";
 
         // lt_wallet_transactions
+        // NOTE: vendor_id is BIGINT (signed) — credit/debit operations on the
+        // foundation wallet insert vendor_id=-1 here; UNSIGNED would reject them.
+        // INT-BUG-1 / Task 62-C.
         $sqls[] = "CREATE TABLE `{$p}lt_wallet_transactions` (
             `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `wallet_id`       BIGINT UNSIGNED NOT NULL,
-            `vendor_id`       BIGINT UNSIGNED NOT NULL,
+            `vendor_id`       BIGINT NOT NULL,
             `order_id`        BIGINT UNSIGNED DEFAULT NULL,
             `type`            ENUM('credit','debit','hold','release','reversal','adjustment','payout','fee','tax_withholding') NOT NULL,
             `amount`          DECIMAL(15,2) NOT NULL,
@@ -563,6 +605,48 @@ final class LTMS_DB_Migrations {
             KEY `idx_status` (`status`)
         ) {$charset}";
 
+        // AUDIT-REDI-UX-GAPS GAP-9 FIX: lt_redi_incidents — cabecera de incidencias ReDi.
+        // Una incidencia es una "novedad" reportada por el vendedor origen o el
+        // revendedor sobre un pedido que contiene productos ReDi. Tiene SLA de
+        // primera respuesta (48h) y resolución (15d), controlados por cron hourly.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_redi_incidents` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`            BIGINT UNSIGNED NOT NULL,
+            `origin_vendor_id`    BIGINT UNSIGNED NOT NULL,
+            `reseller_vendor_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `customer_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `type`                ENUM('stockout','complaint','quality','shipping','payment','other') NOT NULL DEFAULT 'other',
+            `description`         TEXT NOT NULL,
+            `status`              ENUM('open','investigating','escalated','resolved','closed') NOT NULL DEFAULT 'open',
+            `sla_due_at`          DATETIME NOT NULL,
+            `resolution_due_at`   DATETIME NOT NULL,
+            `resolution_notes`    TEXT DEFAULT NULL,
+            `created_by`          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `resolved_at`         DATETIME DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_incident_order_id` (`order_id`),
+            KEY `idx_incident_origin_vendor_id` (`origin_vendor_id`),
+            KEY `idx_incident_reseller_vendor_id` (`reseller_vendor_id`),
+            KEY `idx_incident_status` (`status`),
+            KEY `idx_incident_sla_due_at` (`sla_due_at`),
+            KEY `idx_incident_resolution_due_at` (`resolution_due_at`)
+        ) {$charset}";
+
+        // AUDIT-REDI-UX-GAPS GAP-9 FIX: lt_redi_incident_comments — hilo de
+        // comentarios de cada incidencia (autor + texto + timestamp).
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_redi_incident_comments` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `incident_id` BIGINT UNSIGNED NOT NULL,
+            `user_id`     BIGINT UNSIGNED NOT NULL,
+            `comment`     TEXT NOT NULL,
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_incident_comment_incident_id` (`incident_id`),
+            KEY `idx_incident_comment_user_id` (`user_id`)
+        ) {$charset}";
+
         // ── v1.7.0 Tables ────────────────────────────────────────────
 
         // lt_provider_health — Circuit breaker & uptime monitoring
@@ -723,6 +807,9 @@ final class LTMS_DB_Migrations {
             `notes`                TEXT          DEFAULT NULL,
             `vendor_notes`         TEXT          DEFAULT NULL,
             `ip_address`           VARCHAR(45)   DEFAULT NULL,
+            `check_in_at`          DATETIME      DEFAULT NULL COMMENT 'AUDIT-BOOKING-ENGINE #11: timestamp de check-in',
+            `check_out_at`         DATETIME      DEFAULT NULL COMMENT 'AUDIT-BOOKING-ENGINE #11: timestamp de check-out',
+            `completed_at`         DATETIME      DEFAULT NULL COMMENT 'AUDIT-BOOKING-ENGINE #11: timestamp de completado',
             `created_at`           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -894,6 +981,146 @@ final class LTMS_DB_Migrations {
             KEY `idx_order_id`   (`order_id`)
         ) {$charset}";
 
+        // ── v2.7.0 Tables — Donaciones Fundación Cardio Infantil ────────────────
+        // lt_donations — Registro por orden de la donación calculada automáticamente.
+        // El motor de donaciones (class-ltms-donation-engine.php) inserta una fila
+        // por cada orden completada cuando ltms_donation_enabled='yes'. El monto
+        // se calcula sobre la base seleccionada (platform_fee | order_total |
+        // vendor_net | platform_profit) y se redondea según ltms_donation_rounding.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_donations` (
+            `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`              BIGINT UNSIGNED NOT NULL,
+            `vendor_id`             BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `customer_id`           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `basis_amount`          DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto base usado para el cálculo (ej: comisión de la plataforma)',
+            `basis_type`            VARCHAR(32)  NOT NULL DEFAULT 'platform_fee' COMMENT 'platform_fee | order_total | vendor_net | platform_profit',
+            `donation_percentage`   DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT 'Porcentaje aplicado (0-100)',
+            `donation_amount`       DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Donación calculada = basis_amount * percentage / 100',
+            `currency`              VARCHAR(3)   NOT NULL DEFAULT 'COP',
+            `customer_extra_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Donación extra del cliente (opt-in checkout)',
+            `total_donation`        DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'donation_amount + customer_extra_amount',
+            `status`                VARCHAR(32)  NOT NULL DEFAULT 'pending' COMMENT 'pending | credited | failed | processing | paid | reversed',
+            `payout_batch_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'FK a lt_donation_payouts.id (0 = aún no asignada)',
+            `alegra_entry_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ID del asiento contable en Alegra (0 = no sincronizado)',
+            `certificate_id`        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT 'ID del certificado de donación generado',
+            `created_at`            DATETIME     NOT NULL,
+            `paid_at`               DATETIME     DEFAULT NULL,
+            `metadata`              TEXT         DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_order` (`order_id`),
+            KEY `idx_order`         (`order_id`),
+            KEY `idx_vendor`        (`vendor_id`),
+            KEY `idx_status`        (`status`),
+            KEY `idx_payout_batch`  (`payout_batch_id`),
+            KEY `idx_created_at`    (`created_at`)
+        ) {$charset}";
+
+        // lt_donation_payouts — Lotes de transferencia a la fundación.
+        // El cron de pagos agrupa donaciones por período (weekly/monthly/quarterly)
+        // y crea un batch con la suma total. El admin marca el batch como
+        // 'transferred' al confirmar la transferencia bancaria.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_donation_payouts` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `batch_number`        VARCHAR(32)  NOT NULL COMMENT 'Identificador legible (ej: DON-2026-001)',
+            `period_start`        DATE         NOT NULL,
+            `period_end`          DATE         NOT NULL,
+            `total_amount`        DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma de total_donation de todas las donaciones del lote',
+            `currency`            VARCHAR(3)   NOT NULL DEFAULT 'COP',
+            `transaction_count`   INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Número de donaciones incluidas',
+            `status`              VARCHAR(32)  NOT NULL DEFAULT 'pending' COMMENT 'pending | transferred | failed | cancelled',
+            `transfer_reference`  VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'Referencia bancaria de la transferencia',
+            `transfer_method`     VARCHAR(32)  NOT NULL DEFAULT '' COMMENT 'bank_transfer | pse | nequi | daviplata',
+            `alegra_entry_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `certificate_path`    VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'Ruta al PDF del certificado mensual',
+            `created_by`          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `created_at`          DATETIME     NOT NULL,
+            `transferred_at`      DATETIME     DEFAULT NULL,
+            `metadata`            TEXT         DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_batch` (`batch_number`),
+            KEY `idx_status`       (`status`),
+            KEY `idx_period`       (`period_start`, `period_end`)
+        ) {$charset}";
+
+        // ── v2.8.0 Tables — Cross-Border Commerce ─────────────────────────────
+        // lt_fx_rates — Tasas de cambio cacheadas + overrides manuales.
+        // El provider (LTMS_FX_Rate_Provider) usa transients para caché en memoria,
+        // pero esta tabla es el source-of-truth persistente: almacena la última tasa
+        // conocida por par, el provider que la devolvió, si es override manual y
+        // el timestamp de fetch. El admin panel (html-admin-cross-border.php) la
+        // consulta directamente para mostrar la matriz de tasas en el dashboard.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_fx_rates` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `base_currency`  VARCHAR(3) NOT NULL,
+            `quote_currency` VARCHAR(3) NOT NULL,
+            `rate`           DECIMAL(12,6) NOT NULL,
+            `provider`       VARCHAR(32) NOT NULL DEFAULT 'frankfurter',
+            `is_manual`      TINYINT(1) NOT NULL DEFAULT 0,
+            `fetched_at`     DATETIME NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_pair` (`base_currency`, `quote_currency`),
+            KEY `idx_fetched` (`fetched_at`)
+        ) {$charset}";
+
+        // lt_customs_declarations — Declaraciones aduaneras por orden.
+        // Una fila por cada orden cross-border con origen ≠ destino. Guarda el
+        // desglose completo de costos aduaneros (arancel, IVA, honorarios broker,
+        // otros impuestos), el incoterm aplicado, quién paga (buyer|marketplace),
+        // la moneda original, el número de declaración (si existe) y el estado
+        // del despacho (pending|in_transit|cleared|rejected|reversed).
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_customs_declarations` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`            BIGINT UNSIGNED NOT NULL,
+            `origin_country`      VARCHAR(2) NOT NULL,
+            `destination_country` VARCHAR(2) NOT NULL,
+            `hs_code`             VARCHAR(16) NOT NULL DEFAULT '',
+            `cif_value`           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `duty_rate`           DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            `duty_amount`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `vat_rate`            DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            `vat_amount`          DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `customs_fee`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `other_taxes`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `total_duties`        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `incoterm`            VARCHAR(8) NOT NULL DEFAULT 'DDU',
+            `paid_by`             VARCHAR(16) NOT NULL DEFAULT 'buyer',
+            `currency`            VARCHAR(3) NOT NULL DEFAULT 'USD',
+            `declaration_number`  VARCHAR(64) NOT NULL DEFAULT '',
+            `declaration_status`  VARCHAR(32) NOT NULL DEFAULT 'pending',
+            `created_at`          DATETIME NOT NULL,
+            `cleared_at`          DATETIME DEFAULT NULL,
+            `metadata`            TEXT,
+            PRIMARY KEY (`id`),
+            KEY `idx_order` (`order_id`),
+            KEY `idx_route` (`origin_country`, `destination_country`),
+            KEY `idx_status` (`declaration_status`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}";
+
+        // lt_logs — Tabla de trazabilidad forense ligera.
+        // M-1 FIX: esta tabla se creaba únicamente vía deploy/ltms-patch-db-v2-7-0.php
+        // (un parche one-shot que los sites nuevos o restaurados nunca corrían),
+        // por lo que instalaciones frescas y migraciones posteriores no la creaban.
+        // Al no estar en migrations.php, cualquier código que escriba en lt_logs
+        // (cron retention, commission-writer, kyc backfill, etc.) fallaba en
+        // silencio. La agregamos aquí como CREATE TABLE IF NOT EXISTS idempotente:
+        // dbDelta compara el esquema existente y solo AÑADE columnas/keys que falten
+        // (nunca elimina columnas existentes), por lo que los sites que ya tienen
+        // la versión con `event_type`/`object_id`/`object_type`/`user_id` del
+        // patch v2-7-0 conservan esas columnas y reciben las nuevas (`level`,
+        // `source`, `context`) sin pérdida de datos.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_logs` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `level`      VARCHAR(20)  NOT NULL DEFAULT 'INFO',
+            `source`     VARCHAR(100) NOT NULL DEFAULT '',
+            `message`    TEXT,
+            `context`    LONGTEXT,
+            `created_at` DATETIME     NOT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_level` (`level`),
+            KEY `idx_created` (`created_at`)
+        ) {$charset}";
+
         foreach ( $sqls as $sql ) {
             dbDelta( $sql );
         }
@@ -984,7 +1211,7 @@ final class LTMS_DB_Migrations {
                 $table,
                 [
                     'product_id'     => $seed[0],
-                    'name'           => $seed[1],
+                    'season_name'    => $seed[1],
                     'season_type'    => $seed[2],
                     'country_code'   => $seed[3],
                     'date_from'      => $seed[4],
@@ -2001,6 +2228,21 @@ final class LTMS_DB_Migrations {
                 LTMS_Core_Logger::info( 'MIGRATION', '2.5.0: vendor_net agregado a lt_bookings.' );
             }
         }
+
+        // AUDIT-BOOKING-ENGINE #11 FIX: agregar columnas de lifecycle (check_in_at, check_out_at, completed_at).
+        $lifecycle_cols = [ 'check_in_at', 'check_out_at', 'completed_at' ];
+        foreach ( $lifecycle_cols as $lcol ) {
+            $exists = $wpdb->get_results( $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+                DB_NAME, $p . 'lt_bookings', $lcol
+            ) );
+            if ( empty( $exists ) ) {
+                $wpdb->query( "ALTER TABLE `{$p}lt_bookings` ADD COLUMN `{$lcol}` DATETIME DEFAULT NULL COMMENT 'AUDIT-BOOKING-ENGINE #11: lifecycle timestamp'" );
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::info( 'MIGRATION', "AUDIT-BOOKING-ENGINE #11: {$lcol} agregado a lt_bookings." );
+                }
+            }
+        }
     }
 
     /**
@@ -2069,6 +2311,840 @@ final class LTMS_DB_Migrations {
             LTMS_Core_Logger::info( 'DB_MIGRATE', 'lt_deposits recreada con esquema de depósitos manuales (2.6.0)' );
         } else {
             LTMS_Core_Logger::info( 'DB_MIGRATE', 'lt_deposits ya tiene columna method — skip 2.6.0' );
+        }
+    }
+
+    /**
+     * Migración 2.7.0 — Donaciones Fundación Cardio Infantil.
+     *
+     * Crea las tablas lt_donations y lt_donation_payouts usadas por el motor
+     * de donaciones automático (class-ltms-donation-engine.php) y el generador
+     * de certificados PDF mensuales.
+     *
+     * Aunque las tablas también se crean en create_tables() vía dbDelta (que es
+     * idempotente), este método actúa como red de seguridad explícita versionada:
+     * si dbDelta falla silenciosamente por algún motivo, el CREATE TABLE IF NOT
+     * EXISTS directo asegura que las tablas existan antes de que el motor intente
+     * insertar donaciones. El flag de versión ltms_db_version garantiza que solo
+     * se ejecuta una vez por instalación.
+     *
+     * @return void
+     */
+    private static function migrate_2_7_0_donations(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // Table names are derived from $wpdb->prefix (trusted, server-set value).
+
+        // lt_donations — Registro por orden de la donación calculada.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_donations` (
+            `id`                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`              BIGINT UNSIGNED NOT NULL,
+            `vendor_id`             BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `customer_id`           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `basis_amount`          DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `basis_type`            VARCHAR(32)  NOT NULL DEFAULT 'platform_fee',
+            `donation_percentage`   DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            `donation_amount`       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `currency`              VARCHAR(3)   NOT NULL DEFAULT 'COP',
+            `customer_extra_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `total_donation`        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `status`                VARCHAR(32)  NOT NULL DEFAULT 'pending',
+            `payout_batch_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `alegra_entry_id`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `certificate_id`        VARCHAR(64)  NOT NULL DEFAULT '',
+            `created_at`            DATETIME     NOT NULL,
+            `paid_at`               DATETIME     DEFAULT NULL,
+            `metadata`              TEXT,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_order` (`order_id`),
+            KEY `idx_order`         (`order_id`),
+            KEY `idx_vendor`        (`vendor_id`),
+            KEY `idx_status`        (`status`),
+            KEY `idx_payout_batch`  (`payout_batch_id`),
+            KEY `idx_created_at`    (`created_at`)
+        ) {$charset}" );
+
+        // lt_donation_payouts — Lotes de transferencia a la fundación.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_donation_payouts` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `batch_number`        VARCHAR(32)  NOT NULL,
+            `period_start`        DATE         NOT NULL,
+            `period_end`          DATE         NOT NULL,
+            `total_amount`        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `currency`            VARCHAR(3)   NOT NULL DEFAULT 'COP',
+            `transaction_count`   INT UNSIGNED NOT NULL DEFAULT 0,
+            `status`              VARCHAR(32)  NOT NULL DEFAULT 'pending',
+            `transfer_reference`  VARCHAR(128) NOT NULL DEFAULT '',
+            `transfer_method`     VARCHAR(32)  NOT NULL DEFAULT '',
+            `alegra_entry_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `certificate_path`    VARCHAR(255) NOT NULL DEFAULT '',
+            `created_by`          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `created_at`          DATETIME     NOT NULL,
+            `transferred_at`      DATETIME     DEFAULT NULL,
+            `metadata`            TEXT,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_batch` (`batch_number`),
+            KEY `idx_status`       (`status`),
+            KEY `idx_period`       (`period_start`, `period_end`)
+        ) {$charset}" );
+        // phpcs:enable
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.7.0: lt_donations + lt_donation_payouts OK (Donaciones Fundación Cardio Infantil).'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.7.1 — Fintech Integration Fixes (Task 62-C).
+     *
+     * Aplica correcciones a esquemas existentes que dbDelta no puede aplicar
+     * automáticamente (cambios de tipo de columna y claves únicas).
+     *
+     * 1. INT-BUG-1 (CRITICAL): `lt_vendor_wallets.vendor_id`,
+     *    `lt_wallet_transactions.vendor_id` y `lt_wallet_journal.vendor_id`
+     *    pasan de BIGINT UNSIGNED a BIGINT (signed) para permitir el sentinel
+     *    vendor_id=-1 usado por la wallet de la fundación. Sin este cambio,
+     *    `LTMS_Business_Wallet::get_or_create(-1, ...)` falla en MySQL strict
+     *    mode y TODAS las donaciones se marcan 'failed'.
+     *
+     * 2. INT-BUG-5 (HIGH): Agrega UNIQUE KEY `uniq_order` a `lt_donations.order_id`
+     *    para prevenir donaciones duplicadas por race condition (WC webhook
+     *    double-fire). El handler `on_order_paid` usa SELECT-then-INSERT — el
+     *    UNIQUE KEY hace que el segundo INSERT falle y el handler puede tratar
+     *    el duplicado como idempotente (re-SELECT).
+     *
+     * Idempotente: cada paso verifica el estado actual antes de ejecutar el ALTER.
+     *
+     * @return void
+     */
+    private static function migrate_2_7_1_fintech_fixes(): void {
+        global $wpdb;
+        $p = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // Table names are derived from $wpdb->prefix (trusted, server-set value).
+
+        $tables_to_fix = [
+            $p . 'lt_vendor_wallets',
+            $p . 'lt_wallet_transactions',
+            $p . 'lt_wallet_journal', // created lazily by LTMS_Business_Wallet::ensure_journal_table()
+        ];
+
+        foreach ( $tables_to_fix as $table ) {
+            // Verify the table exists before attempting the ALTER.
+            $exists = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM information_schema.TABLES
+                      WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                    DB_NAME,
+                    $table
+                )
+            );
+            if ( $exists < 1 ) {
+                continue; // Table not created yet (e.g., wallet_journal is lazy).
+            }
+
+            // INT-BUG-1: change vendor_id from BIGINT UNSIGNED to BIGINT (signed).
+            $col = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT COLUMN_TYPE
+                       FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = %s
+                        AND TABLE_NAME   = %s
+                        AND COLUMN_NAME  = 'vendor_id'",
+                    DB_NAME,
+                    $table
+                ),
+                ARRAY_A
+            );
+
+            // Only MODIFY if the column is currently UNSIGNED. Idempotent guard.
+            if ( $col && stripos( $col['COLUMN_TYPE'], 'unsigned' ) !== false ) {
+                $wpdb->query( "ALTER TABLE `{$table}` MODIFY COLUMN `vendor_id` BIGINT NOT NULL" );
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::info(
+                        'DB_MIGRATION',
+                        sprintf( 'v2.7.1: %s.vendor_id BIGINT UNSIGNED → BIGINT (INT-BUG-1 fix)', $table )
+                    );
+                }
+            }
+        }
+
+        // INT-BUG-5: add UNIQUE KEY `uniq_order` on `lt_donations.order_id`.
+        $donations_table = $p . 'lt_donations';
+        $donations_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME,
+                $donations_table
+            )
+        );
+        if ( $donations_exists > 0 ) {
+            // Check if the unique index already exists.
+            $idx_exists = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM information_schema.STATISTICS
+                      WHERE TABLE_SCHEMA = %s
+                        AND TABLE_NAME   = %s
+                        AND INDEX_NAME   = 'uniq_order'",
+                    DB_NAME,
+                    $donations_table
+                )
+            );
+
+            if ( $idx_exists < 1 ) {
+                // Check for duplicate order_id values first — if duplicates exist,
+                // the ADD UNIQUE KEY would fail and abort the migration. Log a
+                // CRITICAL warning so the admin can manually resolve duplicates,
+                // and skip the index creation rather than failing the whole migration.
+                $dup_count = (int) $wpdb->get_var(
+                    "SELECT COUNT(*) FROM (
+                        SELECT order_id
+                          FROM `{$donations_table}`
+                         GROUP BY order_id
+                         HAVING COUNT(*) > 1
+                     ) AS dup"
+                );
+
+                if ( $dup_count > 0 ) {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::critical(
+                            'DB_MIGRATION',
+                            sprintf(
+                                'v2.7.1: lt_donations tiene %d order_id duplicados — no se puede agregar UNIQUE KEY uniq_order. Resuelve los duplicados manualmente y re-ejecuta la migración.',
+                                $dup_count
+                            )
+                        );
+                    }
+                } else {
+                    $wpdb->query( "ALTER TABLE `{$donations_table}` ADD UNIQUE KEY `uniq_order` (`order_id`)" );
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::info(
+                            'DB_MIGRATION',
+                            'v2.7.1: lt_donations UNIQUE KEY uniq_order (order_id) agregado (INT-BUG-5 fix)'
+                        );
+                    }
+                }
+            }
+        }
+        // phpcs:enable
+    }
+
+    /**
+     * Migración v2.8.0 — Cross-Border Commerce (Task 63-C).
+     *
+     * Crea las tablas lt_fx_rates y lt_customs_declarations usadas por el
+     * panel de administración cross-border (LTMS_Admin_Cross_Border) y por
+     * el motor de cálculo de aranceles.
+     *
+     * Aunque las tablas también se crean en create_tables() vía dbDelta
+     * (que es idempotente), este método actúa como red de seguridad
+     * explícita versionada: si dbDelta falla silenciosamente, el CREATE
+     * TABLE IF NOT EXISTS directo asegura que las tablas existan antes
+     * de que el admin panel intente consultarlas. El flag de versión
+     * ltms_db_version garantiza que solo se ejecuta una vez por instalación.
+     *
+     * @return void
+     */
+    private static function migrate_2_8_0_cross_border(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // Table names are derived from $wpdb->prefix (trusted, server-set value).
+
+        // lt_fx_rates — Tasas de cambio cacheadas + overrides manuales.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_fx_rates` (
+            `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `base_currency`  VARCHAR(3) NOT NULL,
+            `quote_currency` VARCHAR(3) NOT NULL,
+            `rate`           DECIMAL(12,6) NOT NULL,
+            `provider`       VARCHAR(32) NOT NULL DEFAULT 'frankfurter',
+            `is_manual`      TINYINT(1) NOT NULL DEFAULT 0,
+            `fetched_at`     DATETIME NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_pair` (`base_currency`, `quote_currency`),
+            KEY `idx_fetched` (`fetched_at`)
+        ) {$charset}" );
+
+        // lt_customs_declarations — Declaraciones aduaneras por orden.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_customs_declarations` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`            BIGINT UNSIGNED NOT NULL,
+            `origin_country`      VARCHAR(2) NOT NULL,
+            `destination_country` VARCHAR(2) NOT NULL,
+            `hs_code`             VARCHAR(16) NOT NULL DEFAULT '',
+            `cif_value`           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `duty_rate`           DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            `duty_amount`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `vat_rate`            DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            `vat_amount`          DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `customs_fee`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `other_taxes`         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `total_duties`        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            `incoterm`            VARCHAR(8) NOT NULL DEFAULT 'DDU',
+            `paid_by`             VARCHAR(16) NOT NULL DEFAULT 'buyer',
+            `currency`            VARCHAR(3) NOT NULL DEFAULT 'USD',
+            `declaration_number`  VARCHAR(64) NOT NULL DEFAULT '',
+            `declaration_status`  VARCHAR(32) NOT NULL DEFAULT 'pending',
+            `created_at`          DATETIME NOT NULL,
+            `cleared_at`          DATETIME DEFAULT NULL,
+            `metadata`            TEXT,
+            PRIMARY KEY (`id`),
+            KEY `idx_order` (`order_id`),
+            KEY `idx_route` (`origin_country`, `destination_country`),
+            KEY `idx_status` (`declaration_status`),
+            KEY `idx_created_at` (`created_at`)
+        ) {$charset}" );
+        // phpcs:enable
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.8.0: lt_fx_rates + lt_customs_declarations OK (Cross-Border Commerce).'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.8.1 — Wallet Multi-Currency Fix (Task 65-C, WL-BUG-1).
+     *
+     * Cambia el UNIQUE KEY de `lt_vendor_wallets` de `vendor_id` solo a
+     * un composite `(vendor_id, currency)`. Sin este cambio, el feature
+     * cross-border multi-currency está completamente roto: un vendor solo
+     * puede tener UNA wallet (la primera currency), y cualquier intento
+     * de crear una wallet secundaria (USD cuando ya tiene COP, o viceversa)
+     * falla con `errno 1062 duplicate key`. Esto bloquea get_wallets(),
+     * get_balance_for_currency(), convert_balance() y credit_within_transaction().
+     *
+     * Idempotente: verifica si el composite index ya existe antes de hacer
+     * el ALTER. Verifica también si hay duplicados (vendor_id con varias
+     * filas) — si los hay, el ADD UNIQUE KEY fallaría y abortaría la
+     * migración. En ese caso se loguea CRITICAL para que el admin resuelva
+     * manualmente y se omite el ALTER (los demás pasos de la migración
+     * continúan).
+     *
+     * @return void
+     */
+    private static function migrate_2_8_1_wallet_multicurrency(): void {
+        global $wpdb;
+        $p = $wpdb->prefix;
+        $table = $p . 'lt_vendor_wallets';
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // Table names are derived from $wpdb->prefix (trusted, server-set value).
+
+        // Verifica que la tabla exista.
+        $exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
+                DB_NAME,
+                $table
+            )
+        );
+        if ( $exists < 1 ) {
+            return; // La tabla se creará vía create_tables() con el schema ya corregido.
+        }
+
+        // Verifica si el composite index ya existe (idempotente).
+        $composite_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME   = %s
+                    AND INDEX_NAME   = 'udx_vendor_currency'",
+                DB_NAME,
+                $table
+            )
+        );
+        if ( $composite_exists > 0 ) {
+            return; // Ya migrado (composite index presente).
+        }
+
+        // Verifica si el viejo index udx_vendor_id (solo vendor_id) existe.
+        $old_index_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME   = %s
+                    AND INDEX_NAME   = 'udx_vendor_id'",
+                DB_NAME,
+                $table
+            )
+        );
+
+        // Si existen vendor_id duplicados en la tabla actual, el ADD UNIQUE KEY
+        // (vendor_id, currency) podría fallar si el duplicado tiene la MISMA
+        // currency. Verificamos antes de aplicar el ALTER.
+        $dup_count = (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM (
+                SELECT vendor_id, currency
+                  FROM `{$table}`
+                 GROUP BY vendor_id, currency
+                 HAVING COUNT(*) > 1
+             ) AS dup"
+        );
+
+        if ( $dup_count > 0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'DB_MIGRATION',
+                    sprintf(
+                        'v2.8.1: lt_vendor_wallets tiene %d pares (vendor_id, currency) duplicados — no se puede agregar UNIQUE KEY udx_vendor_currency. Resuelve los duplicados manualmente y re-ejecuta la migración (WL-BUG-1).',
+                        $dup_count
+                    )
+                );
+            }
+            return; // No aplicar el ALTER, pero dejar que la migración continúe.
+        }
+
+        // Drop del viejo index y ADD del composite. Hacerlos en una sola
+        // sentencia para minimizar la ventana sin UNIQUE KEY (aunque el
+        // DROP+ADD en un solo ALTER es atómico para InnoDB).
+        if ( $old_index_exists > 0 ) {
+            $wpdb->query( "ALTER TABLE `{$table}` DROP INDEX `udx_vendor_id`, ADD UNIQUE KEY `udx_vendor_currency` (`vendor_id`, `currency`)" );
+        } else {
+            // El viejo index no existe (posible si la tabla fue creada manualmente
+            // o ya estaba parcialmente migrada) — solo ADD el composite.
+            $wpdb->query( "ALTER TABLE `{$table}` ADD UNIQUE KEY `udx_vendor_currency` (`vendor_id`, `currency`)" );
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.8.1: lt_vendor_wallets UNIQUE KEY cambiado a (vendor_id, currency) — multi-currency wallets habilitadas (WL-BUG-1 fix).'
+            );
+        }
+        // phpcs:enable
+    }
+
+    /**
+     * Migración v2.8.3 — Shipping Cost Ledger & Reconciliation Engine.
+     *
+     * Crea 5 tablas para cerrar el flujo financiero de costos logísticos
+     * absorbidos por la plataforma (Lo Tengo):
+     *
+     * 1. lt_shipping_cost_ledger     — 1 fila por servicio logístico (quote + real + varianza).
+     * 2. lt_carrier_invoices         — Facturas mensuales de los carriers.
+     * 3. lt_carrier_invoice_lines    — Líneas de factura (1 por guía).
+     * 4. lt_shipping_disputes        — Disputas abiertas con el carrier por sobrecobro.
+     * 5. lt_vendor_shipping_budgets  — Presupuesto mensual por vendor (soft/hard limit).
+     *
+     * @return void
+     */
+    private static function migrate_2_8_3_shipping_cost_ledger(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        // 1. lt_shipping_cost_ledger — libro mayor de costos logísticos.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_shipping_cost_ledger` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`            BIGINT UNSIGNED NOT NULL,
+            `order_item_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT 'ID del shipping line item en WC',
+            `vendor_id`           BIGINT NOT NULL COMMENT 'Vendedor que generó el envío (-1 = platform)',
+            `carrier`             VARCHAR(32) NOT NULL COMMENT 'deprisa|heka|aveonline|uber|pickup|own_delivery|free_absorbed',
+            `tracking_number`     VARCHAR(128) DEFAULT NULL,
+            `quote_cost`          DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Costo cotizado al momento del checkout',
+            `buyer_paid`          DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto cobrado al cliente (shipping_total)',
+            `vendor_charged`      DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto debitado al vendor (modo absorbed)',
+            `real_cost`           DECIMAL(15,2) DEFAULT NULL COMMENT 'Costo real facturado por carrier (NULL = sin conciliar)',
+            `currency`            CHAR(3) NOT NULL DEFAULT 'COP',
+            `country_code`        CHAR(2) NOT NULL DEFAULT 'CO',
+            `status`              ENUM('quoted','shipped','delivered','invoiced','disputed','reconciled','writeoff') NOT NULL DEFAULT 'quoted',
+            `invoice_id`          BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_carrier_invoices.id',
+            `invoice_line_id`     BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_carrier_invoice_lines.id',
+            `dispute_id`          BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_shipping_disputes.id',
+            `variance`            DECIMAL(15,2) DEFAULT NULL COMMENT 'real_cost - quote_cost (calculado al conciliar)',
+            `variance_pct`        DECIMAL(6,2) DEFAULT NULL COMMENT 'variance / quote_cost * 100',
+            `wallet_tx_id`        BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_wallet_transactions.id (debit al vendor)',
+            `platform_wallet_tx_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_wallet_transactions.id (costo en ledger Lo Tengo)',
+            `quote_at`            DATETIME DEFAULT NULL,
+            `shipped_at`          DATETIME DEFAULT NULL,
+            `delivered_at`        DATETIME DEFAULT NULL,
+            `invoiced_at`         DATETIME DEFAULT NULL,
+            `reconciled_at`       DATETIME DEFAULT NULL,
+            `metadata`            LONGTEXT DEFAULT NULL,
+            `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_order_item` (`order_id`, `order_item_id`),
+            KEY `idx_vendor` (`vendor_id`),
+            KEY `idx_carrier` (`carrier`),
+            KEY `idx_status` (`status`),
+            KEY `idx_tracking` (`tracking_number`),
+            KEY `idx_invoice` (`invoice_id`),
+            KEY `idx_dispute` (`dispute_id`),
+            KEY `idx_created` (`created_at`)
+        ) {$charset}" );
+
+        // 2. lt_carrier_invoices — facturas mensuales recibidas de los carriers.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_carrier_invoices` (
+            `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `carrier`          VARCHAR(32) NOT NULL,
+            `invoice_number`   VARCHAR(64) NOT NULL COMMENT 'Número de factura del carrier',
+            `invoice_date`     DATE NOT NULL,
+            `period_start`     DATE NOT NULL COMMENT 'Inicio del período facturado',
+            `period_end`       DATE NOT NULL COMMENT 'Fin del período facturado',
+            `total_amount`     DECIMAL(15,2) NOT NULL,
+            `currency`         CHAR(3) NOT NULL DEFAULT 'COP',
+            `tax_amount`       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `subtotal_amount`  DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `lines_count`      INT UNSIGNED NOT NULL DEFAULT 0,
+            `lines_matched`    INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Líneas matcheadas a un ledger entry',
+            `lines_unmatched`  INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Líneas sin match (phantom charges)',
+            `matched_amount`   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `unmatched_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `variance_total`   DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Sum(real_cost - quote_cost) de líneas matcheadas',
+            `status`           ENUM('imported','matching','matched','partial','disputed','reconciled') NOT NULL DEFAULT 'imported',
+            `source_file`      VARCHAR(255) DEFAULT NULL COMMENT 'Nombre del archivo CSV/JSON importado',
+            `imported_by`      BIGINT UNSIGNED DEFAULT NULL,
+            `imported_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `reconciled_at`    DATETIME DEFAULT NULL,
+            `metadata`         LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_carrier_invoice` (`carrier`, `invoice_number`),
+            KEY `idx_period` (`period_start`, `period_end`),
+            KEY `idx_status` (`status`)
+        ) {$charset}" );
+
+        // 3. lt_carrier_invoice_lines — una fila por guía facturada por el carrier.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_carrier_invoice_lines` (
+            `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `invoice_id`        BIGINT UNSIGNED NOT NULL,
+            `line_number`       INT UNSIGNED NOT NULL COMMENT 'Posición en la factura',
+            `tracking_number`   VARCHAR(128) DEFAULT NULL,
+            `guide_number`      VARCHAR(128) DEFAULT NULL,
+            `order_ref`         VARCHAR(64) DEFAULT NULL COMMENT 'Referencia del pedido si el carrier la incluye',
+            `origin_city`       VARCHAR(64) DEFAULT NULL,
+            `destination_city`  VARCHAR(64) DEFAULT NULL,
+            `weight_kg`         DECIMAL(8,3) DEFAULT NULL,
+            `billed_amount`     DECIMAL(15,2) NOT NULL,
+            `tax_amount`        DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            `total_amount`      DECIMAL(15,2) NOT NULL,
+            `currency`          CHAR(3) NOT NULL DEFAULT 'COP',
+            `ledger_id`         BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_shipping_cost_ledger.id (NULL = sin match)',
+            `match_status`      ENUM('pending','matched','unmatched','disputed') NOT NULL DEFAULT 'pending',
+            `match_method`      VARCHAR(32) DEFAULT NULL COMMENT 'tracking|order_ref|manual',
+            `matched_at`        DATETIME DEFAULT NULL,
+            `metadata`          LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_invoice_line` (`invoice_id`, `line_number`),
+            KEY `idx_tracking` (`tracking_number`),
+            KEY `idx_invoice` (`invoice_id`),
+            KEY `idx_match_status` (`match_status`),
+            KEY `idx_ledger` (`ledger_id`)
+        ) {$charset}" );
+
+        // 4. lt_shipping_disputes — disputas con carriers por sobrecobro.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_shipping_disputes` (
+            `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `ledger_id`         BIGINT UNSIGNED NOT NULL COMMENT 'FK a lt_shipping_cost_ledger.id',
+            `invoice_id`        BIGINT UNSIGNED DEFAULT NULL COMMENT 'FK a lt_carrier_invoices.id',
+            `invoice_line_id`   BIGINT UNSIGNED DEFAULT NULL,
+            `dispute_type`      ENUM('overcharge','phantom_charge','duplicate','wrong_weight','wrong_zone','service_not_used','other') NOT NULL,
+            `dispute_reason`    VARCHAR(500) NOT NULL,
+            `evidence_url`      VARCHAR(500) DEFAULT NULL COMMENT 'URL del archivo de evidencia (PDF, screenshot)',
+            `expected_amount`   DECIMAL(15,2) NOT NULL COMMENT 'Monto que LTMS considera correcto (quote_cost)',
+            `disputed_amount`   DECIMAL(15,2) NOT NULL COMMENT 'Monto en disputa (real_cost - expected)',
+            `credit_amount`     DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Crédito otorgado por el carrier',
+            `status`            ENUM('open','in_review','approved','rejected','credited','expired') NOT NULL DEFAULT 'open',
+            `opened_by`         BIGINT UNSIGNED NOT NULL,
+            `opened_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `sla_due_at`        DATETIME NOT NULL COMMENT 'Fecha límite para resolver (default +15 días)',
+            `resolved_at`       DATETIME DEFAULT NULL,
+            `resolved_by`       BIGINT UNSIGNED DEFAULT NULL,
+            `resolution_notes`  TEXT DEFAULT NULL,
+            `metadata`          LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_ledger` (`ledger_id`),
+            KEY `idx_invoice` (`invoice_id`),
+            KEY `idx_status` (`status`),
+            KEY `idx_sla` (`sla_due_at`)
+        ) {$charset}" );
+
+        // 5. lt_vendor_shipping_budgets — presupuesto mensual por vendor.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_vendor_shipping_budgets` (
+            `id`                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`         BIGINT NOT NULL,
+            `period_year`       SMALLINT UNSIGNED NOT NULL,
+            `period_month`      TINYINT UNSIGNED NOT NULL COMMENT '1-12',
+            `budget_limit`      DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT '0 = sin límite',
+            `soft_threshold`    DECIMAL(5,2) NOT NULL DEFAULT 80.00 COMMENT '% del budget para alerta (default 80%)',
+            `hard_threshold`    DECIMAL(5,2) NOT NULL DEFAULT 100.00 COMMENT '% del budget para bloqueo (default 100%)',
+            `spent_amount`      DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'Acumulado del mes (calculado)',
+            `spent_pct`         DECIMAL(6,2) NOT NULL DEFAULT 0.00 COMMENT 'spent_amount / budget_limit * 100',
+            `alert_sent`        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = alerta soft enviada',
+            `block_sent`        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = notificación hard enviada',
+            `is_blocked`        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = vendor bloqueado de generar envíos absorbed',
+            `notes`             TEXT DEFAULT NULL,
+            `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_vendor_period` (`vendor_id`, `period_year`, `period_month`),
+            KEY `idx_period` (`period_year`, `period_month`),
+            KEY `idx_blocked` (`is_blocked`)
+        ) {$charset}" );
+        // phpcs:enable
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.8.3: lt_shipping_cost_ledger + lt_carrier_invoices + lt_carrier_invoice_lines + lt_shipping_disputes + lt_vendor_shipping_budgets OK (Shipping Cost Ledger & Reconciliation Engine).'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.9.1 — Forensic Log + Retention Log tables.
+     *
+     * Crea las tablas lt_forensic_log y lt_retention_log que eran referenciadas
+     * por class-ltms-forensic-log.php y class-ltms-retention-cron.php pero
+     * nunca se creaban en la migración canónica (solo en un patch script
+     * deploy/ltms-patch-db-v2-7-0.php que no se ejecutaba en instalaciones nuevas).
+     *
+     * Tablas creadas:
+     * 1. lt_forensic_log — Log inmutable con hash chain (SHA-256) para cumplimiento
+     *    forensic. Cada entry incluye entry_hash + prev_hash para detectar tampering.
+     * 2. lt_retention_log — Auditoría del cron de retención de datos (SAGRILAFT/Ley 1581).
+     *
+     * @return void
+     */
+    private static function migrate_2_9_1_forensic_retention_tables(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        // 1. lt_forensic_log — Log forensic con hash chain (FL-1 fix).
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_forensic_log` (
+            `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `action`      VARCHAR(100) NOT NULL COMMENT 'Tipo de evento forensic (login_failed, kyc_viewed, etc.)',
+            `user_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `ip`          VARCHAR(45) NOT NULL DEFAULT '',
+            `user_agent`  VARCHAR(500) NOT NULL DEFAULT '',
+            `request_uri` VARCHAR(500) NOT NULL DEFAULT '',
+            `context`     LONGTEXT DEFAULT NULL COMMENT 'JSON con detalles del evento + __prev_hash + __entry_hash',
+            `entry_hash`  CHAR(64) DEFAULT NULL COMMENT 'SHA-256 hash del entry actual (FL-1 fix)',
+            `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_action` (`action`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_ip` (`ip`),
+            KEY `idx_created_at` (`created_at`),
+            KEY `idx_entry_hash` (`entry_hash`)
+        ) {$charset}" );
+
+        // 2. lt_retention_log — Auditoría del cron de retención.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_retention_log` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id`    BIGINT UNSIGNED NOT NULL,
+            `action`     VARCHAR(50) NOT NULL COMMENT 'notified|swept|protected|skipped',
+            `swept_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `metadata`   LONGTEXT DEFAULT NULL COMMENT 'JSON con detalles de qué se borró/retuvo',
+            PRIMARY KEY (`id`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_action` (`action`),
+            KEY `idx_swept_at` (`swept_at`)
+        ) {$charset}" );
+        // phpcs:enable
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.9.1: lt_forensic_log + lt_retention_log OK (Forensic hash chain + Retention audit).'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.9.8 — Columnas faltantes Art. 30-B CFF (SAT México).
+     *
+     * Añade a lt_commissions las columnas que la norma requiere pero que
+     * no existían en el schema:
+     *  - service_type (Fracción I inciso a: tipo de servicio/operación)
+     *  - iva_retenido (Fracción II inciso f-vi: IVA retenido por plataforma)
+     *  - ieps_retenido (Fracción II inciso f-vii: IEPS retenido por plataforma)
+     *
+     * Idempotente: verifica si la columna ya existe antes de hacer ALTER.
+     *
+     * @return void
+     */
+    private static function migrate_2_9_8_fiscal_30b_columns(): void {
+        global $wpdb;
+        $c = $wpdb->prefix . 'lt_commissions';
+
+        $helper = static function ( string $table, string $column ): bool {
+            global $wpdb;
+            return (bool) $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COUNT(*) FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                    DB_NAME, $table, $column
+                )
+            );
+        };
+
+        // NF-1: service_type — tipo de servicio u operación (Art. 30-B frac. I inc. a).
+        if ( ! $helper( $c, 'service_type' ) ) {
+            $wpdb->query( "ALTER TABLE `{$c}` ADD COLUMN `service_type` VARCHAR(50) DEFAULT NULL COMMENT 'Tipo de servicio/operación (Art.30-B frac.I inc.a)' AFTER `type`" );
+        }
+
+        // NF-2a: iva_retenido — IVA retenido por la plataforma (Art. 30-B frac. II inc. f-vi).
+        if ( ! $helper( $c, 'iva_retenido' ) ) {
+            $wpdb->query( "ALTER TABLE `{$c}` ADD COLUMN `iva_retenido` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'IVA retenido por plataforma (Art.30-B frac.II inc.f-vi)' AFTER `iva_amount`" );
+        }
+
+        // NF-2b: ieps_retenido — IEPS retenido por la plataforma (Art. 30-B frac. II inc. f-vii).
+        if ( ! $helper( $c, 'ieps_retenido' ) ) {
+            $wpdb->query( "ALTER TABLE `{$c}` ADD COLUMN `ieps_retenido` DECIMAL(15,2) NOT NULL DEFAULT 0.00 COMMENT 'IEPS retenido por plataforma (Art.30-B frac.II inc.f-vii)' AFTER `ieps_amount`" );
+        }
+
+        // NF-5: crear tabla lt_fiscal_access_credentials para SAT/DIAN online access.
+        $fac = $wpdb->prefix . 'lt_fiscal_access_credentials';
+        $charset = $wpdb->get_charset_collate();
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$fac}` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `authority`       VARCHAR(10) NOT NULL COMMENT 'SAT (MX) o DIAN (CO)',
+            `username`        VARCHAR(100) NOT NULL,
+            `password_hash`   VARCHAR(255) NOT NULL,
+            `created_by`      BIGINT UNSIGNED NOT NULL,
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `revoked_at`      DATETIME DEFAULT NULL,
+            `last_access_at`  DATETIME DEFAULT NULL,
+            `access_count`    INT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_authority_username` (`authority`, `username`),
+            KEY `idx_authority` (`authority`)
+        ) {$charset}" );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.9.8: lt_commissions +service_type +iva_retenido +ieps_retenido + lt_fiscal_access_credentials OK (Art. 30-B CFF compliance).'
+            );
+        }
+    }
+
+    /**
+     * v2.9.13 — PR-1 CRITICAL BUG FIX: lt_consent_log schema mismatch.
+     *
+     * The original migration (v2.3.0) created `lt_consent_log` with columns:
+     *   purpose, policy_ver, ip_hash, channel, user_agent, meta_json
+     *
+     * But LTMS_Legal_Compliance::log_consent() and the guest checkout flow
+     * in log_checkout_consent() insert into DIFFERENT column names:
+     *   consent_type, accepted, ip_address, version, channel, user_agent
+     *
+     * Result: every $wpdb->insert to lt_consent_log SILENTLY FAILED
+     * (MySQL accepts unknown columns only in IGNORE mode; in default mode
+     * it raises an error that $wpdb->insert captures as last_error but
+     * the calling code never checks).
+     *
+     * This means consent logging has been BROKEN since v2.3.0 — violating
+     * Ley 1581/2012 art. 10 (CO) and LFPDPPP art. 11 (MX) which require
+     * demonstrable proof of consent.
+     *
+     * Fix: ADD the missing columns (additive ALTER TABLE — does not drop
+     * existing data). Going forward, log_consent() writes use the canonical
+     * column names (consent_type, accepted, ip_address, version).
+     *
+     * @return void
+     */
+    private static function migrate_2_9_13_consent_log_schema_fix(): void {
+        global $wpdb;
+        $table    = $wpdb->prefix . 'lt_consent_log';
+        $charset  = $wpdb->get_charset_collate();
+
+        $helper = static function ( string $t, string $column ): bool {
+            global $wpdb;
+            return (bool) $wpdb->get_var(
+                $wpdb->prepare(
+                    'SELECT COUNT(*) FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                    DB_NAME, $t, $column
+                )
+            );
+        };
+
+        // PR-1a: consent_type — replaces ad-hoc usage of `purpose` for type key.
+        if ( ! $helper( $table, 'consent_type' ) ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}` ADD COLUMN `consent_type` VARCHAR(64) NOT NULL DEFAULT 'register'
+                 COMMENT 'Tipo de consentimiento (terms, privacy, sagrilaft, checkout, marketing, data_rectification, etc.)'
+                 AFTER `user_id`"
+            );
+        }
+
+        // PR-1b: accepted — boolean flag (Ley 1581 art. 9 requires consent to be
+        // affirmative, so storing the bool is critical evidence).
+        if ( ! $helper( $table, 'accepted' ) ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}` ADD COLUMN `accepted` TINYINT(1) NOT NULL DEFAULT 1
+                 COMMENT '1 = aceptado, 0 = rechazado/revocado (Ley 1581 art. 9)'
+                 AFTER `consent_type`"
+            );
+        }
+
+        // PR-1c: version — version of the document the user consented to
+        // (terms v4.1, privacy v1.3, sagrilaft v1.0, etc.). Required for
+        // demonstrable consent under GDPR art. 7(1).
+        if ( ! $helper( $table, 'version' ) ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}` ADD COLUMN `version` VARCHAR(16) NOT NULL DEFAULT '1.0'
+                 COMMENT 'Versión del documento consentido (TERMS_VERSION, PRIVACY_VERSION, etc.)'
+                 AFTER `accepted`"
+            );
+        }
+
+        // PR-1d: ip_address — raw IP (NOT hashed). The original schema used
+        // ip_hash for pseudonymization, but forensic/evidence requirements
+        // (GDPR art. 7(1), Ley 1581 art. 10 lit. d) demand the original IP
+        // be retained for the duration of the consent relationship. The
+        // ip_hash column is retained for backward compatibility.
+        if ( ! $helper( $table, 'ip_address' ) ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}` ADD COLUMN `ip_address` VARCHAR(45) NOT NULL DEFAULT ''
+                 COMMENT 'IP del usuario al consentir (IPv4/IPv6). Retenido como evidencia.'
+                 AFTER `version`"
+            );
+        }
+
+        // PR-1e: Backfill ip_hash from ip_address for legacy rows (no-op if
+        // both are empty, which is the case for the previously-failed inserts).
+        $wpdb->query(
+            "UPDATE `{$table}` SET `consent_type` = `purpose` WHERE `consent_type` = 'register' AND `purpose` <> 'register'"
+        );
+        $wpdb->query(
+            "UPDATE `{$table}` SET `version` = `policy_ver` WHERE `version` = '1.0' AND `policy_ver` <> '2.0'"
+        );
+
+        // PR-1f: Add composite index for the canonical access pattern
+        // (arco_access queries by user_id ORDER BY created_at DESC).
+        $idx_exists = (bool) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s',
+                DB_NAME, $table, 'idx_user_consent_type'
+            )
+        );
+        if ( ! $idx_exists ) {
+            $wpdb->query(
+                "ALTER TABLE `{$table}` ADD INDEX `idx_user_consent_type` (`user_id`, `consent_type`)"
+            );
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.9.13 PR-1: lt_consent_log schema fix — added consent_type, accepted, version, ip_address columns + idx_user_consent_type (Ley 1581 art. 10 / LFPDPPP art. 11 / GDPR art. 7(1) compliance).'
+            );
         }
     }
 

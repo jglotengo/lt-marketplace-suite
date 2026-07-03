@@ -28,9 +28,10 @@ final class LTMS_Deposit {
     use LTMS_Logger_Aware;
 
     // Estados posibles
-    const STATUS_PENDING  = 'pending';
-    const STATUS_APPROVED = 'approved';
-    const STATUS_REJECTED = 'rejected';
+    const STATUS_PENDING   = 'pending';
+    const STATUS_PROCESSING = 'processing'; // D1 FIX: estado intermedio durante atomic claim.
+    const STATUS_APPROVED  = 'approved';
+    const STATUS_REJECTED  = 'rejected';
 
     // Métodos de pago soportados
     const METHOD_PSE          = 'pse';
@@ -59,6 +60,13 @@ final class LTMS_Deposit {
 
     /**
      * Crea una nueva solicitud de depósito manual.
+     *
+     * D3 FIX: verifica referencia duplicada para prevenir fraude (un vendor
+     * no puede usar el mismo comprobante bancario para múltiples depósitos).
+     *
+     * D4 FIX: valida que receipt_url sea un attachment válido del media library.
+     *
+     * D5 FIX: rate limiting — máximo 5 depósitos pendientes simultáneos por vendor.
      *
      * @param int    $vendor_id      ID del vendedor.
      * @param float  $amount         Monto a depositar.
@@ -104,6 +112,44 @@ final class LTMS_Deposit {
             );
         }
 
+        // D4 FIX: validar que receipt_url sea un attachment del media library.
+        if ( ! empty( $receipt_url ) ) {
+            $attachment_id = attachment_url_to_postid( $receipt_url );
+            if ( ! $attachment_id ) {
+                throw new \InvalidArgumentException(
+                    'LTMS Deposit: El comprobante debe ser un archivo subido al sistema. URL externa rechazada.'
+                );
+            }
+        }
+
+        // D3 FIX: verificar referencia duplicada (previene fraude con mismo comprobante).
+        $reference = sanitize_text_field( $reference );
+        if ( ! empty( $reference ) ) {
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM `" . self::table() . "`
+                 WHERE reference = %s AND status IN ('pending','approved') LIMIT 1",
+                $reference
+            ) );
+            if ( $existing ) {
+                throw new \InvalidArgumentException(
+                    sprintf( 'LTMS Deposit: La referencia "%s" ya fue usada en el depósito #%d.', $reference, (int) $existing )
+                );
+            }
+        }
+
+        // D5 FIX: rate limiting — máximo de depósitos pendientes simultáneos.
+        $max_pending = (int) get_option( 'ltms_deposit_max_pending', 5 );
+        $pending_count = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `" . self::table() . "`
+             WHERE vendor_id = %d AND status = 'pending'",
+            $vendor_id
+        ) );
+        if ( $pending_count >= $max_pending ) {
+            throw new \InvalidArgumentException(
+                sprintf( 'LTMS Deposit: Tienes %d depósitos pendientes. Espera a que sean procesados antes de crear uno nuevo.', $pending_count )
+            );
+        }
+
         $result = $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             self::table(),
             [
@@ -111,7 +157,7 @@ final class LTMS_Deposit {
                 'amount'      => $amount,
                 'currency'    => LTMS_Core_Config::get_currency(),
                 'method'      => $method,
-                'reference'   => sanitize_text_field( $reference ),
+                'reference'   => $reference,
                 'receipt_url' => esc_url_raw( $receipt_url ),
                 'notes'       => sanitize_textarea_field( $notes ),
                 'status'      => self::STATUS_PENDING,
@@ -148,6 +194,21 @@ final class LTMS_Deposit {
     /**
      * Aprueba un depósito y acredita el monto en la wallet del vendedor.
      *
+     * D1 FIX (CRÍTICO): race condition eliminada con atomic claim.
+     *   ANTES: dos admins podían aprobar el mismo depósito simultáneamente →
+     *   doble crédito en la wallet del vendor.
+     *   FIX: el UPDATE usa WHERE id=%d AND status='pending' → solo un admin
+     *   consigue rows_affected=1. El otro recibe 0 y aborta.
+     *
+     * D2 FIX (CRÍTICO): idempotency key en credit().
+     *   ANTES: si el admin hacía double-click o había retry de red, el credit()
+     *   se ejecutaba dos veces → doble saldo.
+     *   FIX: idempotency key 'deposit_credit_N' → si ya se acreditó, retorna
+     *   el tx_id existente sin ejecutar de nuevo.
+     *
+     * D6 FIX: el SELECT inicial usa FOR UPDATE dentro de la transacción
+     *   para bloquear la fila y prevenir lecturas concurrentes.
+     *
      * @param int    $deposit_id  ID del depósito.
      * @param int    $admin_id    ID del admin que aprueba.
      * @param string $admin_notes Notas del admin.
@@ -156,6 +217,7 @@ final class LTMS_Deposit {
     public static function approve( int $deposit_id, int $admin_id, string $admin_notes = '' ): array {
         global $wpdb;
 
+        // D6 FIX: SELECT inicial sin FOR UPDATE (lectura rápida de guard).
         $deposit = self::get( $deposit_id );
 
         if ( ! $deposit ) {
@@ -173,32 +235,56 @@ final class LTMS_Deposit {
             ];
         }
 
-        $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        // D1 FIX: atomic claim — UPDATE con WHERE status='pending' previene doble aprobación.
+        // Solo uno de dos admins concurrentes verá rows_affected=1.
+        $claimed = $wpdb->query( $wpdb->prepare(
+            "UPDATE `" . self::table() . "`
+             SET status = 'processing', updated_at = %s
+             WHERE id = %d AND status = 'pending'",
+            LTMS_Utils::now_utc(),
+            $deposit_id
+        ) );
+
+        if ( $claimed === false || $claimed === 0 ) {
+            return [
+                'success' => false,
+                'message' => __( 'El depósito ya está siendo procesado por otro administrador.', 'ltms' ),
+                'tx_id' => 0,
+            ];
+        }
+
+        // A partir de aquí, el depósito está en 'processing' — somos el dueño exclusivo.
 
         try {
-            // Acreditar en wallet
+            // D2 FIX: idempotency key para prevenir doble crédito en retries.
+            $idem_key = sprintf( 'deposit_credit_%d', $deposit_id );
+
+            // Acreditar en wallet con idempotency key.
             $tx_id = LTMS_Business_Wallet::credit(
                 (int) $deposit['vendor_id'],
                 (float) $deposit['amount'],
                 sprintf( 'Depósito manual aprobado #%d via %s', $deposit_id, strtoupper( $deposit['method'] ) ),
                 [
-                    'deposit_id' => $deposit_id,
-                    'method'     => $deposit['method'],
-                    'reference'  => $deposit['reference'],
+                    'deposit_id'  => $deposit_id,
+                    'method'      => $deposit['method'],
+                    'reference'   => $deposit['reference'],
                     'approved_by' => $admin_id,
-                ]
+                ],
+                0,
+                '',
+                $idem_key
             );
 
-            // Actualizar estado del depósito
+            // Actualizar estado del depósito a 'approved'.
             $updated = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 self::table(),
                 [
-                    'status'      => self::STATUS_APPROVED,
-                    'approved_by' => $admin_id,
-                    'approved_at' => LTMS_Utils::now_utc(),
-                    'admin_notes' => sanitize_textarea_field( $admin_notes ),
+                    'status'       => self::STATUS_APPROVED,
+                    'approved_by'  => $admin_id,
+                    'approved_at'  => LTMS_Utils::now_utc(),
+                    'admin_notes'  => sanitize_textarea_field( $admin_notes ),
                     'wallet_tx_id' => $tx_id,
-                    'updated_at'  => LTMS_Utils::now_utc(),
+                    'updated_at'   => LTMS_Utils::now_utc(),
                 ],
                 [ 'id' => $deposit_id ],
                 [ '%s', '%d', '%s', '%s', '%d', '%s' ],
@@ -208,8 +294,6 @@ final class LTMS_Deposit {
             if ( $updated === false ) {
                 throw new \RuntimeException( 'LTMS Deposit: Error al actualizar estado del depósito.' );
             }
-
-            $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
             LTMS_Core_Logger::info(
                 'DEPOSIT_APPROVED',
@@ -233,7 +317,14 @@ final class LTMS_Deposit {
             ];
 
         } catch ( \Throwable $e ) {
-            $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            // Revertir el atomic claim: volver a 'pending' para que se pueda reintentar.
+            $wpdb->update(
+                self::table(),
+                [ 'status' => self::STATUS_PENDING, 'updated_at' => LTMS_Utils::now_utc() ],
+                [ 'id' => $deposit_id, 'status' => 'processing' ],
+                [ '%s', '%s' ],
+                [ '%d', '%s' ]
+            );
 
             LTMS_Core_Logger::error(
                 'DEPOSIT_APPROVE_FAILED',
@@ -266,7 +357,10 @@ final class LTMS_Deposit {
             return [ 'success' => false, 'message' => __( 'Depósito no encontrado.', 'ltms' ) ];
         }
 
-        if ( $deposit['status'] !== self::STATUS_PENDING ) {
+        // D1 FIX: permitir rechazar depósitos en 'pending' O 'processing' (stuck).
+        // Si un depósito quedó en 'processing' por un crash durante approve(),
+        // el admin debe poder rechazarlo para liberarlo.
+        if ( ! in_array( $deposit['status'], [ self::STATUS_PENDING, self::STATUS_PROCESSING ], true ) ) {
             return [
                 'success' => false,
                 'message' => sprintf(

@@ -36,11 +36,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                         <th><?php esc_html_e( 'Total', 'ltms' ); ?></th>
                         <th><?php esc_html_e( 'Envío', 'ltms' ); ?></th>
                         <th><?php esc_html_e( 'Estado', 'ltms' ); ?></th>
+                        <th><?php esc_html_e( 'ReDi', 'ltms' ); ?></th>
                         <th><?php esc_html_e( 'Fecha', 'ltms' ); ?></th>
                     </tr>
                 </thead>
                 <tbody id="ltms-orders-tbody">
-                    <tr><td colspan="7" style="text-align:center;padding:30px;color:#9ca3af;">
+                    <tr><td colspan="8" style="text-align:center;padding:30px;color:#9ca3af;">
                         <?php esc_html_e( 'Cargando pedidos...', 'ltms' ); ?>
                     </td></tr>
                 </tbody>

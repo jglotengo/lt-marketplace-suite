@@ -49,6 +49,13 @@ final class LTMS_Frontend_Deposit_Handler {
             wp_send_json_error( __( 'Debes iniciar sesión.', 'ltms' ), 401 );
         }
 
+        // HI-3 FIX: capability check — deposit creation is a vendor-only action.
+        // Without this, any authenticated user (subscriber, customer) could
+        // create deposit requests on their own user_id, polluting the deposit queue.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
+        }
+
         $vendor_id   = get_current_user_id();
         $amount      = (float) ( $_POST['amount'] ?? 0 ); // phpcs:ignore
         $method      = sanitize_text_field( wp_unslash( $_POST['method'] ?? '' ) ); // phpcs:ignore
@@ -80,7 +87,20 @@ final class LTMS_Frontend_Deposit_Handler {
             ] );
 
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            // HI-9 FIX: do not leak the raw exception message to the client — it
+            // can expose DB internals, SQL fragments, or stack-trace details.
+            // Log the real error server-side, return a generic message.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'DEPOSIT_HANDLER_ERROR',
+                    $e->getMessage(),
+                    [ 'trace' => $e->getTraceAsString() ]
+                );
+            }
+            wp_send_json_error(
+                [ 'message' => __( 'An error occurred. Please try again.', 'ltms' ) ],
+                500
+            );
         }
     }
 
@@ -98,24 +118,36 @@ final class LTMS_Frontend_Deposit_Handler {
             wp_send_json_error( __( 'Debes iniciar sesión.', 'ltms' ), 401 );
         }
 
-        if ( empty( $_FILES['receipt'] ) ) { // phpcs:ignore
-            wp_send_json_error( __( 'No se recibió ningún archivo.', 'ltms' ) );
+        // HI-4 FIX: vendor role check — receipt uploads are a vendor-only action.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
+        }
+
+        // HI-4 FIX: verify the upload completed cleanly before processing.
+        // Without this, partial / failed uploads (e.g. network errors mid-upload)
+        // would be passed to media_handle_upload, which can produce confusing
+        // error messages or zero-byte attachments.
+        if ( ! isset( $_FILES['receipt'] ) || $_FILES['receipt']['error'] !== UPLOAD_ERR_OK ) { // phpcs:ignore
+            wp_send_json_error( [ 'message' => __( 'Upload failed', 'ltms' ) ], 400 );
         }
 
         // Validar tipo de archivo
         $file     = $_FILES['receipt']; // phpcs:ignore
-        $allowed  = [ 'image/jpeg', 'image/png', 'image/webp', 'application/pdf' ];
+        // HI-4 FIX: explicit MIME allowlist (PDF, JPEG, PNG). webp was previously
+        // accepted but is not a common receipt format and broadens attack surface.
+        $allowed  = [ 'application/pdf', 'image/jpeg', 'image/png' ];
         $finfo    = finfo_open( FILEINFO_MIME_TYPE );
         $mime     = finfo_file( $finfo, $file['tmp_name'] );
         finfo_close( $finfo );
 
         if ( ! in_array( $mime, $allowed, true ) ) {
-            wp_send_json_error( __( 'Tipo de archivo no permitido. Usa JPG, PNG, WEBP o PDF.', 'ltms' ) );
+            wp_send_json_error( [ 'message' => __( 'Invalid file type', 'ltms' ) ], 400 );
         }
 
+        // HI-4 FIX: explicit size limit (5 MB) — already present but kept for clarity.
         // Límite 5MB
         if ( $file['size'] > 5 * 1024 * 1024 ) {
-            wp_send_json_error( __( 'El archivo no puede superar 5 MB.', 'ltms' ) );
+            wp_send_json_error( [ 'message' => __( 'File too large (max 5MB)', 'ltms' ) ], 400 );
         }
 
         require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -125,7 +157,17 @@ final class LTMS_Frontend_Deposit_Handler {
         $attachment_id = media_handle_upload( 'receipt', 0 );
 
         if ( is_wp_error( $attachment_id ) ) {
-            wp_send_json_error( $attachment_id->get_error_message() );
+            // HI-9 FIX: do not expose the raw WP_Error message — log server-side.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'DEPOSIT_RECEIPT_UPLOAD_ERROR',
+                    $attachment_id->get_error_message()
+                );
+            }
+            wp_send_json_error(
+                [ 'message' => __( 'An error occurred. Please try again.', 'ltms' ) ],
+                500
+            );
         }
 
         $url = wp_get_attachment_url( $attachment_id );
@@ -146,6 +188,11 @@ final class LTMS_Frontend_Deposit_Handler {
 
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( __( 'No autenticado.', 'ltms' ), 401 );
+        }
+
+        // HI-3 FIX: capability check — vendor deposit history is vendor-only.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 
         $vendor_id = get_current_user_id();

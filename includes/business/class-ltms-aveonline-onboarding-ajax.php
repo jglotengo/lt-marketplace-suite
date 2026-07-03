@@ -193,6 +193,8 @@ class LTMS_Aveonline_Onboarding_Ajax {
      * Recibe todos los datos en un solo POST y ejecuta los 4 pasos.
      */
     public static function ajax_full(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
         self::verify_nonce();
 
         // Solo admin o automatización interna
@@ -211,6 +213,11 @@ class LTMS_Aveonline_Onboarding_Ajax {
 
         // Guardar resultados si se especificó un user_id
         $target_user_id = (int) ( $_POST['target_user_id'] ?? 0 );
+        // SEC-7 FIX (v2.9.25): Validar IDOR — solo el propio usuario o un admin
+        // pueden guardar onboarding para otro user_id.
+        if ( $target_user_id && $target_user_id !== get_current_user_id() && ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Sin permisos para modificar el onboarding de otro usuario.', 403 );
+        }
         if ( $result['success'] && $target_user_id ) {
             update_user_meta( $target_user_id, self::META_ONBOARDING_STATUS, 'completed' );
             update_user_meta( $target_user_id, self::META_ONBOARDING_SEED,   $result['seed'] );

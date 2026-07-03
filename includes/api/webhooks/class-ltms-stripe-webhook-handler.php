@@ -61,6 +61,16 @@ class LTMS_Stripe_Webhook_Handler {
      * @return WP_REST_Response
      */
     public static function handle( WP_REST_Request $request ): WP_REST_Response {
+        // API-BUG-19 FIX: per-IP rate limit (max 100 webhooks/min). Flood of invalid
+        // webhooks previously hit the DB on every request (insert to lt_webhook_logs),
+        // a DoS vector. Rate limit BEFORE any work to protect the DB.
+        $rate_key = 'ltms_wh_rate_' . md5( self::client_ip() );
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 100 ) {
+            return new WP_REST_Response( [ 'error' => 'Too many requests' ], 429 );
+        }
+        set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
+
         $body       = $request->get_body();
         $sig_header = $request->get_header( 'stripe_signature' ) ?: '';
 
@@ -95,6 +105,23 @@ class LTMS_Stripe_Webhook_Handler {
             );
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
         }
+
+        // API-BUG-11 FIX: event_id idempotency. Stripe may deliver the same event
+        // 2-3 times (especially on 30s timeout). Without dedup, payment_complete()
+        // could fire multiple times. The transient marks the event as "seen" for 1h.
+        // API-BUG-18 FIX: return 200 immediately if the event was already processed,
+        // so Stripe stops retrying. (Full async migration is a documented follow-up.)
+        $event_id = $event->id ?? ( $event->type ?? 'unknown' ) . '_' . md5( $body );
+        $seen_key = 'ltms_wh_seen_stripe_' . md5( $event_id );
+        if ( get_transient( $seen_key ) ) {
+            LTMS_Core_Logger::info(
+                'STRIPE_WEBHOOK_REPLAY',
+                sprintf( 'Duplicate Stripe event %s ignored (already processed).', $event_id ),
+                [ 'event_id' => $event_id ]
+            );
+            return new WP_REST_Response( [ 'message' => 'Already processed' ], 200 );
+        }
+        set_transient( $seen_key, 1, HOUR_IN_SECONDS );
 
         $event_type = $event->type ?? 'unknown';
         $event_data = $event->data->object ?? null;
@@ -492,5 +519,21 @@ class LTMS_Stripe_Webhook_Handler {
 
         // Fallback: leer desde LTMS_Core_Config.
         return LTMS_Core_Config::get( 'ltms_stripe_webhook_secret', '' );
+    }
+
+    /**
+     * Resuelve la IP del cliente para rate limiting (API-BUG-19).
+     * Respeta la cabecera X-Forwarded-For si el request llega vía proxy/CDN.
+     *
+     * @return string
+     */
+    private static function client_ip(): string {
+        // WH3 FIX (v2.8.9): delegar a LTMS_Core_Security::get_client_ip_safe()
+        // que valida trusted proxies antes de confiar en X-Forwarded-For.
+        if ( class_exists( 'LTMS_Core_Security' ) ) {
+            return LTMS_Core_Security::get_client_ip_safe();
+        }
+        // Fallback defensivo.
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 }

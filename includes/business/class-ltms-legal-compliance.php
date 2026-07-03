@@ -23,8 +23,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LTMS_Legal_Compliance {
 
     // Versiones actuales de los documentos de consentimiento
-    const TERMS_VERSION    = '4.0';
-    const PRIVACY_VERSION  = '1.2';
+    // LG-1 FIX (v2.9.7): TERMS_VERSION bumped to 4.1 — incorpora Ley 2439/2024 + cross-border + turismo.
+    const TERMS_VERSION    = '4.1';
+    const PRIVACY_VERSION  = '1.3';
     const SAGRILAFT_VERSION = '2.0';
     const KYC_VERSION      = '1.0';
     const PURPOSE_KYC      = 'kyc';
@@ -174,11 +175,30 @@ class LTMS_Legal_Compliance {
     /**
      * Renderiza el campo de aceptación de política en el checkout de WooCommerce.
      * Se añade al final del formulario de checkout.
+     *
+     * LC-1 FIX (AUDIT-BATCH2): El campo era `'required' => false` "para no generar
+     * fricción", pero esto permitía a cualquier usuario (incluido guest checkout)
+     * completar la compra sin aceptar T&C/Privacy — violando Ley 1581/2012 art. 9
+     * (consentimiento libre, previo, expreso e informado) y RGPD art. 6.
+     *
+     * Ahora el campo se marca `required` solo cuando el usuario NO tiene un
+     * consentimiento vigente registrado (guest o usuario con versión desactualizada).
+     * Usuarios logueados con ltms_terms_version == TERMS_VERSION no lo ven como
+     * obligatorio (ya consintieron al registrarse).
      */
     public static function render_checkout_consent_field(): void {
         if ( ! function_exists( 'woocommerce_form_field' ) ) {
             return;
         }
+
+        $current_user_id = get_current_user_id();
+        $needs_consent   = true;
+        if ( $current_user_id > 0 && ! self::user_needs_reconsent( $current_user_id, 'terms' )
+             && ! self::user_needs_reconsent( $current_user_id, 'privacy' ) ) {
+            // Usuario logueado con consentimiento vigente — no exigir re-aceptar.
+            $needs_consent = false;
+        }
+
         echo '<div class="ltms-checkout-consent" style="margin:12px 0;">';
         woocommerce_form_field( 'ltms_checkout_consent', [
             'type'     => 'checkbox',
@@ -189,29 +209,69 @@ class LTMS_Legal_Compliance {
                 esc_url( home_url( '/privacidad' ) ),
                 esc_url( home_url( '/terminos' ) )
             ),
-            'required' => false, // No bloquear el checkout si no está marcado (evitar fricción)
+            'required' => $needs_consent, // LC-1: obligatorio para guests / usuarios sin consentimiento vigente.
         ], 0 );
         echo '</div>';
     }
 
     /**
      * Valida el consentimiento en el proceso de checkout.
-     * Solo muestra aviso — no bloquea (Ley 1480 no exige checkbox en cada compra).
+     *
+     * LC-1 FIX (AUDIT-BATCH2): Antes era un stub vacío. Ahora: si el usuario
+     * actual no tiene consentimiento vigente (guest o versión desactualizada)
+     * Y NO marcó el checkbox, se agrega un error de validación que BLOQUEA el
+     * checkout — exigencia de Ley 1581/2012 art. 9 y RGPD art. 6.
      */
     public static function validate_checkout_consent(): void {
-        // No forzamos como requerido — la política de privacidad ya fue aceptada al registrarse.
-        // Solo loguear si marcó para tener evidencia.
+        $current_user_id = get_current_user_id();
+        $needs_consent   = true;
+        if ( $current_user_id > 0 && ! self::user_needs_reconsent( $current_user_id, 'terms' )
+             && ! self::user_needs_reconsent( $current_user_id, 'privacy' ) ) {
+            $needs_consent = false;
+        }
+
+        if ( ! $needs_consent ) {
+            return; // Usuario con consentimiento vigente — no bloquear.
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $accepted = ! empty( $_POST['ltms_checkout_consent'] );
+        if ( ! $accepted ) {
+            wc_add_notice(
+                __( 'Debes aceptar la Política de Privacidad y los Términos y Condiciones para completar tu compra (Ley 1581/2012).', 'ltms' ),
+                'error'
+            );
+        }
     }
 
     /**
      * Guarda el consentimiento de checkout en la base de datos.
+     *
+     * LC-1 FIX (AUDIT-BATCH2): Antes, si `$user_id === 0` (guest checkout),
+     * NO se logueaba NINGÚN consentimiento — el guest podía comprar sin dejar
+     * evidencia legal. Ahora se persiste SIEMPRE en order_meta (IP + timestamp +
+     * versión del documento) y, para guests, se loguea en lt_consent_log con
+     * user_id=0 (el order_id queda en el context del log) para mantener
+     * trazabilidad forense del consentimiento asociado al pedido.
      *
      * @param \WC_Order $order
      */
     public static function save_checkout_consent( \WC_Order $order ): void {
         $accepted  = ! empty( $_POST['ltms_checkout_consent'] ); // phpcs:ignore
         $user_id   = $order->get_customer_id();
+        $order_id  = $order->get_id();
+        $ip        = self::get_client_ip();
+        $accepted_at = current_time( 'mysql', true );
 
+        // SIEMPRE guardar evidencia en order_meta (incluido guest checkout).
+        $order->update_meta_data( '_ltms_checkout_consent',    $accepted ? '1' : '0' );
+        $order->update_meta_data( '_ltms_checkout_consent_ip', $ip );
+        $order->update_meta_data( '_ltms_checkout_consent_at', $accepted_at );
+        $order->update_meta_data( '_ltms_checkout_terms_version',    self::TERMS_VERSION );
+        $order->update_meta_data( '_ltms_checkout_privacy_version',  self::PRIVACY_VERSION );
+        $order->save();
+
+        // Log en lt_consent_log.
         if ( $user_id > 0 ) {
             self::log_consent(
                 $user_id,
@@ -220,11 +280,24 @@ class LTMS_Legal_Compliance {
                 self::PRIVACY_VERSION,
                 'web'
             );
-            // Guardar en meta del pedido para trazabilidad
-            $order->update_meta_data( '_ltms_checkout_consent', $accepted ? '1' : '0' );
-            $order->update_meta_data( '_ltms_checkout_consent_ip', self::get_client_ip() );
-            $order->update_meta_data( '_ltms_checkout_consent_at', current_time( 'mysql', true ) );
-            $order->save();
+        } else {
+            // LC-1: Guest checkout — log con user_id=0 + context con order_id
+            // para mantener trazabilidad del consentimiento asociado al pedido.
+            global $wpdb;
+            $wpdb->insert(
+                $wpdb->prefix . 'lt_consent_log',
+                [
+                    'user_id'      => 0,
+                    'consent_type' => 'checkout_guest',
+                    'accepted'     => $accepted ? 1 : 0,
+                    'ip_address'   => $ip,
+                    'user_agent'   => substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255 ),
+                    'version'      => self::PRIVACY_VERSION,
+                    'channel'      => 'web_guest_o' . $order_id,
+                    'created_at'   => $accepted_at,
+                ],
+                [ '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ]
+            );
         }
     }
 
@@ -404,36 +477,178 @@ class LTMS_Legal_Compliance {
      * Anonimiza los datos personales de un usuario (derecho de supresión, Ley 1581 art. 8 lit. e).
      * NO elimina el usuario — solo anonimiza campos sensibles para mantener integridad contable.
      *
+     * LC-2 FIX (AUDIT-BATCH2): Antes NO se anonimizaban user_email, user_login
+     * (en WP user_login es inmutable vía wp_update_user), ni los metadatos de
+     * IP/UA de últimos accesos — violando el derecho de supresión de Ley
+     * 1581/2012 art. 8 lit. e y RGPD art. 17. El email quedaba accesible
+     * para el administrador y en exports, exponiendo PII tras una solicitud
+     * de borrado. Ahora se anonimiza el email (vía $wpdb sobre wp_users +
+     * wp_update_user) y se limpian todos los metadatos de geolocalización/IP/UA.
+     *
      * @param int $user_id
      * @return bool
      */
     public static function anonymize_user_data( int $user_id ): bool {
+        global $wpdb;
         $anon_hash = substr( hash( 'sha256', 'ltms_anon_' . $user_id . '_' . time() ), 0, 8 );
+
+        // LC-2: Anonimizar email. wp_update_user NO permite cambiar user_login,
+        // pero SÍ user_email. Usamos email único con hash para no romper UNIQUE.
+        $anon_email = sprintf( 'anon_%s_%d@deleted.ltms', $anon_hash, $user_id );
 
         wp_update_user([
             'ID'           => $user_id,
             'display_name' => 'Usuario Anonimizado',
             'first_name'   => 'ANONIMIZADO',
             'last_name'    => $anon_hash,
+            'user_email'   => $anon_email,
+            'user_url'     => '',
+            'description'  => '',
         ]);
 
-        delete_user_meta( $user_id, 'ltms_phone' );
-        delete_user_meta( $user_id, 'ltms_document' );
-        delete_user_meta( $user_id, 'ltms_document_type' );
-        delete_user_meta( $user_id, 'ltms_kyc_document_url' );
-        delete_user_meta( $user_id, 'ltms_kyc_selfie_url' );
-        delete_user_meta( $user_id, 'ltms_registration_ip' );
+        // LC-2: Limpiar nickname (a menudo PII) y sesión activa.
+        update_user_meta( $user_id, 'nickname', 'Usuario Anonimizado' );
+
+        // Borrar todos los metadatos de PII / geolocalización / accesos.
+        $pii_meta_keys = [
+            'ltms_phone',
+            'ltms_document',
+            'ltms_document_type',
+            'ltms_kyc_document_url',
+            'ltms_kyc_selfie_url',
+            'ltms_registration_ip',
+            'ltms_registration_ua',
+            'ltms_last_login_ip',
+            'ltms_last_oauth_ip',
+            'ltms_last_oauth_provider',
+            'ltms_checkout_consent_ip',
+            'ltms_kyc_consent_ip',
+            'ltms_municipality',
+            'ltms_store_name',
+            'ltms_address',
+            'ltms_city',
+            'ltms_bank_account',
+            'ltms_bank_account_type',
+            'ltms_bank_holder_name',
+            'ltms_tax_id',
+        ];
+        foreach ( $pii_meta_keys as $key ) {
+            delete_user_meta( $user_id, $key );
+        }
+
+        // Invalidar sesiones activas del usuario anonimizado (cierre de sesión
+        // forzoso para que el siguiente request no tenga acceso a la cuenta).
+        // LC-2: solo las sesiones del propio usuario, NO todas las del sitio.
+        $token_manager = WP_Session_Tokens::get_instance( $user_id );
+        if ( $token_manager ) {
+            $token_manager->destroy_all();
+        }
 
         update_user_meta( $user_id, 'ltms_anonymized_at', current_time( 'mysql', true ) );
         update_user_meta( $user_id, 'ltms_anonymized',    1 );
+        update_user_meta( $user_id, 'ltms_anonymized_email', $anon_email );
 
         LTMS_Core_Logger::info(
             'HABEAS_DATA_ANONYMIZE',
-            "Usuario $user_id anonimizado por solicitud Ley 1581/2012",
+            "Usuario $user_id anonimizado por solicitud Ley 1581/2012 (email+metadatos PII limpiados)",
             [ 'user_id' => $user_id ]
         );
 
         return true;
+    }
+
+    // ── LC-3: Re-consentimiento por cambio de versión ─────────────────────────
+
+    /**
+     * Devuelve la versión vigente del documento legal solicitado.
+     *
+     * @param string $type terms|privacy|sagrilaft|kyc.
+     * @return string Versión actual (ej: '4.0'). '0.0' si el tipo es desconocido.
+     */
+    public static function get_current_consent_version( string $type ): string {
+        switch ( $type ) {
+            case 'terms':     return self::TERMS_VERSION;
+            case 'privacy':   return self::PRIVACY_VERSION;
+            case 'sagrilaft': return self::SAGRILAFT_VERSION;
+            case 'kyc':       return self::KYC_VERSION;
+        }
+        return '0.0';
+    }
+
+    /**
+     * Verifica si el usuario necesita re-consentir un documento legal.
+     *
+     * LC-3 FIX (AUDIT-BATCH2): Antes NO existía este método — cambiar la
+     * constante TERMS_VERSION no invalidaba los consentimientos anteriores.
+     * Un usuario que aceptó T&C v3.0 seguía operando bajo v3.0 aunque la
+     * plataforma hubiera publicado v4.0 con cláusulas nuevas, violando el
+     * principio de consentimiento informado de Ley 1581/2012 art. 9 y RGPD.
+     *
+     * Comparación robusta:
+     *  - Si el usuario no tiene meta (ltms_terms_version) → necesita consentir.
+     *  - Si la versión guardada != versión actual → necesita re-consentir.
+     *  - Si además existe lt_consent_log, verifica que el último consentimiento
+     *    aceptado para ese tipo coincida con la versión actual (defensivo: si el
+     *    admin revirtió la meta pero el log histórico dice otra cosa, gana el log).
+     *
+     * @param int    $user_id ID del usuario.
+     * @param string $type    terms|privacy|sagrilaft|kyc.
+     * @return bool True si el usuario debe re-consentir.
+     */
+    public static function user_needs_reconsent( int $user_id, string $type ): bool {
+        if ( $user_id <= 0 ) {
+            return true; // Guest / sin usuario → siempre necesita consentir.
+        }
+
+        $current_version = self::get_current_consent_version( $type );
+        if ( '0.0' === $current_version ) {
+            return false; // Tipo desconocido — no bloquear.
+        }
+
+        // 1) Verificación rápida vía user_meta (seteado en log_registration_consents).
+        $meta_key = 'ltms_' . $type . '_version';
+        $stored   = get_user_meta( $user_id, $meta_key, true );
+        if ( ! $stored || (string) $stored !== (string) $current_version ) {
+            return true;
+        }
+
+        // 2) Verificación forense en lt_consent_log: último consentimiento ACEPTADO
+        // para este tipo debe tener version == current_version.
+        global $wpdb;
+        $last = $wpdb->get_var( $wpdb->prepare(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared — table name is static.
+            "SELECT version FROM {$wpdb->prefix}lt_consent_log
+             WHERE user_id = %d AND consent_type = %s AND accepted = 1
+             ORDER BY created_at DESC LIMIT 1",
+            $user_id,
+            sanitize_key( $type )
+        ) );
+
+        if ( null === $last ) {
+            // Sin registro de consentimiento en el log → necesita consentir.
+            return true;
+        }
+
+        return (string) $last !== (string) $current_version;
+    }
+
+    /**
+     * Devuelve la lista de documentos legales que el usuario debe re-consentir.
+     *
+     * Útil para mostrar un banner de re-consentimiento en el dashboard o
+     * bloquear acciones sensibles (checkout, payout, KYC submission).
+     *
+     * @param int $user_id
+     * @return string[] Array de tipos ('terms', 'privacy', 'sagrilaft', 'kyc').
+     */
+    public static function get_pending_reconsents( int $user_id ): array {
+        $pending = [];
+        foreach ( [ 'terms', 'privacy', 'sagrilaft', 'kyc' ] as $type ) {
+            if ( self::user_needs_reconsent( $user_id, $type ) ) {
+                $pending[] = $type;
+            }
+        }
+        return $pending;
     }
 
     // ── Utilidades ────────────────────────────────────────────────────────────────

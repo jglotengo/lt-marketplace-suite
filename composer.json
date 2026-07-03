@@ -18,7 +18,7 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",
-        "dompdf/dompdf": "^2.0",
+        "dompdf/dompdf": "^2.0.9",
         "firebase/php-jwt": "^7.0",
         "ramsey/uuid": "^4.7",
         "stripe/stripe-php": "^13.0"

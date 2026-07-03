@@ -92,12 +92,65 @@ class LTMS_GDPR_Eraser {
             'ltms_kyc_archived_at',
             'ltms_kyc_verified_at',
             'ltms_kyc_rejected_reason',
+            // GDPR-2 FIX: ZapSign manager uses 'ltms_document_number' (without
+            // the 'kyc_' prefix) as the canonical document-number meta key.
+            // The original eraser only deleted 'ltms_kyc_document_number' which
+            // is a DIFFERENT key — the vendor's government ID number was never
+            // actually erased, violating GDPR Art. 17 right to erasure.
+            'ltms_document_number',
+            'ltms_kyc_approved_at',
+            'ltms_phone',
+            // GDPR-1 FIX: ZapSign contract data contains PII (vendor name, email,
+            // masked document, sign URL tied to vendor identity). The original
+            // eraser did NOT delete any contract meta, leaving the vendor's
+            // contract token, sign URL, and signing timestamps in user_meta.
+            'ltms_contract_token',
+            'ltms_contract_status',
+            'ltms_contract_sent_at',
+            'ltms_contract_signed_at',
+            'ltms_contract_sign_url',
+            'ltms_contract_status_verified_at',
+            '_ltms_zapsign_doc_token',
+            '_ltms_zapsign_signed_at',
+            // GDPR-3 FIX: B2 backup references — the actual PDF is deleted below
+            // via the dedicated backup-deletion block, but the meta keys must
+            // also be removed so the vendor's contract can no longer be located.
+            'ltms_contract_b2_bucket',
+            'ltms_contract_b2_key',
+            'ltms_contract_pdf_hash',
+            'ltms_contract_backed_up_at',
         ];
 
         foreach ( $kyc_meta_keys as $key ) {
             if ( get_user_meta( $user_id, $key, true ) ) {
                 delete_user_meta( $user_id, $key );
                 $items_removed = true;
+            }
+        }
+
+        // GDPR-3 FIX: delete the signed contract backup from B2.
+        // backup_signed_contract() uploads the PDF to B2 but does NOT register
+        // it in lt_media_files (the ENUM does not include 'contract'). The only
+        // references are the ltms_contract_b2_bucket / ltms_contract_b2_key
+        // user_meta keys. Without this block, the signed contract PDF — which
+        // contains the vendor's full name, email, masked document, IP, and
+        // signature — would remain in B2 forever after GDPR erasure.
+        $contract_bucket = get_user_meta( $user_id, 'ltms_contract_b2_bucket', true );
+        $contract_key    = get_user_meta( $user_id, 'ltms_contract_b2_key', true );
+        if ( $contract_bucket && $contract_key ) {
+            try {
+                $b2_contract = LTMS_Api_Factory::get( 'backblaze' );
+                $b2_contract->delete_file( $contract_bucket, $contract_key );
+                $items_removed = true;
+                LTMS_Core_Logger::info( 'GDPR_ERASE_CONTRACT', "User #{$user_id} — signed contract deleted from B2: {$contract_bucket}/{$contract_key}" );
+            } catch ( \Throwable $e ) {
+                $items_retained = true;
+                $messages[]     = sprintf(
+                    __( 'No se pudo eliminar el contrato firmado en B2 (%s): %s', 'ltms' ),
+                    esc_html( $contract_key ),
+                    esc_html( $e->getMessage() )
+                );
+                LTMS_Core_Logger::error( 'GDPR_ERASE_CONTRACT_FAILED', "User #{$user_id} — {$contract_bucket}/{$contract_key}: " . $e->getMessage() );
             }
         }
 

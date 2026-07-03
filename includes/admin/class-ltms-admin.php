@@ -42,6 +42,20 @@ final class LTMS_Admin {
         add_action( 'edit_user_profile',   [ $instance, 'render_vendor_commission_field' ] );
         add_action( 'personal_options_update',  [ $instance, 'save_vendor_commission_field' ] );
         add_action( 'edit_user_profile_update', [ $instance, 'save_vendor_commission_field' ] );
+
+        // Task 60-D — Panel de Donaciones (Fundación Cardio Infantil)
+        if ( class_exists( 'LTMS_Admin_Donations' ) ) {
+            LTMS_Admin_Donations::init();
+        }
+        // Hook del generador de certificados PDF
+        if ( class_exists( 'LTMS_Donation_Certificate' ) && method_exists( 'LTMS_Donation_Certificate', 'init' ) ) {
+            LTMS_Donation_Certificate::init();
+        }
+
+        // Task 63-C — Panel de Cross-Border Commerce.
+        if ( class_exists( 'LTMS_Admin_Cross_Border' ) ) {
+            LTMS_Admin_Cross_Border::init();
+        }
     }
 
     /**
@@ -242,6 +256,33 @@ final class LTMS_Admin {
                 'capability' => 'ltms_manage_platform_settings',
                 'slug'       => 'ltms-aveonline-hub',
                 'callback'   => [ $this, 'render_aveonline_hub' ],
+            ],
+            // v3.0.0 — Donaciones Fundación Cardio Infantil (Task 60-D)
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Donaciones — Fundación Cardio Infantil', 'ltms' ),
+                'menu_title' => __( 'Donaciones', 'ltms' ),
+                'capability' => 'manage_options',
+                'slug'       => 'ltms-donations',
+                'callback'   => [ $this, 'render_donations' ],
+            ],
+            // v3.1.0 — Cross-Border Commerce (Task 63-C)
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Cross-Border Commerce', 'ltms' ),
+                'menu_title' => __( 'Cross-Border', 'ltms' ),
+                'capability' => 'manage_options',
+                'slug'       => 'ltms-cross-border',
+                'callback'   => [ 'LTMS_Admin_Cross_Border', 'render_dashboard' ],
+            ],
+            // v2.8.3 — Shipping Cost Ledger & Reconciliation Engine
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Logística / Costos', 'ltms' ),
+                'menu_title' => __( 'Logística / Costos', 'ltms' ),
+                'capability' => 'ltms_view_wallet_ledger',
+                'slug'       => 'ltms-shipping-ledger',
+                'callback'   => [ 'LTMS_Admin_Shipping_Ledger', 'render_page' ],
             ],
         ];
 
@@ -510,6 +551,16 @@ final class LTMS_Admin {
     // v2.9.2 — Ave-Hub
     public function render_aveonline_hub(): void {
         $this->render_view( 'html-admin-aveonline-hub' );
+    }
+
+    // v3.0.0 — Donaciones (Fundación Cardio Infantil)
+    public function render_donations(): void {
+        if ( class_exists( 'LTMS_Admin_Donations' ) ) {
+            LTMS_Admin_Donations::render_dashboard();
+        } else {
+            echo '<div class="wrap"><h1>' . esc_html__( 'Donaciones', 'ltms' ) . '</h1><p>'
+                . esc_html__( 'El módulo de donaciones no está disponible.', 'ltms' ) . '</p></div>';
+        }
     }
 
     /**

@@ -97,7 +97,12 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
 
         $endpoint = sprintf( '/v1/customers/%s/delivery_quotes', rawurlencode( $this->customer_id ) );
 
-        return $this->perform_request( 'POST', $endpoint, $quote_data );
+        // API-BUG-9 FIX: idempotent quote — same quote request retried → same quote_id.
+        $idempotency_key = 'ltms_quote_' . md5( wp_json_encode( $quote_data ) );
+
+        return $this->perform_request( 'POST', $endpoint, $quote_data, [
+            'Idempotency-Key' => $idempotency_key,
+        ] );
     }
 
     /**
@@ -127,7 +132,15 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
             [ 'quote_id' => $quote_id ]
         );
 
-        return $this->perform_request( 'POST', $endpoint, $payload );
+        // API-BUG-9 FIX: deterministic Idempotency-Key by external_id (WC order ID).
+        // Uber Direct dedupes delivery creation when 5xx retries fire after the
+        // first request already created the delivery server-side.
+        $external_id      = $delivery_data['external_id'] ?? '';
+        $idempotency_key  = $external_id ? 'ltms_delivery_' . $external_id : 'ltms_delivery_' . md5( wp_json_encode( $payload ) );
+
+        return $this->perform_request( 'POST', $endpoint, $payload, [
+            'Idempotency-Key' => $idempotency_key,
+        ] );
     }
 
     /**
@@ -198,6 +211,60 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
     // -------------------------------------------------------------------------
 
     /**
+     * Realiza una petición a Uber Direct con refresh automático del OAuth2 token
+     * cuando Uber responde 401 Unauthorized.
+     *
+     * UB-BUG-2 FIX: el cliente base (LTMS_Abstract_API_Client::perform_request)
+     * lanza \RuntimeException inmediatamente en cualquier 4xx sin reintentar.
+     * Uber puede revocar el access token cached en el transient antes de su TTL
+     * (p. ej. rotación de claves, logout forzado por el merchant), y todas las
+     * peticiones posteriores fallaban permanentemente hasta que un admin limpiara
+     * manualmente el transient `ltms_uber_access_token`. Este override intercepta
+     * el 401, limpia el transient, fuerza la obtención de un token nuevo, y
+     * reintenta la petición UNA vez. Si el refresh o el reintento falla, se
+     * propaga la excepción original al caller.
+     *
+     * @param string $method    Método HTTP (GET, POST, PUT, DELETE, PATCH).
+     * @param string $endpoint  Endpoint relativo.
+     * @param array  $data      Datos del body.
+     * @param array  $headers   Headers adicionales.
+     * @param bool   $retry     Si se deben reintentar errores de red.
+     * @return array
+     * @throws \RuntimeException En errores de red o HTTP no-2xx.
+     */
+    public function perform_request(
+        string $method,
+        string $endpoint,
+        array  $data    = [],
+        array  $headers = [],
+        bool   $retry   = true
+    ): array {
+        try {
+            return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
+        } catch ( \RuntimeException $e ) {
+            // El abstract lanza con el status code como exception code.
+            if ( 401 !== (int) $e->getCode() ) {
+                throw $e;
+            }
+
+            // 401 = token inválido/expirado en servidor. Limpiar el cache y
+            // forzar un refresh antes de reintentar UNA vez.
+            delete_transient( 'ltms_uber_access_token' );
+
+            try {
+                $this->refresh_auth_header();
+            } catch ( \Throwable $refresh_error ) {
+                // No pudimos obtener un token nuevo → propagar el 401 original.
+                throw $e;
+            }
+
+            // Reintentar exactamente una vez. Si vuelve a fallar, la excepción
+            // se propaga (no entramos en loop).
+            return parent::perform_request( $method, $endpoint, $data, $headers, $retry );
+        }
+    }
+
+    /**
      * Obtiene un access token OAuth2 de Uber, usando caché de transient.
      *
      * Si existe un token vigente en el transient 'ltms_uber_access_token' lo devuelve
@@ -226,7 +293,10 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
                 'scope'         => 'eats.deliveries',
             ],
             'timeout'   => 20,
-            'sslverify' => LTMS_Core_Config::is_production(),
+            // API-BUG-4 FIX: SSL verification must ALWAYS be true. The previous
+            // `is_production()` check disabled SSL in sandbox, making Uber OAuth
+            // token endpoints vulnerable to MITM in non-prod environments.
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

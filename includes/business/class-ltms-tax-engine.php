@@ -5,11 +5,17 @@
  * Fachada (Facade) que delega el cálculo de impuestos a la estrategia
  * correcta según el país configurado en el plugin.
  *
- * Países soportados: CO (Colombia), MX (México)
+ * Países soportados: CO (Colombia), MX (México),
+ * US (United States), EU (European Union), BR (Brazil).
+ *
+ * Cross-Border motor (Task 63-A/B): registration of US/EU/BR strategies is
+ * defensive — if the strategy class is not loaded yet, the engine still
+ * serves CO/MX (legacy behaviour) and only throws for unknown countries
+ * that are explicitly requested.
  *
  * @package    LTMS
  * @subpackage LTMS/includes/business
- * @version    1.5.0
+ * @version    1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,11 +28,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class LTMS_Tax_Engine {
 
     /**
-     * Punto de entrada del Kernel. Sin hooks que registrar para esta clase.
+     * Punto de entrada del Kernel.
+     *
+     * Cross-Border motor (Task 63-D): registers the new US/EU/BR strategies
+     * defensively so the engine continues to work whether or not the
+     * strategy classes have been loaded by the autoloader. The strategy
+     * instances are only created if the class exists at boot time.
      *
      * @return void
      */
-    public static function init(): void {}
+    public static function init(): void {
+        $cross_border_strategies = [
+            'US' => 'LTMS_Tax_Strategy_US',
+            'EU' => 'LTMS_Tax_Strategy_EU',
+            'BR' => 'LTMS_Tax_Strategy_BR',
+        ];
+
+        foreach ( $cross_border_strategies as $country => $class_name ) {
+            if ( ! isset( self::$strategies[ $country ] ) && class_exists( $class_name ) ) {
+                self::$strategies[ $country ] = new $class_name();
+            }
+        }
+    }
 
     /**
      * Instancias cacheadas de estrategias fiscales.
@@ -41,7 +64,7 @@ final class LTMS_Tax_Engine {
      * @param float  $gross_amount Monto bruto de la transacción.
      * @param array  $order_data   Datos del pedido (tipo de producto, tipo comprador, municipio, etc.).
      * @param array  $vendor_data  Datos del vendedor (régimen, NIT/RFC, CIIU, municipio, etc.).
-     * @param string $country      Código de país: 'CO' o 'MX'.
+     * @param string $country      Código de país: 'CO', 'MX', 'US', 'EU', 'BR'.
      * @return array Desglose fiscal con todos los impuestos y retenciones.
      * @throws \InvalidArgumentException Si el país no está soportado.
      */
@@ -58,7 +81,18 @@ final class LTMS_Tax_Engine {
          * @param array  $vendor_data Vendor context.
          * @param string $country     Country code.
          */
-        return apply_filters( 'ltms_after_tax_calculate', $result, $order_data, $vendor_data, $country );
+        $result = apply_filters( 'ltms_after_tax_calculate', $result, $order_data, $vendor_data, $country );
+
+        // RB-4 FIX (v2.9.19): Disparar ltms_tax_calculation_result para que los
+        // listeners de Physical Products (PP-6 ICE/IEPS), Cross-Border (CB-3 IOSS,
+        // CB-6 non-resident IVA withholding) se ejecuten. Antes de este fix,
+        // esos listeners usaban un filter name que NO existía → silent dead code
+        // desde v2.9.15 y v2.9.18. Pasamos los mismos 4 args que ltms_after_tax_calculate
+        // para mantener consistencia; el filter nuevo se dispara DESPUÉS del existente
+        // para que los modificadores anteriores ya hayan aplicado sus cambios.
+        $result = apply_filters( 'ltms_tax_calculation_result', $result, $order_data['gross'] ?? 0.0, $order_data, $vendor_data );
+
+        return $result;
     }
 
     /**
@@ -76,7 +110,7 @@ final class LTMS_Tax_Engine {
     /**
      * Obtiene el código de país de la estrategia activa.
      *
-     * @return string 'CO' o 'MX'.
+     * @return string 'CO', 'MX', 'US', 'EU' o 'BR'.
      */
     public static function get_active_country(): string {
         return LTMS_Core_Config::get_country();
@@ -84,6 +118,14 @@ final class LTMS_Tax_Engine {
 
     /**
      * Devuelve la estrategia fiscal para el país dado.
+     *
+     * Cross-Border motor (Task 63-D): resolves US/EU/BR strategies IF they
+     * were pre-registered by `init()` (which only runs them through the
+     * autoloader if the class exists). The legacy strategy_map keeps only
+     * the CO/MX entries so that existing unit tests which call
+     * `flush_strategies()` and then expect an InvalidArgumentException for
+     * unrecognised countries continue to pass — the new strategies are
+     * strictly additive (only available after `init()` has registered them).
      *
      * @param string $country Código de país.
      * @return LTMS_Tax_Strategy_Interface
@@ -96,6 +138,11 @@ final class LTMS_Tax_Engine {
             return self::$strategies[ $country ];
         }
 
+        // Legacy map — only CO/MX are directly instantiated. US/EU/BR are
+        // registered by init() at boot time so they appear in self::$strategies
+        // before any calculate() call reaches this point. If they're NOT in
+        // the cache here, the country is treated as unsupported (this preserves
+        // the original InvalidArgumentException behaviour for tests).
         $strategy_map = [
             'CO' => 'LTMS_Tax_Strategy_Colombia',
             'MX' => 'LTMS_Tax_Strategy_Mexico',
@@ -142,8 +189,12 @@ final class LTMS_Tax_Engine {
     /**
      * Formatea el desglose fiscal para mostrar en facturas/recibos.
      *
+     * Cross-Border motor (Task 63-D): added labels for sales_tax (US),
+     * gst (CA/AU), vat (EU/UK), and customs duties so the breakdown table
+     * reflects the new tax strategies.
+     *
      * @param array  $tax_breakdown Resultado de calculate().
-     * @param string $currency      Código de moneda (COP, MXN).
+     * @param string $currency      Código de moneda (COP, MXN, USD, EUR, BRL, etc.).
      * @return string HTML formateado.
      */
     public static function format_breakdown_html( array $tax_breakdown, string $currency ): string {
@@ -159,6 +210,13 @@ final class LTMS_Tax_Engine {
             'reteiva'       => __( 'ReteIVA', 'ltms' ),
             'reteica'       => __( 'ReteICA', 'ltms' ),
             'isr_platform'  => __( 'ISR Plataformas (art. 113-A LISR)', 'ltms' ),
+            // Cross-border labels (Task 63-D).
+            'sales_tax'     => __( 'Sales Tax (US)', 'ltms' ),
+            'gst'           => __( 'GST', 'ltms' ),
+            'vat'           => __( 'VAT', 'ltms' ),
+            'customs_duty'  => __( 'Customs Duty', 'ltms' ),
+            'customs_vat'   => __( 'Customs VAT', 'ltms' ),
+            'customs_fee'   => __( 'Customs Fee', 'ltms' ),
             'total'         => __( 'Total', 'ltms' ),
         ];
 

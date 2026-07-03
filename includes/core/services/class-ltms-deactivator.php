@@ -52,8 +52,10 @@ final class LTMS_Core_Deactivator {
             'ltms_cleanup_sessions',
             'ltms_generate_tax_reports',
             'ltms_approve_payout_cron',
-            'ltms_daily_cron',             // M-46
-            'ltms_alegra_retry_failed',    // Reintentos facturas Alegra
+            'ltms_daily_cron',                // M-46
+            'ltms_alegra_retry_failed',       // Reintentos facturas Alegra
+            'ltms_monthly_cron',              // RB-1 fix v2.9.19
+            'ltms_yearly_cron',               // RB-2 fix v2.9.19
             // Booking cron hooks (LTMS_Core_Cron_Manager)
             'ltms_cron_cleanup_pending_bookings',
             'ltms_cron_send_checkin_reminders',
@@ -61,6 +63,17 @@ final class LTMS_Core_Deactivator {
             'ltms_cron_auto_checkout',
             'ltms_cron_check_rnt_expiry',
             'ltms_cron_release_booking_deposits',
+            // 60-C — Donation motor crons
+            'ltms_donation_payout_cron',
+            'ltms_donation_certificate_cron',
+            'ltms_donation_recover_processing',
+            // 63-C / 65-C — Cross-border motor crons
+            'ltms_refresh_fx_rates',          // CRON-BUG-1 fix: daily FX rates refresh
+            'ltms_recover_pending_wallet_txs',// Wallet journal recovery (hourly)
+            'ltms_sync_aveonline_carriers',   // Aveonline carriers daily sync
+            'ltms_check_aveonboarding_reminders', // Aveonline onboarding reminders
+            // AUDIT-REDI-UX-GAPS GAP-9 FIX: SLA check cron de incidencias ReDi.
+            'ltms_redi_incident_sla_check',
         ];
 
         foreach ( $hooks as $hook ) {

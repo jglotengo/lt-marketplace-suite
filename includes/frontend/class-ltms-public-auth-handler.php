@@ -442,13 +442,38 @@ final class LTMS_Public_Auth_Handler {
             ]);
         }
 
-        // Login automático.
-        wp_set_current_user( $user_id );
-        wp_set_auth_cookie( $user_id, false );
-        // L-5 FIX: Registrar acceso de autenticación para trazabilidad.
-        // Ley 1581/2012 — el titular puede solicitar historial de accesos a sus datos.
-        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-            LTMS_Legal_Compliance::log_oauth_access( $user_id, 'native_login' );
+        // ME-5 FIX: do NOT auto-login after registration by default. The user
+        // must verify their email before they can access the dashboard. This
+        // prevents account creation with fake/typo emails from being used to
+        // browse vendor data immediately.
+        //
+        // If the site admin has explicitly set the option
+        // `ltms_require_email_verification` to 'no', auto-login is preserved
+        // for backward compatibility (e.g. dev / staging sites that skip
+        // email delivery).
+        $require_email_verification = get_option( 'ltms_require_email_verification', 'yes' ) !== 'no';
+
+        $pages        = get_option( 'ltms_installed_pages', [] );
+        $dashboard_id = $pages['ltms-dashboard'] ?? 0;
+        $login_id     = $pages['ltms-login'] ?? 0;
+
+        if ( $require_email_verification ) {
+            // No auth cookie — the user must click the verification link in the
+            // welcome email. Redirect them to the login page with a clear
+            // message so they know to check their inbox.
+            $redirect = $login_id ? get_permalink( $login_id ) : home_url();
+            $message  = __( 'Registration successful. Please check your email to verify your account.', 'ltms' );
+        } else {
+            // Email verification is optional — auto-login (legacy behavior).
+            wp_set_current_user( $user_id );
+            wp_set_auth_cookie( $user_id, false );
+            // L-5 FIX: Registrar acceso de autenticación para trazabilidad.
+            // Ley 1581/2012 — el titular puede solicitar historial de accesos a sus datos.
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_oauth_access( $user_id, 'native_login' );
+            }
+            $redirect = $dashboard_id ? get_permalink( $dashboard_id ) : home_url();
+            $message  = __( '¡Registro exitoso! Revisa tu email para verificar tu cuenta.', 'ltms' );
         }
 
         // Limpiar contador en éxito para no penalizar a usuarios legítimos en la misma red.
@@ -457,16 +482,13 @@ final class LTMS_Public_Auth_Handler {
         LTMS_Core_Logger::info(
             'VENDOR_REGISTERED',
             sprintf( 'Nuevo vendedor registrado: #%d (%s)', $user_id, $data['email'] ),
-            [ 'user_id' => $user_id ]
+            [ 'user_id' => $user_id, 'auto_login' => ! $require_email_verification ]
         );
 
-        $pages        = get_option( 'ltms_installed_pages', [] );
-        $dashboard_id = $pages['ltms-dashboard'] ?? 0;
-        $redirect     = $dashboard_id ? get_permalink( $dashboard_id ) : home_url();
-
         wp_send_json_success([
-            'redirect' => $redirect,
-            'message'  => __( '¡Registro exitoso! Revisa tu email para verificar tu cuenta.', 'ltms' ),
+            'redirect'            => $redirect,
+            'message'             => $message,
+            'email_verification_required' => $require_email_verification,
         ]);
     }
 

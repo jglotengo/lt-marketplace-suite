@@ -171,6 +171,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_dashboard_data(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -209,6 +211,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_wallet_data(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -257,6 +261,14 @@ final class LTMS_Dashboard_Logic {
      */
     public function ajax_get_notifications(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        // HI-8 FIX: capability check — notifications are vendor-only data.
+        // Without this, any logged-in user could read the notification stream
+        // for their own user_id (even if they are not a vendor) and pollute
+        // the notifications table via other endpoints.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
+        }
 
         $user_id = get_current_user_id();
         $since   = sanitize_text_field( $_POST['since'] ?? '' ); // phpcs:ignore
@@ -308,6 +320,12 @@ final class LTMS_Dashboard_Logic {
     public function ajax_mark_notification_read(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
+        // HI-8 FIX: capability check — marking notifications as read is a
+        // vendor-only action.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
+        }
+
         $user_id         = get_current_user_id();
         $notification_id = (int) ( $_POST['notification_id'] ?? 0 ); // phpcs:ignore
 
@@ -349,6 +367,8 @@ final class LTMS_Dashboard_Logic {
      * @return void  Responde con wp_send_json_success/error.
      */
     public function ajax_upload_kyc_document(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -573,6 +593,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_analytics_data(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -726,17 +748,29 @@ final class LTMS_Dashboard_Logic {
      * @return array
      */
     private function get_vendor_orders( int $vendor_id, int $page, int $per_page, string $status ): array {
+        // AUDIT-REDI-UX-GAPS GAP-7 FIX: usar meta_query OR para retornar
+        // también pedidos donde el vendor es el origin ReDi (no solo el
+        // reseller). Antes el origin vendor nunca veía pedidos ReDi en su
+        // dashboard a pesar de ser quien debe enviar el producto.
         $args = [
-            'meta_key'    => '_ltms_vendor_id',
-            'meta_value'  => $vendor_id,
+            'meta_query' => [
+                'relation' => 'OR',
+                [
+                    'key'     => '_ltms_vendor_id',
+                    'value'   => $vendor_id,
+                    'compare' => '=',
+                ],
+                [
+                    'key'     => '_ltms_redi_origin_vendor_id',
+                    'value'   => $vendor_id,
+                    'compare' => '=',
+                ],
+            ],
             'limit'       => $per_page,
             'paged'       => $page,
             'orderby'     => 'date',
             'order'       => 'DESC',
             'type'        => 'shop_order',
-            // BUGFIX (audit pedidos): 'paginate' => true hace que WC devuelva un objeto
-            // con el total REAL de resultados que cumplen el filtro (no solo los de la
-            // página actual), necesario para construir paginación real en el frontend.
             'paginate'    => true,
         ];
 
@@ -761,16 +795,36 @@ final class LTMS_Dashboard_Logic {
                 $shipping_label = $method->get_name();
             }
 
-            // BUGFIX (audit pedidos): usar una variable propia en vez de reasignar el
-            // parámetro $vendor_id de la función dentro del loop (code smell/riesgo latente).
             $order_vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
             $store_info      = ( $is_pickup && $order_vendor_id )
                 ? LTMS_Business_Pickup_Handler::get_vendor_store_info( $order_vendor_id )
                 : [];
 
-            // BUGFIX (audit pedidos): trim + fallback cuando billing_first/last_name
-            // vienen vacíos (compra como invitado sin datos completos).
             $customer_name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
+
+            // AUDIT-REDI-UX-GAPS GAP-7: determinar el rol ReDi del vendor
+            // en este pedido (origin, reseller, o null si no es ReDi).
+            $redi_origin_id = (int) $order->get_meta( '_ltms_redi_origin_vendor_id' );
+            $redi_role      = null;
+            $is_redi        = false;
+            if ( $redi_origin_id > 0 ) {
+                $is_redi = true;
+                if ( $redi_origin_id === $vendor_id ) {
+                    $redi_role = 'origin';
+                } elseif ( $order_vendor_id === $vendor_id ) {
+                    $redi_role = 'reseller';
+                }
+            }
+
+            // AUDIT-REDI-UX-GAPS GAP-7: PII masking para el reseller.
+            // El reseller NO necesita la dirección completa del cliente
+            // (el origin vendor envía directamente). El reseller solo ve
+            // nombre + ciudad. El origin vendor ve la dirección completa.
+            $customer_city = $order->get_billing_city();
+            $masked_customer = $customer_name;
+            if ( $redi_role === 'reseller' && $customer_city ) {
+                $masked_customer .= ' (' . $customer_city . ')';
+            }
 
             $orders[] = [
                 'id'             => $order->get_id(),
@@ -778,12 +832,17 @@ final class LTMS_Dashboard_Logic {
                 'status'         => $order->get_status(),
                 'total'          => (float) $order->get_total(),
                 'formatted'      => LTMS_Utils::format_money( (float) $order->get_total() ),
-                'customer'       => $customer_name !== '' ? $customer_name : __( 'Cliente sin nombre', 'ltms' ),
+                'customer'       => $masked_customer !== '' ? $masked_customer : __( 'Cliente sin nombre', 'ltms' ),
                 'date'           => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
                 'items_count'    => count( $order->get_items() ),
                 'is_pickup'      => $is_pickup,
                 'shipping_label' => $shipping_label ?: __( 'Envío estándar', 'ltms' ),
                 'store_info'     => $store_info,
+                // AUDIT-REDI-UX-GAPS GAP-7: campos ReDi para el frontend.
+                'is_redi'        => $is_redi,
+                'redi_role'      => $redi_role,
+                'redi_origin_id' => $redi_origin_id,
+                'redi_reseller_id' => $order_vendor_id,
             ];
         }
 
@@ -807,6 +866,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_order_detail(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id  = get_current_user_id();
@@ -817,8 +878,23 @@ final class LTMS_Dashboard_Logic {
         }
 
         $order = wc_get_order( $order_id );
-        if ( ! $order || (int) $order->get_meta( '_ltms_vendor_id' ) !== $user_id ) {
+        // AUDIT-REDI-UX-GAPS GAP-7 FIX: permitir acceso al origin vendor
+        // además del reseller. Antes solo `_ltms_vendor_id === user_id`
+        // bloqueaba al origin vendor de ver el detalle del pedido ReDi.
+        $order_vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+        $redi_origin_id  = (int) $order->get_meta( '_ltms_redi_origin_vendor_id' );
+        if ( ! $order || ( $order_vendor_id !== $user_id && $redi_origin_id !== $user_id ) ) {
             wp_send_json_error( __( 'Pedido no encontrado o no te pertenece.', 'ltms' ), 404 );
+        }
+
+        // AUDIT-REDI-UX-GAPS GAP-7: determinar rol ReDi para PII masking.
+        $redi_role = null;
+        if ( $redi_origin_id > 0 ) {
+            if ( $redi_origin_id === $user_id ) {
+                $redi_role = 'origin';
+            } elseif ( $order_vendor_id === $user_id ) {
+                $redi_role = 'reseller';
+            }
         }
 
         $items = [];
@@ -847,6 +923,25 @@ final class LTMS_Dashboard_Logic {
 
         $customer_name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
 
+        // AUDIT-REDI-UX-GAPS GAP-7: PII masking para el reseller en el detalle.
+        // El reseller NO ve la dirección de envío completa, email ni teléfono
+        // del cliente (el origin vendor envía directamente). Solo ve nombre
+        // + ciudad. El origin vendor ve TODO.
+        $billing_address   = trim( $order->get_formatted_billing_address() ?: '' );
+        $shipping_address  = trim( $order->get_formatted_shipping_address() ?: '' );
+        $customer_email    = $order->get_billing_email();
+        $customer_phone    = $order->get_billing_phone();
+
+        if ( $redi_role === 'reseller' ) {
+            $billing_address  = $order->get_billing_city() ?: '';
+            $shipping_address = $order->get_shipping_city() ?: '';
+            $customer_email   = '';
+            $customer_phone   = '';
+            if ( $customer_name && $billing_address ) {
+                $customer_name .= ' (' . $billing_address . ')';
+            }
+        }
+
         // Notas del pedido visibles al cliente (no las internas/privadas del admin).
         $notes = [];
         foreach ( wc_get_order_notes( [ 'order_id' => $order_id, 'type' => 'customer' ] ) as $note ) {
@@ -863,10 +958,10 @@ final class LTMS_Dashboard_Logic {
             'status_label'    => wc_get_order_status_name( $order->get_status() ),
             'date'            => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '',
             'customer'        => $customer_name !== '' ? $customer_name : __( 'Cliente sin nombre', 'ltms' ),
-            'customer_email'  => $order->get_billing_email(),
-            'customer_phone'  => $order->get_billing_phone(),
-            'billing_address' => trim( $order->get_formatted_billing_address() ?: '' ),
-            'shipping_address'=> trim( $order->get_formatted_shipping_address() ?: '' ),
+            'customer_email'  => $customer_email,
+            'customer_phone'  => $customer_phone,
+            'billing_address' => $billing_address,
+            'shipping_address'=> $shipping_address,
             'is_pickup'       => $is_pickup,
             'shipping_label'  => $shipping_label ?: __( 'Envío estándar', 'ltms' ),
             'store_info'      => $store_info,
@@ -876,6 +971,9 @@ final class LTMS_Dashboard_Logic {
             'total'           => LTMS_Utils::format_money( (float) $order->get_total() ),
             'customer_note'   => $order->get_customer_note(),
             'notes'           => $notes,
+            // AUDIT-REDI-UX-GAPS GAP-7: campos ReDi para el frontend.
+            'is_redi'         => $redi_origin_id > 0,
+            'redi_role'       => $redi_role,
             'allowed_transitions' => $this->get_allowed_status_transitions( $order->get_status() ),
             'edit_url'        => $order->get_edit_order_url(),
         ] );
@@ -918,7 +1016,11 @@ final class LTMS_Dashboard_Logic {
         }
 
         $order = wc_get_order( $order_id );
-        if ( ! $order || (int) $order->get_meta( '_ltms_vendor_id' ) !== $user_id ) {
+        // AUDIT-REDI-UX-GAPS GAP-7 FIX: permitir al origin vendor cambiar
+        // estado del pedido ReDi (ej: marcar como completado cuando envía).
+        $order_vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+        $redi_origin_id  = (int) $order->get_meta( '_ltms_redi_origin_vendor_id' );
+        if ( ! $order || ( $order_vendor_id !== $user_id && $redi_origin_id !== $user_id ) ) {
             wp_send_json_error( __( 'Pedido no encontrado o no te pertenece.', 'ltms' ), 404 );
         }
 
@@ -1086,8 +1188,17 @@ final class LTMS_Dashboard_Logic {
                 'message'    => __( 'Producto adoptado como ReDi exitosamente.', 'ltms' ),
             ] );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::error( 'REDI_ADOPT_FAILED', $e->getMessage() );
-            wp_send_json_error( $e->getMessage() );
+            // HI-9 FIX: do not leak the raw exception message to the client.
+            // The real error is logged via LTMS_Core_Logger with full context.
+            LTMS_Core_Logger::error(
+                'REDI_ADOPT_FAILED',
+                $e->getMessage(),
+                [ 'user_id' => $user_id, 'product_id' => $product_id, 'trace' => $e->getTraceAsString() ]
+            );
+            wp_send_json_error(
+                [ 'message' => __( 'An error occurred. Please try again.', 'ltms' ) ],
+                500
+            );
         }
     }
 

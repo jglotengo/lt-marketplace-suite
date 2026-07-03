@@ -21,6 +21,14 @@ class LTMS_Uber_Direct_Webhook_Handler {
     }
 
     public static function handle( \WP_REST_Request $request ): \WP_REST_Response {
+        // API-BUG-19 FIX: per-IP rate limit (max 100 webhooks/min) — protects DB.
+        $rate_key = 'ltms_wh_rate_' . md5( self::client_ip() );
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 100 ) {
+            return new \WP_REST_Response( [ 'error' => 'Too many requests' ], 429 );
+        }
+        set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
+
         $payload   = $request->get_body();
         $signature = $request->get_header( 'x-postmates-signature' ) ?: $request->get_header( 'x-uber-signature' ) ?: '';
         $secret    = LTMS_Core_Config::get( 'ltms_uber_direct_webhook_secret', '' );
@@ -45,6 +53,45 @@ class LTMS_Uber_Direct_Webhook_Handler {
         $event_type = $data['kind'] ?? $data['event_type'] ?? 'unknown';
         $delivery   = $data['data'] ?? [];
         $ext_id     = $delivery['external_id'] ?? $data['external_id'] ?? '';
+
+        // API-BUG-11 FIX: event_id idempotency. Uber Direct may retry the same
+        // webhook on timeout. Without dedup, the same status update would fire
+        // multiple times (e.g., do_action('ltms_shipping_delivered') twice).
+        // API-BUG-18 FIX: return 200 immediately if already processed.
+        //
+        // UB-BUG-1 FIX: the event_id must be UNIQUE PER WEBHOOK EVENT, not per
+        // delivery. Using delivery_id (constant across all status updates of the
+        // same delivery) caused every subsequent status webhook
+        // (pickup_complete → en_route_to_dropoff → delivered) to be deduplicated
+        // against the first one, so orders were stuck in the first status and
+        // `delivered` webhooks were silently dropped (Consumer Protection holds
+        // never released). Prefer Uber's own top-level event_id/webhook_id when
+        // present; otherwise derive a unique id from delivery_id + status +
+        // timestamp (with a random suffix to guarantee uniqueness when the
+        // timestamp is missing or repeated).
+        $delivery_id = $delivery['id'] ?? $delivery['delivery_id'] ?? '';
+        $status      = $delivery['status'] ?? $data['status'] ?? '';
+        $timestamp   = $data['timestamp'] ?? $delivery['timestamp'] ?? '';
+        // Note: $payload is the raw request body string (see $request->get_body()
+        // above); top-level webhook fields live in the decoded $data array.
+        $event_id    = $data['event_id']
+            ?? $data['webhook_id']
+            ?? md5( implode( '|', [
+                $delivery_id,
+                $status,
+                $timestamp,
+                wp_generate_password( 8, false ),
+            ] ) );
+        $seen_key    = 'ltms_wh_seen_uber_' . md5( $event_id );
+        if ( get_transient( $seen_key ) ) {
+            LTMS_Core_Logger::info(
+                'UBER_WEBHOOK_REPLAY',
+                sprintf( 'Duplicate Uber Direct event %s ignored (already processed).', $event_id ),
+                [ 'event_id' => $event_id ]
+            );
+            return new \WP_REST_Response( [ 'message' => 'Already processed' ], 200 );
+        }
+        set_transient( $seen_key, 1, HOUR_IN_SECONDS );
 
         // Log webhook
         global $wpdb;
@@ -122,7 +169,41 @@ class LTMS_Uber_Direct_Webhook_Handler {
     }
 
     private static function validate_signature( string $payload, string $signature, string $secret ): bool {
-        $expected = hash_hmac( 'sha256', $payload, $secret );
-        return hash_equals( $expected, $signature );
+        // AUDIT-SHIPPING-ENGINE #23 FIX: Uber Direct envía la firma HMAC-SHA256
+        // en formato HEX (no base64). El código anterior comparaba hex contra
+        // hex lo cual es correcto, PERO si la firma viene en base64 (algunos
+        // setups de Uber), la comparación siempre fallaba → TODOS los webhooks
+        // eran rechazados con 401.
+        // Ahora intentamos ambos formatos: hex y base64.
+        $expected_hex = hash_hmac( 'sha256', $payload, $secret );
+        $expected_b64 = base64_encode( hex2bin( $expected_hex ) );
+
+        // Try hex comparison first (standard Uber Direct).
+        if ( hash_equals( $expected_hex, $signature ) ) {
+            return true;
+        }
+        // Try base64 comparison (alternative format).
+        if ( hash_equals( $expected_b64, $signature ) ) {
+            return true;
+        }
+        // Try case-insensitive hex comparison (some proxies lowercase the header).
+        if ( hash_equals( strtolower( $expected_hex ), strtolower( $signature ) ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Resuelve la IP del cliente para rate limiting (API-BUG-19).
+     *
+     * @return string
+     */
+    private static function client_ip(): string {
+        // WH3 FIX (v2.8.9): delegar a LTMS_Core_Security::get_client_ip_safe().
+        if ( class_exists( 'LTMS_Core_Security' ) ) {
+            return LTMS_Core_Security::get_client_ip_safe();
+        }
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 }

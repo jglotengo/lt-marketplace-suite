@@ -119,30 +119,38 @@ class LTMS_Business_Aveonline_OrdenCompra {
         return (int) LTMS_Core_Config::get( 'ltms_aveonline_idempresa', 0 );
     }
 
-    private static function api_post( string $payload_json ): array {
-        $api_base = defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production'
-            ? 'https://app.aveonline.co/api'
-            : 'https://sandbox.aveonline.co/api';
-
-        $url = $api_base . self::ENDPOINT;
-
-        $raw = wp_remote_post( $url, [
-            'headers' => [ 'Content-Type' => 'application/json' ],
-            'body'    => $payload_json,
-            'timeout' => 30,
-        ] );
-
-        if ( is_wp_error( $raw ) ) {
-            throw new \RuntimeException( 'Aveonline OC HTTP error: ' . $raw->get_error_message() );
+    /**
+     * AO-BUG-9 FIX: el manager de OC usaba `wp_remote_post()` directo (método
+     * estático `api_post()`), bypassando el cliente de API. Eso omitía logging,
+     * reintentos, verificación SSL del abstract client, e Idempotency-Key.
+     *
+     * Este método ahora delega al cliente `LTMS_Api_Aveonline`, que a su vez
+     * enruta por `aveonline_request()` (con header `Idempotency-Key`).
+     *
+     * @param array $payload Datos a enviar (sin token ni idempresa — el cliente los agrega).
+     * @return array Respuesta decodificada.
+     * @throws \RuntimeException En error de red o si el cliente no está disponible.
+     */
+    private static function api_post( array $payload ): array {
+        if ( ! class_exists( 'LTMS_Api_Aveonline' ) ) {
+            throw new \RuntimeException( 'LTMS_Api_Aveonline no disponible.' );
         }
+        $api = new LTMS_Api_Aveonline();
 
-        $body = json_decode( wp_remote_retrieve_body( $raw ), true );
-        return is_array( $body ) ? $body : [];
+        // `crear_orden_compra` setea token + idempresa + Idempotency-Key internamente.
+        if ( ( $payload['tipo'] ?? '' ) === 'listarproveedores' ) {
+            return $api->list_proveedores_oc();
+        }
+        return $api->crear_orden_compra( $payload );
     }
 
     // ── AJAX: Listar proveedores ──────────────────────────────────────────────
 
     public static function ajax_proveedores(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		// SEC-4 FIX (v2.9.26): capability check.
+		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_nonce();
 
         $cached = get_transient( 'ltms_aveonline_oc_proveedores' );
@@ -151,14 +159,9 @@ class LTMS_Business_Aveonline_OrdenCompra {
         }
 
         try {
-            $token     = self::get_token();
-            $idempresa = self::get_idempresa();
-
-            $body = self::api_post( wp_json_encode( [
-                'tipo'      => 'listarproveedores',
-                'token'     => $token,
-                'idempresa' => $idempresa,
-            ] ) );
+            $body = self::api_post( [
+                'tipo' => 'listarproveedores',
+            ] );
 
             if ( ( $body['status'] ?? '' ) !== 'ok' ) {
                 wp_send_json_error( [ 'message' => $body['message'] ?? 'Error al obtener proveedores.' ] );
@@ -233,13 +236,8 @@ class LTMS_Business_Aveonline_OrdenCompra {
         }
 
         try {
-            $token     = self::get_token();
-            $idempresa = self::get_idempresa();
-
             $payload = [
                 'tipo'        => 'generarorden',
-                'token'       => $token,
-                'idempresa'   => $idempresa,
                 'idproveedor' => $idproveedor,
                 'ordencompra' => $ordencompra,
                 'detalle'     => $detalle_clean,
@@ -249,7 +247,7 @@ class LTMS_Business_Aveonline_OrdenCompra {
             if ( $modoenvio )       { $payload['modoenvio']       = $modoenvio; }
             if ( $idagente )        { $payload['idagente']        = $idagente; }
 
-            $body   = self::api_post( wp_json_encode( $payload ) );
+            $body   = self::api_post( $payload );
             $success = ( $body['status'] ?? '' ) === 'ok';
             $mensaje = $body['message'] ?? '';
 

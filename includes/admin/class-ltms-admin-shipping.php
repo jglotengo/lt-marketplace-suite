@@ -14,6 +14,9 @@ class LTMS_Admin_Shipping {
         add_action( 'ltms_admin_shipping_settings', [ self::class, 'render_settings' ] );
         add_action( 'wp_ajax_ltms_save_shipping_mode', [ self::class, 'ajax_save_mode' ] );
         add_action( 'wp_ajax_ltms_get_vendor_shipping', [ self::class, 'ajax_get_vendor' ] );
+        // v2.8.4: nuevos handlers AJAX para shared shipping y override por categoría.
+        add_action( 'wp_ajax_ltms_save_shared_pct', [ self::class, 'ajax_save_shared_pct' ] );
+        add_action( 'wp_ajax_ltms_save_category_mode', [ self::class, 'ajax_save_category_mode' ] );
         add_action( 'admin_menu', [ self::class, 'add_submenu' ] );
     }
 
@@ -51,7 +54,8 @@ class LTMS_Admin_Shipping {
             'flat'          => 'Tarifa fija',
             'free'          => 'Envío gratis',
             'free_absorbed' => 'Precio todo incluido (vendedor absorbe el flete)',
-            'hybrid'        => 'Gratis desde un monto mínimo',
+            'hybrid'        => 'Gratis desde un monto mínimo (recomendado)',
+            'shared'        => 'Compartido (cliente paga %, vendor absorbe resto)',
         ];
 
         $mode_icons = [
@@ -60,6 +64,7 @@ class LTMS_Admin_Shipping {
             'free'          => '&#x1F381;',
             'free_absorbed' => '&#x1F91D;',
             'hybrid'        => '&#x1F500;',
+            'shared'        => '&#x1F91A;',
         ];
         ?>
         <div class="wrap ltms-admin-wrap">
@@ -224,6 +229,87 @@ class LTMS_Admin_Shipping {
                     </div>
                 </div>
 
+                <!-- v2.8.4: MODO SHARED — % que paga el cliente -->
+                <div class="ltms-table-wrap" style="margin-bottom:20px;padding:0;">
+                    <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+                        <h2 style="margin:0;font-size:15px;font-weight:700;">&#x1F91A; <?php esc_html_e( 'Modo Compartido (Shared Shipping)', 'ltms' ); ?></h2>
+                        <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">
+                            <?php esc_html_e( 'Configura el % del flete que paga el cliente cuando una categoría está en modo "shared". El resto lo absorbe el vendedor.', 'ltms' ); ?>
+                        </p>
+                    </div>
+                    <div style="padding:20px;">
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;"><?php esc_html_e( '% que paga el cliente', 'ltms' ); ?></label>
+                            <input type="number" id="ltms-shared-pct" value="<?php echo esc_attr( class_exists('LTMS_Shipping_Mode') ? LTMS_Shipping_Mode::get_shared_customer_pct() : 60 ); ?>"
+                                   min="0" max="100" step="5"
+                                   style="width:120px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;" />
+                            <span style="font-size:12px;color:#6b7280;margin-left:8px;">
+                                <?php esc_html_e( 'Ej: 60% = cliente paga 60% del flete, vendor absorbe 40%.', 'ltms' ); ?>
+                            </span>
+                        </div>
+                        <button id="ltms-save-shared" class="ltms-btn ltms-btn-primary">
+                            &#x1F4BE; <?php esc_html_e( 'Guardar % compartido', 'ltms' ); ?>
+                        </button>
+                        <span id="ltms-shared-msg" style="margin-left:12px;color:#16a34a;font-size:13px;display:none;">&#x2705; <?php esc_html_e( 'Guardado', 'ltms' ); ?></span>
+                    </div>
+                </div>
+
+                <!-- v2.8.4: OVERRIDE POR CATEGORÍA -->
+                <div class="ltms-table-wrap" style="margin-bottom:20px;padding:0;">
+                    <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+                        <h2 style="margin:0;font-size:15px;font-weight:700;">&#x1F3A7; <?php esc_html_e( 'Override por Categoría', 'ltms' ); ?></h2>
+                        <p style="margin:4px 0 0;font-size:12px;color:#6b7280;">
+                            <?php esc_html_e( 'Asigna un modo de envío específico a categorías de productos. Prioridad: categoría > vendedor > global.', 'ltms' ); ?>
+                        </p>
+                    </div>
+                    <div style="padding:20px;">
+                        <?php
+                        // Obtener todas las categorías de producto.
+                        $all_cats = get_terms( [
+                            'taxonomy'   => 'product_cat',
+                            'hide_empty' => false,
+                            'number'     => 0,
+                        ] );
+                        $overrides = class_exists( 'LTMS_Shipping_Mode' ) ? LTMS_Shipping_Mode::get_all_category_overrides() : [];
+                        ?>
+                        <table class="ltms-table" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th><?php esc_html_e( 'Categoría', 'ltms' ); ?></th>
+                                    <th><?php esc_html_e( 'Modo Actual', 'ltms' ); ?></th>
+                                    <th><?php esc_html_e( 'Acción', 'ltms' ); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if ( is_wp_error( $all_cats ) || empty( $all_cats ) ) : ?>
+                                    <tr><td colspan="3"><?php esc_html_e( 'No hay categorías de producto configuradas.', 'ltms' ); ?></td></tr>
+                                <?php else : foreach ( $all_cats as $cat ) :
+                                    $current_mode = $overrides[ $cat->term_id ]['mode'] ?? '';
+                                    ?>
+                                    <tr>
+                                        <td><strong><?php echo esc_html( $cat->name ); ?></strong></td>
+                                        <td>
+                                            <select id="cat-mode-<?php echo esc_attr( $cat->term_id ); ?>" style="min-width:280px;">
+                                                <option value=""><?php esc_html_e( '— Usar modo global —', 'ltms' ); ?></option>
+                                                <?php foreach ( $mode_labels as $key => $label ) : ?>
+                                                    <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $current_mode, $key ); ?>>
+                                                        <?php echo esc_html( $label ); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button class="ltms-btn ltms-btn-outline ltms-save-cat-mode" data-cat-id="<?php echo esc_attr( $cat->term_id ); ?>">
+                                                &#x1F4BE; <?php esc_html_e( 'Guardar', 'ltms' ); ?>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div><!-- max-width wrapper -->
         </div><!-- .ltms-admin-wrap -->
 
@@ -323,9 +409,80 @@ class LTMS_Admin_Shipping {
                     if ( r.success ) { $( '#ltms-vendor-msg' ).show().delay( 3000 ).fadeOut(); }
                 } ).always( function() { $btn.prop( 'disabled', false ); } );
             } );
+
+            // v2.8.4: Guardar % compartido
+            $( '#ltms-save-shared' ).on( 'click', function() {
+                var $btn = $( this ).prop( 'disabled', true );
+                $.post( ajaxurl, {
+                    action:    'ltms_save_shared_pct',
+                    nonce:     nonce,
+                    pct:       parseFloat( $( '#ltms-shared-pct' ).val() ),
+                }, function( r ) {
+                    if ( r.success ) { $( '#ltms-shared-msg' ).show().delay( 3000 ).fadeOut(); }
+                } ).always( function() { $btn.prop( 'disabled', false ); } );
+            } );
+
+            // v2.8.4: Guardar modo por categoría
+            $( '.ltms-save-cat-mode' ).on( 'click', function() {
+                var $btn = $( this ).prop( 'disabled', true );
+                var catId = $( this ).data( 'cat-id' );
+                var mode = $( '#cat-mode-' + catId ).val();
+                $.post( ajaxurl, {
+                    action:   'ltms_save_category_mode',
+                    nonce:    nonce,
+                    cat_id:   catId,
+                    mode:     mode,
+                }, function( r ) {
+                    if ( r.success ) {
+                        $btn.text( '<?php echo esc_js( __( "Guardado", "ltms" ) ); ?>' ).delay( 2000 )
+                            .queue( function() { $btn.text( '<?php echo esc_js( __( "Guardar", "ltms" ) ); ?>' ).dequeue(); } );
+                    }
+                } ).fail( function() {
+                    alert( '<?php echo esc_js( __( "Error al guardar. Intenta de nuevo.", "ltms" ) ); ?>' );
+                } ).always( function() { $btn.prop( 'disabled', false ); } );
+            } );
         } );
         </script>
         <?php
+    }
+
+    /**
+     * v2.8.4: AJAX handler para guardar el % compartido del modo SHARED.
+     */
+    public static function ajax_save_shared_pct(): void {
+        check_ajax_referer( 'ltms_shipping_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Acceso denegado' );
+        }
+        $pct = (float) ( $_POST['pct'] ?? 60 ); // phpcs:ignore
+        if ( $pct < 0 || $pct > 100 ) {
+            wp_send_json_error( '% debe estar entre 0 y 100' );
+        }
+        if ( ! class_exists( 'LTMS_Shipping_Mode' ) ) {
+            wp_send_json_error( 'Clase LTMS_Shipping_Mode no disponible' );
+        }
+        $ok = LTMS_Shipping_Mode::set_shared_customer_pct( $pct );
+        wp_send_json_success( [ 'saved' => $ok, 'pct' => $pct ] );
+    }
+
+    /**
+     * v2.8.4: AJAX handler para guardar el modo de envío de una categoría.
+     */
+    public static function ajax_save_category_mode(): void {
+        check_ajax_referer( 'ltms_shipping_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( 'Acceso denegado' );
+        }
+        $cat_id = (int) ( $_POST['cat_id'] ?? 0 ); // phpcs:ignore
+        $mode   = sanitize_text_field( $_POST['mode'] ?? '' ); // phpcs:ignore
+        if ( ! $cat_id ) {
+            wp_send_json_error( 'Falta cat_id' );
+        }
+        if ( ! class_exists( 'LTMS_Shipping_Mode' ) ) {
+            wp_send_json_error( 'Clase LTMS_Shipping_Mode no disponible' );
+        }
+        $ok = LTMS_Shipping_Mode::set_category_mode( $cat_id, $mode );
+        wp_send_json_success( [ 'saved' => $ok, 'cat_id' => $cat_id, 'mode' => $mode ] );
     }
 
     public static function ajax_save_mode(): void {

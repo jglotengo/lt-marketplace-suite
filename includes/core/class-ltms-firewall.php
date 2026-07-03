@@ -28,13 +28,52 @@ final class LTMS_Core_Firewall {
         'sql_injection_union'    => '/(\bunion\b.*\bselect\b|\bselect\b.*\bfrom\b.*\bwhere\b)/i',
         'sql_injection_drop'     => '/(\bdrop\b.*\b(table|database)\b|\btruncate\b.*\btable\b)/i',
         'sql_injection_insert'   => '/(\binsert\b.*\binto\b|\bupdate\b.*\bset\b.*\bwhere\b)/i',
+        // FW-1 FIX: DELETE FROM was completely missing — a classic data-destructive
+        // SQLi vector (e.g. "' OR 1=1; DELETE FROM wp_users--") bypassed the WAF.
+        'sql_injection_delete'   => '/\bdelete\b.*\bfrom\b/i',
+        // FW-1 FIX: DDL (ALTER/CREATE/RENAME TABLE) was missing — schema-modifying
+        // attacks are critical-severity because they can persist backdoors
+        // (CREATE TABLE wp_backdoor) or destroy schema (ALTER TABLE ... DROP COLUMN).
+        'sql_injection_ddl'      => '/\b(alter|create|rename)\b.*\btable\b/i',
+        // FW-1 FIX: SQL recon + file exfiltration — INFORMATION_SCHEMA is the
+        // canonical SQLi recon target; LOAD_FILE() reads arbitrary server files
+        // (wp-config.php); INTO OUTFILE writes webshells. All high-confidence
+        // attack signatures with near-zero false-positive rate on user input.
+        'sql_injection_recon'    => '/(\binformation_schema\b|\bload_file\s*\(|\binto\b\s+outfile\b|\binto\b\s+dumpfile\b)/i',
+        // FW-1 FIX: time-based blind SQLi — SLEEP() / BENCHMARK() / WAITFOR DELAY
+        // are the canonical primitives for boolean-blind extraction when UNION
+        // and error-based channels are closed. Without these patterns the WAF
+        // cannot detect the most common blind-SQLi recon technique.
+        'sql_injection_blind'    => '/(\bsleep\s*\(|\bbenchmark\s*\(|\bwaitfor\s+delay\b|\bpg_sleep\s*\()/i',
+        // FW-1 FIX: error-based SQLi — EXTRACTVALUE / UPDATEXML force MySQL to
+        // emit error messages containing exfiltrated data (version, table names,
+        // credentials). Common in automated SQLi tools (sqlmap default mode).
+        'sql_injection_error'    => '/(\bextractvalue\s*\(|\bupdatexml\s*\()/i',
         'sql_injection_comment'  => '/(?:(?<![\w\-])-{2,}(?![\w\-])|#[^\n]*$|\/\*[\s\S]*?\*\/)/mi', // SEC-L1+M-120: avoid matching -- in base64/URLs
         'xss_script'             => '/<\s*script(\s[^>]*)?>/is',
-        'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit)\s*=/i',
+        // FW-2 FIX: expanded event-handler list. The previous list (load/click/
+        // mouseover/error/focus/blur/change/submit) missed modern XSS vectors:
+        //   - ontoggle          : <details open ontoggle=alert(1)> (no JS required)
+        //   - onpointerenter    : Pointer Events API, fires on touch + mouse
+        //   - onanimationstart  : CSS-animation-driven XSS (no user interaction)
+        //   - oninput/onkeydown : form-field XSS without blur
+        //   - onreset/ondrag/ondrop/onwheel/onscroll/onselect/ondblclick/onauxclick
+        // Each of these is a documented PoC in the OWASP XSS Filter Evasion
+        // Cheat Sheet and was bypassing the WAF.
+        'xss_event_handler'      => '/on(load|click|mouseover|error|focus|blur|change|submit|input|keydown|keyup|keypress|reset|toggle|pointerenter|pointerleave|pointermove|pointerdown|pointerup|pointerover|pointerout|pointercancel|animationstart|animationend|animationiteration|transitionend|drag|dragstart|dragend|dragenter|dragleave|dragover|drop|wheel|scroll|select|dblclick|auxclick|copy|cut|paste|search|canplay|canplaythrough|loadeddata|loadedmetadata|loadstart|play|playing|pause|ended|seeked|seeking|stalled|suspend|timeupdate|volumechange|waiting)\s*=/i',
         'xss_javascript'         => '/javascript\s*:/i',
         'lfi_path_traversal'     => '/(\.\.\/|\.\.\\\\|%2e%2e%2f|%2e%2e\/|\.\.%2f)/i',
-        'rfi_http'               => '/(https?|ftp):\/\/.*\.(php|asp|aspx|jsp)/i',
-        'php_injection'          => '/(<\?php|<\?=|eval\s*\(|base64_decode\s*\(|passthru\s*\(|system\s*\(|exec\s*\(|shell_exec\s*\()/i',
+        'rfi_http'               => '/(https?|ftp):\/\/.*\.(php|asp|aspx|jsp|cgi|pl|py)/i',
+        // FW-3 FIX: added proc_open, popen, assert, create_function. These are
+        // well-documented PHP RCE primitives:
+        //   - proc_open/popen  : spawn arbitrary shell commands (same severity as system)
+        //   - assert           : interprets its string argument as PHP code (RCE)
+        //   - create_function  : deprecated since PHP 7.2, takes string body, evals it
+        // All four appear routinely in webshell droppers and exploit kits.
+        // (preg_replace with /e modifier intentionally NOT included — the regex
+        // is brittle across delimiter variants and the /e modifier was removed
+        // in PHP 7.0, so modern deployments are not vulnerable.)
+        'php_injection'          => '/(<\?php|<\?=|eval\s*\(|base64_decode\s*\(|passthru\s*\(|system\s*\(|exec\s*\(|shell_exec\s*\(|proc_open\s*\(|popen\s*\(|assert\s*\(|create_function\s*\()/i',
         'null_byte'              => '/\0/',
     ];
 
@@ -126,8 +165,12 @@ final class LTMS_Core_Firewall {
      */
     private static function is_whitelisted_admin_path(): bool {
         $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        // FW-BUG-1 FIX: use parse_url(PATH) instead of str_contains to prevent
+        // bypass via query params (e.g., ?x=/wp-admin/ would match with str_contains).
+        $parsed_path = parse_url( $request_uri, PHP_URL_PATH ) ?: '';
         foreach ( self::$admin_path_whitelist as $path ) {
-            if ( str_contains( $request_uri, $path ) ) {
+            // Only whitelist if the actual parsed path starts with the whitelisted path
+            if ( str_starts_with( $parsed_path, $path ) ) {
                 return true;
             }
         }
@@ -207,18 +250,35 @@ final class LTMS_Core_Firewall {
             self::handle_attack( 'bad_bot', $ip, 'user_agent', $ua );
         }
 
-        // 4. FIX C-03: Inspect raw JSON request body.
-        // REST API requests send payloads as application/json via php://input,
-        // which never populates $_POST. Without this check, the WAF is completely
-        // blind to injection attacks targeting /wp-json/ltms/v1/* endpoints.
+        // 4. FIX C-03 + FW-5: Inspect raw request body for ALL text-like content types,
+        // not just application/json. The original C-03 fix only inspected JSON bodies,
+        // which let an attacker bypass the WAF by sending the same SQLi/XSS payload as
+        // text/plain, application/xml, or with no Content-Type at all — $_POST is
+        // only populated for application/x-www-form-urlencoded and multipart/form-data,
+        // so any other content type with a body was completely invisible to the WAF.
+        //
+        // Coverage matrix after this fix:
+        //   application/json              → inspect (REST API payloads)
+        //   text/*  (plain, html, xml)    → inspect (raw text bodies, SOAP, etc.)
+        //   application/xml               → inspect (XML-RPC, SOAP)
+        //   <no Content-Type> + empty $_POST → inspect (defensive; some clients omit it)
+        //   application/x-www-form-urlencoded → already covered by $_POST scan in step 2
+        //   multipart/form-data           → $_POST text fields covered in step 2;
+        //                                    binary file blobs skipped (would FP)
         $content_type = strtolower( $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '' );
-        if ( str_contains( $content_type, 'application/json' ) ) {
+        $should_inspect_body = str_contains( $content_type, 'application/json' )
+                            || str_contains( $content_type, 'text/' )
+                            || str_contains( $content_type, 'application/xml' )
+                            || str_contains( $content_type, '+json' )
+                            || ( empty( $content_type ) && empty( $_POST ) );
+
+        if ( $should_inspect_body ) {
             // Limit read to 512 KB to prevent DoS via giant payloads.
             $raw_body = file_get_contents( 'php://input', false, null, 0, 524288 );
             if ( ! empty( $raw_body ) ) {
                 $matched_rule = self::check_patterns( $raw_body );
                 if ( $matched_rule ) {
-                    self::handle_attack( $matched_rule, $ip, 'json_body', $raw_body );
+                    self::handle_attack( $matched_rule, $ip, 'raw_body', $raw_body );
                 }
             }
         }
@@ -286,11 +346,41 @@ final class LTMS_Core_Firewall {
             ]
         );
 
-        // Incrementar contador para esta IP
-        $count_key = 'ltms_waf_' . md5( $ip );
-        $count     = (int) get_transient( $count_key );
-        $count++;
-        set_transient( $count_key, $count, self::get_block_duration() );
+        // FW-4 FIX: count recent attacks from this IP via DB instead of transient
+        // counter. The previous implementation did read-modify-write on a transient:
+        //
+        //     $count = (int) get_transient( $key ); $count++; set_transient( $key, $count, ... );
+        //
+        // which is NOT atomic. N concurrent requests from the same IP all read the
+        // same count, each increments locally, and each overwrites with the same
+        // value — net result is count=1 regardless of N. An attacker firing 100
+        // concurrent SQLi probes would register count=1 and never trigger the
+        // auto-block threshold (BLOCK_THRESHOLD=10), letting them continue probing
+        // indefinitely. Each individual probe was still blocked (block_request fires
+        // per-attack), but the IP was never auto-blocked for FUTURE requests.
+        //
+        // The fix uses COUNT(*) over lt_security_events (which is being written to
+        // by the insert above, in the same transaction scope of this request).
+        // This is atomic at the InnoDB row-lock level: even if 100 concurrent
+        // requests fire, each INSERT is serialized, and each subsequent COUNT(*)
+        // sees a monotonically-increasing event count. The IP is auto-blocked as
+        // soon as the 10th event commits.
+        //
+        // Performance: the query uses the existing idx_ip_address index
+        // (see class-ltms-db-migrations.php line 267) and is bounded by the
+        // block-duration window (default 3600s), so it scans at most one hour of
+        // events for this single IP — typically <100 rows even under attack.
+        $window_start = gmdate( 'Y-m-d H:i:s', time() - self::get_block_duration() );
+        $events_table = $wpdb->prefix . 'lt_security_events';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $count = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$events_table}`
+                 WHERE ip_address = %s AND created_at > %s",
+                $ip,
+                $window_start
+            )
+        );
 
         // Bloquear IP si supera el umbral
         if ( $count >= self::BLOCK_THRESHOLD ) {
@@ -425,8 +515,16 @@ final class LTMS_Core_Firewall {
      * @return string low|medium|high|critical
      */
     private static function get_severity( string $rule ): string {
-        $critical_rules = [ 'sql_injection_drop', 'php_injection', 'rfi_http' ];
-        $high_rules     = [ 'sql_injection_union', 'sql_injection_insert', 'lfi_path_traversal' ];
+        // FW-1/FW-3: critical_rules now also covers sql_injection_ddl (schema
+        // modification is irreversible without backup) — same blast radius as DROP.
+        $critical_rules = [ 'sql_injection_drop', 'sql_injection_ddl', 'php_injection', 'rfi_http' ];
+        // FW-1: high_rules now covers the new SQLi categories (delete, recon,
+        // blind, error-based) — all are active exploitation, not just probing.
+        $high_rules     = [
+            'sql_injection_union', 'sql_injection_insert', 'sql_injection_delete',
+            'sql_injection_recon', 'sql_injection_blind', 'sql_injection_error',
+            'lfi_path_traversal',
+        ];
         $medium_rules   = [ 'xss_script', 'xss_event_handler', 'null_byte' ];
 
         if ( in_array( $rule, $critical_rules, true ) ) {

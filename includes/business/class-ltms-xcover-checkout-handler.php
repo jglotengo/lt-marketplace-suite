@@ -16,6 +16,12 @@ class LTMS_XCover_Checkout_Handler {
         add_action( 'wp_ajax_ltms_get_xcover_quotes', [ $instance, 'ajax_get_quotes' ] );
         add_action( 'wp_ajax_nopriv_ltms_get_xcover_quotes', [ $instance, 'ajax_get_quotes' ] );
         add_action( 'woocommerce_checkout_create_order', [ $instance, 'save_insurance_selection' ] );
+        // XC-3 FIX: add insurance premium as a WooCommerce cart fee so the
+        // customer actually pays for the insurance. Previously the premium was
+        // never charged — the listener created a policy via XCover after payment,
+        // but the order total did not include the premium, so the merchant was
+        // billed by XCover out of pocket (free insurance for the customer).
+        add_action( 'woocommerce_cart_calculate_fees', [ $instance, 'add_insurance_fee' ], 40 );
     }
 
     public function render_insurance_ui(): void {
@@ -91,10 +97,23 @@ class LTMS_XCover_Checkout_Handler {
                 ] );
                 $quote_id = $result['quote_id'] ?? ( $result['quotes'][0]['id'] ?? '' );
                 $premium  = (float) ( $result['quotes'][0]['premium'] ?? $result['premium'] ?? 0 );
+
+                // XC-2 FIX: reject negative or zero premiums. A negative premium
+                // would be a fraud vector (credit to the customer) and a zero
+                // premium indicates a malformed quote. XCover premiums must be > 0.
+                if ( $premium <= 0 ) {
+                    LTMS_Core_Logger::warning( 'XCOVER_QUOTE_INVALID_PREMIUM',
+                        sprintf( 'Rejected quote %s for type %s: premium=%.4f (must be > 0)', $quote_id, $type, $premium ) );
+                    continue;
+                }
+
                 if ( $quote_id ) {
-                    // Store in session
+                    // Store in session — BOTH quote_id and premium, so the checkout
+                    // can validate the user-submitted quote_id (XC-1) and add the
+                    // premium as a cart fee (XC-3).
                     if ( WC()->session ) {
                         WC()->session->set( 'ltms_xcover_quote_' . $type, $quote_id );
+                        WC()->session->set( 'ltms_xcover_premium_' . $type, $premium );
                     }
                     $quotes[] = [
                         'quote_id'       => $quote_id,
@@ -121,11 +140,111 @@ class LTMS_XCover_Checkout_Handler {
         $quote_id = sanitize_text_field( $_POST['ltms_insurance_quote_id'] ?? '' ); // phpcs:ignore
         $type     = sanitize_key( $_POST['ltms_insurance_type'] ?? '' ); // phpcs:ignore
 
+        // XC-1 FIX: validate quote_id format — XCover quote IDs are opaque
+        // alphanumeric tokens (typically UUIDs or short hashes). Reject anything
+        // with weird characters to prevent injection / spoofing.
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $quote_id ) ) {
+            LTMS_Core_Logger::warning( 'XCOVER_QUOTE_ID_INVALID',
+                sprintf( 'Order #%d: rejected invalid quote_id format: %s', $order->get_id(), $quote_id ) );
+            return;
+        }
+
+        if ( ! in_array( $type, [ 'parcel_protection', 'purchase_protection' ], true ) ) {
+            LTMS_Core_Logger::warning( 'XCOVER_TYPE_INVALID',
+                sprintf( 'Order #%d: rejected invalid insurance type: %s', $order->get_id(), $type ) );
+            return;
+        }
+
+        // XC-1 FIX: validate that the submitted quote_id was actually issued by
+        // XCover for this session/cart. Previously the user could submit ANY
+        // quote_id (e.g. one issued for a $1 cart total → cheap premium) and
+        // apply it to a $1000 cart. Now we cross-check against the session.
+        $session_quote_id = '';
+        $session_premium  = 0.0;
+        if ( WC()->session ) {
+            $session_quote_id = (string) WC()->session->get( 'ltms_xcover_quote_' . $type, '' );
+            $session_premium  = (float) WC()->session->get( 'ltms_xcover_premium_' . $type, 0 );
+        }
+
+        if ( ! $session_quote_id || ! hash_equals( $session_quote_id, $quote_id ) ) {
+            LTMS_Core_Logger::warning( 'XCOVER_QUOTE_ID_MISMATCH',
+                sprintf( 'Order #%d: submitted quote_id %s does not match session quote_id %s for type %s — possible fraud attempt',
+                    $order->get_id(), $quote_id, $session_quote_id, $type ) );
+            return;
+        }
+
+        // XC-2 FIX: defensive re-check — premium must be positive.
+        if ( $session_premium <= 0 ) {
+            LTMS_Core_Logger::warning( 'XCOVER_PREMIUM_INVALID',
+                sprintf( 'Order #%d: session premium for type %s is %.4f — refusing to save insurance selection',
+                    $order->get_id(), $type, $session_premium ) );
+            return;
+        }
+
         if ( $quote_id && $type ) {
             $order->update_meta_data( '_ltms_insurance_selected', 'yes' );
             $order->update_meta_data( '_ltms_insurance_quote_id', $quote_id );
             $order->update_meta_data( '_ltms_insurance_type', $type );
+            // XC-3 FIX: persist the verified premium on the order so the listener
+            // and admin can audit that the customer was actually charged.
+            $order->update_meta_data( '_ltms_insurance_premium', $session_premium );
         }
+    }
+
+    /**
+     * XC-3 FIX: adds the insurance premium as a WooCommerce cart fee so the
+     * customer actually pays for the insurance as part of their order.
+     *
+     * Reads the user's selected insurance type from the checkout POST (during
+     * AJAX order-review updates) or from the WC session (fallback), then looks
+     * up the premium from the session (set by ajax_get_quotes). The premium is
+     * never trusted from the client — it always comes from the server-side
+     * session that was populated directly from the XCover API response.
+     *
+     * @param \WC_Cart $cart
+     */
+    public function add_insurance_fee( \WC_Cart $cart ): void {
+        if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
+            return;
+        }
+        if ( ! WC()->session ) {
+            return;
+        }
+
+        // Determine selected type: prefer POST (live checkout update), fall back to session.
+        $selected = 'no';
+        $type     = '';
+        if ( ! empty( $_POST['ltms_insurance_selected'] ) ) { // phpcs:ignore
+            $selected = sanitize_key( $_POST['ltms_insurance_selected'] ); // phpcs:ignore
+            $type     = sanitize_key( $_POST['ltms_insurance_type'] ?? '' ); // phpcs:ignore
+        }
+        if ( $selected !== 'yes' ) {
+            $selected = (string) WC()->session->get( 'ltms_xcover_selected', 'no' );
+            $type     = (string) WC()->session->get( 'ltms_xcover_selected_type', '' );
+        }
+        if ( $selected !== 'yes' || ! $type ) {
+            return;
+        }
+
+        if ( ! in_array( $type, [ 'parcel_protection', 'purchase_protection' ], true ) ) {
+            return;
+        }
+
+        $premium = (float) WC()->session->get( 'ltms_xcover_premium_' . $type, 0 );
+        // XC-2 FIX: never add a non-positive fee.
+        if ( $premium <= 0 ) {
+            return;
+        }
+
+        // Persist selection in session so the fee survives subsequent AJAX updates.
+        WC()->session->set( 'ltms_xcover_selected', 'yes' );
+        WC()->session->set( 'ltms_xcover_selected_type', $type );
+
+        $label = $type === 'parcel_protection'
+            ? __( 'Seguro de Paquete', 'ltms' )
+            : __( 'Seguro de Compra', 'ltms' );
+
+        $cart->add_fee( $label, $premium, true );
     }
 
     private function get_enabled_insurance_types(): array {

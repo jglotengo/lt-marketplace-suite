@@ -31,11 +31,17 @@ class LTMS_Deprisa_API {
 
     /**
      * Constructor
+     *
+     * Lee las credenciales con los mismos nombres de opción que usa la
+     * página de ajustes (LTMS_Settings_Deprisa):
+     *   - ltms_deprisa_username  (NO ltms_deprisa_usuario)
+     *   - ltms_deprisa_password
+     *   - ltms_deprisa_sandbox   (NO ltms_deprisa_modo_pruebas)
      */
     public function __construct() {
-        $this->usuario      = get_option( 'ltms_deprisa_usuario', '' );
+        $this->usuario      = get_option( 'ltms_deprisa_username', '' );
         $this->password     = get_option( 'ltms_deprisa_password', '' );
-        $this->modo_pruebas = get_option( 'ltms_deprisa_modo_pruebas', false );
+        $this->modo_pruebas = (bool) get_option( 'ltms_deprisa_sandbox', false );
         $this->base_url     = $this->modo_pruebas ? self::URL_PRUEBAS : self::URL_PRODUCCION;
     }
 
@@ -121,7 +127,7 @@ class LTMS_Deprisa_API {
             return false;
         }
         libxml_use_internal_errors( true );
-        $xml = simplexml_load_string( $xml_string );
+        $xml = simplexml_load_string( $xml_string, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOENT );
         if ( $xml === false ) {
             $this->log( 'Error parseando XML: ' . implode( ', ', array_map( function( $e ) {
                 return $e->message;
@@ -761,6 +767,46 @@ class LTMS_Deprisa_API {
         $xml .= '</RECOGIDAS>';
 
         $resultado = $this->hacer_request_post( '/recogidas/cancelar', $xml );
+
+        if ( is_wp_error( $resultado ) ) {
+            return $resultado;
+        }
+
+        $errores = $this->extraer_errores_xml( $resultado['xml'] );
+
+        return array(
+            'exito'     => empty( $errores ),
+            'errores'   => $errores,
+            'http_code' => $resultado['code'],
+            'raw'       => $resultado['body'],
+        );
+    }
+
+    /**
+     * Cancela una admisión / envío ya creado (incluye devoluciones).
+     *
+     * Endpoint estándar de Deprisa para anular un envío admitido. Si la guía
+     * ya fue entregada o está en tránsito avanzado, la API puede rechazar la
+     * cancelación; el llamador debe decidir si bloquea o continúa.
+     *
+     * @param string $numero_envio  Número de guía Deprisa a cancelar.
+     * @param string $motivo        Motivo de cancelación (obligatorio).
+     * @return array|WP_Error       Array con 'exito', 'errores', 'http_code', 'raw'.
+     */
+    public function cancelar_envio( $numero_envio, $motivo ) {
+        if ( empty( $motivo ) ) {
+            return new WP_Error( 'motivo_requerido', 'El motivo de cancelación es obligatorio.' );
+        }
+
+        $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<ADMISIONES>' . "\n";
+        $xml .= '  <ADMISION>' . "\n";
+        $xml .= '    <NUMERO_ENVIO>' . esc_xml( $numero_envio ) . '</NUMERO_ENVIO>' . "\n";
+        $xml .= '    <MOTIVO>' . esc_xml( $motivo ) . '</MOTIVO>' . "\n";
+        $xml .= '  </ADMISION>' . "\n";
+        $xml .= '</ADMISIONES>';
+
+        $resultado = $this->hacer_request_post( '/admision_envios/cancelar', $xml );
 
         if ( is_wp_error( $resultado ) ) {
             return $resultado;

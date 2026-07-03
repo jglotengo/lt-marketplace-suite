@@ -36,6 +36,13 @@ final class LTMS_Frontend_Assets {
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_frontend_assets' ] );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_header_nav' ], 5 );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_homepage_fixes' ], 20 );
+        // Task 67-A / UX-LOAD-1: the 25,000-line UX enhancement layer was
+        // documented in UX_ENHANCEMENTS.md but never enqueued — all toasts,
+        // theme toggle, keyboard shortcuts, password strength meter, command
+        // palette, focus trap, dark mode, tour system, etc. were dead code.
+        // Loaded on every non-admin frontend page so the data-* attributes
+        // rendered by templates actually trigger their JS handlers.
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_ux_enhancements' ], 25 );
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
     }
@@ -141,6 +148,31 @@ final class LTMS_Frontend_Assets {
             'after'
         );
 
+        // Task 67-B — UX layer public AJAX bootstrap.
+        // The ltms-ux-enhancements.js layer (toasts, quick view, reorder,
+        // bundle, subscription, coupon, waitlist, recommendations, etc.)
+        // needs an ajax_url + nonce available on EVERY page (storefront,
+        // product, cart, checkout, dashboard). Previously the JS gated every
+        // AJAX call behind `typeof ltmsDashboard !== 'undefined'`, which is
+        // only localized on vendor dashboard pages — so on the customer-
+        // facing storefront every UX module either silently failed or
+        // faked a success toast. Exposing a global `ltmsUX` object with a
+        // dedicated `ltms_ux_nonce` action lets the UX modules hit the
+        // new endpoints added in class-ltms-frontend-checkout-handler.php
+        // (ltms_get_recommendations, ltms_quick_view, ltms_reorder,
+        // ltms_validate_coupon, ltms_add_bundle_to_cart,
+        // ltms_toggle_subscription, ltms_get_recent_purchases,
+        // ltms_submit_review, ltms_waitlist_subscribe,
+        // ltms_search_autocomplete) from any page context.
+        wp_add_inline_script(
+            'jquery-core',
+            'window.ltmsUX = window.ltmsUX || {}; window.ltmsUX.ajax_url = ' .
+            wp_json_encode( admin_url( 'admin-ajax.php' ) ) .
+            '; window.ltmsUX.nonce = ' . wp_json_encode( wp_create_nonce( 'ltms_ux_nonce' ) ) .
+            ';',
+            'after'
+        );
+
         // CSS base del dashboard (siempre en páginas LTMS)
         if ( $this->is_ltms_page( $page_id, $pages ) ) {
             wp_enqueue_style(
@@ -200,9 +232,13 @@ final class LTMS_Frontend_Assets {
             $this->enqueue_dashboard_assets( $url, $ver, $suffix );
         }
 
-        // KDS — Kitchen Display System (tab=kds dentro del dashboard)
+        // KDS — Kitchen Display System (tab=kds o view=kitchen en el dashboard SPA).
+        // AUDIT-RESTAURANT-ENGINE: también cargar cuando el vendor es restaurante.
+        $_is_restaurant_vendor = is_user_logged_in() && get_user_meta( get_current_user_id(), 'ltms_is_restaurant', true ) === 'yes';
         if ( $page_id === (int) ( $pages['ltms-dashboard'] ?? 0 ) &&
-             isset( $_GET['tab'] ) && sanitize_key( $_GET['tab'] ) === 'kds' ) {
+             ( $_is_restaurant_vendor ||
+               ( isset( $_GET['tab'] ) && sanitize_key( $_GET['tab'] ) === 'kds' ) ||
+               ( isset( $_GET['view'] ) && sanitize_key( $_GET['view'] ) === 'kitchen' ) ) ) {
             $this->enqueue_kds_assets( $url, $ver, $suffix );
         }
 
@@ -211,6 +247,8 @@ final class LTMS_Frontend_Assets {
             $this->enqueue_checkout_assets( $url, $ver, $suffix );
             $this->enqueue_shipping_selector( $url, $ver, $suffix );
             $this->enqueue_stripe_assets( $url, $ver, $suffix );
+            // v3.1.0 — Cross-Border motor (Task 63-D): currency switcher widget.
+            $this->enqueue_currency_switcher( $url, $ver, $suffix );
         }
 
         // Login y Registro de vendedores — detección por ID o por shortcode (M-121 fallback)
@@ -269,6 +307,69 @@ final class LTMS_Frontend_Assets {
             wp_enqueue_style( 'ltms-dashboard', $url . 'css/ltms-dashboard.css', [], $ver );
             wp_enqueue_style( 'ltms-frontend-extensions', $url . 'css/ltms-frontend-extensions.css', [ 'ltms-dashboard' ], $ver );
         }
+    }
+
+    /**
+     * Enqueue UX Enhancements (toasts, theme toggle, keyboard shortcuts, etc.)
+     *
+     * Task 67-A / UX-LOAD-1 FIX: This method was missing — all UX features
+     * (toasts, command palette, theme toggle, focus trap, password strength
+     * meter, dark mode, tour system, etc.) were dead code in production. The
+     * 25,000-line UX layer (ltms-ux-enhancements.js + .css) was never wired to
+     * any `wp_enqueue_*` call.
+     *
+     * Loaded on every non-admin frontend page (the JS self-detects context and
+     * bails out of irrelevant modules via element-existence checks). Style
+     * dependencies are declared against the always-loaded `ltms-header-nav` and
+     * the page-conditional `ltms-frontend`, `ltms-dashboard`,
+     * `ltms-login-register` styles — WordPress silently skips deps that were
+     * never registered on a given page, so the same call is safe everywhere.
+     *
+     * @return void
+     */
+    public static function enqueue_ux_enhancements(): void {
+        // Admin is served by its own assets pipeline — never load here.
+        if ( is_admin() ) {
+            return;
+        }
+
+        $min = ( defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production' ) ? '.min' : '';
+        $ver = LTMS_VERSION;
+        $url = LTMS_ASSETS_URL;
+
+        // CSS — depends on whichever LTMS stylesheets are already registered
+        // for the current page type. Missing deps are silently skipped by WP.
+        wp_enqueue_style(
+            'ltms-ux-enhancements',
+            $url . 'css/ltms-ux-enhancements' . $min . '.css',
+            [ 'ltms-frontend', 'ltms-dashboard', 'ltms-login-register', 'ltms-header-nav' ],
+            $ver
+        );
+
+        // JS — load in the footer so the DOM is ready when initAll() runs.
+        wp_enqueue_script(
+            'ltms-ux-enhancements',
+            $url . 'js/ltms-ux-enhancements' . $min . '.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
+
+        // Localize AJAX endpoint + nonce + i18n for the JS layer.
+        wp_localize_script( 'ltms-ux-enhancements', 'ltmsUX', [
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'ltms_ux_nonce' ),
+            'is_admin' => false,
+            'currency' => LTMS_Core_Config::get_currency(),
+            'i18n'     => [
+                'loading' => __( 'Cargando...', 'ltms' ),
+                'error'   => __( 'Ocurrió un error', 'ltms' ),
+                'success' => __( '¡Éxito!', 'ltms' ),
+                'copied'  => __( 'Copiado al portapapeles', 'ltms' ),
+                'offline' => __( 'Sin conexión a internet', 'ltms' ),
+                'online'  => __( 'Conexión restablecida', 'ltms' ),
+            ],
+        ] );
     }
 
     /**
@@ -438,6 +539,63 @@ final class LTMS_Frontend_Assets {
     }
 
     /**
+     * v3.1.0 — Cross-Border motor (Task 63-D): enqueues the currency
+     * switcher widget JS + CSS on the checkout page.
+     *
+     * The widget lets the customer switch the display currency (COP, MXN,
+     * USD, EUR, etc.) before placing the order. The JS calls the
+     * `ltms_change_currency` AJAX endpoint to refresh the cart totals and
+     * displays the new customs estimate based on the selected currency.
+     *
+     * @param string $url    Base assets URL.
+     * @param string $ver    Plugin version (cache-busting).
+     * @param string $suffix '.min' in production.
+     * @return void
+     */
+    private function enqueue_currency_switcher( string $url, string $ver, string $suffix = '' ): void {
+        // CSS: small styling for the switcher + customs estimate block.
+        wp_enqueue_style(
+            'ltms-currency-switcher',
+            $url . 'css/ltms-currency-switcher.css',
+            [],
+            $ver
+        );
+
+        // JS: currency switch logic + customs estimate loader.
+        wp_enqueue_script(
+            'ltms-currency-switcher',
+            $url . 'js/ltms-currency-switcher' . $suffix . '.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
+
+        // Localize the AJAX endpoint + nonce + i18n strings for the JS.
+        wp_localize_script( 'ltms-currency-switcher', 'ltmsCurrencySwitcher', [
+            'ajax_url'      => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'ltms_checkout_nonce' ),
+            'default_currency' => class_exists( 'LTMS_Currency_Manager' )
+                ? LTMS_Currency_Manager::get_display_currency()
+                : LTMS_Core_Config::get_currency(),
+            'i18n' => [
+                'converting'           => __( 'Convirtiendo…', 'ltms' ),
+                'customs_loading'      => __( 'Calculando impuestos aduaneros…', 'ltms' ),
+                'customs_title'        => __( 'Estimación de impuestos aduaneros', 'ltms' ),
+                'ddp_paid_at_checkout' => __( 'Duties paid at checkout (DDP) — included in your total.', 'ltms' ),
+                'ddu_payable_on_delivery' => __( 'Duties payable on delivery (DDU) — not included in your total.', 'ltms' ),
+                'below_de_minimis'     => __( 'Below de minimis threshold — no duties apply.', 'ltms' ),
+                'domestic_no_duties'   => __( 'Domestic shipment — no customs duties apply.', 'ltms' ),
+                'duty_label'           => __( 'Import duty', 'ltms' ),
+                'vat_label'            => __( 'VAT/GST', 'ltms' ),
+                'fee_label'            => __( 'Customs fee', 'ltms' ),
+                'total_label'          => __( 'Total duties + taxes', 'ltms' ),
+                'rate_label'           => __( 'FX rate', 'ltms' ),
+                'error_generic'        => __( 'Error al actualizar la moneda. Intenta de nuevo.', 'ltms' ),
+            ],
+        ]);
+    }
+
+    /**
      * Carga el Kitchen Display System (KDS) — solo cuando tab=kds.
      * Bug M-21: el script ltms-kds.js nunca fue enqueued ni localizado.
      *
@@ -469,7 +627,8 @@ final class LTMS_Frontend_Assets {
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'ltms_dashboard_nonce' ),
             'vendor_id'     => $vendor_id,
-            'poll_interval' => 15000,
+            'poll_interval' => 10000, // AUDIT-RESTAURANT-ENGINE: 10s (era 15s — too slow for kitchen).
+            'alert_sound'   => $url . 'sounds/new-order.mp3', // AUDIT-RESTAURANT-ENGINE: dynamic path.
             'i18n'          => [
                 'loading'        => __( 'Cargando pedidos...', 'ltms' ),
                 'no_orders'      => __( 'No hay pedidos activos', 'ltms' ),

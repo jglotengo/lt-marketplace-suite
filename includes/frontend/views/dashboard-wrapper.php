@@ -27,6 +27,7 @@ $nav_items = [
     [ 'view' => 'orders',   'icon' => '📦', 'label' => __( 'Pedidos', 'ltms' ) ],
     [ 'view' => 'products', 'icon' => '🛍️', 'label' => __( 'Productos', 'ltms' ) ],
     [ 'view' => 'envios',        'icon' => '🚚', 'label' => __( 'Envíos', 'ltms' ) ],
+    [ 'view' => 'shipping-statement', 'icon' => '🧾', 'label' => __( 'Fletes', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
     [ 'view' => 'bookings', 'icon' => '🏨', 'label' => __( 'Reservas', 'ltms' ) ],
     [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
@@ -47,6 +48,31 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
         'view'  => 'analytics',
         'icon'  => '📈',
         'label' => __( 'Analytics', 'ltms' ),
+    ]] );
+}
+
+// AUDIT-REDI-UX-GAPS GAP-1 FIX: tab ReDi en el dashboard del vendedor.
+if ( get_option( 'ltms_redi_enabled', 'no' ) === 'yes' ) {
+    array_splice( $nav_items, 3, 0, [[
+        'view'  => 'redi',
+        'icon'  => '🔁',
+        'label' => __( 'ReDi', 'ltms' ),
+    ]] );
+    // GAP-9: tab Novedades.
+    array_splice( $nav_items, 5, 0, [[
+        'view'  => 'incidents',
+        'icon'  => '⚠️',
+        'label' => __( 'Novedades', 'ltms' ),
+    ]] );
+}
+
+// AUDIT-RESTAURANT-ENGINE: tab Kitchen Display para vendors con restaurante.
+$_user_id = get_current_user_id();
+if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'yes' ) {
+    array_splice( $nav_items, 4, 0, [[
+        'view'  => 'kitchen',
+        'icon'  => '🍳',
+        'label' => __( 'Cocina', 'ltms' ),
     ]] );
 }
 ?>
@@ -148,6 +174,43 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
         <div class="ltms-view-section" id="ltms-view-envios" style="display:none;">
             <?php include __DIR__ . '/view-envios.php'; ?>
         </div>
+
+        <?php
+        // v2.8.3 — Shipping Cost Ledger: estado de cuenta de fletes absorbed.
+        if ( file_exists( __DIR__ . '/view-shipping-statement.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-shipping-statement" style="display:none;">
+            <?php include __DIR__ . '/view-shipping-statement.php'; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // AUDIT-REDI-UX-GAPS GAP-1 FIX: incluir view-redi.php cuando está habilitado.
+        if ( get_option( 'ltms_redi_enabled', 'no' ) === 'yes' && file_exists( __DIR__ . '/view-redi.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-redi" style="display:none;">
+            <?php include __DIR__ . '/view-redi.php'; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // AUDIT-REDI-UX-GAPS GAP-9 FIX: incluir view-incidents.php.
+        if ( get_option( 'ltms_redi_enabled', 'no' ) === 'yes' && file_exists( __DIR__ . '/view-incidents.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-incidents" style="display:none;">
+            <?php include __DIR__ . '/view-incidents.php'; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // AUDIT-RESTAURANT-ENGINE: incluir view-kitchen.php para vendors con restaurante.
+        $_uid = get_current_user_id();
+        if ( $_uid && get_user_meta( $_uid, 'ltms_is_restaurant', true ) === 'yes' && file_exists( __DIR__ . '/view-kitchen.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-kitchen" style="display:none;">
+            <?php include __DIR__ . '/view-kitchen.php'; ?>
+        </div>
+        <?php endif; ?>
 
         <div class="ltms-view-section" id="ltms-view-ordenes-compra" style="display:none;">
             <?php include __DIR__ . '/view-ordenes-compra.php'; ?>

@@ -34,6 +34,8 @@ final class LTMS_Core_Activator {
         self::set_default_options();
         self::schedule_cron_jobs();
         self::create_secure_directories();
+        self::create_email_queue_table(); // INT-BUG-14: async email queue infrastructure
+        self::create_foundation_wallet(); // 60-C: wallet for foundation (donation motor)
 
         update_option( 'ltms_version', LTMS_VERSION );
         update_option( 'ltms_activation_redirect', true );
@@ -151,7 +153,7 @@ final class LTMS_Core_Activator {
             'ltms_payout_frequency'        => 'weekly',
             'ltms_hold_period_days'        => '7',
             'ltms_kyc_required'            => 'yes',
-            'ltms_2fa_required_vendors'    => 'no',
+            'ltms_2fa_required_vendors'    => 'yes', // FT-6 (v2.9.16): 2FA obligatorio vendors con payouts (Ley Fintech art. 95 MX / Circular SFC CO).
             'ltms_waf_enabled'             => 'yes',
             'ltms_log_retention_days'      => '90',
             'ltms_country'                 => 'CO',
@@ -181,13 +183,30 @@ final class LTMS_Core_Activator {
             'ltms_alegra_default_number_template' => 0,
             'ltms_alegra_bank_account_id'         => 0,
             'ltms_alegra_commission_account_id'   => 0,    // Cuenta para comisiones de plataforma
-            'ltms_alegra_retefuente_tax_id'       => 0,    // ID impuesto retención fuente en Alegra
+            'ltms_alegra_retefuente_tax_id'       => 0,    // ID impuesto retención fuente en Alegra (CO)
+            'ltms_alegra_reteiva_tax_id'          => 0,    // NC-1 (v2.9.12): ID impuesto ReteIVA en Alegra (CO)
+            'ltms_alegra_reteica_tax_id'          => 0,    // NC-1 (v2.9.12): ID impuesto ReteICA en Alegra (CO)
+            'ltms_alegra_inc_tax_id'              => 0,    // NC-5 (v2.9.12): ID impuesto Impoconsumo en Alegra (CO)
+            'ltms_alegra_ish_tax_id'              => 0,    // ID impuesto ISH hospedaje en Alegra (MX)
+            'ltms_alegra_iva_retenido_mx_tax_id'  => 0,    // NC-1 (v2.9.12): ID impuesto IVA retenido en Alegra (MX, persona moral)
             'ltms_alegra_shipping_tax_id'         => 1,    // ID impuesto para envíos (1=exento CO)
             'ltms_alegra_invoice_on_processing'   => 'no',
             'ltms_alegra_auto_payment'            => 'no',
             'ltms_alegra_send_invoice_email'      => 'no',
             'ltms_alegra_webhook_secret'          => '',
             'ltms_alegra_exchange_rate'           => 1,    // Tasa de cambio para monedas no-COP
+            'ltms_alegra_fx_sync'                 => 'yes', // NC-2 (v2.9.12): sincronizar asientos FX con Alegra
+            'ltms_alegra_fx_gain_account_id'      => 0,    // NC-2 (v2.9.12): ID cuenta ingreso FX (4255 PUC CO)
+            'ltms_alegra_fx_loss_account_id'      => 0,    // NC-2 (v2.9.12): ID cuenta gasto FX (5255 PUC CO)
+
+            // NC-3 (v2.9.12) — Resolución DIAN Colombia (Res. DIAN 000042/2020 art. 5).
+            // Configurar con los datos de la resolución vigente otorgada por DIAN.
+            'ltms_dian_resolution_number'         => '',   // Ej: '18764000004200'
+            'ltms_dian_resolution_date'           => '',   // Ej: '2024-01-15'
+            'ltms_dian_prefix'                    => '',   // Ej: 'SET' o 'SETP'
+            'ltms_dian_range_from'                => '',   // Ej: '1'
+            'ltms_dian_range_to'                  => '',   // Ej: '50000'
+            'ltms_dian_technical_key'             => '',   // Clave técnica DIAN (config software)
             'ltms_google_client_secret'         => '',  // Se guarda cifrado; ver ltms_google_client_secret_raw
             'ltms_sitemap_exclude_outofstock'   => true,
             'ltms_og_site_name'                 => 'Lo Tengo Colombia',
@@ -225,9 +244,14 @@ final class LTMS_Core_Activator {
             'ltms_zapsign_booking_template_id'        => '',
 
             // v2.0.0 — Comisiones avanzadas
+            // LG-6 FIX (v2.9.7): ltms_platform_commission_rate alineado con contrato v4.1
+            // y Commission Strategy DEFAULT_RATE (0.15 = 15%).
+            // ANTES: 0.05 (5%) — contradecía el DEFAULT_RATE del código (0.15) y
+            // el contrato real (10-15% por categoría). Los vendors nuevos recibían
+            // 5% de comisión en lugar del 15% correcto.
             'ltms_basic_commission_rate'      => '0.10',
             'ltms_premium_commission_rate'    => '0.08',
-            'ltms_platform_commission_rate'   => '0.05',
+            'ltms_platform_commission_rate'   => '0.15',
             'ltms_category_commission_rates'  => '',
             'ltms_volume_tiers_enabled'       => false,
             'ltms_custom_commission_rate'     => '',
@@ -235,11 +259,15 @@ final class LTMS_Core_Activator {
             // La vista guarda 'yes'/'no' y la lógica compara === 'yes'.
             // Se agregan los defaults para todos los campos MLM que el activador no tenía.
             'ltms_mlm_enabled'                => 'no',
-            'ltms_mlm_levels'                 => '2',
-            'ltms_referral_rates'             => '[0.05,0.02,0.01]',
+            'ltms_mlm_levels'                 => '3',
+            // LG-7 FIX (v2.9.7): referral_rates alineado con DEFAULT_RATES de
+            // Referral_Tree ([0.40, 0.20, 0.10] = 40%/20%/10% del commission_fee).
+            // ANTES: [0.05,0.02,0.01] — contradecía DEFAULT_RATES y el contrato.
+            // También había un duplicado de ltms_referral_rates (línea 241 y 244)
+            // que causaba que el segundo sobrescribiera al primero con menos niveles.
+            'ltms_referral_rates'             => '[0.40,0.20,0.10]',
             'ltms_mlm_min_sales_activate'     => 1,
             'ltms_mlm_referral_rate'          => '0.02',
-            'ltms_referral_rates'             => '[0.05,0.02]', // 5% nivel 1, 2% nivel 2
 
             // v2.0.0 — Seguridad / WAF / 2FA
             'ltms_2fa_required_auditors'         => 'no',
@@ -281,6 +309,75 @@ final class LTMS_Core_Activator {
             'ltms_iva_general'                  => '0.19',
             'ltms_iva_reducido'                 => '0.05',
             'ltms_impoconsumo_rate'             => '0.08',
+            'ltms_co_impoconsumo'               => '0.08', // RT-6 (v2.9.14): canónica admin UI (html-admin-fiscal-colombia.php).
+            'ltms_alcohol_allowed_hours'        => '10:00-22:00', // RT-4: horario venta alcohol (configurable por municipio).
+            // FT (v2.9.16) — Fintech Compliance defaults.
+            'ltms_ft_daily_payout_limit_usd'    => 5000,    // FT-3: límite diario payout por vendor (USD eq).
+            'ltms_ft_monthly_payout_limit_usd'  => 20000,   // FT-3: límite mensual payout por vendor (USD eq).
+            'ltms_ft_daily_tx_count_limit'      => 50,      // FT-3: número máximo de transacciones diarias.
+            'ltms_ft_travel_rule_threshold_usd' => 1000,    // FT-4: umbral Travel Rule (FATF Rec. 16).
+            'ltms_ft_compliance_officer_email'  => '',      // FT-1/2/5/7: oficial de cumplimiento.
+            'ltms_ft_pci_dss_saq_signed_at'     => '',      // FT-5: fecha firma SAQ-A.
+            'ltms_ft_pci_dss_saq_signatory'     => '',      // FT-5: firmante SAQ-A.
+            'ltms_ft_pci_dss_saq_validity'      => '',      // FT-5: vigencia SAQ-A.
+            'ltms_mx_uma_valor'                 => '108.57', // FT-8: UMA MX 2026 (Regla 10 LFPIDRPI).
+            // LT (v2.9.17) — Logistics Compliance defaults.
+            'ltms_carrier_rnt_co'               => '',      // LT-2: RNT Mintransporte (CO) formato RNT-C-XXXXX.
+            'ltms_carrier_rnt_expires_co'       => '',      // LT-2: vigencia RNT.
+            'ltms_carrier_sct_permit'           => '',      // LT-3: permiso SCT MX formato SCT-TP0X-XXXXX.
+            'ltms_carrier_sct_expires'          => '',      // LT-3: vigencia permiso SCT.
+            'ltms_carrier_rc_expires'           => '',      // LT-5: vigencia póliza RC transportista.
+            'ltms_carrier_rc_amount'            => 0,       // LT-5: monto RC (CO 700 SMLMV / MX 35k UMA).
+            'ltms_carrier_iso_certified'        => 'no',    // LT-6: carrier certificado ISO 17712.
+            'ltms_carrier_gps_enabled'          => 'no',    // LT-7: carrier con GPS satelital.
+            'ltms_carrier_rfc_mx'               => '',      // LT-1: RFC carrier MX para Carta Porte.
+            'ltms_carrier_operator_name'        => '',      // LT-1: nombre operador Carta Porte.
+            'ltms_carrier_operator_license'     => '',      // LT-1: licencia federal operador.
+            'ltms_carrier_vehicle_config'       => 'C2',    // LT-1: config vehicular (C2, C3, T2S1, T3S2...).
+            'ltms_usd_cop_rate'                 => 4200,    // LT-9: FX USD/COP para valor declarado Deprisa.
+            'ltms_mxn_cop_rate'                 => 245,     // LT-9: FX MXN/COP.
+            // CB (v2.9.18) — Cross-Border Compliance defaults.
+            'ltms_ioss_number'                  => '',      // CB-3: número IOSS UE (Reglamento UE 2017/2455).
+            'ltms_usd_cop_rate_cb'              => 4200,    // CB-9: FX USD/COP para conversión de minimis.
+            'ltms_eur_cop_rate'                 => 4500,    // CB-3: FX EUR/COP para cálculo IOSS.
+            'ltms_eur_mxn_rate'                 => 19,      // CB-3: FX EUR/MXN para cálculo IOSS.
+            'ltms_eur_usd_rate'                 => 1.08,    // CB-3: FX EUR/USD.
+            // AC (v2.9.20) — Authorities Compliance defaults (SIC + ICA + ANLA + INVIMA + DNDA + IMPI).
+            'ltms_ppc_sic_endpoint'             => '',      // AC-3: API PPC SIC (https://ppc.api.gov.co/v1/quejas).
+            'ltms_ppc_sic_token'                => '',      // AC-3: bearer token autenticación PPC SIC.
+            'ltms_dian_api_token'               => '',      // AC-7: token API DIAN validación RUT.
+            'ltms_sat_api_token'                => '',      // AC-7: token API SAT validación RFC.
+            'ltms_dnda_api_token'               => '',      // AC-1: token API DNDA consulta marcas.
+            'ltms_impi_api_token'               => '',      // AC-1: token API IMPI MX consulta marcas.
+            // HD (v2.9.21) — Data Protection Compliance defaults.
+            'ltms_csp_header'                   => '',      // HD-1: CSP override (vacío = default estricto).
+            'ltms_csp_report_uri'               => '',      // HD-1: URI reporte violaciones CSP.
+            'ltms_sic_registration_number'       => '',      // HD-2: registro SIC responsables (Decreto 1727/2024).
+            'ltms_sic_registration_expires'      => '',      // HD-2: vigencia registro SIC.
+            'ltms_dpo_name'                     => '',      // HD-6: nombre DPO/Encargado.
+            'ltms_dpo_email'                    => '',      // HD-6: email contacto DPO.
+            'ltms_dpo_phone'                    => '',      // HD-6: teléfono DPO.
+            'ltms_last_key_rotation'            => 0,       // HD-9: timestamp última rotación de clave.
+            // SE (v2.9.22) — SEO Enhanced defaults.
+            'ltms_hero_image_url'               => '',      // SE-6: hero image preload en homepage (Core Web Vitals).
+            // BR (v2.9.30) — Branding Engine defaults.
+            'ltms_logo_white_url'               => '',      // BR-1: logo fondo blanco (Organization schema + favicon).
+            'ltms_logo_dark_url'                => '',      // BR-1: logo fondo negro (dark mode).
+            'ltms_brand_slogan'                 => 'Compra con confianza, vende sin límites',
+            'ltms_social_facebook'              => '',
+            'ltms_social_instagram'             => '',
+            'ltms_social_twitter'               => '',
+            'ltms_social_linkedin'              => '',
+            'ltms_social_youtube'               => '',
+            'ltms_social_tiktok'                => '',
+            'ltms_contact_phone'                => '',
+            'ltms_contact_email'                => '',
+            'ltms_founder_name'                 => '',
+            'ltms_founding_date'                => '2024',
+            // FN (v2.9.23) — Foundation Compliance defaults (ESAL / fundaciones).
+            'ltms_donation_foundation_rte_number'   => '',   // FN-1: número calificación RTE ante DIAN (Decreto 832/2019).
+            'ltms_donation_foundation_rte_expires'  => '',   // FN-1: vigencia calificación RTE.
+            'ltms_donation_foundation_bank_account' => '',   // FN-6: cuenta bancaria fundación (verificación SFC).
             'ltms_retefuente_compras'           => '0.025',
             'ltms_retefuente_servicios'         => '0.04',
             'ltms_retefuente_honorarios'        => '0.11',
@@ -290,6 +387,11 @@ final class LTMS_Core_Activator {
             'ltms_reteiva_rate'                 => '0.15',
             'ltms_sagrilaft_uvt_threshold'      => 10000,
             'ltms_uvt_valor'                    => '52752', // UVT 2026 — Resolución DIAN 000187/2025
+
+            // AUDIT-BOOKING-ENGINE #10 — Turismo fiscal config.
+            'ltms_iva_turismo_co'               => '0.07', // IVA reducido turismo CO (Ley 1819/2016 Art. 115).
+            'ltms_ish_rate_mx'                  => '0.03',  // ISH hospedaje MX (default 3%, varía por estado).
+            'ltms_alegra_ish_tax_id'            => 0,       // ID del impuesto ISH en Alegra (configurar manualmente).
 
             // v2.0.0 — Impuestos MX
             'ltms_mx_iva_general'      => '0.16',
@@ -327,11 +429,17 @@ final class LTMS_Core_Activator {
             'ltms_xcover_partner_code'        => '',
             'ltms_xcover_purchase_protection' => false,
             'ltms_xcover_parcel_protection'   => false,
+            // Fix AD-5: Deprisa defaults — was missing from activator entirely.
+            'ltms_deprisa_enabled'            => 'no',
             'ltms_zapsign_api_token'                  => '',
             'ltms_zapsign_enabled'                    => 'no',
             'ltms_kyc_zapsign_enabled'                => 'no',
             'ltms_zapsign_sandbox'                    => '1',    // sandbox por defecto — apagar en producción
-            'ltms_zapsign_vendor_template_id'         => '526a9570-0160-42f9-999b-5b624527ba5e', // plantilla Contrato_Vendedor_LoTengo_v4.1
+            // Fix M-7: template_id must NOT be hardcoded — it's account-specific.
+            // The previous default '526a9570-...' only works for the LoTengo Colombia
+            // account. Other deployments (Mexico, other clients) would get a 404 from
+            // ZapSign. Now empty by default — admin must configure it explicitly.
+            'ltms_zapsign_vendor_template_id'         => '',
             'ltms_zapsign_contract_pdf_url'           => '',
             'ltms_zapsign_auto_approve_kyc'           => 'yes',  // M-67: activado por defecto
             'ltms_zapsign_contract_attachment_id'     => '',
@@ -351,6 +459,55 @@ final class LTMS_Core_Activator {
             'ltms_backblaze_endpoint'           => '',
             'ltms_backblaze_default_bucket'     => '',
             'ltms_backblaze_private_bucket'     => 'lotengo-kyc-docs',
+
+            // v2.7.0 — Donaciones Fundación Cardio Infantil
+            // El motor de donaciones (class-ltms-donation-engine.php) lee estas
+            // opciones al procesar cada orden completada. Defaults conservadores:
+            // disabled + percentage 0 + sin certificados activos. El admin debe
+            // habilitar explícitamente en Settings → Donaciones.
+            'ltms_donation_enabled'              => 'no',
+            'ltms_donation_percentage'           => 0.0,
+            'ltms_donation_min_amount'           => 0.0,
+            'ltms_donation_max_amount'           => 0.0,
+            'ltms_donation_basis'                => 'platform_fee',
+            'ltms_donation_rounding'             => 'none',
+            'ltms_donation_foundation_name'      => 'Fundación Cardio Infantil',
+            'ltms_donation_foundation_nit'       => '',
+            'ltms_donation_foundation_contact'   => '',
+            'ltms_donation_foundation_email'     => '',
+            'ltms_donation_alegra_account_id'    => 0,
+            'ltms_donation_payout_frequency'     => 'monthly',
+            'ltms_donation_payout_day'           => 15,
+            'ltms_donation_vendor_transparency'  => 'yes',
+            'ltms_donation_customer_opt_in'      => 'no',
+            'ltms_donation_tax_deductible'       => 'yes',
+            'ltms_donation_certificate_enabled'  => 'yes',
+
+            // v3.1.0 — Cross-Border Commerce (Task 63-C)
+            // El motor cross-border (LTMS_Admin_Cross_Border + LTMS_FX_Rate_Provider)
+            // lee estas opciones al procesar órdenes internacionales. Defaults
+            // conservadores: deshabilitado + moneda base USD + 3 monedas latam
+            // + spread 1.5% + provider Frankfurter + incoterm DDU + KYC y fraud
+            // screening activos. El admin debe habilitar explícitamente en
+            // Settings → Cross-Border.
+            'ltms_cross_border_enabled'                    => 'no',
+            'ltms_base_currency'                           => 'USD',
+            'ltms_enabled_currencies'                      => [ 'COP', 'MXN', 'USD' ],
+            'ltms_fx_spread_percentage'                    => 1.5,
+            'ltms_fx_provider'                             => 'frankfurter',
+            'ltms_fx_cache_ttl_hours'                      => 6,
+            'ltms_fx_manual_overrides'                     => '',
+            'ltms_default_incoterm'                        => 'DDU',
+            'ltms_customs_duty_rates'                      => '',
+            'ltms_customs_fees'                            => '',
+            'ltms_cross_border_origin_countries'           => [],
+            'ltms_cross_border_destination_countries'      => [],
+            'ltms_de_minimis_thresholds'                   => '',
+            'ltms_cross_border_kyc_required'               => 'yes',
+            'ltms_cross_border_fraud_screening'            => 'yes',
+            'ltms_international_shipping_carriers'         => [],
+            'ltms_customs_broker_contact'                  => '',
+            'ltms_customs_broker_email'                    => '',
         ];
 
         $current_settings = get_option( 'ltms_settings', [] );
@@ -380,6 +537,28 @@ final class LTMS_Core_Activator {
                     'display'  => __( 'Every 30 Minutes', 'ltms' ),
                 ];
             }
+            if ( ! isset( $schedules['every_15_minutes'] ) ) {
+                $schedules['every_15_minutes'] = [
+                    'interval' => 15 * MINUTE_IN_SECONDS,
+                    'display'  => __( 'Every 15 Minutes', 'ltms' ),
+                ];
+            }
+            // RB-1/RB-2 FIX (v2.9.19): "monthly" y "yearly" no son schedules nativos de WordPress.
+            // "monthly" a veces existe pero no es confiable; "yearly" JAMÁS existe.
+            // Sin estos schedules, wp_schedule_event('monthly'/'yearly') falla silenciosamente
+            // y TODOS los hooks ltms_monthly_cron + ltms_yearly_cron son dead code desde v2.9.13.
+            if ( ! isset( $schedules['monthly'] ) ) {
+                $schedules['monthly'] = [
+                    'interval' => 30 * DAY_IN_SECONDS, // WP core usa ~30 días; proche to "monthly".
+                    'display'  => __( 'Once Monthly', 'ltms' ),
+                ];
+            }
+            if ( ! isset( $schedules['yearly'] ) ) {
+                $schedules['yearly'] = [
+                    'interval' => 365 * DAY_IN_SECONDS,
+                    'display'  => __( 'Once Yearly', 'ltms' ),
+                ];
+            }
             return $schedules;
         } );
 
@@ -391,9 +570,21 @@ final class LTMS_Core_Activator {
             'ltms_process_job_queue'     => [ 'recurrence' => 'every_5_minutes',   'time' => null ],
             'ltms_send_notifications'    => [ 'recurrence' => 'hourly',            'time' => null ],
             'ltms_update_tracking'       => [ 'recurrence' => 'every_30_minutes',  'time' => null ],
+            'ltms_every_15_minutes'      => [ 'recurrence' => 'every_15_minutes',  'time' => null ], // SB-1: carrito abandonado.
             'ltms_approve_payout_cron'   => [ 'recurrence' => 'daily',             'time' => '06:00:00' ],
             'ltms_daily_cron'            => [ 'recurrence' => 'daily',             'time' => '01:00:00' ], // M-46: consumer protection holds
             'ltms_alegra_retry_failed'   => [ 'recurrence' => 'hourly',            'time' => null ],       // Reintentar facturas Alegra fallidas
+            // RB-1/RB-2 FIX (v2.9.19): crons mensual y anual ahora SÍ se agendan.
+            // Antes de este fix, ltms_monthly_cron y ltms_yearly_cron eran
+            // hook listeners registered (add_action) pero NUNCA disparados
+            // (sin wp_schedule_event) → silent dead code desde v2.9.13.
+            // Afectados: NC-4 cierre contable, NC-6 AR/AP reconciliation,
+            // FT-1 SOS reports, FT-2 rescreen vendors, FT-7 CRS/FATCA anual,
+            // FT-5 PCI DSS anual, RT-2 sanitary expiry, PP-7 batch traceability,
+            // LT annual carrier docs expiry, CB annual cross-border review,
+            // NT-3 FONTUR report.
+            'ltms_monthly_cron'          => [ 'recurrence' => 'monthly',            'time' => '03:30:00' ], // Día 1 del mes, 03:30 UTC.
+            'ltms_yearly_cron'           => [ 'recurrence' => 'yearly',             'time' => '04:30:00' ], // 1 enero + aniversario activate, 04:30 UTC.
         ];
 
         foreach ( $jobs as $hook => $config ) {
@@ -403,6 +594,114 @@ final class LTMS_Core_Activator {
                     : time();
 
                 wp_schedule_event( $timestamp, $config['recurrence'], $hook );
+            }
+        }
+
+        // INT-BUG-4 FIX: 3 cron hooks were previously MISSING from the activator —
+        // they were registered ad-hoc by individual modules on first load, which
+        // means a fresh install with no cron trigger would never run them.
+        // Scheduling them in activate() guarantees they exist from minute 0.
+        // The offsets (+3600 / +1800) defer the first run so they don't all fire
+        // simultaneously with the activate() request itself.
+        if ( ! wp_next_scheduled( 'ltms_check_rnt_expiry' ) ) {
+            wp_schedule_event( time() + 3600, 'daily', 'ltms_check_rnt_expiry' );
+        }
+        if ( ! wp_next_scheduled( 'ltms_check_aveonboarding_reminders' ) ) {
+            wp_schedule_event( time() + 3600, 'daily', 'ltms_check_aveonboarding_reminders' );
+        }
+        if ( ! wp_next_scheduled( 'ltms_zapsign_poll_pending' ) ) {
+            wp_schedule_event( time() + 1800, 'hourly', 'ltms_zapsign_poll_pending' );
+        }
+
+        // 60-C — Donation motor crons.
+        //   - ltms_donation_payout_cron: batch transfer to the foundation bank
+        //     account. Frequency is configurable (ltms_donation_payout_frequency):
+        //       'weekly'     → weekly schedule
+        //       'monthly'    → monthly schedule (default)
+        //       'quarterly'  → monthly schedule (CRON-BUG-3 / Task 62-C: quarterly
+        //                       is not a WP native recurrence; we schedule monthly
+        //                       and rely on LTMS_Donation_Manager::process_payout_batch()
+        //                       to short-circuit on non-quarter-boundary months.
+        //                       TODO (Task 62-A scope): add is_quarter_end() check
+        //                       at the top of process_payout_batch — return null on
+        //                       non-quarter months (Jan, Apr, Jul, Oct 1st = process;
+        //                       other months = skip).
+        //   - ltms_donation_certificate_cron: monthly generation of tax-deductible
+        //     donation certificates for donors (Colombia: certificado de donaciones
+        //     Ley 1819/2016 art. 257).
+        // First run is offset +86400s (1 day) so it doesn't collide with the
+        // activate() request and the foundation wallet is fully initialized.
+        if ( ! wp_next_scheduled( 'ltms_donation_payout_cron' ) ) {
+            $frequency = LTMS_Core_Config::get( 'ltms_donation_payout_frequency', 'monthly' );
+            // CRON-BUG-3 / Task 62-C: explicit schedule mapping. 'quarterly'
+            // schedules monthly (WP has no quarterly recurrence); the actual
+            // quarter-boundary filter must live in process_payout_batch().
+            $schedule = $frequency === 'weekly' ? 'weekly' : 'monthly';
+            wp_schedule_event( time() + 86400, $schedule, 'ltms_donation_payout_cron' );
+        }
+        if ( ! wp_next_scheduled( 'ltms_donation_certificate_cron' ) ) {
+            wp_schedule_event( time() + 86400, 'monthly', 'ltms_donation_certificate_cron' );
+        }
+
+        // AUDIT-REDI-UX-GAPS GAP-9 FIX: cron hourly para SLA check de incidencias ReDi.
+        if ( ! wp_next_scheduled( 'ltms_redi_incident_sla_check' ) ) {
+            wp_schedule_event( time() + 3600, 'hourly', 'ltms_redi_incident_sla_check' );
+        }
+    }
+
+    /**
+     * 60-C — Crea la wallet de la fundación (vendor ID especial -1).
+     *
+     * El motor de donaciones (Task 60-B) usa una wallet con vendor_id = -1 para
+     * acumular las donaciones antes de transferirlas a la cuenta bancaria de la
+     * fundación. Esta wallet debe existir desde la activación para que las
+     * donaciones individuales (que llaman Wallet::credit dentro del hook
+     * 'ltms_order_paid_after_split') no fallen por wallet-not-found.
+     *
+     * INT-BUG-1 / Task 62-C: vendor_id=-1 requiere que las columnas
+     * `vendor_id` de `lt_vendor_wallets`, `lt_wallet_transactions` y
+     * `lt_wallet_journal` sean BIGINT (signed), no BIGINT UNSIGNED. Sin esta
+     * corrección (aplicada en class-ltms-db-migrations.php v2.7.1), el INSERT
+     * falla en MySQL strict mode con "Out of range value for column 'vendor_id'".
+     *
+     * Defensive: si el motor de donaciones no está cargado (clase
+     * LTMS_Donation_Manager no existe), se omite silenciosamente — la wallet se
+     * creará on-demand por Wallet::get_or_create en la primera donación.
+     *
+     * @return void
+     */
+    private static function create_foundation_wallet(): void {
+        if ( ! class_exists( 'LTMS_Business_Wallet' ) ) {
+            return;
+        }
+        if ( ! class_exists( 'LTMS_Donation_Manager' ) ) {
+            // Motor de donaciones no cargado — la wallet se creará on-demand
+            // cuando el motor esté disponible. No es un error.
+            return;
+        }
+
+        try {
+            $currency = LTMS_Core_Config::get_currency();
+            LTMS_Business_Wallet::get_or_create(
+                LTMS_Donation_Manager::FOUNDATION_VENDOR_ID,
+                $currency
+            );
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'FOUNDATION_WALLET_CREATED',
+                    sprintf( 'Wallet de fundación creada (vendor_id=%d, currency=%s)', LTMS_Donation_Manager::FOUNDATION_VENDOR_ID, $currency )
+                );
+            }
+        } catch ( \Throwable $e ) {
+            // No propagar — la activación no debe fallar si la wallet no se pudo
+            // crear (la tabla lt_vendor_wallets podría no existir aún si las
+            // migraciones no corrieron correctamente). Se loguea y se continúa.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'FOUNDATION_WALLET_CREATE_FAILED',
+                    sprintf( 'No se pudo crear la wallet de fundación: %s', $e->getMessage() )
+                );
             }
         }
     }
@@ -541,6 +840,17 @@ final class LTMS_Core_Activator {
     /**
      * Crea los directorios seguros necesarios en wp-content/uploads.
      *
+     * PERM-2 (Task 57-E): File permissions are enforced so that BOTH the
+     * web server AND the admin can read/write:
+     *   - Directories: 0755 (rwxr-xr-x) — admin can list + create files.
+     *   - Static protection files (.htaccess, index.php): 0644 (rw-r--r--).
+     *   - Generated content files (logs, contracts, invoices): 0664
+     *     (rw-rw-r--) so the web server and admin can both append/write.
+     *
+     * wp_mkdir_p() respects the WP FS_METHOD and the configured umask, so
+     * we explicitly chmod afterwards to guarantee the recommended mode
+     * regardless of the host's default umask (some hosts use 0775 or 0700).
+     *
      * @return void
      */
     private static function create_secure_directories(): void {
@@ -558,17 +868,122 @@ final class LTMS_Core_Activator {
                 wp_mkdir_p( $dir );
             }
 
+            // PERM-2: enforce 0755 on directories so the admin can list/create
+            // files inside (admin editor requires the plugin folders to be
+            // readable+executable by the web server; the vault dirs follow
+            // the same convention for consistency).
+            if ( function_exists( 'chmod' ) && is_dir( $dir ) ) {
+                @chmod( $dir, 0755 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.chmod_chmod
+            }
+
             // Proteger con .htaccess
             $htaccess = $dir . '.htaccess';
             if ( ! file_exists( $htaccess ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
                 file_put_contents( $htaccess, "Order Deny,Allow\nDeny from all\n", LOCK_EX );
+            }
+            // PERM-2: static protection files use 0644.
+            if ( function_exists( 'chmod' ) && file_exists( $htaccess ) ) {
+                @chmod( $htaccess, 0644 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.chmod_chmod
             }
 
             // Proteger con index.php
             $index = $dir . 'index.php';
             if ( ! file_exists( $index ) ) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
                 file_put_contents( $index, '<?php // Silence is golden.', LOCK_EX );
             }
+            // PERM-2: index.php is a static protection file — 0644.
+            if ( function_exists( 'chmod' ) && file_exists( $index ) ) {
+                @chmod( $index, 0644 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.chmod_chmod
+            }
+
+            // PERM-2: for directories that hold generated runtime content
+            // (logs, contracts, invoices, certificates), enforce 0664 on
+            // any pre-existing files so the admin can read+edit them via
+            // the WP admin editor or SFTP. We skip the .htaccess/index.php
+            // already handled above.
+            $is_generated_dir = (
+                strpos( $dir, LTMS_LOG_DIR ) === 0
+                || strpos( $dir, LTMS_VAULT_DIR . 'contracts/' ) === 0
+                || strpos( $dir, LTMS_VAULT_DIR . 'invoices/' ) === 0
+                || strpos( $dir, LTMS_VAULT_DIR . 'certificates/' ) === 0
+                || strpos( $dir, LTMS_VAULT_DIR . 'kyc/' ) === 0
+            );
+            if ( $is_generated_dir && is_dir( $dir ) ) {
+                $files = glob( $dir . '*' ) ?: [];
+                foreach ( $files as $f ) {
+                    if ( ! is_file( $f ) ) {
+                        continue;
+                    }
+                    $base = basename( $f );
+                    if ( '.htaccess' === $base || 'index.php' === $base ) {
+                        continue;
+                    }
+                    if ( function_exists( 'chmod' ) ) {
+                        @chmod( $f, 0664 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.chmod_chmod
+                    }
+                }
+            }
         }
+    }
+
+    /**
+     * INT-BUG-14 FIX: Crea la tabla de cola de emails (`lt_email_queue`).
+     *
+     * All emails in the plugin currently go out via direct wp_mail() calls —
+     * synchronous and blocking. A failed SMTP connection (timeouts, rate limits,
+     * DNS issues) blocks the calling request, which has already caused:
+     *   - Registration flows where a bad SMTP deletes the vendor account (REG-BUG-2)
+     *   - Payout approval pages that hang for 30s when the email server is slow
+     *   - KYC approval flows that surface a 500 to the admin
+     *
+     * The queue table is the infrastructure for a future async email sender:
+     *   - Callers enqueue via LTMS_Email_Queue::enqueue($to, $subject, $body, $headers)
+     *   - A cron job (ltms_process_email_queue, to be wired up) will poll and send.
+     *
+     * NOTE: full migration of all wp_mail() callers is OUT OF SCOPE for this task.
+     * This method only creates the table + the enqueue() entry point so that
+     * new code (and gradually migrated callers) can start using it.
+     *
+     * @return void
+     */
+    private static function create_email_queue_table(): void {
+        global $wpdb;
+
+        $table      = $wpdb->prefix . 'lt_email_queue';
+        $charset    = $wpdb->get_charset_collate();
+        $exists     = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->prepare(
+                "SHOW TABLES LIKE %s",
+                $table
+            )
+        );
+
+        if ( $exists === $table ) {
+            return; // Already created — idempotent.
+        }
+
+        $sql = "CREATE TABLE `{$table}` (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            recipient VARCHAR(255) NOT NULL,
+            subject VARCHAR(500) NOT NULL,
+            body LONGTEXT NOT NULL,
+            headers TEXT NULL,
+            priority TINYINT(1) NOT NULL DEFAULT 5,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            attempts TINYINT(3) UNSIGNED NOT NULL DEFAULT 0,
+            max_attempts TINYINT(3) UNSIGNED NOT NULL DEFAULT 3,
+            last_error TEXT NULL,
+            scheduled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            sent_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY status_scheduled (status, scheduled_at),
+            KEY priority_scheduled (priority, scheduled_at)
+        ) {$charset};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta( $sql );
     }
 }

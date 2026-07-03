@@ -71,6 +71,26 @@ final class LTMS_Aveonline_Hub_Listener {
             return;
         }
 
+        // AO-BUG-8 FIX (regression of LS-BUG-7): event_id idempotency. El Hub
+        // puede reenviar el mismo evento en retries, y módulos del marketplace
+        // pueden disparar `ltms_report_shipment_status_to_hub` varias veces para
+        // el mismo order_id+estado dentro de la misma hora. Sin dedup, cada
+        // disparo genera una nueva fila en el Hub Log y un POST duplicado a
+        // Ave-Hub. Calculamos un event_id determinista (del extra o de los
+        // campos clave) y lo gateamos con un transient de 1 hora.
+        $fecha_estado = (string) ( $extra['fecha_estado'] ?? current_time( 'Y-m-d H:i:s' ) );
+        $event_id     = (string) ( $extra['event_id'] ?? md5( implode( '|', [
+            $order_id,
+            $cod_estado,
+            $fecha_estado,
+            (string) floor( time() / 3600 ), // bucket de 1h: protege contra duplicados en la misma hora sin bloquear un estado legitimo en la siguiente hora
+        ] ) ) );
+        $cache_key    = 'ltms_avehub_seen_' . md5( $event_id );
+        if ( get_transient( $cache_key ) ) {
+            return; // Already processed
+        }
+        set_transient( $cache_key, true, HOUR_IN_SECONDS );
+
         $id_transportadora = (int) get_option( 'ltms_aveonline_hub_idtransportadora', 0 );
         if ( ! $id_transportadora ) {
             // No configurado: no es un error de negocio, solo no hay nada que reportar.
@@ -81,7 +101,7 @@ final class LTMS_Aveonline_Hub_Listener {
             'id_envio'      => (string) $order_id,
             'cod_estado'    => $cod_estado,
             'nombre_estado' => $nombre_estado,
-            'fecha_estado'  => current_time( 'Y-m-d H:i:s' ),
+            'fecha_estado'  => $fecha_estado,
         ], $extra ) );
 
         try {

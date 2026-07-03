@@ -1,0 +1,329 @@
+<?php
+/**
+ * LTMS Cart Drawer — Carrito lateral (slide-in) con upsells + free shipping bar.
+ *
+ * Reemplaza el redirect a /cart con un drawer AJAX que se desliza desde la derecha.
+ * Incluye:
+ *  - Barra de progreso de envío gratis (conecta con MODE_HYBRID threshold).
+ *  - Upsells: productos del mismo vendor que ya están en el carrito.
+ *  - Countdown timer: "Tu carrito está reservado por X minutos".
+ *  - Integración con WooCommerce AJAX fragments.
+ *
+ * @package LTMS
+ * @version 2.9.2
+ */
+
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+
+class LTMS_Cart_Drawer {
+
+    public static function init(): void {
+        // Render drawer HTML en el footer de todas las páginas.
+        add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ] );
+
+        // AJAX: obtener contenido del drawer (refresh).
+        add_action( 'wp_ajax_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
+        add_action( 'wp_ajax_nopriv_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
+
+        // AJAX: remove item from cart via drawer.
+        add_action( 'wp_ajax_ltms_drawer_remove_item', [ __CLASS__, 'ajax_remove_item' ] );
+        add_action( 'wp_ajax_nopriv_ltms_drawer_remove_item', [ __CLASS__, 'ajax_remove_item' ] );
+
+        // AJAX: update quantity via drawer.
+        add_action( 'wp_ajax_ltms_drawer_update_qty', [ __CLASS__, 'ajax_update_qty' ] );
+        add_action( 'wp_ajax_nopriv_ltms_drawer_update_qty', [ __CLASS__, 'ajax_update_qty' ] );
+
+        // Hook into WC add_to_cart to trigger drawer open (via JS).
+        add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'add_drawer_fragment' ] );
+
+        // Disable WC redirect to cart after add (we use drawer instead).
+        add_filter( 'woocommerce_cart_redirect_after_add', [ __CLASS__, 'disable_cart_redirect' ] );
+    }
+
+    /**
+     * Desactiva el redirect a /cart después de add-to-cart (usamos drawer).
+     */
+    public static function disable_cart_redirect(): bool {
+        return false;
+    }
+
+    /**
+     * Añade un fragment para que el JS sepa que el carrito cambió.
+     */
+    public static function add_drawer_fragment( array $fragments ): array {
+        $fragments['div.ltms-drawer-fragments'] = '<div class="ltms-drawer-fragments" data-cart-count="' . esc_attr( WC()->cart ? WC()->cart->get_cart_contents_count() : 0 ) . '"></div>';
+        return $fragments;
+    }
+
+    /**
+     * Renderiza el HTML del drawer en el footer.
+     */
+    public static function render_drawer_html(): void {
+        ?>
+        <!-- Drawer Overlay -->
+        <div id="ltms-cart-drawer-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99998;opacity:0;transition:opacity 0.3s;"></div>
+
+        <!-- Cart Drawer -->
+        <div id="ltms-cart-drawer" style="position:fixed;top:0;right:-450px;width:100%;max-width:420px;height:100vh;background:#fff;z-index:99999;box-shadow:-4px 0 20px rgba(0,0,0,0.15);transition:right 0.3s ease-in-out;display:flex;flex-direction:column;">
+
+            <!-- Header -->
+            <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:#fff;">
+                <h3 style="margin:0;font-size:16px;font-weight:700;">
+                    &#x1F6D2; <?php esc_html_e( 'Tu carrito', 'ltms' ); ?>
+                    <span id="ltms-drawer-count" style="font-size:13px;color:#6b7280;font-weight:400;"></span>
+                </h3>
+                <button type="button" id="ltms-drawer-close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
+            </div>
+
+            <!-- Free Shipping Progress Bar -->
+            <div id="ltms-drawer-shipping-bar" style="padding:12px 20px;background:#f0fdf4;border-bottom:1px solid #d1fae5;"></div>
+
+            <!-- Countdown Timer -->
+            <div id="ltms-drawer-countdown" style="padding:8px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e;text-align:center;display:none;"></div>
+
+            <!-- Cart Items (scrollable) -->
+            <div id="ltms-drawer-items" style="flex:1;overflow-y:auto;padding:0 20px;"></div>
+
+            <!-- Upsells -->
+            <div id="ltms-drawer-upsells" style="padding:12px 20px;border-top:1px solid #e5e7eb;background:#f9fafb;display:none;"></div>
+
+            <!-- Footer -->
+            <div id="ltms-drawer-footer" style="padding:16px 20px;border-top:1px solid #e5e7eb;background:#fff;"></div>
+        </div>
+        <?php
+    }
+
+    /**
+     * AJAX: refresca todo el contenido del drawer.
+     */
+    public static function ajax_refresh_drawer(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        wp_send_json_success( self::get_drawer_data() );
+    }
+
+    /**
+     * AJAX: elimina un item del carrito.
+     */
+    public static function ajax_remove_item(): void {
+        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
+        if ( $cart_item_key && WC()->cart ) {
+            WC()->cart->remove_cart_item( $cart_item_key );
+        }
+        wp_send_json_success( self::get_drawer_data() );
+    }
+
+    /**
+     * AJAX: actualiza cantidad.
+     */
+    public static function ajax_update_qty(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
+        $qty = (int) ( $_POST['qty'] ?? 1 );
+        if ( $cart_item_key && WC()->cart ) {
+            WC()->cart->set_quantity( $cart_item_key, max( 1, $qty ), true );
+        }
+        wp_send_json_success( self::get_drawer_data() );
+    }
+
+    /**
+     * Construye todos los datos del drawer para AJAX.
+     */
+    private static function get_drawer_data(): array {
+        $cart = WC()->cart;
+        if ( ! $cart ) return [ 'items_html' => '', 'count' => 0, 'subtotal' => '0' ];
+
+        $items = [];
+        $vendor_ids = [];
+        foreach ( $cart->get_cart() as $key => $item ) {
+            $product = $item['data'];
+            $vendor_id = (int) get_post_field( 'post_author', $item['product_id'] );
+            $vendor_ids[ $vendor_id ] = true;
+
+            $items[] = [
+                'key' => $key,
+                'name' => $product->get_name(),
+                'price' => $product->get_price_html(),
+                'image' => $product->get_image( 'thumbnail' ),
+                'qty' => $item['quantity'],
+                'permalink' => $product->get_permalink(),
+                'subtotal' => wc_price( $item['line_subtotal'] ),
+                'vendor_name' => self::get_vendor_name( $vendor_id ),
+            ];
+        }
+
+        // Free shipping bar data.
+        $shipping_bar = self::get_shipping_bar_data( $cart );
+
+        // Upsells: productos del mismo vendor que NO están en el carrito.
+        $upsells = self::get_upsell_products( array_keys( $vendor_ids ), $cart );
+
+        return [
+            'count' => $cart->get_cart_contents_count(),
+            'subtotal' => wc_price( $cart->get_cart_subtotal() ),
+            'shipping_bar' => $shipping_bar,
+            'items' => $items,
+            'upsells' => $upsells,
+            'cart_url' => wc_get_cart_url(),
+            'checkout_url' => wc_get_checkout_url(),
+            'payment_badges' => self::get_payment_badges(),
+            'checkout_note' => self::get_checkout_note(),
+            'tnc_required' => self::is_tnc_required(),
+            'tnc_url' => LTMS_Core_Config::get( 'ltms_terms_url', '' ),
+            'tnc_version' => class_exists( 'LTMS_Legal_Compliance' ) ? LTMS_Legal_Compliance::TERMS_VERSION : '1.0',
+        ];
+    }
+
+    /**
+     * F6: Obtiene los badges de métodos de pago activos.
+     * Muestra iconos de Visa, Mastercard, PSE, Nequi, etc. según gateways activos.
+     */
+    private static function get_payment_badges(): array {
+        $badges = [];
+        $country = LTMS_Core_Config::get_country();
+
+        // Stripe (tarjetas internacionales).
+        if ( LTMS_Core_Config::get( 'ltms_stripe_enabled', 'no' ) === 'yes' ) {
+            $badges[] = [ 'name' => 'Visa', 'icon' => '&#x1F4B3;' ];
+            $badges[] = [ 'name' => 'Mastercard', 'icon' => '&#x1F4B3;' ];
+            $badges[] = [ 'name' => 'Amex', 'icon' => '&#x1F4B3;' ];
+        }
+
+        // Openpay (México + Colombia).
+        if ( LTMS_Core_Config::get( 'ltms_openpay_enabled', 'no' ) === 'yes' ) {
+            $badges[] = [ 'name' => 'Openpay', 'icon' => '&#x1F4F1;' ];
+        }
+
+        // PSE (Colombia).
+        if ( $country === 'CO' ) {
+            $badges[] = [ 'name' => 'PSE', 'icon' => '&#x1F4F1;' ];
+        }
+
+        // Nequi / Daviplata (Colombia).
+        if ( $country === 'CO' ) {
+            $badges[] = [ 'name' => 'Nequi', 'icon' => '&#x1F4F1;' ];
+            $badges[] = [ 'name' => 'Daviplata', 'icon' => '&#x1F4F1;' ];
+        }
+
+        // Addi (BNPL Colombia + México).
+        if ( LTMS_Core_Config::get( 'ltms_addi_enabled', 'no' ) === 'yes' ) {
+            $badges[] = [ 'name' => 'Addi', 'icon' => '&#x1F4B5;' ];
+        }
+
+        // PayPal (si está activo via Stripe).
+        if ( LTMS_Core_Config::get( 'ltms_stripe_enabled', 'no' ) === 'yes' ) {
+            $badges[] = [ 'name' => 'PayPal', 'icon' => '&#x1F4B3;' ];
+        }
+
+        return $badges;
+    }
+
+    /**
+     * F5: Obtiene el note informativo debajo del botón de checkout.
+     */
+    private static function get_checkout_note(): string {
+        $country = LTMS_Core_Config::get_country();
+        $currency = LTMS_Core_Config::get_currency();
+
+        if ( $country === 'MX' ) {
+            return __( 'Impuestos incluidos. Envío calculado al finalizar la compra.', 'ltms' );
+        }
+
+        return __( 'IVA incluido. Envío calculado al finalizar la compra.', 'ltms' );
+    }
+
+    /**
+     * F3: Verifica si el checkbox de T&C es obligatorio.
+     * Conecta con LTMS_Legal_Compliance para respetar la config.
+     */
+    private static function is_tnc_required(): bool {
+        if ( ! class_exists( 'LTMS_Legal_Compliance' ) ) return false;
+        return LTMS_Core_Config::get( 'ltms_require_tnc_at_checkout', 'yes' ) === 'yes';
+    }
+
+    /**
+     * Datos de la barra de envío gratis.
+     */
+    private static function get_shipping_bar_data( \WC_Cart $cart ): array {
+        $subtotal = (float) $cart->get_cart_subtotal();
+
+        // Obtener threshold de envío gratis.
+        $threshold = 0;
+        if ( class_exists( 'LTMS_Shipping_Mode' ) ) {
+            $threshold = (float) LTMS_Core_Config::get( 'ltms_shipping_hybrid_threshold', 100000 );
+        }
+
+        if ( $threshold <= 0 ) {
+            return [ 'show' => false ];
+        }
+
+        $remaining = max( 0, $threshold - $subtotal );
+        $pct = min( 100, ( $subtotal / $threshold ) * 100 );
+
+        return [
+            'show' => true,
+            'threshold' => $threshold,
+            'remaining' => $remaining,
+            'percentage' => $pct,
+            'threshold_formatted' => wc_price( $threshold ),
+            'remaining_formatted' => wc_price( $remaining ),
+            'message' => $remaining > 0
+                ? sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), wc_price( $remaining ) )
+                : __( '&#x1F389; ¡Tienes envío gratis!', 'ltms' ),
+        ];
+    }
+
+    /**
+     * Obtiene productos de upsell: del mismo vendor, no en carrito, mismo categoría.
+     */
+    private static function get_upsell_products( array $vendor_ids, \WC_Cart $cart ): array {
+        if ( empty( $vendor_ids ) ) return [];
+
+        // IDs ya en carrito.
+        $in_cart = [];
+        foreach ( $cart->get_cart() as $item ) {
+            $in_cart[] = (int) $item['product_id'];
+        }
+
+        $upsells = [];
+        foreach ( array_slice( $vendor_ids, 0, 3 ) as $vid ) {
+            $query = new \WP_Query( [
+                'post_type' => 'product',
+                'post_status' => 'publish',
+                'posts_per_page' => 3,
+                'author' => $vid,
+                'post__not_in' => $in_cart,
+                'fields' => 'ids',
+                'orderby' => 'rand',
+            ] );
+
+            foreach ( $query->posts as $pid ) {
+                $p = wc_get_product( $pid );
+                if ( ! $p || $p->get_price() <= 0 ) continue;
+                $upsells[] = [
+                    'id' => $pid,
+                    'name' => $p->get_name(),
+                    'price' => $p->get_price_html(),
+                    'image' => $p->get_image( 'thumbnail' ),
+                    'permalink' => $p->get_permalink(),
+                    'add_to_cart_url' => '?add-to-cart=' . $pid,
+                ];
+                if ( count( $upsells ) >= 5 ) break 2;
+            }
+        }
+
+        return $upsells;
+    }
+
+    /**
+     * Obtiene el nombre del vendor.
+     */
+    private static function get_vendor_name( int $vendor_id ): string {
+        $user = get_userdata( $vendor_id );
+        return $user ? $user->display_name : '';
+    }
+}

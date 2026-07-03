@@ -36,6 +36,10 @@ $tabs = [
     'deprisa'     => __( "Deprisa", "ltms" ),
     // v2.3.0 — Analytics & Tracking
     'analytics'   => __( "Analytics / Tracking", "ltms" ),
+    // v3.1.0 — Cross-Border Commerce (Task 63-C)
+    'cross_border'=> __( "Cross-Border", "ltms" ),
+    // v2.9.13 — Privacy / Habeas Data / ARCO
+    'privacy'     => __( "Privacidad / ARCO", "ltms" ),
 ];
 
 // Bienestar: mostrar aviso si vienen del wizard de activación
@@ -230,11 +234,27 @@ function ltms_render_generic_settings_section( string $tab, array $tab_labels = 
             [ 'key' => 'ltms_alegra_send_invoice_email',     'label' => __( "Enviar factura por email", "ltms" ),            'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Alegra envía automáticamente la factura al email del comprador.", "ltms" ) ],
             [ 'key' => 'ltms_alegra_auto_payment',           'label' => __( "Registrar pago automáticamente", "ltms" ),       'type' => 'checkbox', 'default' => 'no',  'desc' => __( "Registra el pago en Alegra al crear la factura. Requiere ID Cuenta Bancaria.", "ltms" ) ],
             [ 'key' => 'ltms_alegra_commission_account_id',  'label' => __( "ID Cuenta Comisiones Plataforma", "ltms" ),      'type' => 'number',   'desc' => __( "ID de cuenta bancaria en Alegra donde se registran las comisiones del marketplace. Déjalo en 0 para omitir.", "ltms" ) ],
-            [ 'key' => 'ltms_alegra_retefuente_tax_id',      'label' => __( "ID Impuesto Retención en la Fuente", "ltms" ),   'type' => 'number',   'desc' => __( "ID del impuesto de retefuente en Alegra (Configuración → Impuestos). Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_retefuente_tax_id',      'label' => __( "ID Impuesto Retención en la Fuente (CO)", "ltms" ),   'type' => 'number',   'desc' => __( "ID del impuesto de retefuente en Alegra (Configuración → Impuestos). Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_reteiva_tax_id',         'label' => __( "ID Impuesto ReteIVA (CO)", "ltms" ),                 'type' => 'number',   'desc' => __( "NC-1: ID del impuesto ReteIVA (15% del IVA) en Alegra. Aplica cuando el vendor es gran contribuyente. Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_reteica_tax_id',         'label' => __( "ID Impuesto ReteICA (CO)", "ltms" ),                 'type' => 'number',   'desc' => __( "NC-1: ID del impuesto ReteICA (municipal) en Alegra. Aplica cuando el vendor tiene CIIU + municipio. Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_inc_tax_id',             'label' => __( "ID Impuesto Impoconsumo (CO)", "ltms" ),             'type' => 'number',   'desc' => __( "NC-5: ID del impuesto Impoconsumo (8% restaurantes) en Alegra. Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_iva_retenido_mx_tax_id', 'label' => __( "ID Impuesto IVA Retenido (MX)", "ltms" ),            'type' => 'number',   'desc' => __( "NC-1: ID del impuesto IVA retenido (4% persona moral, art. 1-A LIVA) en Alegra. Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_ish_tax_id',             'label' => __( "ID Impuesto ISH Hospedaje (MX)", "ltms" ),            'type' => 'number',   'desc' => __( "ID del impuesto ISH (Impuesto Sobre Hospedaje) en Alegra. Déjalo en 0 si no aplica.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_fx_sync',                'label' => __( "Sincronizar asientos FX con Alegra", "ltms" ),        'type' => 'checkbox', 'default' => 'yes',  'desc' => __( "NC-2: envía asientos de ganancia/pérdida cambiaria (NIIF 9 / NIF B-15) a Alegra.", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_fx_gain_account_id',     'label' => __( "ID Cuenta Ingreso FX (4255 PUC)", "ltms" ),           'type' => 'number',   'desc' => __( "NC-2: ID de la cuenta de ingreso por diferencia en cambio en Alegra (típicamente 4255 en PUC CO).", "ltms" ) ],
+            [ 'key' => 'ltms_alegra_fx_loss_account_id',     'label' => __( "ID Cuenta Gasto FX (5255 PUC)", "ltms" ),             'type' => 'number',   'desc' => __( "NC-2: ID de la cuenta de gasto por diferencia en cambio en Alegra (típicamente 5255 en PUC CO).", "ltms" ) ],
             [ 'key' => 'ltms_alegra_shipping_tax_id',        'label' => __( "ID Impuesto para Envíos", "ltms" ),              'type' => 'number',   'desc' => __( "ID del impuesto a aplicar en el ítem de envío. Default: 1 (exento en Colombia).", "ltms" ) ],
             [ 'key' => 'ltms_alegra_exchange_rate',          'label' => __( "Tasa de cambio (moneda extranjera)", "ltms" ),   'type' => 'number',   'desc' => __( "Tasa de cambio a usar cuando el pedido no es en COP/MXN. Default: 1.", "ltms" ) ],
             [ 'key' => 'ltms_alegra_webhook_secret',         'label' => __( "Webhook Secret (token)", "ltms" ),              'type' => 'text',     'desc' => __( "Token para validar webhooks entrantes de Alegra. Configura este mismo valor en Alegra al crear la suscripción.", "ltms" ) ],
             [ 'key' => 'ltms_alegra_webhook_url',            'label' => __( "URL del Webhook (solo lectura)", "ltms" ),      'type' => 'text',     'default' => function_exists( 'home_url' ) ? home_url( '/wp-json/ltms/v1/webhooks/alegra' ) : '', 'attrs' => 'readonly style="background:#f9f9f9;cursor:default;"', 'desc' => __( "Registra esta URL en Alegra → Webhooks para recibir notificaciones de facturas.", "ltms" ) ],
+
+            // NC-3 (v2.9.12) — Resolución DIAN Colombia.
+            [ 'key' => 'ltms_dian_resolution_number',        'label' => __( "Número Resolución DIAN (CO)", "ltms" ),           'type' => 'text',     'desc' => __( "NC-3: Número de la resolución DIAN vigente (ej: 18764000004200). Res. DIAN 000042/2020 art. 5.", "ltms" ) ],
+            [ 'key' => 'ltms_dian_resolution_date',          'label' => __( "Fecha Resolución DIAN", "ltms" ),                 'type' => 'text',     'desc' => __( "Fecha de la resolución DIAN (YYYY-MM-DD).", "ltms" ) ],
+            [ 'key' => 'ltms_dian_prefix',                   'label' => __( "Prefijo Autorizado DIAN", "ltms" ),               'type' => 'text',     'desc' => __( "Prefijo autorizado por DIAN (ej: SET, SETP).", "ltms" ) ],
+            [ 'key' => 'ltms_dian_range_from',               'label' => __( "Rango DIAN Desde", "ltms" ),                      'type' => 'text',     'desc' => __( "Número inicial del rango autorizado por DIAN.", "ltms" ) ],
+            [ 'key' => 'ltms_dian_range_to',                 'label' => __( "Rango DIAN Hasta", "ltms" ),                      'type' => 'text',     'desc' => __( "Número final del rango autorizado por DIAN.", "ltms" ) ],
+            [ 'key' => 'ltms_dian_technical_key',            'label' => __( "Clave Técnica DIAN", "ltms" ),                    'type' => 'password', 'desc' => __( "Clave técnica de configuración de software DIAN (se guarda cifrado).", "ltms" ) ],
         ],
     ];
 

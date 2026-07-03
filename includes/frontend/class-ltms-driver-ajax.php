@@ -39,6 +39,8 @@ class LTMS_Driver_Ajax {
     // ── Guardar / crear domiciliario ─────────────────────────────────────
 
     public function ajax_save_driver(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -173,6 +175,8 @@ class LTMS_Driver_Ajax {
     // ── Configuración de entrega propia ──────────────────────────────────
 
     public function ajax_save_delivery_settings(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();

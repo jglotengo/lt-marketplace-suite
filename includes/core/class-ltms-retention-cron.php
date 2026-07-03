@@ -17,6 +17,28 @@ class LTMS_Retention_Cron {
     const BATCH_SIZE      = 50;
     const CRON_HOOK       = 'ltms_retention_daily_sweep';
 
+    /**
+     * RC-2 FIX: returns the legal data-retention period in years for the
+     * current operating country.
+     *
+     *   - Colombia (CO): SAGRILAFT / Ley 1581/2012 → 5 years.
+     *   - México (MX):   Ley General de Protección de Datos Personales en
+     *                    Posesión de los Particulares (LFPDPPP) Art. 16 +
+     *                    SAT fiscal retention → 10 years.
+     *
+     * Previously the cron used a hardcoded SAGRILAFT_YEARS=5 for ALL countries,
+     * which would delete MX vendor KYC data after 5 years — violating Mexican
+     * law (10 years) and exposing the operator to sanctions by INAI.
+     *
+     * @return int Years to retain KYC data before archive/delete.
+     */
+    private static function get_retention_years(): int {
+        $country = method_exists( 'LTMS_Core_Config', 'get_country' )
+            ? LTMS_Core_Config::get_country()
+            : 'CO';
+        return strtoupper( $country ) === 'MX' ? 10 : self::SAGRILAFT_YEARS;
+    }
+
     public static function init(): void {
         add_filter( 'cron_schedules', [ __CLASS__, 'add_daily_schedule' ] );
         add_action( self::CRON_HOOK, [ __CLASS__, 'run_daily_sweep' ] );
@@ -79,11 +101,22 @@ class LTMS_Retention_Cron {
     }
 
     private static function evaluate_user( int $user_id ): string {
+        // RC-1 FIX: legal hold — if the user is under legal hold (active dispute,
+        // investigation, lawsuit, regulatory request), NEVER archive or delete.
+        // Admin sets ltms_legal_hold = '1' (or a reason string) via the admin UI.
+        $legal_hold = get_user_meta( $user_id, 'ltms_legal_hold', true );
+        if ( ! empty( $legal_hold ) ) {
+            return 'protect';
+        }
+
         if ( get_user_meta( $user_id, 'ltms_gdpr_erased_at', true ) ) {
             return 'protect';
         }
 
         $last_tx = self::get_last_transaction_date( $user_id );
+
+        // RC-2 FIX: country-aware retention period.
+        $retention_years = self::get_retention_years();
 
         if ( ! $last_tx ) {
             $user_data  = get_userdata( $user_id );
@@ -94,7 +127,7 @@ class LTMS_Retention_Cron {
             return self::resolve_archive_or_delete( $user_id );
         }
 
-        if ( ( time() - $last_tx ) / YEAR_IN_SECONDS < self::SAGRILAFT_YEARS ) {
+        if ( ( time() - $last_tx ) / YEAR_IN_SECONDS < $retention_years ) {
             return 'protect';
         }
 
@@ -122,29 +155,50 @@ class LTMS_Retention_Cron {
             $user_id
         ) );
 
-        if ( ! $rows ) {
-            return true;
-        }
-
-        try {
-            $b2 = LTMS_Api_Factory::get( 'backblaze' );
-        } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::error( 'RETENTION_B2_INIT', $e->getMessage() );
-            return false;
-        }
-
-        foreach ( $rows as $row ) {
+        if ( $rows ) {
             try {
-                $b2->delete_file( $row->bucket, $row->file_key );
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $wpdb->delete( $table, [ 'id' => (int) $row->id ], [ '%d' ] );
-                LTMS_Core_Logger::info( 'RETENTION_FILE_DELETED', "User #{$user_id} — {$row->file_key}" );
+                $b2 = LTMS_Api_Factory::get( 'backblaze' );
             } catch ( \Throwable $e ) {
-                LTMS_Core_Logger::error( 'RETENTION_FILE_DELETE_FAILED', "User #{$user_id} — {$row->file_key}: " . $e->getMessage() );
+                LTMS_Core_Logger::error( 'RETENTION_B2_INIT', $e->getMessage() );
+                return false;
+            }
+
+            foreach ( $rows as $row ) {
+                try {
+                    $b2->delete_file( $row->bucket, $row->file_key );
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                    $wpdb->delete( $table, [ 'id' => (int) $row->id ], [ '%d' ] );
+                    LTMS_Core_Logger::info( 'RETENTION_FILE_DELETED', "User #{$user_id} — {$row->file_key}" );
+                } catch ( \Throwable $e ) {
+                    LTMS_Core_Logger::error( 'RETENTION_FILE_DELETE_FAILED', "User #{$user_id} — {$row->file_key}: " . $e->getMessage() );
+                }
             }
         }
 
-        foreach ( [ 'ltms_kyc_document_url', 'ltms_kyc_selfie_url', 'ltms_kyc_document_number', 'ltms_kyc_status', 'ltms_kyc_archived_at' ] as $key ) {
+        // RC-3 FIX: also delete the signed contract backup from B2.
+        // backup_signed_contract() uploads the signed PDF to B2 but does NOT
+        // register it in lt_media_files (the ENUM lacks 'contract'). The only
+        // references are the ltms_contract_b2_bucket / ltms_contract_b2_key
+        // user_meta keys. Without this block, signed contracts would persist
+        // in B2 forever — defeating the retention policy and leaking PII
+        // (vendor name, email, masked document, signature) past the legal window.
+        $contract_bucket = get_user_meta( $user_id, 'ltms_contract_b2_bucket', true );
+        $contract_key    = get_user_meta( $user_id, 'ltms_contract_b2_key', true );
+        if ( $contract_bucket && $contract_key ) {
+            try {
+                $b2_contract = LTMS_Api_Factory::get( 'backblaze' );
+                $b2_contract->delete_file( $contract_bucket, $contract_key );
+                LTMS_Core_Logger::info( 'RETENTION_CONTRACT_DELETED', "User #{$user_id} — signed contract: {$contract_bucket}/{$contract_key}" );
+            } catch ( \Throwable $e ) {
+                LTMS_Core_Logger::error( 'RETENTION_CONTRACT_DELETE_FAILED', "User #{$user_id} — {$contract_bucket}/{$contract_key}: " . $e->getMessage() );
+            }
+        }
+
+        foreach ( [ 'ltms_kyc_document_url', 'ltms_kyc_selfie_url', 'ltms_kyc_document_number', 'ltms_kyc_status', 'ltms_kyc_archived_at',
+                    // RC-3 FIX: also clear contract meta keys so no dangling references remain.
+                    'ltms_contract_token', 'ltms_contract_status', 'ltms_contract_sent_at', 'ltms_contract_signed_at',
+                    'ltms_contract_sign_url', 'ltms_contract_b2_bucket', 'ltms_contract_b2_key', 'ltms_contract_pdf_hash',
+                    'ltms_contract_backed_up_at', 'ltms_document_number', 'ltms_phone' ] as $key ) {
             delete_user_meta( $user_id, $key );
         }
 

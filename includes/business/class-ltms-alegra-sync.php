@@ -75,8 +75,25 @@ final class LTMS_Alegra_Sync {
         // KYC aprobado → actualizar tipo de contacto si ya existe
         add_action( 'ltms_vendor_approved', [ $instance, 'on_vendor_approved' ], 20 );
 
-        // Payout completado → registrar egreso en Alegra
-        add_action( 'ltms_payout_completed', [ $instance, 'on_payout_completed' ], 20, 2 );
+        // Payout completado → registrar egreso en Alegra.
+        // FU2 FIX (v2.9.1): aceptar 3 args (vendor_id, amount, payout_id).
+        add_action( 'ltms_payout_completed', [ $instance, 'on_payout_completed' ], 20, 3 );
+
+        // 60-C — Donations: registrar asiento contable (gasto) y transferencia bancaria.
+        // 'ltms_donation_credited' dispara cuando el motor de donaciones (Task 60-B)
+        // acredita una donación individual a la wallet de la fundación.
+        // 'ltms_donation_payout_completed' dispara cuando se ejecuta el batch de
+        // transferencia bancaria mensual/trimestral a la fundación.
+        add_action( 'ltms_donation_credited', [ $instance, 'on_donation_credited' ], 10, 4 );
+        add_action( 'ltms_donation_payout_completed', [ $instance, 'on_donation_payout_completed' ], 10, 3 );
+
+        // v3.1.0 — Cross-Border motor (Task 63-D): listen for cross-border
+        // orders so we can add customs duties as a separate Alegra line item
+        // and annotate the FX conversion (display → base currency). The
+        // primary invoice is still created by on_order_completed above; this
+        // listener only enriches the existing invoice with cross-border
+        // metadata (it does NOT create a second invoice).
+        add_action( 'ltms_cross_border_order', [ $instance, 'on_cross_border_order' ], 10, 4 );
 
         // Cron de reintentos para facturas fallidas
         add_action( 'ltms_alegra_retry_failed', [ $instance, 'retry_failed_invoices' ] );
@@ -127,6 +144,16 @@ final class LTMS_Alegra_Sync {
                     sprintf( 'Factura Alegra #%d (%s) para pedido WC #%d', $invoice_id, $invoice_number, $order_id )
                 );
 
+                // NC-3 FIX (v2.9.12): disparar action para que los listeners
+                // (LTMS_Accounting_Compliance::persist_dian_resolution) puedan
+                // persistir la resolución DIAN + rango de numeración en el order
+                // meta para cumplimiento Res. DIAN 000042/2020 art. 5.
+                //
+                // ANTES: el hook estaba registrado pero NUNCA se disparaba →
+                // persist_dian_resolution nunca se ejecutaba → las facturas no
+                // tenían trazabilidad de resolución DIAN en el order meta.
+                do_action( 'ltms_alegra_invoice_created', $invoice_id, $order, $result );
+
                 // ── A. Registrar pago automático si está configurado ─────────
                 if ( LTMS_Core_Config::get( 'ltms_alegra_auto_payment', 'no' ) === 'yes' ) {
                     $this->register_invoice_payment( $invoice_id, $order );
@@ -140,6 +167,31 @@ final class LTMS_Alegra_Sync {
                 // ── C. M-201: la factura YA es de comisión al vendedor (no del total al comprador).
                 // register_platform_commission queda como legacy/dead-code; no llamar para evitar duplicar
                 // el ingreso en Alegra. Se mantiene la función para rollback si hace falta.
+            } else {
+                // AL-5 FIX (AUDIT-AL): 200 OK de Alegra PERO sin `id` en el
+                // body. Esto ocurre cuando Alegra devuelve un 200 con un
+                // cuerpo de error (ej.: `{"code": 400, "message": "..."}`),
+                // un cuerpo vacío, o un cuerpo con estructura inesperada.
+                // Antes: el código caía silenciosamente al final del try
+                // sin guardar meta, sin flag para reintento, sin log →
+                // retry_failed_invoices() nunca lo re-procesaba → factura
+                // perdida en limbo. El meta `_ltms_alegra_invoice_id`
+                // quedaba vacío así que el guard de idempotencia no barraba
+                // re-llamadas manuales, pero el cron no las hacía.
+                // Ahora: flag + log ERROR para que el cron reintente y el
+                // admin pueda ver el body devuelto por Alegra.
+                $body_preview = function_exists( 'wp_json_encode' )
+                    ? substr( wp_json_encode( $result ), 0, 500 )
+                    : '(no serializable)';
+                $this->log_error(
+                    'ALEGRA_INVOICE_NO_ID',
+                    sprintf( 'Pedido #%d: Alegra respondió 200 pero sin id en el body. Posible error body: %s', $order_id, $body_preview ),
+                    [ 'order_id' => $order_id, 'response' => $result ]
+                );
+                $order->update_meta_data( '_ltms_alegra_invoice_failed', 1 );
+                $order->update_meta_data( '_ltms_alegra_invoice_error',
+                    sprintf( '200 OK sin id — body: %s', $body_preview ) );
+                $order->save();
             }
         } catch ( \Throwable $e ) {
             $this->log_error(
@@ -208,7 +260,26 @@ final class LTMS_Alegra_Sync {
                 'items'        => $credit_items,
             ];
 
-            $result = $client->create_credit_note( $payload );
+            // AL-4 FIX (AUDIT-AL): pasar Idempotency-Key PER-REFUND. El
+            // código anterior no pasaba el parámetro $idempotency_key, así
+            // que create_credit_note() derivaba el key como
+            // `'ltms_credit_note_invoice_' . invoice_id` — IDENTICO para
+            // todos los reembolsos de la misma factura. En reembolsos
+            // parciales múltiples (común en WC: refund #1 por $50, refund #2
+            // por $30), Alegra dedupeaba el segundo contra el primero y
+            // DEVOLVÍA la misma credit-note #A en vez de crear #B → el
+            // segundo reembolso ($30) NO se reflejaba en Alegra. El cliente
+            // quedaba short-changed $30 en su contabilidad. El meta check
+            // local (_ltms_alegra_credit_note_{refund_id}) NO detectaba el
+            // problema porque el segundo result['id'] = #A (no vacío) →
+            // guardaba _ltms_alegra_credit_note_{refund_id_2} = #A (un
+            // ID duplicado engañoso).
+            // El nuevo key es determinístico por (invoice_id, refund_id) →
+            // Alegra dedupe solo retries del MISMO reembolso, no reembolsos
+            // distintos de la misma factura.
+            $idem_key = 'ltms_credit_note_refund_' . $refund_id . '_inv_' . $alegra_invoice_id;
+
+            $result = $client->create_credit_note( $payload, $idem_key );
 
             if ( ! empty( $result['id'] ) ) {
                 // Guardar por refund_id para idempotencia
@@ -220,9 +291,22 @@ final class LTMS_Alegra_Sync {
                 );
                 $order->save();
                 $this->log_info( 'alegra_sync', "Nota crédito #{$result['id']} para reembolso #{$refund_id}" );
+            } else {
+                // AL-5 FIX (AUDIT-AL): 200 sin id → flag para reintento manual.
+                $order->update_meta_data( '_ltms_alegra_credit_note_failed', 1 );
+                $order->update_meta_data( '_ltms_alegra_credit_note_error',
+                    sprintf( 'Reembolso #%d: respuesta Alegra sin id (200 OK con body inesperado)', $refund_id ) );
+                $order->save();
+                $this->log_warning( 'ALEGRA_CREDIT_NOTE_NO_ID',
+                    sprintf( 'Reembolso #%d (order #%d): Alegra devolvió 200 sin id — body: %s', $refund_id, $order_id, wp_json_encode( $result ) )
+                );
             }
         } catch ( \Throwable $e ) {
             $this->log_error( 'alegra_sync', 'Error nota de crédito: ' . $e->getMessage() );
+            // AL-5 FIX (AUDIT-AL): flag para reintento manual.
+            $order->update_meta_data( '_ltms_alegra_credit_note_failed', 1 );
+            $order->update_meta_data( '_ltms_alegra_credit_note_error', $e->getMessage() );
+            $order->save();
         }
     }
 
@@ -280,7 +364,17 @@ final class LTMS_Alegra_Sync {
      * Payout completado → registrar egreso en Alegra.
      * AUDIT-FIX A5: incluir el monto del pago en el payload.
      */
-    public function on_payout_completed( int $vendor_id, float $net_amount ): void {
+    /**
+     * FU2 FIX (v2.9.1): aceptar payout_id como 3er argumento para idempotency correcta.
+     * Antes: solo (vendor_id, amount) → key = vendor_id+amount+fecha → colisión
+     * si 2 payouts al mismo vendor por el mismo monto en el mismo día.
+     * Ahora: (vendor_id, amount, payout_id) → key único por payout.
+     *
+     * @param int   $vendor_id   ID del vendedor.
+     * @param float $net_amount  Monto neto del payout.
+     * @param int   $payout_id   ID del payout (0 si no está disponible, para compat).
+     */
+    public function on_payout_completed( int $vendor_id, float $net_amount, int $payout_id = 0 ): void {
         $bank_account_id   = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
         $alegra_contact_id = (int) get_user_meta( $vendor_id, '_ltms_alegra_contact_id', true );
 
@@ -288,10 +382,48 @@ final class LTMS_Alegra_Sync {
             return;
         }
 
+        // AL-3 FIX (AUDIT-AL): idempotency-key determinístico por
+        // (vendor_id, net_amount, fecha). El código anterior NO pasaba
+        // $idempotency_key a create_payment(), y como tampoco se pasa
+        // 'invoice_id' en el payload, create_payment() derivaba el key
+        // fallback como `'ltms_payment_invoice_0_out'` — IDENTICO para cada
+        // payout a cada vendedor. Alegra dedupeaba por Idempotency-Key en
+        // server-side → solo el PRIMER payout (al primer vendedor, en la
+        // primera ejecución) quedaba registrado en Alegra. Todos los pagos
+        // posteriores a cualquier vendedor recibían el mismo ID de vuelta
+        // (dedupe) y NO se creaban en Alegra → egresos fantasma: la wallet
+        // LTMS debitaba pero Alegra no reflejaba el egreso contable.
+        //
+        // No tenemos payout_id en este hook (ver AL-3a en worklog —
+        // ltms_payout_completed firea con (vendor_id, amount) desde el
+        // scheduler y con (payout_id, vendor_id) desde Openpay webhook).
+        // Usamos (vendor_id, amount, fecha YYYY-MM-DD) como key. Dos payouts
+        // al mismo vendedor por el mismo monto en el mismo día colisionarían
+        // (dedupe incorrecto) — caso raro pero posible. Mitigado por el
+        // meta check abajo: si ya existe un Alegra payment ID para este
+        // key, se omite la llamada.
+        // FU2 FIX (v2.9.1): si tenemos payout_id, usarlo en la key para garantizar
+        // idempotency absoluta (sin colisión entre payouts del mismo vendor/monto/día).
+        $payout_date = current_time( 'Y-m-d' );
+        if ( $payout_id > 0 ) {
+            $idem_key = 'ltms_payout_' . $payout_id;
+        } else {
+            // Fallback legacy: vendor_id + amount + fecha (puede colisionar en casos raros).
+            $idem_key = 'ltms_vendor_payout_' . $vendor_id . '_' . md5( $net_amount . '_' . $payout_date );
+        }
+        $local_meta  = '_ltms_alegra_payout_' . md5( $idem_key );
+        $existing_id = (int) get_user_meta( $vendor_id, $local_meta, true );
+        if ( $existing_id > 0 ) {
+            // Ya sincronizado — short-circuit idempotente (ahorra API call).
+            $this->log_info( 'alegra_payout_skip',
+                sprintf( 'Payout vendedor #%d ($%s) ya registrado en Alegra como pago #%d — skip.', $vendor_id, $net_amount, $existing_id ) );
+            return;
+        }
+
         try {
             $client  = LTMS_Api_Factory::get( 'alegra' );
             $payment = $client->create_payment( [
-                'date'            => current_time( 'Y-m-d' ),
+                'date'            => $payout_date,
                 'bank_account_id' => $bank_account_id,
                 'payment_method'  => 'transfer',
                 'type'            => 'out',
@@ -302,13 +434,243 @@ final class LTMS_Alegra_Sync {
                     $vendor_id,
                     number_format( $net_amount, 0, '.', '.' )
                 ),
-            ] );
+            ], $idem_key );
 
-            $this->log_info( 'alegra_payout_registered',
-                sprintf( 'Egreso Alegra #%d — vendedor #%d — $%s', $payment['id'] ?? 0, $vendor_id, $net_amount ) );
+            // Persistir el payment ID en user meta para idempotencia local
+            // (evita re-llamar a la API en re-fire del action; el Idempotency-Key
+            // igual deduparía server-side, pero esto ahorra una red round-trip).
+            if ( ! empty( $payment['id'] ) ) {
+                update_user_meta( $vendor_id, $local_meta, (int) $payment['id'] );
+                $this->log_info( 'alegra_payout_registered',
+                    sprintf( 'Egreso Alegra #%d — vendedor #%d — $%s', $payment['id'], $vendor_id, $net_amount ) );
+            } else {
+                // AL-5 (relacionado): 200 sin id → flag para revisión manual.
+                $this->log_warning( 'alegra_payout_no_id',
+                    sprintf( 'Alegra devolvió 200 sin id para payout vendedor #%d ($%s) — posible error body.', $vendor_id, $net_amount ) );
+            }
         } catch ( \Throwable $e ) {
             $this->log_warning( 'alegra_payout_failed',
                 sprintf( 'No se pudo registrar egreso Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
+        }
+    }
+
+    /**
+     * 60-C — Donación acreditada → asiento contable (gasto) en Alegra.
+     *
+     * Cuando el motor de donaciones (Task 60-B) acredita una donación a la wallet
+     * de la fundación, se registra como un asiento de diario (journal entry) en
+     * Alegra con doble entrada:
+     *   - Débito:  cuenta de gasto "Donaciones" (ltms_donation_alegra_account_id)
+     *   - Crédito: cuenta de banco/caja (ltms_alegra_bank_account_id)
+     *
+     * El ID del asiento se persiste en `lt_donations.alegra_entry_id` para
+     * idempotencia (no se recrea el asiento si ya existe) y para conciliación.
+     *
+     * NOTE: el endpoint de Alegra para asientos contables es POST /journal-entries.
+     * LTMS_Api_Alegra no expone aún un método create_journal_entry() dedicado, así
+     * que se invoca el endpoint vía perform_request() (public en Abstract_API_Client).
+     * Si una futura versión de class-ltms-api-alegra.php añade create_journal_entry(),
+     * se debe reemplazar esta llamada por el método dedicado para ganancia de
+     * validación de payload e idempotency-key.
+     *
+     * @param int    $donation_id ID de la fila en {prefix}lt_donations.
+     * @param int    $order_id    ID del pedido WC que originó la donación.
+     * @param float  $amount      Monto de la donación.
+     * @param string $currency    Moneda (COP, MXN).
+     * @return void
+     */
+    public function on_donation_credited( int $donation_id, int $order_id, float $amount, string $currency ): void {
+        $account_id = (int) LTMS_Core_Config::get( 'ltms_donation_alegra_account_id', 0 );
+        if ( ! $account_id || $amount <= 0 ) {
+            return;
+        }
+
+        // INT-BUG-7 / Task 62-C: short-circuit if this donation has already been
+        // synced to Alegra. Avoids a needless API call on every retry/re-fire of
+        // `ltms_donation_credited` (the Idempotency-Key would dedupe at Alegra's
+        // side anyway, but this saves a network round-trip).
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $existing_entry_id = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT alegra_entry_id FROM `{$wpdb->prefix}lt_donations` WHERE id = %d",
+                $donation_id
+            )
+        );
+        if ( $existing_entry_id > 0 ) {
+            return; // Already synced — idempotent short-circuit.
+        }
+
+        // ltms_alegra_enabled ya está validado por init(), pero la acción puede
+        // dispararse desde cualquier contexto (cron, webhook). Si init() no corrió
+        // (porque Alegra está deshabilitado), la factory lanzará RuntimeException.
+        try {
+            $alegra = LTMS_Api_Factory::get( 'alegra' );
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'DONATION_ALEGRA_SKIP',
+                sprintf( 'Alegra no disponible — donación #%d omitida: %s', $donation_id, $e->getMessage() )
+            );
+            return;
+        }
+
+        $bank_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
+
+        // INT-BUG-4 / Task 62-C: Si no está configurado el bank_account_id, NO
+        // incluir una fila de crédito con account.id=0 (Alegra la rechazaría con
+        // "account ID 0 is invalid"). Se construye el asiento con una sola fila
+        // (débito) y se loguea un WARNING para que el admin configure la cuenta
+        // bancaria. Un asiento de una sola fila puede ser rechazado por Alegra
+        // por descuadre (double-entry), pero al menos no falla por account.id=0.
+        if ( ! $bank_account_id ) {
+            $this->log_warning( 'DONATION_ALEGRA_BANK_MISSING',
+                sprintf( 'No hay bank_account_id configurado (ltms_alegra_bank_account_id=0) — el asiento para donación #%d se enviará sin fila de crédito.', $donation_id )
+            );
+        }
+
+        // Asiento contable (Alegra POST /journal-entries).
+        // Payload adaptado al schema de Alegra: cada línea referencia una cuenta
+        // por ID con debit/credit en valores absolutos. La suma de débitos debe
+        // igualar la suma de créditos (double-entry).
+        $rows = [
+            // Débito: gasto Donaciones.
+            [
+                'account' => [ 'id' => $account_id ],
+                'debit'   => round( $amount, 2 ),
+                'credit'  => 0,
+            ],
+        ];
+
+        // Crédito: Banco/Caja — solo se agrega si hay bank_account_id válido
+        // (INT-BUG-4). Sin esto, Alegra rechazaría la fila con account.id=0.
+        if ( $bank_account_id > 0 ) {
+            $rows[] = [
+                'account' => [ 'id' => $bank_account_id ],
+                'debit'   => 0,
+                'credit'  => round( $amount, 2 ),
+            ];
+        }
+
+        $entry = [
+            'date'        => gmdate( 'Y-m-d' ),
+            'description' => sprintf(
+                'Donación orden #%d — %s',
+                $order_id,
+                LTMS_Core_Config::get( 'ltms_donation_foundation_name', 'Fundación' )
+            ),
+            'rows'        => $rows,
+        ];
+
+        try {
+            // perform_request() es público en LTMS_Abstract_API_Client.
+            // Si la API Alegra añade create_journal_entry() en el futuro,
+            // sustituir esta línea por: $result = $alegra->create_journal_entry( $entry );
+            $result = $alegra->perform_request(
+                'POST',
+                '/journal-entries',
+                $entry,
+                [
+                    // Idempotency-Key determinístico por donation_id — evita
+                    // duplicar el asiento si el cron o el webhook reintentan.
+                    'Idempotency-Key' => 'ltms_donation_' . $donation_id,
+                ]
+            );
+
+            if ( ! empty( $result['id'] ) ) {
+                global $wpdb;
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->update(
+                    $wpdb->prefix . 'lt_donations',
+                    [ 'alegra_entry_id' => (int) $result['id'] ],
+                    [ 'id' => $donation_id ]
+                );
+
+                $this->log_info( 'DONATION_ALEGRA_SYNCED',
+                    sprintf( 'Donación #%d sincronizada con Alegra (entry #%d)', $donation_id, $result['id'] )
+                );
+            }
+        } catch ( \Throwable $e ) {
+            // Fail-loud: loguear pero no propagar — la donación ya está acreditada
+            // en la wallet de la fundación; la sincronización con Alegra es best-effort.
+            // El administrador puede re-sincronizar manualmente desde el panel.
+            $this->log_error( 'DONATION_ALEGRA_FAILED',
+                sprintf( 'Error sincronizando donación #%d con Alegra: %s', $donation_id, $e->getMessage() ),
+                [ 'donation_id' => $donation_id, 'order_id' => $order_id, 'amount' => $amount ]
+            );
+        }
+    }
+
+    /**
+     * 60-C — Batch de pago a la fundación → transferencia bancaria en Alegra.
+     *
+     * Cuando el cron ltms_donation_payout_cron dispara el batch de transferencia
+     * bancaria mensual/trimestral a la fundación (ltms_donation_payout_completed),
+     * se registra como un egreso (payment 'out') en Alegra — mismo modelo que
+     * on_payout_completed() para vendedores, pero con la fundación como contacto.
+     *
+     * La fundación debe existir como contacto Alegra (tipo provider). Su ID se
+     * almacena en la opción ltms_donation_alegra_contact_id.
+     *
+     * @param int    $batch_id ID del batch de pago (tabla lt_donation_payouts).
+     * @param float  $total    Monto total transferido a la fundación.
+     * @param string $currency Moneda (COP, MXN).
+     * @return void
+     */
+    public function on_donation_payout_completed( int $batch_id, float $total, string $currency ): void {
+        $bank_account_id = (int) LTMS_Core_Config::get( 'ltms_alegra_bank_account_id', 0 );
+        $contact_id      = (int) LTMS_Core_Config::get( 'ltms_donation_alegra_contact_id', 0 );
+
+        if ( ! $bank_account_id || ! $contact_id || $total <= 0 ) {
+            return;
+        }
+
+        try {
+            $alegra = LTMS_Api_Factory::get( 'alegra' );
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'DONATION_PAYOUT_ALEGRA_SKIP',
+                sprintf( 'Alegra no disponible — batch de donaciones #%d omitido: %s', $batch_id, $e->getMessage() )
+            );
+            return;
+        }
+
+        try {
+            $payment = $alegra->create_payment( [
+                'date'            => current_time( 'Y-m-d' ),
+                'bank_account_id' => $bank_account_id,
+                'payment_method'  => 'transfer',
+                'type'            => 'out',
+                'client_id'       => $contact_id,
+                'amount'          => round( $total, 2 ),
+                'observations'    => sprintf(
+                    /* translators: 1: batch ID, 2: foundation name */
+                    __( 'Transferencia batch donaciones #%1$d — %2$s — LTMS', 'ltms' ),
+                    $batch_id,
+                    LTMS_Core_Config::get( 'ltms_donation_foundation_name', 'Fundación' )
+                ),
+            ], 'ltms_donation_payout_' . $batch_id ); // INT-BUG-2 / Task 62-C: per-batch idempotency key.
+
+            // INT-BUG-6 / Task 62-C: persist the Alegra payment ID on the batch
+            // row so admins can cross-reference batches → Alegra payment records.
+            // Before this fix, `lt_donation_payouts.alegra_entry_id` was always 0.
+            $alegra_payment_id = (int) ( $payment['id'] ?? 0 );
+            if ( $alegra_payment_id > 0 ) {
+                global $wpdb;
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->update(
+                    $wpdb->prefix . 'lt_donation_payouts',
+                    [ 'alegra_entry_id' => $alegra_payment_id ],
+                    [ 'id' => $batch_id ]
+                );
+            }
+
+            $this->log_info( 'DONATION_PAYOUT_ALEGRA_SYNCED',
+                sprintf( 'Egreso Alegra #%d — batch donaciones #%d — $%s',
+                    $payment['id'] ?? 0, $batch_id, number_format( $total, 2, '.', '.' ) )
+            );
+        } catch ( \Throwable $e ) {
+            $this->log_error( 'DONATION_PAYOUT_ALEGRA_FAILED',
+                sprintf( 'Error registrando batch de donaciones #%d en Alegra: %s', $batch_id, $e->getMessage() ),
+                [ 'batch_id' => $batch_id, 'total' => $total, 'currency' => $currency ]
+            );
         }
     }
 
@@ -444,40 +806,110 @@ final class LTMS_Alegra_Sync {
         }
 
         $currency = $order->get_currency();
-        if ( $currency && $currency !== 'COP' ) {
-            $invoice_data['currency']      = $currency;
-            $invoice_data['exchange_rate'] = (float) LTMS_Core_Config::get( 'ltms_alegra_exchange_rate', 1 );
+        $base_currency = class_exists( 'LTMS_Currency_Manager' )
+            ? LTMS_Currency_Manager::get_base_currency()
+            : LTMS_Core_Config::get_currency();
+
+        // v3.1.0 — Cross-Border motor (Task 63-D): multi-currency entries.
+        //
+        // When the order currency differs from the platform base currency, we
+        // include the FX rate in the Alegra payload AND add an observation
+        // note documenting the conversion ("Order in {currency} at rate {rate},
+        // settled in {base_currency}"). This keeps the Alegra audit trail
+        // consistent with the LTMS wallet ledger (which always credits the
+        // vendor in the settlement currency).
+        if ( $currency && $currency !== $base_currency ) {
+            $invoice_data['currency'] = $currency;
+
+            // Resolve the FX rate: prefer the snapshot stored on the order at
+            // checkout time (most accurate), fall back to the live rate from
+            // the FX provider, finally fall back to the legacy config value.
+            $fx_rate = (float) $order->get_meta( '_ltms_display_currency_rate' );
+            if ( $fx_rate <= 0 && class_exists( 'LTMS_FX_Rate_Provider' ) ) {
+                $live_rate = LTMS_FX_Rate_Provider::get_rate( $base_currency, $currency );
+                if ( $live_rate !== null ) {
+                    $fx_rate = (float) $live_rate;
+                }
+            }
+            if ( $fx_rate <= 0 ) {
+                $fx_rate = (float) LTMS_Core_Config::get( 'ltms_alegra_exchange_rate', 1 );
+            }
+            $invoice_data['exchange_rate'] = $fx_rate;
+
+            // Append a multi-currency note to the observations field.
+            $fx_note = sprintf(
+                /* translators: 1: order currency, 2: fx rate, 3: base currency */
+                __( 'Order in %1$s at rate %2$.4f, settled in %3$s.', 'ltms' ),
+                $currency,
+                $fx_rate,
+                $base_currency
+            );
+            $existing_obs = $invoice_data['observations'] ?? '';
+            $invoice_data['observations'] = trim( $existing_obs . ' || ' . $fx_note );
+
+            // Store the FX note on the order so downstream consumers (Alegra
+            // webhook, accounting reports) can read it without recomputing.
+            if ( ! $order->get_meta( '_ltms_alegra_fx_note' ) ) {
+                $order->update_meta_data( '_ltms_alegra_fx_note', $fx_note );
+                $order->update_meta_data( '_ltms_alegra_fx_rate', $fx_rate );
+            }
+        }
+
+        // v3.1.0 — Cross-Border motor (Task 63-D): add customs duties as a
+        // separate Alegra line item for cross-border orders. The duties were
+        // already collected from the buyer (DDP) or are due on delivery (DDU);
+        // either way, Alegra needs a line to track them for accounting.
+        $customs_declaration = $order->get_meta( '_ltms_customs_declaration' );
+        if ( is_array( $customs_declaration ) && ! empty( $customs_declaration['total_duties_taxes'] ) ) {
+            $duty_amount = (float) $customs_declaration['total_duties_taxes'];
+            if ( $duty_amount > 0 ) {
+                $invoice_data['items'][] = [
+                    'name'        => sprintf(
+                        /* translators: 1: origin country, 2: destination country, 3: incoterm */
+                        __( 'Customs duties — %1$s → %2$s (%3$s)', 'ltms' ),
+                        $customs_declaration['origin_country'] ?? '',
+                        $customs_declaration['destination_country'] ?? '',
+                        $customs_declaration['incoterm'] ?? 'DDU'
+                    ),
+                    'description' => sprintf(
+                        __( 'Duty: %s; VAT: %s; Fees: %s. Paid by: %s.', 'ltms' ),
+                        $customs_declaration['duty_amount'] ?? 0,
+                        $customs_declaration['vat_amount'] ?? 0,
+                        $customs_declaration['customs_fee'] ?? 0,
+                        $customs_declaration['paid_by'] ?? 'buyer'
+                    ),
+                    'price'       => round( $duty_amount, 2 ),
+                    'quantity'    => 1,
+                ];
+            }
         }
 
         $invoice_data['anotation'] = 'WC-' . $order->get_order_number() . '-COMM';
 
-        // Inline invoice build para evitar caché de método en memoria
-$items_raw = $invoice_data['items'] ?? [];
-$items_fmt = [];
-foreach ( $items_raw as $itm ) {
-    $qty   = isset( $itm['quantity'] ) ? (int) $itm['quantity'] : 1;
-    $price = isset( $itm['price'] )    ? (float) $itm['price']  : 0.0;
-    $rid   = 0;
-    if ( isset( $itm['id'] ) && (int) $itm['id'] > 0 ) { $rid = (int) $itm['id']; }
-    elseif ( isset( $itm['alegra_id'] ) && (int) $itm['alegra_id'] > 0 ) { $rid = (int) $itm['alegra_id']; }
-    $e = [ 'quantity' => $qty, 'price' => $price ];
-    if ( $rid > 0 ) { $e['id'] = $rid; }
-    elseif ( ! empty( $itm['name'] ) ) { $e['name'] = substr( $itm['name'], 0, 150 ); }
-    if ( ! empty( $itm['tax'] ) ) { $e['tax'] = is_array( $itm['tax'] ) ? $itm['tax'] : [ $itm['tax'] ]; }
-    $items_fmt[] = $e;
-}
-$raw_payload = [
-    'date'    => $invoice_data['date']     ?? current_time( 'Y-m-d' ),
-    'dueDate' => $invoice_data['due_date'] ?? current_time( 'Y-m-d' ),
-    'client'  => [ 'id' => (int) $invoice_data['client_id'] ],
-    'items'   => $items_fmt,
-];
-if ( ! empty( $invoice_data['observations'] ) ) { $raw_payload['observations'] = substr( $invoice_data['observations'], 0, 500 ); }
-if ( ! empty( $invoice_data['anotation'] ) )    { $raw_payload['anotation']    = substr( $invoice_data['anotation'], 0, 100 ); }
-$ref_alegra  = new \ReflectionClass( $client );
-$perform_req = $ref_alegra->getMethod( 'perform_request' );
-$perform_req->setAccessible( true );
-return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
+        // RB-7 FIX (v2.9.19): Disparar filter ltms_alegra_invoice_payload para
+        // que los listeners (CB-1 attach cert origin, LT-1 attach carta porte)
+        // puedan adjuntar complementos al payload Alegra. Antes de este fix,
+        // el payload se pasaba directamente a $client->create_invoice() sin
+        // filter → CB-1 y LT-1 eran silent dead code desde v2.9.17.
+        $invoice_data = apply_filters( 'ltms_alegra_invoice_payload', $invoice_data, $order );
+
+        // AL-1 FIX (AUDIT-AL): usar $client->create_invoice() en vez del inline
+        // build + reflection. El inline build anterior perdía:
+        //   1. Header `Idempotency-Key` — Alegra no dedupaba reintentos cron.
+        //      Si on_order_completed tenía éxito en Alegra (200 + id) pero el
+        //      meta update posterior fallaba (DB lock, process kill, OOM), el
+        //      meta `_ltms_alegra_invoice_id` quedaba vacío y el cron
+        //      retry_failed_invoices() volvía a llamar on_order_completed →
+        //      segunda factura creada en Alegra (sin Idempotency-Key no hay
+        //      dedupe server-side). Factura duplicada → doble ingreso contable.
+        //   2. Campos `currency` + `exchangeRate` — facturas multi-currency se
+        //      registraban en COP al valor facial de la comisión, ocultando la
+        //      conversión FX y la ganancia/pérdida cambiaria (NIIF 9 / NIF B-15).
+        //   3. Campo `numberTemplate` — numeración corporativa no respetada.
+        //   4. Sanitización de observations/anotation (skipped en inline build).
+        // create_invoice() hace todo lo anterior y deriva el Idempotency-Key
+        // del `anotation` (WC-{order_number}-COMM), determinístico por pedido.
+        return $client->create_invoice( $invoice_data );
     }
 
     /**
@@ -501,6 +933,26 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
      * Una sola línea: "Comisión marketplace pedido #X" con monto = platform_fee.
      * IVA 19% sobre el servicio de intermediación (Colombia) — el comprador (vendedor)
      * paga IVA al marketplace y lo descuenta como gasto en su declaración.
+     *
+     * NC-1 FIX (v2.9.12) CRÍTICO FISCAL — Aplicar ReteIVA, ReteICA y ReteFuente a la
+     * factura de comisión cuando el vendor sea gran contribuyente (CO) o persona moral
+     * (MX). ANTES solo se aplicaba IVA, lo que subreportaba las retenciones que el
+     * vendor (como comprador del servicio de intermediación) debe practicar al
+     * marketplace. Esto es violación del ET art. 437-2 (ReteIVA) y del régimen
+     * municipal de ICA (ReteICA).
+     *
+     * Modelo legal:
+     *  - Marketplace EMITE factura de comisión + IVA al vendor.
+     *  - Vendor (si es gran contribuyente/autorretenedor en CO) PRACTICA retenciones:
+     *      * ReteIVA = 15% del IVA (ET art. 437-2)
+     *      * ReteICA = tasa municipal sobre la base (Estatuto municipal, varía 0.4-1.1%)
+     *      * ReteFuente = 4% sobre servicios si base >= 27 UVT (ET art. 392 + art. 103)
+     *  - Vendor (si es persona moral en MX) PRACTICA retención:
+     *      * IVA retenido = 2/3 del IVA (4% sobre base, art. 1-A LIVA)
+     *
+     * Las retenciones se aplican como `tax[]` adicional en el line item de Alegra.
+     * Los tax IDs deben estar configurados en Alegra con su signo correcto (negativo
+     * para retenciones). LTMS solo referencia el ID — Alegra hace el cálculo.
      *
      * @param \WC_Order $order      Pedido.
      * @param float     $commission Monto de la comisión.
@@ -553,21 +1005,270 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
             $line['id'] = $item_id;
         }
 
-        // IVA: solo agregar si el item maestro tiene tax configurado en Alegra.
-        // Si tax_map tiene el id correcto, agregarlo; de lo contrario Alegra
-        // usa el tax del item maestro automáticamente.
+        // FU5 FIX (v2.9.1) CRÍTICO FISCAL: aplicar IVA a la línea de comisión.
         if ( $iva_rate > 0 ) {
             $iva_key = (string) round( $iva_rate * 100 );
             $iva_tax_id = $tax_map[ $iva_key ] ?? null;
-            // Solo agregar tax al line si el id existe y es > 0
-            // Nota: si el item maestro no tiene tax, NO agregar aquí para evitar error 400
+
             if ( $iva_tax_id && (int) $iva_tax_id > 0 ) {
-                // Comentado temporalmente: Alegra rechaza si el item no tiene ese tax
-                // $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
+                $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
+            } else {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ALEGRA_COMMISSION_NO_IVA',
+                        sprintf(
+                            'Factura para pedido #%d: IVA %.0f%% no aplicado a comisión — tax_id no configurado en tax_map (país=%s, key=%s). Configurar ltms_alegra_tax_map_co/mx.',
+                            $order->get_id(),
+                            $iva_rate * 100,
+                            $country,
+                            $iva_key
+                        )
+                    );
+                }
+            }
+        }
+
+        // NC-1 FIX (v2.9.12) CRÍTICO: aplicar retenciones (ReteIVA, ReteICA,
+        // ReteFuente en CO; IVA retenido en MX) a la factura de comisión.
+        //
+        // Las retenciones se calculan y aplican solo cuando el vendor (como
+        // comprador del servicio de intermediación) es agente retenedor según
+        // la legislación fiscal de cada país.
+        $withholding_tax_ids = $this->resolve_commission_withholdings( $order, $commission, $iva_rate, $country );
+        if ( ! empty( $withholding_tax_ids ) ) {
+            if ( ! isset( $line['tax'] ) ) {
+                $line['tax'] = [];
+            }
+            foreach ( $withholding_tax_ids as $tax_id ) {
+                $line['tax'][] = [ 'id' => (int) $tax_id ];
             }
         }
 
         return [ $line ];
+    }
+
+    /**
+     * NC-1 FIX (v2.9.12) — Resuelve qué retenciones aplican a la factura de
+     * comisión emitida por el marketplace al vendor.
+     *
+     * La factura de comisión es un servicio de intermediación prestado por el
+     * marketplace al vendor. Cuando el vendor es agente retenedor (gran
+     * contribuyente en CO, persona moral en MX), debe practicar retenciones
+     * sobre el IVA y/o la base de la comisión.
+     *
+     * Las retenciones se devuelven como una lista de tax IDs configurados en
+     * Alegra. Cada tax ID en Alegra debe tener configurada su tarifa con signo
+     * negativo (ej.: ReteIVA = -15% sobre base IVA). LTMS solo referencia el
+     * ID — Alegra aplica el cálculo.
+     *
+     * Reglas por país:
+     *
+     * COLOMBIA (ET art. 437-2, art. 392, régimen municipal ICA):
+     *  - ReteIVA: 15% del IVA si vendor es gran contribuyente Y es responsable
+     *    de IVA (régimen común/especial/gran_contribuyente).
+     *  - ReteICA: aplica siempre que el vendor tenga CIIU y municipio configurados.
+     *    Tasa varía por municipio + CIIU (lookup en lt_co_reteica_rates_municipal).
+     *  - ReteFuente: 4% sobre servicios si comisión >= 27 UVT (umbral servicios).
+     *    Solo aplica si vendor es agente retenedor.
+     *
+     * MEXICO (LIVA art. 1-A, LISR art. 113-A):
+     *  - IVA retenido: 2/3 del IVA (4% sobre base) si vendor es persona moral.
+     *    Personas físicas con actividad empresarial retienen 100% (no aplica aquí
+     *    porque el marketplace es persona moral).
+     *  - ISR retenido plataformas: art. 113-A LISR — se maneja en Tax_Strategy_MX,
+     *    no se duplica aquí.
+     *
+     * @param \WC_Order $order        Pedido (para extraer vendor_id).
+     * @param float     $commission   Monto de la comisión (base imponible).
+     * @param float     $iva_rate     Tasa de IVA aplicada (0.19 CO, 0.16 MX).
+     * @param string    $country      Código de país ('CO' o 'MX').
+     * @return array<int,int> Lista de tax IDs de Alegra para retenciones.
+     */
+    private function resolve_commission_withholdings( \WC_Order $order, float $commission, float $iva_rate, string $country ): array {
+
+        $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
+        if ( ! $vendor_id ) {
+            // Sin vendor identificado no podemos resolver régimen fiscal.
+            return [];
+        }
+
+        $tax_ids = [];
+
+        if ( $country === 'CO' ) {
+            $tax_ids = $this->resolve_co_commission_withholdings( $vendor_id, $commission, $iva_rate );
+        } elseif ( $country === 'MX' ) {
+            $tax_ids = $this->resolve_mx_commission_withholdings( $vendor_id, $commission, $iva_rate );
+        }
+
+        if ( ! empty( $tax_ids ) && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'ALEGRA_COMMISSION_WITHHOLDINGS',
+                sprintf(
+                    'Pedido #%d (vendor #%d, %s): aplicando retenciones tax_ids=%s sobre comisión $%.2f',
+                    $order->get_id(),
+                    $vendor_id,
+                    $country,
+                    implode( ',', $tax_ids ),
+                    $commission
+                )
+            );
+        }
+
+        return $tax_ids;
+    }
+
+    /**
+     * NC-1 FIX (v2.9.12) — Retenciones Colombia para factura de comisión.
+     *
+     * Verifica el régimen fiscal del vendor y aplica:
+     *  1. ReteIVA (15% del IVA) si vendor es gran contribuyente + responsable IVA.
+     *  2. ReteICA (tasa municipal) si vendor tiene CIIU + municipio.
+     *  3. ReteFuente (4% servicios) si comisión >= umbral servicios (27 UVT).
+     *
+     * @param int   $vendor_id   ID del vendor.
+     * @param float $commission  Monto de la comisión.
+     * @param float $iva_rate    Tasa de IVA (0.19).
+     * @return array<int,int>
+     */
+    private function resolve_co_commission_withholdings( int $vendor_id, float $commission, float $iva_rate ): array {
+        $tax_ids = [];
+
+        $tax_regime           = (string) get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'simplified';
+        $is_gran_contribuyente = (bool) get_user_meta( $vendor_id, 'ltms_is_gran_contribuyente', true );
+
+        // Mapear tax_regime de UI → strategy input.
+        // UI guarda: 'iva' (responsable), 'no_iva' (no responsable), 'gran_contribuyente', 'simplified'.
+        // Strategy espera: 'simplified', 'common', 'special', 'gran_contribuyente'.
+        $normalized_regime = $tax_regime;
+        if ( $tax_regime === 'iva' ) {
+            $normalized_regime = 'common';
+        } elseif ( $tax_regime === 'no_iva' ) {
+            $normalized_regime = 'simplified';
+        } elseif ( $tax_regime === 'gran_contribuyente' ) {
+            $normalized_regime = 'gran_contribuyente';
+            $is_gran_contribuyente = true;
+        }
+
+        $is_responsible_iva = in_array( $normalized_regime, [ 'common', 'special', 'gran_contribuyente' ], true );
+
+        // 1. ReteIVA: solo si vendor es gran contribuyente Y responsable de IVA.
+        // El marketplace (como vendedor del servicio) es el retenido.
+        // El vendor (como gran contribuyente) es el agente retenedor.
+        if ( $is_gran_contribuyente && $is_responsible_iva && $iva_rate > 0 ) {
+            $reteiva_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_reteiva_tax_id', 0 );
+            if ( $reteiva_tax_id > 0 ) {
+                $tax_ids[] = $reteiva_tax_id;
+            } else {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ALEGRA_RETEIVA_NO_CONFIG',
+                        sprintf(
+                            'Vendor #%d es gran contribuyente + responsable IVA pero ltms_alegra_reteiva_tax_id=0 — ReteIVA NO aplicada a factura de comisión. Configurar en Alegra → Impuestos.',
+                            $vendor_id
+                        )
+                    );
+                }
+            }
+        }
+
+        // 2. ReteICA: aplica siempre que el vendor tenga CIIU y municipio.
+        // El marketplace realiza la actividad de "intermediación" (CIIU 7490 en CO),
+        // pero la retención se practica en el municipio del comprador (vendor) si
+        // es agente retenedor, o en el municipio del vendedor (marketplace) si no.
+        // Para simplificar: usamos el CIIU y municipio del vendor (comúnmente
+        // configurado en su perfil fiscal).
+        $ciiu_code    = (string) get_user_meta( $vendor_id, 'ltms_ciiu_code', true );
+        $municipality = (string) get_user_meta( $vendor_id, 'ltms_municipality', true );
+
+        if ( $ciiu_code && $municipality ) {
+            $reteica_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_reteica_tax_id', 0 );
+            if ( $reteica_tax_id > 0 ) {
+                $tax_ids[] = $reteica_tax_id;
+            } else {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ALEGRA_RETEICA_NO_CONFIG',
+                        sprintf(
+                            'Vendor #%d tiene CIIU=%s + municipio=%s pero ltms_alegra_reteica_tax_id=0 — ReteICA NO aplicada. Configurar en Alegra → Impuestos.',
+                            $vendor_id, $ciiu_code, $municipality
+                        )
+                    );
+                }
+            }
+        }
+
+        // 3. ReteFuente: 4% servicios si comisión >= umbral (27 UVT en 2026 ≈ $1.42M COP).
+        // Aplica cuando el vendor es agente retenedor (gran contribuyente) o cuando
+        // el marketplace está catalogado como gran contribuyente (autorretenedor).
+        $uvt = (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 52752.0 );
+        $retefuente_min_servicios = $uvt * (float) LTMS_Core_Config::get( 'ltms_retefuente_min_servicios_uvt', 2.666 );
+
+        if ( $commission >= $retefuente_min_servicios && $is_gran_contribuyente ) {
+            $retefuente_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_retefuente_tax_id', 0 );
+            if ( $retefuente_tax_id > 0 ) {
+                $tax_ids[] = $retefuente_tax_id;
+            } else {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ALEGRA_RETEFUENTE_NO_CONFIG',
+                        sprintf(
+                            'Vendor #%d: comisión $%.2f >= umbral ReteFuente servicios ($%.2f) pero ltms_alegra_retefuente_tax_id=0 — ReteFuente NO aplicada.',
+                            $vendor_id, $commission, $retefuente_min_servicios
+                        )
+                    );
+                }
+            }
+        }
+
+        return $tax_ids;
+    }
+
+    /**
+     * NC-1 FIX (v2.9.12) — Retenciones México para factura de comisión.
+     *
+     * Aplica IVA retenido al 4% (2/3 del 16% de IVA) cuando el vendor es
+     * persona moral (LIVA art. 1-A fracción II). Las personas físicas con
+     * actividad empresarial también retienen (fracción III), pero el marketplace
+     * no aplica retención sobre personas físicas que emiten CFDI con IVA
+     * trasladado (se asume régimen simplificado).
+     *
+     * Para plataformas tecnológicas (art. 113-A LISR), la retención de ISR
+     * se calcula en Tax_Strategy_Mexico y se aplica al payout del vendor, no
+     * a la factura de comisión del marketplace.
+     *
+     * @param int   $vendor_id   ID del vendor.
+     * @param float $commission  Monto de la comisión.
+     * @param float $iva_rate    Tasa de IVA (0.16).
+     * @return array<int,int>
+     */
+    private function resolve_mx_commission_withholdings( int $vendor_id, float $commission, float $iva_rate ): array {
+        $tax_ids = [];
+
+        // Detectar si el vendor es persona moral (SA de CV) o persona física.
+        // La config en MX usa 'ltms_tax_regime' con valores: 'morale' (persona moral),
+        // 'fisica' (persona física con actividad empresarial), 'simplificado' (RIF).
+        $tax_regime = (string) get_user_meta( $vendor_id, 'ltms_tax_regime', true ) ?: 'fisica';
+
+        // Solo aplicar retención de IVA si el vendor es persona moral.
+        // Personas físicas (incluyendo RIF) NO retienen IVA al marketplace.
+        if ( $tax_regime === 'morale' || $tax_regime === 'moral' ) {
+            $iva_retenido_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_iva_retenido_mx_tax_id', 0 );
+            if ( $iva_retenido_tax_id > 0 ) {
+                $tax_ids[] = $iva_retenido_tax_id;
+            } else {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ALEGRA_IVA_RETENIDO_MX_NO_CONFIG',
+                        sprintf(
+                            'Vendor #%d es persona moral pero ltms_alegra_iva_retenido_mx_tax_id=0 — IVA retenido NO aplicado. Configurar en Alegra → Impuestos.',
+                            $vendor_id
+                        )
+                    );
+                }
+            }
+        }
+
+        return $tax_ids;
     }
 
     /**
@@ -758,10 +1459,31 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
         $country = strtoupper( LTMS_Core_Config::get_country() );
         $tax_map = $country === 'MX' ? self::TAX_MAP_MX : self::TAX_MAP_CO;
 
+        // AUDIT-BOOKING-ENGINE #10 FIX: detectar si el pedido contiene items
+        // de turismo/hospedaje para aplicar tratamiento fiscal especial.
+        $has_booking_items = false;
+        $booking_rnt       = '';
+        $booking_sectur    = '';
+
         foreach ( $order->get_items() as $item ) {
             /** @var \WC_Order_Item_Product $item */
             $product_id     = $item->get_product_id();
+            $product        = $item->get_product();
             $alegra_item_id = (int) get_post_meta( $product_id, '_ltms_alegra_item_id', true );
+
+            // Detectar producto bookable (turismo/hospedaje).
+            $is_bookable = $product && method_exists( $product, 'get_type' ) && $product->get_type() === 'ltms_bookable';
+            if ( $is_bookable ) {
+                $has_booking_items = true;
+                // Capturar RNT/SECTUR del vendor para incluir en la factura.
+                $vendor_id = (int) get_post_meta( $product_id, '_ltms_vendor_id', true );
+                if ( $vendor_id && ! $booking_rnt ) {
+                    $booking_rnt = get_user_meta( $vendor_id, 'ltms_rnt_number', true ) ?: '';
+                }
+                if ( $vendor_id && ! $booking_sectur ) {
+                    $booking_sectur = get_user_meta( $vendor_id, 'ltms_sectur_folio', true ) ?: '';
+                }
+            }
 
             if ( ! $alegra_item_id && $product_id ) {
                 $alegra_item_id = $this->sync_product_as_item( $product_id );
@@ -777,6 +1499,19 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
                 'name'     => $item->get_name(),
             ];
 
+            // AUDIT-BOOKING-ENGINE #10: agregar datos de reserva al description.
+            if ( $is_bookable ) {
+                $checkin  = $item->get_meta( '_ltms_checkin_date' ) ?: '';
+                $checkout = $item->get_meta( '_ltms_checkout_date' ) ?: '';
+                $guests   = (int) ( $item->get_meta( '_ltms_guests' ) ?: 1 );
+                $entry['description'] = sprintf(
+                    __( 'Reserva: %s a %s, %d huésped(es).%s%s', 'ltms' ),
+                    $checkin, $checkout, $guests,
+                    $booking_rnt ? ' RNT: ' . $booking_rnt . '.' : '',
+                    $booking_sectur ? ' SECTUR: ' . $booking_sectur . '.' : ''
+                );
+            }
+
             if ( $alegra_item_id ) {
                 $entry['alegra_id'] = $alegra_item_id;
             }
@@ -784,6 +1519,20 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
             // ── IVA real del item ──────────────────────────────────
             $item_taxes = $item->get_taxes();
             $total_tax  = array_sum( $item_taxes['total'] ?? [] );
+
+            // AUDIT-BOOKING-ENGINE #10: Colombia — IVA reducido para turismo.
+            // Ley 1819/2016 Art. 115: servicios hotelistas prestados a
+            // no residentes tienen IVA del 0%. Paquetes turísticos
+            // calificados pueden tener IVA del 7% (no 19%).
+            if ( $is_bookable && $country === 'CO' ) {
+                $iva_turismo = (float) LTMS_Core_Config::get( 'ltms_iva_turismo_co', 0.07 );
+                $iva_key_tur = (string) round( $iva_turismo * 100 );
+                if ( isset( $tax_map[ $iva_key_tur ] ) ) {
+                    $entry['tax'] = [ [ 'id' => $tax_map[ $iva_key_tur ] ] ];
+                    $items[] = $entry;
+                    continue; // Skip el cálculo automático de IVA abajo.
+                }
+            }
 
             if ( $subtotal > 0 && $total_tax >= 0 ) {
                 $tax_rate_pct = (int) round( ( $total_tax / $subtotal ) * 100 );
@@ -800,7 +1549,6 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
             }
 
             // ── Retención en la fuente (Colombia) ──────────────────
-            // AUDIT-FIX A11: agregar retefuente si aplica
             $retefuente = $item->get_meta( '_retefuente_amount' );
             if ( $retefuente && (float) $retefuente > 0 ) {
                 $retefuente_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_retefuente_tax_id', 0 );
@@ -809,7 +1557,68 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
                 }
             }
 
+            // NC-1 FIX (v2.9.12): ReteIVA y ReteICA en factura Alegra.
+            // ANTES: solo ReteFuente se incluía como tax en la factura.
+            // Faltaba ReteIVA (15% del IVA) y ReteICA (municipal).
+            $reteiva = $item->get_meta( '_reteiva_amount' );
+            if ( $reteiva && (float) $reteiva > 0 ) {
+                $reteiva_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_reteiva_tax_id', 0 );
+                if ( $reteiva_tax_id ) {
+                    $entry['tax'][] = [ 'id' => $reteiva_tax_id ];
+                }
+            }
+
+            $reteica = $item->get_meta( '_reteica_amount' );
+            if ( $reteica && (float) $reteica > 0 ) {
+                $reteica_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_reteica_tax_id', 0 );
+                if ( $reteica_tax_id ) {
+                    $entry['tax'][] = [ 'id' => $reteica_tax_id ];
+                }
+            }
+
+            // NC-5 FIX (v2.9.12): Impoconsumo (INC 8%) para restaurantes CO.
+            // Ley 2010/2019 art. 3: 8% sobre alimentos preparados en restaurantes.
+            $inc = $item->get_meta( '_ltms_impoconsumo_amount' );
+            if ( $inc && (float) $inc > 0 ) {
+                $inc_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_inc_tax_id', 0 );
+                if ( $inc_tax_id ) {
+                    $entry['tax'][] = [ 'id' => $inc_tax_id ];
+                }
+            }
+
             $items[] = $entry;
+        }
+
+        // AUDIT-BOOKING-ENGINE #10: México — ISH (Impuesto Sobre Hospedaje).
+        // Aplica a servicios de hospedaje. Tasa varía por estado (2-5%).
+        // Se agrega como un item adicional en la factura.
+        if ( $has_booking_items && $country === 'MX' ) {
+            $ish_rate = (float) LTMS_Core_Config::get( 'ltms_ish_rate_mx', 0.03 ); // default 3%.
+            $ish_tax_id = (int) LTMS_Core_Config::get( 'ltms_alegra_ish_tax_id', 0 );
+
+            if ( $ish_rate > 0 ) {
+                // Calcular base: solo items de hospedaje (no envío, no descuentos).
+                $ish_base = 0.0;
+                foreach ( $order->get_items() as $item ) {
+                    $p = $item->get_product();
+                    if ( $p && method_exists( $p, 'get_type' ) && $p->get_type() === 'ltms_bookable' ) {
+                        $ish_base += (float) $item->get_subtotal();
+                    }
+                }
+
+                if ( $ish_base > 0 ) {
+                    $ish_amount = round( $ish_base * $ish_rate, 2 );
+                    $ish_item = [
+                        'name'     => __( 'ISH (Impuesto Sobre Hospedaje)', 'ltms' ),
+                        'price'    => $ish_amount,
+                        'quantity' => 1,
+                    ];
+                    if ( $ish_tax_id ) {
+                        $ish_item['tax'] = [ [ 'id' => $ish_tax_id ] ];
+                    }
+                    $items[] = $ish_item;
+                }
+            }
         }
 
         // ── Envío como item de servicio ────────────────────────────
@@ -897,13 +1706,51 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
 
         try {
             $client  = LTMS_Api_Factory::get( 'alegra' );
+
+            // AL-2 FIX (AUDIT-AL): la factura Alegra creada por
+            // create_invoice_for_order() es la factura de COMISIÓN (M-201),
+            // cuyo total = platform_fee (+ IVA si aplica). Antes se usaba
+            // $order->get_total() (total del pedido WC) como monto del pago.
+            // Como total WC > comisión (siempre, salvo edge case de fee=100%),
+            // Alegra marcaba la factura como sobrepagada: el excedente quedaba
+            // como saldo a favor en el contacto del vendedor, descuadrando la
+            // cuenta por cobrar y generando un pasivo fantasma.
+            // Orden de resolución del monto correcto:
+            //   1. _ltms_platform_fee (meta persistido por Order_Split::process)
+            //   2. lt_commissions.commission_amount (camino de producción)
+            //   3. GET /invoices/{id} a Alegra ( fuente de verdad final )
+            $payment_amount = (float) $order->get_meta( '_ltms_platform_fee' );
+            if ( $payment_amount <= 0 ) {
+                global $wpdb;
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                $payment_amount = (float) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT commission_amount FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d LIMIT 1",
+                    $order->get_id()
+                ) );
+            }
+            if ( $payment_amount <= 0 ) {
+                // Último recurso: consultar el total real de la factura en Alegra.
+                try {
+                    $inv_data       = $client->get_invoice( $invoice_id );
+                    $payment_amount = (float) ( $inv_data['total'] ?? 0 );
+                } catch ( \Throwable $e ) {
+                    $payment_amount = 0.0;
+                }
+            }
+            if ( $payment_amount <= 0 ) {
+                // No persistir un pago por 0 — Alegra lo rechazaría.
+                $this->log_warning( 'alegra_payment_skip',
+                    sprintf( 'No se pudo determinar el monto de la factura Alegra #%d (pedido #%d) — pago omitido.', $invoice_id, $order->get_id() ) );
+                return;
+            }
+
             $payment = $client->create_payment( [
                 'date'            => current_time( 'Y-m-d' ),
                 'bank_account_id' => $bank_account_id,
                 'payment_method'  => $alegra_method,
                 'type'            => 'in',
                 'invoice_id'      => $invoice_id,
-                'amount'          => (float) $order->get_total(),
+                'amount'          => $payment_amount,
                 'observations'    => sprintf(
                     __( 'Pago pedido WC #%s — método: %s', 'ltms' ),
                     $order->get_order_number(),
@@ -978,6 +1825,95 @@ return $perform_req->invoke( $client, 'POST', '/invoices', $raw_payload );
         } catch ( \Throwable $e ) {
             $this->log_warning( 'alegra_invoice_email_failed',
                 sprintf( 'No se pudo enviar email factura Alegra #%d: %s', $alegra_invoice_id, $e->getMessage() ) );
+        }
+    }
+
+    // =========================================================================
+    // v3.1.0 — Cross-Border motor (Task 63-D)
+    // =========================================================================
+
+    /**
+     * Cross-Border listener: reacts to `ltms_cross_border_order` fired by
+     * the Order Split when a vendor's slice of an order is cross-border.
+     *
+     * Responsibilities:
+     *   - Log the cross-border event on the Alegra invoice (if it exists) as
+     *     an order note so accountants can see the customs declaration.
+     *   - If the primary Alegra invoice hasn't been created yet, this method
+     *     does NOT create it — that's done by on_order_completed when the
+     *     order transitions to processing/completed.
+     *   - If the primary Alegra invoice already exists, add a comment to
+     *     the invoice via the Alegra API (best-effort — failures are logged
+     *     but do not block the order flow).
+     *
+     * @param int   $order_id       WooCommerce order ID.
+     * @param int   $vendor_id      Vendor ID.
+     * @param array $customs        Customs calculation result.
+     * @param array $context        Additional context (origin, destination, etc.).
+     * @return void
+     */
+    public function on_cross_border_order( int $order_id, int $vendor_id, array $customs, array $context = [] ): void {
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            return;
+        }
+
+        $origin      = $context['origin_country']      ?? '';
+        $destination = $context['destination_country'] ?? '';
+        $incoterm    = $context['incoterm']            ?? 'DDU';
+        $display_ccy = $context['display_currency']    ?? $order->get_currency();
+        $settle_ccy  = $context['settlement_currency'] ?? $display_ccy;
+        $duties      = (float) ( $customs['total_duties_taxes'] ?? 0 );
+
+        // Order note — always added (visible to admins in the WC order screen).
+        $note = sprintf(
+            /* translators: 1: origin, 2: destination, 3: incoterm, 4: duties, 5: currency, 6: settlement currency */
+            __( '🌍 Cross-border order: %1$s → %2$s (%3$s). Duties: %4$s %5$s. Settlement: %6$s.', 'ltms' ),
+            $origin,
+            $destination,
+            $incoterm,
+            number_format( $duties, 2 ),
+            $display_ccy,
+            $settle_ccy
+        );
+        $order->add_order_note( $note );
+
+        // If the Alegra invoice already exists, append a comment to it so the
+        // accountant can see the customs breakdown alongside the commission line.
+        $alegra_invoice_id = (int) $order->get_meta( '_ltms_alegra_invoice_id' );
+        if ( ! $alegra_invoice_id ) {
+            return;
+        }
+
+        try {
+            $client = LTMS_Api_Factory::get( 'alegra' );
+
+            // Alegra comments are added via the /invoices/{id}/comments endpoint.
+            // We use the perform_request method via reflection (same pattern as
+            // create_invoice_for_order above) because the API client does not
+            // expose a public add_comment method.
+            $comment = sprintf(
+                "Cross-border: %s→%s (%s)\nDuties: %s %s\nSettlement: %s",
+                $origin,
+                $destination,
+                $incoterm,
+                number_format( $duties, 2 ),
+                $display_ccy,
+                $settle_ccy
+            );
+
+            $ref = new \ReflectionClass( $client );
+            $m   = $ref->getMethod( 'perform_request' );
+            $m->setAccessible( true );
+            $m->invoke( $client, 'POST', '/invoices/' . $alegra_invoice_id . '/comments', [
+                'description' => substr( $comment, 0, 500 ),
+            ] );
+
+            $this->log_info( 'alegra_cross_border_note', sprintf( 'Cross-border comment added to Alegra invoice #%d (order #%d)', $alegra_invoice_id, $order_id ) );
+        } catch ( \Throwable $e ) {
+            $this->log_warning( 'alegra_cross_border_note_failed',
+                sprintf( 'Could not add cross-border comment to Alegra invoice #%d: %s', $alegra_invoice_id, $e->getMessage() )
+            );
         }
     }
 }

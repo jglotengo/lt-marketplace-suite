@@ -111,7 +111,11 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
         ];
 
         $response = $this->perform_request( 'POST', '/v1/applications', $payload, [
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization'     => 'Bearer ' . $token,
+            // API-BUG-9 FIX: deterministic Idempotency-Key by order_id — Addi dedupes
+            // duplicate application submissions when 5xx retries fire after the
+            // first request already created the application server-side.
+            'Idempotency-Key'  => 'ltms_application_order_' . $checkout_data['order_id'],
         ]);
 
         return [
@@ -149,7 +153,10 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
     public function cancel_application( string $application_id ): bool {
         $token    = $this->get_access_token();
         $response = $this->perform_request( 'POST', '/v1/applications/' . $application_id . '/cancel', [], [
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization'    => 'Bearer ' . $token,
+            // API-BUG-9 FIX: idempotent cancel — repeated cancel requests on the same application
+            // are safe (provider returns the current status).
+            'Idempotency-Key' => 'ltms_cancel_application_' . $application_id,
         ]);
 
         return ( $response['status'] ?? '' ) === 'CANCELLED';

@@ -17,15 +17,23 @@ class LTMS_Business_Redi_Order_Split {
      * @return void
      */
     public static function process( \WC_Order $order, array $redi_items ): void {
-        // CS-CASCADE: Use LTMS_Commission_Strategy::get_rate() so per-vendor/per-product rules apply.
-        $platform_rate = class_exists( 'LTMS_Commission_Strategy' )
-            ? LTMS_Commission_Strategy::get_rate( $origin_vendor_id, $order )
-            : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 );
-        $country       = LTMS_Core_Config::get_country();
+        // AUDIT-RD-BK RD-2 FIX: la llamada a LTMS_Commission_Strategy::get_rate()
+        // estaba ANTES del loop, referenciando $origin_vendor_id que NO existe en
+        // este scope (solo se define dentro de process_item). El resultado era
+        // que get_rate() recibía NULL/0 como vendor_id → las reglas per-vendor
+        // (tier DB, plan, contrato negociado) NUNCA aplicaban a órdenes ReDi,
+        // cayendo siempre al DEFAULT_RATE. Comparar con class-ltms-order-split.php
+        // linea 110 donde get_rate() se llama DENTRO del foreach con $vendor_id
+        // correctamente definido por iteración.
+        //
+        // FIX: mover el cálculo de $platform_rate dentro de process_item() para
+        // que cada item use el origin_vendor_id correspondiente (un carrito ReDi
+        // puede tener items de distintos origin vendors con distintos tiers).
+        $country = LTMS_Core_Config::get_country();
 
         foreach ( $redi_items as $item_data ) {
             try {
-                self::process_item( $order, $item_data, $platform_rate, $country );
+                self::process_item( $order, $item_data, $country );
             } catch ( \Throwable $e ) {
                 LTMS_Core_Logger::error(
                     'REDI_SPLIT_ITEM_FAILED',
@@ -35,7 +43,7 @@ class LTMS_Business_Redi_Order_Split {
         }
     }
 
-    private static function process_item( \WC_Order $order, array $item_data, float $platform_rate, string $country ): void {
+    private static function process_item( \WC_Order $order, array $item_data, string $country ): void {
         $gross              = (float) ( $item_data['gross'] ?? 0 );
         $reseller_id        = (int) ( $item_data['reseller_id'] ?? 0 );
         $origin_vendor_id   = (int) ( $item_data['origin_vendor_id'] ?? 0 );
@@ -46,9 +54,53 @@ class LTMS_Business_Redi_Order_Split {
             return;
         }
 
-        // Commission split formula
+        // AUDIT-RD-BK RD-2 FIX: calcular $platform_rate AQUÍ (dentro del item),
+        // usando el $origin_vendor_id real de este item. Antes este cálculo
+        // estaba en process() con $origin_vendor_id indefinido → siempre caía
+        // al default 0.15.
+        $platform_rate = class_exists( 'LTMS_Commission_Strategy' )
+            ? LTMS_Commission_Strategy::get_rate( $origin_vendor_id, $order )
+            : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 );
+
+        // AUDIT-RD-BK RD-3 FIX: anti-comisión-circular. Si el customer que
+        // compró es el propio reseller (mismo user_id), NO se paga la comisión
+        // ReDi al reseller — solo se acredita el neto al origin vendor como en
+        // una venta directa. Sin este guardián, un reseller podía comprar su
+        // propia copia ReDi y recibir de vuelta la comisión (descuento encubierto
+        // = redi_rate * gross), abuso típico en modelos MLM. El origin vendor
+        // sigue recibiendo su parte porque sí envió el producto.
+        $customer_id        = (int) $order->get_customer_id();
+        $is_self_purchase   = ( $customer_id > 0 && $customer_id === $reseller_id );
+        if ( $is_self_purchase ) {
+            LTMS_Core_Logger::warning(
+                'REDI_CIRCULAR_PURCHASE_BLOCKED',
+                sprintf(
+                    'Order #%d: reseller #%d attempted to purchase own ReDi product (origin #%d). Reseller commission suppressed; origin vendor still credited.',
+                    $order->get_id(), $reseller_id, $origin_vendor_id
+                )
+            );
+        }
+
+        // AUDIT-RD-BK RD-1 (related): si agreement_id es 0 después del fix de
+        // get_agreement_id(), significa que NO hay acuerdo activo para este
+        // par reseller+origin_product. Registramos para monitoreo pero NO
+        // bloqueamos el pago al origin vendor (la venta fue legítima, el
+        // producto estaba publicado cuando se hizo el pedido — la pausa del
+        // acuerdo pudo ocurrir entre pedido y pago).
+        if ( ! $agreement_id ) {
+            LTMS_Core_Logger::warning(
+                'REDI_NO_ACTIVE_AGREEMENT',
+                sprintf(
+                    'Order #%d item %d: no active agreement found for reseller #%d + origin_product (origin vendor #%d). Commission recorded with agreement_id=0.',
+                    $order->get_id(), (int) ( $item_data['item_id'] ?? 0 ), $reseller_id, $origin_vendor_id
+                )
+            );
+        }
+
+        // Commission split formula.
+        // RD-3: si es self-purchase, reseller_commission = 0 (no se paga al reseller).
         $platform_fee            = round( $gross * $platform_rate, 2 );
-        $reseller_commission     = round( $gross * $redi_rate, 2 );
+        $reseller_commission     = $is_self_purchase ? 0.0 : round( $gross * $redi_rate, 2 );
         $origin_vendor_gross     = $gross - $platform_fee - $reseller_commission;
         $origin_vendor_gross     = max( 0.0, $origin_vendor_gross );
 
@@ -96,25 +148,32 @@ class LTMS_Business_Redi_Order_Split {
         $origin_tx_id = $origin_held ? null : true; // compat for record_redi_commission
 
         // Retener comisión del revendedor durante el período de protección al consumidor
+        // AUDIT-RD-BK RD-3 FIX: omitir todo el bloque de crédito/hold cuando
+        // $reseller_commission es 0 (caso self-purchase o rate=0). Antes se
+        // llamaba a Wallet::credit(0) y Consumer_Protection::hold_commission(0),
+        // generando transacciones de monto 0 en lt_wallet_transactions y
+        // filas fantasma en la tabla de holds — contaminación de ledger.
         $reseller_held = false;
-        if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
-            $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
+        if ( $reseller_commission > 0 ) {
+            if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
+                $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
+            }
+            if ( ! $reseller_held ) {
+                // M-108: firma correcta
+                LTMS_Business_Wallet::credit(
+                    $reseller_id,
+                    $reseller_commission,
+                    sprintf(
+                        /* translators: %1$s: order number */
+                        __( 'Comisión ReDi pedido #%1$s (revendedor)', 'ltms' ),
+                        $order->get_order_number()
+                    ),
+                    [ 'type' => 'commission', 'order_id' => $order->get_id(), 'redi' => true ],
+                    $order->get_id()
+                );
+            }
         }
-        if ( ! $reseller_held ) {
-            // M-108: firma correcta
-            LTMS_Business_Wallet::credit(
-                $reseller_id,
-                $reseller_commission,
-                sprintf(
-                    /* translators: %1$s: order number */
-                    __( 'Comisión ReDi pedido #%1$s (revendedor)', 'ltms' ),
-                    $order->get_order_number()
-                ),
-                [ 'type' => 'commission', 'order_id' => $order->get_id(), 'redi' => true ],
-                $order->get_id()
-            );
-        }
-        $reseller_tx_id = $reseller_held ? null : true; // compat for record_redi_commission
+        $reseller_tx_id = ( $reseller_commission > 0 && ! $reseller_held ) ? true : null; // compat for record_redi_commission
 
         self::record_redi_commission(
             $order, $origin_vendor_id, $reseller_id,

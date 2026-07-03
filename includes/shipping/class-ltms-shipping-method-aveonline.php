@@ -31,6 +31,15 @@ class LTMS_Shipping_Method_Aveonline extends WC_Shipping_Method {
             return; // Colombia only
         }
 
+        // AO-BUG-7 FIX: vendors con onboarding incompleto (flag 14d) no deben
+        // ver tarifas de Aveonline en el checkout — bloquea la creación de
+        // envíos sin KYC/contrato. El flag lo levanta el cron de recordatorios
+        // de onboarding (ltms_check_aveonboarding_reminders).
+        $vendor_id = get_current_user_id();
+        if ( $vendor_id && get_user_meta( $vendor_id, '_ltms_ave_shipments_blocked', true ) ) {
+            return; // No mostrar rates de Aveonline para vendors bloqueados
+        }
+
         $cache_key = hash( 'sha256', wp_json_encode( [
             'origin'      => $package['origin'] ?? [],
             'destination' => $package['destination'] ?? [],

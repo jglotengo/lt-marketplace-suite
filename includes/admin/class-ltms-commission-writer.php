@@ -32,7 +32,20 @@ class LTMS_Commission_Writer {
     // ── Constantes de plataforma ─────────────────────────────────────────────
     const PLATFORM_NAME    = 'Lo-Tengo.com.co';
     const PLATFORM_METHOD  = 'wallet_marketplace'; // método de pago de la plataforma (Frac. II f-iv-c)
-    const LTMS_TABLE       = 'bkr_lt_commissions';
+
+    /**
+     * Returns the fully-qualified commissions table name, honouring the
+     * site's configured $wpdb->prefix. C-2 FIX: previously this was a
+     * hard-coded `bkr_lt_commissions` constant which broke on sites whose
+     * DB prefix is not `bkr_` (staging, multisite, dev). All callers must
+     * use this helper instead of the removed `LTMS_TABLE` constant.
+     *
+     * @return string
+     */
+    private static function table(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'lt_commissions';
+    }
 
     // Tasa IVA Colombia
     const IVA_CO = 0.19;
@@ -128,9 +141,9 @@ class LTMS_Commission_Writer {
             $item_service_type = get_post_meta( $item->get_product_id(), '_ltms_service_type', true )
                                  ?: $service_type;
 
-            // ── Buscar fila existente en bkr_lt_commissions ─────────────────
+            // ── Buscar fila existente en {prefix}lt_commissions ────────────
             $row = $wpdb->get_row( $wpdb->prepare(
-                "SELECT id FROM `" . self::LTMS_TABLE . "`
+                "SELECT id FROM `" . self::table() . "`
                   WHERE order_id = %d AND vendor_id = %d
                   LIMIT 1",
                 $order_id, $vendor_id
@@ -160,7 +173,7 @@ class LTMS_Commission_Writer {
             if ( $row ) {
                 // Actualizar fila existente
                 $wpdb->update(
-                    self::LTMS_TABLE,
+                    self::table(),
                     $data,
                     [ 'id' => $row->id ],
                     $formats,
@@ -183,7 +196,7 @@ class LTMS_Commission_Writer {
                     'created_at'        => current_time( 'mysql' ),
                 ], $data );
 
-                $wpdb->insert( self::LTMS_TABLE, $data );
+                $wpdb->insert( self::table(), $data );
             }
 
             // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
@@ -354,7 +367,7 @@ class LTMS_Commission_Writer {
         // Obtener órdenes que tienen comisiones con service_type o payment_method vacíos
         $order_ids = $wpdb->get_col( "
             SELECT DISTINCT order_id
-            FROM `" . self::LTMS_TABLE . "`
+            FROM `" . self::table() . "`
             WHERE service_type IS NULL
                OR service_type = ''
                OR payment_method IS NULL

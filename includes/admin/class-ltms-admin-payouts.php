@@ -106,6 +106,22 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'KYC no encontrado.', 'ltms' ) );
         }
 
+        // RB-9 FIX (v2.9.19): Disparar filter ltms_kyc_pre_approve para que
+        // los listeners (FT-2 screen_against_sanctions_lists, RT-2 validate_sanitary_registration)
+        // puedan BLOQUEAR la aprobación si el vendor está en listas restrictivas o
+        // no cumple requisitos sanitarios. Antes de este fix, FT-2 y RT-2 eran
+        // silent dead code desde v2.9.14/16. Recibe (true, $vendor_id); retornar false bloquea.
+        $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+        $allow   = (bool) apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        if ( ! $allow ) {
+            LTMS_Core_Logger::warning(
+                'KYC_APPROVE_BLOCKED_BY_FILTER',
+                sprintf( 'KYC del vendedor #%d bloqueado por filter ltms_kyc_pre_approve (sanctions screening / sanitary reg / otros).', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id(), 'country' => $country ]
+            );
+            wp_send_json_error( __( 'Aprobación bloqueada por política de cumplimiento (screening listas restrictivas o registro sanitario). Revisar logs.', 'ltms' ), 403 );
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_vendor_kyc';
 
@@ -465,6 +481,12 @@ final class LTMS_Admin_Payouts {
                 'admin_kyc_modal'
             );
         }
+
+        // HD-7 (v2.9.21): Bitácora de acceso a datos personales (Ley 1581 art. 15).
+        // Disparar hook ltms_personal_data_accessed para que LTMS_Data_Protection_Compliance
+        // registre el acceso en lt_personal_data_access_log. Antes de este fix,
+        // el listener estaba registrado pero NUNCA se disparaba → silent dead code.
+        do_action( 'ltms_personal_data_accessed', $vendor_id, get_current_user_id(), 'kyc_documents', 'admin_kyc_modal' );
 
         // Construir URLs de documentos — leer todos los rows del vendor por document_type
         $kyc_rows = $wpdb->get_results(

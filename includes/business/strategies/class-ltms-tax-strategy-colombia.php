@@ -28,7 +28,11 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
     // ── Tasas Colombia — configurables (v1.7.0) ───────────────────────────────
 
     private function get_uvt(): float {
-        return (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 49799.0 );
+        // LF-1 FIX (v2.9.11): UVT actualizado a valor 2026 ($52.752).
+        // ANTES: default era 49799 (valor 2024) — contradecía el activador (52752).
+        // Esto hacía que los mínimos de retención fueran ~5% más bajos de lo correcto.
+        $uvt = (float) LTMS_Core_Config::get( 'ltms_uvt_valor', 52752.0 );
+        return $uvt > 0 ? $uvt : 52752.0;
     }
 
     private function get_iva_general(): float {
@@ -60,7 +64,11 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
     }
 
     private function get_impoconsumo_rate(): float {
-        return (float) LTMS_Core_Config::get( 'ltms_impoconsumo_rate', 0.08 );
+        // RT-6 FIX (v2.9.14): Bug de option key mismatch — el admin UI guarda en
+        // 'ltms_co_impoconsumo' pero esta función leía de 'ltms_impoconsumo_rate'.
+        // El filter 'ltms_impoconsumo_rate' (LTMS_Restaurant_Compliance::resolve_impoconsumo_rate)
+        // prioriza el valor admin canonico y advierte en log si hay conflicto.
+        return (float) apply_filters( 'ltms_impoconsumo_rate', 0.08 );
     }
 
     private function get_retefuente_min_compras(): float {
@@ -96,12 +104,17 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             $retefuente_amount = round( $gross_amount * $retefuente_rate, 2 );
         }
 
-        // 3. ReteIVA (solo si hay IVA y el comprador es gran contribuyente)
+        // 3. ReteIVA (solo si hay IVA, el comprador es gran contribuyente Y el vendor
+        // es responsable de IVA — régimen común/especial/gran_contribuyente).
+        // T3 FIX: antes solo se verificaba el buyer, no el vendor. Si el vendor era
+        // régimen simplificado (no factura IVA), se le retenía IVA igual → incorrecto.
         $reteiva_rate   = 0.0;
         $reteiva_amount = 0.0;
 
         $buyer_is_grande = $order_data['buyer_is_gran_contribuyente'] ?? false;
-        if ( $buyer_is_grande && $iva_amount > 0 ) {
+        $vendor_responsible_iva = in_array( $vendor_regime, [ 'common', 'special', 'gran_contribuyente' ], true );
+
+        if ( $buyer_is_grande && $iva_amount > 0 && $vendor_responsible_iva ) {
             $reteiva_rate   = $this->get_reteiva_rate();
             $reteiva_amount = round( $iva_amount * $reteiva_rate, 2 );
         }
@@ -128,9 +141,13 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
         // 6. Totales
         $total_taxes       = $iva_amount + $inc_amount;
         $total_withholding = $retefuente_amount + $reteiva_amount + $reteica_amount;
-        $net_to_vendor     = round( $gross_amount - $total_withholding, 2 );
 
-        return [
+        // T2 FIX: net_to_vendor NUNCA debe ser negativo.
+        // Las retenciones no pueden superar el gross_amount. Si lo hacen
+        // (por error de configuración o redondeo), se truncan al gross.
+        $net_to_vendor     = round( max( 0, $gross_amount - $total_withholding ), 2 );
+
+        $result = [
             'gross'              => $gross_amount,
             'iva'                => $iva_amount,
             'iva_rate'           => $iva_rate,
@@ -155,6 +172,29 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
             'currency'           => 'COP',
             'uvt_value'          => $this->get_uvt(),
         ];
+
+        // T7 FIX: log de auditoría fiscal para cumplimiento DIAN.
+        // Registra cada cálculo con timestamp, montos y tasas aplicadas.
+        if ( $gross_amount > 0 && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'TAX_CALCULATION_CO',
+                sprintf(
+                    'CO Tax: gross=%.2f, iva=%.2f(%.0f%%), retefuente=%.2f(%.1f%%), reteiva=%.2f, reteica=%.2f, impoconsumo=%.2f, net_vendor=%.2f',
+                    $gross_amount,
+                    $iva_amount,
+                    $iva_rate * 100,
+                    $retefuente_amount,
+                    $retefuente_rate * 100,
+                    $reteiva_amount,
+                    $reteica_amount,
+                    $inc_amount,
+                    $net_to_vendor
+                ),
+                $result
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -178,8 +218,20 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
 
     /**
      * Tasa de IVA según tipo de producto.
+     *
+     * NT-1 FIX (v2.9.9): IVA turismo 7% para productos bookable/turismo (Estatuto Tributario art. 468-1).
+     * ANTES: el IVA turismo solo se aplicaba en Alegra sync, no en el flujo de Order Split →
+     * el cliente pagaba 19% en lugar del 7% correcto para hospedaje turístico.
      */
     private function get_iva_rate( string $product_type, array $order_data ): float {
+        // NT-1: IVA turismo 7% — Estatuto Tributario art. 468-1 (Ley 1607/2012).
+        // Aplica a servicios de hospedaje turístico prestados por hoteles con RNT.
+        $is_tourism = ! empty( $order_data['is_booking'] ) || ! empty( $order_data['is_tourism'] )
+            || in_array( $product_type, [ 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
+        if ( $is_tourism ) {
+            return (float) LTMS_Core_Config::get( 'ltms_iva_turismo_co', 0.07 );
+        }
+
         $exempt_types = [ 'basic_food', 'medicine', 'health_service', 'education', 'agricultural_basic' ];
         if ( in_array( $product_type, $exempt_types, true ) ) {
             return 0.0;

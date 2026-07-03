@@ -14,6 +14,10 @@ class LTMS_Settings_Deprisa {
     }
     public static function save(): void {}
     public static function ajax_test_connection(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		// SEC-4 FIX (v2.9.26): capability check.
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         wp_send_json_error(['message' => 'Settings file not found.']);
     }
     public static function init(): void {

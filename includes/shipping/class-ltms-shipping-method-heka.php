@@ -56,7 +56,10 @@ class LTMS_Shipping_Method_Heka extends WC_Shipping_Method {
                 $rates  = $heka->get_rates( [
                     'origin_city'      => LTMS_Core_Config::get( 'ltms_store_city', 'Bogotá' ),
                     'destination_city' => $dest['city'] ?? 'Bogotá',
-                    'weight'           => max( 0.1, (float) $weight ),
+                    // HK-BUG-1 FIX: API client reads 'weight_kg' (see LTMS_Api_Heka::get_rates).
+                    // Previously the key was 'weight', which the client ignored — resulting
+                    // in weight_kg=0.0 being sent to Heka and all quotes being for 0kg.
+                    'weight_kg'        => max( 0.1, (float) $weight ),
                     'declared_value'   => max( 0, (float) $value ),
                 ] );
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -77,11 +80,24 @@ class LTMS_Shipping_Method_Heka extends WC_Shipping_Method {
             return;
         }
 
-        // Add each rate option returned by Heka
+        // Add each rate option returned by Heka.
+        // HK-BUG-2 FIX: the API client's get_rates() docblock documents the
+        // returned fields as carrier, price, eta_days, service_type — there is
+        // no 'service_code' nor 'service_name'. Reading those keys returned
+        // uniqid() (unstable rate id, breaking cache/dedupe) and the generic
+        // 'Estándar' label for every option (no way to distinguish Express vs
+        // Estándar vs Día Siguiente). Use 'service_type' for both the rate id
+        // suffix and the display label, falling back to a translated 'Estándar'
+        // when the API omits it.
         foreach ( $rates as $rate ) {
+            $service_type = $rate['service_type'] ?? '';
             $this->add_rate( [
-                'id'    => $this->get_rate_id() . '_' . ( $rate['service_code'] ?? uniqid() ),
-                'label' => sprintf( '%s - %s', $this->title, $rate['service_name'] ?? __( 'Estándar', 'ltms' ) ),
+                'id'    => $this->get_rate_id() . '_' . ( $service_type !== '' ? sanitize_key( $service_type ) : uniqid() ),
+                'label' => sprintf(
+                    '%s - %s',
+                    $this->title,
+                    $service_type !== '' ? $service_type : __( 'Estándar', 'ltms' )
+                ),
                 'cost'  => (float) ( $rate['price'] ?? $rate['total'] ?? 0 ),
             ] );
         }

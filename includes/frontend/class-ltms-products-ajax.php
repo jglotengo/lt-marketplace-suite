@@ -24,6 +24,13 @@ class LTMS_Products_Ajax {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( 'Not logged in', 401 );
         }
+        // HI-2 FIX: most product handlers (update_product, create_product,
+        // delete_product, upload_product_image, ...) mutate vendor data. Without
+        // a capability check, any logged-in user (subscriber, customer) could
+        // call them. Require ltms_vendor or manage_options.
+        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
+        }
     }
 
     public function get_products_data() {
@@ -201,6 +208,15 @@ class LTMS_Products_Ajax {
             wp_send_json_error( 'Nombre y precio son requeridos', 400 );
         }
 
+        // HI-1 FIX: validate status against an allowlist before applying it.
+        // Without this, a vendor could set status to 'trash', 'inherit',
+        // 'private', 'future', etc., which would break product visibility,
+        // inventory sync, and admin reports.
+        $allowed_statuses = [ 'publish', 'pending', 'draft' ];
+        if ( ! in_array( $status, $allowed_statuses, true ) ) {
+            wp_send_json_error( [ 'message' => __( 'Invalid product status', 'ltms' ) ], 400 );
+        }
+
         $product->set_name( $name );
         $product->set_description( $description );
         $product->set_regular_price( $price );
@@ -338,7 +354,19 @@ class LTMS_Products_Ajax {
 
         $attachment_id = media_handle_upload( 'image', 0 );
         if ( is_wp_error( $attachment_id ) ) {
-            wp_send_json_error( $attachment_id->get_error_message(), 500 );
+            // HI-9 FIX: do not expose the raw WP_Error message — can leak
+            // server paths (e.g. wp-content/uploads/...). Log server-side and
+            // return a generic message.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'PRODUCT_IMAGE_UPLOAD_ERROR',
+                    $attachment_id->get_error_message()
+                );
+            }
+            wp_send_json_error(
+                [ 'message' => __( 'An error occurred. Please try again.', 'ltms' ) ],
+                500
+            );
         }
 
         $final_url  = wp_get_attachment_url( $attachment_id );

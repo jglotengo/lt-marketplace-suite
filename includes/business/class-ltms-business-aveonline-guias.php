@@ -88,6 +88,58 @@ class LTMS_Business_Aveonline_Guias {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => 'No autenticado.' ], 401 );
         }
+        // AO-BUG-6 FIX: `is_user_logged_in()` solo verifica sesión — cualquier
+        // cliente (incluso `subscriber`) puede llegar hasta aquí. Exigimos rol
+        // `ltms_vendor` o capacidad `manage_options` (admin).
+        $is_vendor = class_exists( 'LTMS_Utils' ) ? LTMS_Utils::is_ltms_vendor() : current_user_can( 'ltms_vendor' );
+        if ( ! $is_vendor && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Insufficient permissions' ], 403 );
+        }
+    }
+
+    /**
+     * AO-BUG-5 FIX: verifica que el usuario actual sea dueño de TODAS las
+     * guías indicadas en la tabla local `lt_aveonline_guias`. Si alguna guía
+     * no existe o no pertenece al vendor, se devuelve 403.
+     *
+     * @param string[] $guias Lista de números de guía a verificar.
+     * @return bool True si el vendor posee todas las guías.
+     */
+    private static function vendor_owns_guias( array $guias ): bool {
+        $guias = array_values( array_filter( array_map( 'strval', $guias ) ) );
+        if ( empty( $guias ) ) {
+            return false;
+        }
+        global $wpdb;
+        $vendor_id = get_current_user_id();
+        $table     = $wpdb->prefix . self::TABLE;
+        $placeholders = implode( ',', array_fill( 0, count( $guias ), '%s' ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $owned = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$table}` WHERE numguia IN ({$placeholders}) AND vendor_id = %d",
+            array_merge( $guias, [ $vendor_id ] )
+        ) );
+        return $owned === count( $guias );
+    }
+
+    /**
+     * AO-BUG-7 FIX: bloqueo de envíos para vendors pendientes de onboarding
+     * (flag `_ltms_ave_shipments_blocked` levantado por el cron de
+     * recordatorios a los 14 días). Aplica tanto al cálculo de tarifas en
+     * checkout como a la generación manual de guías desde el dashboard.
+     *
+     * @return bool True si el vendor actual tiene los envíos bloqueados.
+     */
+    private static function is_vendor_blocked(): bool {
+        $vendor_id = get_current_user_id();
+        if ( ! $vendor_id ) {
+            return false;
+        }
+        // Admins no se bloquean — pueden gestionar guías aunque el flag exista.
+        if ( current_user_can( 'manage_options' ) ) {
+            return false;
+        }
+        return (bool) get_user_meta( $vendor_id, '_ltms_ave_shipments_blocked', true );
     }
 
     /**
@@ -129,6 +181,10 @@ class LTMS_Business_Aveonline_Guias {
      *              valorrecaudo, contraentrega, idasumecosto
      */
     public static function ajax_cotizar(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		// SEC-4 FIX (v2.9.26): capability check.
+		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         $origen  = sanitize_text_field( $_POST['origen']  ?? '' );  // phpcs:ignore
@@ -182,6 +238,16 @@ class LTMS_Business_Aveonline_Guias {
     public static function ajax_generar_guia(): void {
         self::check_vendor_nonce();
 
+        // AO-BUG-7 FIX: vendors con onboarding incompleto (flag 14d) no pueden
+        // generar guías nuevas. Esto evita que envíos sin KYC/contrato completado
+        // lleguen a Aveonline y queden en limbo.
+        if ( self::is_vendor_blocked() ) {
+            wp_send_json_error( [
+                'code'    => 'vendor_blocked',
+                'message' => 'Tus envíos están bloqueados. Completa el onboarding de Aveonline para continuar.',
+            ], 403 );
+        }
+
         $vendor_id       = get_current_user_id();
         $idtransportador = sanitize_text_field( $_POST['idtransportador'] ?? '' ); // phpcs:ignore
         $origen          = sanitize_text_field( $_POST['origen']          ?? '' ); // phpcs:ignore
@@ -206,6 +272,28 @@ class LTMS_Business_Aveonline_Guias {
 
         if ( ! $idtransportador || ! $origen || ! $destino || ! $destinatario || ! $dir_dest || ! $tel_dest ) {
             wp_send_json_error( [ 'message' => 'Faltan campos requeridos.' ] );
+        }
+
+        // AO-BUG-11 FIX: dedup por order_id. Un doble-clic en "Generar guía"
+        // disparaba dos POST a Aveonline y creaba dos guías para la misma
+        // orden. Si ya existe una guía persistida para este order_id (o el
+        // meta `_ltms_aveonline_tracking` en el pedido), devolvemos la
+        // existente en lugar de generar otra.
+        if ( $order_id ) {
+            global $wpdb;
+            $table = $wpdb->prefix . self::TABLE;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $existing_numguia = $wpdb->get_var( $wpdb->prepare(
+                "SELECT numguia FROM `{$table}` WHERE order_id = %d AND vendor_id = %d ORDER BY id DESC LIMIT 1",
+                $order_id, $vendor_id
+            ) );
+            if ( $existing_numguia ) {
+                wp_send_json_error( [
+                    'code'    => 'guia_exists',
+                    'message' => 'Ya existe una guía para esta orden.',
+                    'numguia' => (string) $existing_numguia,
+                ], 409 );
+            }
         }
 
         // Datos del remitente (vendedor)
@@ -298,6 +386,10 @@ class LTMS_Business_Aveonline_Guias {
      * Devuelve las guías del vendedor logueado desde la tabla local.
      */
     public static function ajax_mis_guias(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		// SEC-4 FIX (v2.9.26): capability check.
+		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         global $wpdb;
@@ -329,6 +421,12 @@ class LTMS_Business_Aveonline_Guias {
         $numguia = sanitize_text_field( $_POST['numguia'] ?? '' ); // phpcs:ignore
         if ( ! $numguia ) {
             wp_send_json_error( [ 'message' => 'Número de guía requerido.' ] );
+        }
+
+        // AO-BUG-5 FIX: IDOR — el vendor solo puede consultar guías que él
+        // generó. Sin este check, Vendor A podría rastrear las guías de Vendor B.
+        if ( ! self::vendor_owns_guias( [ $numguia ] ) ) {
+            wp_send_json_error( [ 'message' => 'Guía not found or not owned by you' ], 403 );
         }
 
         try {
@@ -364,6 +462,10 @@ class LTMS_Business_Aveonline_Guias {
      * POST params: idoperador (int), guias (string separado por comas)
      */
     public static function ajax_reimprimir_guia(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+		// SEC-4 FIX (v2.9.26): capability check.
+		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         $idoperador = (int) ( $_POST['idoperador'] ?? 0 ); // phpcs:ignore
@@ -377,6 +479,11 @@ class LTMS_Business_Aveonline_Guias {
 
         if ( empty( $guias ) ) {
             wp_send_json_error( [ 'message' => 'Ingresa al menos un número de guía.' ] );
+        }
+
+        // AO-BUG-5 FIX: IDOR — solo se permiten reimprimir guías del vendor.
+        if ( ! self::vendor_owns_guias( $guias ) ) {
+            wp_send_json_error( [ 'message' => 'Guía not found or not owned by you' ], 403 );
         }
 
         $idcliente = (int) LTMS_Core_Config::get( 'ltms_aveonline_idempresa', 0 );
@@ -426,6 +533,11 @@ class LTMS_Business_Aveonline_Guias {
 
         if ( empty( $guias ) ) {
             wp_send_json_error( [ 'message' => 'No se encontraron números de guía válidos.' ] );
+        }
+
+        // AO-BUG-5 FIX: IDOR — solo se permiten solicitar recogida de guías del vendor.
+        if ( ! self::vendor_owns_guias( $guias ) ) {
+            wp_send_json_error( [ 'message' => 'Guía not found or not owned by you' ], 403 );
         }
 
         try {

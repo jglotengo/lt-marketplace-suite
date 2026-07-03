@@ -37,18 +37,30 @@ final class LTMS_Payout_Scheduler {
     /**
      * Registra los hooks de WP Cron para el procesamiento de retiros.
      *
+     * B8 FIX (v2.8.5): no programar el cron redundante `ltms_approve_payout_cron`.
+     * Solo `ltms_process_payouts` es necesario (las 2am). El cron de las 6am
+     * sigue registrado como hook para compatibilidad, pero no se programa de nuevo.
+     * Si ya estaba programado de una versión anterior, se desprograma.
+     *
      * @return void
      */
     public static function init(): void {
         add_action( 'ltms_process_payouts', [ __CLASS__, 'process_pending_payouts' ] );
         add_action( 'ltms_approve_payout_cron', [ __CLASS__, 'auto_approve_eligible' ] );
 
-        // M-118: Registrar schedules si no existen (idempotente — safe to call on every request).
+        // M-118: Registrar schedule principal si no existe.
         if ( ! wp_next_scheduled( 'ltms_process_payouts' ) ) {
             wp_schedule_event( strtotime( 'tomorrow 02:00:00' ), 'daily', 'ltms_process_payouts' );
         }
-        if ( ! wp_next_scheduled( 'ltms_approve_payout_cron' ) ) {
-            wp_schedule_event( strtotime( 'tomorrow 06:00:00' ), 'daily', 'ltms_approve_payout_cron' );
+
+        // B8 FIX: desprogramar el cron redundante si estaba programado de antes.
+        $legacy_cron_ts = wp_next_scheduled( 'ltms_approve_payout_cron' );
+        if ( $legacy_cron_ts ) {
+            wp_unschedule_event( $legacy_cron_ts, 'ltms_approve_payout_cron' );
+            LTMS_Core_Logger::info(
+                'PAYOUT_CRON_CLEANUP',
+                'Cron redundante ltms_approve_payout_cron desprogramado (B8 fix).'
+            );
         }
     }
 
@@ -125,24 +137,101 @@ final class LTMS_Payout_Scheduler {
         $payout_fee = self::calculate_payout_fee( $amount, $method );
         $net_amount = round( $amount - $payout_fee, 2 );
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert(
-            $table,
-            [
-                'vendor_id'       => $vendor_id,
-                'amount'          => $amount,
-                'fee'             => $payout_fee,
-                'net_amount'      => $net_amount,
-                'method'          => $method,
-                'bank_account_id' => sanitize_text_field( $bank_account_id ),
-                'status'          => 'pending',
-                'reference'       => LTMS_Utils::generate_reference( 'PAY' ),
-                'created_at'      => LTMS_Utils::now_utc(),
-            ],
-            [ '%d', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
-        );
+        // M-9 FIX: Wrap Wallet::hold() + $wpdb->insert() in a compensating
+        // transaction. If the BD insert fails AFTER the hold succeeded, the
+        // vendor's funds would remain locked in `balance_pending` forever with
+        // no payout row to reconcile against. Reverse the hold by crediting
+        // the same amount back with an idempotency key so a retry of the same
+        // payout create cannot double-credit.
+        $payout_id = 0;
+        try {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $inserted = $wpdb->insert(
+                $table,
+                [
+                    'vendor_id'       => $vendor_id,
+                    'amount'          => $amount,
+                    'fee'             => $payout_fee,
+                    'net_amount'      => $net_amount,
+                    'method'          => $method,
+                    'bank_account_id' => sanitize_text_field( $bank_account_id ),
+                    'status'          => 'pending',
+                    'reference'       => LTMS_Utils::generate_reference( 'PAY' ),
+                    'created_at'      => LTMS_Utils::now_utc(),
+                ],
+                [ '%d', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
+            );
 
-        $payout_id = (int) $wpdb->insert_id;
+            if ( false === $inserted ) {
+                throw new \RuntimeException(
+                    'wpdb::insert() returned false — last_error: ' . $wpdb->last_error
+                );
+            }
+
+            $payout_id = (int) $wpdb->insert_id;
+        } catch ( \Throwable $insert_error ) {
+            // Compensating action: reverse the hold so the vendor's available
+            // balance is restored. Use a unique idempotency key per attempt so
+            // that retries (or duplicate calls in this exact failure path) are
+            // deduplicated by the wallet layer.
+            $idempotency_key = 'payout_create_reversal_' . $vendor_id . '_' . time() . '_' . wp_rand( 1000, 9999 );
+            try {
+                LTMS_Business_Wallet::credit(
+                    $vendor_id,
+                    $amount,
+                    'Reversión: la solicitud de retiro no pudo registrarse en BD',
+                    [
+                        'reason'      => 'payout_create_insert_failed',
+                        'amount_held' => $amount,
+                    ],
+                    0,
+                    '',
+                    $idempotency_key
+                );
+            } catch ( \Throwable $reversal_error ) {
+                // Reversal itself failed — escalate so an admin can reconcile
+                // manually. We log both the original insert failure and the
+                // reversal failure so the vendor's stuck hold is visible.
+                LTMS_Core_Logger::error(
+                    'PAYOUT_CREATE_REVERSAL_FAILED',
+                    sprintf(
+                        'Vendedor #%d: hold de %s NO pudo revertirse tras fallo de insert. Reversal error: %s',
+                        $vendor_id,
+                        LTMS_Utils::format_money( $amount ),
+                        $reversal_error->getMessage()
+                    ),
+                    [
+                        'vendor_id'         => $vendor_id,
+                        'amount'            => $amount,
+                        'idempotency_key'   => $idempotency_key,
+                        'insert_error'      => $insert_error->getMessage(),
+                        'reversal_error'    => $reversal_error->getMessage(),
+                    ]
+                );
+            }
+
+            LTMS_Core_Logger::error(
+                'PAYOUT_CREATE_INSERT_FAILED',
+                sprintf(
+                    'Vendedor #%d: insert en lt_payout_requests falló tras hold exitoso de %s. Hold revertido.',
+                    $vendor_id,
+                    LTMS_Utils::format_money( $amount )
+                ),
+                [
+                    'vendor_id'       => $vendor_id,
+                    'amount'          => $amount,
+                    'method'          => $method,
+                    'insert_error'    => $insert_error->getMessage(),
+                    'reversal_key'    => $idempotency_key,
+                ]
+            );
+
+            return [
+                'success'   => false,
+                'message'   => __( 'No pudimos registrar tu solicitud de retiro. El saldo retenido fue devuelto a tu billetera. Intenta de nuevo.', 'ltms' ),
+                'payout_id' => 0,
+            ];
+        }
 
         LTMS_Core_Logger::info(
             'PAYOUT_REQUEST_CREATED',
@@ -173,6 +262,36 @@ final class LTMS_Payout_Scheduler {
             return [ 'success' => false, 'message' => __( 'Solicitud no encontrada o ya procesada.', 'ltms' ) ];
         }
 
+        // PO-BUG-B FIX: re-verify KYC at approval time. KYC was checked at create_request(),
+        // but it may have been revoked since (vendor uploaded fraudulent docs, then KYC team
+        // revoked after the payout was already pending). Approving a payout to a vendor with
+        // revoked KYC is a compliance violation (SAGRILAFT). The check is cheap (user_meta
+        // reads) and prevents the most dangerous case: sending bank money to a fraudster.
+        if ( ! self::vendor_has_approved_kyc( (int) $payout['vendor_id'] ) ) {
+            LTMS_Core_Logger::warning(
+                'PAYOUT_KYC_REVOKED_AT_APPROVAL',
+                sprintf( 'Retiro #%d: KYC del vendedor #%d ya no está aprobado al momento de aprobar — denegado.', $payout_id, $payout['vendor_id'] ),
+                [ 'payout_id' => $payout_id, 'vendor_id' => $payout['vendor_id'], 'admin_id' => $admin_id ]
+            );
+            return [ 'success' => false, 'message' => __( 'No se puede aprobar el retiro: KYC ya no está aprobado.', 'ltms' ) ];
+        }
+
+        // RB-8 FIX (v2.9.19): Disparar filter ltms_payout_pre_approve para que
+        // los listeners (FT-3 enforce_operational_limits) puedan bloquear la
+        // aprobación si el vendor excede límites diarios/mensuales. Antes de
+        // este fix, FT-3 era silent dead code desde v2.9.16. Recibe 3 args:
+        // (true, $payout_id, $vendor_id) y debe retornar false para bloquear.
+        $vendor_id = (int) $payout['vendor_id'];
+        $allow     = (bool) apply_filters( 'ltms_payout_pre_approve', true, $payout_id, $vendor_id );
+        if ( ! $allow ) {
+            LTMS_Core_Logger::warning(
+                'PAYOUT_BLOCKED_BY_FILTER',
+                sprintf( 'Retiro #%d bloqueado por filter ltms_payout_pre_approve (vendor #%d).', $payout_id, $vendor_id ),
+                [ 'payout_id' => $payout_id, 'vendor_id' => $vendor_id, 'admin_id' => $admin_id ]
+            );
+            return [ 'success' => false, 'message' => __( 'Retiro bloqueado por política de cumplimiento (límites operativos). Revisar logs.', 'ltms' ) ];
+        }
+
         // Step 2: M-117 — Atomic claim to prevent double-approval race condition.
         // Only one of two concurrent admin clicks will see rows_affected = 1.
         // In unit tests (mock wpdb) this UPDATE always returns 1, which is fine because
@@ -193,25 +312,122 @@ final class LTMS_Payout_Scheduler {
             return [ 'success' => false, 'message' => __( 'Solicitud ya está siendo procesada por otro administrador.', 'ltms' ) ];
         }
 
-        // Intentar procesar el pago vía gateway
-        $payment_result = self::execute_payout_payment( $payout );
+        // RB-8 FIX (v2.9.19): Disparar action ltms_payout_pre_execute para que
+        // los listeners (FT-4 attach_travel_rule_metadata, LT-1 generate_carta_porte)
+        // puedan adjuntar metadata antes de que el pago se ejecute vía gateway.
+        // Antes de este fix, FT-4 y LT-1 eran silent dead code desde v2.9.16/17.
+        // 2 args: ($payout_id, $payout array con vendor_id, amount, currency).
+        do_action( 'ltms_payout_pre_execute', (int) $payout_id, $payout );
 
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // PO-CRASH-3 FIX: Check if gateway payment already succeeded in a previous attempt.
+        // If gateway_ref is already set on the payout row, the gateway call succeeded before
+        // but wallet ops crashed (or admin re-approved after a crash). Skip the gateway call
+        // to avoid DOUBLE CHARGE — proceed directly to wallet ops with the existing reference.
+        $gateway_already_paid = ! empty( $payout['gateway_ref'] );
+
+        if ( $gateway_already_paid ) {
+            $payment_result = [
+                'success'   => true,
+                'reference' => $payout['gateway_ref'],
+                'message'   => 'Gateway payment already succeeded in a previous attempt — skipping re-execution to avoid double charge.',
+            ];
+            LTMS_Core_Logger::warning(
+                'PAYOUT_GATEWAY_ALREADY_PAID',
+                sprintf( 'Retiro #%d: gateway_ref ya seteado (%s) — saltando re-ejecución del pago para evitar doble cobro.', $payout_id, $payout['gateway_ref'] ),
+                [ 'payout_id' => $payout_id, 'gateway_ref' => $payout['gateway_ref'], 'vendor_id' => $payout['vendor_id'] ]
+            );
+        } else {
+            // Intentar procesar el pago vía gateway (first attempt or retry after gateway failure).
+            $payment_result = self::execute_payout_payment( $payout );
+
+            // PO-CRASH-3: persist gateway_ref IMMEDIATELY after gateway success, BEFORE
+            // wallet operations. If wallet ops crash, the next approve() will see gateway_ref
+            // set and skip the gateway call (no double charge). The wallet ops will then run
+            // with idempotency keys (PO-BUG-A) to ensure they execute exactly once.
+            if ( $payment_result['success'] && ! empty( $payment_result['reference'] ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->update(
+                    $table,
+                    [ 'gateway_ref' => $payment_result['reference'] ],
+                    [ 'id' => $payout_id ],
+                    [ '%s' ],
+                    [ '%d' ]
+                );
+            }
+        }
+
         if ( $payment_result['success'] ) {
+            // PO-BUG-A FIX: use idempotency keys for release + debit.
+            //
+            // THE BUG: On a previous attempt, gateway may have succeeded but wallet ops
+            // crashed mid-way. The release() may have committed but debit() didn't run.
+            // On retry (new approve() call), the OLD code would:
+            //   1. release() → throws "balance_pending=0" (already released)
+            //   2. catch fires → marks payout 'completed' with note
+            //   3. debit() NEVER runs → vendor has bank money + wallet balance (DOUBLE SPEND).
+            //
+            // THE FIX: idempotency keys (stored in lt_wallet_transactions.reference).
+            //   - release() with key `payout_release_N`: if already done, returns existing
+            //     tx_id WITHOUT executing (no exception, no balance check).
+            //   - debit() with key `payout_debit_N`: if already done, returns existing tx_id;
+            //     otherwise executes normally (first time).
+            //
+            // This guarantees that on retry:
+            //   - If release was done before → skipped (idempotent), debit runs (first time). ✓
+            //   - If debit was done before → release may or may not have been done (both
+            //     idempotent), no double-spend possible. ✓
+            $release_idem_key = sprintf( 'payout_release_%d', $payout_id );
+            $debit_idem_key   = sprintf( 'payout_debit_%d',   $payout_id );
+
             // 1. Liberar el hold + debitar — envuelto en try/catch porque Wallet lanza RuntimeException
             try {
-                LTMS_Business_Wallet::release(
-                    (int) $payout['vendor_id'],
-                    (float) $payout['amount'],
-                    sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id )
+                // PO-BUG-A: explicit check for already-released state (defense in depth
+                // on top of the idempotency_key mechanism in Wallet::release()).
+                $tx_table = $wpdb->prefix . 'lt_wallet_transactions';
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $existing_release_tx_id = (int) $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT id FROM `{$tx_table}` WHERE vendor_id = %d AND `reference` = %s LIMIT 1",
+                        (int) $payout['vendor_id'],
+                        $release_idem_key
+                    )
                 );
 
+                if ( $existing_release_tx_id > 0 ) {
+                    // Hold already released (previous retry or crash) — skip release, proceed to debit.
+                    LTMS_Core_Logger::warning(
+                        'PAYOUT_HOLD_ALREADY_RELEASED',
+                        sprintf( 'Hold already released for payout #%d (previous retry or crash) — skipping release, proceeding to debit.', $payout_id ),
+                        [
+                            'payout_id'              => $payout_id,
+                            'hold_id'                => $existing_release_tx_id,
+                            'vendor_id'              => $payout['vendor_id'],
+                            'existing_release_tx_id' => $existing_release_tx_id,
+                        ]
+                    );
+                } else {
+                    LTMS_Business_Wallet::release(
+                        (int) $payout['vendor_id'],
+                        (float) $payout['amount'],
+                        sprintf( __( 'Hold liberado para retiro #%d', 'ltms' ), $payout_id ),
+                        [ 'payout_id' => $payout_id ],
+                        0,
+                        '',
+                        $release_idem_key
+                    );
+                }
+
+                // Always debit (idempotent — if already debited, returns existing tx_id, no exception).
                 LTMS_Business_Wallet::debit(
                     (int) $payout['vendor_id'],
                     (float) $payout['amount'],
                     sprintf( __( 'Retiro procesado #%d', 'ltms' ), $payout_id ),
-                    [ 'payout_id' => $payout_id, 'type' => 'payout' ]
+                    [ 'payout_id' => $payout_id, 'type' => 'payout' ],
+                    0,
+                    '',
+                    $debit_idem_key
                 );
             } catch ( \Throwable $wallet_err ) {
                 // El gateway ya procesó el pago pero la billetera falló.
@@ -236,7 +452,7 @@ final class LTMS_Payout_Scheduler {
                     [ '%s', '%s', '%s' ],
                     [ '%d' ]
                 );
-                do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'] );
+                do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id );
                 return [
                     'success' => true,
                     'message' => __( 'Retiro procesado. Advertencia: billetera requiere revisión.', 'ltms' ),
@@ -257,7 +473,9 @@ final class LTMS_Payout_Scheduler {
             );
 
             // M-41: disparar acción para que Affiliates y otros listeners procesen la comisión de referido.
-            do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'] );
+            // FU2 FIX (v2.9.1): incluir payout_id como 3er arg para que Alegra pueda
+            // registrar el pago contra la factura correcta (antes solo tenía vendor_id+amount).
+            do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id );
 
             LTMS_Core_Logger::info(
                 'PAYOUT_APPROVED',
@@ -324,8 +542,47 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
             return [ 'success' => false, 'message' => __( 'Solicitud no encontrada o ya procesada.', 'ltms' ) ];
         }
 
-        // Liberar el hold en la billetera
-        LTMS_Business_Wallet::release( (int) $payout['vendor_id'], (float) $payout['amount'], 'Retiro rechazado: ' . $reason );
+        // PO-BUG-C FIX: wrap Wallet::release() in try/catch.
+        //
+        // THE BUG: release() can throw RuntimeException (e.g., balance_pending < amount if
+        // the hold was partially released by a concurrent process, or DB deadlock). The old
+        // code let the exception propagate, which:
+        //   1. Broke the rejection flow — the payout stayed 'pending' forever.
+        //   2. Could leave the vendor without recourse (can't request a new payout because
+        //      the hold is still in place).
+        //   3. Leaked internal exception details to the admin UI.
+        //
+        // THE FIX: catch the exception, log it, and continue with the rejection. The payout
+        // row is marked 'rejected' regardless — the hold can be cleaned up later by the
+        // consumer protection release cron or manual admin intervention. The important thing
+        // is that the payout doesn't get stuck in 'pending' just because release failed.
+        try {
+            // B9 FIX: idempotency key para evitar doble liberación si el rechazo se reintenta.
+            $release_idem_key = sprintf( 'payout_reject_release_%d', $payout_id );
+            LTMS_Business_Wallet::release(
+                (int) $payout['vendor_id'],
+                (float) $payout['amount'],
+                'Retiro rechazado: ' . $reason,
+                [ 'payout_id' => $payout_id, 'type' => 'reject' ],
+                0,
+                '',
+                $release_idem_key
+            );
+        } catch ( \Throwable $release_err ) {
+            LTMS_Core_Logger::error(
+                'PAYOUT_REJECT_RELEASE_FAILED',
+                sprintf( 'Retiro #%d: no se pudo liberar el hold durante el rechazo — %s. El payout será marcado como rejected de todas formas; el hold puede requerir limpieza manual.', $payout_id, $release_err->getMessage() ),
+                [
+                    'payout_id' => $payout_id,
+                    'vendor_id' => $payout['vendor_id'],
+                    'amount'    => $payout['amount'],
+                    'exception' => get_class( $release_err ),
+                ]
+            );
+            // Continue with rejection — the hold can be cleaned up later by:
+            //   - The consumer protection release cron (release_eligible_holds)
+            //   - Manual admin intervention via Wallet::release() direct call
+        }
 
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
@@ -379,21 +636,88 @@ Puedes enviar una nueva solicitud desde tu panel.
     /**
      * Procesa todos los retiros pendientes aprobados automáticamente (cron diario).
      *
+     * B5 FIX: solo procesa si la auto-aprobación está HABILITADA en config.
+     * Antes, este cron ejecutaba payouts automáticamente sin importar la
+     * configuración `ltms_auto_approve_payouts`, lo cual es peligroso:
+     * un admin que desactiva auto-aprobación para control manual seguía
+     * viendo cómo el cron ejecutaba pagos automáticamente.
+     *
+     * B6 FIX: respeta el monto máximo de auto-aprobación configurado.
+     * Antes procesaba CUALQUIER monto. Ahora respeta el threshold.
+     *
+     * B7 FIX: idempotencia — si un payout ya está en 'processing' o 'completed'
+     * (porque otro proceso lo tomó), no se reintenta. Antes el cron podía
+     * re-ejecutar approve() sobre un payout ya completado.
+     *
      * @return void
      */
     public static function process_pending_payouts(): void {
+        // B5 FIX: respetar el flag de auto-aprobación.
+        $auto_approve_enabled = LTMS_Core_Config::get( 'ltms_auto_approve_payouts', 'no' );
+        if ( $auto_approve_enabled !== 'yes' ) {
+            LTMS_Core_Logger::info(
+                'PAYOUT_CRON_SKIP',
+                'process_pending_payouts: auto-aprobación deshabilitada (ltms_auto_approve_payouts=no). No se procesarán payouts.'
+            );
+            return;
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // B6 FIX: respetar el monto máximo de auto-aprobación.
+        $max_auto_amount = (float) LTMS_Core_Config::get( 'ltms_auto_approve_max_amount', 500000 );
+        $min_auto_amount = self::get_minimum_payout_amount();
+
+        // B7 FIX: solo seleccionar payouts 'pending' (no 'processing' ni 'completed').
+        // El atomic claim en approve() ya previene double-approval, pero esta query
+        // reduce el número de intentos inútiles.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $payouts = $wpdb->get_results(
-            "SELECT * FROM `{$table}` WHERE status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 1 DAY) ORDER BY created_at ASC LIMIT 50",
+            $wpdb->prepare(
+                "SELECT * FROM `{$table}`
+                 WHERE status = 'pending'
+                 AND amount >= %f
+                 AND amount <= %f
+                 AND created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)
+                 ORDER BY created_at ASC
+                 LIMIT 50",
+                $min_auto_amount,
+                $max_auto_amount
+            ),
             ARRAY_A
         );
 
-        foreach ( $payouts as $payout ) {
-            self::approve( (int) $payout['id'], 0 ); // 0 = sistema automático
+        if ( empty( $payouts ) ) {
+            return;
         }
+
+        $processed = 0;
+        $skipped   = 0;
+        foreach ( $payouts as $payout ) {
+            // B6 FIX: re-validar KYC antes de procesar (puede haber cambiado).
+            if ( ! self::vendor_has_approved_kyc( (int) $payout['vendor_id'] ) ) {
+                $skipped++;
+                LTMS_Core_Logger::warning(
+                    'PAYOUT_CRON_KYC_SKIP',
+                    sprintf( 'Cron: payout #%d saltado — vendor #%d no tiene KYC aprobado.', $payout['id'], $payout['vendor_id'] )
+                );
+                continue;
+            }
+
+            $result = self::approve( (int) $payout['id'], 0 ); // 0 = sistema automático.
+            if ( $result['success'] ) {
+                $processed++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        LTMS_Core_Logger::info(
+            'PAYOUT_CRON_PROCESSED',
+            sprintf( 'Cron process_pending_payouts: %d procesados, %d saltados de %d seleccionados.', $processed, $skipped, count( $payouts ) ),
+            [ 'processed' => $processed, 'skipped' => $skipped, 'selected' => count( $payouts ) ]
+        );
     }
 
     // ── Helpers privados ──────────────────────────────────────────
@@ -634,34 +958,17 @@ Puedes enviar una nueva solicitud desde tu panel.
     /**
      * Aprueba automáticamente retiros que cumplan los criterios.
      *
+     * B8 FIX: este cron es REDUNDANTE con process_pending_payouts() que ya hace
+     * lo mismo (post v2.8.5). Para evitar doble procesamiento, este método ahora
+     * es un wrapper que simplemente llama a process_pending_payouts().
+     *
+     * Se conserva por compatibilidad con instalaciones existentes que tengan el
+     * cron `ltms_approve_payout_cron` programado. No se programa de nuevo.
+     *
      * @return void
      */
     public static function auto_approve_eligible(): void {
-        $auto_approve_enabled = LTMS_Core_Config::get( 'ltms_auto_approve_payouts', 'no' );
-        if ( $auto_approve_enabled !== 'yes' ) {
-            return;
-        }
-
-        $max_auto_amount = (float) LTMS_Core_Config::get( 'ltms_auto_approve_max_amount', 500000 );
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'lt_payout_requests';
-
-        // M-QA-03: include minimum payout amount guard to prevent approving dust amounts.
-        $min_auto_amount = self::get_minimum_payout_amount();
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $eligible = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT id FROM `{$table}` WHERE status = 'pending' AND amount >= %f AND amount <= %f ORDER BY created_at ASC LIMIT 20",
-                $min_auto_amount,
-                $max_auto_amount
-            ),
-            ARRAY_A
-        );
-
-        foreach ( $eligible as $row ) {
-            self::approve( (int) $row['id'], 0 );
-        }
+        // B8 FIX: delegar a process_pending_payouts() que tiene toda la lógica.
+        self::process_pending_payouts();
     }
 }

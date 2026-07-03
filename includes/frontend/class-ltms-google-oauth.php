@@ -103,6 +103,8 @@ final class LTMS_Google_OAuth {
     // -------------------------------------------------------------------------
 
     public function ajax_redirect_to_google(): void {
+		// SEC-3 FIX (v2.9.26): CSRF protection.
+		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
         // Generar y guardar state anti-CSRF en una transient de corta vida.
         $state = wp_generate_uuid4();
         set_transient( self::STATE_META . '_' . $state, 1, self::STATE_TTL );

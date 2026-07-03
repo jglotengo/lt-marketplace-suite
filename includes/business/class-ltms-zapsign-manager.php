@@ -317,17 +317,26 @@ final class LTMS_ZapSign_Manager {
             $bucket = LTMS_Core_Config::get( 'ltms_backblaze_contratos_bucket', 'lotengo-contratos' ) ?: 'lotengo-contratos'; // BC-01-FIX: opcion guardada vacia en BD no debe pasar isset()
             $key    = sprintf( 'contratos/%s/vendedor-%d-%s.pdf', gmdate( 'Y/m' ), $vendor_id, $doc_token );
 
+            // ZS-1 FIX: compute SHA-256 of the signed PDF binary BEFORE uploading.
+            // Stored in user_meta so any later tampering with the B2 object (swap,
+            // re-upload, partial overwrite) is detectable via verify_contract_integrity().
+            // Without this hash, an attacker with B2 write access could silently
+            // replace the signed contract with a forged PDF and no one would know.
+            $pdf_hash = hash( 'sha256', $pdf_binary );
+
             $b2->upload_file( $bucket, $key, $pdf_binary, 'application/pdf', [
-                'vendor_id' => (string) $vendor_id,
-                'doc_token' => $doc_token,
+                'vendor_id'  => (string) $vendor_id,
+                'doc_token'  => $doc_token,
+                'pdf_sha256' => $pdf_hash,
             ] );
 
             update_user_meta( $vendor_id, 'ltms_contract_b2_bucket', $bucket );
             update_user_meta( $vendor_id, 'ltms_contract_b2_key', $key );
+            update_user_meta( $vendor_id, 'ltms_contract_pdf_hash', $pdf_hash );
             update_user_meta( $vendor_id, 'ltms_contract_backed_up_at', LTMS_Utils::now_utc() );
 
             LTMS_Core_Logger::info( 'B2_CONTRACT_BACKUP_OK',
-                sprintf( 'Contrato de vendedor #%d respaldado en B2: %s/%s', $vendor_id, $bucket, $key ) );
+                sprintf( 'Contrato de vendedor #%d respaldado en B2: %s/%s (sha256=%s)', $vendor_id, $bucket, $key, $pdf_hash ) );
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::warning( 'B2_CONTRACT_BACKUP_FAIL',
                 sprintf( 'No se pudo respaldar contrato de vendedor #%d (doc_token=%s): %s',
@@ -341,6 +350,8 @@ final class LTMS_ZapSign_Manager {
      * Reenviar contrato desde el dashboard del vendedor.
      */
     public function ajax_resend_contract(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -401,7 +412,61 @@ final class LTMS_ZapSign_Manager {
     }
 
     /**
+     * ZS-1 FIX: verifies that the B2-backed-up signed contract still matches the
+     * SHA-256 hash recorded at backup time. Returns true if the hash matches (or
+     * if no hash was recorded for legacy backups), false if the file was tampered.
+     *
+     * @param int $vendor_id
+     * @return array{verified: bool, reason: string}
+     */
+    public static function verify_contract_integrity( int $vendor_id ): array {
+        $stored_hash = get_user_meta( $vendor_id, 'ltms_contract_pdf_hash', true );
+        $bucket      = get_user_meta( $vendor_id, 'ltms_contract_b2_bucket', true );
+        $key         = get_user_meta( $vendor_id, 'ltms_contract_b2_key', true );
+
+        if ( ! $stored_hash || ! $bucket || ! $key ) {
+            return [ 'verified' => true, 'reason' => 'no_hash_recorded' ];
+        }
+
+        try {
+            $b2        = LTMS_Api_Factory::get( 'backblaze' );
+            $signed_url = $b2->get_signed_url( $bucket, $key, 300 );
+            $resp       = wp_remote_get( $signed_url, [
+                'timeout'   => 30,
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
+            ] );
+            if ( is_wp_error( $resp ) ) {
+                return [ 'verified' => false, 'reason' => 'download_error: ' . $resp->get_error_message() ];
+            }
+            $code = (int) wp_remote_retrieve_response_code( $resp );
+            if ( $code < 200 || $code >= 300 ) {
+                return [ 'verified' => false, 'reason' => 'download_http_' . $code ];
+            }
+            $pdf_binary = wp_remote_retrieve_body( $resp );
+            if ( empty( $pdf_binary ) ) {
+                return [ 'verified' => false, 'reason' => 'download_empty' ];
+            }
+            $current_hash = hash( 'sha256', $pdf_binary );
+            if ( ! hash_equals( $stored_hash, $current_hash ) ) {
+                LTMS_Core_Logger::error( 'ZAPSIGN_CONTRACT_TAMPERED',
+                    sprintf( 'Vendor #%d contract hash mismatch: stored=%s current=%s', $vendor_id, $stored_hash, $current_hash ) );
+                return [ 'verified' => false, 'reason' => 'hash_mismatch', 'stored' => $stored_hash, 'current' => $current_hash ];
+            }
+            return [ 'verified' => true, 'reason' => 'match' ];
+        } catch ( \Throwable $e ) {
+            return [ 'verified' => false, 'reason' => 'exception: ' . $e->getMessage() ];
+        }
+    }
+
+    /**
      * Verifica el estado del contrato de un vendedor consultando ZapSign en tiempo real.
+     *
+     * ZS-2 FIX: previously, once the cache said 'signed', ZapSign was NEVER
+     * re-consulted. If the contract was later cancelled/refused/expired in
+     * ZapSign (or if ltms_contract_status was maliciously flipped to 'signed'
+     * via DB write), the local state stayed 'signed' forever — allowing a
+     * vendor to operate as approved even if their contract was retracted.
+     * Now we re-verify with ZapSign at most once every 24h.
      */
     public static function get_contract_status( int $vendor_id ): array {
         $token = get_user_meta( $vendor_id, 'ltms_contract_token', true );
@@ -411,13 +476,22 @@ final class LTMS_ZapSign_Manager {
 
         $cached_status = get_user_meta( $vendor_id, 'ltms_contract_status', true );
 
-        // Si ya está firmado en caché, no consultar ZapSign de nuevo
+        // ZS-2 FIX: re-verify 'signed' cache with ZapSign at most once per 24h.
+        // This catches contracts that were cancelled/refused/expired after signing,
+        // and detects meta tampering (manually setting status='signed').
         if ( 'signed' === $cached_status ) {
-            return [
-                'status'    => 'signed',
-                'sent'      => true,
-                'signed_at' => get_user_meta( $vendor_id, 'ltms_contract_signed_at', true ),
-            ];
+            $last_verified = get_user_meta( $vendor_id, 'ltms_contract_status_verified_at', true );
+            $stale = ! $last_verified || ( time() - strtotime( $last_verified ) ) > DAY_IN_SECONDS;
+
+            if ( ! $stale ) {
+                return [
+                    'status'    => 'signed',
+                    'sent'      => true,
+                    'signed_at' => get_user_meta( $vendor_id, 'ltms_contract_signed_at', true ),
+                ];
+            }
+
+            // Cache is stale — fall through to real-time verification below.
         }
 
         // Consultar estado en tiempo real
@@ -425,9 +499,28 @@ final class LTMS_ZapSign_Manager {
             $client = LTMS_Api_Factory::get( 'zapsign' );
             $status = $client->get_document_status( $token );
 
-            if ( 'completed' === $status['status'] ) {
+            $remote_status = $status['status'] ?? 'unknown';
+
+            if ( 'completed' === $remote_status ) {
                 update_user_meta( $vendor_id, 'ltms_contract_status', 'signed' );
                 update_user_meta( $vendor_id, 'ltms_contract_signed_at', LTMS_Utils::now_utc() );
+                update_user_meta( $vendor_id, 'ltms_contract_status_verified_at', LTMS_Utils::now_utc() );
+            } else {
+                // ZS-2 FIX: if ZapSign no longer says 'completed', update local cache.
+                // Covers: contract cancelled, refused, expired, or voided after signing.
+                $local_status = match ( $remote_status ) {
+                    'active', 'pending'         => 'pending',
+                    'refused', 'rejected'       => 'cancelled',
+                    'expired'                   => 'expired',
+                    'cancelled', 'voided'       => 'cancelled',
+                    default                     => $cached_status ?: 'unknown',
+                };
+                if ( $local_status !== $cached_status ) {
+                    update_user_meta( $vendor_id, 'ltms_contract_status', $local_status );
+                    LTMS_Core_Logger::warning( 'ZAPSIGN_CONTRACT_STATUS_RETRACTED',
+                        sprintf( 'Vendor #%d cache=signed → remote=%s (local=%s)', $vendor_id, $remote_status, $local_status ) );
+                }
+                update_user_meta( $vendor_id, 'ltms_contract_status_verified_at', LTMS_Utils::now_utc() );
             }
 
             return array_merge( $status, [

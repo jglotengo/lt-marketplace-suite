@@ -146,7 +146,10 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             ];
         }
 
-        return $this->perform_request( 'POST', '/contacts', $payload );
+        return $this->perform_request( 'POST', '/contacts', $payload, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key prevents duplicate contact creation on 5xx retry.
+            'Idempotency-Key' => 'ltms_contact_' . ( $contact_data['identification'] ?? md5( wp_json_encode( $payload ) ) ),
+        ] );
     }
 
     /**
@@ -364,7 +367,10 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['description'] = substr( sanitize_textarea_field( $item_data['description'] ), 0, 500 );
         }
 
-        return $this->perform_request( 'POST', '/items', $payload );
+        return $this->perform_request( 'POST', '/items', $payload, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key by item name hash to prevent duplicate items on retry.
+            'Idempotency-Key' => 'ltms_item_' . md5( $payload['name'] ?? '' ),
+        ] );
     }
 
     /**
@@ -435,7 +441,12 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             ];
         }
 
-        return $this->perform_request( 'POST', '/invoices', $payload );
+        return $this->perform_request( 'POST', '/invoices', $payload, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key by (order anotation) — same order retried → same key →
+            // Alegra dedupes the duplicate invoice server-side. Uses anotation (WC order reference) when present,
+            // falls back to a hash of the payload.
+            'Idempotency-Key' => 'ltms_invoice_order_' . ( $invoice_data['anotation'] ?? md5( wp_json_encode( $payload ) ) ),
+        ] );
     }
 
     /**
@@ -466,6 +477,9 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         return $this->perform_request( 'POST', '/invoices/' . $invoice_id . '/email', [
             'emails'          => array_values( $valid_emails ),
             'sendCopyToUser'  => $copy_user,
+        ], [
+            // API-BUG-9 FIX: idempotent email-send — Alegra dedupes by invoice_id + emails hash.
+            'Idempotency-Key' => 'ltms_invoice_email_' . $invoice_id . '_' . md5( implode( ',', $valid_emails ) ),
         ] );
     }
 
@@ -493,16 +507,28 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     /**
      * Registra un pago en Alegra.
      *
-     * @param array $payment_data Datos del pago.
+     * @param array  $payment_data    Datos del pago.
+     * @param string $idempotency_key (Opcional) Clave de idempotencia explícita.
+     *                                Cuando se provee (ej. 'ltms_donation_payout_42'),
+     *                                se usa directamente en lugar de la derivación
+     *                                por (invoice_id, type). Requerido para pagos
+     *                                sin invoice_id (donations) — de lo contrario
+     *                                todos los batches mensuales deduplican contra
+     *                                el primero (INT-BUG-2 / Task 62-C).
      * @return array{id: int}
      * @throws \RuntimeException
      */
-    public function create_payment( array $payment_data ): array {
+    public function create_payment( array $payment_data, string $idempotency_key = '' ): array {
         $payload = [
             'date'          => $payment_data['date']    ?? current_time( 'Y-m-d' ),
             'bankAccount'   => [ 'id' => (int) ( $payment_data['bank_account_id'] ?? 0 ) ],
             'paymentMethod' => $payment_data['payment_method'] ?? 'transfer',
             'type'          => $payment_data['type']           ?? 'in',
+            // INT-BUG-3 / Task 62-C: 'price' (campo 'amount' en la entrada) DEBE
+            // enviarse en el payload — antes era recolectado pero nunca incluido
+            // en el POST body, lo que hacía que Alegra rechazara o guardara el
+            // pago con amount=0. Alegra usa 'price' como campo del pago.
+            'price'         => (float) ( $payment_data['amount'] ?? 0 ),
         ];
 
         if ( ! empty( $payment_data['client_id'] ) ) {
@@ -517,7 +543,17 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['observations'] = substr( sanitize_textarea_field( $payment_data['observations'] ), 0, 500 );
         }
 
-        return $this->perform_request( 'POST', '/payments', $payload );
+        // INT-BUG-2 / Task 62-C: si el caller provee una clave explícita (p.ej.
+        // para pagos de donaciones sin invoice_id), usarla. De lo contrario,
+        // mantener la derivación por (invoice_id, type) para vendor payouts.
+        $key = $idempotency_key !== ''
+            ? $idempotency_key
+            : 'ltms_payment_invoice_' . ( $payment_data['invoice_id'] ?? '0' ) . '_' . ( $payment_data['type'] ?? 'in' );
+
+        return $this->perform_request( 'POST', '/payments', $payload, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key by (invoice_id, type) — prevents duplicate payment registration.
+            'Idempotency-Key' => $key,
+        ] );
     }
 
     // ── NUMERACIONES ───────────────────────────────────────────────
@@ -559,14 +595,22 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
     /**
      * Crea una nota de crédito (credit note) en Alegra asociada a una factura.
      *
-     * @param array $data {
+     * @param array  $data {
      *     @type int    $invoice_id   ID de la factura origen en Alegra.
      *     @type float  $amount       Monto total de la nota de crédito.
      *     @type string $observations Observaciones opcionales.
      * }
+     * @param string $idempotency_key (Opcional) Clave de idempotencia explícita.
+     *                                Cuando se provee (ej. 'ltms_credit_note_refund_42'),
+     *                                se usa directamente en lugar de la derivación
+     *                                por invoice_id. Requerido para múltiples
+     *                                reembolsos parciales de la misma factura —
+     *                                de lo contrario todos los reembolsos de la
+     *                                misma factura deduplican contra el primero
+     *                                (AUDIT-AL AL-4).
      * @return array Respuesta de la API con el ID de la nota de crédito.
      */
-    public function create_credit_note( array $data ): array {
+    public function create_credit_note( array $data, string $idempotency_key = '' ): array {
         // Usar items detallados si vienen; si no, item genérico con monto total
         if ( ! empty( $data['items'] ) ) {
             $items = $data['items'];
@@ -588,7 +632,18 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $payload['observations'] = substr( sanitize_textarea_field( $data['observations'] ), 0, 500 );
         }
 
-        return $this->perform_request( 'POST', '/credit-notes', $payload );
+        // AUDIT-AL AL-4 FIX: si el caller provee una clave explícita (p.ej.
+        // para reembolsos parciales múltiples de la misma factura), usarla.
+        // De lo contrario, mantener la derivación por invoice_id (que es
+        // CORRECTA cuando solo hay un reembolso por factura — backward compat).
+        $key = $idempotency_key !== ''
+            ? $idempotency_key
+            : 'ltms_credit_note_invoice_' . ( $data['invoice_id'] ?? '0' );
+
+        return $this->perform_request( 'POST', '/credit-notes', $payload, [
+            // API-BUG-9 FIX: deterministic Idempotency-Key by invoice_id — prevents duplicate credit notes on retry.
+            'Idempotency-Key' => $key,
+        ] );
     }
 
     public function get_credit_note( int $id ): array {
@@ -605,6 +660,9 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
         return $this->perform_request( 'POST', '/webhooks/subscriptions', [
             'event' => $event,
             'url'   => esc_url_raw( $url ),
+        ], [
+            // API-BUG-9 FIX: idempotent webhook subscription registration by (event, url) hash.
+            'Idempotency-Key' => 'ltms_webhook_sub_' . md5( $event . '|' . $url ),
         ] );
     }
 
@@ -662,9 +720,20 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
      * Sobrescribe perform_request para inyectar HTTP Basic Auth de Alegra.
      * Alegra usa base64(email:token) como Authorization header.
      *
+     * AL-7 FIX (AUDIT-AL): visibility MUST be `public` para matchear el
+     * contrato de LTMS_Abstract_API_Client::perform_request() (que es
+     * `public`). Antes estaba declarado `protected`, lo que es un FATAL
+     * ERROR de narrowing en PHP (Cannot make public method protected in
+     * child class). El class-loading fallaba al primer request a Alegra,
+     * y como el fatal no es catcheable como Exception (es \Error), los
+     * handlers catch(\Throwable) logueaban "Alegra no configurado" —
+     * erróneo. Adicionalmente, on_vendor_approved() llama
+     * $client->perform_request() directamente (línea 335 del Sync), lo
+     * que también fatal-erroría si el método no es público.
+     *
      * @inheritDoc
      */
-    protected function perform_request(
+    public function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],

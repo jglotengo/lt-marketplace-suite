@@ -71,7 +71,8 @@ class LTMS_Media_Guard {
                 sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 100 ) ) // phpcs:ignore
             ) );
 
-            wp_redirect( esc_url_raw( $url ) );
+            // SEC-13 FIX (v2.9.25): usar wp_safe_redirect para prevenir open redirect.
+            wp_safe_redirect( esc_url_raw( $url ) );
             exit;
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'VAULT_SIGNED_URL_FAILED', $e->getMessage() );

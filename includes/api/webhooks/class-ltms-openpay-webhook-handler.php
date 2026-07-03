@@ -29,23 +29,49 @@ class LTMS_Openpay_Webhook_Handler {
      * @return WP_REST_Response
      */
     public static function handle( WP_REST_Request $request ): WP_REST_Response {
+        // API-BUG-19 FIX: per-IP rate limit (max 100 webhooks/min) — protects DB
+        // from flood of invalid webhook attempts.
+        $rate_key = 'ltms_wh_rate_' . md5( self::client_ip() );
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 100 ) {
+            return new WP_REST_Response( [ 'error' => 'Too many requests' ], 429 );
+        }
+        set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
+
         // M-104: Verificar firma HMAC-SHA256 del payload con la clave privada de Openpay
         // Openpay envía el header X-Openpay-Signature: sha256=<hmac>
+        //
+        // WH1 FIX (v2.8.9) CRÍTICO: si private_key está vacío, RECHAZAR el webhook
+        // (fail-closed). Antes, si no había key configurada, se omitía la validación
+        // de firma → cualquier atacante podía forjar webhooks y completar pedidos.
         $country     = LTMS_Core_Config::get_country();
         $enc_key     = LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
         $private_key = $enc_key ? LTMS_Core_Security::decrypt( $enc_key ) : '';
 
-        if ( $private_key ) {
-            $raw_body      = $request->get_body();
-            $expected_hmac = 'sha256=' . hash_hmac( 'sha256', $raw_body, $private_key );
-            $received_hmac = $request->get_header( 'x-openpay-signature' ) ?: '';
-
-            if ( ! hash_equals( $expected_hmac, $received_hmac ) ) {
-                if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                    LTMS_Core_Logger::warning( 'OPENPAY_WEBHOOK_AUTH', 'Firma HMAC inválida en webhook Openpay' );
-                }
-                return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
+        if ( empty( $private_key ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'OPENPAY_WEBHOOK_NO_SECRET',
+                    'Openpay private key no configurado. Webhook rechazado (fail-closed).'
+                );
             }
+            return new WP_REST_Response( [ 'error' => 'Webhook endpoint not configured' ], 401 );
+        }
+
+        // Validar firma HMAC-SHA256 (obligatorio).
+        $raw_body      = $request->get_body();
+        $expected_hmac = 'sha256=' . hash_hmac( 'sha256', $raw_body, $private_key );
+        $received_hmac = $request->get_header( 'x-openpay-signature' ) ?: '';
+
+        if ( ! hash_equals( $expected_hmac, $received_hmac ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'OPENPAY_WEBHOOK_INVALID_SIG',
+                    'Firma HMAC inválida en webhook Openpay.',
+                    [ 'received_sig' => substr( $received_hmac, 0, 40 ) ]
+                );
+            }
+            return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
         }
 
         $body = $request->get_json_params();
@@ -56,6 +82,22 @@ class LTMS_Openpay_Webhook_Handler {
         if ( empty( $event_type ) || empty( $transaction ) ) {
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
         }
+
+        // API-BUG-11 FIX: event_id idempotency. OpenPay may deliver the same event
+        // 2-3 times on retry. Without dedup, payout.failed could re-send admin emails
+        // and re-fire ltms_payout_failed actions. Key scoped to (event_type, txn.id).
+        // API-BUG-18 FIX: return 200 immediately if already processed, so OpenPay
+        // stops retrying. (Full async migration is a documented follow-up.)
+        $openpay_id = sanitize_text_field( $transaction['id'] ?? '' );
+        $event_id   = $openpay_id ?: ( $event_type . '_' . md5( wp_json_encode( $transaction ) ) );
+        $seen_key   = 'ltms_wh_seen_openpay_' . md5( $event_type . '|' . $event_id );
+        if ( get_transient( $seen_key ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info( 'OPENPAY_WEBHOOK_REPLAY', "Duplicate webhook ignored: event={$event_type}, txn={$event_id}" );
+            }
+            return new WP_REST_Response( [ 'message' => 'Already processed' ], 200 );
+        }
+        set_transient( $seen_key, 1, HOUR_IN_SECONDS );
 
         $openpay_id  = sanitize_text_field( $transaction['id'] ?? '' );
         $order_ref   = sanitize_text_field( $transaction['order_id'] ?? '' );
@@ -238,7 +280,7 @@ Equipo Lo Tengo",
                         [ 'payout_id' => $payout_id, 'vendor_id' => $vendor_id, 'openpay_id' => $openpay_id ]
                     );
 
-                    do_action( 'ltms_payout_completed', $payout_id, $vendor_id );
+                    do_action( 'ltms_payout_completed', $vendor_id, (float) $payout['amount'], $payout_id );
                 }
                 break;
 
@@ -310,6 +352,19 @@ Equipo Lo Tengo",
             ) );
         }
         return $order_id;
+    }
+
+    /**
+     * Resuelve la IP del cliente para rate limiting (API-BUG-19).
+     *
+     * @return string
+     */
+    private static function client_ip(): string {
+        // WH3 FIX (v2.8.9): delegar a LTMS_Core_Security::get_client_ip_safe().
+        if ( class_exists( 'LTMS_Core_Security' ) ) {
+            return LTMS_Core_Security::get_client_ip_safe();
+        }
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 }
 

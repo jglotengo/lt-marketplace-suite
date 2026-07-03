@@ -309,6 +309,8 @@ class LTMS_Booking_Policy_Handler {
     // ── AJAX (panel de vendedor) ────────────────────────────────────────
 
     public static function ajax_get_vendor_policies(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
         wp_send_json_success( self::get_vendor_policies( get_current_user_id() ) );
     }

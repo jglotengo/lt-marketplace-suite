@@ -129,11 +129,75 @@ class LTMS_Aveonline_Webhook_Handler {
     public static function handle( WP_REST_Request $request ): WP_REST_Response {
         $body = $request->get_json_params();
 
+        // API-BUG-19 FIX: per-IP rate limit (max 100 webhooks/min) — protects DB.
+        // Applied before token check to protect against DoS from invalid webhooks.
+        $rate_key = 'ltms_wh_rate_' . md5( self::client_ip() );
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 100 ) {
+            return new WP_REST_Response(
+                [ 'success' => false, 'messages' => 'Too many requests' ],
+                429
+            );
+        }
+        set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
+
+        // AO-BUG-12 FIX: IP allowlist (regression of M-9). AveOnline source IPs
+        // are configurable via `ltms_aveonline_webhook_ips` (CSV). If configured,
+        // reject any request from an unlisted IP. If not configured, log a
+        // warning and continue (fail-open by config, but visible to admins).
+        $client_ip   = self::client_ip();
+        $allowlist   = trim( (string) ( method_exists( 'LTMS_Core_Config', 'get' ) ? LTMS_Core_Config::get( 'ltms_aveonline_webhook_ips', '' ) : get_option( 'ltms_aveonline_webhook_ips', '' ) ) );
+        if ( $allowlist !== '' ) {
+            $allowed_ips = array_filter( array_map( 'trim', explode( ',', $allowlist ) ) );
+            if ( ! in_array( $client_ip, $allowed_ips, true ) ) {
+                self::log_warning( 'IP_NOT_ALLOWED', "ip={$client_ip}" );
+                return new WP_REST_Response(
+                    [ 'success' => false, 'messages' => 'Origen no permitido.' ],
+                    403
+                );
+            }
+        } else {
+            self::log_warning( 'IP_ALLOWLIST_EMPTY', 'ltms_aveonline_webhook_ips no configurado; saltando verificación de IP.' );
+        }
+
+        // AO-BUG-2 FIX: event-level idempotency. AveOnline retries the same
+        // webhook on timeout. Without dedup, retries produce duplicate rows in
+        // lt_aveonline_tracking_events and re-fire `ltms_shipping_delivered`
+        // (double payouts). We compute a deterministic event_id from the payload
+        // and gate processing on a 1-hour transient.
+        $event_id  = isset( $body['event_id'] ) && $body['event_id'] !== ''
+            ? (string) $body['event_id']
+            : md5( wp_json_encode( [
+                'guia'   => $body['guia'] ?? '',
+                'estado' => $body['estado'] ?? [],
+                'fecha'  => $body['fechaentrega'] ?? '',
+            ] ) );
+        $cache_key = 'ltms_ave_wh_seen_' . md5( $event_id );
+        if ( get_transient( $cache_key ) ) {
+            return new WP_REST_Response(
+                [ 'success' => true, 'messages' => 'Evento ya procesado.' ],
+                200
+            );
+        }
+        set_transient( $cache_key, true, HOUR_IN_SECONDS );
+
         // ── 1. Validar token ──────────────────────────────────────────────────
+        // AO-BUG-1 FIX: fail-closed when the configured token is empty AND use
+        // hash_equals() for timing-safe comparison (prevents timing attacks on
+        // the token). Previously, an empty option made the check pass for any
+        // payload, allowing forged delivery webhooks.
         $token_recibido  = sanitize_text_field( (string) ( $body['token'] ?? '' ) );
         $token_esperado  = trim( (string) get_option( 'ltms_aveonline_webhook_token', '' ) );
 
-        if ( $token_esperado && $token_recibido !== $token_esperado ) {
+        if ( $token_esperado === '' ) {
+            self::log_warning( 'TOKEN_NOT_CONFIGURED', 'ltms_aveonline_webhook_token vacío — fail-closed.' );
+            return new WP_REST_Response(
+                [ 'success' => false, 'messages' => 'Webhook no configurado.' ],
+                403
+            );
+        }
+
+        if ( ! hash_equals( $token_esperado, $token_recibido ) ) {
             self::log_warning( 'TOKEN_MISMATCH', "recibido={$token_recibido}" );
             return new WP_REST_Response(
                 [ 'success' => false, 'messages' => 'Token inválido.' ],
@@ -328,6 +392,14 @@ class LTMS_Aveonline_Webhook_Handler {
         $order->update_meta_data( '_ltms_aveonline_tracking',    $guia );
         $order->update_meta_data( '_ltms_shipping_status',       $nombre_estado );
         $order->update_meta_data( '_ltms_aveonline_estado_id',   $estado_id );
+        // AUDIT-SHIPPING-ENGINE #11 FIX: también guardar en _ltms_aveonline_status
+        // (la key que Consumer_Protection::is_order_delivered_or_no_shipping() busca).
+        // Antes el estado se guardaba solo en _ltms_shipping_status pero
+        // Consumer Protection busca en _ltms_aveonline_status → nunca encontraba
+        // el estado de entrega → los holds no se liberaban por la vía de
+        // is_order_delivered_or_no_shipping() (aunque sí por el do_action
+        // del case 'delivered').
+        $order->update_meta_data( '_ltms_aveonline_status',      $accion ?: $nombre_estado );
 
         if ( $guia_digitalizada ) {
             $order->update_meta_data( '_ltms_aveonline_guia_pdf', $guia_digitalizada );
@@ -359,7 +431,14 @@ class LTMS_Aveonline_Webhook_Handler {
                 if ( ! $order->has_status( 'completed' ) ) {
                     $order->update_status( 'completed', __( 'Entregado por Aveonline.', 'ltms' ) );
                 }
-                do_action( 'ltms_shipping_delivered', $order_id, 'aveonline' );
+                // AO-BUG-13 FIX: make `ltms_shipping_delivered` idempotent.
+                // Without this guard, a single Aveonline retry would fire the
+                // action twice, causing Consumer Protection to release the hold
+                // twice and double-crediting the vendor wallet.
+                if ( ! $order->get_meta( '_ltms_shipping_delivered_fired' ) ) {
+                    do_action( 'ltms_shipping_delivered', $order_id, 'aveonline' );
+                    $order->update_meta_data( '_ltms_shipping_delivered_fired', current_time( 'mysql', true ) );
+                }
                 break;
 
             case 'failed':
@@ -384,5 +463,18 @@ class LTMS_Aveonline_Webhook_Handler {
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::warning( 'AVEONLINE_WEBHOOK_' . $code, $msg );
         }
+    }
+
+    /**
+     * Resuelve la IP del cliente para rate limiting (API-BUG-19).
+     *
+     * @return string
+     */
+    private static function client_ip(): string {
+        // WH3 FIX (v2.8.9): delegar a LTMS_Core_Security::get_client_ip_safe().
+        if ( class_exists( 'LTMS_Core_Security' ) ) {
+            return LTMS_Core_Security::get_client_ip_safe();
+        }
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 }

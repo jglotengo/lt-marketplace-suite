@@ -1,0 +1,249 @@
+/* ============================================================================
+ * LTMS Currency Switcher Styles (Task 63-D)
+ *
+ * Styling for the cross-border currency switcher widget and the customs
+ * estimate block rendered on the WooCommerce checkout page.
+ *
+ * @package    LTMS
+ * @subpackage LTMS/assets/css
+ * @version    3.1.0
+ * ========================================================================== */
+
+/* ── Currency switcher widget ──────────────────────────────────────────── */
+
+.ltms-currency-switcher-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin: 0 0 20px 0;
+    background: #f8f9fa;
+    border: 1px solid #e2e4e7;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.ltms-currency-switcher__label {
+    font-weight: 600;
+    color: #1d2327;
+    margin-right: 4px;
+}
+
+.ltms-currency-switcher__select {
+    min-width: 180px;
+    padding: 6px 10px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+    color: #1d2327;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ltms-currency-switcher__select:hover {
+    border-color: #8c8f94;
+}
+
+.ltms-currency-switcher__select:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.ltms-currency-switcher__spinner {
+    display: none;
+    color: #2271b1;
+    font-size: 13px;
+    font-style: italic;
+    padding-left: 8px;
+}
+
+.ltms-currency-switcher__spinner::before {
+    content: '\f463';
+    display: inline-block;
+    font-family: 'dashicons';
+    font-size: 14px;
+    margin-right: 4px;
+    animation: ltms-currency-spin 1s linear infinite;
+}
+
+@keyframes ltms-currency-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.ltms-currency-switcher__error {
+    color: #d63638;
+    font-size: 0.9em;
+    margin-top: 4px;
+}
+
+/* ── Customs estimate block ────────────────────────────────────────────── */
+
+.ltms-customs-estimate {
+    margin: 16px 0;
+    padding: 14px 18px;
+    background: #fffdf5;
+    border: 1px solid #f0e6c5;
+    border-left: 4px solid #dba617;
+    border-radius: 4px;
+    color: #1d2327;
+}
+
+.ltms-customs-estimate__title {
+    margin: 0 0 10px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #614a07;
+}
+
+.ltms-customs-estimate__body {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.ltms-customs-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px dashed #e8dfb8;
+}
+
+.ltms-customs-row:last-of-type {
+    border-bottom: none;
+}
+
+.ltms-customs-row.ltms-customs-origin {
+    justify-content: flex-start;
+    font-weight: 600;
+    color: #614a07;
+    border-bottom: 1px solid #e8dfb8;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+}
+
+.ltms-customs-row.ltms-customs-total {
+    font-weight: 700;
+    font-size: 14px;
+    color: #614a07;
+    border-top: 2px solid #e8dfb8;
+    border-bottom: none;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.ltms-customs-row.ltms-customs-de-minimis {
+    color: #2a7d2a;
+    font-style: italic;
+}
+
+.ltms-customs-label {
+    flex: 1 1 auto;
+    color: #3c434a;
+}
+
+.ltms-customs-value {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    color: #1d2327;
+}
+
+.ltms-customs-loading {
+    color: #614a07;
+    font-style: italic;
+    padding: 4px 0;
+}
+
+.ltms-customs-notice {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.ltms-customs-notice-ddp {
+    background: #edfaef;
+    border: 1px solid #c6e7cb;
+    color: #1a6d1a;
+}
+
+.ltms-customs-notice-ddu {
+    background: #fdf3ed;
+    border: 1px solid #f0c8a4;
+    color: #8a4500;
+}
+
+/* ── Dark mode support ────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+    .ltms-currency-switcher-wrap {
+        background: #2c3338;
+        border-color: #40464d;
+        color: #c3c4c7;
+    }
+
+    .ltms-currency-switcher__label {
+        color: #e0e0e0;
+    }
+
+    .ltms-currency-switcher__select {
+        background: #1d2327;
+        color: #e0e0e0;
+        border-color: #50575e;
+    }
+
+    .ltms-customs-estimate {
+        background: #2c3338;
+        border-color: #50575e;
+        color: #e0e0e0;
+    }
+
+    .ltms-customs-estimate__title {
+        color: #f0c8a4;
+    }
+
+    .ltms-customs-row {
+        border-color: #40464d;
+    }
+
+    .ltms-customs-row.ltms-customs-origin,
+    .ltms-customs-row.ltms-customs-total {
+        color: #f0c8a4;
+        border-color: #50575e;
+    }
+
+    .ltms-customs-label {
+        color: #c3c4c7;
+    }
+
+    .ltms-customs-value {
+        color: #e0e0e0;
+    }
+
+    .ltms-customs-loading {
+        color: #f0c8a4;
+    }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .ltms-currency-switcher-wrap {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .ltms-currency-switcher__select {
+        width: 100%;
+    }
+
+    .ltms-customs-row {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}

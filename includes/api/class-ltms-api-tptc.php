@@ -119,6 +119,54 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Revierte una venta previamente sincronizada cuando el pedido es reembolsado.
+     *
+     * TPTC-BUG-2 FIX (regresión de LS-BUG-6 / Task 53-C): el método fue
+     * documentado como añadido en Task 53-C pero no existía en el código actual.
+     * Sin este método, reembolsar un pedido WC dejaba la venta activa en TPTC,
+     * produciendo inconsistencia contable/compliance permanente.
+     *
+     * @param array $reversal_data {
+     *     @type int    $vendor_id      ID del vendedor en LTMS.
+     *     @type int    $order_id       ID del pedido WC.
+     *     @type float  $amount         Monto a revertir.
+     *     @type string $currency       Moneda (default COP).
+     *     @type string $reason         Motivo de la reversión.
+     *     @type string $reversal_date  Fecha ISO-8601 (default now UTC).
+     * }
+     * @return array{success: bool, points_reversed: int, transaction_id: string}
+     */
+    public function reverse_sale( array $reversal_data ): array {
+        $affiliate_id = get_user_meta( $reversal_data['vendor_id'], 'ltms_tptc_affiliate_id', true );
+        if ( ! $affiliate_id ) {
+            return [
+                'success'          => false,
+                'points_reversed'  => 0,
+                'transaction_id'   => '',
+                'message'          => 'Afiliado no registrado en TPTC',
+            ];
+        }
+
+        $payload = [
+            'program_id'        => $this->program_id,
+            'affiliate_id'      => $affiliate_id,
+            'external_order_id' => 'ltms_order_' . $reversal_data['order_id'],
+            'amount'            => (float) ( $reversal_data['amount'] ?? 0 ),
+            'currency'          => $reversal_data['currency'] ?? 'COP',
+            'reason'            => $reversal_data['reason'] ?? 'order_refunded',
+            'reversal_date'     => $reversal_data['reversal_date'] ?? LTMS_Utils::now_utc(),
+        ];
+
+        $response = $this->perform_request( 'POST', '/sales/reverse', $payload );
+
+        return [
+            'success'          => isset( $response['transaction_id'] ) || ( ( $response['reversed'] ?? false ) === true ),
+            'points_reversed'  => (int) ( $response['points_reversed'] ?? $response['points_credited'] ?? 0 ),
+            'transaction_id'   => $response['transaction_id'] ?? '',
+        ];
+    }
+
+    /**
      * Consulta el estado y balance de puntos de un afiliado.
      *
      * @param int $vendor_id ID del vendedor en LTMS.

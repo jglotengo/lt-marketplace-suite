@@ -74,8 +74,28 @@ class LTMS_Vendor_Settings_Saver {
             wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
         }
 
-        if ( empty( $_FILES['banner'] ) ) { // phpcs:ignore
-            wp_send_json_error( __( 'No se recibió ningún archivo.', 'ltms' ) );
+        // HI-5 FIX: validate the upload completed cleanly. Previously only the
+        // presence of the 'banner' key was checked, so partial / failed uploads
+        // (network errors, exceeding max_file_size) were passed straight to
+        // media_handle_upload, which produced confusing error messages.
+        if ( ! isset( $_FILES['banner'] ) || $_FILES['banner']['error'] !== UPLOAD_ERR_OK ) { // phpcs:ignore
+            wp_send_json_error( [ 'message' => __( 'Upload failed', 'ltms' ) ], 400 );
+        }
+
+        // HI-5 FIX: MIME allowlist — match the pattern used in
+        // upload_product_image (only image types). Banners should never be PDF,
+        // video, or other binary formats.
+        $file         = $_FILES['banner']; // phpcs:ignore
+        $allowed_mime = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ];
+        $finfo        = new finfo( FILEINFO_MIME_TYPE );
+        $real_mime    = $finfo->file( $file['tmp_name'] );
+        if ( ! in_array( $real_mime, $allowed_mime, true ) ) {
+            wp_send_json_error( [ 'message' => __( 'Invalid file type', 'ltms' ) ], 415 );
+        }
+
+        // HI-5 FIX: explicit size limit (10 MB) — matches upload_product_image.
+        if ( $file['size'] > 10 * 1024 * 1024 ) {
+            wp_send_json_error( [ 'message' => __( 'File too large (max 10MB)', 'ltms' ) ], 413 );
         }
 
         require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -85,7 +105,17 @@ class LTMS_Vendor_Settings_Saver {
         $attachment_id = media_handle_upload( 'banner', 0 );
 
         if ( is_wp_error( $attachment_id ) ) {
-            wp_send_json_error( $attachment_id->get_error_message() );
+            // HI-9 FIX: do not expose the raw WP_Error message — log server-side.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'VENDOR_BANNER_UPLOAD_ERROR',
+                    $attachment_id->get_error_message()
+                );
+            }
+            wp_send_json_error(
+                [ 'message' => __( 'An error occurred. Please try again.', 'ltms' ) ],
+                500
+            );
         }
 
         $banner_url = wp_get_attachment_url( $attachment_id );
@@ -147,6 +177,38 @@ class LTMS_Vendor_Settings_Saver {
         $zone_raw    = get_user_meta( $vendor_id, '_ltms_delivery_zone',      true );
         $zone        = $zone_raw ? json_decode( $zone_raw, true ) : [];
 
+        // HI-6 FIX: never return the bank account number in plaintext — it can
+        // be exfiltrated via XSS or browser extensions with broad DOM access.
+        // The vendor only needs to see the masked value (e.g. "****1234") to
+        // confirm which account is on file; the plaintext stays server-side.
+        // Handles both plaintext storage (save_profile flow) and encrypted
+        // storage (products-ajax.php save_vendor_settings — stored with
+        // LTMS_Core_Security::encrypt, prefixed 'v1:').
+        $bank_account_raw = (string) get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
+        if ( $bank_account_raw && 0 === strpos( $bank_account_raw, 'v1:' ) && class_exists( 'LTMS_Core_Security' ) ) {
+            try {
+                $decrypted = LTMS_Core_Security::decrypt( $bank_account_raw );
+                if ( is_string( $decrypted ) ) {
+                    $bank_account_raw = $decrypted;
+                }
+            } catch ( \Throwable $e ) {
+                // Decryption failed (key rotation, corrupt data) — fall through
+                // to masking the encrypted blob, which produces a harmless
+                // "****" value instead of leaking anything.
+                $bank_account_raw = '';
+            }
+        }
+        if ( $bank_account_raw && class_exists( 'LTMS_Data_Masking' ) ) {
+            $masked_bank_account = LTMS_Data_Masking::mask_bank_account( $bank_account_raw );
+        } elseif ( $bank_account_raw ) {
+            // Fallback simple mask if LTMS_Data_Masking is not available.
+            $masked_bank_account = strlen( $bank_account_raw ) > 8
+                ? substr( $bank_account_raw, 0, 4 ) . '****' . substr( $bank_account_raw, -4 )
+                : '****';
+        } else {
+            $masked_bank_account = '';
+        }
+
         // Estructura compatible con renderSettingsView() en ltms-dashboard.js:
         // El JS lee data.store.name, data.store.phone, data.store.store_name, etc.
         wp_send_json_success( [
@@ -160,7 +222,8 @@ class LTMS_Vendor_Settings_Saver {
                 'bank_info'            => get_user_meta( $vendor_id, 'ltms_bank_info',             true ),
                 // Campos bancarios completos para retiros
                 'bank_name'            => get_user_meta( $vendor_id, 'ltms_bank_name',            true ),
-                'bank_account_number'  => get_user_meta( $vendor_id, 'ltms_bank_account_number',  true ),
+                // HI-6: masked bank account number — never plaintext to the client.
+                'bank_account_number'  => $masked_bank_account,
                 'bank_account_type'    => get_user_meta( $vendor_id, 'ltms_bank_account_type',    true ) ?: 'ahorros',
                 'bank_account_holder'  => get_user_meta( $vendor_id, 'ltms_bank_account_holder',  true ),
                 // Campos de perfil público — usados en "Perfil Público de la Tienda"

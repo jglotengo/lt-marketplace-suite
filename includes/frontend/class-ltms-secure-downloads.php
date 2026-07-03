@@ -69,6 +69,8 @@ class LTMS_Secure_Downloads {
      * @return void
      */
     public function ajax_generate_token(): void {
+		// SEC-4 FIX (v2.9.26): auth required.
+		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id    = get_current_user_id();

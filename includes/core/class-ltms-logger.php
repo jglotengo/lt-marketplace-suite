@@ -259,6 +259,12 @@ final class LTMS_Core_Logger {
      * @return string
      */
     private static function get_caller_class(): string {
+        // SEC-27 FIX (v2.9.26): debug_backtrace es costoso y puede exponer
+        // información sensible del stack en producción. Solo ejecutar si
+        // WP_DEBUG está activo; en producción usar 'LTMS_System' como fallback.
+        if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+            return 'LTMS_System';
+        }
         $trace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 5 );
         foreach ( $trace as $frame ) {
             if ( isset( $frame['class'] ) && $frame['class'] !== self::class ) {
@@ -275,7 +281,7 @@ final class LTMS_Core_Logger {
      * @return array Contexto sanitizado.
      */
     private static function sanitize_context( array $context ): array {
-        $sensitive = [ 'password', 'secret', 'api_key', 'private_key', 'token', 'credit_card', 'cvv', 'pin' ];
+        $sensitive = [ 'password', 'secret', 'api_key', 'private_key', 'token', 'credit_card', 'cvv', 'pin', 'bank_account', 'clabe', 'iban', 'swift' ];
         $sanitized = [];
 
         foreach ( $context as $key => $value ) {
@@ -286,10 +292,52 @@ final class LTMS_Core_Logger {
                     break;
                 }
             }
-            $sanitized[ $key ] = $is_sensitive ? '[REDACTED]' : $value;
+            if ( $is_sensitive ) {
+                $sanitized[ $key ] = '[REDACTED]';
+            } elseif ( is_array( $value ) ) {
+                // LOG-BUG-1 FIX: recurse into nested arrays to redact sensitive keys at every level
+                $sanitized[ $key ] = self::sanitize_context( $value );
+            } else {
+                // MASK-BUG-2 FIX: mask PII (email/phone/document) in log context values
+                $sanitized[ $key ] = self::mask_pii_value( $value );
+            }
         }
 
         return $sanitized;
+    }
+
+    /**
+     * MASK-BUG-2 FIX: Mask PII (email/phone/document) in a scalar value before logging.
+     *
+     * @param mixed $value Value to mask.
+     * @return mixed Masked value (or original if not PII).
+     */
+    private static function mask_pii_value( $value ) {
+        if ( ! is_string( $value ) ) {
+            return $value;
+        }
+        // Mask email
+        if ( preg_match( '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $value ) ) {
+            $parts = explode( '@', $value );
+            $local = $parts[0];
+            $masked_local = strlen( $local ) > 2 ? substr( $local, 0, 2 ) . str_repeat( '*', max( 3, strlen( $local ) - 2 ) ) : '***';
+            return $masked_local . '@' . $parts[1];
+        }
+        // Mask phone (10+ digits)
+        if ( preg_match( '/^[\+]?[0-9]{10,15}$/', preg_replace( '/[\s\-\(\)]/', '', $value ) ) ) {
+            $clean = preg_replace( '/[^0-9]/', '', $value );
+            if ( strlen( $clean ) >= 8 ) {
+                return str_repeat( '*', strlen( $clean ) - 4 ) . substr( $clean, -4 );
+            }
+        }
+        // Mask document number (8-18 alphanumeric, likely CC/NIT/CURP/RFC)
+        if ( preg_match( '/^[a-zA-Z0-9]{8,18}$/', $value ) && ! is_numeric( $value ) === false ) {
+            // Only mask if it looks like a document (not a normal word)
+            if ( preg_match( '/[0-9]/', $value ) && strlen( $value ) >= 8 ) {
+                return str_repeat( '*', max( 4, strlen( $value ) - 4 ) ) . substr( $value, -4 );
+            }
+        }
+        return $value;
     }
 
     /**

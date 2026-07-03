@@ -61,6 +61,47 @@ class LTMS_Deprisa_Order_Split {
             return;
         }
 
+        // AUDIT-SHIPPING-ENGINE #3 FIX: NO procesar pedidos que NO usan
+        // Deprisa como método de envío. Antes esto corría en TODOS los
+        // pedidos processing — incluyendo pickup (recogida en tienda) y
+        // own delivery (logística propia del vendedor) → se generaban
+        // guías Deprisa y se cobraba al merchant por pedidos que no
+        // necesitaban envío nacional.
+        $shipping_methods = $order->get_shipping_methods();
+        $has_deprisa = false;
+        foreach ( $shipping_methods as $method ) {
+            $method_id = $method->get_method_id();
+            $instance_id = $method->get_instance_id();
+            // Deprisa method ID is 'ltms_deprisa'.
+            if ( strpos( $method_id, 'deprisa' ) !== false || strpos( $method_id, 'ltms_deprisa' ) !== false ) {
+                $has_deprisa = true;
+                break;
+            }
+        }
+
+        // Also check if the order has any shipping method that's NOT Deprisa.
+        // If it's pickup or own delivery, skip.
+        if ( ! $has_deprisa ) {
+            // Check if ANY shipping method is pickup or own_delivery.
+            foreach ( $shipping_methods as $method ) {
+                $method_id = $method->get_method_id();
+                if ( strpos( $method_id, 'pickup' ) !== false
+                     || strpos( $method_id, 'own_delivery' ) !== false
+                     || strpos( $method_id, 'own-delivery' ) !== false
+                     || strpos( $method_id, 'free_absorbed' ) !== false ) {
+                    // This order uses pickup/own-delivery — skip Deprisa processing.
+                    self::log( $order_id, "Skipping Deprisa split: order uses {$method_id} (not Deprisa)." );
+                    return;
+                }
+            }
+
+            // If no shipping methods at all (virtual products), skip.
+            if ( empty( $shipping_methods ) ) {
+                self::log( $order_id, "Skipping Deprisa split: no shipping methods (virtual order)." );
+                return;
+            }
+        }
+
         self::process_order( $order );
     }
 
@@ -121,8 +162,18 @@ class LTMS_Deprisa_Order_Split {
         }
 
         // 2. Instanciar cliente API
-        $username = get_option( 'ltms_deprisa_username', '' );
-        $password = get_option( 'ltms_deprisa_password', '' );
+        // AUDIT-SHIPPING-ENGINE #5 FIX: descifrar credenciales si están cifradas.
+        // Todos los demás carriers (Heka, Uber, Aveonline) usan LTMS_Core_Security::decrypt().
+        // Deprisa era el único carrier con credenciales en plaintext.
+        $username_raw = get_option( 'ltms_deprisa_username', '' );
+        $password_raw = get_option( 'ltms_deprisa_password', '' );
+
+        $username = ( str_starts_with( $password_raw, 'v1:' ) && class_exists( 'LTMS_Core_Security' ) )
+            ? LTMS_Core_Security::decrypt( $username_raw )
+            : $username_raw;
+        $password = ( str_starts_with( $password_raw, 'v1:' ) && class_exists( 'LTMS_Core_Security' ) )
+            ? LTMS_Core_Security::decrypt( $password_raw )
+            : $password_raw;
         $sandbox  = (bool) get_option( 'ltms_deprisa_sandbox', true );
 
         if ( empty( $username ) || empty( $password ) ) {
@@ -151,6 +202,16 @@ class LTMS_Deprisa_Order_Split {
         $order->update_meta_data( self::META_SPLIT_DONE, 'yes' );
         $order->update_meta_data( self::META_SPLIT_TS,   current_time( 'mysql' ) );
         $order->save();
+
+        // 5.1 SHIPPING-LEDGER-FIX (v2.8.3): disparar ltms_shipment_created por cada
+        // guía generada para que el ledger capture el tracking_number y marque el
+        // entry como 'shipped'. Esto permite conciliar la factura del carrier
+        // contra el ledger por tracking_number.
+        foreach ( $resultados as $vendor_id => $r ) {
+            if ( ! empty( $r['ok'] ) && ! empty( $r['numero_envio'] ) ) {
+                do_action( 'ltms_shipment_created', $order_id, $r['numero_envio'], 'deprisa' );
+            }
+        }
 
         // 6. Nota en el pedido
         $ok_count  = count( array_filter( $resultados, fn( $r ) => $r['ok'] ) );
@@ -416,7 +477,9 @@ class LTMS_Deprisa_Order_Split {
                 ];
             }
 
-            $numero_envio = $resp['numero_envio'] ?? '';
+            // AUDIT-SHIPPING-ENGINE #1 FIX: handle both key formats (camelCase
+            // from LTMS_Api_Deprisa::parse_admision, snake_case from LTMS_Deprisa_API).
+            $numero_envio = $resp['numeroEnvio'] ?? $resp['numero_envio'] ?? '';
             self::log( $order_id, "Vendor {$vendor_id} — Guía generada: {$numero_envio}" );
 
             // Obtener etiqueta PDF
@@ -541,5 +604,45 @@ class LTMS_Deprisa_Order_Split {
         }
 
         wp_die( 'Etiqueta no disponible.', 'Error', [ 'response' => 404 ] );
+    }
+}
+
+/* ========================================================================= */
+/* DP-BUG-8: Bootstrap de tracking-cron + devoluciones                      */
+/* ========================================================================= */
+/*
+ * El loader activo en producción (ltms-deprisa-loader.php, procedural) NO
+ * carga los archivos class-ltms-deprisa-tracking-cron.php ni
+ * class-ltms-deprisa-devoluciones.php, y por tanto nunca llama a sus
+ * métodos register(). Esto deja el cron de tracking sin agendar y los
+ * botones "↩️ Devolución" / "📡 Actualizar tracking" del metabox devuelven
+ * HTTP 400 / "0".
+ *
+ * Mientras se migrá el loader activo al class-based
+ * (class-ltms-deprisa-loader.php, ya corregido), este bootstrap mínimo
+ * asegura que las clases relacionadas se carguen y registren cuando
+ * order-split.php es cargado por el loader activo. Es idempotente vía
+ * did_action(): no se ejecuta dos veces ni duplica hooks si el loader
+ * class-based también se carga.
+ */
+if ( ! did_action( 'ltms_deprisa_related_bootstrap' ) ) {
+    do_action( 'ltms_deprisa_related_bootstrap' );
+
+    $ltms_deprisa_dir = __DIR__;
+
+    if ( ! class_exists( 'LTMS_Deprisa_Tracking_Cron' ) ) {
+        require_once $ltms_deprisa_dir . '/class-ltms-deprisa-tracking-cron.php';
+    }
+    if ( class_exists( 'LTMS_Deprisa_Tracking_Cron' ) ) {
+        LTMS_Deprisa_Tracking_Cron::register();
+        // activate() es idempotente (wp_next_scheduled check) — asegura el cron.
+        LTMS_Deprisa_Tracking_Cron::activate();
+    }
+
+    if ( ! class_exists( 'LTMS_Deprisa_Devoluciones' ) ) {
+        require_once $ltms_deprisa_dir . '/class-ltms-deprisa-devoluciones.php';
+    }
+    if ( class_exists( 'LTMS_Deprisa_Devoluciones' ) ) {
+        LTMS_Deprisa_Devoluciones::register();
     }
 }

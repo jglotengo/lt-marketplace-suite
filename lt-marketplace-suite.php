@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.7.5
+ * Version:           2.9.31
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -17,7 +17,7 @@
  * Requires Plugins:     woocommerce
  *
  * @package LTMS
- * @version 2.1.4
+ * @version 2.9.31
  */
 
 require_once __DIR__ . '/ltms-boot-patch.php';
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.7.8' );
+define( 'LTMS_VERSION', '2.9.31' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -76,6 +76,27 @@ define( 'LTMS_VAULT_DIR',        WP_CONTENT_DIR . '/uploads/ltms-secure-vault/' 
 
 // Tabla prefixes (usamos constantes para facilitar búsquedas en código)
 define( 'LTMS_TABLE_PREFIX',     'lt_' );
+
+// ============================================================
+// PERM-1 (Task 57-E): File editor policy.
+// ============================================================
+// LT Marketplace Suite does NOT define `DISALLOW_FILE_EDIT` or
+// `DISALLOW_FILE_MODS` — the administrator can edit plugin/theme files
+// via the WordPress admin editor (Appearance > Theme File Editor,
+// Plugins > Plugin File Editor) by default.
+//
+// If your wp-config.php defines these constants as `true` and you want
+// to use the admin editor, comment them out or set them to `false`:
+//   // define( 'DISALLOW_FILE_EDIT', true );
+//   // define( 'DISALLOW_FILE_MODS', true );
+//
+// Recommended file permissions for the plugin's folders so the web
+// server AND the admin can read+write (admin edits via the editor
+// require write access on the PHP files being edited):
+//   Directories: 0755 (rwxr-xr-x)
+//   PHP/CSS/JS:  0644 (rw-r--r--)
+//   Generated files (logs, contracts): 0664 (rw-rw-r--)
+// The activator enforces these on the directories it creates.
 
 // Entorno de ejecución (puede sobreescribirse en wp-config.php)
 if ( ! defined( 'LTMS_ENVIRONMENT' ) ) {
@@ -398,6 +419,8 @@ function ltms_load_autoloader(): void {
                 'ltms-vendor-storefront'                 => 'frontend/class-ltms-vendor-storefront.php',
                 // ZapSign Manager vive en business/ (subdir 'zapsign' no existe)
                 'ltms-zapsign-manager'                   => 'business/class-ltms-zapsign-manager.php',
+                // AUDIT-REDI-UX-GAPS GAP-9 FIX: Incident Manager para el modelo ReDi.
+                'ltms-business-redi-incident'            => 'business/class-ltms-business-redi-incident.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
@@ -635,14 +658,13 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
     }
 
     // Aliases de compatibilidad — usados en smoke-tests, docs y código de terceros.
-    // LTMS_Firewall y LTMS_Encryption apuntan a LTMS_Core_Security (la clase real).
-    if ( class_exists( 'LTMS_Core_Security' ) ) {
-        if ( ! class_exists( 'LTMS_Encryption', false ) ) {
-            class_alias( 'LTMS_Core_Security', 'LTMS_Encryption' );
-        }
-        if ( ! class_exists( 'LTMS_Firewall', false ) ) {
-            class_alias( 'LTMS_Core_Security', 'LTMS_Firewall' );
-        }
+    // LTMS_Encryption apunta a LTMS_Core_Security (la clase real de cifrado).
+    // LTMS_Firewall apunta a LTMS_Core_Firewall (la clase real del WAF — NO a Security).
+    if ( class_exists( 'LTMS_Core_Security' ) && ! class_exists( 'LTMS_Encryption', false ) ) {
+        class_alias( 'LTMS_Core_Security', 'LTMS_Encryption' );
+    }
+    if ( class_exists( 'LTMS_Core_Firewall' ) && ! class_exists( 'LTMS_Firewall', false ) ) {
+        class_alias( 'LTMS_Core_Firewall', 'LTMS_Firewall' );
     }
 }
 
@@ -798,6 +820,10 @@ function ltms_emergency_dashboard_page(): void {
 
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-commission-writer.php';
 require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-backfill-kyc.php';
+// v2.8.0 — Panel admin de estado de módulos UX (submenú "Estado UX" bajo LTMS)
+require_once plugin_dir_path(__FILE__).'includes/admin/class-ltms-admin-ux-status.php';
+// v2.8.0 — Aveonline Onboarding Trigger (auto-registro + dashboard wizard)
+require_once plugin_dir_path(__FILE__).'includes/business/class-ltms-aveonline-onboarding-trigger.php';
 // v2.8.0 — Vitrina pública del vendedor — cargado directamente para sobrevivir
 // si el kernel lanza excepción antes de llegar a boot_frontend().
 require_once plugin_dir_path(__FILE__).'includes/frontend/class-ltms-vendor-storefront.php';

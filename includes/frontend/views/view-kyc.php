@@ -256,6 +256,15 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 </label>
             </div>
 
+            <?php
+            // RB-9 FIX (v2.9.19): Disparar action ltms_kyc_fields_extra para que
+            // los listeners (RT-2 render_sanitary_registration_fields) puedan
+            // añadir campos adicionales al formulario KYC del vendor (registro
+            // INVIMA/COFEPRIS para restaurantes, etc.). Antes de este fix, RT-2
+            // era silent dead code desde v2.9.14. Recibe 2 args: ($vendor_id, $country).
+            do_action( 'ltms_kyc_fields_extra', (int) get_current_user_id(), $country ?? 'CO' );
+            ?>
+
             <button type="button" id="ltms-kyc-submit-btn"
                     class="ltms-btn ltms-btn-primary" style="width:100%;justify-content:center;padding:12px;">
                 <?php esc_html_e( 'Enviar para Verificación', 'ltms' ); ?>

@@ -68,6 +68,10 @@ final class LTMS_Admin_Settings {
             'ltms_mlm_settings',
             'ltms_security_settings',
             'ltms_email_settings',
+            // v2.7.0 — Donaciones Fundación Cardio Infantil
+            'ltms_donations_settings',
+            // v3.1.0 — Cross-Border Commerce (Task 63-C)
+            'ltms_cross_border_settings',
         ];
 
         foreach ( $option_groups as $group ) {
@@ -102,6 +106,7 @@ final class LTMS_Admin_Settings {
                 'ltms_uber_direct_client_secret', 'ltms_heka_api_key',
                 'ltms_alegra_token',          // v2.1.0
                 'ltms_google_client_secret',  // v2.2.0 (M-62)
+                'ltms_deprisa_password',      // AUDIT-SHIPPING-ENGINE #5 — Deprisa password encryption.
             ];
 
             if ( in_array( $key, $encrypted_fields, true ) && ! empty( $value ) ) {
@@ -118,7 +123,11 @@ final class LTMS_Admin_Settings {
             // Solo dividir entre 100 si el valor es > 1, lo que indica que el usuario
             // lo ingresó como porcentaje. Si ya es ≤ 1, ya está en formato decimal correcto.
             // C-02b FIX: ltms_referral_rates es JSON array, NO un float — excluir del conversor.
-            if ( $key !== 'ltms_referral_rates' && ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false ) ) {
+            // v3.1.0 (Task 63-C): ltms_fx_spread_percentage se trata como % directo
+            // (0-5) y se sanitiza en su propio bloque más abajo — excluirlo aquí.
+            $pct_excludes = [ 'ltms_referral_rates', 'ltms_fx_spread_percentage' ];
+            if ( ! in_array( $key, $pct_excludes, true )
+                 && ( strpos( $key, '_rate' ) !== false || strpos( $key, '_percent' ) !== false ) ) {
                 $float_val = (float) $value;
                 if ( $float_val > 1 ) {
                     $sanitized[ $key ] = max( 0, min( 1, $float_val / 100 ) );
@@ -129,8 +138,58 @@ final class LTMS_Admin_Settings {
             }
 
             // Campos booleanos (yes/no)
-            if ( strpos( $key, '_enabled' ) !== false || strpos( $key, '_required' ) !== false ) {
+            // v3.1.0 (Task 63-C): ltms_enabled_currencies es un array multi-select,
+            // NO un booleano — excluirlo aquí (se sanitiza en su bloque propio más abajo).
+            $bool_excludes = [ 'ltms_enabled_currencies' ];
+            if ( ! in_array( $key, $bool_excludes, true )
+                 && ( strpos( $key, '_enabled' ) !== false || strpos( $key, '_required' ) !== false ) ) {
                 $sanitized[ $key ] = in_array( $value, [ 'yes', '1', 'true' ], true ) ? 'yes' : 'no';
+                continue;
+            }
+
+            // v2.7.0 — Donaciones Fundación Cardio Infantil.
+            // Estos campos requieren sanitización específica ANTES del bloque genérico
+            // `_amount` / `_limit` (que invoca absint) porque los montos de donación
+            // son DECIMAL(12,2) y absint los truncaría perdiendo la fracción
+            // (ej: 1000.50 → 1000). Adicionalmente, normaliza los select yes/no
+            // que no terminan en `_enabled` (vendor_transparency, customer_opt_in,
+            // tax_deductible) y valida el email de la fundación.
+            $donation_yes_no_fields = [
+                'ltms_donation_vendor_transparency',
+                'ltms_donation_customer_opt_in',
+                'ltms_donation_tax_deductible',
+            ];
+            if ( in_array( $key, $donation_yes_no_fields, true ) ) {
+                $sanitized[ $key ] = in_array( $value, [ 'yes', '1', 'true' ], true ) ? 'yes' : 'no';
+                continue;
+            }
+            if ( in_array( $key, [ 'ltms_donation_percentage' ], true ) ) {
+                // Porcentaje 0-100 con 2 decimales. NO se divide entre 100 aquí:
+                // el motor de donaciones lee el valor tal cual y lo usa como %.
+                $sanitized[ $key ] = max( 0.0, min( 100.0, (float) $value ) );
+                continue;
+            }
+            if ( in_array( $key, [ 'ltms_donation_min_amount', 'ltms_donation_max_amount' ], true ) ) {
+                // Montos monetarios decimales (no negativos). absint los truncaría.
+                $sanitized[ $key ] = max( 0.0, (float) $value );
+                continue;
+            }
+            if ( in_array( $key, [ 'ltms_donation_alegra_account_id', 'ltms_donation_payout_day' ], true ) ) {
+                $sanitized[ $key ] = absint( $value );
+                continue;
+            }
+            if ( $key === 'ltms_donation_foundation_email' ) {
+                $sanitized[ $key ] = is_email( $value ) ? sanitize_email( $value ) : '';
+                continue;
+            }
+            if ( in_array( $key, [ 'ltms_donation_basis', 'ltms_donation_rounding', 'ltms_donation_payout_frequency' ], true ) ) {
+                // Enums controlados por <select> — lista blanca estricta.
+                $allowed_enums = [
+                    'ltms_donation_basis'           => [ 'platform_fee', 'order_total', 'vendor_net', 'platform_profit' ],
+                    'ltms_donation_rounding'        => [ 'none', 'up_50', 'up_100', 'up_500' ],
+                    'ltms_donation_payout_frequency'=> [ 'weekly', 'monthly', 'quarterly', 'manual' ],
+                ];
+                $sanitized[ $key ] = in_array( $value, $allowed_enums[ $key ], true ) ? $value : '';
                 continue;
             }
 
@@ -170,6 +229,80 @@ final class LTMS_Admin_Settings {
             // E-02 FIX: ltms_email_from_address debe ser un email válido.
             if ( $key === 'ltms_email_from_address' ) {
                 $sanitized[ $key ] = is_email( $value ) ? sanitize_email( $value ) : get_option( 'admin_email', '' );
+                continue;
+            }
+
+            // v3.1.0 — Cross-Border Commerce (Task 63-C).
+            // Sanitización específica para los campos de configuración
+            // cross-border antes del fallback genérico. Los campos multi-select
+            // llegan como array; los textareas como strings multilinea; los
+            // enums yes/no y los proveedores FX pasan por lista blanca.
+            $cross_border_yes_no = [
+                'ltms_cross_border_enabled',
+                'ltms_cross_border_kyc_required',
+                'ltms_cross_border_fraud_screening',
+            ];
+            if ( in_array( $key, $cross_border_yes_no, true ) ) {
+                $sanitized[ $key ] = in_array( $value, [ 'yes', '1', 'true' ], true ) ? 'yes' : 'no';
+                continue;
+            }
+            if ( $key === 'ltms_base_currency' ) {
+                $allowed = [ 'USD', 'COP', 'MXN', 'EUR' ];
+                $sanitized[ $key ] = in_array( strtoupper( (string) $value ), $allowed, true ) ? strtoupper( (string) $value ) : 'USD';
+                continue;
+            }
+            if ( $key === 'ltms_enabled_currencies'
+                 || $key === 'ltms_cross_border_origin_countries'
+                 || $key === 'ltms_cross_border_destination_countries'
+                 || $key === 'ltms_international_shipping_carriers' ) {
+                // Multi-select: array de strings — sanitizar cada uno.
+                if ( is_array( $value ) ) {
+                    $clean = array_map( 'sanitize_text_field', $value );
+                    $clean = array_filter( $clean, static fn( $v ) => $v !== '' );
+                    $sanitized[ $key ] = array_values( $clean );
+                } else {
+                    $sanitized[ $key ] = [];
+                }
+                continue;
+            }
+            if ( $key === 'ltms_fx_spread_percentage' ) {
+                // Spread FX: 0-5% con 2 decimales. NO se divide entre 100 aquí.
+                $sanitized[ $key ] = max( 0.0, min( 5.0, (float) $value ) );
+                continue;
+            }
+            if ( $key === 'ltms_fx_cache_ttl_hours' ) {
+                $sanitized[ $key ] = max( 1, min( 168, absint( $value ) ) );
+                continue;
+            }
+            if ( $key === 'ltms_fx_provider' ) {
+                $allowed = [ 'frankfurter', 'exchangerate', 'ecb', 'manual' ];
+                $sanitized[ $key ] = in_array( $value, $allowed, true ) ? $value : 'frankfurter';
+                continue;
+            }
+            if ( $key === 'ltms_default_incoterm' ) {
+                $allowed = [ 'DDP', 'DDU' ];
+                $sanitized[ $key ] = in_array( strtoupper( (string) $value ), $allowed, true ) ? strtoupper( (string) $value ) : 'DDU';
+                continue;
+            }
+            if ( $key === 'ltms_customs_broker_email' ) {
+                $sanitized[ $key ] = is_email( $value ) ? sanitize_email( $value ) : '';
+                continue;
+            }
+            // Textareas multi-línea con pares clave=valor (FX overrides, duty rates,
+            // customs fees, de minimis). sanitize_text_field() rompería las nuevas
+            // líneas — usar sanitize_textarea_field() en su lugar.
+            $cross_border_textareas = [
+                'ltms_fx_manual_overrides',
+                'ltms_customs_duty_rates',
+                'ltms_customs_fees',
+                'ltms_de_minimis_thresholds',
+            ];
+            if ( in_array( $key, $cross_border_textareas, true ) ) {
+                $sanitized[ $key ] = sanitize_textarea_field( $value );
+                continue;
+            }
+            if ( $key === 'ltms_customs_broker_contact' ) {
+                $sanitized[ $key ] = sanitize_text_field( $value );
                 continue;
             }
 
@@ -231,6 +364,24 @@ final class LTMS_Admin_Settings {
             ],
             'zapsign'     => [ 'ltms_zapsign_enabled', 'ltms_zapsign_sandbox' ],
             'deprisa'     => [ 'ltms_deprisa_enabled' ],
+            // v2.7.0 — Donaciones: los campos yes/no se renderizan como <select>
+            // (siempre envían un valor), pero se registran aquí por consistencia
+            // y para soportar una futura migración a checkboxes.
+            'donations'   => [
+                'ltms_donation_enabled',
+                'ltms_donation_vendor_transparency',
+                'ltms_donation_customer_opt_in',
+                'ltms_donation_tax_deductible',
+                'ltms_donation_certificate_enabled',
+            ],
+            // v3.1.0 — Cross-Border: los campos yes/no se renderizan como <select>
+            // (siempre envían un valor), pero se registran aquí por consistencia
+            // y para soportar una futura migración a checkboxes.
+            'cross_border' => [
+                'ltms_cross_border_enabled',
+                'ltms_cross_border_kyc_required',
+                'ltms_cross_border_fraud_screening',
+            ],
         ];
         $checkbox_keys = $checkbox_keys_by_section[ $section ] ?? [];
         foreach ( $checkbox_keys as $cb_key ) {

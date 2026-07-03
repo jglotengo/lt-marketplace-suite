@@ -126,13 +126,19 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
         $iva_amount = round( $gross_amount * $iva_rate, 2 );
 
         // 2. Retención IVA (cuando la plataforma actúa como retenedor PM)
+        // T5 FIX: la retención se calcula sobre el IVA GENERADO, no sobre el gross.
+        // El 10.67% del gross equivale matemáticamente a 2/3 del IVA del 16%,
+        // PERO cuando el producto es exento (IVA=0), no debe haber retención.
+        // El código anterior calculaba $gross * 10.67% sin validar IVA > 0,
+        // lo que generaba retención incluso en operaciones exentas.
         $retencion_iva_rate   = 0.0;
         $retencion_iva_amount = 0.0;
 
         $platform_is_pm = $order_data['platform_is_persona_moral'] ?? true;
-        if ( $platform_is_pm && $iva_amount > 0 ) {
+        if ( $platform_is_pm && $iva_amount > 0 && $iva_rate > 0 ) {
             $retencion_iva_rate   = $this->get_retencion_iva_pm();
-            $retencion_iva_amount = round( $gross_amount * $retencion_iva_rate, 2 );
+            // Retención = 2/3 del IVA generado (equivalente a 10.67% del gross cuando IVA=16%).
+            $retencion_iva_amount = round( $iva_amount * ( 2 / 3 ), 2 );
         }
 
         // 3. ISR
@@ -148,10 +154,32 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
         $ieps_rate   = $this->get_ieps_rate( $product_type );
         $ieps_amount = round( $gross_amount * $ieps_rate, 2 );
 
+        // NT-2 FIX (v2.9.9): ISH (Impuesto Sobre Hospedaje) — LIEPS art. 2-B.
+        // Aplica a servicios de hospedaje. Tasa varía por estado (2-5%).
+        // ANTES: el ISH solo se aplicaba en Alegra sync, no en el flujo de Order Split →
+        // el impuesto no se recaudaba ni se reportaba al SAT.
+        $ish_rate   = 0.0;
+        $ish_amount = 0.0;
+        $is_hospedaje = ! empty( $order_data['is_booking'] ) || ! empty( $order_data['is_tourism'] )
+            || in_array( $product_type, [ 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
+        if ( $is_hospedaje ) {
+            // Tasa configurable por estado (default 3%).
+            $ish_state = $order_data['shipping_state'] ?? $vendor_data['state'] ?? '';
+            $ish_rate = $ish_state
+                ? (float) LTMS_Core_Config::get( 'ltms_ish_rate_mx_' . strtolower( $ish_state ), 0.03 )
+                : (float) LTMS_Core_Config::get( 'ltms_ish_rate_mx', 0.03 );
+            $ish_amount = round( $gross_amount * $ish_rate, 2 );
+        }
+
         // 5. Totales
-        $total_taxes       = $iva_amount + $ieps_amount;
+        $total_taxes       = $iva_amount + $ieps_amount + $ish_amount;
         $total_withholding = $retencion_iva_amount + $isr_amount;
-        $net_to_vendor     = round( $gross_amount - $total_withholding, 2 );
+
+        // T4 FIX: net_to_vendor NUNCA debe ser negativo (igual que en strategy CO).
+        $net_to_vendor     = round( max( 0, $gross_amount - $total_withholding ), 2 );
+
+        // T6 FIX: umbral CFDI configurable (default $2000 MXN, CFF art. 29-A).
+        $cfdi_threshold = (float) LTMS_Core_Config::get( 'ltms_mx_cfdi_threshold', 2000.0 );
 
         return [
             'gross'              => $gross_amount,
@@ -167,6 +195,8 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
             'isr_rate'           => $isr_rate,
             'ieps'               => $ieps_amount,
             'ieps_rate'          => $ieps_rate,
+            'ish'                => $ish_amount,
+            'ish_rate'           => $ish_rate,
             'impoconsumo'        => 0.0,
             'impoconsumo_rate'   => 0.0,
             'total_taxes'        => $total_taxes,
@@ -176,7 +206,8 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
             'strategy'           => self::class,
             'country'            => 'MX',
             'currency'           => 'MXN',
-            'cfdi_required'      => $gross_amount >= 2000,
+            'cfdi_required'      => $gross_amount >= $cfdi_threshold,
+            'cfdi_threshold'     => $cfdi_threshold,
         ];
     }
 

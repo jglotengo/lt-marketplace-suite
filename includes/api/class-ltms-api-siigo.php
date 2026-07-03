@@ -136,7 +136,15 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
     public function create_invoice( array $invoice_data ): array {
         $this->ensure_authenticated();
 
-        $response = $this->perform_request( 'POST', '/v1/invoices', $invoice_data );
+        // API-BUG-9 FIX: deterministic Idempotency-Key. Siigo supports idempotency on
+        // POST /v1/invoices — same key retried → server returns the original invoice
+        // instead of creating a duplicate. Key scoped to the WC order number embedded
+        // in the 'observations' field (see build_invoice_payload).
+        $idempotency_key = 'ltms_invoice_' . ( $invoice_data['observations'] ?? md5( wp_json_encode( $invoice_data ) ) );
+
+        $response = $this->perform_request( 'POST', '/v1/invoices', $invoice_data, [
+            'Idempotency-Key' => $idempotency_key,
+        ] );
 
         LTMS_Core_Logger::info(
             'SIIGO_INVOICE_CREATED',
@@ -155,7 +163,11 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
      */
     public function create_credit_note( array $credit_note_data ): array {
         $this->ensure_authenticated();
-        return $this->perform_request( 'POST', '/v1/credit-notes', $credit_note_data );
+        // API-BUG-9 FIX: idempotent credit-note creation by invoice_id.
+        $idempotency_key = 'ltms_credit_note_' . ( $credit_note_data['invoice']['id'] ?? md5( wp_json_encode( $credit_note_data ) ) );
+        return $this->perform_request( 'POST', '/v1/credit-notes', $credit_note_data, [
+            'Idempotency-Key' => $idempotency_key,
+        ] );
     }
 
     /**
@@ -210,7 +222,11 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             'fiscal_responsibilities' => [ [ 'code' => 'R-99-PN' ] ], // No responsable de IVA por defecto
         ];
 
-        return $this->perform_request( 'POST', '/v1/customers', $payload );
+        return $this->perform_request( 'POST', '/v1/customers', $payload, [
+            // API-BUG-9 FIX: idempotent customer creation by NIT/identification — prevents duplicate
+            // customers when 5xx retry fires after Siigo already persisted the record.
+            'Idempotency-Key' => 'ltms_customer_' . ( $nit ?: md5( wp_json_encode( $payload ) ) ),
+        ] );
     }
 
     /**

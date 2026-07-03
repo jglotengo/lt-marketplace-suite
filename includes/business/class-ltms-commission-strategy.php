@@ -245,13 +245,22 @@ final class LTMS_Commission_Strategy {
      */
     private static function get_db_tier_rate( float $monthly_sales, string $country ): ?float {
         global $wpdb;
+        // CS-2 FIX: ORDER BY min_amount DESC, sort_order ASC — at tier boundaries
+        // (e.g. $5,000,000 exact), the inclusive `min_amount <= X AND max_amount >= X`
+        // predicate matches BOTH the lower tier (max=5M) AND the upper tier (min=5M).
+        // The previous `ORDER BY sort_order ASC` returned whichever tier happened to
+        // have the lowest sort_order, which is admin-config dependent and could
+        // award the vendor a LOWER commission rate than they had qualified for
+        // (lost revenue) OR a HIGHER rate (overcharge). Sorting by min_amount DESC
+        // deterministically returns the highest-volume tier the vendor has reached,
+        // which is the semantically correct tier per the documented tier ladder.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rate = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT rate FROM `{$wpdb->prefix}lt_commission_tiers`
                  WHERE country = %s AND is_active = 1
                    AND min_amount <= %f AND max_amount >= %f
-                 ORDER BY sort_order ASC LIMIT 1",
+                 ORDER BY min_amount DESC, sort_order ASC LIMIT 1",
                 $country,
                 $monthly_sales,
                 $monthly_sales
@@ -266,7 +275,15 @@ final class LTMS_Commission_Strategy {
         if ( $rate_float > 1 ) {
             $rate_float = $rate_float / 100;
         }
-        return $rate_float;
+        // CS-1 FIX: clamp to [0,1] — without this, a misconfigured DB row (rate=-5
+        // or rate=200) would propagate as a negative or >100% commission rate.
+        // The DB column is DECIMAL(5,4) which permits values up to 9.9999 (999.99%);
+        // admin UI sanitization exists but cannot be relied on as the sole guard
+        // (direct DB writes, migrations, imports all bypass it). Negative rates
+        // would mean the platform PAYS the vendor to take orders; >100% rates
+        // would mean the vendor pays more than the order total. Both are
+        // unrecoverable revenue bugs.
+        return max( 0.0, min( 1.0, $rate_float ) );
     }
 
     /**
@@ -290,7 +307,10 @@ final class LTMS_Commission_Strategy {
 
             foreach ( $term_ids as $term_id ) {
                 if ( isset( $category_rates[ $term_id ] ) ) {
-                    return (float) $category_rates[ $term_id ];
+                    // CS-1 FIX: clamp to [0,1]. The category_rates array is admin-editable
+                    // via ltms_category_commission_rates option; an admin typo (e.g. -10
+                    // or 150) would propagate as an out-of-range commission rate.
+                    return max( 0.0, min( 1.0, (float) $category_rates[ $term_id ] ) );
                 }
             }
         }
@@ -311,11 +331,14 @@ final class LTMS_Commission_Strategy {
         }
 
         if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
-            return (float) LTMS_Core_Config::get( 'ltms_premium_commission_rate', 0.08 );
+            // CS-1 FIX: clamp to [0,1] — admin could set a negative or >100% premium
+            // rate via the options table; without this guard the rate propagates raw.
+            return max( 0.0, min( 1.0, (float) LTMS_Core_Config::get( 'ltms_premium_commission_rate', 0.08 ) ) );
         }
 
         if ( in_array( 'ltms_vendor', (array) $user->roles, true ) ) {
-            return (float) LTMS_Core_Config::get( 'ltms_basic_commission_rate', 0.10 );
+            // CS-1 FIX: same clamp for basic plan rate.
+            return max( 0.0, min( 1.0, (float) LTMS_Core_Config::get( 'ltms_basic_commission_rate', 0.10 ) ) );
         }
 
         return null;

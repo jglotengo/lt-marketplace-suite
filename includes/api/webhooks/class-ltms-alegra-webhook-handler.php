@@ -51,6 +51,14 @@ final class LTMS_Alegra_Webhook_Handler {
      * @return \WP_REST_Response
      */
     public static function handle( \WP_REST_Request $request ): \WP_REST_Response {
+        // API-BUG-19 FIX: per-IP rate limit (max 100 webhooks/min) — protects DB.
+        $rate_key = 'ltms_wh_rate_' . md5( self::client_ip() );
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 100 ) {
+            return new \WP_REST_Response( [ 'error' => 'Too many requests' ], 429 );
+        }
+        set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
+
         // 1. Verificar token compartido
         $expected_secret = (string) LTMS_Core_Config::get( 'ltms_alegra_webhook_secret', '' );
         if ( $expected_secret ) {
@@ -83,6 +91,25 @@ final class LTMS_Alegra_Webhook_Handler {
         if ( empty( $event ) ) {
             return new \WP_REST_Response( [ 'error' => 'Missing event type' ], 400 );
         }
+
+        // API-BUG-11 FIX: event_id idempotency. Alegra may deliver the same webhook
+        // multiple times on retry. The event_id is derived from (event, entity_id);
+        // when no entity_id is available we hash the payload as a fallback.
+        // API-BUG-18 FIX: return 200 immediately if already processed, so Alegra
+        // stops retrying. (Full async migration is a documented follow-up.)
+        $entity_data = $body['data'] ?? $body['invoice'] ?? $body['contact'] ?? [];
+        $entity_id   = is_array( $entity_data ) ? ( $entity_data['id'] ?? 0 ) : 0;
+        $event_id    = $entity_id ? $event . '_' . $entity_id : $event . '_' . md5( wp_json_encode( $body ) );
+        $seen_key    = 'ltms_wh_seen_alegra_' . md5( $event_id );
+        if ( get_transient( $seen_key ) ) {
+            LTMS_Core_Logger::info(
+                'ALEGRA_WEBHOOK_REPLAY',
+                sprintf( 'Duplicate Alegra event %s ignored (already processed).', $event_id ),
+                [ 'event_id' => $event_id ]
+            );
+            return new \WP_REST_Response( [ 'message' => 'Already processed' ], 200 );
+        }
+        set_transient( $seen_key, 1, HOUR_IN_SECONDS );
 
         // 3. Despachar por tipo de evento
         if ( in_array( $event, self::INVOICE_EVENTS, true ) ) {
@@ -227,5 +254,21 @@ final class LTMS_Alegra_Webhook_Handler {
         }
 
         return $order_id;
+    }
+
+    /**
+     * Resuelve la IP del cliente para rate limiting (API-BUG-19).
+     *
+     * @return string
+     */
+    private static function client_ip(): string {
+        $ip = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+        if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+            $forwarded = array_filter( array_map( 'trim', explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) ) ) );
+            if ( ! empty( $forwarded ) ) {
+                $ip = end( $forwarded );
+            }
+        }
+        return $ip;
     }
 }
