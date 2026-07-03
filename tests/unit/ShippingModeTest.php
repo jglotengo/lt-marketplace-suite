@@ -52,8 +52,9 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
     // ── get_global_mode ───────────────────────────────────────────────────
 
-    public function test_get_global_mode_returns_flat_by_default(): void {
-        $this->assertSame( 'flat', \LTMS_Shipping_Mode::get_global_mode() );
+    public function test_get_global_mode_returns_hybrid_by_default(): void {
+        // v2.9.31: default cambió de 'flat' a 'hybrid' (gratis desde umbral).
+        $this->assertSame( 'hybrid', \LTMS_Shipping_Mode::get_global_mode() );
     }
 
     public function test_get_global_mode_returns_configured_value(): void {
@@ -88,18 +89,26 @@ class ShippingModeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     // ── calculate_shipping ────────────────────────────────────────────────
 
     public function test_calculate_free_absorbed_returns_zero(): void {
-        Functions\when( 'get_user_meta' )->justReturn( 'free_absorbed' );
-        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( [], 1 ) );
+        // v2.9.31: calculate_shipping usa get_effective_mode_for_package() en vez de
+        // get_user_meta directo. Para forzar free_absorbed, seteamos el modo global.
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'free_absorbed' );
+        Functions\when( 'wp_get_post_terms' )->justReturn( [] );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( [ 'contents' => [] ], 1 ) );
     }
 
     public function test_calculate_free_returns_zero(): void {
-        Functions\when( 'get_user_meta' )->justReturn( 'free' );
-        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( [], 1 ) );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'free' );
+        Functions\when( 'wp_get_post_terms' )->justReturn( [] );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        $this->assertSame( 0.0, \LTMS_Shipping_Mode::calculate_shipping( [ 'contents' => [] ], 1 ) );
     }
 
     public function test_calculate_quoted_returns_null(): void {
-        Functions\when( 'get_user_meta' )->justReturn( 'quoted' );
-        $this->assertNull( \LTMS_Shipping_Mode::calculate_shipping( [], 1 ) );
+        LTMS_Core_Config::set( 'ltms_shipping_mode', 'quoted' );
+        Functions\when( 'wp_get_post_terms' )->justReturn( [] );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        $this->assertNull( \LTMS_Shipping_Mode::calculate_shipping( [ 'contents' => [] ], 1 ) );
     }
 
     public function test_calculate_flat_uses_vendor_meta_rate(): void {

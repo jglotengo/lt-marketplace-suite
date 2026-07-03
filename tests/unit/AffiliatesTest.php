@@ -83,6 +83,8 @@ class AffiliatesTest extends TestCase
         Functions\when('update_option')->justReturn(true);
         Functions\when('do_action')->justReturn(null);
         Functions\when('add_action')->justReturn(null);
+        // v2.9.31: affiliates usa wp_generate_password para generar códigos únicos.
+        Functions\when('wp_generate_password')->alias(static fn( $n = 12 ) => substr( str_repeat( 'a', max( 1, (int) $n ) ), 0, max( 1, (int) $n ) ) );
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────

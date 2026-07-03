@@ -351,6 +351,9 @@ class ReferralTreeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     public function test_register_node_returns_false_for_nonexistent_code(): void {
         Functions\when( 'get_users' )->justReturn( [] );
         Functions\when( 'sanitize_text_field' )->returnArg();
+        // v2.9.31: ensure wpdb mock returns null/0 so idempotency check doesn't
+        // short-circuit register_node with true (which would make the test fail).
+        $GLOBALS['wpdb'] = $this->make_wpdb_stub( null );
 
         $this->assertFalse( LTMS_Referral_Tree::register_node( 100, 'BADCODE' ) );
     }
@@ -358,6 +361,7 @@ class ReferralTreeTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     public function test_register_node_returns_false_for_empty_code(): void {
         Functions\when( 'get_users' )->justReturn( [] );
         Functions\when( 'sanitize_text_field' )->returnArg();
+        $GLOBALS['wpdb'] = $this->make_wpdb_stub( null );
 
         $this->assertFalse( LTMS_Referral_Tree::register_node( 100, '' ) );
     }

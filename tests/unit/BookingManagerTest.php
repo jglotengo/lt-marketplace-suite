@@ -45,7 +45,10 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
         $ref->setValue( null, false );
 
         Functions\stubs([
-            'current_time' => static fn( $type ) => gmdate( 'Y-m-d H:i:s' ),
+            'current_time'          => static fn( $type ) => gmdate( 'Y-m-d H:i:s' ),
+            'sanitize_text_field'   => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
+            'sanitize_textarea_field' => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
+            '__'                    => static fn( $s ) => $s,
         ]);
     }
 
@@ -83,6 +86,7 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
             public string $prefix     = 'wp_';
             public string $posts      = 'wp_posts';
             public int    $insert_id  = 0;
+            public string $last_error = '';
             private mixed $get_var_val;
             private mixed $get_row_val;
             private array $results;
@@ -195,7 +199,7 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
         $this->assertTrue( $result );
     }
 
-    /** Booking ya cancelado → WP_Error 'invalid_status' */
+    /** Booking ya cancelado → WP_Error 'already_cancelled' (v2.9.31: antes 'invalid_status') */
     public function test_cancel_booking_already_cancelled_returns_wp_error(): void {
         $GLOBALS['wpdb'] = $this->make_wpdb(
             get_row_return: $this->make_booking_row( 'cancelled' )
@@ -203,10 +207,10 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
 
         $result = \LTMS_Booking_Manager::cancel_booking( 1 );
         $this->assertInstanceOf( \WP_Error::class, $result );
-        $this->assertSame( 'invalid_status', $result->get_error_code() );
+        $this->assertSame( 'already_cancelled', $result->get_error_code() );
     }
 
-    /** Booking con status 'checked_out' → WP_Error 'invalid_status' */
+    /** Booking con status 'checked_out' → WP_Error 'already_cancelled' (v2.9.31: agrupado) */
     public function test_cancel_booking_checked_out_returns_wp_error(): void {
         $GLOBALS['wpdb'] = $this->make_wpdb(
             get_row_return: $this->make_booking_row( 'checked_out' )
@@ -214,10 +218,10 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
 
         $result = \LTMS_Booking_Manager::cancel_booking( 1 );
         $this->assertInstanceOf( \WP_Error::class, $result );
-        $this->assertSame( 'invalid_status', $result->get_error_code() );
+        $this->assertSame( 'already_cancelled', $result->get_error_code() );
     }
 
-    /** Booking con status 'completed' → WP_Error 'invalid_status' */
+    /** Booking con status 'completed' → WP_Error 'already_cancelled' (v2.9.31: agrupado) */
     public function test_cancel_booking_completed_returns_wp_error(): void {
         $GLOBALS['wpdb'] = $this->make_wpdb(
             get_row_return: $this->make_booking_row( 'completed' )
@@ -225,7 +229,7 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
 
         $result = \LTMS_Booking_Manager::cancel_booking( 1 );
         $this->assertInstanceOf( \WP_Error::class, $result );
-        $this->assertSame( 'invalid_status', $result->get_error_code() );
+        $this->assertSame( 'already_cancelled', $result->get_error_code() );
     }
 
     /** cancel_booking retorna bool|WP_Error (never null) */

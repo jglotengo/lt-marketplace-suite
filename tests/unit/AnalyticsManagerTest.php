@@ -188,10 +188,16 @@ class AnalyticsManagerTest extends TestCase {
         self::$option_store['ltms_settings'] = [ 'ltms_meta_pixel_id' => '1234567890' ];
         \LTMS_Core_Config::flush_cache();
         Monkey\Functions\when( 'esc_js' )->returnArg();
+        Monkey\Functions\when( 'get_current_user_id' )->justReturn( 0 );
+
+        // v2.9.6 consent gating: require 'full' consent cookie or pixel is suppressed.
+        $_COOKIE['ltms_cookie_consent'] = 'full';
 
         ob_start();
         \LTMS_Analytics_Manager::inject_meta_pixel();
         $output = ob_get_clean();
+
+        unset( $_COOKIE['ltms_cookie_consent'] );
 
         $this->assertStringContainsString( 'fbq', $output );
         $this->assertStringContainsString( '1234567890', $output );

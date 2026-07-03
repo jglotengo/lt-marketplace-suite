@@ -313,7 +313,7 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
         }
     }
 
-    public function test_register_settings_registers_eight_groups(): void
+    public function test_register_settings_registers_ten_groups(): void
     {
         $count = 0;
         Functions\when('register_setting')->alias(
@@ -322,7 +322,8 @@ class AdminSettingsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
         $this->settings->register_settings();
 
-        $this->assertSame(8, $count);
+        // 8 original groups + donations (v2.7.0) + cross_border (v3.1.0) = 10
+        $this->assertSame(10, $count);
     }
 
     // ── SECCIÓN 9: init() ─────────────────────────────────────────────────────
