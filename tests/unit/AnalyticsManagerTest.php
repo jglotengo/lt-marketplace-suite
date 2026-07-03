@@ -188,7 +188,8 @@ class AnalyticsManagerTest extends TestCase {
         self::$option_store['ltms_settings'] = [ 'ltms_meta_pixel_id' => '1234567890' ];
         \LTMS_Core_Config::flush_cache();
         Monkey\Functions\when( 'esc_js' )->returnArg();
-        Monkey\Functions\when( 'get_current_user_id' )->justReturn( 0 );
+        // stub get_userdata so Advanced Matching code path is a no-op (no user email).
+        Monkey\Functions\when( 'get_userdata' )->justReturn( false );
 
         // v2.9.6 consent gating: require 'full' consent cookie or pixel is suppressed.
         $_COOKIE['ltms_cookie_consent'] = 'full';

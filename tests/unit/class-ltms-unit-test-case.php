@@ -135,21 +135,18 @@ abstract class LTMS_Unit_Test_Case extends TestCase {
 
                 // v2.9.31: Wallet y otros módulos llaman require_once ABSPATH 'wp-admin/includes/upgrade.php'
                 // cuando dbDelta() no existe. En tests UNIT_ONLY ese archivo no existe, así que
-                // mockeamos dbDelta como no-op para que function_exists() retorne true y el
-                // require_once nunca se ejecute.
-                if ( ! function_exists( 'dbDelta' ) ) {
-                        Monkey\Functions\stubs( [
-                                'dbDelta' => static fn( $sql = '' ): array => [],
-                        ] );
-                }
+                // mockeamos dbDelta como no-op. Sin el guard function_exists() porque Patchwork
+                // define dbDelta como redefinible (function_exists retorna true) pero Brain\Monkey
+                // necesita que la stub se registre para asignarle comportamiento.
+                Monkey\Functions\stubs( [
+                        'dbDelta' => static fn( $sql = '' ): array => [],
+                ] );
 
                 // v2.9.31: afiliados y otros usan wp_generate_password para generar códigos.
-                if ( ! function_exists( 'wp_generate_password' ) ) {
-                        Monkey\Functions\stubs( [
-                                'wp_generate_password' => static fn( int $length = 12, bool $special_chars = true, bool $extra_special_chars = false ): string
-                                        => substr( str_repeat( 'a', max( 1, $length ) ), 0, max( 1, $length ) ),
-                        ] );
-                }
+                Monkey\Functions\stubs( [
+                        'wp_generate_password' => static fn( int $length = 12, bool $special_chars = true, bool $extra_special_chars = false ): string
+                                => substr( str_repeat( 'a', max( 1, $length ) ), 0, max( 1, $length ) ),
+                ] );
         }
 
         /**

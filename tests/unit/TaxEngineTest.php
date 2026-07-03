@@ -38,8 +38,6 @@ class TaxEngineTest extends TestCase
             'update_option' => static fn() => true,
             'apply_filters' => static fn( $tag, $val ) => $val,
             'sanitize_text_field'   => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
-            'sanitize_textarea_field' => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
-            'wp_generate_password'  => static fn( $n = 12 ) => substr( str_repeat( 'a', max( 1, (int) $n ) ), 0, max( 1, (int) $n ) ),
             'absint'        => static fn( $v ) => abs( (int) $v ),
         ] );
         \LTMS_Tax_Engine::flush_strategies();

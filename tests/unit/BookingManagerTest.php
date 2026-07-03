@@ -47,7 +47,6 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
         Functions\stubs([
             'current_time'          => static fn( $type ) => gmdate( 'Y-m-d H:i:s' ),
             'sanitize_text_field'   => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
-            'sanitize_textarea_field' => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
             '__'                    => static fn( $s ) => $s,
         ]);
     }
