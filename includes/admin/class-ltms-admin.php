@@ -494,33 +494,8 @@ final class LTMS_Admin {
     }
 
     public function render_auditor_dashboard(): void {
-        // DEBUG: Forzar logging de errores a archivo propio (SiteGround suprime debug.log).
-        $_ltms_dbg = WP_CONTENT_DIR . '/ltms-auditor-debug.log';
-        ini_set( 'log_errors', '1' );
-        ini_set( 'error_log', $_ltms_dbg );
-        ini_set( 'display_errors', '1' );
-        error_reporting( E_ALL );
-        file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] === render_auditor_dashboard INVOKED ===\n", FILE_APPEND );
-
-        try {
-            if ( ! class_exists( 'LTMS_Data_Masking' ) ) {
-                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1: LTMS_Data_Masking class NOT found\n", FILE_APPEND );
-            } else {
-                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1: LTMS_Data_Masking exists, calling log_auditor_access\n", FILE_APPEND );
-                LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard' );
-                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1: log_auditor_access returned OK\n", FILE_APPEND );
-            }
-        } catch ( \Throwable $e ) {
-            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1 EXCEPTION: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND );
-        }
-
-        try {
-            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP2: Calling render_view('view-auditor-dashboard')...\n", FILE_APPEND );
-            $this->render_view( 'view-auditor-dashboard' );
-            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP2: render_view returned normally.\n", FILE_APPEND );
-        } catch ( \Throwable $e ) {
-            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP2 EXCEPTION: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND );
-        }
+        LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard' );
+        $this->render_view( 'view-auditor-dashboard' );
     }
 
     public function render_pickup_orders(): void {

@@ -19,24 +19,6 @@
 
 defined( 'ABSPATH' ) || exit;
 
-// DEBUG: Forzar logging de errores a archivo propio (SiteGround suprime debug.log).
-$_ltms_debug_log = WP_CONTENT_DIR . '/ltms-auditor-debug.log';
-ini_set( 'log_errors', '1' );
-ini_set( 'error_log', $_ltms_debug_log );
-error_reporting( E_ALL );
-set_error_handler( static function ( $errno, $errstr, $errfile, $errline ) use ( $_ltms_debug_log ) {
-    $msg = '[' . date( 'Y-m-d H:i:s' ) . "] errno={$errno} {$errstr} at {$errfile}:{$errline}\n";
-    file_put_contents( $_ltms_debug_log, $msg, FILE_APPEND );
-    return false;
-} );
-register_shutdown_function( static function () use ( $_ltms_debug_log ) {
-    $err = error_get_last();
-    if ( $err && in_array( $err['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ], true ) ) {
-        $msg = '[' . date( 'Y-m-d H:i:s' ) . "] FATAL: {$err['message']} at {$err['file']}:{$err['line']}\n";
-        file_put_contents( $_ltms_debug_log, $msg, FILE_APPEND );
-    }
-} );
-
 if ( ! current_user_can( 'ltms_access_auditor_dashboard' ) ) {
     wp_die( esc_html__( 'No tienes permiso para acceder a esta página.', 'ltms' ) );
 }

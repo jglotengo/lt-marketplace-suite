@@ -550,7 +550,7 @@ final class LTMS_Core_Firewall {
      *
      * @return string
      */
-    private static function get_client_ip(): string {
+    public static function get_client_ip(): string {
         $remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
 
         if ( ! filter_var( $remote_addr, FILTER_VALIDATE_IP ) ) {
