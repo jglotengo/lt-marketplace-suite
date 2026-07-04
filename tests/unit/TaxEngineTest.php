@@ -521,10 +521,12 @@ class TaxEngineTest extends TestCase
 
     public function test_mx_retencion_iva_pm_is_applied_when_platform_pm(): void
     {
-        // 1_000_000 ? 0.1067 = 106_700
+        // v2.9.31: reteiva = round(iva * 2/3, 2) donde iva = round(gross * 0.16, 2).
+        // Para gross=1_000_000: iva=160_000.00, reteiva=round(106_666.666..., 2)=106_666.67.
+        // (Antes se calculaba gross * 0.1067 = 106_700 sin redondeo intermedio del IVA.)
         $result = $this->mx_calculate( 1_000_000.0, [ 'platform_is_persona_moral' => true ] );
         $this->assertSame( 0.1067, $result['reteiva_rate'] );
-        $this->assertSame( 106_700.0, $result['reteiva'] );
+        $this->assertSame( 106_666.67, $result['reteiva'] );
     }
 
     public function test_mx_retencion_iva_not_applied_when_not_pm(): void

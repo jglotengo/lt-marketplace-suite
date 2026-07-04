@@ -180,8 +180,12 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
 
     /** Booking con status 'pending' → cancelable → retorna true */
     public function test_cancel_booking_pending_returns_true(): void {
+        // v2.9.31: cancel_booking ahora verifica que $wpdb->update() no retorne false
+        // (si retorna false → WP_Error 'cancel_db_error'; si retorna 0 → 'concurrent_cancel').
+        // Pasamos update_rows: 1 para que el mock retorne 1 (éxito).
         $GLOBALS['wpdb'] = $this->make_wpdb(
-            get_row_return: $this->make_booking_row( 'pending' )
+            get_row_return: $this->make_booking_row( 'pending' ),
+            update_rows: 1
         );
 
         $result = \LTMS_Booking_Manager::cancel_booking( 1 );
@@ -191,7 +195,8 @@ class BookingManagerTest extends LTMS_Unit_Test_Case {
     /** Booking con status 'confirmed' → cancelable → retorna true */
     public function test_cancel_booking_confirmed_returns_true(): void {
         $GLOBALS['wpdb'] = $this->make_wpdb(
-            get_row_return: $this->make_booking_row( 'confirmed' )
+            get_row_return: $this->make_booking_row( 'confirmed' ),
+            update_rows: 1
         );
 
         $result = \LTMS_Booking_Manager::cancel_booking( 1 );

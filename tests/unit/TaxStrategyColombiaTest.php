@@ -1132,7 +1132,8 @@ class TaxStrategyColombiaTest extends LTMS_Unit_Test_Case {
                                 'product_type'              => 'coffee',
                                 'buyer_is_gran_contribuyente' => true,
                         ],
-                        []
+                        // v2.9.31: reteiva requiere vendor_responsible_iva (tax_regime ∈ [common, special, gran_contribuyente]).
+                        [ 'tax_regime' => 'common' ]
                 );
 
                 $iva_esperado    = round( $gross * self::IVA_REDUCIDO, 2 );          // 50,000
@@ -1155,7 +1156,8 @@ class TaxStrategyColombiaTest extends LTMS_Unit_Test_Case {
                                 'product_type'              => 'eggs_retail',
                                 'buyer_is_gran_contribuyente' => true,
                         ],
-                        []
+                        // v2.9.31: reteiva requiere vendor_responsible_iva.
+                        [ 'tax_regime' => 'common' ]
                 );
 
                 $this->assertEqualsWithDelta( self::RETEIVA_RATE, $result['reteiva_rate'], 0.001,
@@ -1716,6 +1718,12 @@ class TaxStrategyColombiaTest extends LTMS_Unit_Test_Case {
          */
         public function test_impoconsumo_rate_configurable(): void {
                 \LTMS_Core_Config::set( 'ltms_impoconsumo_rate', 0.10 );
+                // v2.9.14 RT-6 FIX: impoconsumo se lee via apply_filters('ltms_impoconsumo_rate', 0.08),
+                // no via LTMS_Core_Config::get. Override el stub de apply_filters para que retorne 0.10
+                // cuando el tag sea 'ltms_impoconsumo_rate'.
+                Monkey\Functions\when( 'apply_filters' )->alias(
+                        static fn( $tag, $value ) => $tag === 'ltms_impoconsumo_rate' ? 0.10 : $value
+                );
 
                 $result = $this->strategy->calculate(
                         1_000_000.0,

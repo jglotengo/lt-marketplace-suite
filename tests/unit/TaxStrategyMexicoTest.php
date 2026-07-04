@@ -271,10 +271,14 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
 
     /** @return array<string, array{float, float}> */
     public static function provider_retencion_iva_pm(): array {
+        // v2.9.31: reteiva = round(iva * 2/3, 2) donde iva = round(gross * 0.16, 2).
+        // Para gross=1000: iva=160.00, reteiva=round(106.666..., 2)=106.67.
+        // (Antes se calculaba gross * 0.1067 = 106.70, pero el redondeo intermedio
+        // del IVA hace que iva*2/3 dé 106.67.)
         return [
-            '$1,000 MXN'  => [  1_000.0,   106.70 ],
-            '$10,000 MXN' => [ 10_000.0, 1_067.00 ],
-            '$50,000 MXN' => [ 50_000.0, 5_335.00 ],
+            '$1,000 MXN'  => [  1_000.0,   106.67 ],
+            '$10,000 MXN' => [ 10_000.0, 1_066.67 ],
+            '$50,000 MXN' => [ 50_000.0, 5_333.33 ],
         ];
     }
 
@@ -300,7 +304,10 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
             [ 'tax_regime' => 'resico', 'monthly_income' => 30_000.0 ]
         );
         $isr_esperado     = round( $gross * 0.015, 2 );
-        $reteiva_esperado = round( $gross * 0.1067, 2 );
+        // v2.9.31: reteiva = round(iva * 2/3, 2), no round(gross * 0.1067, 2).
+        // iva = round(gross * 0.16, 2), asi que reteiva = round(round(gross * 0.16, 2) * 2/3, 2).
+        $iva_esperado    = round( $gross * 0.16, 2 );
+        $reteiva_esperado = round( $iva_esperado * ( 2 / 3 ), 2 );
         $withholding      = round( $isr_esperado + $reteiva_esperado, 2 );
         $net_esperado     = round( $gross - $withholding, 2 );
         $this->assertEqualsWithDelta( $isr_esperado, $result['isr'], self::DELTA );
@@ -734,7 +741,9 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
             [ 'tax_regime' => 'pf_honorarios' ]
         );
         $expected_isr    = round( $gross * 0.10, 2 );
-        $expected_reteiva = round( $gross * 0.1067, 2 );
+        // v2.9.31: reteiva = round(iva * 2/3, 2), no round(gross * 0.1067, 2).
+        $expected_iva     = round( $gross * 0.16, 2 );
+        $expected_reteiva = round( $expected_iva * ( 2 / 3 ), 2 );
         $expected_withholding = round( $expected_isr + $expected_reteiva, 2 );
 
         $this->assertEqualsWithDelta( $expected_withholding, $result['total_withholding'], self::DELTA,
@@ -758,10 +767,13 @@ class TaxStrategyMexicoTest extends LTMS_Unit_Test_Case {
         $this->assertEqualsWithDelta( 1_600.0, $result['iva'],         self::DELTA );
         $this->assertEqualsWithDelta( 2_600.0, $result['ieps'],        self::DELTA );
         $this->assertEqualsWithDelta( 4_200.0, $result['total_taxes'], self::DELTA );
-        $this->assertEqualsWithDelta( 1_067.0, $result['reteiva'],     self::DELTA );
+        // v2.9.31: reteiva = round(iva * 2/3, 2) = round(round(10000*0.16,2) * 2/3, 2)
+        // = round(1600 * 2/3, 2) = round(1066.666..., 2) = 1066.67
+        $this->assertEqualsWithDelta( 1_066.67, $result['reteiva'],     self::DELTA );
         $this->assertEqualsWithDelta(   200.0, $result['isr'],         self::DELTA );
-        $this->assertEqualsWithDelta( 1_267.0, $result['total_withholding'], self::DELTA );
-        $this->assertEqualsWithDelta( 8_733.0, $result['net_to_vendor'],     self::DELTA );
+        // total_withholding = 1066.67 + 200 = 1266.67
+        $this->assertEqualsWithDelta( 1_266.67, $result['total_withholding'], self::DELTA );
+        $this->assertEqualsWithDelta( 8_733.33, $result['net_to_vendor'],     self::DELTA );
     }
 
     public function test_todos_los_campos_numericos_son_float(): void {
