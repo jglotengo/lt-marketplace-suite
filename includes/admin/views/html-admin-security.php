@@ -39,6 +39,7 @@ if ( current_user_can( 'manage_options' ) ) :
 </script>
 <?php endif; ?>
 
+<?php
 // Acciones manuales
 if ( isset( $_POST['ltms_block_ip'] ) && check_admin_referer( 'ltms_security_action' ) ) {
     $ip_to_block = sanitize_text_field( $_POST['block_ip'] ?? '' );

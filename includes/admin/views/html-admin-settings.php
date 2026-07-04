@@ -73,7 +73,15 @@ $is_welcome = ! empty( $_GET['ltms_welcome'] ); // phpcs:ignore
         <input type="hidden" name="tab" value="<?php echo esc_attr( $active_tab ); ?>">
 
         <?php
+        // Buscar el archivo de sección: probar primero con el slug tal cual,
+        // luego con underscores convertidos a hyphens (cross_border → cross-border).
         $section_file = LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . $active_tab . '.php';
+        if ( ! file_exists( $section_file ) ) {
+            $alt_file = LTMS_INCLUDES_DIR . 'admin/views/settings/section-' . str_replace( '_', '-', $active_tab ) . '.php';
+            if ( file_exists( $alt_file ) ) {
+                $section_file = $alt_file;
+            }
+        }
         if ( file_exists( $section_file ) ) {
             include_once $section_file;
         } else {
