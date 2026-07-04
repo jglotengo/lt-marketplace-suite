@@ -338,11 +338,14 @@ final class LTMS_Frontend_Assets {
         $url = LTMS_ASSETS_URL;
 
         // CSS — depends on whichever LTMS stylesheets are already registered
-        // for the current page type. Missing deps are silently skipped by WP.
+        // for the current page type. Filter to only registered deps to avoid
+        // WP 6.9.1+ notice "se ha puesto en cola con dependencias que no están registradas".
+        $ux_deps = [ 'ltms-frontend', 'ltms-dashboard', 'ltms-login-register', 'ltms-header-nav' ];
+        $ux_deps = array_filter( $ux_deps, static fn( $h ) => wp_style_is( $h, 'registered' ) );
         wp_enqueue_style(
             'ltms-ux-enhancements',
             $url . 'css/ltms-ux-enhancements' . $min . '.css',
-            [ 'ltms-frontend', 'ltms-dashboard', 'ltms-login-register', 'ltms-header-nav' ],
+            $ux_deps,
             $ver
         );
 
