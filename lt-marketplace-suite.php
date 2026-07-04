@@ -421,6 +421,50 @@ function ltms_load_autoloader(): void {
                 'ltms-zapsign-manager'                   => 'business/class-ltms-zapsign-manager.php',
                 // AUDIT-REDI-UX-GAPS GAP-9 FIX: Incident Manager para el modelo ReDi.
                 'ltms-business-redi-incident'            => 'business/class-ltms-business-redi-incident.php',
+                // v2.9.31 — Compliance modules (Art. 30-B CFF, SAGRILAFT, Ley 1581/2012).
+                'ltms-accounting-compliance'             => 'business/class-ltms-accounting-compliance.php',
+                'ltms-authorities-compliance'            => 'business/class-ltms-authorities-compliance.php',
+                'ltms-compliance-guardian'               => 'business/class-ltms-compliance-guardian.php',
+                'ltms-cross-border-compliance'           => 'business/class-ltms-cross-border-compliance.php',
+                'ltms-currency-manager'                  => 'business/class-ltms-currency-manager.php',
+                'ltms-customs-calculator'                => 'business/class-ltms-customs-calculator.php',
+                'ltms-data-protection-compliance'        => 'business/class-ltms-data-protection-compliance.php',
+                'ltms-fintech-compliance'                => 'business/class-ltms-fintech-compliance.php',
+                'ltms-fiscal-annual-close'               => 'business/class-ltms-fiscal-annual-close.php',
+                'ltms-foundation-compliance'             => 'business/class-ltms-foundation-compliance.php',
+                'ltms-fx-rate-provider'                  => 'business/class-ltms-fx-rate-provider.php',
+                'ltms-jurisprudence-compliance'          => 'business/class-ltms-jurisprudence-compliance.php',
+                'ltms-logistics-compliance'              => 'business/class-ltms-logistics-compliance.php',
+                'ltms-mlm-compliance-guardian'           => 'business/class-ltms-mlm-compliance-guardian.php',
+                'ltms-physical-products-compliance'      => 'business/class-ltms-physical-products-compliance.php',
+                'ltms-privacy-toolkit'                   => 'business/class-ltms-privacy-toolkit.php',
+                'ltms-restaurant-compliance'             => 'business/class-ltms-restaurant-compliance.php',
+                'ltms-tourism-compliance-ext'            => 'business/class-ltms-tourism-compliance-ext.php',
+                // v2.9.31 — Marketing & sales modules.
+                'ltms-product-bundles'                   => 'business/class-ltms-product-bundles.php',
+                'ltms-sales-booster'                     => 'business/class-ltms-sales-booster.php',
+                'ltms-shipping-cost-ledger'              => 'business/class-ltms-shipping-cost-ledger.php',
+                'ltms-traffic-booster'                   => 'business/class-ltms-traffic-booster.php',
+                // v2.9.31 — Donations (Fundación Cardio Infantil).
+                'ltms-donation-calculator'               => 'business/class-ltms-donation-calculator.php',
+                'ltms-donation-certificate'              => 'business/class-ltms-donation-certificate.php',
+                'ltms-donation-manager'                  => 'business/class-ltms-donation-manager.php',
+                // v2.9.31 — Admin panels for new modules.
+                'ltms-admin-cross-border'                => 'admin/class-ltms-admin-cross-border.php',
+                'ltms-admin-donations'                   => 'admin/class-ltms-admin-donations.php',
+                'ltms-admin-shipping-ledger'             => 'admin/class-ltms-admin-shipping-ledger.php',
+                'ltms-admin-ux-status'                   => 'admin/class-ltms-admin-ux-status.php',
+                'ltms-fiscal-online-access'              => 'admin/class-ltms-fiscal-online-access.php',
+                // v2.9.31 — Core: TOTP 2FA.
+                'ltms-totp-2fa'                          => 'core/class-ltms-totp-2fa.php',
+                // v2.9.31 — Tax strategies (BR/EU/US for cross-border).
+                'ltms-tax-strategy-br'                   => 'business/strategies/class-ltms-tax-strategy-br.php',
+                'ltms-tax-strategy-eu'                   => 'business/strategies/class-ltms-tax-strategy-eu.php',
+                'ltms-tax-strategy-us'                   => 'business/strategies/class-ltms-tax-strategy-us.php',
+                // v2.9.31 — Frontend UX enhancements.
+                'ltms-amazon-enhancements'               => 'frontend/class-ltms-amazon-enhancements.php',
+                'ltms-branding-engine'                   => 'frontend/class-ltms-branding-engine.php',
+                'ltms-cart-drawer'                       => 'frontend/class-ltms-cart-drawer.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {

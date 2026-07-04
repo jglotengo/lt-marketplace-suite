@@ -13,12 +13,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Valores actuales.
-$retention_config = class_exists( 'LTMS_Privacy_Toolkit' )
-    ? LTMS_Privacy_Toolkit::get_retention_config()
-    : LTMS_Privacy_Toolkit::RETENTION_DEFAULTS;
-$legal_basis = class_exists( 'LTMS_Privacy_Toolkit' )
-    ? LTMS_Privacy_Toolkit::get_legal_basis()
-    : [];
+// Safety: si LTMS_Privacy_Toolkit no esta cargado (autoloader falla), usar defaults hardcodeados.
+if ( class_exists( 'LTMS_Privacy_Toolkit' ) ) {
+    $retention_config = LTMS_Privacy_Toolkit::get_retention_config();
+    $legal_basis      = LTMS_Privacy_Toolkit::get_legal_basis();
+} else {
+    // Defaults mirror LTMS_Privacy_Toolkit::RETENTION_DEFAULTS — kept in sync manually.
+    $retention_config = [
+        'transactional' => 365 * 5,   // 5 años (ET art. 632 CO, CFF art. 30 MX)
+        'kyc_docs'      => 365 * 10,  // 10 años (SAGRILAFT Res. 314/2021 CO)
+        'audit_logs'    => 365 * 5,   // 5 años (Ley 1581/2012 art. 15 CO)
+        'consent_log'   => 365 * 10,  // 10 años (LFPDPPP art. 24 MX)
+    ];
+    $legal_basis = [];
+}
 $last_run    = get_option( 'ltms_retention_last_run', null );
 $nonce       = wp_create_nonce( 'ltms_retention_nonce' );
 
