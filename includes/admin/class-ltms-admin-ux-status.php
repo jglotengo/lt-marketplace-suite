@@ -270,7 +270,11 @@ class LTMS_Admin_UX_Status {
      * Recoge todas las métricas para mostrar.
      */
     private function collect_metrics() {
-        $assets_dir = LTMS_ASSETS_PATH ?? ( LTMS_PLUGIN_DIR_PATH . 'assets/' );
+        // v2.9.31: usar constantes que SI estan definidas en lt-marketplace-suite.php.
+        // ANTES usaba LTMS_ASSETS_PATH y LTMS_PLUGIN_DIR_PATH que NO existen →
+        // undefined constant warnings + file_exists siempre false → pagina vacia.
+        $assets_dir = defined( 'LTMS_ASSETS_PATH' ) ? LTMS_ASSETS_PATH : ( LTMS_PLUGIN_DIR . 'assets/' );
+        $plugin_dir = defined( 'LTMS_PLUGIN_DIR_PATH' ) ? LTMS_PLUGIN_DIR_PATH : LTMS_PLUGIN_DIR;
         $js_file = $assets_dir . 'js/ltms-ux-enhancements.js';
         $js_min  = $assets_dir . 'js/ltms-ux-enhancements.min.js';
         $css_file = $assets_dir . 'css/ltms-ux-enhancements.css';
@@ -293,7 +297,7 @@ class LTMS_Admin_UX_Status {
 
         // data-* en plantillas
         $data_in_views = 0;
-        $views_dir = LTMS_PLUGIN_DIR_PATH . 'includes/frontend/views/';
+        $views_dir = $plugin_dir . 'includes/frontend/views/';
         if ( is_dir( $views_dir ) ) {
             $rii = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $views_dir ) );
             foreach ( $rii as $file ) {
@@ -305,7 +309,7 @@ class LTMS_Admin_UX_Status {
         }
 
         // Emails migrados
-        $emails_dir = LTMS_PLUGIN_DIR_PATH . 'templates/emails/';
+        $emails_dir = $plugin_dir . 'templates/emails/';
         $emails_total = 0;
         $emails_migrated = 0;
         if ( is_dir( $emails_dir ) ) {
