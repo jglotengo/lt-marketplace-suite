@@ -246,8 +246,8 @@ class LTMS_Logistics_Compliance {
         foreach ( $shipping_methods as $method ) {
             $method_id = $method->get_method_id();
             if ( in_array( $method_id, [ 'ltms_deprisa', 'ltms_heka', 'flat_rate', 'free_shipping', 'local_pickup' ], true ) ) {
-                // Local pickup no requiere Carta Porte.
-                if ( $method_id === 'local_pickup' ) continue 2;
+                // Local pickup no requiere Carta Porte — saltar al siguiente método.
+                if ( $method_id === 'local_pickup' ) continue;
                 $is_terrestrial = true;
                 break;
             }
