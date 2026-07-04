@@ -1721,7 +1721,9 @@ class TaxStrategyColombiaTest extends LTMS_Unit_Test_Case {
                 // v2.9.14 RT-6 FIX: impoconsumo se lee via apply_filters('ltms_impoconsumo_rate', 0.08),
                 // no via LTMS_Core_Config::get. Override el stub de apply_filters para que retorne 0.10
                 // cuando el tag sea 'ltms_impoconsumo_rate'.
-                Monkey\Functions\when( 'apply_filters' )->alias(
+                // Nota: backslash inicial para llamar a la funcion global Brain\Monkey\Functions\when
+                // desde dentro del namespace LTMS\Tests\Unit.
+                \Brain\Monkey\Functions\when( 'apply_filters' )->alias(
                         static fn( $tag, $value ) => $tag === 'ltms_impoconsumo_rate' ? 0.10 : $value
                 );
 
