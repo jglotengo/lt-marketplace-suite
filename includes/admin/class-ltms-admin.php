@@ -494,8 +494,34 @@ final class LTMS_Admin {
     }
 
     public function render_auditor_dashboard(): void {
-        LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard' );
+        // DEBUG: Forzar logging de errores a archivo propio (SiteGround suprime debug.log).
+        $_ltms_dbg = WP_CONTENT_DIR . '/ltms-auditor-debug.log';
+        ini_set( 'log_errors', '1' );
+        ini_set( 'error_log', $_ltms_dbg );
+        ini_set( 'display_errors', '1' );
+        error_reporting( E_ALL );
+        set_error_handler( static function ( $errno, $errstr, $errfile, $errline ) use ( $_ltms_dbg ) {
+            $msg = '[' . date( 'Y-m-d H:i:s' ) . "] errno={$errno} {$errstr} at {$errfile}:{$errline}\n";
+            file_put_contents( $_ltms_dbg, $msg, FILE_APPEND );
+            return false;
+        } );
+        register_shutdown_function( static function () use ( $_ltms_dbg ) {
+            $err = error_get_last();
+            if ( $err ) {
+                $msg = '[' . date( 'Y-m-d H:i:s' ) . "] FATAL type={$err['type']}: {$err['message']} at {$err['file']}:{$err['line']}\n";
+                file_put_contents( $_ltms_dbg, $msg, FILE_APPEND );
+            }
+        } );
+        file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] === render_auditor_dashboard INVOKED ===\n", FILE_APPEND );
+
+        if ( ! class_exists( 'LTMS_Data_Masking' ) ) {
+            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] ERROR: LTMS_Data_Masking class not found\n", FILE_APPEND );
+        } else {
+            LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard' );
+        }
+        file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] Calling render_view('view-auditor-dashboard')...\n", FILE_APPEND );
         $this->render_view( 'view-auditor-dashboard' );
+        file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] render_view returned normally.\n", FILE_APPEND );
     }
 
     public function render_pickup_orders(): void {
