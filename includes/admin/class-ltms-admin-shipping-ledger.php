@@ -53,22 +53,42 @@ class LTMS_Admin_Shipping_Ledger {
      * Router principal: muestra una de 5 pestañas.
      */
     public static function render_page(): void {
-        if ( ! current_user_can( 'ltms_view_wallet_ledger' ) ) {
-            wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'ltms' ) );
-        }
+        // DEBUG: Forzar logging de errores a archivo propio (SiteGround suprime debug.log).
+        $_ltms_dbg = WP_CONTENT_DIR . '/ltms-shipping-ledger-debug.log';
+        ini_set( 'log_errors', '1' );
+        ini_set( 'error_log', $_ltms_dbg );
+        ini_set( 'display_errors', '1' );
+        error_reporting( E_ALL );
+        file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] === render_page INVOKED ===\n", FILE_APPEND );
 
-        $tab   = sanitize_key( $_GET['tab'] ?? 'dashboard' );
-        $valid = [ 'dashboard', 'ledger', 'invoices', 'disputes', 'budgets' ];
-        if ( ! in_array( $tab, $valid, true ) ) {
-            $tab = 'dashboard';
-        }
+        try {
+            if ( ! current_user_can( 'ltms_view_wallet_ledger' ) ) {
+                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1: permission denied\n", FILE_APPEND );
+                wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'ltms' ) );
+            }
+            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP1: permission OK\n", FILE_APPEND );
 
-        // Cargar la vista.
-        $view_path = LTMS_PATH . 'includes/admin/views/html-admin-shipping-ledger.php';
-        if ( file_exists( $view_path ) ) {
-            include $view_path;
-        } else {
-            echo '<div class="wrap"><p>' . esc_html__( 'Vista no encontrada.', 'ltms' ) . '</p></div>';
+            $tab   = sanitize_key( $_GET['tab'] ?? 'dashboard' );
+            $valid = [ 'dashboard', 'ledger', 'invoices', 'disputes', 'budgets' ];
+            if ( ! in_array( $tab, $valid, true ) ) {
+                $tab = 'dashboard';
+            }
+            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP2: tab={$tab}\n", FILE_APPEND );
+
+            // Cargar la vista.
+            $view_path = LTMS_PATH . 'includes/admin/views/html-admin-shipping-ledger.php';
+            file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP3: view_path={$view_path} exists=" . (file_exists($view_path) ? 'YES' : 'NO') . "\n", FILE_APPEND );
+            if ( file_exists( $view_path ) ) {
+                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP4: including view...\n", FILE_APPEND );
+                include $view_path;
+                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] STEP5: view included OK\n", FILE_APPEND );
+            } else {
+                echo '<div class="wrap"><p>' . esc_html__( 'Vista no encontrada.', 'ltms' ) . '</p></div>';
+                file_put_contents( $_ltms_dbg, '[' . date( 'Y-m-d H:i:s' ) . "] ERROR: view not found\n", FILE_APPEND );
+            }
+        } catch ( \Throwable $e ) {
+            $msg = '[' . date( 'Y-m-d H:i:s' ) . "] EXCEPTION: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine() . "\n" . $e->getTraceAsString() . "\n";
+            file_put_contents( $_ltms_dbg, $msg, FILE_APPEND );
         }
     }
 
