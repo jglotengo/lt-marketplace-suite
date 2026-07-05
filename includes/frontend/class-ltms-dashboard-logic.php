@@ -75,6 +75,9 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_save_posgold_seo',            [ $instance, 'ajax_save_posgold_seo' ] );
         add_action( 'wp_ajax_ltms_get_posgold_categories',      [ $instance, 'ajax_get_posgold_categories' ] );
 
+        // v2.9.31: Activity Feed — endpoint faltante que causaba error AJAX en home del vendor.
+        add_action( 'wp_ajax_ltms_get_activity_feed',           [ $instance, 'ajax_get_activity_feed' ] );
+
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
     }
@@ -1688,5 +1691,108 @@ final class LTMS_Dashboard_Logic {
                 count( $result['categories'] )
             ),
         ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Activity Feed del vendor (home dashboard).
+     *
+     * El JS ltms-ux-enhancements.js llama a este endpoint para mostrar
+     * actividad reciente en el home del vendor. Antes no existía y causaba
+     * error AJAX "Algo salió mal".
+     *
+     * @return void
+     */
+    public function ajax_get_activity_feed(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $limit = min( 50, max( 5, (int) ( $_POST['limit'] ?? 10 ) ) );
+
+        // Construir feed de actividad desde múltiples fuentes.
+        $activities = [];
+
+        // 1. Pedidos recientes del vendor.
+        $orders = wc_get_orders( [
+            'limit'      => $limit,
+            'orderby'    => 'date',
+            'order'      => 'DESC',
+            'meta_key'   => '_vendor_id',
+            'meta_value' => $user_id,
+        ] );
+
+        foreach ( $orders as $order ) {
+            $activities[] = [
+                'type'        => 'order',
+                'title'       => sprintf(
+                    /* translators: %s: número de pedido */
+                    __( 'Pedido #%s', 'ltms' ),
+                    $order->get_order_number()
+                ),
+                'description' => sprintf(
+                    /* translators: %s: nombre del cliente */
+                    __( 'Cliente: %s', 'ltms' ),
+                    $order->get_formatted_billing_full_name() ?: __( 'Invitado', 'ltms' )
+                ),
+                'time'        => human_time_diff( $order->get_date_created()->getTimestamp(), current_time( 'timestamp' ) ) . ' ' . __( 'atrás', 'ltms' ),
+                'amount'      => '+' . wp_strip_all_tags( $order->get_formatted_order_total() ),
+                'amountType'  => 'positive',
+                'timestamp'   => $order->get_date_created()->getTimestamp(),
+            ];
+        }
+
+        // 2. Transacciones de billetera recientes.
+        if ( class_exists( 'LTMS_Business_Wallet' ) ) {
+            $wallet_txs = $this->get_wallet_transactions( $user_id );
+            $count = 0;
+            foreach ( $wallet_txs as $tx ) {
+                if ( $count >= $limit ) break;
+                $is_positive = in_array( $tx['type'] ?? '', [ 'credit', 'release', 'reversal' ], true );
+                $activities[] = [
+                    'type'        => $tx['type'] === 'payout' ? 'payout' : 'payment',
+                    'title'       => $tx['description'] ?? __( 'Transacción de billetera', 'ltms' ),
+                    'description' => '',
+                    'time'        => isset( $tx['created_at'] ) ? human_time_diff( strtotime( $tx['created_at'] ), current_time( 'timestamp' ) ) . ' ' . __( 'atrás', 'ltms' ) : '',
+                    'amount'      => ( $is_positive ? '+' : '-' ) . LTMS_Utils::format_money( (float) ( $tx['amount'] ?? 0 ) ),
+                    'amountType'  => $is_positive ? 'positive' : 'negative',
+                    'timestamp'   => isset( $tx['created_at'] ) ? strtotime( $tx['created_at'] ) : 0,
+                ];
+                $count++;
+            }
+        }
+
+        // 3. Notificaciones recientes.
+        global $wpdb;
+        $notif_table = $wpdb->prefix . 'lt_notifications';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
+        $notifs = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM `{$notif_table}` WHERE user_id = %d ORDER BY created_at DESC LIMIT %d",
+            $user_id, $limit
+        ), ARRAY_A );
+
+        foreach ( $notifs as $notif ) {
+            $activities[] = [
+                'type'        => 'kyc',
+                'title'       => $notif['title'] ?? __( 'Notificación', 'ltms' ),
+                'description' => $notif['message'] ?? '',
+                'time'        => human_time_diff( strtotime( $notif['created_at'] ), current_time( 'timestamp' ) ) . ' ' . __( 'atrás', 'ltms' ),
+                'amount'      => '',
+                'amountType'  => '',
+                'timestamp'   => strtotime( $notif['created_at'] ),
+            ];
+        }
+
+        // Ordenar por timestamp descendente y limitar.
+        usort( $activities, static fn( $a, $b ) => ( $b['timestamp'] ?? 0 ) <=> ( $a['timestamp'] ?? 0 ) );
+        $activities = array_slice( $activities, 0, $limit );
+
+        wp_send_json_success( [ 'activities' => $activities ] );
     }
 }
