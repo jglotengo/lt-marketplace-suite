@@ -240,22 +240,43 @@ if ( empty( $seo_template ) ) {
                         <?php wp_nonce_field( 'ltms_posgold_save_categories', 'ltms_posgold_categories_nonce' ); ?>
 
                         <div style="margin-bottom:16px;">
-                            <label for="ltms-posgold-category-ids" style="display:block;font-weight:600;margin-bottom:4px;">
-                                <?php esc_html_e( 'IDs de categorías PosGold a sincronizar', 'ltms' ); ?>
+                            <label style="display:block;font-weight:600;margin-bottom:4px;">
+                                <?php esc_html_e( 'Selecciona las categorías a sincronizar', 'ltms' ); ?>
                             </label>
-                            <input type="text"
-                                   id="ltms-posgold-category-ids"
-                                   name="ltms_posgold_category_ids"
-                                   value="<?php echo esc_attr( $category_ids ); ?>"
-                                   placeholder="5,12,18"
-                                   style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;">
-                            <p style="margin:4px 0 0;font-size:0.75rem;color:#9ca3af;">
-                                <?php esc_html_e( 'Lista separada por comas de categoriaid de PosGold. Solo se sincronizarán los productos de estas categorías. Ej: "5" para solo Juegos de Mesa. Déjalo vacío para sincronizar TODO el catálogo.', 'ltms' ); ?>
+                            <p style="margin:0 0 12px;font-size:0.75rem;color:#9ca3af;">
+                                <?php esc_html_e( 'Solo se sincronizarán los productos de las categorías seleccionadas. Si no seleccionas ninguna, se sincroniza TODO el catálogo.', 'ltms' ); ?>
                             </p>
+
+                            <!-- Botones de acción -->
+                            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+                                <button type="button" id="ltms-posgold-load-cats" class="ltms-btn ltms-btn-outline ltms-btn-sm">
+                                    📋 <?php esc_html_e( 'Cargar categorías', 'ltms' ); ?>
+                                </button>
+                                <button type="button" id="ltms-posgold-refresh-cats" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="display:none;">
+                                    🔄 <?php esc_html_e( 'Refrescar', 'ltms' ); ?>
+                                </button>
+                                <button type="button" id="ltms-posgold-select-all-cats" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="display:none;">
+                                    ☑️ <?php esc_html_e( 'Todas', 'ltms' ); ?>
+                                </button>
+                                <button type="button" id="ltms-posgold-clear-cats" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="display:none;">
+                                    ⬜ <?php esc_html_e( 'Ninguna', 'ltms' ); ?>
+                                </button>
+                                <span id="ltms-posgold-cats-status" style="font-size:0.8rem;color:#6b7280;"></span>
+                            </div>
+
+                            <!-- Contenedor de checkboxes -->
+                            <div id="ltms-posgold-cats-container" style="max-height:300px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fafafa;">
+                                <p style="text-align:center;color:#9ca3af;padding:24px 0;margin:0;" id="ltms-posgold-cats-empty">
+                                    <?php esc_html_e( 'Haz click en "Cargar categorías" para ver tu lista de categorías PosGold.', 'ltms' ); ?>
+                                </p>
+                            </div>
+
+                            <!-- Input hidden para guardar los IDs seleccionados -->
+                            <input type="hidden" id="ltms-posgold-category-ids" name="ltms_posgold_category_ids" value="<?php echo esc_attr( $category_ids ); ?>">
                         </div>
 
                         <button type="submit" name="ltms_posgold_action" value="save_categories" class="ltms-btn ltms-btn-primary">
-                            💾 <?php esc_html_e( 'Guardar categorías', 'ltms' ); ?>
+                            💾 <?php esc_html_e( 'Guardar categorías seleccionadas', 'ltms' ); ?>
                         </button>
                     </form>
                 </div>
@@ -542,17 +563,104 @@ if ( empty( $seo_template ) ) {
             nonce: nonce,
             category_ids: $('#ltms-posgold-category-ids').val()
         }).done(function(resp){
-            $btn.prop('disabled', false).html('💾 Guardar categorías');
+            $btn.prop('disabled', false).html('💾 Guardar categorías seleccionadas');
             if (resp.success) {
                 alert('✓ ' + resp.data.message);
             } else {
                 alert('Error: ' + (resp.data.message || resp.data));
             }
         }).fail(function(){
-            $btn.prop('disabled', false).html('💾 Guardar categorías');
+            $btn.prop('disabled', false).html('💾 Guardar categorías seleccionadas');
             alert('Error de red.');
         });
     });
+
+    // === Cargar categorías PosGold (dropdown con checkboxes) ===
+
+    var selectedCatIds = $('#ltms-posgold-category-ids').val().split(',').filter(function(v){ return v.trim() !== ''; });
+
+    function renderCategoriesList(categories) {
+        var $container = $('#ltms-posgold-cats-container');
+        $container.empty();
+
+        if (!categories || categories.length === 0) {
+            $container.html('<p style="text-align:center;color:#9ca3af;padding:24px 0;margin:0;">No se encontraron categorías en tu PosGold.</p>');
+            return;
+        }
+
+        var html = '';
+        categories.forEach(function(cat) {
+            var checked = selectedCatIds.indexOf(cat.id) !== -1 ? 'checked' : '';
+            var countLabel = cat.count > 0 ? ' <span style="color:#9ca3af;font-size:0.8rem;">(' + cat.count + ' productos)</span>' : '';
+            html += '<label style="display:flex;align-items:center;padding:8px 12px;border-radius:6px;cursor:pointer;background:#fff;margin-bottom:4px;border:1px solid #e5e7eb;">';
+            html += '<input type="checkbox" class="ltms-posgold-cat-checkbox" value="' + cat.id + '" ' + checked + ' style="margin-right:8px;width:18px;height:18px;">';
+            html += '<span style="flex:1;"><strong>' + cat.nombre + '</strong>' + countLabel + '<br><span style="font-size:0.7rem;color:#9ca3af;">ID: ' + cat.id + '</span></span>';
+            html += '</label>';
+        });
+        $container.html(html);
+
+        // Mostrar botones de acción
+        $('#ltms-posgold-refresh-cats, #ltms-posgold-select-all-cats, #ltms-posgold-clear-cats').show();
+        $('#ltms-posgold-load-cats').hide();
+
+        // Manejar cambios en checkboxes
+        $('.ltms-posgold-cat-checkbox').on('change', function(){
+            updateSelectedCats();
+        });
+    }
+
+    function updateSelectedCats() {
+        selectedCatIds = [];
+        $('.ltms-posgold-cat-checkbox:checked').each(function(){
+            selectedCatIds.push($(this).val());
+        });
+        $('#ltms-posgold-category-ids').val(selectedCatIds.join(','));
+        var count = selectedCatIds.length;
+        $('#ltms-posgold-cats-status').text(count === 0 ? 'Ninguna seleccionada (se sincronizará TODO)' : count + ' seleccionada(s)');
+    }
+
+    function loadCategories(forceRefresh) {
+        var $status = $('#ltms-posgold-cats-status');
+        $status.text('Cargando categorías...');
+
+        $.post(ajaxUrl, {
+            action: 'ltms_get_posgold_categories',
+            nonce: nonce,
+            force_refresh: forceRefresh ? 'yes' : 'no'
+        }).done(function(resp){
+            if (resp.success) {
+                renderCategoriesList(resp.data.categories);
+                var source = resp.data.source === 'cache' ? ' (cache)' : (resp.data.source === 'fallback' ? ' (extraídas de productos)' : ' (endpoint)');
+                $('#ltms-posgold-cats-status').text(resp.data.message + source);
+                updateSelectedCats();
+            } else {
+                $('#ltms-posgold-cats-status').text('Error: ' + (resp.data.message || resp.data));
+                $('#ltms-posgold-cats-container').html('<p style="text-align:center;color:#dc2626;padding:24px 0;margin:0;">✗ ' + (resp.data.message || resp.data) + '<br><br>Verifica tus credenciales en la sección "Credenciales PosGold" arriba.</p>');
+            }
+        }).fail(function(){
+            $('#ltms-posgold-cats-status').text('Error de red.');
+        });
+    }
+
+    // Cargar categorías al hacer click
+    $('#ltms-posgold-load-cats, #ltms-posgold-refresh-cats').on('click', function(){
+        loadCategories($(this).attr('id') === 'ltms-posgold-refresh-cats');
+    });
+
+    // Seleccionar todas / ninguna
+    $('#ltms-posgold-select-all-cats').on('click', function(){
+        $('.ltms-posgold-cat-checkbox').prop('checked', true);
+        updateSelectedCats();
+    });
+    $('#ltms-posgold-clear-cats').on('click', function(){
+        $('.ltms-posgold-cat-checkbox').prop('checked', false);
+        updateSelectedCats();
+    });
+
+    // Cargar categorías automáticamente si ya tiene credenciales configuradas
+    if ($('#ltms-posgold-subdomain').val() && $('#ltms-posgold-token').val()) {
+        loadCategories(false);
+    }
 
     // Guardar reglas de precio
     $('#ltms-posgold-rules-form').on('submit', function(e){

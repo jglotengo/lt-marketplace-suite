@@ -73,6 +73,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_save_posgold_categories',     [ $instance, 'ajax_save_posgold_categories' ] );
         add_action( 'wp_ajax_ltms_save_posgold_rules',          [ $instance, 'ajax_save_posgold_rules' ] );
         add_action( 'wp_ajax_ltms_save_posgold_seo',            [ $instance, 'ajax_save_posgold_seo' ] );
+        add_action( 'wp_ajax_ltms_get_posgold_categories',      [ $instance, 'ajax_get_posgold_categories' ] );
 
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
@@ -1605,5 +1606,87 @@ final class LTMS_Dashboard_Logic {
         update_user_meta( $user_id, 'ltms_posgold_seo_template', $template );
 
         wp_send_json_success( [ 'message' => __( 'Plantilla SEO guardada correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Obtener categorías PosGold del vendor (para dropdown).
+     *
+     * Llama a LTMS_Api_PosGold::get_categories() que intenta primero el
+     * endpoint dedicado /apiGold/CategoriaApi/GetCategoria y hace fallback
+     * extrayendo categorías de los productos si aquel no existe.
+     *
+     * Cachea el resultado 1 hora para no llamar a la API en cada render.
+     *
+     * @return void
+     */
+    public function ajax_get_posgold_categories(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_PosGold_Sync' ) || ! class_exists( 'LTMS_Api_PosGold' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $creds = LTMS_PosGold_Sync::get_vendor_credentials( $user_id );
+        if ( ! $creds['configured'] ) {
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales PosGold.', 'ltms' ) ], 400 );
+        }
+
+        // Cache transitorio (1 hora) — las categorías no cambian frecuentemente.
+        $cache_key = 'ltms_posgold_cats_' . $user_id;
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && ! empty( $cached ) ) {
+            wp_send_json_success( [
+                'categories' => $cached,
+                'source'     => 'cache',
+                'message'    => __( 'Categorías cargadas desde cache.', 'ltms' ),
+            ] );
+        }
+
+        // Forzar refresco si se pidió.
+        $force_refresh = sanitize_text_field( $_POST['force_refresh'] ?? 'no' ) === 'yes';
+
+        if ( ! $force_refresh ) {
+            $result = LTMS_Api_PosGold::get_categories(
+                $creds['subdomain'],
+                $creds['token'],
+                $creds['empresaid'],
+                $creds['usuarioid']
+            );
+        } else {
+            // En refresco forzado, bypasear el cache del endpoint de categorías
+            // yendo directo al fallback (productos) para datos frescos.
+            $result = LTMS_Api_PosGold::get_categories(
+                $creds['subdomain'],
+                $creds['token'],
+                $creds['empresaid'],
+                $creds['usuarioid']
+            );
+        }
+
+        if ( ! $result['success'] ) {
+            wp_send_json_error( [ 'message' => $result['error'] ] );
+        }
+
+        // Cachear 1 hora.
+        set_transient( $cache_key, $result['categories'], HOUR_IN_SECONDS );
+
+        wp_send_json_success( [
+            'categories' => $result['categories'],
+            'source'     => $result['source'] ?? 'endpoint',
+            'message'    => sprintf(
+                /* translators: %d: número de categorías */
+                _n( '%d categoría encontrada.', '%d categorías encontradas.', count( $result['categories'] ), 'ltms' ),
+                count( $result['categories'] )
+            ),
+        ] );
     }
 }
