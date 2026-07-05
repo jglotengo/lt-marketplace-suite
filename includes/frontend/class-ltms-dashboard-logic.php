@@ -70,6 +70,9 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_save_posgold_credentials',   [ $instance, 'ajax_save_posgold_credentials' ] );
         add_action( 'wp_ajax_ltms_test_posgold_connection',     [ $instance, 'ajax_test_posgold_connection' ] );
         add_action( 'wp_ajax_ltms_sync_posgold_products',       [ $instance, 'ajax_sync_posgold_products' ] );
+        add_action( 'wp_ajax_ltms_save_posgold_categories',     [ $instance, 'ajax_save_posgold_categories' ] );
+        add_action( 'wp_ajax_ltms_save_posgold_rules',          [ $instance, 'ajax_save_posgold_rules' ] );
+        add_action( 'wp_ajax_ltms_save_posgold_seo',            [ $instance, 'ajax_save_posgold_seo' ] );
 
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
@@ -1476,14 +1479,131 @@ final class LTMS_Dashboard_Logic {
 
         if ( $result['success'] ) {
             wp_send_json_success( [
-                'message' => $result['message'],
-                'created' => $result['created'],
-                'updated' => $result['updated'],
-                'skipped' => $result['skipped'],
-                'errors'  => $result['errors'],
+                'message'      => $result['message'],
+                'created'      => $result['created'],
+                'updated'      => $result['updated'],
+                'skipped'      => $result['skipped'],
+                'duplicates'   => $result['duplicates'] ?? 0,
+                'filtered_out' => $result['filtered_out'] ?? 0,
+                'errors'       => $result['errors'],
             ] );
         } else {
             wp_send_json_error( [ 'message' => $result['message'] ] );
         }
+    }
+
+    /**
+     * v2.9.31 — AJAX: Guardar filtro de categorías PosGold del vendor.
+     */
+    public function ajax_save_posgold_categories(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        // Sanitizar comma-separated list de IDs.
+        $raw       = sanitize_text_field( $_POST['category_ids'] ?? '' );
+        $ids       = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
+        $sanitized = [];
+        foreach ( $ids as $id ) {
+            if ( is_numeric( $id ) ) {
+                $sanitized[] = (string) absint( $id );
+            }
+        }
+        $clean = implode( ',', $sanitized );
+
+        update_user_meta( $user_id, 'ltms_posgold_category_ids', $clean );
+
+        wp_send_json_success( [
+            'message' => __( 'Categorías guardadas correctamente.', 'ltms' ),
+            'category_ids' => $clean,
+        ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Guardar reglas de precio PosGold del vendor.
+     */
+    public function ajax_save_posgold_rules(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_PosGold_Price_Calculator' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $rules = [
+            'is_redi'                => sanitize_text_field( $_POST['is_redi'] ?? 'no' ) === 'yes',
+            'transport_pct'          => (float) ( $_POST['transport_pct'] ?? 0 ),
+            'advertising_pct'        => (float) ( $_POST['advertising_pct'] ?? 0 ),
+            'returns_pct'            => (float) ( $_POST['returns_pct'] ?? 0 ),
+            'margin_pct'             => (float) ( $_POST['margin_pct'] ?? 30 ),
+            'lotengo_commission_pct' => (float) ( $_POST['lotengo_commission_pct'] ?? 10 ),
+            'iva_pct'                => (float) ( $_POST['iva_pct'] ?? 19 ),
+            'redi_cost_pct'          => (float) ( $_POST['redi_cost_pct'] ?? 0 ),
+            'round_multiple'         => (int)   ( $_POST['round_multiple'] ?? 1000 ),
+        ];
+
+        // Validar rangos.
+        $rules['transport_pct']          = max( 0, min( 100, $rules['transport_pct'] ) );
+        $rules['advertising_pct']        = max( 0, min( 100, $rules['advertising_pct'] ) );
+        $rules['returns_pct']            = max( 0, min( 100, $rules['returns_pct'] ) );
+        $rules['margin_pct']             = max( 0, min( 500, $rules['margin_pct'] ) );
+        $rules['lotengo_commission_pct'] = max( 0, min( 50, $rules['lotengo_commission_pct'] ) );
+        $rules['redi_cost_pct']          = max( 0, min( 100, $rules['redi_cost_pct'] ) );
+        $rules['round_multiple']         = max( 1, $rules['round_multiple'] );
+
+        LTMS_PosGold_Price_Calculator::save_vendor_rules( $user_id, $rules );
+
+        wp_send_json_success( [ 'message' => __( 'Reglas de precio guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Guardar plantilla SEO PosGold del vendor.
+     */
+    public function ajax_save_posgold_seo(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $template = sanitize_text_field( $_POST['seo_template'] ?? '' );
+        if ( empty( $template ) ) {
+            $template = '{nombre} {marca} {categoria}';
+        }
+
+        // Validar que solo contenga placeholders permitidos y texto plano.
+        $allowed_placeholders = [ '{nombre}', '{marca}', '{categoria}', '{modelo}', '{codigo}' ];
+        $check                = $template;
+        foreach ( $allowed_placeholders as $ph ) {
+            $check = str_replace( $ph, '', $check );
+        }
+        // Si después de quitar placeholders quedan caracteres raros, rechazar.
+        if ( preg_match( '/[<>{}]/', $check ) ) {
+            wp_send_json_error( [ 'message' => __( 'Plantilla inválida. Solo se permiten los placeholders {nombre}, {marca}, {categoria}, {modelo}, {codigo} y texto plano.', 'ltms' ) ], 400 );
+        }
+
+        update_user_meta( $user_id, 'ltms_posgold_seo_template', $template );
+
+        wp_send_json_success( [ 'message' => __( 'Plantilla SEO guardada correctamente.', 'ltms' ) ] );
     }
 }
