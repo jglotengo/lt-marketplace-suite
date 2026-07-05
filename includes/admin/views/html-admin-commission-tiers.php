@@ -107,7 +107,7 @@ $base_url = admin_url( 'admin.php?page=ltms-commission-tiers' );
         <?php endforeach; ?>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;">
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start;" class="ltms-commission-tiers-grid">
 
         <!-- ── Tabla de niveles ── -->
         <div class="ltms-table-wrap">

@@ -100,7 +100,10 @@
     background: #fff;
     border: 1px solid var(--ltms-border);
     border-radius: var(--ltms-radius);
-    overflow: hidden;
+    /* v2.9.31: overflow-x:auto en lugar de hidden para que tablas anchas
+       (9+ columnas como commission-tiers) tengan scroll horizontal en vez
+       de cortar el contenido. */
+    overflow-x: auto;
     box-shadow: var(--ltms-shadow);
     margin-bottom: 24px;
 }
@@ -119,6 +122,9 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
+    /* v2.9.31: min-width para forzar scroll horizontal cuando la tabla
+       tiene muchas columnas y el contenedor es estrecho. */
+    min-width: 720px;
 }
 
 .ltms-table thead th {
@@ -142,6 +148,8 @@
     padding: 10px 16px;
     border-bottom: 1px solid #f0f0f0;
     vertical-align: middle;
+    /* v2.9.31: permitir wrap en celdas con texto largo (etiquetas, etc). */
+    word-break: break-word;
 }
 
 /* ── Status Badges ──────────────────────────────────────────── */
@@ -299,6 +307,16 @@
     }
     .ltms-table {
         font-size: 0.8rem;
+    }
+}
+
+/* v2.9.31: Layout responsive para páginas con grid tabla + formulario lateral
+   (ej: commission-tiers con 9 columnas + formulario de 380px). En pantallas
+   medianas el formulario pasa abajo para dar más espacio a la tabla. */
+@media (max-width: 1280px) {
+    .ltms-commission-tiers-grid,
+    .ltms-two-col-grid {
+        grid-template-columns: 1fr !important;
     }
 }
 
