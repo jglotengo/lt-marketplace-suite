@@ -431,13 +431,30 @@ class LTMS_TOTP_2FA {
     }
 
     /**
+     * v2.9.31: Verifica nonce del admin o del dashboard del vendor.
+     *
+     * Los endpoints 2FA son usados tanto desde el admin (nonce ltms_admin_nonce)
+     * como desde el dashboard del vendedor (nonce ltms_dashboard_nonce). Este
+     * helper acepta cualquiera de los dos para no duplicar lógica.
+     *
+     * @return void  Emite 403 si el nonce es inválido.
+     */
+    private static function check_2fa_nonce(): void {
+        $nonce = sanitize_text_field( $_POST['nonce'] ?? '' );
+        if ( ! wp_verify_nonce( $nonce, 'ltms_admin_nonce' ) && ! wp_verify_nonce( $nonce, 'ltms_dashboard_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce inválido. Recarga la página e intenta de nuevo.', 'ltms' ) ], 403 );
+        }
+    }
+
+    /**
      * AJAX: configurar 2FA (genera secret + QR URI).
      */
     public static function ajax_setup_2fa(): void {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
         }
-        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        // v2.9.31: aceptar nonce del admin o del dashboard del vendor.
+        self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
         $secret = self::generate_secret();
@@ -462,7 +479,7 @@ class LTMS_TOTP_2FA {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
         }
-        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
         $code = sanitize_text_field( $_POST['code'] ?? '' );
@@ -479,6 +496,7 @@ class LTMS_TOTP_2FA {
         // Activar 2FA.
         update_user_meta( $user_id, '_ltms_2fa_secret', $secret );
         update_user_meta( $user_id, '_ltms_2fa_enabled', 'yes' );
+        update_user_meta( $user_id, '_ltms_2fa_enabled_at', current_time( 'mysql', true ) );
         delete_user_meta( $user_id, '_ltms_2fa_pending_secret' );
 
         // Generar códigos de backup.
@@ -503,7 +521,7 @@ class LTMS_TOTP_2FA {
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
         }
-        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
         $code = sanitize_text_field( $_POST['code'] ?? '' );
@@ -521,6 +539,7 @@ class LTMS_TOTP_2FA {
         // Desactivar.
         delete_user_meta( $user_id, '_ltms_2fa_secret' );
         delete_user_meta( $user_id, '_ltms_2fa_enabled' );
+        delete_user_meta( $user_id, '_ltms_2fa_enabled_at' );
         delete_user_meta( $user_id, '_ltms_2fa_backup_codes' );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
