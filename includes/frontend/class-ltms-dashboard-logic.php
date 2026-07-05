@@ -66,6 +66,11 @@ final class LTMS_Dashboard_Logic {
         // v2.9.31: Marketing — tracking de descargas de banners promocionales.
         add_action( 'wp_ajax_ltms_track_banner_download', [ $instance, 'ajax_track_banner_download' ] );
 
+        // v2.9.31: PosGold — sincronización de catálogo.
+        add_action( 'wp_ajax_ltms_save_posgold_credentials',   [ $instance, 'ajax_save_posgold_credentials' ] );
+        add_action( 'wp_ajax_ltms_test_posgold_connection',     [ $instance, 'ajax_test_posgold_connection' ] );
+        add_action( 'wp_ajax_ltms_sync_posgold_products',       [ $instance, 'ajax_sync_posgold_products' ] );
+
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
     }
@@ -1356,5 +1361,129 @@ final class LTMS_Dashboard_Logic {
         // phpcs:enable
 
         wp_send_json_success( [ 'message' => __( 'Descarga registrada.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Guardar credenciales PosGold del vendor.
+     */
+    public function ajax_save_posgold_credentials(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $subdomain = sanitize_text_field( $_POST['subdomain'] ?? '' );
+        $token     = sanitize_text_field( $_POST['token'] ?? '' );
+        $empresaid = absint( $_POST['empresaid'] ?? 1 ) ?: 1;
+        $usuarioid = absint( $_POST['usuarioid'] ?? 1 ) ?: 1;
+        $bodegaid  = absint( $_POST['bodegaid']  ?? 1 ) ?: 1;
+
+        if ( empty( $subdomain ) || empty( $token ) ) {
+            wp_send_json_error( [ 'message' => __( 'Subdominio y Token son obligatorios.', 'ltms' ) ], 400 );
+        }
+
+        // Cifrar el token antes de guardarlo (si LTMS_Core_Security está disponible).
+        $token_to_save = $token;
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+            $encrypted = LTMS_Core_Security::encrypt( $token );
+            if ( $encrypted ) {
+                $token_to_save = $encrypted;
+            }
+        }
+
+        update_user_meta( $user_id, 'ltms_posgold_subdomain', $subdomain );
+        update_user_meta( $user_id, 'ltms_posgold_token',     $token_to_save );
+        update_user_meta( $user_id, 'ltms_posgold_empresaid', $empresaid );
+        update_user_meta( $user_id, 'ltms_posgold_usuarioid', $usuarioid );
+        update_user_meta( $user_id, 'ltms_posgold_bodegaid',  $bodegaid );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'POSGOLD_CREDENTIALS_SAVED', sprintf( 'Vendor #%d guardó credenciales PosGold (subdomain=%s)', $user_id, $subdomain ) );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Credenciales guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Probar conexión PosGold del vendor.
+     */
+    public function ajax_test_posgold_connection(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_PosGold_Sync' ) || ! class_exists( 'LTMS_Api_PosGold' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $creds = LTMS_PosGold_Sync::get_vendor_credentials( $user_id );
+        if ( ! $creds['configured'] ) {
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales.', 'ltms' ) ], 400 );
+        }
+
+        $result = LTMS_Api_PosGold::test_connection(
+            $creds['subdomain'],
+            $creds['token'],
+            $creds['empresaid'],
+            $creds['usuarioid']
+        );
+
+        if ( $result['success'] ) {
+            wp_send_json_success( [ 'message' => $result['message'] ] );
+        } else {
+            wp_send_json_error( [ 'message' => $result['message'] ] );
+        }
+    }
+
+    /**
+     * v2.9.31 — AJAX: Sincronizar productos PosGold → WooCommerce.
+     */
+    public function ajax_sync_posgold_products(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_PosGold_Sync' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
+        }
+
+        // Aumentar tiempo límite para sync grandes.
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( 600 ); // 10 minutos.
+        }
+
+        $result = LTMS_PosGold_Sync::sync_vendor_products( $user_id );
+
+        if ( $result['success'] ) {
+            wp_send_json_success( [
+                'message' => $result['message'],
+                'created' => $result['created'],
+                'updated' => $result['updated'],
+                'skipped' => $result['skipped'],
+                'errors'  => $result['errors'],
+            ] );
+        } else {
+            wp_send_json_error( [ 'message' => $result['message'] ] );
+        }
     }
 }

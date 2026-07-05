@@ -465,6 +465,9 @@ function ltms_load_autoloader(): void {
                 'ltms-amazon-enhancements'               => 'frontend/class-ltms-amazon-enhancements.php',
                 'ltms-branding-engine'                   => 'frontend/class-ltms-branding-engine.php',
                 'ltms-cart-drawer'                       => 'frontend/class-ltms-cart-drawer.php',
+                // v2.9.31 — PosGold integration (POS/inventarios colombiano).
+                'ltms-api-posgold'                       => 'api/class-ltms-api-posgold.php',
+                'ltms-posgold-sync'                      => 'business/class-ltms-posgold-sync.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
