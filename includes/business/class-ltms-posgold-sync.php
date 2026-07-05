@@ -112,19 +112,55 @@ final class LTMS_PosGold_Sync {
             ];
         }
 
-        // 4. Sincronizar cada producto.
-        $created = 0;
-        $updated = 0;
-        $skipped = 0;
-        $errors  = [];
-
+        // 4. Normalizar todos los productos.
+        $normalized = [];
         foreach ( $products as $raw_product ) {
-            $product = LTMS_Api_PosGold::normalize_product( $raw_product );
+            $normalized[] = LTMS_Api_PosGold::normalize_product( $raw_product );
+        }
 
-            if ( empty( $product['codigo'] ) ) {
+        // 5. Filtrar por categoriaid si el vendor configuró categorías.
+        $category_filter = (string) get_user_meta( $vendor_id, 'ltms_posgold_category_ids', true );
+        if ( ! empty( $category_filter ) && class_exists( 'LTMS_PosGold_Price_Calculator' ) ) {
+            $before_count = count( $normalized );
+            $normalized = LTMS_PosGold_Price_Calculator::filter_by_category( $normalized, $category_filter );
+            $filtered_out = $before_count - count( $normalized );
+        } else {
+            $filtered_out = 0;
+        }
+
+        // 6. Depurar duplicados por SKU.
+        $dedup_result = LTMS_PosGold_Price_Calculator::deduplicate_by_sku( $normalized );
+        $normalized   = $dedup_result['unique'];
+        $duplicates   = $dedup_result['duplicates'];
+
+        // 7. Obtener reglas de precio del vendor.
+        $price_rules = LTMS_PosGold_Price_Calculator::get_vendor_rules( $vendor_id );
+
+        // 8. Obtener plantilla SEO del vendor.
+        $seo_template = (string) get_user_meta( $vendor_id, 'ltms_posgold_seo_template', true );
+
+        // 9. Sincronizar cada producto.
+        $created         = 0;
+        $updated         = 0;
+        $skipped         = 0;
+        $skipped_incomplete = 0;
+        $errors          = [];
+
+        foreach ( $normalized as $product ) {
+            // 9a. Validar completitud.
+            $validation = LTMS_PosGold_Price_Calculator::validate_product_completeness( $product );
+            if ( ! $validation['complete'] ) {
                 $skipped++;
+                $skipped_incomplete++;
                 continue;
             }
+
+            // 9b. Calcular precio final con reglas del vendor.
+            $price_calc = LTMS_PosGold_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+            $product['regular_price'] = $price_calc['price'];
+
+            // 9c. Generar título SEO.
+            $product['name'] = LTMS_PosGold_Price_Calculator::generate_seo_title( $product, $seo_template );
 
             try {
                 $sync_result = self::sync_single_product( $vendor_id, $product );
@@ -144,39 +180,71 @@ final class LTMS_PosGold_Sync {
             }
         }
 
-        // 5. Actualizar metadata de sync.
+        // 10. Actualizar metadata de sync.
         update_user_meta( $vendor_id, 'ltms_posgold_last_sync', time() );
-        update_user_meta( $vendor_id, 'ltms_posgold_last_sync_count', count( $products ) );
+        update_user_meta( $vendor_id, 'ltms_posgold_last_sync_count', count( $normalized ) );
 
-        // 6. Log.
+        // 11. Log.
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info(
                 'POSGOLD_SYNC',
                 sprintf(
-                    'Vendor #%d sync: %d created, %d updated, %d skipped, %d errors',
-                    $vendor_id, $created, $updated, $skipped, count( $errors )
+                    'Vendor #%d sync: %d created, %d updated, %d skipped (%d incomplete), %d duplicates, %d filtered, %d errors',
+                    $vendor_id, $created, $updated, $skipped, $skipped_incomplete, count( $duplicates ), $filtered_out, count( $errors )
                 ),
                 [
-                    'vendor_id' => $vendor_id,
-                    'total'     => count( $products ),
-                    'created'   => $created,
-                    'updated'   => $updated,
-                    'skipped'   => $skipped,
-                    'errors'    => $errors,
+                    'vendor_id'          => $vendor_id,
+                    'total_raw'          => count( $products ),
+                    'total_normalized'   => count( $normalized ),
+                    'filtered_out'       => $filtered_out,
+                    'duplicates'         => count( $duplicates ),
+                    'created'            => $created,
+                    'updated'            => $updated,
+                    'skipped'            => $skipped,
+                    'skipped_incomplete' => $skipped_incomplete,
+                    'errors'             => $errors,
                 ]
+            );
+        }
+
+        // 12. Mensaje de resultado.
+        $message_parts = [
+            sprintf(
+                /* translators: 1: created, 2: updated */
+                __( '%1$d creados, %2$d actualizados', 'ltms' ),
+                $created, $updated
+            ),
+        ];
+        if ( $skipped > 0 ) {
+            $message_parts[] = sprintf(
+                /* translators: %d: skipped */
+                __( '%d omitidos', 'ltms' ),
+                $skipped
+            );
+        }
+        if ( $duplicates ) {
+            $message_parts[] = sprintf(
+                /* translators: %d: duplicates */
+                __( '%d duplicados', 'ltms' ),
+                count( $duplicates )
+            );
+        }
+        if ( $filtered_out > 0 ) {
+            $message_parts[] = sprintf(
+                /* translators: %d: filtered */
+                __( '%d fuera de categoría', 'ltms' ),
+                $filtered_out
             );
         }
 
         return [
             'success' => true,
-            'message' => sprintf(
-                /* translators: 1: created, 2: updated, 3: skipped */
-                __( 'Sincronización completa: %1$d creados, %2$d actualizados, %3$d omitidos.', 'ltms' ),
-                $created, $updated, $skipped
-            ),
+            'message' => __( 'Sincronización completa: ', 'ltms' ) . implode( ', ', $message_parts ) . '.',
             'created' => $created,
             'updated' => $updated,
             'skipped' => $skipped,
+            'duplicates'   => count( $duplicates ),
+            'filtered_out' => $filtered_out,
             'errors'  => $errors,
         ];
     }

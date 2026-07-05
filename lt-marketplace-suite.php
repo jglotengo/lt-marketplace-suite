@@ -468,6 +468,7 @@ function ltms_load_autoloader(): void {
                 // v2.9.31 — PosGold integration (POS/inventarios colombiano).
                 'ltms-api-posgold'                       => 'api/class-ltms-api-posgold.php',
                 'ltms-posgold-sync'                      => 'business/class-ltms-posgold-sync.php',
+                'ltms-posgold-price-calculator'          => 'business/class-ltms-posgold-price-calculator.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
