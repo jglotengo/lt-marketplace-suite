@@ -63,6 +63,9 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_get_shipping_quotes',   [ $instance, 'ajax_get_shipping_quotes' ] );
         add_action( 'wp_ajax_nopriv_ltms_get_shipping_quotes', [ $instance, 'ajax_get_shipping_quotes' ] );
 
+        // v2.9.31: Marketing — tracking de descargas de banners promocionales.
+        add_action( 'wp_ajax_ltms_track_banner_download', [ $instance, 'ajax_track_banner_download' ] );
+
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
     }
@@ -171,8 +174,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_dashboard_data(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -211,8 +214,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_wallet_data(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -367,8 +370,8 @@ final class LTMS_Dashboard_Logic {
      * @return void  Responde con wp_send_json_success/error.
      */
     public function ajax_upload_kyc_document(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -593,8 +596,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_analytics_data(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id = get_current_user_id();
@@ -866,8 +869,8 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_order_detail(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $user_id  = get_current_user_id();
@@ -1313,5 +1316,45 @@ final class LTMS_Dashboard_Logic {
         }
 
         return '<div class="ltms-notice ltms-notice-warning"><p>' . $msg . '</p></div>';
+    }
+
+    /**
+     * v2.9.31 — AJAX: Track vendor download of promotional banner.
+     *
+     * Incrementa el contador download_count en lt_marketing_banners cuando
+     * un vendedor descarga material promocional desde su dashboard.
+     *
+     * @return void
+     */
+    public function ajax_track_banner_download(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $banner_id = absint( $_POST['banner_id'] ?? 0 );
+        if ( ! $banner_id ) {
+            wp_send_json_error( [ 'message' => __( 'Banner ID inválido.', 'ltms' ) ], 400 );
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_marketing_banners';
+
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE `{$table}` SET download_count = download_count + 1 WHERE id = %d",
+                $banner_id
+            )
+        );
+        // phpcs:enable
+
+        wp_send_json_success( [ 'message' => __( 'Descarga registrada.', 'ltms' ) ] );
     }
 }

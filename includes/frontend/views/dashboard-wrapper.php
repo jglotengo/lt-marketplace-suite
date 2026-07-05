@@ -30,6 +30,7 @@ $nav_items = [
     [ 'view' => 'shipping-statement', 'icon' => '🧾', 'label' => __( 'Fletes', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
     [ 'view' => 'bookings', 'icon' => '🏨', 'label' => __( 'Reservas', 'ltms' ) ],
+    [ 'view' => 'marketing', 'icon' => '🎨', 'label' => __( 'Marketing', 'ltms' ) ],
     [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
 ];
 
@@ -218,6 +219,10 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
 
         <div class="ltms-view-section" id="ltms-view-bookings" style="display:none;">
             <?php include __DIR__ . '/view-bookings.php'; ?>
+        </div>
+
+        <div class="ltms-view-section" id="ltms-view-marketing" style="display:none;">
+            <?php include __DIR__ . '/view-marketing.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">
