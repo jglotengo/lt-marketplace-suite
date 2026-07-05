@@ -2494,8 +2494,9 @@
             // En desarrollo, no interferir
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
 
+            // v2.9.31: reducir duración de 8s a 4s — menos intrusivo.
             toast('error', 'Algo salió mal', 'Se produjo un error inesperado. Si persiste, recarga la página.', {
-                duration: 8000,
+                duration: 4000,
                 action: {
                     label: 'Recargar',
                     action: () => window.location.reload(),

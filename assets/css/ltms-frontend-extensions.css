@@ -1089,3 +1089,196 @@
     }
     .ltms-user-dropdown { right: 0; left: auto; min-width: 160px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v2.9.31 — UX/UI FIXES (Auditoría completa del storefront)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ERROR TOAST — menos intrusivo ──────────────────────────── */
+/* El error boundary del JS muestra popups "Algo salió mal" que son
+   demasiado grandes y persistentes. Hacerlos más pequeños y auto-dismiss. */
+.ltms-toast.ltms-toast-error {
+    max-width: 320px !important;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+    opacity: 0.92 !important;
+    z-index: 99990 !important;
+}
+.ltms-toast.ltms-toast-error .ltms-toast-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+.ltms-toast.ltms-toast-error .ltms-toast-message {
+    font-size: 11px !important;
+}
+/* Auto-dismiss después de 4s en lugar de 8s */
+.ltms-toast.ltms-toast-error .ltms-toast-close {
+    display: block !important;
+}
+
+/* ── 2. PRODUCT PAGE — alineación y espaciado ──────────────────── */
+/* Fix: la imagen del producto y el formulario deben estar alineados */
+.woocommerce div.product div.images,
+.woocommerce div.product div.summary {
+    margin-bottom: 20px !important;
+}
+.woocommerce div.product div.images {
+    text-align: center;
+}
+.woocommerce div.product div.images img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+/* El summary (formulario de compra) debe tener padding consistente */
+.woocommerce div.product div.summary {
+    padding: 0 10px;
+}
+/* Fix: el botón "Añadir al carrito" debe tener margen superior */
+.woocommerce div.product form.cart {
+    margin-top: 16px !important;
+    padding-top: 16px !important;
+    border-top: 1px solid #f0f0f0;
+}
+/* Fix: productos relacionados deben estar alineados con el contenedor principal */
+.woocommerce .related.products,
+.woocommerce .upsells.products {
+    clear: both;
+    width: 100%;
+    margin-top: 40px !important;
+    padding-top: 24px;
+    border-top: 1px solid #f0f0f0;
+}
+.woocommerce .related.products h2,
+.woocommerce .upsells.products h2 {
+    margin-bottom: 16px !important;
+    font-size: 1.2rem !important;
+}
+
+/* ── 3. GIFT OPTIONS — fondo menos agresivo ────────────────────── */
+/* El fondo amarillo #fef3c7 es demasiado llamativo. Cambiar a un
+   tono más sutil que no compita con el botón de compra. */
+.ltms-gift-options {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+}
+
+/* ── 4. CHECKOUT — espaciado y alineación ──────────────────────── */
+/* Fix: campos de formulario con espaciado consistente */
+.woocommerce-checkout .form-row {
+    padding: 4px 0 !important;
+    margin-bottom: 12px !important;
+}
+.woocommerce-checkout .form-row-first,
+.woocommerce-checkout .form-row-last {
+    width: 48% !important;
+    float: left !important;
+    clear: none !important;
+}
+.woocommerce-checkout .form-row-last {
+    margin-right: 0 !important;
+}
+.woocommerce-checkout .form-row-first {
+    margin-right: 4% !important;
+}
+/* Fix: separar el formulario del resumen del carrito */
+.woocommerce-checkout #customer_details {
+    margin-bottom: 30px !important;
+}
+.woocommerce-checkout #order_review_heading,
+.woocommerce-checkout #order_review {
+    clear: both !important;
+    margin-top: 20px !important;
+}
+/* Fix: el resumen del carrito debe tener margen consistente */
+.woocommerce-checkout-review-order-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* ── 5. HEADER — alineación de elementos ───────────────────────── */
+/* Fix: logo, buscador y carrito deben estar alineados verticalmente */
+.ltms-header-nav-wrapper,
+.ltms-site-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+.ltms-site-header .ltms-header-logo,
+.ltms-site-header .ltms-header-search,
+.ltms-site-header .ltms-header-cart {
+    display: flex !important;
+    align-items: center !important;
+}
+/* Fix: el buscador central debe tener margen equilibrado */
+.ltms-site-header .ltms-header-search {
+    flex: 1;
+    max-width: 500px;
+    margin: 0 20px;
+}
+
+/* ── 6. COOKIE BANNER — menos invasivo ─────────────────────────── */
+/* Fix: hacer el banner más compacto y con mejor contraste */
+#ltms-cookie-banner,
+.ltms-cookie-banner {
+    padding: 8px 20px !important;
+    font-size: 12px !important;
+}
+#ltms-cookie-banner .ltms-cookie-actions,
+.ltms-cookie-banner .ltms-cookie-actions {
+    display: flex !important;
+    gap: 8px !important;
+}
+#ltms-cookie-banner button,
+.ltms-cookie-banner button {
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+}
+
+/* ── 7. HOMEPAGE — categorías y secciones promocionales ────────── */
+/* Fix: las categorías deben tener espaciado uniforme */
+.ltms-homepage-categories {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+    justify-content: center !important;
+    margin: 24px 0 !important;
+}
+.ltms-homepage-category-btn {
+    min-width: 140px !important;
+    text-align: center !important;
+    padding: 10px 20px !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+
+/* ── 8. RESPONSIVE — mobile fixes ──────────────────────────────── */
+@media (max-width: 768px) {
+    /* Product page: stack imagen arriba, formulario abajo */
+    .woocommerce div.product div.images,
+    .woocommerce div.product div.summary {
+        width: 100% !important;
+        float: none !important;
+        padding: 0 !important;
+    }
+    /* Checkout: campos a 100% en mobile */
+    .woocommerce-checkout .form-row-first,
+    .woocommerce-checkout .form-row-last {
+        width: 100% !important;
+        float: none !important;
+        margin-right: 0 !important;
+    }
+    /* Header: reducir elementos en mobile */
+    .ltms-site-header .ltms-header-search {
+        display: none !important;
+    }
+    /* Toast: más pequeño en mobile */
+    .ltms-toast.ltms-toast-error {
+        max-width: calc(100vw - 32px) !important;
+        left: 16px !important;
+        right: 16px !important;
+    }
+}
