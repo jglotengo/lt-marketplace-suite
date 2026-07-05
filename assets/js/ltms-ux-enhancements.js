@@ -547,7 +547,17 @@
     function initAjaxErrorInterceptor() {
         if (typeof jQuery === 'undefined') return;
 
+        // v2.9.31: DISABLED — el interceptor mostraba toast por cada AJAX
+        // que fallaba (incluso third-party plugins), saturando al usuario
+        // con popups "Error". Solo loguear a consola.
+        const SHOW_AJAX_ERROR_TOASTS = false;
+
         jQuery(document).ajaxError((event, jqXHR, settings, error) => {
+            // Siempre loguear a consola para debug
+            console.error('[LTMS.UX] AJAX error:', settings.url, jqXHR.status, jqXHR.statusText);
+
+            if (!SHOW_AJAX_ERROR_TOASTS) return;
+
             // Ignorar peticiones abortadas
             if (jqXHR.statusText === 'abort') return;
 
@@ -2484,9 +2494,18 @@
      */
 
     function initErrorBoundaries() {
+        // v2.9.31: DISABLED — el error boundary mostraba popups "Algo salió mal"
+        // por errores JS menores que no afectan la funcionalidad. Solo loguear
+        // a consola sin mostrar toast al usuario.
+        // Para reactivar: cambiar el flag abajo a true.
+
+        const SHOW_ERROR_TOASTS = false; // Cambiar a true para debug
+
         // Errores JS no capturados
         window.addEventListener('error', (e) => {
             console.error('[LTMS.UX] Error capturado:', e.error || e.message);
+
+            if (!SHOW_ERROR_TOASTS) return;
 
             // No mostrar toast para errores de red de recursos (img, script)
             if (e.target && e.target.tagName) return;
@@ -2494,7 +2513,6 @@
             // En desarrollo, no interferir
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
 
-            // v2.9.31: reducir duración de 8s a 4s — menos intrusivo.
             toast('error', 'Algo salió mal', 'Se produjo un error inesperado. Si persiste, recarga la página.', {
                 duration: 4000,
                 action: {
@@ -2507,6 +2525,8 @@
         // Promesas rechazadas no capturadas
         window.addEventListener('unhandledrejection', (e) => {
             console.error('[LTMS.UX] Promesa rechazada:', e.reason);
+
+            if (!SHOW_ERROR_TOASTS) return;
 
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
 
