@@ -809,6 +809,35 @@ final class LTMS_Donation_Manager {
     }
 
     /**
+     * v2.9.31: Estadísticas de donaciones de un vendor (transparency page).
+     *
+     * @param int $vendor_id Vendor ID.
+     * @return array{total: float, orders: int}
+     */
+    public static function get_vendor_donation_stats( int $vendor_id ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_DONATIONS;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT
+                    COALESCE(SUM(total_donation), 0) AS total,
+                    COUNT(*) AS orders
+                 FROM `{$table}`
+                 WHERE vendor_id = %d AND status != 'reversed'",
+                $vendor_id
+            ),
+            ARRAY_A
+        );
+
+        return [
+            'total'  => (float) ( $row['total'] ?? 0 ),
+            'orders' => (int) ( $row['orders'] ?? 0 ),
+        ];
+    }
+
+    /**
      * Manually trigger a payout (admin action).
      *
      * @param int $admin_id WP user ID of the admin triggering the payout.
