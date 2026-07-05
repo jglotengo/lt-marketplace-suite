@@ -78,6 +78,19 @@ final class LTMS_Dashboard_Logic {
         // v2.9.31: Activity Feed — endpoint faltante que causaba error AJAX en home del vendor.
         add_action( 'wp_ajax_ltms_get_activity_feed',           [ $instance, 'ajax_get_activity_feed' ] );
 
+        // v2.9.31: Endpoints faltantes que causaban error "Algo salió mal" en el storefront.
+        add_action( 'wp_ajax_ltms_backorder_notify',            [ $instance, 'ajax_backorder_notify' ] );
+        add_action( 'wp_ajax_nopriv_ltms_backorder_notify',     [ $instance, 'ajax_backorder_notify' ] );
+        add_action( 'wp_ajax_ltms_get_invoices',                [ $instance, 'ajax_get_invoices' ] );
+        add_action( 'wp_ajax_ltms_review_helpful',              [ $instance, 'ajax_review_helpful' ] );
+        add_action( 'wp_ajax_nopriv_ltms_review_helpful',       [ $instance, 'ajax_review_helpful' ] );
+        add_action( 'wp_ajax_ltms_save_push_subscription',      [ $instance, 'ajax_save_push_subscription' ] );
+        add_action( 'wp_ajax_nopriv_ltms_save_push_subscription', [ $instance, 'ajax_save_push_subscription' ] );
+        add_action( 'wp_ajax_ltms_submit_question',             [ $instance, 'ajax_submit_question' ] );
+        add_action( 'wp_ajax_nopriv_ltms_submit_question',      [ $instance, 'ajax_submit_question' ] );
+        add_action( 'wp_ajax_ltms_submit_return',               [ $instance, 'ajax_submit_return' ] );
+        add_action( 'wp_ajax_nopriv_ltms_submit_return',        [ $instance, 'ajax_submit_return' ] );
+
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
     }
@@ -1794,5 +1807,170 @@ final class LTMS_Dashboard_Logic {
         $activities = array_slice( $activities, 0, $limit );
 
         wp_send_json_success( [ 'activities' => $activities ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Notificar cuando un producto está agotado (backorder).
+     * El usuario se suscribe para ser notificado cuando el producto vuelva a tener stock.
+     */
+    public function ajax_backorder_notify(): void {
+        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+
+        $product_id = absint( $_POST['product_id'] ?? 0 );
+        $email      = sanitize_email( $_POST['email'] ?? '' );
+
+        if ( ! $product_id || ! is_email( $email ) ) {
+            wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
+        }
+
+        // Guardar suscripción en user_meta o en una tabla custom.
+        // Por ahora, guardar en options como array simple.
+        $subscriptions = get_option( 'ltms_backorder_subscriptions', [] );
+        if ( ! is_array( $subscriptions ) ) $subscriptions = [];
+
+        $subscriptions[] = [
+            'product_id' => $product_id,
+            'email'      => $email,
+            'created_at' => current_time( 'mysql', true ),
+        ];
+        update_option( 'ltms_backorder_subscriptions', $subscriptions );
+
+        wp_send_json_success( [ 'message' => __( 'Te notificaremos cuando el producto vuelva a estar disponible.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Obtener facturas del vendor (shipping ledger invoices).
+     */
+    public function ajax_get_invoices(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_carrier_invoices';
+        $invoices = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM `{$table}` WHERE vendor_id = %d ORDER BY created_at DESC LIMIT 50",
+            $user_id
+        ), ARRAY_A );
+
+        wp_send_json_success( [ 'invoices' => $invoices ?: [] ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Marcar una reseña como útil (helpful).
+     */
+    public function ajax_review_helpful(): void {
+        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+
+        $review_id = absint( $_POST['review_id'] ?? 0 );
+        if ( ! $review_id ) {
+            wp_send_json_error( [ 'message' => __( 'Reseña inválida.', 'ltms' ) ], 400 );
+        }
+
+        $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
+        $helpful_count++;
+        update_comment_meta( $review_id, 'ltms_helpful_count', $helpful_count );
+
+        wp_send_json_success( [ 'count' => $helpful_count ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Guardar suscripción a push notifications (web push).
+     */
+    public function ajax_save_push_subscription(): void {
+        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+
+        $endpoint = sanitize_text_field( $_POST['endpoint'] ?? '' );
+        $keys     = $_POST['keys'] ?? [];
+
+        if ( empty( $endpoint ) ) {
+            wp_send_json_error( [ 'message' => __( 'Endpoint inválido.', 'ltms' ) ], 400 );
+        }
+
+        // Guardar suscripción en user_meta (si está logueado) o en sesión.
+        $user_id = get_current_user_id();
+        if ( $user_id ) {
+            update_user_meta( $user_id, 'ltms_push_endpoint', $endpoint );
+            update_user_meta( $user_id, 'ltms_push_keys', $keys );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Suscripción guardada.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Enviar pregunta sobre un producto (Q&A).
+     */
+    public function ajax_submit_question(): void {
+        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+
+        $product_id = absint( $_POST['product_id'] ?? 0 );
+        $question   = sanitize_textarea_field( $_POST['question'] ?? '' );
+        $name       = sanitize_text_field( $_POST['name'] ?? '' );
+        $email      = sanitize_email( $_POST['email'] ?? '' );
+
+        if ( ! $product_id || empty( $question ) || ! is_email( $email ) ) {
+            wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
+        }
+
+        // Guardar la pregunta como comentario pendiente.
+        $comment_data = [
+            'comment_post_ID'      => $product_id,
+            'comment_author'       => $name ?: __( 'Anónimo', 'ltms' ),
+            'comment_author_email' => $email,
+            'comment_content'      => $question,
+            'comment_type'         => 'ltms_question',
+            'comment_approved'     => 0,
+        ];
+        $comment_id = wp_insert_comment( $comment_data );
+
+        if ( ! $comment_id ) {
+            wp_send_json_error( [ 'message' => __( 'Error al guardar la pregunta.', 'ltms' ) ], 500 );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Tu pregunta fue enviada. Te notificaremos cuando el vendedor responda.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Solicitar devolución de un producto.
+     */
+    public function ajax_submit_return(): void {
+        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+
+        $order_id   = absint( $_POST['order_id'] ?? 0 );
+        $product_id = absint( $_POST['product_id'] ?? 0 );
+        $reason     = sanitize_textarea_field( $_POST['reason'] ?? '' );
+        $type       = sanitize_text_field( $_POST['type'] ?? 'refund' );
+
+        if ( ! $order_id || ! $product_id || empty( $reason ) ) {
+            wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
+        }
+
+        // Verificar que el pedido pertenece al usuario.
+        $order = wc_get_order( $order_id );
+        if ( ! $order || (int) $order->get_customer_id() !== get_current_user_id() ) {
+            wp_send_json_error( [ 'message' => __( 'Pedido no encontrado.', 'ltms' ) ], 404 );
+        }
+
+        // Guardar la solicitud de devolución.
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_returns';
+        $wpdb->insert( $table, [
+            'order_id'   => $order_id,
+            'product_id' => $product_id,
+            'user_id'    => get_current_user_id(),
+            'reason'     => $reason,
+            'type'       => $type,
+            'status'     => 'pending',
+            'created_at' => current_time( 'mysql', true ),
+        ], [ '%d', '%d', '%d', '%s', '%s', '%s', '%s' ] );
+
+        wp_send_json_success( [ 'message' => __( 'Solicitud de devolución enviada. Te contactaremos pronto.', 'ltms' ) ] );
     }
 }
