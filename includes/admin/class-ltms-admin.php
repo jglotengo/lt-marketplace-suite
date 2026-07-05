@@ -276,9 +276,14 @@ final class LTMS_Admin {
                 'callback'   => [ 'LTMS_Admin_Cross_Border', 'render_dashboard' ],
             ],
             // v2.8.3 — Shipping Cost Ledger & Reconciliation Engine
-            // NOTA: 'Logística / Costos' (ltms-shipping-ledger) se registra en
-            // class-ltms-admin-shipping-ledger.php via add_submenu() en admin_menu.
-            // NO duplicarlo aquí para evitar que aparezca dos veces en el menú.
+            [
+                'parent'     => 'ltms-dashboard',
+                'page_title' => __( 'Logística / Costos', 'ltms' ),
+                'menu_title' => __( 'Logística / Costos', 'ltms' ),
+                'capability' => 'ltms_view_wallet_ledger',
+                'slug'       => 'ltms-shipping-ledger',
+                'callback'   => [ 'LTMS_Admin_Shipping_Ledger', 'render_page' ],
+            ],
         ];
 
         foreach ( $submenus as $submenu ) {
