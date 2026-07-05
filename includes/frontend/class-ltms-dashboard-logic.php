@@ -1814,7 +1814,7 @@ final class LTMS_Dashboard_Logic {
      * El usuario se suscribe para ser notificado cuando el producto vuelva a tener stock.
      */
     public function ajax_backorder_notify(): void {
-        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         $product_id = absint( $_POST['product_id'] ?? 0 );
         $email      = sanitize_email( $_POST['email'] ?? '' );
@@ -1867,7 +1867,7 @@ final class LTMS_Dashboard_Logic {
      * v2.9.31 — AJAX: Marcar una reseña como útil (helpful).
      */
     public function ajax_review_helpful(): void {
-        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         $review_id = absint( $_POST['review_id'] ?? 0 );
         if ( ! $review_id ) {
@@ -1885,7 +1885,7 @@ final class LTMS_Dashboard_Logic {
      * v2.9.31 — AJAX: Guardar suscripción a push notifications (web push).
      */
     public function ajax_save_push_subscription(): void {
-        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         $endpoint = sanitize_text_field( $_POST['endpoint'] ?? '' );
         $keys     = $_POST['keys'] ?? [];
@@ -1908,7 +1908,7 @@ final class LTMS_Dashboard_Logic {
      * v2.9.31 — AJAX: Enviar pregunta sobre un producto (Q&A).
      */
     public function ajax_submit_question(): void {
-        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         $product_id = absint( $_POST['product_id'] ?? 0 );
         $question   = sanitize_textarea_field( $_POST['question'] ?? '' );
@@ -1941,7 +1941,7 @@ final class LTMS_Dashboard_Logic {
      * v2.9.31 — AJAX: Solicitar devolución de un producto.
      */
     public function ajax_submit_return(): void {
-        check_ajax_referer( 'ltms_storefront_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         $order_id   = absint( $_POST['order_id'] ?? 0 );
         $product_id = absint( $_POST['product_id'] ?? 0 );
