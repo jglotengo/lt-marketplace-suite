@@ -130,7 +130,7 @@ class LTMS_Admin_UX_Status {
 
             <?php if ( ! $metrics['min_files_exist'] ) : ?>
             <div class="ltms-ux-status-notice ltms-ux-status-notice-info">
-                ⚠️ <?php esc_html_e( 'Los archivos .min aún no están generados. Ejecuta: node /home/z/my-project/scripts/build-minify.js', 'ltms' ); ?>
+                ⚠️ <?php esc_html_e( 'Algunos archivos .min no están presentes en el servidor. Ejecuta: git checkout origin/main -- assets/css/ltms-admin-ux.min.css assets/js/ltms-ux-enhancements.min.js assets/css/ltms-ux-enhancements.min.css desde el directorio del plugin.', 'ltms' ); ?>
             </div>
             <?php endif; ?>
 
