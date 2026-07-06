@@ -189,10 +189,13 @@ class LTMS_Logistics_Compliance {
         add_filter( 'ltms_alegra_invoice_payload', [ __CLASS__, 'add_carta_porte_to_alegra_invoice' ], 10, 2 );
 
         // LT-2: Validación RNT-Mintransporte (CO).
-        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_carrier_rnt' ], 10, 2 );
+        // v2.9.38: WooCommerce pasa solo 1 argumento ($method_id string) a este hook.
+        // El método esperaba 2 ($method_id + $method object) causando fatal error.
+        // Aceptar argumentos opcionales para compatibilidad.
+        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_carrier_rnt' ], 10, 1 );
 
         // LT-3: Validación permiso SCT (MX).
-        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_sct_permit' ], 10, 2 );
+        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_sct_permit' ], 10, 1 );
 
         // LT-4: Pesos y dimensiones máximas (NOM-012).
         add_action( 'woocommerce_check_cart_items', [ __CLASS__, 'validate_weight_dimensions' ] );
@@ -406,7 +409,7 @@ class LTMS_Logistics_Compliance {
      *
      * Resolución 4146/2016 Mintransporte.
      */
-    public static function validate_carrier_rnt( string $method_id, \WC_Shipping_Method $method ): void {
+    public static function validate_carrier_rnt( string $method_id, $method = null ): void {
         $country = LTMS_Core_Config::get_country();
         if ( $country !== 'CO' ) return;
 
@@ -463,7 +466,7 @@ class LTMS_Logistics_Compliance {
      *
      * Ley de Caminos, Puentes y Autotransporte Federal art. 5.
      */
-    public static function validate_sct_permit( string $method_id, \WC_Shipping_Method $method ): void {
+    public static function validate_sct_permit( string $method_id, $method = null ): void {
         $country = LTMS_Core_Config::get_country();
         if ( $country !== 'MX' ) return;
 
