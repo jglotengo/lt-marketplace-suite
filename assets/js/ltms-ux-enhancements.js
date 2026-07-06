@@ -9138,13 +9138,19 @@
     let cartRecoveryShown = false;
 
     function initAbandonedCartRecovery() {
-        // v2.9.44: NO mostrar en página de carrito, checkout, ni order-received
+        // v2.9.46: DESACTIVADO completamente — el modal es demasiado intrusivo
+        // y se dispara en momentos inapropiados (al añadir al carrito, al mover
+        // el mouse, etc.). Se reactivará solo cuando se configure correctamente
+        // con un delay mínimo de 60s y solo en intenciones reales de salida.
+        return;
+
+        /* CÓDIGO ORIGINAL DESACTIVADO:
         if (document.body.classList.contains('woocommerce-checkout')) return;
         if (document.body.classList.contains('woocommerce-order-received')) return;
         if (document.body.classList.contains('woocommerce-cart')) return;
         if (document.querySelector('.ltms-auth-container')) return;
-        // NO mostrar si el carrito drawer está abierto
         if (cartDrawerState.drawer) return;
+        */
 
         // Detectar mouseleave hacia la parte superior (intención de salir)
         document.addEventListener('mouseleave', (e) => {
