@@ -5542,15 +5542,21 @@
     }
 
     function initCartDrawer() {
-        // Hook en botones de carrito existentes
+        // v2.9.37: Hook en TODOS los botones/enlaces de carrito del marketplace.
+        // Selectores ampliados para capturar todos los botones de carrito.
         document.addEventListener('click', (e) => {
-            const cartTrigger = e.target.closest('.ltms-sf-topbar-cart, .ltms-cart-trigger, [data-cart-drawer]');
+            const cartTrigger = e.target.closest(
+                '.ltms-sf-topbar-cart, .ltms-cart-trigger, [data-cart-drawer], ' +
+                '.site-header-cart, .cart-contents, .wc-block-mini-cart__button, ' +
+                'a[href*="/carrito"], a[href*="/cart"], ' +
+                '.ltms-header-cart, .ltms-cart-icon, .ltms-cart-link'
+            );
             if (!cartTrigger) return;
 
-            // Solo si no es un enlace directo al carrito
-            if (cartTrigger.tagName === 'A' && !cartTrigger.dataset.cartDrawer) return;
-
+            // Si es un <a> con href al carrito, SIEMPRE abrir el drawer
+            // (antes se saltaba si no tenía data-cart-drawer).
             e.preventDefault();
+            e.stopPropagation();
             openCartDrawer();
         });
 
@@ -5558,6 +5564,14 @@
         if (typeof jQuery !== 'undefined') {
             jQuery(document.body).on('updated_cart_totals', () => {
                 if (cartDrawerState.drawer) loadCartContents();
+            });
+            // También actualizar cuando se añade un producto
+            jQuery(document.body).on('added_to_cart', () => {
+                if (cartDrawerState.drawer) loadCartContents();
+                // Actualizar contador visible en el header
+                jQuery('.ltms-sf-cart-count').each(function() {
+                    jQuery(this).text('?'); // Se actualizará vía fragments
+                });
             });
         }
     }
