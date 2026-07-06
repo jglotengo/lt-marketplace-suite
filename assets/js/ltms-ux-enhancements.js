@@ -5418,15 +5418,18 @@
             return;
         }
 
+        // v2.9.36: NO usar escapeHtml en price_formatted ni total_formatted
+        // porque ya vienen sanitizados con wp_strip_all_tags() desde PHP.
+        // escapeHtml convierte &#36; → &amp;#36; rompiendo los precios.
         container.innerHTML = data.items.map((item) => `
             <div class="ltms-cart-item" data-cart-item-key="${escapeHtml(item.key)}">
                 <div class="ltms-cart-item-img">
-                    ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}">` : '<div class="ltms-cart-item-no-img">📦</div>'}
+                    ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy">` : '<div class="ltms-cart-item-no-img">📦</div>'}
                 </div>
                 <div class="ltms-cart-item-info">
-                    <div class="ltms-cart-item-name">${escapeHtml(item.name)}</div>
+                    <a href="${escapeHtml(item.product_url || '#')}" class="ltms-cart-item-name">${escapeHtml(item.name)}</a>
                     ${item.variation ? `<div class="ltms-cart-item-variation">${escapeHtml(item.variation)}</div>` : ''}
-                    <div class="ltms-cart-item-price">${escapeHtml(item.price_formatted || '')}</div>
+                    <div class="ltms-cart-item-price">${item.price_formatted || ''}</div>
                     <div class="ltms-cart-item-qty">
                         <button type="button" class="ltms-cart-qty-btn ltms-cart-qty-dec" data-key="${escapeHtml(item.key)}" aria-label="Disminuir">−</button>
                         <span class="ltms-cart-qty-value">${item.quantity}</span>
@@ -5469,25 +5472,72 @@
     }
 
     function updateCartQty(key, change) {
-        if (typeof jQuery === 'undefined') return;
-        jQuery.post(wc_cart_fragments_params ? wc_cart_fragments_params.ajax_url : '/wp-admin/admin-ajax.php', {
-            action: 'woocommerce_update_cart',
-            cart_key: key,
-            quantity_change: change,
-        }, () => {
-            loadCartContents();
-            announce('Carrito actualizado');
-        });
+        // v2.9.36: usar ltms_get_cart para refrescar después de actualizar.
+        // Primero obtener la cantidad actual, luego actualizar via WC.
+        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)
+            || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
+            || '/wp-admin/admin-ajax.php';
+
+        // Buscar la cantidad actual en el DOM
+        const qtyEl = document.querySelector(`[data-cart-item-key="${key}"] .ltms-cart-qty-value`);
+        const currentQty = qtyEl ? parseInt(qtyEl.textContent) : 1;
+        const newQty = Math.max(1, currentQty + change);
+
+        // Usar WooCommerce's built-in cart update via fragments
+        if (typeof jQuery !== 'undefined' && typeof wc_add_to_cart_params !== 'undefined') {
+            jQuery.post(ajaxUrl, {
+                action: 'woocommerce_set_cart_quantity',
+                cart_key: key,
+                cart_quantity: newQty,
+            }, () => {
+                loadCartContents();
+                announce('Carrito actualizado');
+            }).fail(() => {
+                // Fallback: recargar datos del carrito
+                loadCartContents();
+            });
+        } else {
+            // Sin jQuery, usar fetch
+            const body = new URLSearchParams();
+            body.append('action', 'ltms_drawer_update_qty');
+            body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
+            body.append('cart_item_key', key);
+            body.append('qty', newQty);
+            fetch(ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: body.toString(),
+            }).then(() => {
+                loadCartContents();
+                announce('Carrito actualizado');
+            }).catch(() => {
+                loadCartContents();
+            });
+        }
     }
 
     function removeCartItem(key) {
-        if (typeof jQuery === 'undefined') return;
-        jQuery.post(wc_cart_fragments_params ? wc_cart_fragments_params.ajax_url : '/wp-admin/admin-ajax.php', {
-            action: 'woocommerce_remove_cart_item',
-            cart_key: key,
-        }, () => {
+        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)
+            || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
+            || '/wp-admin/admin-ajax.php';
+
+        // v2.9.36: usar ltms_drawer_remove_item (soporta guests) en vez de
+        // woocommerce_remove_cart_item (requiere nonce de WC que puede no estar).
+        const body = new URLSearchParams();
+        body.append('action', 'ltms_drawer_remove_item');
+        body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
+        body.append('cart_item_key', key);
+        fetch(ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+        }).then(() => {
             loadCartContents();
             announce('Producto eliminado del carrito');
+        }).catch(() => {
+            loadCartContents();
         });
     }
 
