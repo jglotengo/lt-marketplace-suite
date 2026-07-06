@@ -16,8 +16,11 @@
         init: function() {
             this.nonce = typeof ltmsDrawerData !== 'undefined' ? ltmsDrawerData.nonce : '';
 
-            // Open drawer on add-to-cart.
-            $(document.body).on('added_to_cart', this.openAfterAdd.bind(this));
+            // v2.9.45: NO abrir drawer viejo en added_to_cart.
+            // El cart drawer de ltms-ux-enhancements.js maneja esto ahora.
+            // El drawer viejo abría un overlay (#ltms-cart-drawer-overlay) que
+            // se quedaba pegado y bloqueaba la página.
+            // $(document.body).on('added_to_cart', this.openAfterAdd.bind(this));
             $(document.body).on('wc_cart_fragment_refreshed', this.refresh.bind(this));
 
             // Close drawer.
