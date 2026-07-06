@@ -9138,10 +9138,13 @@
     let cartRecoveryShown = false;
 
     function initAbandonedCartRecovery() {
-        // Solo en páginas con carrito (no checkout, no order-received)
+        // v2.9.44: NO mostrar en página de carrito, checkout, ni order-received
         if (document.body.classList.contains('woocommerce-checkout')) return;
         if (document.body.classList.contains('woocommerce-order-received')) return;
+        if (document.body.classList.contains('woocommerce-cart')) return;
         if (document.querySelector('.ltms-auth-container')) return;
+        // NO mostrar si el carrito drawer está abierto
+        if (cartDrawerState.drawer) return;
 
         // Detectar mouseleave hacia la parte superior (intención de salir)
         document.addEventListener('mouseleave', (e) => {
