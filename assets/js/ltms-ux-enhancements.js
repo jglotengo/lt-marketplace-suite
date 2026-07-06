@@ -368,7 +368,7 @@
         applyTheme(getStoredTheme());
 
         document.addEventListener('click', (e) => {
-            const toggle = e.target.closest('.ltms-theme-toggle');
+            const toggle = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-theme-toggle');
             if (!toggle) return;
 
             const current = getStoredTheme();
@@ -385,7 +385,7 @@
 
     function initCopyButtons() {
         document.addEventListener('click', async (e) => {
-            const btn = e.target.closest('[data-copy]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-copy]');
             if (!btn) return;
             e.preventDefault();
 
@@ -466,7 +466,7 @@
 
     // Interceptar data-confirm="true" en clicks
     document.addEventListener('click', async (e) => {
-        const el = e.target.closest('[data-confirm-message]');
+        const el = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-confirm-message]');
         if (!el) return;
         e.preventDefault();
 
@@ -743,7 +743,7 @@
 
     function initPasswordToggles() {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.ltms-toggle-password');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-toggle-password');
             if (!btn) return;
 
             const targetId = btn.dataset.target;
@@ -814,7 +814,7 @@
 
     function initRefreshButton() {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.ltms-refresh-btn');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-refresh-btn');
             if (!btn) return;
 
             btn.classList.add('spinning');
@@ -833,7 +833,7 @@
     function initNotificationsPanel() {
         // Close button del panel de notificaciones
         document.addEventListener('click', (e) => {
-            const closeBtn = e.target.closest('.ltms-notif-close');
+            const closeBtn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-notif-close');
             if (closeBtn) {
                 const panel = document.querySelector('.ltms-notifications-panel');
                 if (panel) {
@@ -846,7 +846,7 @@
             }
 
             // Mark all as read
-            const markAllBtn = e.target.closest('.ltms-notif-mark-all');
+            const markAllBtn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-notif-mark-all');
             if (markAllBtn) {
                 e.preventDefault();
                 const unreadItems = document.querySelectorAll('.ltms-notif-item.unread');
@@ -1738,7 +1738,7 @@
     function initTour() {
         // Click en botones de tour
         document.addEventListener('click', (e) => {
-            const action = e.target.closest('[data-tour-action]');
+            const action = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-tour-action]');
             if (action) {
                 e.preventDefault();
                 const act = action.dataset.tourAction;
@@ -1749,7 +1749,7 @@
             }
 
             // Launcher button
-            const launcher = e.target.closest('.ltms-tour-launcher');
+            const launcher = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-tour-launcher');
             if (launcher) {
                 e.preventDefault();
                 startTour();
@@ -2170,7 +2170,7 @@
         document.addEventListener('change', (e) => {
             if (!e.target.matches('.ltms-bulk-checkbox')) return;
 
-            const table = e.target.closest('.ltms-bulk-table');
+            const table = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-bulk-table');
             if (!table) return;
 
             updateBulkSelection(table);
@@ -2180,7 +2180,7 @@
         document.addEventListener('change', (e) => {
             if (!e.target.matches('.ltms-bulk-select-all')) return;
 
-            const table = e.target.closest('.ltms-bulk-table');
+            const table = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-bulk-table');
             if (!table) return;
 
             const checkboxes = table.querySelectorAll('.ltms-bulk-checkbox');
@@ -2193,7 +2193,7 @@
 
         // Bulk action button
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-bulk-action]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-bulk-action]');
             if (!btn) return;
 
             const table = btn.closest('.ltms-bulk-table') || document.querySelector('.ltms-bulk-table');
@@ -2285,7 +2285,7 @@
 
         // Drag & drop zones
         document.addEventListener('dragover', (e) => {
-            const zone = e.target.closest('.ltms-dropzone');
+            const zone = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-dropzone');
             if (!zone) return;
 
             e.preventDefault();
@@ -2293,7 +2293,7 @@
         });
 
         document.addEventListener('dragleave', (e) => {
-            const zone = e.target.closest('.ltms-dropzone');
+            const zone = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-dropzone');
             if (!zone) return;
 
             // Solo remover si salimos de la zona completamente
@@ -2303,7 +2303,7 @@
         });
 
         document.addEventListener('drop', (e) => {
-            const zone = e.target.closest('.ltms-dropzone');
+            const zone = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-dropzone');
             if (!zone) return;
 
             e.preventDefault();
@@ -2662,7 +2662,7 @@
     function initContextualHelp() {
         // Tooltip en hover/focus para elementos con data-help
         const showHelp = (e) => {
-            const target = e.target.closest('[data-help]');
+            const target = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-help]');
             if (!target) return;
             const text = target.dataset.help;
             if (!text) return;
@@ -2937,7 +2937,7 @@
                 header.appendChild(filters);
 
                 filters.addEventListener('click', (e) => {
-                    const btn = e.target.closest('.ltms-notif-filter');
+                    const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-notif-filter');
                     if (!btn) return;
 
                     filters.querySelectorAll('.ltms-notif-filter').forEach((b) => b.classList.remove('active'));
@@ -3295,7 +3295,7 @@
         };
 
         document.addEventListener('dragstart', (e) => {
-            const widget = e.target.closest('.ltms-draggable-widget');
+            const widget = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-draggable-widget');
             if (!widget) return;
 
             draggedEl = widget;
@@ -3307,7 +3307,7 @@
         });
 
         document.addEventListener('dragend', (e) => {
-            const widget = e.target.closest('.ltms-draggable-widget');
+            const widget = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-draggable-widget');
             if (widget) widget.classList.remove('ltms-widget-dragging');
 
             if (placeholder && placeholder.parentNode) {
@@ -3323,7 +3323,7 @@
             if (!draggedEl) return;
 
             e.preventDefault();
-            const container = e.target.closest('.ltms-home-grid, .ltms-view-section');
+            const container = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-home-grid, .ltms-view-section');
             if (!container) return;
 
             const afterElement = getDragAfterElement(container, e.clientY);
@@ -3865,7 +3865,7 @@
     function initPerformanceOptimizations() {
         // Prefetch de páginas comunes al hover
         document.addEventListener('mouseover', throttle((e) => {
-            const link = e.target.closest('a[href]');
+            const link = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('a[href]');
             if (!link) return;
             const href = link.getAttribute('href');
             if (href && href.startsWith('/') && !link.dataset.prefetched) {
@@ -4064,7 +4064,7 @@
     // Hook para botones con data-export
     function initDataExport() {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-export-table]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-export-table]');
             if (!btn) return;
             e.preventDefault();
 
@@ -4218,7 +4218,7 @@
     function initLightbox() {
         // Click en imágenes con data-lightbox
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-lightbox]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-lightbox]');
             if (!trigger) return;
 
             e.preventDefault();
@@ -6244,7 +6244,7 @@
 
     function initQuickView() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-quick-view]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-quick-view]');
             if (!trigger) return;
             e.preventDefault();
             const productId = trigger.dataset.quickView || trigger.dataset.productId;
@@ -6322,7 +6322,7 @@
 
         // Hook en botones con data-wishlist
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-wishlist-toggle]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-wishlist-toggle]');
             if (!btn) return;
             e.preventDefault();
             const productId = btn.dataset.wishlistToggle || btn.dataset.productId;
@@ -6729,7 +6729,7 @@
 
     function initQRCode() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-qr-generate]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-qr-generate]');
             if (!trigger) return;
             e.preventDefault();
             const text = trigger.dataset.qrGenerate || window.location.href;
@@ -6910,7 +6910,7 @@
         updateCompareBadge(getCompareList().length);
 
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-compare-toggle]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-compare-toggle]');
             if (!btn) return;
             e.preventDefault();
             const productId = btn.dataset.compareToggle || btn.dataset.productId;
@@ -7166,7 +7166,7 @@
         document.addEventListener('mousemove', (e) => {
             // v2.9.32: e.target puede ser un Document o text node que no tiene .closest()
             if (!e.target || typeof e.target.closest !== 'function') return;
-            const container = e.target.closest('.ltms-zoom-container');
+            const container = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-zoom-container');
             if (!container) return;
 
             const img = container.querySelector('img');
@@ -7181,7 +7181,7 @@
         });
 
         document.addEventListener('mouseleave', (e) => {
-            const container = e.target.closest('.ltms-zoom-container');
+            const container = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-zoom-container');
             if (!container) return;
 
             const img = container.querySelector('img');
@@ -7215,7 +7215,7 @@
 
     function initAccordion() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-accordion-trigger]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-accordion-trigger]');
             if (!trigger) return;
 
             const item = trigger.closest('.ltms-accordion-item');
@@ -8450,7 +8450,7 @@
 
         // Helpful voting
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-review-helpful]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-review-helpful]');
             if (!btn) return;
             e.preventDefault();
 
@@ -8540,7 +8540,7 @@
 
         // Manual trigger
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-order-success]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-order-success]');
             if (!trigger) return;
             e.preventDefault();
             showOrderSuccess({
@@ -10007,7 +10007,7 @@
 
     function initSizeGuide() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-size-guide]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-size-guide]');
             if (!trigger) return;
             e.preventDefault();
 
@@ -10663,7 +10663,7 @@
 
     function initReturnWizard() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-return-wizard]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-return-wizard]');
             if (!trigger) return;
             e.preventDefault();
 
@@ -11188,7 +11188,7 @@
 
         // Waitlist trigger
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-waitlist-trigger]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-waitlist-trigger]');
             if (!btn) return;
             e.preventDefault();
 
@@ -11617,7 +11617,7 @@
 
     function initPriceMatch() {
         document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-price-match]');
+            const trigger = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-price-match]');
             if (!trigger) return;
             e.preventDefault();
 
@@ -11776,7 +11776,7 @@
 
     function initOneClickReorder() {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-reorder]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-reorder]');
             if (!btn) return;
             e.preventDefault();
 
@@ -11854,7 +11854,7 @@
     function initSaveCart() {
         // Save cart button
         document.addEventListener('click', (e) => {
-            const saveBtn = e.target.closest('[data-save-cart]');
+            const saveBtn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-save-cart]');
             if (!saveBtn) return;
             e.preventDefault();
 
@@ -11891,7 +11891,7 @@
 
         // Restore cart button
         document.addEventListener('click', (e) => {
-            const restoreBtn = e.target.closest('[data-restore-cart]');
+            const restoreBtn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-restore-cart]');
             if (!restoreBtn) return;
             e.preventDefault();
 
@@ -11954,7 +11954,7 @@
 
         // Delete saved cart
         document.addEventListener('click', (e) => {
-            const deleteBtn = e.target.closest('[data-delete-saved-cart]');
+            const deleteBtn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('[data-delete-saved-cart]');
             if (!deleteBtn) return;
             e.preventDefault();
 
@@ -12350,7 +12350,7 @@
     function initBottomNav() {
         // Click en items de bottom nav
         document.addEventListener('click', (e) => {
-            const item = e.target.closest('.ltms-bottom-nav-item');
+            const item = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('.ltms-bottom-nav-item');
             if (!item) return;
 
             // Botón "Más" abre el sidebar
@@ -12499,7 +12499,7 @@
 
     function initExportButtons() {
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('#ltms-export-movements, [data-export]');
+            const btn = (!e.target || typeof e.target.closest !== "function") ? null : e.target.closest('#ltms-export-movements, [data-export]');
             if (!btn) return;
             e.preventDefault();
 

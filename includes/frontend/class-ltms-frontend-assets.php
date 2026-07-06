@@ -44,6 +44,7 @@ final class LTMS_Frontend_Assets {
         // rendered by templates actually trigger their JS handlers.
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_ux_enhancements' ], 25 );
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
+        add_action( 'wp_head',            [ $instance, 'inject_ajaxurl' ], 1 );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
     }
 
@@ -789,6 +790,17 @@ final class LTMS_Frontend_Assets {
 
         $sw_url = LTMS_PLUGIN_URL . 'sw.js';
         echo '<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("' . esc_url( $sw_url ) . '").catch(()=>{});}</script>' . "\n";
+    }
+
+    /**
+     * v2.9.40: Inject ajaxurl global variable in frontend.
+     *
+     * Some inline scripts and JS files use `ajaxurl` directly, but WordPress
+     * only defines it in admin pages. This injects it in the frontend <head>
+     * so those scripts don't throw ReferenceError.
+     */
+    public function inject_ajaxurl(): void {
+        echo '<script>var ajaxurl = ' . wp_json_encode( admin_url( 'admin-ajax.php' ) ) . ';</script>' . "\n";
     }
 
     /**

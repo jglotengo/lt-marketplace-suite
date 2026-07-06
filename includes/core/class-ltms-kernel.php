@@ -421,6 +421,7 @@ final class LTMS_Core_Kernel {
             wp_enqueue_script( 'ltms-product-enhancements', $url . 'js/ltms-product-enhancements.js', [ 'jquery' ], $ver, true );
             wp_localize_script( 'ltms-product-enhancements', 'ltmsDrawerData', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'ajaxurl' => admin_url( 'admin-ajax.php' ), // v2.9.40: some JS code uses ajaxurl directly
                 'nonce'   => wp_create_nonce( 'ltms_drawer_nonce' ),
                 'i18n'    => [
                     'remove'           => __( 'Quitar', 'ltms' ),
