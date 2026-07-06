@@ -7104,6 +7104,8 @@
 
     function initImageZoom() {
         document.addEventListener('mousemove', (e) => {
+            // v2.9.32: e.target puede ser un Document o text node que no tiene .closest()
+            if (!e.target || typeof e.target.closest !== 'function') return;
             const container = e.target.closest('.ltms-zoom-container');
             if (!container) return;
 
