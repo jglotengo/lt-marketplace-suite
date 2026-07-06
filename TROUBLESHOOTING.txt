@@ -1,6 +1,6 @@
 ================================================================================
  LT MARKETPLACE SUITE — GUÍA DE SOLUCIÓN DE PROBLEMAS (TROUBLESHOOTING)
- Versión 1.5.0
+ Versión 2.9.35
 ================================================================================
 
 ÍNDICE RÁPIDO
@@ -11,7 +11,7 @@ Use Ctrl+F para buscar el código de error o síntoma exacto.
 2.  Problemas de Base de Datos
 3.  Errores de Cifrado
 4.  Problemas de Billetera y Pagos
-5.  Errores de API (Openpay, Siigo, etc.)
+5.  Errores de API (Openpay, Siigo, PosGold, etc.)
 6.  Problemas del Dashboard del Vendedor
 7.  Problemas de Email
 8.  Errores de KYC
@@ -19,6 +19,11 @@ Use Ctrl+F para buscar el código de error o síntoma exacto.
 10. Errores de Cron Jobs
 11. Problemas de Rendimiento
 12. Errores PHP y Logs
+13. Problemas de PosGold (nuevo v2.9.35)
+14. Problemas de 2FA / TOTP (nuevo v2.9.35)
+15. Pop-up "Algo salió mal" (nuevo v2.9.35)
+16. HTTP 500 tras deploy (nuevo v2.9.35)
+17. Páginas admin en blanco / WSOD (nuevo v2.9.35)
 
 ================================================================================
 1. PROBLEMAS DE ACTIVACIÓN
@@ -83,6 +88,19 @@ SOLUCIÓN:
   1. Restaurar la clave original en wp-config.php
   2. Si la clave se perdió permanentemente, los datos cifrados NO son recuperables
   3. Para datos nuevos, los vendedores deben reingresar información bancaria
+
+SÍNTOMA: Faltan columnas SAT México en lt_sat_mexico_report
+CÓDIGO:   LTMS_DB_005
+CAUSA:    La migración a 2.9.35 no se ejecutó (ltms_db_version < 2.9.35)
+SOLUCIÓN:
+  1. wp eval 'LTMS_DB_Migrations::run();' --allow-root
+  2. wp option get ltms_db_version   # debe ser >= 2.9.35
+  3. DESCRIBE lt_sat_mexico_report;  # deben aparecer 11 columnas:
+     rfc_emisor, nombre_emisor, rfc_receptor, nombre_receptor, uuid_cfdi,
+     fecha_emision, total, isr_retenido, iva_cobrado, ieps_aplicado,
+     estatus_comprobante
+  4. Repoblar el reporte:
+     wp eval 'LTMS_Admin_Sat_Report::rebuild_current_period();' --allow-root
 
 ================================================================================
 3. ERRORES DE CIFRADO
@@ -282,6 +300,16 @@ SOLUCIÓN:
   3. Reinstalar hooks de cron:
      wp eval 'LTMS_Kernel::get_instance()->register_cron();' --allow-root
 
+SÍNTOMA: PosGold no sincroniza automáticamente
+CÓDIGO:   LTMS_CRON_002
+DIAGNÓSTICO:
+  wp cron event list | grep posgold
+  Debe aparecer ltms_posgold_sync_poller (cada 15 min).
+SOLUCIÓN:
+  1. Reinstalar el hook: wp eval 'LTMS_Kernel::get_instance()->register_cron();' --allow-root
+  2. Ejecutar manualmente: wp eval 'do_action("ltms_posgold_sync_poller");' --allow-root
+  3. Revisar lt_posgold_sync_log para errores detallados.
+
 ================================================================================
 11. PROBLEMAS DE RENDIMIENTO
 ================================================================================
@@ -322,11 +350,11 @@ Errores Comunes
   Fix:    Verificar si otro plugin tiene clases con mismo nombre; desactivar conflictivo
 
   Error: "Maximum execution time of 30 seconds exceeded"
-  Causa:  Operaciones complejas (ej: distribución MLM masiva)
+  Causa:  Operaciones complejas (ej: distribución MLM masiva, sync PosGold de > 500 productos)
   Fix:    Aumentar max_execution_time a 120 en php.ini
 
   Error: "Allowed memory size exhausted"
-  Causa:  Procesamiento de muchos pedidos simultáneos
+  Causa:  Procesamiento de muchos pedidos simultáneos o sync PosGold masiva
   Fix:    Aumentar memory_limit a 512M en php.ini
 
 Contacto de Soporte
@@ -337,5 +365,266 @@ Si el problema persiste después de revisar esta guía:
   3. Enviar a: soporte@ltmarketplace.co
 
 ================================================================================
- FIN DE LA GUÍA DE TROUBLESHOOTING — LT Marketplace Suite v1.5.0
+13. PROBLEMAS DE POSGOLD (NUEVO v2.9.35)
+================================================================================
+
+SÍNTOMA: "No se encontraron productos" al sincronizar
+CÓDIGO:   LTMS_POSGOLD_001
+CAUSA:    Credenciales inválidas o categorías PosGold con IDs distintos
+SOLUCIÓN:
+  1. Verificar credenciales del vendedor en PosGold > Credenciales:
+     - subdominio, token, empresaid, usuarioid, bodegaid
+  2. Probar conexión con el botón "Probar conexión" en PosGold > Credenciales.
+  3. Verificar que las categorías marcadas en PosGold > Categorías existan
+     en PosGold. Si PosGold cambió los IDs, actualizar la selección.
+  4. Revisar lt_posgold_sync_log para ver el request enviado y la respuesta.
+  5. Confirmar con el admin de PosGold que la bodegaid asignada tiene stock.
+
+SÍNTOMA: "Error de conexión" / cURL error 28 / HTTP 502
+CÓDIGO:   LTMS_POSGOLD_002
+CAUSA:    Subdominio incorrecto o token inválido/expirado
+SOLUCIÓN:
+  1. Verificar que el subdominio sea accesible desde el servidor:
+     curl -I https://tienda.posgoldcloud.com
+  2. Verificar que el token sea el correcto y no haya expirado.
+  3. Si el token caducó, solicitar uno nuevo al admin de PosGold y
+     actualizarlo en wp-config.php (token global) o en
+     PosGold > Credenciales (token del vendedor, si aplica).
+  4. Verificar conectividad saliente del servidor (firewall).
+
+SÍNTOMA: "Productos duplicados" tras sincronizar
+CÓDIGO:   LTMS_POSGOLD_003
+CAUSA:    Comportamiento normal en algunos escenarios
+SOLUCIÓN:
+  Este mensaje NO es un error. El sistema detecta productos con el mismo
+  SKU y los actualiza en lugar de crear duplicados. La deduplicación es
+  automática por SKU. Si el contador dice "Productos actualizados: N",
+  es el comportamiento esperado.
+
+  Si aun así aparecen productos duplicados en WooCommerce:
+  1. Verificar que los productos tengan el meta_key _ltms_posgold_sku correcto.
+  2. Ejecutar limpieza: wp eval 'LTMS_Business_PosGold_Sync::dedupe_by_sku();' --allow-root
+  3. Revisar que ningún otro plugin esté creando productos con el mismo SKU.
+
+SÍNTOMA: "Precio incorrecto" en productos sincronizados
+CÓDIGO:   LTMS_POSGOLD_004
+CAUSA:    Reglas de precio mal configuradas
+SOLUCIÓN:
+  1. Verificar las 8 reglas de precio en PosGold > Reglas de Precio:
+     transporte, publicidad, devoluciones, margen, comisión marketplace,
+     IVA, costo ReDi, redondeo.
+  2. Recalcular manualmente para un producto de prueba:
+     costo_posgold = $10,000
+     + transporte 5%  = $10,500
+     + publicidad 2%  = $10,710
+     + devoluciones 1%= $10,817
+     × (1 + margen 30%) = $14,062
+     × (1 + comisión 10%) = $15,468
+     × (1 + IVA 19% + ReDi 1%) = $18,562
+     redondear(100) = $18,600
+  3. Comparar con el precio mostrado en WooCommerce.
+  4. Si el toggle ReDi está activado, el costo ReDi se incluye; si no, se omite.
+  5. Volver a sincronizar tras ajustar las reglas.
+
+SÍNTOMA: Sincronización se queda en "En progreso" indefinidamente
+CÓDIGO:   LTMS_POSGOLD_005
+CAUSA:    Cron atascado o proceso PHP muerto por timeout
+SOLUCIÓN:
+  1. Verificar lt_posgold_sync_log para el último intento.
+  2. Reiniciar el estado:
+     DELETE FROM lt_posgold_sync_log WHERE status = 'in_progress' AND created_at < NOW() - INTERVAL 1 HOUR;
+  3. Aumentar max_execution_time a 300 en php.ini para sync de catálogos grandes.
+  4. Reintentar la sincronización desde el dashboard del vendedor.
+
+================================================================================
+14. PROBLEMAS DE 2FA / TOTP (NUEVO v2.9.35)
+================================================================================
+
+SÍNTOMA: "Código incorrecto" al verificar 2FA
+CÓDIGO:   LTMS_TOTP_001
+CAUSA:    Desfase de reloj entre el teléfono y el servidor
+SOLUCIÓN:
+  1. Verificar que la hora del teléfono esté en modo automático (ajuste por red).
+  2. Verificar la zona horaria del teléfono coincida con la del servidor.
+  3. Verificar la zona horaria del WordPress en Ajustes > General > Zona horaria.
+  4. Esperar 30 segundos y volver a intentar con un código nuevo.
+  5. Si persiste, desinstalar la cuenta TOTP de la app y reescanear el QR.
+  6. Verificar sincronización NTP del servidor:
+     timedatectl status   # debe mostrar "System clock synchronized: yes"
+
+SÍNTOMA: "No puedo iniciar sesión" porque perdí mi teléfono
+CÓDIGO:   LTMS_TOTP_002
+CAUSA:    Dispositivo con la app TOTP perdido o inaccesible
+SOLUCIÓN:
+  1. En la pantalla de código TOTP, click "Usar código de respaldo".
+  2. Ingresar uno de los 8 códigos de respaldo guardados al activar 2FA.
+  3. Cada código sirve UNA sola vez. Después del uso, iniciar sesión
+     normalmente y desactivar 2FA o reactivarlo con un dispositivo nuevo.
+  4. Si tampoco tienes los códigos de respaldo, contacta al admin del
+     marketplace para que revoque tu 2FA desde
+     LT Marketplace > Seguridad > 2FA > Usuarios > Revocar 2FA.
+  5. Una vez revocado, puedes volver a activar 2FA desde tu dashboard.
+
+SÍNTOMA: 2FA se desactivó solo
+CÓDIGO:   LTMS_TOTP_003
+CAUSA:    El admin revocó el 2FA o el secret se corrompió
+SOLUCIÓN:
+  1. Revisar el log forense en LT Marketplace > Seguridad para ver si el
+     admin revocó el 2FA (queda registrado).
+  2. Si el secret se corrompió (error de cifrado), verificar WP_LTMS_MASTER_KEY.
+  3. Reactivar 2FA desde el dashboard > Seguridad > Activar 2FA.
+
+SÍNTOMA: Los códigos de respaldo no funcionan
+CÓDIGO:   LTMS_TOTP_004
+CAUSA:    Código ya usado o tabla lt_totp_backup_codes corrupta
+SOLUCIÓN:
+  1. Verificar que el código no haya sido usado antes (cada código es single-use).
+  2. Si tienes otros códigos sin usar, probar con uno diferente.
+  3. Si todos fallan, el admin puede regenerar los códigos desde
+     LT Marketplace > Seguridad > 2FA > Usuarios > Regenerar códigos.
+  4. Verificar que la tabla lt_totp_backup_codes exista y tenga hashes:
+     SELECT COUNT(*) FROM lt_totp_backup_codes WHERE user_id = XXXX;
+
+================================================================================
+15. POP-UP "ALGO SALIÓ MAL" (NUEVO v2.9.35)
+================================================================================
+
+SÍNTOMA: Aparece el pop-up "Algo salió mal" al interactuar con el dashboard
+CÓDIGO:   LTMS_AJAX_001
+CAUSA:    Endpoint AJAX faltante o nonce inválido
+SOLUCIÓN:
+  1. Abrir DevTools del navegador (F12) > pestaña Network.
+  2. Reproducir la acción que dispara el pop-up.
+  3. Localizar la petición AJAX (admin-ajax.php) y revisar:
+     a. Código de respuesta HTTP (200 / 400 / 403 / 500).
+     b. Cuerpo de la respuesta (mensaje de error específico).
+     c. Header X-Action para identificar el endpoint (action=ltms_xxx).
+  4. Si la respuesta es 400 "Invalid nonce":
+     a. Recargar la página (F5) para obtener un nonce nuevo.
+     b. Si persiste, verificar que el .min.js cargado sea la versión 2.9.35.
+        DevTools > Sources > buscar ltms-ux-enhancements.min.js y verificar
+        que no esté en cache del navegador (hard reload con Ctrl+Shift+R).
+  5. Si la respuesta es 500:
+     a. Revisar wp-content/debug.log para el error PHP específico.
+     b. Verificar que la clase correspondiente al endpoint exista y esté
+        cargada por el autoloader (ver sección 17).
+  6. Limpiar cache de SiteGround Optimizer:
+     rm -rf wp-content/cache/siteground-optimizer-assets/*
+     wp cache flush --allow-root
+  7. Verificar que el .min.js cargado sea el correcto (no una versión cacheada):
+     comparar el hash del archivo servido vs el del disco.
+
+Endpoints AJAX nuevos en v2.9.35 que pueden disparar este pop-up:
+  - ltms_posgold_save_credentials
+  - ltms_posgold_run_sync
+  - ltms_totp_enable
+  - ltms_totp_verify
+  - ltms_marketing_download_banner
+  - ltms_donations_fetch_ledger
+
+================================================================================
+16. HTTP 500 TRAS DEPLOY (NUEVO v2.9.35)
+================================================================================
+
+SÍNTOMA: Tras deploy, cualquier página del site o del admin devuelve HTTP 500
+CÓDIGO:   LTMS_DEPLOY_001
+CAUSA:    .min.js demasiado grande (> 350 KB) rechazado por SiteGround Optimizer,
+         o cache de SiteGround Optimizer sirviendo assets obsoletos, o cache de
+         opcache de PHP con clases antiguas.
+SOLUCIÓN:
+  1. Verificar tamaño del .min.js:
+     ls -lh wp-content/plugins/lt-marketplace-suite/assets/js/ltms-ux-enhancements.min.js
+     Si supera 350 KB (358400 bytes), reconstruir eliminando código no usado:
+     make dist
+  2. Limpiar cache de SiteGround Optimizer:
+     rm -rf wp-content/cache/siteground-optimizer-assets/*
+     (o desde Site Tools > Speed > Caching > Purge All)
+  3. Flush de cache de WordPress:
+     wp cache flush --allow-root
+     wp transient delete --all --allow-root
+  4. Resetear opcache de PHP:
+     wp eval 'opcache_reset();' --allow-root
+     (o acceder a deploy/ltms-opcache-flush.php desde el navegador)
+  5. Recargar PHP-FPM (VPS/dedicado):
+     systemctl reload php8.2-fpm
+  6. Verificar que wp-content/debug.log no muestre errores de clase faltante
+     (ver sección 17).
+  7. Hard reload del navegador (Ctrl+Shift+R) para evitar cache local.
+
+SÍNTOMA: HTTP 500 solo en el dashboard del vendedor
+CÓDIGO:   LTMS_DEPLOY_002
+CAUSA:    El .min.js está corrupto o el hash de integridad no coincide
+SOLUCIÓN:
+  1. Verificar integridad del .min.js:
+     php bin/master-integrity-check.php
+  2. Si el hash no coincide, re-subir el archivo desde el build.
+  3. Limpiar caches como en LTMS_DEPLOY_001.
+
+================================================================================
+17. PÁGINAS ADMIN EN BLANCO / WSOD (NUEVO v2.9.35)
+================================================================================
+
+SÍNTOMA: Páginas del admin de WordPress aparecen en blanco (White Screen of Death)
+         tras deploy, especialmente en submenús nuevos: Marketing, Donaciones,
+         PosGold, Cross-Border, Estado UX, Logística/Costos, Auditoría LTMS.
+CÓDIGO:   LTMS_WSOD_001
+CAUSA 1:  La clase que renderiza la página no está registrada en el autoloader.
+SOLUCIÓN:
+  1. Verificar $exceptions_npart en lt-marketplace-suite.php.
+     Este array lista las clases que el autoloader no debe cargar automáticamente
+     (o que requieren carga explícita).
+  2. Confirmar que las nuevas clases de v2.9.35 están correctamente declaradas:
+     - LTMS_Admin_Donations
+     - LTMS_Admin_Marketing_Manager
+     - LTMS_Admin_Cross_Border
+     - LTMS_Admin_Ux_Status
+     - LTMS_Admin_Shipping_Ledger
+     - LTMS_Admin_Sat_Report
+     - LTMS_Admin_Auditor_Panel
+     - LTMS_TOTP_2FA
+     - LTMS_Business_PosGold_Sync
+     - LTMS_Business_PosGold_Price_Calculator
+     - LTMS_Donation_Manager
+     - LTMS_Donation_Certificate
+  3. Si falta alguna, agregarla a $exceptions_npart o al mapa de namespaces
+     del autoloader, según corresponda.
+  4. Limpiar caches (opcache + SiteGround) como en LTMS_DEPLOY_001.
+  5. Verificar en wp-content/debug.log:
+     tail -f wp-content/debug.log
+     El error típico es: "Class 'LTMS_Admin_Donations' not found in
+     .../includes/admin/class-ltms-admin.php on line XXX".
+
+CAUSA 2:  Método privado llamado desde fuera de la clase (visibility error).
+SOLUCIÓN:
+  1. Revisar wp-content/debug.log:
+     Error típico: "Call to private method LTMS_Admin_Donations::render_page()
+     from global scope" o "Call to undefined method...".
+  2. Localizar el método en la clase correspondiente:
+     rg "function render_page" includes/admin/class-ltms-admin-donations.php
+  3. Cambiar la visibilidad de private a public:
+     Antes:  private function render_page() { ... }
+     Después: public function render_page() { ... }
+  4. Guardar el archivo, limpiar opcache:
+     wp eval 'opcache_reset();' --allow-root
+  5. Recargar la página del admin.
+
+CAUSA 3:  Memoria insuficiente al renderizar páginas con muchos registros
+         (ej: Auditoría LTMS con miles de logs).
+SOLUCIÓN:
+  1. Aumentar memory_limit en php.ini a 512M.
+  2. Verificar en wp-content/debug.log:
+     "Fatal error: Allowed memory size of XXX bytes exhausted".
+  3. Si el problema es de volumen, paginar la consulta SQL o exportar
+     a CSV en lugar de cargar todo en memoria.
+
+CAUSA 4:  Plugin de cache (W3 Total Cache, WP Rocket) sirviendo HTML obsoleto
+         que referencia clases antiguas.
+SOLUCIÓN:
+  1. Vaciar todas las caches del plugin de cache.
+  2. wp cache flush --allow-root
+  3. rm -rf wp-content/cache/siteground-optimizer-assets/*
+  4. wp eval 'opcache_reset();' --allow-root
+
+================================================================================
+ FIN DE LA GUÍA DE TROUBLESHOOTING — LT Marketplace Suite v2.9.35
 ================================================================================

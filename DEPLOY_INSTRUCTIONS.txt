@@ -1,6 +1,6 @@
 ================================================================================
  LT MARKETPLACE SUITE — INSTRUCCIONES DE DESPLIEGUE
- Versión 2.0.1
+ Versión 2.9.35
 ================================================================================
 
 TABLA DE CONTENIDOS
@@ -11,8 +11,11 @@ TABLA DE CONTENIDOS
 4. Deploy en VPS/Dedicado (Ubuntu/Debian)
 5. Deploy con Docker
 6. Deploy vía CI/CD (GitHub Actions)
-7. Post-Deploy Verification
-8. Rollback
+7. Deploy de la Integración PosGold
+8. Migración de Base de Datos (SAT México 11 columnas)
+9. Post-Deploy Verification (Endpoints AJAX)
+10. Cache, Opcache y SiteGround
+11. Rollback
 
 ================================================================================
 1. ENTORNO RECOMENDADO
@@ -47,12 +50,14 @@ PHP Extensions Requeridas
 [ ] Backup completo de wp-content/
 [ ] WP_LTMS_MASTER_KEY generada (bin/generate-secrets.sh)
 [ ] Todas las credenciales de API configuradas en wp-config.php
+[ ] Credenciales PosGold (subdominio + token) listas para configurar
 [ ] SSL activo y verificado (https://www.ssllabs.com/ssltest/)
 [ ] WooCommerce activo y configurado
 [ ] Modo sandbox de APIs activado para pruebas
 [ ] Email SMTP configurado
 [ ] Capacidad de mantenimiento verificada (wp maintenance-mode)
 [ ] Revisado php.ini: upload_max_filesize >= 10M, memory_limit >= 256M
+[ ] .min.js verificado: tamaño < 350 KB (limite SiteGround optimizer)
 
 ================================================================================
 3. DEPLOY EN SERVIDOR COMPARTIDO (cPanel)
@@ -63,23 +68,30 @@ PHP Extensions Requeridas
 
 2. Subir el ZIP:
    Administrador de archivos cPanel > wp-content/plugins/
-   Subir lt-marketplace-suite-2.0.1.zip
+   Subir lt-marketplace-suite-2.9.35.zip
    Extraer el ZIP
 
 3. Configurar wp-config.php:
    Editar el archivo y agregar las constantes de wp-config-sample-snippet.php
+   Agregar también las constantes PosGold:
+     define( 'WP_LTMS_POSGOLD_SUBDOMAIN', 'tienda.posgoldcloud.com' );
+     define( 'WP_LTMS_POSGOLD_TOKEN',     'token-global-posgold' );
 
 4. Activar en WordPress admin:
    wp-admin > Plugins > Activar "LT Marketplace Suite"
 
 5. Verificar tablas:
    phpMyAdmin > tu_base_de_datos
-   Confirmar existencia de lt_wallets, lt_commissions, etc.
+   Confirmar existencia de lt_wallets, lt_commissions, lt_posgold_sync_log,
+   lt_donations, lt_marketing_banners, lt_totp_secrets, lt_totp_backup_codes
+
+6. Ejecutar migración de las 11 columnas SAT México (ver sección 8).
 
 ⚠️ LIMITACIONES DE HOSTING COMPARTIDO:
    - Puede no admitir cron jobs reales (usar plugin WP Crontrol)
    - Memory limit puede ser insuficiente (contactar al proveedor)
    - MySQL puede ser MariaDB; verificar compatibilidad
+   - SiteGround Optimizer: limita .min.js a 350 KB. Verificar tamaño tras build.
 
 ================================================================================
 4. DEPLOY EN VPS/DEDICADO
@@ -140,6 +152,8 @@ Variables de entorno para producción (.env):
   MYSQL_DATABASE=wordpress
   WP_DOMAIN=tu-dominio.com
   LTMS_MASTER_KEY=clave-generada-con-openssl
+  LTMS_POSGOLD_SUBDOMAIN=tienda.posgoldcloud.com
+  LTMS_POSGOLD_TOKEN=token-global-posgold
 
 ================================================================================
 6. DEPLOY VÍA CI/CD (GITHUB ACTIONS)
@@ -163,6 +177,13 @@ Crear .github/workflows/deploy.yml:
             extensions: openssl,bcmath,intl,mbstring
         - name: Install & Build
           run: make install && make dist --skip-lint --skip-tests
+        - name: Verify .min.js size (SiteGround 350KB limit)
+          run: |
+            SIZE=$(stat -c%s assets/js/ltms-ux-enhancements.min.js)
+            if [ "$SIZE" -gt 358400 ]; then
+              echo "ERROR: .min.js too large ($SIZE bytes > 350KB)"
+              exit 1
+            fi
         - name: Deploy
           run: |
             bash bin/deploy-server.sh \
@@ -176,8 +197,90 @@ Secrets a configurar en GitHub:
   DEPLOY_KEY       Contenido de ~/.ssh/id_rsa
 
 ================================================================================
-7. POST-DEPLOY VERIFICATION
+7. DEPLOY DE LA INTEGRACIÓN POSGOLD
 ================================================================================
+
+Pasos específicos para activar PosGold en producción:
+
+1. Verificar constantes en wp-config.php:
+     WP_LTMS_POSGOLD_SUBDOMAIN
+     WP_LTMS_POSGOLD_TOKEN
+
+2. Ir a LT Marketplace > Configuración > PosGold y guardar las credenciales
+   globales (subdominio + token). El sistema las valida con un health_check().
+
+3. Probar conexión: el botón "Probar conexión" debe responder 200 OK y mostrar
+   el listado de bodegas disponibles.
+
+4. (Opcional) Configurar credenciales globales por defecto para empresaid,
+   usuarioid y bodegaid que se usarán como fallback si un vendedor no las define.
+
+5. Verificar que el cron `ltms_posgold_sync_poller` esté registrado:
+     wp cron event list | grep posgold
+
+6. Verificar que la tabla lt_posgold_sync_log exista:
+     SHOW TABLES LIKE 'lt_posgold_sync_log';
+
+7. Activar el módulo PosGold para vendedores desde
+   LT Marketplace > Configuración > PosGold > "Permitir sync a vendedores".
+
+8. Smoke test: pedir a un vendedor de prueba que ejecute una sincronización
+   desde su dashboard > PosGold > "Sincronizar ahora".
+
+================================================================================
+8. MIGRACIÓN DE BASE DE DATOS (SAT MÉXICO 11 COLUMNAS)
+================================================================================
+
+La versión 2.9.35 añade 11 columnas a la tabla lt_sat_mexico_report para
+cumplir con la cuadrícula de reporte SAT CFDI 4.0:
+
+  1. rfc_emisor
+  2. nombre_emisor
+  3. rfc_receptor
+  4. nombre_receptor
+  5. uuid_cfdi
+  6. fecha_emision
+  7. total
+  8. isr_retenido
+  9. iva_cobrado
+  10. ieps_aplicado
+  11. estatus_comprobante
+
+Pasos de migración:
+
+1. Activar el plugin (el activador ejecuta la migración automáticamente).
+
+2. Verificar la versión de DB:
+     wp option get ltms_db_version
+   Debe ser >= 2.9.35.
+
+3. Si la migración no se ejecutó (DB version antigua), forzarla:
+     wp eval 'LTMS_DB_Migrations::run();' --allow-root
+
+4. Verificar columnas nuevas:
+     DESCRIBE lt_sat_mexico_report;
+   Deben aparecer las 11 columnas listadas.
+
+5. Repoblar el reporte del período actual:
+     wp eval 'LTMS_Admin_Sat_Report::rebuild_current_period();' --allow-root
+
+6. Validar exportación CSV desde LT Marketplace > Reportes Fiscales > México.
+   El CSV debe contener exactamente 11 columnas + cabecera.
+
+Tablas nuevas creadas en 2.9.35:
+  - lt_donations
+  - lt_donation_certificates
+  - lt_marketing_banners
+  - lt_totp_secrets
+  - lt_totp_backup_codes
+  - lt_posgold_sync_log
+  - lt_posgold_vendor_credentials
+
+================================================================================
+9. POST-DEPLOY VERIFICATION (ENDPOINTS AJAX)
+================================================================================
+
+La versión 2.9.35 añade 6 nuevos endpoints AJAX. Verificar cada uno tras el deploy.
 
 Checklist Post-Deploy
 ----------------------
@@ -193,6 +296,17 @@ Checklist Post-Deploy
 [ ] PWA: manifest.json accesible
 [ ] Service Worker registrado (DevTools > Application)
 
+6 nuevos endpoints AJAX (verificar con DevTools > Network):
+  1. ltms_posgold_save_credentials   Guarda credenciales PosGold del vendedor
+  2. ltms_posgold_run_sync           Dispara la sincronización de catálogo
+  3. ltms_totp_enable                Activa 2FA y retorna el secret + QR URL
+  4. ltms_totp_verify                Verifica el primer código TOTP y confirma 2FA
+  5. ltms_marketing_download_banner  Descarga un banner promocional
+  6. ltms_donations_fetch_ledger     Retorna el libro mayor público de donaciones
+
+Para verificar cada uno (ejemplo):
+  wp eval 'do_action("wp_ajax_ltms_posgold_run_sync");' --allow-root
+
 Comandos WP-CLI para verificación
 -----------------------------------
   wp plugin status lt-marketplace-suite
@@ -206,7 +320,36 @@ Prueba de integridad
   php bin/master-integrity-check.php              # Verificar en el futuro
 
 ================================================================================
-8. ROLLBACK
+10. CACHE, OPCACHE Y SITEGROUND
+================================================================================
+
+Tras cada deploy, SIEMPRE ejecutar esta secuencia para evitar servir
+assets obsoletos:
+
+1. Limpiar cache de SiteGround Optimizer (si aplica):
+     rm -rf wp-content/cache/siteground-optimizer-assets/*
+   Equivalente desde Site Tools > Speed > Caching > Purge All.
+
+2. Limpiar cache de objetos de WordPress:
+     wp cache flush --allow-root
+     wp transient delete --all --allow-root
+
+3. Resetear opcache de PHP para que cargue los nuevos archivos PHP:
+     wp eval 'opcache_reset();' --allow-root
+   O acceder a deploy/ltms-opcache-flush.php desde el navegador (protegido).
+
+4. Recargar PHP-FPM (VPS/dedicado):
+     systemctl reload php8.2-fpm
+
+⚠️ Advertencia de tamaño .min.js para SiteGround:
+   SiteGround Optimizer rechaza combinar archivos .min.js mayores a 350 KB.
+   Tras el build verificar:
+     ls -lh assets/js/ltms-ux-enhancements.min.js
+   Si el archivo supera 350 KB (358400 bytes), dividir el código o
+   eliminar imports no utilizados antes de deployar.
+
+================================================================================
+11. ROLLBACK
 ================================================================================
 
 Rollback de Plugin
@@ -226,13 +369,17 @@ Rollback de Plugin
 5. Limpiar caches:
    wp cache flush --allow-root
    wp transient delete --all --allow-root
+   rm -rf wp-content/cache/siteground-optimizer-assets/*
+   wp eval 'opcache_reset();' --allow-root
 
 Rollback Rápido (si bin/deploy-server.sh falló)
 ------------------------------------------------
 El script crea un backup antes de deploy en /tmp/ltms-backup-TIMESTAMP/.
 En el servidor:
   cp -r /tmp/ltms-backup-TIMESTAMP/ /path/to/plugins/lt-marketplace-suite/
+  wp cache flush --allow-root
+  wp eval 'opcache_reset();' --allow-root
 
 ================================================================================
- FIN DE LAS INSTRUCCIONES DE DESPLIEGUE — LT Marketplace Suite v2.0.1
+ FIN DE LAS INSTRUCCIONES DE DESPLIEGUE — LT Marketplace Suite v2.9.35
 ================================================================================

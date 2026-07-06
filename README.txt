@@ -1,20 +1,21 @@
 === LT Marketplace Suite ===
 Contributors: ltms-team
-Tags: marketplace, multi-vendor, woocommerce, colombia, mexico, wallet, mlm, kyc
+Tags: marketplace, multi-vendor, woocommerce, colombia, mexico, wallet, mlm, kyc, posgold, 2fa, donations
 Requires at least: 6.3
-Tested up to: 6.7
+Tested up to: 6.9
 Requires PHP: 8.1
-Stable tag: 1.5.0
+Stable tag: 2.9.35
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Enterprise multi-vendor marketplace for WooCommerce. Colombia & Mexico.
+Enterprise multi-vendor marketplace for WooCommerce with PosGold sync, TOTP 2FA, marketing banners and donation transparency. Colombia & Mexico.
 
 == Description ==
 
 LT Marketplace Suite (LTMS) is an enterprise-grade multi-vendor WooCommerce plugin
 designed for Latin American markets, with specific support for Colombia (DIAN, SAGRILAFT)
-and Mexico (SAT, CFDI 4.0, RESICO).
+and Mexico (SAT, CFDI 4.0, RESICO). Version 2.9.35 introduces PosGold catalog sync,
+TOTP two-factor authentication, marketing banner management and full donation transparency.
 
 = Key Features =
 
@@ -27,6 +28,10 @@ and Mexico (SAT, CFDI 4.0, RESICO).
 * AES-256 encryption for all PII data
 * Built-in Web Application Firewall (WAF)
 * Immutable forensic logging for compliance
+* PosGold two-way catalog synchronization with 8-component price rules
+* TOTP 2FA (RFC 6238) with backup codes for vendors and admins
+* Marketing banner manager with promotional assets per vendor tier
+* Donation transparency module with public ledger and certificate generator
 
 = Payment Gateways =
 
@@ -43,6 +48,7 @@ and Mexico (SAT, CFDI 4.0, RESICO).
 * TPTC — MLM network synchronization
 * XCover — Product insurance
 * Backblaze B2 — Secure document storage for KYC
+* PosGold — Catalog and inventory synchronization (two-way sync, SKU dedupe)
 
 == Installation ==
 
@@ -86,6 +92,21 @@ Colombian Pesos (COP) and Mexican Pesos (MXN). The currency is set in Settings >
 3. Admin approves or rejects with reason
 4. Approved vendors unlock wallet withdrawal functionality
 
+= How does the PosGold sync work? =
+
+1. The admin enables PosGold in LT Marketplace > Configuración > PosGold and enters the
+   global credentials (subdomain, token).
+2. Each vendor configures their own PosGold credentials in their dashboard
+   (empresaid, usuarioid, bodegaid) and selects which categories to import.
+3. The vendor defines price rules (8 components) and an SEO title template.
+4. On sync, LTMS pulls products from PosGold, applies the price rules, deduplicates
+   by SKU and publishes them to the vendor's WooCommerce catalog.
+
+= Is 2FA mandatory? =
+
+2FA (TOTP) is opt-in per user. Vendors can enable it from their dashboard > Security.
+Admins can enforce 2FA for all vendors from LT Marketplace > Configuración > Seguridad.
+
 == Screenshots ==
 
 1. Vendor Dashboard — KPIs and sales chart
@@ -94,8 +115,28 @@ Colombian Pesos (COP) and Mexican Pesos (MXN). The currency is set in Settings >
 4. KYC document review
 5. Tax reports with fiscal compliance data
 6. MLM referral network tree
+7. PosGold sync configuration screen
+8. TOTP 2FA activation with QR code
+9. Marketing banner manager
+10. Donations transparency public ledger
 
 == Changelog ==
+
+= 2.9.35 =
+* PosGold integration: two-way catalog sync with 8-component price calculator
+  (transporte, publicidad, devoluciones, margen, comisión marketplace, IVA, costo ReDi, redondeo)
+* TOTP 2FA (RFC 6238) for vendors and admins with backup codes
+* Marketing banner manager with per-tier promotional assets
+* Donations transparency module with public ledger and PDF certificate
+* New vendor dashboard menu items: Marketing, Security (2FA), Donations, PosGold
+* SAT México reports: 11 columns compliance grid
+  (RFC emisor, nombre emisor, RFC receptor, nombre receptor, UUID/CFDI, fecha emisión,
+  total, ISR retenido, IVA cobrado, IEPS aplicado, estatus)
+* New admin submenus: Cross-Border, Estado UX, Logística/Costos, Auditoría LTMS
+* PosGold vendor credentials management (admin override panel)
+* 6 new AJAX endpoints for PosGold, 2FA, Marketing and Donations workflows
+* WordPress 6.9 compatibility verified
+* SiteGround optimizer cache compatibility (assets purge + opcache reset)
 
 = 1.5.0 =
 * Initial enterprise release
@@ -109,6 +150,12 @@ Colombian Pesos (COP) and Mexican Pesos (MXN). The currency is set in Settings >
 * SAGRILAFT compliance logging
 
 == Upgrade Notice ==
+
+= 2.9.35 =
+Major release. Adds PosGold sync, TOTP 2FA, Marketing banners and Donations transparency.
+After updating: clear SiteGround optimizer cache (rm -rf siteground-optimizer-assets/*),
+run `wp cache flush` and reset opcache. Verify the 11 new SAT México columns in
+LT Marketplace > Reportes Fiscales > México. See DEPLOY_INSTRUCTIONS.txt for full steps.
 
 = 1.5.0 =
 Initial enterprise release. Review wp-config-sample-snippet.php for required constants.

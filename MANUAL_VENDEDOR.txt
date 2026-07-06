@@ -1,6 +1,6 @@
 ================================================================================
  LT MARKETPLACE SUITE — MANUAL DEL VENDEDOR
- Versión 1.5.0 | Español
+ Versión 2.9.35 | Español
 ================================================================================
 
 ÍNDICE
@@ -13,8 +13,12 @@
 6. Red de Afiliados (MLM)
 7. Verificación de Identidad (KYC)
 8. Configuración de la Tienda
-9. Notificaciones
-10. Preguntas Frecuentes
+9. PosGold — Sincronización de Catálogo
+10. Marketing — Banners Promocionales
+11. Seguridad — Autenticación de Dos Factores (2FA)
+12. Donaciones — Transparencia
+13. Notificaciones
+14. Preguntas Frecuentes
 
 ================================================================================
 1. PRIMEROS PASOS
@@ -38,6 +42,9 @@ Inicio de Sesión
 IMPORTANTE: Si intentas ingresar más de 5 veces incorrectamente,
 tu acceso quedará bloqueado por 15 minutos.
 
+Si activaste 2FA (ver sección 11), además deberás ingresar el código
+de 6 dígitos generado por tu app de autenticación.
+
 ================================================================================
 2. PANEL DE CONTROL (DASHBOARD)
 ================================================================================
@@ -56,10 +63,14 @@ Muestra tus ventas y comisiones de los últimos 12 meses.
 Navegación
 ----------
 El menú lateral izquierdo te permite acceder a:
-  🏠 Inicio      - Métricas y gráficos
-  📦 Pedidos     - Lista de pedidos
-  💰 Billetera   - Saldo y movimientos
-  🛍️ Productos   - Tu catálogo
+  🏠 Inicio        - Métricas y gráficos
+  📦 Pedidos       - Lista de pedidos
+  💰 Billetera     - Saldo y movimientos
+  🛍️ Productos     - Tu catálogo
+  🔗 PosGold       - Sincronización con tu PosGold (nuevo v2.9.35)
+  📢 Marketing     - Banners promocionales para descargar (nuevo v2.9.35)
+  🛡️ Seguridad     - Activación de 2FA (nuevo v2.9.35)
+  🤝 Donaciones    - Transparencia de donaciones (nuevo v2.9.35)
   ⚙️ Configuración - Datos de tu tienda
 
 ================================================================================
@@ -126,11 +137,12 @@ Solicitar un Retiro
   - Tener verificación KYC aprobada
   - No tener la billetera congelada
   - Máximo 3 solicitudes pendientes simultáneas
+  - Si el admin forzó 2FA, debes tener 2FA activo
 
 Historial de Movimientos
 -------------------------
 La tabla de movimientos muestra:
-  - Tipo (comisión, retiro, referido, ajuste)
+  - Tipo (comisión, retiro, referido, ajuste, donación)
   - Descripción
   - Monto (positivo=ingreso, negativo=egreso)
   - Saldo después del movimiento
@@ -146,6 +158,7 @@ Ve a "Productos" para ver tu catálogo actual con:
   - Imagen del producto
   - Nombre y precio
   - Estado (publicado / borrador / sin stock)
+  - Origen (manual / PosGold sync)
   - Accesos rápidos a editar / ver en tienda
 
 Agregar Productos
@@ -154,6 +167,9 @@ Los productos se gestionan desde WooCommerce admin:
 1. Login en wp-admin
 2. Ve a Productos > Agregar nuevo
 3. Asegúrate de que el producto esté asignado a tu tienda
+
+Alternativamente, puedes sincronizar tu catálogo desde PosGold
+(ver sección 9) para importar productos automáticamente.
 
 ================================================================================
 6. RED DE AFILIADOS (MLM)
@@ -251,7 +267,247 @@ Cambiar Contraseña
 Usa la opción de WordPress "Olvidé mi contraseña" en /ltms-login/.
 
 ================================================================================
-9. NOTIFICACIONES
+9. POSGOLD — SINCRONIZACIÓN DE CATÁLOGO
+================================================================================
+
+El módulo PosGold (nuevo en v2.9.35) te permite importar tu catálogo desde
+PosGold hacia tu tienda WooCommerce aplicando reglas de precio automáticas.
+
+Requisitos
+----------
+  - Tener una cuenta PosGold activa con API habilitada
+  - Haber recibido del admin de PosGold: subdominio, token, empresaid,
+    usuarioid y bodegaid
+  - Haber activado KYC en tu cuenta de vendedor
+
+Paso 1: Configurar Credenciales
+--------------------------------
+Ve a PosGold > Credenciales e ingresa:
+
+  - Subdominio PosGold   Ej: tienda.posgoldcloud.com
+                          (el mismo subdominio del admin, ya precargado)
+  - Token                Token de API entregado por el admin de PosGold
+  - Empresa ID           ID numérico de tu empresa en PosGold
+  - Usuario ID           ID numérico de tu usuario PosGold
+  - Bodega ID            ID numérico de la bodega a sincronizar
+
+Click en "Guardar credenciales". El sistema las cifra con AES-256.
+
+Paso 2: Seleccionar Categorías
+-------------------------------
+Ve a PosGold > Categorías:
+  - Se muestra un dropdown con todas las categorías disponibles en PosGold
+  - Cada categoría tiene un checkbox
+  - Marca las categorías que deseas importar a tu tienda
+  - Click "Guardar selección"
+
+Paso 3: Configurar Reglas de Precio
+-------------------------------------
+Ve a PosGold > Reglas de Precio. Define los 8 componentes del cálculo:
+
+  1. Transporte (% o valor fijo)        Costo de envío a incluir en el precio
+  2. Publicidad (%)                     Costo de publicidad interna
+  3. Devoluciones (%)                   Reserva para devoluciones estimadas
+  4. Margen (%)                         Ganancia bruta deseada
+  5. Comisión marketplace (%)           Fee de la plataforma (default 10%)
+  6. IVA (%)                            Impuesto al valor agregado (16% MX / 19% CO)
+  7. Costo ReDi (%)                     Costo de logística inversa ReDi
+  8. Redondeo (0 / 10 / 50 / 100)       Redondeo del precio final
+
+Fórmula (simplificada):
+  precio_base  = costo_posgold + transporte + publicidad + devoluciones
+  precio_bruto = precio_base × (1 + margen)
+  precio_comis = precio_bruto × (1 + comisión_marketplace)
+  precio_iva   = precio_comis × (1 + IVA + ReDi)
+  precio_final = redondear(precio_iva, redondeo)
+
+Click "Guardar reglas". Las reglas se aplican a TODAS las sincronizaciones
+futuras hasta que las cambies.
+
+Paso 4: Plantilla SEO de Título
+--------------------------------
+Ve a PosGold > SEO y define una plantilla para el título del producto en
+WooCommerce. Variables disponibles:
+
+  {nombre}        Nombre del producto en PosGold
+  {marca}         Marca
+  {categoria}     Categoría principal
+  {sku}           SKU
+  {tienda}        Nombre de tu tienda
+
+Ejemplo: "{nombre} - {marca} | {tienda}"
+
+Paso 5: Toggle ReDi
+--------------------
+Ve a PosGold > Avanzado y activa/desactiva el toggle "ReDi".
+  - Activado: los productos sincronizados incluyen el costo ReDi en el precio
+    y se etiquetan para participar del programa de logística inversa.
+  - Desactivado: el costo ReDi se omite del cálculo.
+
+Paso 6: Ejecutar la Sincronización
+-----------------------------------
+Ve a PosGold > Sincronizar:
+  1. Click en el botón "Sincronizar ahora"
+  2. Aparece un loader; el proceso es asíncrono (no cierres la pestaña)
+  3. Cuando termina, verás un resumen:
+     - Productos insertados: N
+     - Productos actualizados: N
+     - Productos saltados: N
+     - Errores: N (ver logs en caso de error)
+  4. Los productos quedan publicados en tu catálogo WooCommerce
+
+⚠️ Comportamiento esperado:
+  - Los productos duplicados por SKU se actualizan (no se crean dos veces).
+    El sistema deduplica automáticamente por SKU.
+  - Si una categoría PosGold cambia de ID, debes actualizar la selección
+    en PosGold > Categorías.
+
+Sincronización Automática
+--------------------------
+El sistema ejecuta sincronizaciones automáticas cada 15 minutos si hay
+cambios en PosGold (cron ltms_posgold_sync_poller). No necesitas hacer
+nada manual para mantener tu catálogo actualizado.
+
+================================================================================
+10. MARKETING — BANNERS PROMOCIONALES
+================================================================================
+
+El módulo Marketing (nuevo en v2.9.35) te permite descargar banners
+promocionales oficiales para usar en tus redes sociales, WhatsApp y
+campañas de email.
+
+Acceder a Marketing
+-------------------
+Ve a "Marketing" en el menú lateral del dashboard.
+
+Ver Banners Disponibles
+------------------------
+La página muestra una grilla de tarjetas con:
+  - Imagen preview del banner
+  - Título y descripción
+  - Categoría (Descuentos, Temporada, Black Friday, etc.)
+  - Vigencia (fecha inicio / fin)
+  - Botón "Descargar"
+
+Descargar un Banner
+-------------------
+1. Click en "Descargar" sobre el banner elegido
+2. El archivo (JPG / PNG / WebP) se descarga a tu dispositivo
+3. El contador de descargas se incrementa (visible para el admin)
+
+Banners Personalizados (Premium)
+--------------------------------
+Si tienes plan premium, podrás ver banners exclusivos para ti marcados
+con el ícono ⭐. Estos banners no aparecen para otros vendedores.
+
+Sugerencias de Uso
+-------------------
+  - Comparte los banners en Instagram / Facebook Stories
+  - Úsalos como portada de WhatsApp Business
+  - Adjúntalos en campañas de email a tus clientes
+  - Respeta siempre la vigencia indicada en cada banner
+
+================================================================================
+11. SEGURIDAD — AUTENTICACIÓN DE DOS FACTORES (2FA)
+================================================================================
+
+El módulo 2FA (nuevo en v2.9.35) protege tu cuenta con un segundo factor
+de autenticación usando TOTP (RFC 6238).
+
+¿Por qué activar 2FA?
+---------------------
+  - Protege tu billetera y retiros incluso si alguien obtiene tu contraseña
+  - Si el admin lo forza, es obligatorio para retirar dinero
+  - Recomendado para todos los vendedores
+
+Apps Compatibles
+-----------------
+  - Google Authenticator (Android / iOS)
+  - Authy
+  - Microsoft Authenticator
+  - 1Password
+  - Cualquier app compatible con TOTP RFC 6238
+
+Activar 2FA — Paso a Paso
+--------------------------
+1. Ve a "Seguridad" en el menú lateral
+2. Click en "Activar 2FA"
+3. Aparece un código QR en pantalla
+4. Abre tu app de autenticación y escanea el QR
+   (o ingresa manualmente el secret mostrado debajo del QR)
+5. La app genera un código de 6 dígitos cada 30 segundos
+6. Ingresa el código actual en el campo "Verificar código"
+7. Click "Confirmar y activar"
+8. El sistema genera 8 códigos de respaldo (backup codes)
+9. ⚠️ Guarda los códigos de respaldo en un lugar seguro.
+   Cada código sirve UNA sola vez.
+
+A partir de este momento, cada vez que inicies sesión deberás ingresar
+tu usuario, contraseña y el código TOTP actual.
+
+Iniciar Sesión con 2FA
+----------------------
+1. En /ltms-login/ ingresas usuario y contraseña
+2. Aparece una pantalla pidiendo el código TOTP
+3. Abre tu app de autenticación y copia el código de 6 dígitos
+4. Ingrésalo antes de que cambie (tienes 30 segundos)
+
+Si no tienes tu dispositivo (códigos de respaldo)
+--------------------------------------------------
+1. En la pantalla del código TOTP, click "Usar código de respaldo"
+2. Ingresa uno de los 8 códigos que guardaste al activar 2FA
+3. Ese código queda marcado como usado y no se puede reutilizar
+4. Inicias sesión normalmente
+
+Desactivar 2FA
+--------------
+Ve a Seguridad > "Desactivar 2FA". Te pedirá tu contraseña y un código
+TOTP vigente para confirmar. Si perdiste tu dispositivo y no tienes
+códigos de respaldo, contacta al admin del marketplace para que revoque
+el 2FA desde su panel.
+
+================================================================================
+12. DONACIONES — TRANSPARENCIA
+================================================================================
+
+El módulo Donaciones (nuevo en v2.9.35) muestra la transparencia del
+programa de donaciones del marketplace. Los compradores pueden donar
+al hacer checkout, y todo el dinero se acredita a una organización
+beneficiaria.
+
+Ver Donaciones
+--------------
+Ve a "Donaciones" en el menú lateral. Verás:
+
+  - Total recaudado por el marketplace en el mes
+  - Total histórico recaudado
+  - Organización beneficiaria actual (nombre, logo, RFC/NIT)
+  - Tabla de últimas 50 donaciones (fecha, monto, hash verificable)
+
+Libro Mayor Público
+-------------------
+El libro mayor es accesible públicamente en una URL del tipo:
+  tusitio.com/donaciones/
+
+Cualquier persona (sin login) puede ver el listado completo de donaciones
+con un hash verificable por transacción. Esto garantiza transparencia total
+sin exponer datos personales de los donantes.
+
+Certificados de Donación
+------------------------
+Si un donante realizó una donación y quiere un certificado, puede
+solicitarlo desde la página pública del libro mayor. El sistema genera
+un PDF con número de transacción, fecha, monto y sello digital.
+
+Tu Rol como Vendedor
+--------------------
+Como vendedor, tu rol es informativo:
+  - Puedes ver el impacto del programa de donaciones
+  - Puedes compartir la URL pública con tus clientes para generar confianza
+  - Las donaciones no afectan tu billetera ni tus comisiones
+
+================================================================================
+13. NOTIFICACIONES
 ================================================================================
 
 Notificaciones en el Panel
@@ -269,6 +525,9 @@ Tipos de Notificaciones
   ❌ Retiro rechazado
   📋 KYC aprobado/rechazado
   👥 Nuevo referido registrado
+  🔗 Sincronización PosGold completada / fallida (nuevo v2.9.35)
+  📢 Nuevo banner disponible (nuevo v2.9.35)
+  🛡️ 2FA activado / desactivado (nuevo v2.9.35)
 
 Notificaciones Push (PWA)
 --------------------------
@@ -281,7 +540,7 @@ Para instalar como PWA:
   3. Acepta los permisos de notificación
 
 ================================================================================
-10. PREGUNTAS FRECUENTES
+14. PREGUNTAS FRECUENTES
 ================================================================================
 
 ¿Por qué no puedo retirar dinero?
@@ -291,6 +550,7 @@ Revisa estos requisitos:
   2. Saldo disponible mayor al mínimo ($50,000 COP / $500 MXN)
   3. Billetera no congelada
   4. Máximo 3 retiros pendientes
+  5. Si el admin forzó 2FA, debes tenerlo activo
 
 ¿Cuánto tiempo tarda el retiro?
 ---------------------------------
@@ -312,11 +572,35 @@ Ejemplo Colombia (pedido $100,000):
 Actualmente, cada cuenta solo puede tener una tienda.
 Para múltiples tiendas necesitas diferentes cuentas de email.
 
+¿PosGold reemplaza mi catálogo WooCommerce?
+---------------------------------------------
+No. PosGold importa productos hacia WooCommerce (por SKU). Si ya tienes
+productos creados manualmente con el mismo SKU, se actualizan en lugar
+de duplicarse. Los productos manuales que no estén en PosGold se
+mantienen intactos.
+
+¿Qué pasa si cambio el costo de un producto en PosGold?
+-------------------------------------------------------
+En la próxima sincronización, el precio se recalcula con tus reglas de
+precio (transporte, publicidad, devoluciones, margen, comisión, IVA,
+ReDi, redondeo) y se actualiza en WooCommerce. No se actualiza
+instantáneamente; la sync automática corre cada 15 minutos.
+
+¿Puedo forzar una sincronización inmediata?
+-------------------------------------------
+Sí. Ve a PosGold > Sincronizar y click en "Sincronizar ahora".
+
+¿Qué hago si perdí mi teléfono con 2FA?
+---------------------------------------
+Usa uno de los 8 códigos de respaldo que guardaste al activar 2FA.
+Si tampoco los tienes, escribe a soporte@ltmarketplace.co para que el
+admin revoque tu 2FA y puedas reactivarlo.
+
 ¿Cómo contacto al soporte?
 -----------------------------
 Desde tu panel ve a Configuración > Soporte, o escribe a:
 soporte@ltmarketplace.co
 
 ================================================================================
- FIN DEL MANUAL DEL VENDEDOR — LT Marketplace Suite v1.5.0
+ FIN DEL MANUAL DEL VENDEDOR — LT Marketplace Suite v2.9.35
 ================================================================================

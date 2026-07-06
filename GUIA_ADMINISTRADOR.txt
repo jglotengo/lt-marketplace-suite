@@ -1,6 +1,6 @@
 ================================================================================
  LT MARKETPLACE SUITE — GUÍA DEL ADMINISTRADOR
- Versión 1.5.0 | Español
+ Versión 2.9.35 | Español
 ================================================================================
 
 ÍNDICE
@@ -15,8 +15,12 @@
 8. Seguridad y Logs
 9. Marketing y Red MLM
 10. Configuración Avanzada
-11. Cron Jobs
-12. Solución de Problemas
+11. PosGold — Sincronización de Catálogo
+12. TOTP 2FA — Autenticación de Dos Factores
+13. Marketing — Gestión de Banners
+14. Donaciones — Transparencia
+15. Cron Jobs
+16. Solución de Problemas
 
 ================================================================================
 1. INSTALACIÓN Y CONFIGURACIÓN INICIAL
@@ -36,6 +40,8 @@ Agregar ANTES de "That's all, stop editing!":
 
   define( 'WP_LTMS_MASTER_KEY', 'clave-generada-con-openssl-rand-base64-32' );
   define( 'WP_LTMS_OPENPAY_MERCHANT_ID_CO', 'tu-merchant-id' );
+  define( 'WP_LTMS_POSGOLD_SUBDOMAIN', 'tienda.posgoldcloud.com' );
+  define( 'WP_LTMS_POSGOLD_TOKEN',     'token-global-posgold' );
   // Ver wp-config-sample-snippet.php para todas las constantes
 
 ⚠️ La clave maestra NUNCA puede cambiar después de crear datos.
@@ -46,9 +52,9 @@ Paso 3: Activación
   1. Subir ZIP en wp-admin > Plugins > Agregar nuevo
   2. Activar el plugin
   3. El activador ejecuta automáticamente:
-     - Creación de tablas en la DB
+     - Creación de tablas en la DB (incluye 11 columnas SAT México)
      - Registro de roles y capacidades
-     - Configuración de cron jobs
+     - Configuración de cron jobs (incluye ltms_posgold_sync_poller)
      - Flush de reglas de reescritura
 
 Paso 4: Configuración mínima
@@ -59,6 +65,8 @@ Paso 4: Configuración mínima
   3. Pagos: credenciales de Openpay
   4. KYC: documentos requeridos
   5. Emails: email de soporte
+  6. PosGold: subdominio y token globales (ver sección 11)
+  7. Seguridad: forzar 2FA para vendedores (ver sección 12)
 
 Paso 5: Páginas
 ----------------
@@ -75,16 +83,22 @@ Acceso: LT Marketplace en el menú de WordPress admin
 
 Menú Principal
 --------------
-  📊 Dashboard        Métricas globales, gráficos, estado de APIs
-  👥 Vendedores       Lista y gestión de vendedores
-  📦 Pedidos          Todos los pedidos del marketplace
-  💰 Billeteras       Saldos y movimientos de todos los vendedores
-  💸 Retiros          Cola de retiros pendientes, procesados, rechazados
-  📋 KYC / Docs       Documentos de verificación de identidad
-  📊 Reportes Fiscales Declaraciones DIAN (CO) / SAT (MX)
-  📢 Marketing        Banners, red MLM, leaderboard
-  🔒 Seguridad        Eventos WAF, IPs bloqueadas, logs
-  ⚙️ Configuración    Todos los ajustes del plugin
+  📊 Dashboard           Métricas globales, gráficos, estado de APIs
+  👥 Vendedores          Lista y gestión de vendedores
+  📦 Pedidos             Todos los pedidos del marketplace
+  💰 Billeteras          Saldos y movimientos de todos los vendedores
+  💸 Retiros             Cola de retiros pendientes, procesados, rechazados
+  📋 KYC / Docs          Documentos de verificación de identidad
+  📊 Reportes Fiscales   Declaraciones DIAN (CO) / SAT (MX) — 11 columnas
+  🌐 Cross-Border        Compliance transfronterizo CO/MX (nuevo v2.9.35)
+  🎨 Estado UX           Diagnóstico de UX y assets del frontend (nuevo v2.9.35)
+  🚚 Logística/Costos    Ledger de costos logísticos por pedido (nuevo v2.9.35)
+  📢 Marketing           Banners, red MLM, leaderboard
+  🤝 Donaciones          Libro mayor y certificados de donaciones (nuevo v2.9.35)
+  🛡️ Auditoría LTMS     Panel del auditor externo (nuevo v2.9.35)
+  🔒 Seguridad           Eventos WAF, IPs bloqueadas, 2FA, logs
+  🔗 PosGold             Sincronización de catálogo y credenciales (nuevo v2.9.35)
+  ⚙️ Configuración       Todos los ajustes del plugin
 
 Dashboard de Métricas
 ----------------------
@@ -93,7 +107,9 @@ Muestra:
   - Total de vendedores activos
   - Retiros pendientes de aprobar
   - Documentos KYC pendientes de revisar
-  - Estado de conexión con cada API integrada
+  - Estado de conexión con cada API integrada (incluye PosGold)
+  - Estado de la última sincronización PosGold por vendedor
+  - Suma de donaciones recaudadas en el mes
 
 ================================================================================
 3. GESTIÓN DE VENDEDORES
@@ -106,6 +122,8 @@ LT Marketplace > Vendedores muestra:
   - Plan (básico / premium)
   - Estado KYC
   - Saldo de billetera
+  - Estado PosGold (configurado / pendiente)
+  - Estado 2FA (activado / no activado)
   - Botón congelar/descongelar billetera
 
 Buscar Vendedores
@@ -117,6 +135,7 @@ Congelar/Descongelar Billetera
 La billetera congelada impide:
   - Acreditar nuevas comisiones
   - Solicitar retiros
+  - Ejecutar sincronización PosGold
 
 Uso típico: Investigación de fraude, incumplimiento de políticas.
 
@@ -129,6 +148,8 @@ Para descongelar: Click en "Descongelar"
 Asignar Plan Premium
 ---------------------
 Cambiar el rol del usuario a 'ltms_vendor_premium' desde wp-admin > Usuarios.
+Los vendedores premium tienen acceso a banners personalizados y mayor
+cuota de sincronización PosGold.
 
 ================================================================================
 4. GESTIÓN DE BILLETERAS
@@ -247,15 +268,29 @@ Colombia — Información mostrada
   Total bruto, fee plataforma, neto vendedores,
   ReteFuente total, ReteIVA total, ReteICA total, Impoconsumo
 
-México — Información mostrada
-------------------------------
-  Total bruto, fee plataforma, neto vendedores,
-  ISR art. 113-A retenido, IVA cobrado, IEPS aplicado
+México — Información mostrada (11 columnas SAT)
+-----------------------------------------------
+La cuadrícula SAT CFDI 4.0 incluye exactamente las siguientes 11 columnas:
+  1.  RFC del emisor
+  2.  Nombre o razón social del emisor
+  3.  RFC del receptor
+  4.  Nombre o razón social del receptor
+  5.  UUID / folio fiscal del CFDI
+  6.  Fecha y hora de emisión
+  7.  Total del comprobante
+  8.  ISR retenido (art. 113-A)
+  9.  IVA cobrado (16% / 0% / exento)
+  10. IEPS aplicado (si aplica)
+  11. Estatus del comprobante (vigente / cancelado)
+
+Estas 11 columnas se almacenan en la tabla lt_sat_mexico_report (creada en 2.9.35)
+y se pueden exportar en CSV para entrega al SAT.
 
 Exportación
 -----------
 Los reportes pueden exportarse en formato CSV para declaración ante
-DIAN (Colombia) o SAT (México).
+DIAN (Colombia) o SAT (México). El CSV México respeta el orden de las
+11 columnas oficiales.
 
 Panel del Auditor Externo
 --------------------------
@@ -266,6 +301,8 @@ El auditor tiene acceso de solo lectura a:
   - Alertas SAGRILAFT (retiros > umbral)
   - KYC pendiente
   - Eventos de seguridad
+  - Libro mayor de donaciones
+  - Logs de sincronización PosGold (auditoría de credenciales y ejecuciones)
 
 Todos los accesos del auditor quedan registrados en el log forense.
 
@@ -296,6 +333,7 @@ El WAF se activa en:
   - Traversal de directorios
   - Bots maliciosos
   - 10+ intentos de login fallidos
+  - Intento de acceso a endpoints 2FA sin sesión válida
 
 ⚠️ El log de seguridad es INMUTABLE. Triggers de MySQL previenen
    la modificación o eliminación de registros históricos.
@@ -321,6 +359,8 @@ Banners
 La tabla de banners registra los materiales de marketing activos.
 Los vendedores con plan premium pueden acceder a banners personalizados.
 
+Ver sección 13 para la gestión detallada del nuevo módulo de banners.
+
 ================================================================================
 10. CONFIGURACIÓN AVANZADA
 ================================================================================
@@ -335,7 +375,8 @@ Pestañas Disponibles
   Siigo         Facturación electrónica DIAN (Colombia)
   KYC           Documentos requeridos, auto-aprobación
   MLM           Tasas de comisión por nivel (Niv1/Niv2/Niv3)
-  Seguridad     Umbral WAF, rotación de logs, 2FA
+  Seguridad     Umbral WAF, rotación de logs, 2FA obligatorio
+  PosGold       Subdominio, token global, sync permitido a vendedores
   Emails        Remitente, plantillas, notificaciones
 
 Campos de API (Contraseñas)
@@ -346,10 +387,176 @@ Verás el indicador "🔐 AES-256" junto a los campos cifrados.
 Test de Conexión
 -----------------
 El botón "Probar conexión" en cada API llama a health_check()
-para verificar que las credenciales son válidas.
+para verificar que las credenciales son válidas. PosGold reporta
+además el listado de bodegas accesibles.
 
 ================================================================================
-11. CRON JOBS
+11. POSGOLD — SINCRONIZACIÓN DE CATÁLOGO
+================================================================================
+
+LT Marketplace > PosGold
+
+Este módulo (nuevo en v2.9.35) permite a los vendedores importar su catálogo
+desde PosGold hacia WooCommerce aplicando reglas de precio.
+
+Configuración Global (Admin)
+-----------------------------
+1. LT Marketplace > Configuración > PosGold
+2. Ingresar subdominio PosGold (ej: tienda.posgoldcloud.com)
+3. Ingresar token global (generado desde el panel de PosGold)
+4. Click "Probar conexión" → debe responder 200 OK y listar bodegas
+5. (Opcional) Definir empresaid/usuarioid/bodegaid por defecto como fallback
+6. Activar "Permitir sync a vendedores" para habilitar el módulo en el dashboard
+
+Gestión de Credenciales de Vendedor
+------------------------------------
+LT Marketplace > PosGold > Credenciales por Vendedor
+
+Permite al admin:
+  - Ver todas las credenciales PosGold configuradas por cada vendedor
+  - Editar empresaid / usuarioid / bodegaid de un vendedor
+  - Revocar credenciales (vendedor debe reconfigurar)
+  - Ver la fecha de la última sincronización exitosa
+  - Ver el contador de productos sincronizados
+
+⚠️ Las credenciales se cifran con AES-256 (WP_LTMS_MASTER_KEY). Nunca se
+   muestran en claro, solo el subdominio y los IDs son visibles.
+
+Logs de Sincronización
+-----------------------
+LT Marketplace > PosGold > Logs muestra:
+  - Fecha y hora de cada ejecución
+  - Vendedor
+  - Resultado (éxito / error)
+  - Productos insertados / actualizados / saltados
+  - Mensaje de error (si aplica)
+  - Duración de la sincronización
+
+Cron de Sincronización
+-----------------------
+  ltms_posgold_sync_poller   Cada 15 min   Procesa la cola de sync pendiente
+
+Forzar sync manualmente para un vendedor:
+  wp eval 'LTMS_Business_PosGold_Sync::run_for_vendor(USER_ID);' --allow-root
+
+================================================================================
+12. TOTP 2FA — AUTENTICACIÓN DE DOS FACTORES
+================================================================================
+
+LT Marketplace > Seguridad > 2FA
+
+El módulo TOTP (RFC 6238) permite activar autenticación de dos factores
+para vendedores y administradores usando apps como Google Authenticator,
+Authy, 1Password o Microsoft Authenticator.
+
+Configuración Global
+---------------------
+1. LT Marketplace > Configuración > Seguridad
+2. Activar "Forzar 2FA para administradores" (recomendado)
+3. Activar "Forzar 2FA para vendedores" (opcional)
+4. Definir número de códigos de respaldo a generar (default: 8)
+
+Gestión de 2FA por Usuario
+----------------------------
+LT Marketplace > Seguridad > 2FA > Usuarios muestra:
+  - Lista de usuarios con 2FA activado
+  - Fecha de activación
+  - Última verificación exitosa
+  - Acciones: revocar 2FA, regenerar códigos de respaldo
+
+Revocar 2FA de un usuario
+---------------------------
+Útil cuando un vendedor pierde su dispositivo:
+  1. Click "Revocar 2FA" en la fila del usuario
+  2. Confirmar la acción (queda registrada en el log forense)
+  3. El vendedor puede volver a activar 2FA desde su dashboard
+
+⚠️ La revocación de 2FA es un evento sensible. Siempre deja rastro
+   en el log inmutable con usuario admin que ejecutó la acción, IP y motivo.
+
+Tablas relacionadas
+--------------------
+  - lt_totp_secrets        Almacena el secret TOTP cifrado por usuario
+  - lt_totp_backup_codes   Hashes de códigos de respaldo (single-use)
+
+================================================================================
+13. MARKETING — GESTIÓN DE BANNERS
+================================================================================
+
+LT Marketplace > Marketing > Banners
+
+Este módulo (mejorado en v2.9.35) permite gestionar banners promocionales
+que los vendedores pueden descargar desde su dashboard.
+
+Acciones del Admin
+-------------------
+  - Subir nuevo banner (JPG/PNG/WebP, máximo 2MB)
+  - Definir título, descripción y categoría del banner
+  - Asignar banner a tier (básico / premium / todos)
+  - Definir vigencia (fecha inicio / fecha fin)
+  - Activar / desactivar banner
+  - Ver contador de descargas por banner
+
+Categorías Sugeridas
+---------------------
+  - Descuentos
+  - Temporada
+  - Lanzamientos
+  - Black Friday
+  - Navidad
+  - Día de la Madre / San Valentín
+
+Banner personalizado por vendedor
+----------------------------------
+El admin puede subir un banner y marcarlo como "exclusivo" de un vendedor
+premium. Solo ese vendedor lo verá en su dashboard.
+
+Tabla relacionada: lt_marketing_banners (con columnas: id, title, file_url,
+tier, vendor_id opcional, start_date, end_date, downloads_count, active).
+
+================================================================================
+14. DONACIONES — TRANSPARENCIA
+================================================================================
+
+LT Marketplace > Donaciones
+
+Este módulo (nuevo en v2.9.35) permite:
+  - Recibir donaciones de compradores en el checkout (opt-in)
+  - Acreditar las donaciones a una fundación o causa configurada
+  - Mostrar un libro mayor público accesible sin login
+  - Generar certificados de donación PDF descargables
+
+Configuración
+--------------
+LT Marketplace > Configuración > Donaciones:
+  - Activar módulo de donaciones
+  - Definir organización beneficiaria (nombre, RFC/NIT, logo)
+  - Montos sugeridos en checkout (ej: $5.000 / $10.000 / $20.000 COP)
+  - Permitir monto libre
+  - Activar generación automática de certificados
+  - URL pública del libro mayor (shortcode [ltms_donations_ledger])
+
+Libro Mayor Público
+--------------------
+LT Marketplace > Donaciones > Libro Mayor muestra una tabla con:
+  - Fecha
+  - Monto
+  - Organización beneficiaria
+  - Comprobante (hash verificable, sin exponer datos personales del donante)
+  - Estado (acreditado / pendiente)
+
+Certificados
+-------------
+El admin puede regenerar certificados PDF en lote y reenviarlos por email.
+Cada certificado incluye número de transacción, fecha, monto y sello digital.
+
+Tablas relacionadas
+--------------------
+  - lt_donations
+  - lt_donation_certificates
+
+================================================================================
+15. CRON JOBS
 ================================================================================
 
 El plugin registra los siguientes cron jobs en WordPress:
@@ -358,15 +565,18 @@ El plugin registra los siguientes cron jobs en WordPress:
   ltms_weekly_tax_report        Lunes           Genera reporte fiscal semanal
   ltms_hourly_waf_cleanup       Cada hora       Limpia IPs expiradas del WAF
   ltms_sync_commission_rates    Diario 06:00    Sincroniza tasas desde config
+  ltms_posgold_sync_poller      Cada 15 min     Procesa cola de sync PosGold
+  ltms_donations_daily_close    Diario 23:00    Cierra donaciones del día
 
 Verificar estado de crons:
   wp cron event list
 
 Ejecutar manualmente:
   wp eval 'do_action("ltms_daily_payout_processor");' --allow-root
+  wp eval 'do_action("ltms_posgold_sync_poller");' --allow-root
 
 ================================================================================
-12. SOLUCIÓN DE PROBLEMAS
+16. SOLUCIÓN DE PROBLEMAS
 ================================================================================
 
 Error: "Tabla lt_wallets no existe"
@@ -375,10 +585,21 @@ Solución: Desactivar y reactivar el plugin. Esto ejecuta el activador que
 crea las tablas.
 Si persiste: Ejecutar manualmente el script SQL en database_schema_full.sql
 
+Error: "Tabla lt_posgold_sync_log no existe"
+---------------------------------------------
+Solución: Forzar migración a 2.9.35:
+  wp eval 'LTMS_DB_Migrations::run();' --allow-root
+  wp option get ltms_db_version    # debe ser >= 2.9.35
+
 Error: "Función de cifrado no disponible"
 ------------------------------------------
 Solución: Verificar que la constante WP_LTMS_MASTER_KEY esté definida en
 wp-config.php y que PHP tenga la extensión openssl habilitada.
+
+Error: PosGold "No se encontraron productos"
+---------------------------------------------
+Solución: Verificar que las credenciales del vendedor (empresaid, usuarioid,
+bodegaid) sean correctas y que las categorías seleccionadas existan en PosGold.
 
 Los emails no se envían
 ------------------------
@@ -397,12 +618,23 @@ Vendedor no puede acceder al dashboard
 1. Verificar que el usuario tenga rol ltms_vendor
 2. Verificar que la página del dashboard tenga el shortcode [ltms_vendor_dashboard]
 3. Verificar que la URL de la página esté configurada en Ajustes > General
+4. Si 2FA está activado y el vendedor perdió su dispositivo, revocar 2FA
+   desde LT Marketplace > Seguridad > 2FA > Usuarios.
 
 WAF bloqueando IPs legítimas
 -----------------------------
 1. LT Marketplace > Seguridad > IPs Bloqueadas
 2. Localizar la IP y desbloquearla
 3. Si es frecuente, aumentar el umbral en Ajustes > Seguridad
+
+Páginas admin en blanco (WSOD) tras deploy
+-------------------------------------------
+Causa común: la clase no está registrada en el autoloader.
+Solución: Verificar $exceptions_npart en lt-marketplace-suite.php incluya
+las clases nuevas (LTMS_Admin_Donations, LTMS_Admin_Marketing_Manager,
+LTMS_Admin_Cross_Border, LTMS_Admin_Ux_Status, LTMS_Admin_Shipping_Ledger,
+LTMS_Admin_Sat_Report, LTMS_TOTP_2FA, LTMS_Business_PosGold_Sync, etc.).
+Otra causa: método privado llamado desde fuera → cambiar a public.
 
 Log de errores de WordPress
 -----------------------------
@@ -413,6 +645,14 @@ Agregar a wp-config.php para debugging:
 
 Los errores se escriben en wp-content/debug.log
 
+HTTP 500 tras deploy en SiteGround
+-----------------------------------
+Causa: .min.js demasiado grande (>350 KB) o cache SiteGround obsoleto.
+Solución:
+  rm -rf wp-content/cache/siteground-optimizer-assets/*
+  wp cache flush --allow-root
+  wp eval 'opcache_reset();' --allow-root
+
 ================================================================================
- FIN DE LA GUÍA DEL ADMINISTRADOR — LT Marketplace Suite v1.5.0
+ FIN DE LA GUÍA DEL ADMINISTRADOR — LT Marketplace Suite v2.9.35
 ================================================================================
