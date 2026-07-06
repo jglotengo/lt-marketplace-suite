@@ -5542,15 +5542,14 @@
     }
 
     function initCartDrawer() {
-        // v2.9.39: Hook en botones de carrito del marketplace.
-        // EXCLUIR Elementor cart (elementor-menu-cart) para no romper su funcionamiento.
+        // v2.9.42: Interceptamos el click del botón de carrito de Elementor
+        // porque su JS está roto (elementorModules is not defined en v4.1.x).
+        // En lugar de dejar que Elementor maneje el carrito (que no funciona),
+        // abrimos el cart drawer de LTMS que SÍ funciona.
         document.addEventListener('click', (e) => {
-            // NO interceptar clicks en el carrito de Elementor
-            if (e.target.closest('.elementor-menu-cart__toggle_button, .elementor-menu-cart__wrapper, #elementor-menu-cart__toggle_button')) {
-                return; // Dejar que Elementor maneje su propio carrito
-            }
-
             const cartTrigger = e.target.closest(
+                '.elementor-menu-cart__toggle_button, .elementor-menu-cart__wrapper, ' +
+                '#elementor-menu-cart__toggle_button, ' +
                 '.ltms-sf-topbar-cart, .ltms-cart-trigger, [data-cart-drawer], ' +
                 '.ltms-header-cart, .ltms-cart-icon, .ltms-cart-link'
             );
