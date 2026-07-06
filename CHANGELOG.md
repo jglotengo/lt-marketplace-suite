@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.35] — 2026-07-06
+
+### Added
+
+- **PosGold API integration**: vendors sync their PosGold catalog to WooCommerce (API client, sync engine, price calculator with 8 components, category dropdown, SEO templates, price rounding, deduplication)
+- **Vendor dashboard**: 4 new views — Marketing (banners), Security (TOTP 2FA), Donations (transparency), PosGold (catalog sync)
+- **Activity feed endpoint** for vendor home dashboard
+- **6 missing AJAX endpoints**: `backorder_notify`, `get_invoices`, `review_helpful`, `save_push_subscription`, `submit_question`, `submit_return`
+- **11 SAT México columns** added to `lt_commissions` table (CFDI / RFC / régimen / uso de CFDI / etc.)
+- **8 frontend classes added to autoloader** classmap: `Wishlist`, `Quick_View`, `Comparison_Table`, `Product_Tabs`, `Product_Video`, `Rating_Summary`, `Trust_Badges`, `SEO_Enhanced`
+
+### Fixed
+
+- composer `dompdf` constraint `^2.0.9` → `^2.0` (version 2.0.9 doesn't exist on packagist)
+- `LTMS_Core_Security::derive_key()` declared twice (fatal error on boot)
+- `continue 2` in `logistics-compliance.php` illegal (only 1 loop level present)
+- `LTMS_Core_Firewall::get_client_ip()` was private, called from `LTMS_Data_Masking` (WSOD — White Screen of Death)
+- 35+ classes missing from autoloader classmap (silent `class_exists() === false` in production)
+- PHP code visible on admin Security page (missing `<?php` tag at top of template)
+- Cross-Border settings section not found (slug underscore vs hyphen mismatch)
+- Submenu "Logística / Costos" duplicated in admin menu
+- `LTMS_PATH` constant undefined, changed to `LTMS_PLUGIN_DIR`
+- `e.target.closest is not a function` (guard for text nodes in event delegation)
+- Error toasts "Algo salió mal" disabled (`SHOW_ERROR_TOASTS=false`, `SHOW_AJAX_ERROR_TOASTS=false`)
+- CSS fixes: product page button deformed, quantity field too small, upsell items rendered as giant buttons
+- Nonce action corrected from `ltms_storefront_nonce` to `ltms_ux_nonce`
+- `.min.css` files were in `.gitignore`, force-tracked so they reach production
+- `.min.js` / `.min.css` synchronized with `.js` / `.css` source files
+
+### Stats
+
+- **3,038 tests passing** (CI #1185 green)
+- **5,633 files tracked** in repository
+- **309 PHP classes** in `includes/`
+- **113 JS modules** across `assets/js/`
+
 ## [2.9.31] — 2026-07-03
 
 ### Fixed — Auditoría profunda: integridad referencial + race conditions + dead code

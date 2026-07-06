@@ -3,7 +3,7 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-06 (versión del plugin en ese momento: `2.9.31`).
+> **Última auditoría completa del repo:** 2026-07-06 (versión del plugin en ese momento: `2.9.35`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
 > (`jglotengo/lt-marketplace-suite@main`, ~316 archivos en `includes/`, 6528 en total
 > incluyendo `vendor/`) y corrige varias secciones que estaban desactualizadas respecto
@@ -18,7 +18,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.31` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo).
+**Versión actual del plugin:** `2.9.35` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo).
 
 ---
 
@@ -265,7 +265,7 @@ Estructura real verificada en `includes/` (316 archivos). Más granular que un r
 | Deploy | `deploy/` | Webhook de auto-deploy, scripts de diagnóstico/parche puntuales, endpoint de flush de OPcache | Ver detalle abajo |
 | Bin | `bin/` | Scripts CLI de diagnóstico, QA manual y fixes puntuales (decenas de archivos `ltms-diag-*`, `ltms-qa-*`, `ltms-fix-*`) | Muchos son de un solo uso histórico; no asumas que siguen aplicando sin revisarlos |
 | Tests | `tests/` (directorio real, no solo `.rar`) | PHPUnit (`tests/unit/`, `tests/integration/`), QA manual (`tests/qa-*.php`), E2E Cypress (`tests/e2e/`) | Ver sección Tests arriba |
-| Docs | `docs/` | `docs/architecture/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/api/openapi.yaml` | ⚠️ Ambos docs están fechados/versionados como "1.5.0 / 2025-01-01", desactualizados respecto al código real (2.9.31) — útiles como referencia conceptual (hexagonal architecture, patrón ACID del wallet, RBAC) pero no confíes en detalles específicos de nombres de tabla/clase sin verificar contra el código |
+| Docs | `docs/` | `docs/architecture/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/api/openapi.yaml` | Ambos docs actualizados a 2.9.35 (2026-07-06) en esta revisión — ahora incluyen PosGold pattern, TOTP 2FA, SAT México columns y autoloader. Útiles como referencia conceptual (hexagonal architecture, patrón ACID del wallet, RBAC) |
 
 ### Contenido de `deploy/` (relevante para el issue de ZapSign 401)
 
@@ -289,7 +289,7 @@ El fix del bucket vacío de Backblaze (`ltms_backblaze_contratos_bucket`) **ya e
 
 ## Referencia Rápida de Arquitectura
 
-*(Resumen de `docs/architecture/ARCHITECTURE.md`, marcado ahí como versión 1.5.0/2025-01-01 — conceptualmente vigente pero verifica detalles contra el código antes de citarlos como hechos actuales.)*
+*(Resumen de `docs/architecture/ARCHITECTURE.md`, actualizado a versión 2.9.35 / 2026-07-06. Verifica detalles contra el código antes de citarlos como hechos actuales.)*
 
 - **Patrón general:** Arquitectura Hexagonal (Ports & Adapters). Lado "driving": hooks de WordPress, REST API, WP-Admin, SPA de vendedor. Núcleo de aplicación: `LTMS_Wallet`, `LTMS_Tax_Engine`, `LTMS_Commission_Strategy`, `LTMS_Referral_Tree`, `LTMS_Payout_Scheduler`. Lado "driven": MySQL/wpdb + APIs externas (Openpay, Siigo, Addi, ZapSign, XCover, TPTC, Aveonline, Backblaze).
 - **Wallet ACID:** usa `SELECT ... FOR UPDATE` (locking pesimista) + transacción MySQL explícita para debitar/creditar saldo y escribir el ledger en la misma operación.
@@ -347,6 +347,17 @@ tail -n 30 /home/customer/www/lo-tengo.com.co/logs/error_log
 ```
 
 > **Advertencia OPcache:** En SiteGround compartido, `git reset --hard` puede no reflejar cambios si OPcache retiene el bytecode compilado **en el pool PHP-FPM web**, que es distinto del pool que usa WP-CLI/SSH. `wp cache flush` no basta para ese pool. Usa `deploy/ltms-opcache-flush.php?token=ltms_opcache_2026` (ver tabla de `deploy/` arriba) para forzar el flush vía HTTP, o contacta soporte de SiteGround / usa la herramienta de purge del panel si el problema persiste.
+
+---
+
+## Lecciones aprendidas en v2.9.35 (corregidas, no repetir)
+
+- **Constante de path del plugin:** usar siempre `LTMS_PLUGIN_DIR`. Las constantes `LTMS_PATH` y `LTMS_PLUGIN_DIR_PATH` NO existen y provocan fatal en cualquier código que las referencie. Si ves `LTMS_PATH` en código heredado, reemplázalo por `LTMS_PLUGIN_DIR`.
+- **Nonce action para AJAX del storefront:** el action correcto es `ltms_ux_nonce`, NO `ltms_storefront_nonce`. Si un handler usa `check_ajax_referer('ltms_storefront_nonce', 'nonce')`, todos los AJAX del storefront fallan con 403 silencioso.
+- **Visibilidad de métodos importa:** `LTMS_Core_Firewall::get_client_ip()` debe ser `public` (no `private`). Es llamada desde `LTMS_Data_Masking` para enmascarar IPs en logs. Si la declaras `private`, el WSOD es inmediato en cualquier página que dispare data masking.
+- **`continue 2` requiere 2+ niveles de loop anidado.** Usar `continue 2` dentro de un `foreach` simple (1 nivel) es un error fatal: `Fatal error: 'continue 2' is in the wrong context`. Usa `continue;` (sin número) si solo hay 1 loop.
+- **Sincronización `.min.js` / `.min.css`:** los archivos minificados deben regenerarse y commitearse en el mismo commit que sus fuentes `.js` / `.css`. Si solo actualizas la fuente y olvidas el `.min`, en producción se sirve la versión vieja (SiteGround sirve el `.min` por defecto si `SCRIPT_DEBUG` no está definido). Los `.min.*` están force-tracked (fueron removidos de `.gitignore` en v2.9.35).
+- **Nuevas vistas del dashboard de vendedor (v2.9.35):** `view-marketing.php`, `view-security.php`, `view-donations.php`, `view-posgold.php` en `includes/frontend/views/`. Cada una tiene su endpoint AJAX y su entrada en el menú lateral del dashboard SPA.
 
 ---
 

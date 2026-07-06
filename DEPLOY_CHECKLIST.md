@@ -1,6 +1,8 @@
-# Deploy Checklist — LT Marketplace Suite v2.8.0
+# Deploy Checklist — LT Marketplace Suite v2.9.35
 
 Checklist paso a paso para desplegar la nueva capa UX de forma segura en producción.
+
+> **Notas v2.9.35 (2026-07-06):** añadir verificaciones de endpoints AJAX nuevos (6), vistas nuevas del dashboard de vendedor (4), columnas SAT México (11) y límite de tamaño de `.min.js` para SiteGround.
 
 ## Pre-despliegue (en local / staging)
 
@@ -12,15 +14,22 @@ Checklist paso a paso para desplegar la nueva capa UX de forma segura en producc
 
 ### 2. Verificación de archivos
 - [ ] `assets/js/ltms-ux-enhancements.min.js` existe y pesa ~309 KB
+- [ ] **VERIFICAR que `.min.js` NO pese más de 350 KB** (límite de memoria de SiteGround para assets combinados). Si excede, reducir módulos o dividir bundle.
 - [ ] `assets/css/ltms-ux-enhancements.min.css` existe y pesa ~196 KB
 - [ ] `assets/css/ltms-admin-ux.min.css` existe y pesa ~15 KB
 - [ ] Versiones originales (sin `.min`) siguen presentes para fallback con `SCRIPT_DEBUG=true`
+- [ ] `.min.js` y `.min.css` están **sincronizados** con sus fuentes `.js` / `.css` (mismo contenido, solo minificado)
+- [ ] `.min.*` NO están en `.gitignore` (fueron removidos en v2.9.35, force-tracked)
 
 ### 3. Verificación de PHP
 - [ ] `class-ltms-frontend-assets.php` incluye la lógica `$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';`
 - [ ] `class-ltms-admin.php` incluye la lógica `$ux_suffix` para `ltms-admin-ux`
-- [ ] `LTMS_VERSION` en `lt-marketplace-suite.php` = `2.8.0`
-- [ ] `Version:` en header del plugin = `2.8.0`
+- [ ] `LTMS_VERSION` en `lt-marketplace-suite.php` = `2.9.35`
+- [ ] `Version:` en header del plugin = `2.9.35`
+- [ ] Constante `LTMS_PLUGIN_DIR` definida y usada (NO `LTMS_PATH` ni `LTMS_PLUGIN_DIR_PATH`)
+- [ ] Nonce action `ltms_ux_nonce` usado en todos los handlers AJAX del storefront (NO `ltms_storefront_nonce`)
+- [ ] `LTMS_Core_Firewall::get_client_ip()` declarado `public` (no `private`)
+- [ ] No quedan `continue 2` en loops de 1 solo nivel
 
 ### 4. Verificación de plantillas PHP (data-* aplicados)
 - [ ] `dashboard-wrapper.php` — botón `data-tour-start` presente en topbar
@@ -60,7 +69,7 @@ Checklist paso a paso para desplegar la nueva capa UX de forma segura en producc
 - [ ] Actualizar `UX_ENHANCEMENTS.md`, `QA_REPORT.md`, `CHANGELOG.md`
 
 ### 8. Verificación post-despliegue
-- [ ] Acceder a `wp-admin/plugins.php` — versión del plugin muestra `2.8.0`
+- [ ] Acceder a `wp-admin/plugins.php` — versión del plugin muestra `2.9.35`
 - [ ] No hay errores PHP en `wp-content/debug.log`
 - [ ] Abrir una ventana incógnito y visitar:
   - `/login-vendedor/` → formulario con validación en vivo, password strength, toggle password
@@ -71,6 +80,23 @@ Checklist paso a paso para desplegar la nueva capa UX de forma segura en producc
   - Vista pedidos → búsqueda con autocompletar, export CSV
   - Vista billetera → export CSV
   - Vista envíos → export CSV
+- [ ] **Verificar 4 nuevos items del menú del dashboard de vendedor**: Marketing, Security, Donations, PosGold
+- [ ] **Verificar 6 nuevos endpoints AJAX** (cada uno debe responder 200 con nonce válido):
+  - `ltms_backorder_notify` — notificar cliente cuando producto vuelva a tener stock
+  - `ltms_get_invoices` — listar facturas del vendedor
+  - `ltms_review_helpful` — votar si una reseña fue útil
+  - `ltms_save_push_subscription` — guardar suscripción Web Push (VAPID)
+  - `ltms_submit_question` — enviar pregunta Q&A sobre un producto
+  - `ltms_submit_return` — solicitar devolución de producto
+- [ ] **Verificar migración SAT México**: ejecutar en DB `DESCRIBE lt_commissions;` y confirmar que las **11 columnas nuevas** están presentes (cfdi_uuid, rfc, regimen_fiscal, uso_cfdi, etc.)
+- [ ] Verificar que la actividad del vendedor (activity feed) carga en `view-home.php`
+- [ ] **Limpiar cache de SiteGround Optimizer**: `rm -rf wp-content/uploads/siteground-optimizer-assets/*`
+- [ ] **Flush WordPress cache + OPcache del pool web**:
+  ```bash
+  wp cache flush --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+  wp eval 'opcache_reset();' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+  ```
+  - Alternativa HTTP (preferida en SiteGround): `curl 'https://lo-tengo.com.co/wp-content/plugins/lt-marketplace-suite/deploy/ltms-opcache-flush.php?token=ltms_opcache_2026'`
 
 ### 9. Verificación de performance
 - [ ] En DevTools → Network, confirmar que se cargan `ltms-ux-enhancements.min.js` y `.min.css`
@@ -125,6 +151,23 @@ grep -oE '\}' assets/css/ltms-ux-enhancements.css | wc -l
 
 # Forzar carga de assets no minificados (en wp-config.php)
 define( 'SCRIPT_DEBUG', true );
+
+# === Comandos post-deploy v2.9.35 ===
+
+# Limpiar cache del SiteGround Optimizer (assets combinados/minificados)
+rm -rf wp-content/uploads/siteground-optimizer-assets/*
+
+# Flush object cache de WordPress
+wp cache flush --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+
+# Flush OPcache del pool CLI (no afecta al pool web en SiteGround, ver nota abajo)
+wp eval 'opcache_reset();' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+
+# Flush OPcache del pool WEB (preferido en SiteGround)
+curl 'https://lo-tengo.com.co/wp-content/plugins/lt-marketplace-suite/deploy/ltms-opcache-flush.php?token=ltms_opcache_2026'
+
+# Verificar 11 columnas SAT México en lt_commissions
+wp db query 'DESCRIBE lt_commissions;' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html | grep -E 'cfdi|rfc|regimen|uso_cfdi'
 ```
 
 ## Notas finales

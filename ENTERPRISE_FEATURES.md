@@ -1,6 +1,6 @@
 # LT Marketplace Suite — Enterprise Features
 
-**Version:** 1.5.0
+**Version:** 2.9.35
 
 ---
 
@@ -152,9 +152,98 @@ BEFORE DELETE ON lt_security_events → SIGNAL SQLSTATE '45000'
 | TPTC | MLM Network | CO, MX | API Key |
 | XCover | Insurance | CO, MX | Partner Code |
 | Backblaze B2 | File Storage | All | App Key |
+| **PosGold** | **Catalog Sync (POS → WooCommerce)** | **MX, CO** | **API Key + Token** |
 
 All clients extend `LTMS_Abstract_Api_Client` implementing `LTMS_Api_Client_Interface`.
 Created via `LTMS_Api_Factory::get('provider')`.
+
+---
+
+## 🏪 PosGold Integration (v2.9.35)
+
+PosGold is a Point-of-Sale / ERP system widely used by Mexican and Colombian vendors. The v2.9.35 integration allows vendors to sync their physical-store catalog into WooCommerce automatically.
+
+### Architecture
+
+- **API client:** `includes/api/class-ltms-api-posgold.php` (extends `LTMS_Abstract_Api_Client`)
+- **Sync engine:** `includes/business/class-ltms-posgold-sync.php`
+- **Price calculator:** `includes/business/class-ltms-posgold-price-calculator.php`
+- **Vendor dashboard view:** `includes/frontend/views/view-posgold.php`
+
+### Price Calculator — 8 Components
+
+The price calculator decomposes the final WooCommerce price into 8 configurable components so vendors have full transparency over margins and tax burden:
+
+| # | Component | Description |
+|---|-----------|-------------|
+| 1 | `cost` | Base acquisition cost from PosGold |
+| 2 | `markup` | Vendor profit margin (percentage) |
+| 3 | `iva` | VAT (16% MX / 19% CO) |
+| 4 | `ieps` | IEPS excise tax (MX only, variable by category) |
+| 5 | `shipping_factor` | Average shipping cost amortized per unit |
+| 6 | `platform_fee` | LTMS marketplace commission (volume-tiered) |
+| 7 | `payment_fee` | Payment gateway fee (Openpay/SPEI/OXXO) |
+| 8 | `rounding` | Round-up to next psychological price (.99 / .00) |
+
+Final price = `cost + markup + iva + ieps + shipping_factor + platform_fee + payment_fee + rounding`
+
+### Catalog Sync Features
+
+- **Category dropdown:** maps PosGold categories → WooCommerce categories (auto-create if missing)
+- **SEO templates:** per-category SEO title/description templates (filled with product data)
+- **Price rounding:** configurable rounding rule (none / .99 / .00 / next-10 / next-50)
+- **Deduplication:** matches PosGold SKU ↔ `_sku` to avoid duplicate products on re-sync
+- **Activity log:** every sync batch writes to `lt_posgold_sync_log` (vendor_id, products_synced, errors, duration)
+- **Manual trigger:** vendor clicks "Sincronizar ahora" in `view-posgold.php` (AJAX `ltms_posgold_sync`)
+- **Scheduled sync:** optional WP-Cron event `ltms_posgold_scheduled_sync` (daily by default)
+
+---
+
+## 🔐 TOTP 2FA (v2.9.35)
+
+Vendors can now enable Time-based One-Time Password (TOTP) two-factor authentication from their dashboard.
+
+- **Class:** `includes/core/class-ltms-totp-2fa.php`
+- **Algorithm:** RFC 6238 TOTP (SHA-1, 30-second window, 6 digits)
+- **QR code:** generated via `endroid/qr-code` (Composer dependency)
+- **Secret storage:** encrypted with `LTMS_Core_Security::encrypt()` (AES-256-CBC) before saving to `user_meta` (`ltms_totp_secret`)
+- **Recovery codes:** 10 single-use codes stored hashed (bcrypt), regenerated on demand
+- **Enforcement:** admin can force 2FA for `ltms_vendor_premium` and `ltms_compliance_officer` roles via `ltms_force_2fa_roles` setting
+- **Grace period:** 7 days from first login after enrollment before 2FA is mandatory (configurable)
+- **Vendor dashboard view:** `view-security.php` (enroll, verify, regenerate recovery codes, disable)
+- **Login flow:** after password verification, if 2FA enabled → redirect to `ltms_2fa_challenge` page → verify TOTP code → complete login
+
+### SAT México Compliance Logging
+
+The TOTP module also writes to `lt_security_events` for SAT compliance auditing:
+- 2FA enrollment events
+- 2FA challenge failures (with IP + user-agent)
+- 2FA disabled events (with reason)
+- Recovery code usage
+
+---
+
+## 🇲🇽 SAT México Compliance Columns (v2.9.35)
+
+The `lt_commissions` table was extended with **11 new columns** to support Mexican fiscal reporting (CFDI 4.0):
+
+| # | Column | Type | Purpose |
+|---|--------|------|---------|
+| 1 | `cfdi_uuid` | VARCHAR(64) | UUID del CFDI emitido (SAT) |
+| 2 | `cfdi_serie` | VARCHAR(20) | Serie del comprobante |
+| 3 | `cfdi_folio` | VARCHAR(40) | Folio del comprobante |
+| 4 | `rfc_emisor` | VARCHAR(13) | RFC del emisor (vendedor) |
+| 5 | `rfc_receptor` | VARCHAR(13) | RFC del receptor (comprador/marketplace) |
+| 6 | `regimen_fiscal` | VARCHAR(10) | Clave de régimen fiscal (ej. 616 — Sin obligaciones fiscales) |
+| 7 | `uso_cfdi` | VARCHAR(10) | Clave de uso de CFDI (ej. G03 — Gastos en general) |
+| 8 | `forma_pago` | VARCHAR(10) | Clave de forma de pago (ej. 03 — Transferencia) |
+| 9 | `metodo_pago` | VARCHAR(10) | Clave de método de pago (PUE / PPD) |
+| 10 | `fecha_certificacion` | DATETIME | Fecha de certificación SAT |
+| 11 | `estado_cfdi` | VARCHAR(20) | Vigente / Cancelado |
+
+- **Migration:** `includes/core/migrations/class-ltms-db-migrations.php` (idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`)
+- **Fiscal reports:** admin fiscal-mexico panel queries these columns for monthly SAT reports
+- **Export:** CSV export of `lt_commissions` includes these columns when `LTMS_Core_Config::get_country() === 'MX'`
 
 ---
 

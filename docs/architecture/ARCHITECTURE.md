@@ -1,7 +1,7 @@
 # LT Marketplace Suite — Architecture Documentation
 
-**Version:** 1.5.0
-**Last Updated:** 2025-01-01
+**Version:** 2.9.35
+**Last Updated:** 2026-07-06
 **Pattern:** Hexagonal Architecture (Ports & Adapters)
 
 ---
@@ -252,6 +252,32 @@ LTMS.Dashboard.loadView('wallet')
 | TPTC | MLM network sync | API Key |
 | XCover | Product insurance | Partner Code |
 | Backblaze B2 | File storage (KYC docs) | App Key |
+| **PosGold** (v2.9.35) | **Catalog sync (POS → WooCommerce)** | **API Key + Token** |
+
+### 8.1 PosGold Pattern (v2.9.35)
+
+PosGold integration follows the standard Hexagonal pattern, with a sync engine that bridges the PosGold API client and the WooCommerce product repository:
+
+```
+LTMS_PosGold_Sync::run($vendor_id)
+    ↓
+  LTMS_Api_Posgold::fetch_catalog($vendor_id, $cursor)
+    ↓
+  LTMS_PosGold_Price_Calculator::compute($posgold_product, $vendor_config)
+    ↓
+  LTMS_PosGold_Sync::upsert_product($wc_product_data)
+    ↓
+  wp_insert_post() / wc_get_product()->save()
+    ↓
+  LTMS_PosGold_Sync::log_sync($vendor_id, $count, $errors, $duration)
+```
+
+**Price calculator — 8 components:**
+`final_price = cost + markup + iva + ieps + shipping_factor + platform_fee + payment_fee + rounding`
+
+Each component is configurable per-vendor (markup %, rounding rule) and per-country (iva, ieps). The calculator is unit-tested independently of the sync engine.
+
+**Deduplication:** products are matched by SKU (`_sku` meta key). Existing products are updated; new products are created. The sync log table `lt_posgold_sync_log` records every batch with vendor_id, products_synced, errors, duration_ms.
 
 ---
 
@@ -261,18 +287,87 @@ LTMS.Dashboard.loadView('wallet')
 |-------|---------|
 | `lt_wallets` | Vendor wallet balances |
 | `lt_wallet_ledger` | Immutable transaction log |
-| `lt_commissions` | Commission records per order |
+| `lt_commissions` | Commission records per order (v2.9.35: +11 SAT México CFDI columns) |
 | `lt_payout_requests` | Payout requests + status |
 | `lt_vendor_kyc` | KYC document submissions |
 | `lt_referral_network` | MLM tree with ancestor paths |
-| `lt_security_events` | Immutable WAF/auth event log |
+| `lt_security_events` | Immutable WAF/auth event log (v2.9.35: +5 TOTP 2FA event types) |
 | `lt_waf_blocked_ips` | WAF IP blocklist |
 | `lt_notifications` | In-app vendor notifications |
 | `lt_marketing_banners` | Marketing banner registry |
+| `lt_posgold_sync_log` (v2.9.35) | PosGold catalog sync audit log |
+
+### 9.1 Schema Extensions in v2.9.35
+
+**`lt_commissions` — 11 new SAT México columns (CFDI 4.0 compliance):**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `cfdi_uuid` | VARCHAR(64) | UUID del CFDI emitido |
+| `cfdi_serie` | VARCHAR(20) | Serie del comprobante |
+| `cfdi_folio` | VARCHAR(40) | Folio del comprobante |
+| `rfc_emisor` | VARCHAR(13) | RFC del emisor (vendedor) |
+| `rfc_receptor` | VARCHAR(13) | RFC del receptor |
+| `regimen_fiscal` | VARCHAR(10) | Clave de régimen fiscal |
+| `uso_cfdi` | VARCHAR(10) | Clave de uso de CFDI |
+| `forma_pago` | VARCHAR(10) | Clave de forma de pago |
+| `metodo_pago` | VARCHAR(10) | Clave de método de pago (PUE/PPD) |
+| `fecha_certificacion` | DATETIME | Fecha de certificación SAT |
+| `estado_cfdi` | VARCHAR(20) | Vigente / Cancelado |
+
+Migration is idempotent: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. Colombian commission rows leave these columns as NULL.
+
+**`lt_security_events` — 5 new TOTP 2FA event types:**
+
+| event_type | Trigger |
+|-----------|--------|
+| `2fa_enrolled` | Vendor completes TOTP enrollment |
+| `2fa_challenge_failed` | Wrong TOTP code submitted |
+| `2fa_disabled` | 2FA disabled (self or admin) |
+| `2fa_recovery_used` | Recovery code consumed |
+| `2fa_locked_out` | 5 failed attempts in 15 min → lockout |
+
+**`lt_posgold_sync_log` (new table):**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | BIGINT AUTO_INCREMENT | Primary key |
+| `vendor_id` | BIGINT | FK → wp_users.ID |
+| `started_at` | DATETIME | Sync start timestamp |
+| `finished_at` | DATETIME | Sync end timestamp |
+| `duration_ms` | INT | Total duration in milliseconds |
+| `products_synced` | INT | Count of products upserted |
+| `errors_count` | INT | Count of failed product upserts |
+| `error_log` | LONGTEXT | JSON-encoded error details |
+| `trigger` | VARCHAR(20) | manual / scheduled |
 
 ---
 
-## 10. Cron Jobs
+## 10. Autoloader (v2.9.35)
+
+The autoloader lives in `lt-marketplace-suite.php` (function `ltms_load_autoloader()`, ~200 lines). It is an SPL autoloader with multiple resolution strategies:
+
+1. **Composer fallback:** if `vendor/autoload.php` exists, it's loaded — but Composer's classmap does NOT cover `LTMS_*` classes (no namespaces, underscore naming). The SPL autoloader remains mandatory.
+2. **Eager loading:** the two traits (`LTMS_Logger_Aware`, `LTMS_Singleton`), the two interfaces (`LTMS_Api_Client_Interface`, `LTMS_Tax_Strategy_Interface`), and two gateway files are loaded eagerly to prevent fatal during `boot()`.
+3. **2-part classes:** `LTMS_Admin` → `includes/admin/class-ltms-admin.php`. Special cases handled via `$two_part_exceptions` map.
+4. **3+ part classes:** `LTMS_Core_Security` → `includes/core/class-ltms-core-security.php`. Special cases handled via `$exceptions_npart` map (~60+ entries, growing).
+5. **Classmap additions in v2.9.35** (8 new frontend classes registered):
+   - `LTMS_Wishlist` → `frontend/class-ltms-wishlist.php`
+   - `LTMS_Quick_View` → `frontend/class-ltms-quick-view.php`
+   - `LTMS_Comparison_Table` → `frontend/class-ltms-comparison-table.php`
+   - `LTMS_Product_Tabs` → `frontend/class-ltms-product-tabs.php`
+   - `LTMS_Product_Video` → `frontend/class-ltms-product-video.php`
+   - `LTMS_Rating_Summary` → `frontend/class-ltms-rating-summary.php`
+   - `LTMS_Trust_Badges` → `frontend/class-ltms-trust-badges.php`
+   - `LTMS_SEO_Enhanced` → `frontend/class-ltms-seo-enhanced.php`
+
+In total, v2.9.35 added 35+ missing entries to the autoloader classmap (silent `class_exists() === false` failures in production). New PosGold classes (`LTMS_Api_Posgold`, `LTMS_PosGold_Sync`, `LTMS_PosGold_Price_Calculator`) and `LTMS_Core_TOTP_2FA` are also registered.
+
+**Rule:** when adding a new class, if its path does not follow the standard convention, register the exception in `$two_part_exceptions` or `$exceptions_npart` in the **same commit**. Without this, `class_exists()` silently returns `false` in production (no fatal, the class just never loads).
+
+---
+
+## 11. Cron Jobs
 
 | Hook | Schedule | Action |
 |------|----------|--------|
@@ -280,7 +375,8 @@ LTMS.Dashboard.loadView('wallet')
 | `ltms_weekly_tax_report` | Weekly Monday | Generate fiscal reports |
 | `ltms_hourly_waf_cleanup` | Hourly | Clean expired WAF blocks |
 | `ltms_sync_commission_rates` | Daily 06:00 | Sync rates from config |
+| `ltms_posgold_scheduled_sync` (v2.9.35) | Daily 03:00 | Sync PosGold catalog for enrolled vendors |
 
 ---
 
-*This document was generated as part of the LTMS 1.5.0 release.*
+*This document was generated as part of the LTMS 2.9.35 release.*

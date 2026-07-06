@@ -1,6 +1,6 @@
 # LT Marketplace Suite — Security Policy
 
-**Version:** 1.5.0
+**Version:** 2.9.35
 **Maintained by:** LTMS Security Team
 
 ---
@@ -9,9 +9,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.5.x   | ✅ Active  |
-| 1.4.x   | ⚠️ Security fixes only |
-| < 1.4   | ❌ End of life |
+| 2.9.x   | ✅ Active  |
+| 2.8.x   | ⚠️ Security fixes only |
+| < 2.8   | ❌ End of life |
 
 ---
 
@@ -93,11 +93,58 @@ END$$
 
 **Login throttling:** 5 attempts per IP per 15 minutes using WordPress transients.
 
-**Nonce verification:** All AJAX endpoints verify `wp_verify_nonce()`.
+**Nonce verification:** All AJAX endpoints verify `wp_verify_nonce()`. The storefront AJAX endpoints use the `ltms_ux_nonce` action (NOT `ltms_storefront_nonce`, which was the old, broken name and has been removed in v2.9.35).
 
 **Capability checks:** Every admin action checks `current_user_can()` before execution.
 
 **Vendor isolation:** Vendors cannot access `wp-admin`. Enforced via `redirect_vendor_from_admin()` hook.
+
+### 3.4.1 TOTP 2FA (v2.9.35)
+
+Vendors and compliance officers can enroll in **Time-based One-Time Password (TOTP)** two-factor authentication via `includes/core/class-ltms-totp-2fa.php`.
+
+**Algorithm:** RFC 6238 (SHA-1, 30-second window, 6 digits) — compatible with Google Authenticator, Microsoft Authenticator, Authy, 1Password.
+
+**Secret storage:**
+- 32-byte base32 secret generated via `random_bytes()`
+- Encrypted with `LTMS_Core_Security::encrypt()` (AES-256-CBC + PBKDF2) before saving to `user_meta` key `ltms_totp_secret`
+- Never stored in plaintext, never logged
+
+**Recovery codes:**
+- 10 single-use codes generated on enrollment
+- Stored bcrypt-hashed (cost 12) in `user_meta` key `ltms_totp_recovery_hashes`
+- Each code is consumed on use and cannot be reused
+- Regenerated on demand; old codes invalidated
+
+**Login flow:**
+1. User submits username + password
+2. If password verifies AND `ltms_totp_secret` exists → redirect to `ltms_2fa_challenge` page
+3. User submits 6-digit TOTP code (or recovery code)
+4. `verify_code()` checks the 30-second window (allows ±1 step for clock drift)
+5. On success → complete login; on failure → log to `lt_security_events` and retry
+
+**Enforcement:**
+- Admin can force 2FA for specific roles via `ltms_force_2fa_roles` setting (default: `ltms_vendor_premium`, `ltms_compliance_officer`)
+- 7-day grace period from first login after enrollment before 2FA is mandatory (configurable via `ltms_2fa_grace_period_days`)
+- During grace period, dashboard shows persistent reminder banner
+
+**Anti-replay:** each TOTP code can only be used once per session — a hash of the code is cached for 30s via transient `ltms_totp_used_{user_id}_{code_hash}`.
+
+**Vendor dashboard view:** `includes/frontend/views/view-security.php` — enroll, scan QR, verify, view/regenerate recovery codes, disable.
+
+### 3.4.2 SAT México Compliance Logging
+
+The TOTP module and login flow write to `lt_security_events` for Mexican SAT (Servicio de Administración Tributaria) compliance auditing:
+
+| Event type | Trigger | Data logged |
+|-----------|---------|-------------|
+| `2fa_enrolled` | Vendor completes TOTP enrollment | user_id, IP, user-agent, timestamp |
+| `2fa_challenge_failed` | Wrong TOTP code submitted | user_id, IP, user-agent, attempt count |
+| `2fa_disabled` | Vendor (or admin) disables 2FA | user_id, IP, reason (self / admin_force) |
+| `2fa_recovery_used` | Recovery code consumed | user_id, IP, code index (not the code itself) |
+| `2fa_locked_out` | 5 failed TOTP attempts in 15 min | user_id, IP, lockout duration |
+
+These events are exportable as CSV from the admin Security panel for SAT audit submission.
 
 ### 3.5 Input Validation & Sanitization
 
@@ -202,6 +249,14 @@ We appreciate responsible disclosure. Depending on severity:
 
 | Version | Date | Change |
 |---------|------|--------|
+| 2.9.35 | 2026-07-06 | TOTP 2FA (RFC 6238) for vendors and compliance officers |
+| — | — | SAT México compliance logging (5 new event types in `lt_security_events`) |
+| — | — | `LTMS_Core_Firewall::get_client_ip()` made `public` (was `private`, caused WSOD via `LTMS_Data_Masking` call) |
+| — | — | `LTMS_Core_Security::derive_key()` duplicate declaration removed (was fatal on boot) |
+| — | — | Storefront nonce action standardized to `ltms_ux_nonce` (removed `ltms_storefront_nonce`) |
+| — | — | `continue 2` illegal use fixed in `logistics-compliance.php` |
+| — | — | Admin Security page template — missing `<?php` opening tag fixed (PHP source was leaking to browser) |
+| — | — | 11 SAT México columns added to `lt_commissions` (CFDI 4.0 compliance) |
 | 1.5.0 | 2025-01-01 | Initial enterprise security implementation |
 | — | — | AES-256 encryption for all PII fields |
 | — | — | WAF with IP banning |

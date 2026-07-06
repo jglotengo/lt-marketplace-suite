@@ -1,4 +1,4 @@
-# UX Enhancements — LT Marketplace Suite v2.0
+# UX Enhancements — LT Marketplace Suite v2.9.35
 
 Capa overlay de mejoras de experiencia de usuario aplicada a **todas las interfaces** del marketplace.
 
@@ -211,3 +211,67 @@ Los 105+ módulos JS ahora se activan automáticamente mediante atributos `data-
 3. **Lighthouse audit**: medir impacto en performance y accessibility scores
 4. **A/B testing**: comparar conversión de registro antes/después de validación en vivo
 5. **Migración de emails restantes**: las plantillas grandes (`email-welcome-vendor.php`, `email-kyc-approved.php`, `email-payout-approved.php`, `email-commission-credited.php`) mantienen su diseño bespoke pero podrían alinear colores con la paleta centralizada
+
+---
+
+## v2.9.35 — CSS Fixes & Toast Behavior
+
+### Correcciones de CSS en la página de producto
+
+| Issue | Causa | Fix |
+|-------|-------|-----|
+| Botón "Añadir al carrito" deformado | Falta `min-width` + `padding` heredado de WC | `.single_add_to_cart_button { min-width: 180px; padding: 12px 24px; }` |
+| Campo de cantidad demasiado pequeño | `input.qty` sin `width` definido | `input.qty { width: 60px; min-height: 40px; text-align: center; }` |
+| Items de upsell renderizados como botones gigantes | `.upsells .button` con `width: 100%` | `.upsells .button { width: auto; display: inline-block; }` |
+| Padding desigual entre productos relacionados y upsells | Margin collapse entre secciones | Regla normalizadora `.related.products, .upsells.products { padding-top: 2rem; }` |
+
+### Error toasts deshabilitados
+
+Los toasts genéricos de error "Algo salió mal" que aparecían en cada AJAX fallido han sido **deshabilitados globalmente** para reducir ruido visual en producción:
+
+```js
+// assets/js/ltms-ux-enhancements.js
+window.LTMS_CONFIG = window.LTMS_CONFIG || {};
+window.LTMS_CONFIG.SHOW_ERROR_TOASTS = false;       // toasts de error genéricos
+window.LTMS_CONFIG.SHOW_AJAX_ERROR_TOASTS = false;  // toasts de error AJAX
+```
+
+**Rationale:**
+- Cada error AJAX ya queda registrado en `lt_security_events` y en el log PHP.
+- El toast genérico era confuso para el usuario final (no le daba información actionable).
+- Los errores de validación (formularios) siguen mostrando feedback visual inline.
+- Los errores críticos (pago fallido, KYC rechazado) muestran mensajes contextizados vía el handler específico, no vía el toast genérico.
+
+**Para re-habilitar en debugging:**
+```js
+// En la consola del navegador o vía wp_localize_script
+LTMS_CONFIG.SHOW_ERROR_TOASTS = true;
+LTMS_CONFIG.SHOW_AJAX_ERROR_TOASTS = true;
+```
+
+### Otros fixes JS de v2.9.35
+
+- **`e.target.closest is not a function`**: cuando el usuario hace click sobre un text node (no un Element), `e.target` no tiene método `closest`. Se añadió guard:
+  ```js
+  function handleClick(e) {
+      const target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      if (!target) return;
+      const btn = target.closest('[data-action]');
+      // ...
+  }
+  ```
+- **Nonce action corregido**: los handlers AJAX del storefront usaban `check_ajax_referer('ltms_storefront_nonce', 'nonce')` (nombre inexistente). Corregido a `ltms_ux_nonce` en todos los handlers. Esto resolvía la falsa impresión de "AJAX no funciona" en el storefront.
+- **`.min.js` / `.min.css` sincronizados**: las versiones minificadas ahora se regeneran en cada commit que toca las fuentes. Fueron removidas de `.gitignore` para que siempre lleguen a producción.
+
+### Nuevas vistas del dashboard (v2.9.35)
+
+4 nuevas plantillas PHP añadidas al directorio `includes/frontend/views/`:
+
+| Archivo | Propósito | data-* principales |
+|---------|-----------|--------------------|
+| `view-marketing.php` | Gestión de banners promocionales | `data-banner-list`, `data-banner-upload`, `data-banner-toggle` |
+| `view-security.php` | TOTP 2FA + códigos de recuperación | `data-totp-enroll`, `data-totp-verify`, `data-totp-disable`, `data-recovery-codes` |
+| `view-donations.php` | Transparencia de donaciones | `data-donation-chart`, `data-donation-list` |
+| `view-posgold.php` | Sincronización de catálogo PosGold | `data-posgold-sync`, `data-posgold-status`, `data-posgold-mapping` |
+
+Cada vista se carga vía el SPA del dashboard (jQuery `LTMS.Dashboard.loadView('marketing')` etc.) con su endpoint AJAX correspondiente.
