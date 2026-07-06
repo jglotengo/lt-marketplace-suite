@@ -201,7 +201,7 @@ class LTMS_Logistics_Compliance {
         add_action( 'woocommerce_check_cart_items', [ __CLASS__, 'validate_weight_dimensions' ] );
 
         // LT-5: Póliza RC transportista.
-        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_carrier_rc_insurance' ], 10, 2 );
+        add_action( 'woocommerce_shipping_method_chosen', [ __CLASS__, 'validate_carrier_rc_insurance' ], 10, 1 );
 
         // LT-6: Sellos ISO 17712.
         add_action( 'woocommerce_product_options_general_product_data', [ __CLASS__, 'register_iso_seal_metabox' ] );
@@ -577,7 +577,7 @@ class LTMS_Logistics_Compliance {
      * Valida que el carrier tenga póliza RC vigente (CO Res. 4146/2016 art. 18,
      * MX Ley de Caminos art. 66).
      */
-    public static function validate_carrier_rc_insurance( string $method_id, \WC_Shipping_Method $method ): void {
+    public static function validate_carrier_rc_insurance( string $method_id, $method = null ): void {
         $country = LTMS_Core_Config::get_country();
 
         $rc_expires = LTMS_Core_Config::get( 'ltms_carrier_rc_expires', '' );
