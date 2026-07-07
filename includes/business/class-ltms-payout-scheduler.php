@@ -118,6 +118,34 @@ final class LTMS_Payout_Scheduler {
             ];
         }
 
+        // v2.9.63 DEEP-AUDIT-002 P1-6: Validar que el bank_account_id pertenece al vendor.
+        // Antes se aceptaba cualquier valor — un vendor podía especificar la cuenta
+        // de otro vendor. Ahora verificamos que los últimos 4 dígitos coincidan
+        // con la cuenta guardada en user_meta.
+        $saved_bank_acc = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
+        if ( ! empty( $saved_bank_acc ) ) {
+            // Desencriptar si está cifrado.
+            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+                $decrypted = LTMS_Core_Security::decrypt( $saved_bank_acc );
+                if ( $decrypted !== false && $decrypted !== '' ) {
+                    $saved_bank_acc = $decrypted;
+                }
+            }
+            $saved_last4 = substr( preg_replace( '/\D/', '', $saved_bank_acc ), -4 );
+            $input_last4 = substr( preg_replace( '/\D/', '', $bank_account_id ), -4 );
+            if ( $saved_last4 && $input_last4 && $saved_last4 !== $input_last4 ) {
+                LTMS_Core_Logger::security(
+                    'PAYOUT_BANK_MISMATCH',
+                    sprintf( 'Vendor #%d intentó retirar a cuenta que no coincide con su cuenta registrada', $vendor_id )
+                );
+                return [
+                    'success'   => false,
+                    'message'   => __( 'La cuenta bancaria no coincide con tu cuenta registrada.', 'ltms' ),
+                    'payout_id' => 0,
+                ];
+            }
+        }
+
         // Poner en hold el monto en la billetera
         try {
             LTMS_Business_Wallet::hold( $vendor_id, $amount, 'Retiro solicitado en procesamiento' );

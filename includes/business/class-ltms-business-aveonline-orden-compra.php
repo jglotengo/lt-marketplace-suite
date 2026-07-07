@@ -210,6 +210,15 @@ class LTMS_Business_Aveonline_OrdenCompra {
             wp_send_json_error( [ 'message' => 'Debe incluir al menos una línea de detalle.' ] );
         }
 
+        // v2.9.63 DEEP-AUDIT-002 P2-20: Limitar tamaño del JSON de detalle (100KB max).
+        if ( strlen( $detalle_raw ) > 102400 ) {
+            wp_send_json_error( [ 'message' => 'El detalle de la OC excede el tamaño máximo permitido (100KB).' ] );
+        }
+        // Limitar número de líneas (max 200).
+        if ( count( $detalle ) > 200 ) {
+            wp_send_json_error( [ 'message' => 'El detalle de la OC excede el número máximo de líneas (200).' ] );
+        }
+
         $detalle_clean = [];
         foreach ( $detalle as $linea ) {
             $detalle_clean[] = [

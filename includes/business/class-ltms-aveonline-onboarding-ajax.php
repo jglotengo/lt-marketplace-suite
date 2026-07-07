@@ -91,11 +91,35 @@ class LTMS_Aveonline_Onboarding_Ajax {
             $data['email'] = $user->user_email;
         }
 
+        // v2.9.63 DEEP-AUDIT-002 P3-10: Redactar password en logs.
+        // La password se envía a Aveonline pero NUNCA debe guardarse en user_meta
+        // ni loguearse en texto plano (Ley 1581/2012 — datos sensibles).
+        if ( isset( $data['password'] ) ) {
+            // La password se usa solo para el API call, no se persiste.
+            $password_for_api = $data['password'];
+            unset( $data['password'] ); // Remover del array que se podría loguear
+            $data['password'] = '[REDACTED]'; // Placeholder para logs
+        }
+
+        // Reconstruir data para el API call con la password real.
+        if ( isset( $password_for_api ) ) {
+            $data['password'] = $password_for_api;
+        }
+
         $result = LTMS_Api_Aveonline_Onboarding::instance()->create_lead( $data );
 
         if ( $result['success'] && ! empty( $result['seed'] ) ) {
             update_user_meta( $user_id, self::META_ONBOARDING_SEED,   $result['seed'] );
             update_user_meta( $user_id, self::META_ONBOARDING_STATUS, 'step2' );
+        }
+
+        // v2.9.63 P3-10: Log sin password (usar array sin password para el log).
+        $log_data = $data;
+        if ( isset( $log_data['password'] ) ) {
+            $log_data['password'] = '[REDACTED]';
+        }
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'AVE_ONBOARDING_STEP2', sprintf( 'Vendor #%d completed step 2', $user_id ), $log_data );
         }
 
         self::respond( $result );
@@ -193,8 +217,8 @@ class LTMS_Aveonline_Onboarding_Ajax {
      * Recibe todos los datos en un solo POST y ejecuta los 4 pasos.
      */
     public static function ajax_full(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // SEC-3 FIX (v2.9.26): CSRF protection.
+                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
         self::verify_nonce();
 
         // Solo admin o automatización interna

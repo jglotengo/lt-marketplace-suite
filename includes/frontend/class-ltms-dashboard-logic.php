@@ -450,9 +450,12 @@ final class LTMS_Dashboard_Logic {
         }
 
         // ── Construir clave en el bucket ──────────────────────────────────────
+        // v2.9.63 DEEP-AUDIT-002 P2-8: Añadir sufijo random para evitar colisiones
+        // cuando se suben múltiples archivos en el mismo segundo.
         $ext       = pathinfo( $orig_name, PATHINFO_EXTENSION );
         $safe_name = preg_replace( '/[^a-zA-Z0-9_\-]/', '_', pathinfo( $orig_name, PATHINFO_FILENAME ) );
-        $key       = sprintf( 'kyc/%d/%d_%s.%s', $vendor_id, time(), $safe_name, $ext );
+        $random_suffix = wp_generate_password( 6, false );
+        $key       = sprintf( 'kyc/%d/%d_%s_%s.%s', $vendor_id, time(), $random_suffix, $safe_name, $ext );
 
         // ── Subir a Backblaze B2 ──────────────────────────────────────────────
         try {
@@ -551,6 +554,35 @@ final class LTMS_Dashboard_Logic {
 
         if ( empty( $full_name ) || empty( $document_number ) ) {
             wp_send_json_error( __( 'El nombre completo y número de documento son obligatorios.', 'ltms' ) );
+        }
+
+        // v2.9.63 DEEP-AUDIT-002 P2-9: Validación estricta de número de documento por tipo.
+        $doc_clean = preg_replace( '/[\s\-\.]/', '', $document_number );
+        $doc_valid = true;
+        switch ( $document_type ) {
+            case 'cc':       // Cédula de Ciudadanía Colombia: 6-10 dígitos
+            case 'ce':       // Cédula de Extranjería: 6-12 dígitos
+                $doc_valid = (bool) preg_match( '/^\d{6,12}$/', $doc_clean );
+                break;
+            case 'nit':      // NIT: 9-11 dígitos + posible dígito de verificación
+                $doc_valid = (bool) preg_match( '/^\d{8,11}$/', $doc_clean );
+                break;
+            case 'passport': // Pasaporte: 6-20 alfanuméricos
+                $doc_valid = (bool) preg_match( '/^[A-Z0-9]{6,20}$/i', $doc_clean );
+                break;
+        }
+        if ( ! $doc_valid ) {
+            wp_send_json_error( sprintf(
+                /* translators: %s: tipo de documento */
+                __( 'Número de documento inválido para el tipo %s. Verifica el formato.', 'ltms' ),
+                strtoupper( $document_type )
+            ) );
+        }
+
+        // v2.9.63 P2-9: Validar número de cuenta bancaria (solo dígitos, 6-20).
+        $bank_acc_clean = preg_replace( '/[\s\-]/', '', $bank_account_number );
+        if ( ! preg_match( '/^\d{6,20}$/', $bank_acc_clean ) ) {
+            wp_send_json_error( __( 'Número de cuenta bancaria inválido. Debe tener entre 6 y 20 dígitos.', 'ltms' ) );
         }
 
         // KYC-BANCO-1: Validar datos bancarios obligatorios (certificación representante legal)
@@ -1433,6 +1465,13 @@ final class LTMS_Dashboard_Logic {
 
         if ( empty( $subdomain ) || empty( $token ) ) {
             wp_send_json_error( [ 'message' => __( 'Subdominio y Token son obligatorios.', 'ltms' ) ], 400 );
+        }
+
+        // v2.9.63 DEEP-AUDIT-002 P1-10: Validar subdomain para prevenir SSRF.
+        // El subdomain se usa para construir URLs de PosGold — debe ser solo
+        // caracteres alfanuméricos y guiones (formato de subdominio válido).
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $subdomain ) ) {
+            wp_send_json_error( [ 'message' => __( 'Subdominio inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
         }
 
         // Cifrar el token antes de guardarlo (si LTMS_Core_Security está disponible).
