@@ -205,11 +205,31 @@ if ( empty( $seo_template ) ) {
                             <label for="ltms-posgold-token" style="display:block;font-weight:600;margin-bottom:4px;">
                                 <?php esc_html_e( 'Bearer Token (JWT) *', 'ltms' ); ?>
                             </label>
-                            <textarea id="ltms-posgold-token"
-                                      name="ltms_posgold_token"
-                                      rows="3"
-                                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                                      style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;font-family:monospace;font-size:0.85rem;"><?php echo esc_textarea( $creds['token'] ); ?></textarea>
+                            <?php
+                            // v2.9.61 DEEP-AUDIT-002 P0-2 FIX: No mostrar el token completo (credencial sensible).
+                            // Mostrar solo si está configurado (masked) + opción de actualizar.
+                            $has_token = ! empty( $creds['token'] );
+                            $masked_token = $has_token ? substr( $creds['token'], 0, 20 ) . '...' . substr( $creds['token'], -10 ) : '';
+                            ?>
+                            <?php if ( $has_token ) : ?>
+                                <div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;margin-bottom:8px;font-family:monospace;font-size:0.85rem;color:#166534;">
+                                    ✅ <?php esc_html_e( 'Token configurado:', 'ltms' ); ?> <code><?php echo esc_html( $masked_token ); ?></code>
+                                </div>
+                                <details style="margin-bottom:8px;">
+                                    <summary style="cursor:pointer;font-size:0.85rem;color:#6b7280;"><?php esc_html_e( 'Actualizar token', 'ltms' ); ?></summary>
+                                    <textarea id="ltms-posgold-token"
+                                              name="ltms_posgold_token"
+                                              rows="3"
+                                              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                                              style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;font-family:monospace;font-size:0.85rem;margin-top:8px;"></textarea>
+                                </details>
+                            <?php else : ?>
+                                <textarea id="ltms-posgold-token"
+                                          name="ltms_posgold_token"
+                                          rows="3"
+                                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                                          style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;font-family:monospace;font-size:0.85rem;"></textarea>
+                            <?php endif; ?>
                             <p style="margin:4px 0 0;font-size:0.75rem;color:#9ca3af;">
                                 <?php esc_html_e( 'Token JWT de autenticación. Lo obtienes desde Postman o tu panel PosGold.', 'ltms' ); ?>
                             </p>

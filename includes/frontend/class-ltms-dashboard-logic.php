@@ -522,8 +522,23 @@ final class LTMS_Dashboard_Logic {
         $file_path        = sanitize_text_field( wp_unslash( $_POST['file_path']        ?? '' ) ); // phpcs:ignore
         $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
         $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
+        $file_path_banco  = sanitize_text_field( wp_unslash( $_POST['file_path_banco']  ?? '' ) ); // phpcs:ignore
+
+        // v2.9.61 DEEP-AUDIT-002 P0-5 FIX: Validar que los file_path pertenecen al vendor.
+        // Antes un vendor podía enviar el path de otro vendor (IDOR) y usar sus documentos.
+        // Los paths deben empezar con kyc/{vendor_id}/.
+        $expected_prefix = 'kyc/' . $vendor_id . '/';
+        $paths_to_check = [ $file_path, $file_path_rut, $file_path_camara, $file_path_banco ];
+        foreach ( $paths_to_check as $path ) {
+            if ( ! empty( $path ) && strpos( $path, $expected_prefix ) !== 0 ) {
+                LTMS_Core_Logger::security(
+                    'KYC_IDOR_ATTEMPT',
+                    sprintf( 'Vendor #%d intentó usar path que no le pertenece: %s', $vendor_id, $path )
+                );
+                wp_send_json_error( __( 'Error de seguridad: archivo no válido.', 'ltms' ), 403 );
+            }
+        }
         // KYC-BANCO-1: Certificación bancaria — representante legal
-        $file_path_banco     = sanitize_text_field( wp_unslash( $_POST['file_path_banco']     ?? '' ) ); // phpcs:ignore
         $bank_rep_legal_name = sanitize_text_field( wp_unslash( $_POST['bank_rep_legal_name'] ?? '' ) ); // phpcs:ignore
         $bank_name           = sanitize_text_field( wp_unslash( $_POST['bank_name']           ?? '' ) ); // phpcs:ignore
         $bank_account_number = sanitize_text_field( wp_unslash( $_POST['bank_account_number'] ?? '' ) ); // phpcs:ignore

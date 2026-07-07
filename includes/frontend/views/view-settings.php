@@ -14,9 +14,26 @@ $store_name   = get_user_meta( $vendor_id, 'ltms_store_name', true );
 $store_desc   = get_user_meta( $vendor_id, 'ltms_store_description', true );
 $phone        = get_user_meta( $vendor_id, 'ltms_store_phone', true ) ?: get_user_meta( $vendor_id, 'ltms_phone', true );
 $bank_name        = get_user_meta( $vendor_id, 'ltms_bank_name',           true );
-$bank_account     = get_user_meta( $vendor_id, 'ltms_bank_account_number',  true );
+$bank_account_raw = get_user_meta( $vendor_id, 'ltms_bank_account_number',  true );
 $bank_account_type= get_user_meta( $vendor_id, 'ltms_bank_account_type',    true ) ?: 'ahorros';
 $bank_holder      = get_user_meta( $vendor_id, 'ltms_bank_account_holder',  true );
+
+// v2.9.61 DEEP-AUDIT-002 P0-6 FIX: Desencriptar el número de cuenta y enmascararlo.
+// Antes se mostraba el valor encriptado (v1:abc...) como garbage en el input.
+// Si el valor ya está desencriptado (no empieza con v1:), mostrarlo tal cual.
+$bank_account = '';
+if ( ! empty( $bank_account_raw ) ) {
+    if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+        $decrypted = LTMS_Core_Security::decrypt( $bank_account_raw );
+        $bank_account = ( $decrypted !== false && $decrypted !== '' ) ? $decrypted : $bank_account_raw;
+    } else {
+        $bank_account = $bank_account_raw;
+    }
+    // Si después de desencriptar sigue teniendo formato de ciphertext, mostrar vacío.
+    if ( preg_match( '/^v[0-9]+:/', $bank_account ) ) {
+        $bank_account = '';
+    }
+}
 $kyc_status   = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) ?: 'pending';
 $referral_code = get_user_meta( $vendor_id, 'ltms_referral_code', true );
 // v2.3.0 — Analytics por vendedor

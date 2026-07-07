@@ -97,9 +97,19 @@ class LTMS_Business_Aveonline_OrdenCompra {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static function check_nonce(): void {
-        check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
+        // v2.9.61 DEEP-AUDIT-002: Aceptar ltms_dashboard_nonce (estándar del panel)
+        // con fallback a ltms_vendor_nonce para compatibilidad.
+        $nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : ''; // phpcs:ignore
+        $valid = wp_verify_nonce( $nonce, 'ltms_dashboard_nonce' ) || wp_verify_nonce( $nonce, 'ltms_vendor_nonce' );
+        if ( ! $valid ) {
+            wp_send_json_error( [ 'message' => 'Token inválido.' ], 403 );
+        }
         if ( ! is_user_logged_in() ) {
             wp_send_json_error( [ 'message' => 'No autenticado.' ], 401 );
+        }
+        // v2.9.61: Capability check para vendors.
+        if ( ! current_user_can( 'edit_products' ) ) {
+            wp_send_json_error( [ 'message' => 'Permisos insuficientes.' ], 403 );
         }
     }
 
@@ -147,11 +157,12 @@ class LTMS_Business_Aveonline_OrdenCompra {
     // ── AJAX: Listar proveedores ──────────────────────────────────────────────
 
     public static function ajax_proveedores(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-		// SEC-4 FIX (v2.9.26): capability check.
-		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
-        self::check_nonce();
+                // v2.9.61 DEEP-AUDIT-002 P0-3/4 FIX: Cambiar nonce a ltms_dashboard_nonce
+                // (el que los vendors SÍ tienen) y capability a edit_products (asignado a ltms_vendor).
+                // Antes verificaba ltms_admin_nonce (imposible para vendors) Y edit_posts
+                // (no concedido a ltms_vendor role) → todo click desde el panel fallaba con 403.
+                check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+                if ( ! current_user_can( 'edit_products' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
 
         $cached = get_transient( 'ltms_aveonline_oc_proveedores' );
         if ( false !== $cached ) {

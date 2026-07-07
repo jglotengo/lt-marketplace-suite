@@ -334,6 +334,8 @@
         } );
 
         // AUDIT-REDI-UX-GAPS GAP-3 FIX: soft pause/resume handlers.
+        // v2.9.61 DEEP-AUDIT-002 P0-1 FIX: El PHP espera 'origin_product_id' (no 'product_id').
+        // Antes todos los clicks retornaban 400 "ID de producto origen inválido".
         $(document).on('click', '.ltms-redi-pause-btn', function(e){
                 e.preventDefault();
                 var $btn = $(this);
@@ -344,7 +346,7 @@
                 $.post(ajaxurl, {
                         action: 'ltms_redi_soft_pause',
                         nonce: (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '',
-                        product_id: productId
+                        origin_product_id: productId
                 }, function(resp){
                         if (resp && resp.success) {
                                 alert('<?php echo esc_js( __( 'ReDi pausado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
@@ -368,7 +370,7 @@
                 $.post(ajaxurl, {
                         action: 'ltms_redi_soft_resume',
                         nonce: (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '',
-                        product_id: productId
+                        origin_product_id: productId
                 }, function(resp){
                         if (resp && resp.success) {
                                 alert('<?php echo esc_js( __( 'ReDi reanudado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');

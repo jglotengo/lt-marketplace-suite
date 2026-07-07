@@ -14,9 +14,23 @@ $balance      = (float) $wallet['balance'];
 $held         = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
 $available    = max( 0, $balance - $held );
 $saved_bank        = get_user_meta( $vendor_id, 'ltms_bank_name',           true );
-$saved_bank_acc    = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
+$saved_bank_acc_raw = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
 $saved_bank_type   = get_user_meta( $vendor_id, 'ltms_bank_account_type',   true ) ?: 'ahorros';
 $saved_bank_holder = get_user_meta( $vendor_id, 'ltms_bank_account_holder', true );
+
+// v2.9.61 DEEP-AUDIT-002 P0-6 FIX: Desencriptar el número de cuenta.
+$saved_bank_acc = '';
+if ( ! empty( $saved_bank_acc_raw ) ) {
+    if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+        $decrypted = LTMS_Core_Security::decrypt( $saved_bank_acc_raw );
+        $saved_bank_acc = ( $decrypted !== false && $decrypted !== '' ) ? $decrypted : $saved_bank_acc_raw;
+    } else {
+        $saved_bank_acc = $saved_bank_acc_raw;
+    }
+    if ( preg_match( '/^v[0-9]+:/', $saved_bank_acc ) ) {
+        $saved_bank_acc = '';
+    }
+}
 $has_bank_data     = ! empty( $saved_bank_acc );
 ?>
 <div class="ltms-view-pad">
