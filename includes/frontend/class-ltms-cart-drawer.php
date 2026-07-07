@@ -213,14 +213,32 @@ class LTMS_Cart_Drawer {
                     });
                 }
 
-                // Actualizar subtotal (usar innerHTML para renderizar entidades HTML)
-                var subtotalEl = document.querySelector('#ltms-cart-subtotal');
-                if (subtotalEl && data.total_formatted) {
-                    subtotalEl.innerHTML = data.total_formatted;
+                // Actualizar subtotal — buscar por múltiples IDs posibles
+                // v2.9.58: El HTML del drawer usa id="ltms-drawer-footer" (sin "cart-")
+                // pero el footer puede contener un span con el subtotal.
+                // También buscar #ltms-cart-subtotal por si existe.
+                if (data.total_formatted) {
+                    var subtotalEl = document.querySelector('#ltms-cart-subtotal');
+                    if (!subtotalEl) {
+                        // Crear un elemento de subtotal si no existe
+                        var footer = document.querySelector('#ltms-drawer-footer');
+                        if (footer && !footer.querySelector('.ltms-cart-subtotal-display')) {
+                            var subtotalDiv = document.createElement('div');
+                            subtotalDiv.className = 'ltms-cart-subtotal-display';
+                            subtotalDiv.style.cssText = 'padding:8px 0;font-size:18px;font-weight:700;display:flex;justify-content:space-between;';
+                            subtotalDiv.innerHTML = '<span>Subtotal</span><span class="ltms-cart-subtotal-value"></span>';
+                            footer.insertBefore(subtotalDiv, footer.firstChild);
+                        }
+                        subtotalEl = document.querySelector('.ltms-cart-subtotal-value');
+                    }
+                    if (subtotalEl) {
+                        subtotalEl.innerHTML = data.total_formatted;
+                    }
                 }
 
                 // Re-renderizar items del carrito
-                var container = document.querySelector('#ltms-cart-drawer-items');
+                // v2.9.58: El HTML del drawer usa id="ltms-drawer-items" (sin "cart-")
+                var container = document.querySelector('#ltms-drawer-items') || document.querySelector('#ltms-cart-drawer-items');
                 if (!container) return;
 
                 if (!data.items || !data.items.length) {
