@@ -457,6 +457,15 @@ class LTMS_TOTP_2FA {
         self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
+
+        // v2.9.62 DEEP-AUDIT-002 P2-17: Rate limit para setup (5/hora).
+        $throttle_key = 'ltms_2fa_setup_attempts_' . $user_id;
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 5 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos de configuración. Espera una hora.', 'ltms' ) ], 429 );
+        }
+        set_transient( $throttle_key, $attempts + 1, HOUR_IN_SECONDS );
+
         $secret = self::generate_secret();
         $user = wp_get_current_user();
 

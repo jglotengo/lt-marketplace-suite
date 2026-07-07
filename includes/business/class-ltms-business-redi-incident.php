@@ -1067,6 +1067,11 @@ final class LTMS_Business_Redi_Incident {
             wp_send_json_error( [ 'message' => __( 'No tiene permisos para comentar en esta incidencia', 'ltms' ) ], 403 );
         }
 
+        // v2.9.62 DEEP-AUDIT-002 P2-15: Validar que el comentario no esté vacío.
+        if ( empty( trim( $comment_text ) ) ) {
+            wp_send_json_error( [ 'message' => __( 'El comentario no puede estar vacío', 'ltms' ) ], 400 );
+        }
+
         $result = self::add_comment( $incident_id, $user_id, $comment_text );
 
         if ( empty( $result['success'] ) ) {

@@ -208,10 +208,12 @@ class LTMS_Products_Ajax {
             wp_send_json_error( 'Nombre y precio son requeridos', 400 );
         }
 
+        // v2.9.62 DEEP-AUDIT-002 P2-6: Validar que la categoría existe.
+        if ( $category_id && ! term_exists( $category_id, 'product_cat' ) ) {
+            wp_send_json_error( 'Categoría inválida', 400 );
+        }
+
         // HI-1 FIX: validate status against an allowlist before applying it.
-        // Without this, a vendor could set status to 'trash', 'inherit',
-        // 'private', 'future', etc., which would break product visibility,
-        // inventory sync, and admin reports.
         $allowed_statuses = [ 'publish', 'pending', 'draft' ];
         if ( ! in_array( $status, $allowed_statuses, true ) ) {
             wp_send_json_error( [ 'message' => __( 'Invalid product status', 'ltms' ) ], 400 );
@@ -509,6 +511,11 @@ class LTMS_Products_Ajax {
             wp_send_json_error( 'Nombre y precio son requeridos', 400 );
         }
 
+        // v2.9.62 DEEP-AUDIT-002 P2-6: Validar que la categoría existe.
+        if ( $category_id && ! term_exists( $category_id, 'product_cat' ) ) {
+            wp_send_json_error( 'Categoría inválida', 400 );
+        }
+
         $product = new WC_Product_Simple();
         $product->set_name( $name );
         $product->set_description( $description );
@@ -599,9 +606,12 @@ class LTMS_Products_Ajax {
         if ( ! $product || $product->get_post_data()->post_author != get_current_user_id() ) {
             wp_send_json_error( 'Producto no encontrado o sin permiso', 403 );
         }
-        $result = wp_delete_post( $product_id, true );
+        // v2.9.62 DEEP-AUDIT-002 P2-7: Usar wp_trash_post en vez de wp_delete_post(true).
+        // Antes se hacía force-delete (true) lo que borraba permanentemente el producto
+        // sin posibilidad de recuperación. Ahora va a la papelera de reciclaje.
+        $result = wp_trash_post( $product_id );
         if ( $result ) {
-            wp_send_json_success( [ 'message' => 'Producto eliminado' ] );
+            wp_send_json_success( [ 'message' => 'Producto movido a papelera' ] );
         } else {
             wp_send_json_error( 'No se pudo eliminar el producto' );
         }

@@ -85,11 +85,12 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_review_helpful',              [ $instance, 'ajax_review_helpful' ] );
         add_action( 'wp_ajax_nopriv_ltms_review_helpful',       [ $instance, 'ajax_review_helpful' ] );
         add_action( 'wp_ajax_ltms_save_push_subscription',      [ $instance, 'ajax_save_push_subscription' ] );
-        add_action( 'wp_ajax_nopriv_ltms_save_push_subscription', [ $instance, 'ajax_save_push_subscription' ] );
+        // v2.9.62 P2-22: Removido nopriv — push subscriptions requieren login.
         add_action( 'wp_ajax_ltms_submit_question',             [ $instance, 'ajax_submit_question' ] );
         add_action( 'wp_ajax_nopriv_ltms_submit_question',      [ $instance, 'ajax_submit_question' ] );
         add_action( 'wp_ajax_ltms_submit_return',               [ $instance, 'ajax_submit_return' ] );
-        add_action( 'wp_ajax_nopriv_ltms_submit_return',        [ $instance, 'ajax_submit_return' ] );
+        // v2.9.62 DEEP-AUDIT-002 P3-8: Removido wp_ajax_nopriv_ltms_submit_return (dead code).
+        // ajax_submit_return() verifica get_current_user_id() — guests no pueden tener orders.
 
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
@@ -1950,14 +1951,35 @@ final class LTMS_Dashboard_Logic {
     public function ajax_save_push_subscription(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // v2.9.62 DEEP-AUDIT-002 P2-22: Requerir login para push subscriptions.
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
         $endpoint = sanitize_text_field( $_POST['endpoint'] ?? '' );
-        $keys     = $_POST['keys'] ?? [];
+        $keys_raw = $_POST['keys'] ?? [];
 
         if ( empty( $endpoint ) ) {
             wp_send_json_error( [ 'message' => __( 'Endpoint inválido.', 'ltms' ) ], 400 );
         }
 
-        // Guardar suscripción en user_meta (si está logueado) o en sesión.
+        // v2.9.62 P2-22: Validar que el endpoint sea HTTPS (evita SSRF).
+        if ( ! preg_match( '/^https:\/\/[a-z0-9.\-]+\/.+/i', $endpoint ) ) {
+            wp_send_json_error( [ 'message' => __( 'Endpoint debe ser HTTPS.', 'ltms' ) ], 400 );
+        }
+
+        // Sanitizar keys (p256dh + auth).
+        $keys = [];
+        if ( is_array( $keys_raw ) ) {
+            if ( isset( $keys_raw['p256dh'] ) ) {
+                $keys['p256dh'] = sanitize_text_field( $keys_raw['p256dh'] );
+            }
+            if ( isset( $keys_raw['auth'] ) ) {
+                $keys['auth'] = sanitize_text_field( $keys_raw['auth'] );
+            }
+        }
+
+        // Guardar suscripción en user_meta.
         $user_id = get_current_user_id();
         if ( $user_id ) {
             update_user_meta( $user_id, 'ltms_push_endpoint', $endpoint );

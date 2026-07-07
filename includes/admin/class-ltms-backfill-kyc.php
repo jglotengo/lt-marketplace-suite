@@ -294,6 +294,28 @@ class LTMS_KYC_Guard {
             ],
             300
         );
+
+        // v2.9.62 DEEP-AUDIT-002 P2-1: Notificar al vendor en el dashboard
+        // por qué su producto quedó en 'pending'.
+        global $wpdb;
+        $notifications_table = $wpdb->prefix . 'lt_notifications';
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$notifications_table}'" ) === $notifications_table ) {
+            $wpdb->insert(
+                $notifications_table,
+                [
+                    'user_id'    => $vendor_id,
+                    'type'       => 'kyc_block',
+                    'title'      => __( 'Producto pendiente de aprobación', 'ltms' ),
+                    'message'    => sprintf(
+                        __( 'Tu producto "%s" quedó en revisión porque tu verificación KYC está incompleta. Completa tu KYC para publicarlo.', 'ltms' ),
+                        $post->post_title
+                    ),
+                    'is_read'    => 0,
+                    'created_at' => LTMS_Utils::now_utc(),
+                ],
+                [ '%d', '%s', '%s', '%s', '%d', '%s' ]
+            );
+        }
     }
 
     /**

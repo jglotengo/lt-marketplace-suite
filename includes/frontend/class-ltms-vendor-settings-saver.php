@@ -56,6 +56,20 @@ class LTMS_Vendor_Settings_Saver {
             }
         }
 
+        // v2.9.62 DEEP-AUDIT-002 P2-12: Validar formatos de GA4 y Pixel IDs.
+        $ga4_id = get_user_meta( $vendor_id, 'ltms_vendor_ga4_id', true );
+        if ( ! empty( $ga4_id ) && ! preg_match( '/^G-[A-Z0-9]{6,}$/', $ga4_id ) ) {
+            // GA4 inválido — limpiar para no inyectar script roto.
+            delete_user_meta( $vendor_id, 'ltms_vendor_ga4_id' );
+            $this->log_info( 'VENDOR_GA4_INVALID', sprintf( 'Vendor #%d GA4 ID inválido limpiado: %s', $vendor_id, $ga4_id ) );
+        }
+        $pixel_id = get_user_meta( $vendor_id, 'ltms_vendor_pixel_id', true );
+        if ( ! empty( $pixel_id ) && ! preg_match( '/^\d{15,16}$/', $pixel_id ) ) {
+            // Pixel inválido — limpiar.
+            delete_user_meta( $vendor_id, 'ltms_vendor_pixel_id' );
+            $this->log_info( 'VENDOR_PIXEL_INVALID', sprintf( 'Vendor #%d Pixel ID inválido limpiado: %s', $vendor_id, $pixel_id ) );
+        }
+
         $this->log_info( 'VENDOR_PROFILE_SAVED', "Perfil del vendedor #{$vendor_id} actualizado." );
 
         wp_send_json_success( [ 'message' => __( 'Perfil guardado exitosamente.', 'ltms' ) ] );
