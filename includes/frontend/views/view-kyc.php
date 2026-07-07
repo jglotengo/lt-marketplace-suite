@@ -101,7 +101,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             <div class="ltms-form-group">
                 <label><?php esc_html_e( 'Nombre completo (como aparece en el documento)', 'ltms' ); ?></label>
                 <input type="text" id="ltms-kyc-full-name" class="ltms-form-control"
-                       value="<?php echo esc_attr( get_user_meta( $user_id, 'ltms_full_name', true ) ); ?>"
+                       value="<?php echo esc_attr( $kyc && $kyc->full_name ? $kyc->full_name : get_user_meta( $user_id, 'ltms_full_name', true ) ); ?>"
                        placeholder="<?php esc_attr_e( 'Ej: Juan Pérez García', 'ltms' ); ?>">
             </div>
 
@@ -109,14 +109,14 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 <label><?php esc_html_e( 'Tipo de documento', 'ltms' ); ?></label>
                 <select id="ltms-kyc-doc-type" class="ltms-form-control">
                     <?php if ( $is_mx ) : ?>
-                        <option value="rfc"><?php esc_html_e( 'RFC', 'ltms' ); ?></option>
-                        <option value="curp"><?php esc_html_e( 'CURP', 'ltms' ); ?></option>
-                        <option value="passport"><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
+                        <option value="rfc" <?php selected( $kyc->document_type ?? '', 'rfc' ); ?>><?php esc_html_e( 'RFC', 'ltms' ); ?></option>
+                        <option value="curp" <?php selected( $kyc->document_type ?? '', 'curp' ); ?>><?php esc_html_e( 'CURP', 'ltms' ); ?></option>
+                        <option value="passport" <?php selected( $kyc->document_type ?? '', 'passport' ); ?>><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
                     <?php else : ?>
-                        <option value="cc"><?php esc_html_e( 'Cédula de Ciudadanía (CC)', 'ltms' ); ?></option>
-                        <option value="ce"><?php esc_html_e( 'Cédula de Extranjería (CE)', 'ltms' ); ?></option>
-                        <option value="nit"><?php esc_html_e( 'NIT (Empresa)', 'ltms' ); ?></option>
-                        <option value="passport"><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
+                        <option value="cc" <?php selected( $kyc->document_type ?? '', 'cc' ); ?>><?php esc_html_e( 'Cédula de Ciudadanía (CC)', 'ltms' ); ?></option>
+                        <option value="ce" <?php selected( $kyc->document_type ?? '', 'ce' ); ?>><?php esc_html_e( 'Cédula de Extranjería (CE)', 'ltms' ); ?></option>
+                        <option value="nit" <?php selected( $kyc->document_type ?? '', 'nit' ); ?>><?php esc_html_e( 'NIT (Empresa)', 'ltms' ); ?></option>
+                        <option value="passport" <?php selected( $kyc->document_type ?? '', 'passport' ); ?>><?php esc_html_e( 'Pasaporte', 'ltms' ); ?></option>
                     <?php endif; ?>
                 </select>
             </div>
@@ -124,6 +124,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             <div class="ltms-form-group">
                 <label><?php esc_html_e( 'Número de documento', 'ltms' ); ?></label>
                 <input type="text" id="ltms-kyc-doc-number" class="ltms-form-control"
+                       value="<?php echo esc_attr( $kyc->document_number ?? '' ); ?>"
                        placeholder="<?php esc_attr_e( 'Ej: 12345678', 'ltms' ); ?>">
             </div>
 
@@ -198,6 +199,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                         ? esc_html__( 'Nombre del titular (debe coincidir con el RFC)', 'ltms' )
                         : esc_html__( 'Nombre del Representante Legal (titular de la cuenta)', 'ltms' ); ?></label>
                     <input type="text" id="ltms-kyc-rep-legal-name" class="ltms-form-control"
+                           value="<?php echo esc_attr( $kyc->bank_rep_legal_name ?? '' ); ?>"
                            placeholder="<?php echo $is_mx
                                ? esc_attr__( 'Ej: María López Torres', 'ltms' )
                                : esc_attr__( 'Ej: Carlos Ramírez Gómez', 'ltms' ); ?>">
@@ -206,6 +208,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 <div class="ltms-form-group" style="margin-bottom:12px;">
                     <label style="font-size:.875rem;"><?php esc_html_e( 'Entidad bancaria', 'ltms' ); ?></label>
                     <input type="text" id="ltms-kyc-bank-name" class="ltms-form-control"
+                           value="<?php echo esc_attr( $kyc->bank_name ?? '' ); ?>"
                            placeholder="<?php echo $is_mx
                                ? esc_attr__( 'Ej: BBVA, Santander, Banorte…', 'ltms' )
                                : esc_attr__( 'Ej: Bancolombia, Davivienda, Nequi…', 'ltms' ); ?>">
@@ -216,6 +219,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                         ? esc_html__( 'CLABE interbancaria (18 dígitos)', 'ltms' )
                         : esc_html__( 'Número de cuenta bancaria', 'ltms' ); ?></label>
                     <input type="text" id="ltms-kyc-account-number" class="ltms-form-control"
+                           value="<?php echo esc_attr( $kyc->bank_account_number ?? '' ); ?>"
                            <?php if ( $is_mx ) : ?>maxlength="18" pattern="\d{18}" inputmode="numeric"
                            placeholder="<?php esc_attr_e( '18 dígitos, ej: 012345678901234567', 'ltms' ); ?>"
                            <?php else : ?>inputmode="numeric"

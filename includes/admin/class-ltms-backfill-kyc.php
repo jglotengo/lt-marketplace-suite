@@ -228,6 +228,87 @@ class LTMS_KYC_Guard {
         add_action( 'admin_notices',          [ __CLASS__, 'show_kyc_notice' ] );
         // API REST: bloquear publicación de producto sin KYC
         add_filter( 'woocommerce_rest_pre_insert_product_object', [ __CLASS__, 'block_rest_publish_without_kyc' ], 10, 2 );
+        // v2.9.65 P3-12: Cron de recordatorio de expiración KYC
+        add_action( 'ltms_daily_cron',        [ __CLASS__, 'check_kyc_expiry_reminders' ] );
+    }
+
+    /**
+     * v2.9.65 DEEP-AUDIT-002 P3-12: Verifica KYCs que expiran pronto y envía recordatorios.
+     * Se ejecuta diariamente via ltms_daily_cron.
+     */
+    public static function check_kyc_expiry_reminders(): void {
+        global $wpdb;
+        $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$kyc_table}'" ) !== $kyc_table ) {
+            return;
+        }
+
+        // Buscar KYCs aprobados que expiran en los próximos 30 días.
+        // expires_at puede ser NULL si no se configuró expiración.
+        $thirty_days_from_now = gmdate( 'Y-m-d H:i:s', time() + 30 * DAY_IN_SECONDS );
+        $now = gmdate( 'Y-m-d H:i:s' );
+
+        $expiring = $wpdb->get_results( $wpdb->prepare(
+            "SELECT vendor_id, expires_at FROM `{$kyc_table}`
+             WHERE status = 'approved'
+             AND expires_at IS NOT NULL
+             AND expires_at > %s
+             AND expires_at <= %s",
+            $now,
+            $thirty_days_from_now
+        ) );
+
+        if ( empty( $expiring ) ) {
+            return;
+        }
+
+        foreach ( $expiring as $row ) {
+            $vendor_id = (int) $row->vendor_id;
+            $expires_at = $row->expires_at;
+
+            // Verificar si ya se envió recordatorio (usar transient para no duplicar).
+            $reminder_key = 'ltms_kyc_expiry_reminder_' . $vendor_id;
+            if ( get_transient( $reminder_key ) ) {
+                continue; // Ya se envió recordatorio reciente.
+            }
+
+            $vendor = get_userdata( $vendor_id );
+            if ( ! $vendor || ! $vendor->user_email ) {
+                continue;
+            }
+
+            $days_left = max( 0, (int) ceil( ( strtotime( $expires_at ) - time() ) / DAY_IN_SECONDS ) );
+
+            $subject = sprintf(
+                '[%s] Tu verificación KYC expira en %d días',
+                get_bloginfo( 'name' ),
+                $days_left
+            );
+
+            $body = sprintf(
+                "Hola %s,\n\n" .
+                "Tu verificación de identidad (KYC) expira el %s (en %d días).\n\n" .
+                "Para mantener tu cuenta activa y poder seguir vendiendo, por favor actualiza tus documentos de verificación:\n%s\n\n" .
+                "Si tienes preguntas, contáctanos.",
+                $vendor->display_name,
+                $expires_at,
+                $days_left,
+                home_url( '/panel-vendedor/?view=kyc' )
+            );
+
+            wp_mail( $vendor->user_email, $subject, $body );
+
+            // Marcar como recordatorio enviado (no reenviar por 7 días).
+            set_transient( $reminder_key, 1, 7 * DAY_IN_SECONDS );
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'KYC_EXPIRY_REMINDER_SENT',
+                    sprintf( 'Recordatorio de expiración KYC enviado a vendor #%d (%d días restantes)', $vendor_id, $days_left )
+                );
+            }
+        }
     }
 
     /**
