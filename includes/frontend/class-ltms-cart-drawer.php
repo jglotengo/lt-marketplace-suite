@@ -21,9 +21,10 @@ class LTMS_Cart_Drawer {
         // Render drawer HTML en el footer de todas las páginas.
         add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ] );
 
-        // v2.9.54: Script inline con prioridad alta para que se renderice
-        // ANTES de que SiteGround SuperCacher cachee el HTML.
-        add_action( 'wp_footer', [ __CLASS__, 'render_cart_buttons_script' ], 1 );
+        // v2.9.57: Script inline en wp_head (NO wp_footer) para que se cargue
+        // ANTES que el JS externo y SiteGround no lo pueda combinar/remover.
+        // Prioridad 1 para que sea de los primeros en renderizarse.
+        add_action( 'wp_head', [ __CLASS__, 'render_cart_buttons_script' ], 1 );
 
         // AJAX: obtener contenido del drawer (refresh).
         add_action( 'wp_ajax_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
@@ -101,213 +102,161 @@ class LTMS_Cart_Drawer {
     }
 
     /**
-     * v2.9.53: Renderiza un script inline que maneja los botones del carrito
-     * con event delegation en document. Esto funciona sin importar si el JS
-     * externo está cacheado o no.
+     * v2.9.57: Script inline SIMPLIFICADO en wp_head.
+     * Este script se carga ANTES que cualquier JS externo y usa event delegation
+     * con capture=true para interceptar clicks de los botones del carrito.
+     * Es intencionalmente simple para evitar errores de sintaxis.
      */
     public static function render_cart_buttons_script(): void {
         $ajax_url = admin_url( 'admin-ajax.php' );
         $nonce = wp_create_nonce( 'ltms_ux_nonce' );
         ?>
-        <!-- LTMS-CART-SCRIPT-v2.9.55-START -->
+        <!-- LTMS-CART-SCRIPT-v2.9.57-START -->
         <script>
-        (function() {
-            'use strict';
-            // v2.9.55: Event delegation con CAPTURE=true para interceptar clicks
-            // ANTES que el JS externo (ltms-ux-enhancements.js) que está cacheado
-            // en versión vieja y dispara AJAX incorrectos.
-            // stopImmediatePropagation() previene que otros handlers se ejecuten.
-            document.addEventListener('click', function(e) {
-                // No interferir si el click no fue en un botón del carrito
-                var incBtn = e.target.closest ? e.target.closest('.ltms-cart-qty-inc') : null;
-                var decBtn = e.target.closest ? e.target.closest('.ltms-cart-qty-dec') : null;
-                var removeBtn = e.target.closest ? e.target.closest('.ltms-cart-item-remove') : null;
+        window.LTMS_CART = {
+            ajaxUrl: '<?php echo esc_js( $ajax_url ); ?>',
+            nonce: '<?php echo esc_js( $nonce ); ?>',
+            busy: false
+        };
 
-                if (!incBtn && !decBtn && !removeBtn) return;
+        // v2.9.57: Event delegation con capture=true en document.
+        // Se registra en <head> ANTES de que el DOM exista, así captura
+        // TODOS los clicks futuros de botones del carrito.
+        document.addEventListener('click', function(e) {
+            // Si el click no fue en un elemento del carrito, salir
+            if (!e.target || typeof e.target.closest !== 'function') return;
 
-                // CRÍTICO: stopImmediatePropagation previene que el JS viejo
-                // (que tiene event listeners en los botones individuales) se ejecute.
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+            var incBtn = e.target.closest('.ltms-cart-qty-inc');
+            var decBtn = e.target.closest('.ltms-cart-qty-dec');
+            var removeBtn = e.target.closest('.ltms-cart-item-remove');
 
-                var ajaxUrl = '<?php echo esc_js( $ajax_url ); ?>';
-                var nonce = '<?php echo esc_js( $nonce ); ?>';
+            if (!incBtn && !decBtn && !removeBtn) return;
 
-                // Desactivar el botón temporalmente para prevenir clicks dobles
-                var clickedBtn = incBtn || decBtn || removeBtn;
-                if (clickedBtn) {
-                    clickedBtn.style.pointerEvents = 'none';
-                    clickedBtn.style.opacity = '0.6';
-                    setTimeout(function() {
-                        clickedBtn.style.pointerEvents = '';
-                        clickedBtn.style.opacity = '';
-                    }, 1000);
-                }
+            // CRÍTICO: Prevenir que el JS viejo cacheado también procese el click
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
 
-                if (incBtn || decBtn) {
-                    var btn = incBtn || decBtn;
-                    var key = btn.dataset.key;
-                    var change = incBtn ? 1 : -1;
+            // Evitar clicks dobles
+            if (window.LTMS_CART.busy) return;
+            window.LTMS_CART.busy = true;
+            setTimeout(function() { window.LTMS_CART.busy = false; }, 800);
 
-                    // Buscar la cantidad actual en el DOM
-                    var itemEl = btn.closest('.ltms-cart-item');
-                    var qtyEl = itemEl ? itemEl.querySelector('.ltms-cart-qty-value') : null;
-                    var currentQty = qtyEl ? parseInt(qtyEl.textContent, 10) : 1;
-                    var newQty = Math.max(1, currentQty + change);
+            // Determinar qué acción hacer
+            if (incBtn || decBtn) {
+                var btn = incBtn || decBtn;
+                LTMS_CART.updateQty(btn.dataset.key, incBtn ? 1 : -1);
+            } else if (removeBtn) {
+                LTMS_CART.removeItem(removeBtn.dataset.key);
+            }
+        }, true); // capture: true
 
-                    // Feedback visual inmediato
-                    if (qtyEl) qtyEl.textContent = newQty;
+        // Función para actualizar cantidad
+        window.LTMS_CART.updateQty = function(key, change) {
+            var qtyEl = document.querySelector('[data-cart-item-key="' + key + '"] .ltms-cart-qty-value');
+            var currentQty = qtyEl ? parseInt(qtyEl.textContent, 10) : 1;
+            var newQty = Math.max(1, currentQty + change);
+            if (qtyEl) qtyEl.textContent = newQty;
 
-                    // Enviar AJAX
-                    var body = new URLSearchParams();
-                    body.append('action', 'ltms_drawer_update_qty');
-                    body.append('nonce', nonce);
-                    body.append('cart_item_key', key);
-                    body.append('qty', newQty);
+            var body = 'action=ltms_drawer_update_qty&nonce=' + encodeURIComponent(LTMS_CART.nonce) +
+                       '&cart_item_key=' + encodeURIComponent(key) + '&qty=' + newQty;
 
-                    fetch(ajaxUrl, {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
-                        body: body.toString()
-                    }).then(function(r) { return r.json(); }).then(function(response) {
-                        // Recargar el carrito completo
-                        if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.openCartDrawer) {
-                            // Trigger loadCartContents via jQuery event
-                            if (typeof jQuery !== 'undefined') {
-                                jQuery(document.body).trigger('wc_fragment_refresh');
-                            }
-                        }
-                        // Actualizar badge
-                        if (response && response.data && response.data.count !== undefined) {
-                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
-                                el.textContent = response.data.count;
-                            });
-                        }
-                        // Recargar contenido del drawer
-                        reloadCartContents();
-                    }).catch(function() {
-                        reloadCartContents();
+            fetch(LTMS_CART.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: body
+            }).then(function(r) { return r.json(); }).then(function() {
+                LTMS_CART.reload();
+            }).catch(function() {
+                LTMS_CART.reload();
+            });
+        };
+
+        // Función para eliminar item
+        window.LTMS_CART.removeItem = function(key) {
+            var itemEl = document.querySelector('[data-cart-item-key="' + key + '"]');
+            if (itemEl) itemEl.style.opacity = '0.5';
+
+            var body = 'action=ltms_drawer_remove_item&nonce=' + encodeURIComponent(LTMS_CART.nonce) +
+                       '&cart_item_key=' + encodeURIComponent(key);
+
+            fetch(LTMS_CART.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: body
+            }).then(function(r) { return r.json(); }).then(function() {
+                LTMS_CART.reload();
+            }).catch(function() {
+                if (itemEl) itemEl.style.opacity = '';
+                LTMS_CART.reload();
+            });
+        };
+
+        // Función para recargar el carrito completo
+        window.LTMS_CART.reload = function() {
+            var body = 'action=ltms_get_cart&nonce=' + encodeURIComponent(LTMS_CART.nonce);
+            fetch(LTMS_CART.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: body
+            }).then(function(r) { return r.json(); }).then(function(response) {
+                if (!response || !response.success || !response.data) return;
+                var data = response.data;
+
+                // Actualizar contador en el header
+                if (data.count !== undefined) {
+                    document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
+                        el.textContent = data.count;
                     });
                 }
 
-                if (removeBtn) {
-                    var key = removeBtn.dataset.key;
-                    var itemEl = removeBtn.closest('.ltms-cart-item');
-                    if (itemEl) {
-                        itemEl.style.opacity = '0.5';
-                        itemEl.style.pointerEvents = 'none';
-                    }
-
-                    var body = new URLSearchParams();
-                    body.append('action', 'ltms_drawer_remove_item');
-                    body.append('nonce', nonce);
-                    body.append('cart_item_key', key);
-
-                    fetch(ajaxUrl, {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
-                        body: body.toString()
-                    }).then(function(r) { return r.json(); }).then(function(response) {
-                        // Actualizar badge
-                        if (response && response.data && response.data.count !== undefined) {
-                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
-                                el.textContent = response.data.count;
-                            });
-                        }
-                        reloadCartContents();
-                    }).catch(function() {
-                        if (itemEl) {
-                            itemEl.style.opacity = '';
-                            itemEl.style.pointerEvents = '';
-                        }
-                        reloadCartContents();
-                    });
+                // Actualizar subtotal (usar innerHTML para renderizar entidades HTML)
+                var subtotalEl = document.querySelector('#ltms-cart-subtotal');
+                if (subtotalEl && data.total_formatted) {
+                    subtotalEl.innerHTML = data.total_formatted;
                 }
-            }, true);  // capture: true — intercepta ANTES que otros handlers
 
-            // Función para recargar el contenido del carrito vía AJAX
-            function reloadCartContents() {
-                var ajaxUrl = '<?php echo esc_js( $ajax_url ); ?>';
-                var nonce = '<?php echo esc_js( $nonce ); ?>';
-                var body = new URLSearchParams();
-                body.append('action', 'ltms_get_cart');
-                body.append('nonce', nonce);
+                // Re-renderizar items del carrito
+                var container = document.querySelector('#ltms-cart-drawer-items');
+                if (!container) return;
 
-                fetch(ajaxUrl, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
-                    body: body.toString()
-                }).then(function(r) { return r.json(); }).then(function(response) {
-                    if (response && response.success && response.data) {
-                        var container = document.querySelector('#ltms-cart-drawer-items');
-                        if (!container) return;
+                if (!data.items || !data.items.length) {
+                    container.innerHTML = '<div style="text-align:center;padding:40px 20px;"><p style="font-size:16px;margin-bottom:16px;">Tu carrito está vacío</p></div>';
+                    return;
+                }
 
-                        if (!response.data.items || !response.data.items.length) {
-                            // Carrito vacío
-                            container.innerHTML = '<div class="ltms-cart-empty" style="text-align:center;padding:40px 20px;">' +
-                                '<p style="font-size:16px;margin-bottom:16px;">Tu carrito está vacío</p>' +
-                                '<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" onclick="document.getElementById(\'ltms-cart-drawer-overlay\').click()">Explorar productos</button>' +
-                                '</div>';
-                        } else {
-                            // Renderizar items
-                            container.innerHTML = response.data.items.map(function(item) {
-                                return '<div class="ltms-cart-item" data-cart-item-key="' + escapeAttr(item.key) + '">' +
-                                    '<div class="ltms-cart-item-img">' +
-                                        (item.image ? '<img src="' + escapeAttr(item.image) + '" alt="' + escapeAttr(item.name) + '" loading="lazy">' : '<div class="ltms-cart-item-no-img">📦</div>') +
-                                    '</div>' +
-                                    '<div class="ltms-cart-item-info">' +
-                                        '<a href="' + escapeAttr(item.product_url || '#') + '" class="ltms-cart-item-name">' + escapeHtml(item.name) + '</a>' +
-                                        (item.variation ? '<div class="ltms-cart-item-variation">' + escapeHtml(item.variation) + '</div>' : '') +
-                                        '<div class="ltms-cart-item-price">' + (item.price_formatted || '') + '</div>' +
-                                        '<div class="ltms-cart-item-qty">' +
-                                            '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-dec" data-key="' + escapeAttr(item.key) + '" aria-label="Disminuir">−</button>' +
-                                            '<span class="ltms-cart-qty-value">' + item.quantity + '</span>' +
-                                            '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-inc" data-key="' + escapeAttr(item.key) + '" aria-label="Aumentar">+</button>' +
-                                        '</div>' +
-                                    '</div>' +
-                                    '<button type="button" class="ltms-cart-item-remove" data-key="' + escapeAttr(item.key) + '" aria-label="Eliminar">' +
-                                        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>' +
-                                    '</button>' +
-                                '</div>';
-                            }).join('');
-                        }
+                container.innerHTML = data.items.map(function(item) {
+                    return '<div class="ltms-cart-item" data-cart-item-key="' + LTMS_CART.esc(item.key) + '">' +
+                        '<div class="ltms-cart-item-img">' +
+                            (item.image ? '<img src="' + LTMS_CART.esc(item.image) + '" alt="' + LTMS_CART.esc(item.name) + '" loading="lazy">' : '<div>📦</div>') +
+                        '</div>' +
+                        '<div class="ltms-cart-item-info">' +
+                            '<a href="' + LTMS_CART.esc(item.product_url || '#') + '" class="ltms-cart-item-name">' + LTMS_CART.esc(item.name) + '</a>' +
+                            '<div class="ltms-cart-item-price">' + (item.price_formatted || '') + '</div>' +
+                            '<div class="ltms-cart-item-qty">' +
+                                '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-dec" data-key="' + LTMS_CART.esc(item.key) + '">−</button>' +
+                                '<span class="ltms-cart-qty-value">' + item.quantity + '</span>' +
+                                '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-inc" data-key="' + LTMS_CART.esc(item.key) + '">+</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<button type="button" class="ltms-cart-item-remove" data-key="' + LTMS_CART.esc(item.key) + '" aria-label="Eliminar">✕</button>' +
+                    '</div>';
+                }).join('');
+            }).catch(function() {});
+        };
 
-                        // Actualizar subtotal
-                        var subtotalEl = document.querySelector('#ltms-cart-subtotal');
-                        if (subtotalEl && response.data.total_formatted) {
-                            subtotalEl.innerHTML = response.data.total_formatted;
-                        }
-
-                        // Actualizar contador
-                        if (response.data.count !== undefined) {
-                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
-                                el.textContent = response.data.count;
-                            });
-                        }
-                    }
-                }).catch(function() {
-                    // Silenciar errores
-                });
-            }
-
-            function escapeHtml(str) {
-                if (!str) return '';
-                return String(str).replace(/[&<>"']/g, function(c) {
-                    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-                });
-            }
-
-            function escapeAttr(str) {
-                if (!str) return '';
-                return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            }
-        })();
+        // Función de escape HTML
+        window.LTMS_CART.esc = function(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+            });
+        };
         </script>
-        <!-- LTMS-CART-SCRIPT-v2.9.55-END -->
+        <!-- LTMS-CART-SCRIPT-v2.9.57-END -->
         <?php
     }
 
