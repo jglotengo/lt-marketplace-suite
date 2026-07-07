@@ -21,8 +21,14 @@ if ( ! $vendor_id ) {
     return;
 }
 
-$year  = (int) ( $_GET['year']  ?? current_time( 'Y' ) );
-$month = (int) ( $_GET['month'] ?? current_time( 'n' ) );
+// v2.9.70 P3-6: Verificar nonce del GET form si se envió.
+$ss_nonce = $_GET['ltms_ss_nonce'] ?? '';
+if ( ! empty( $ss_nonce ) && ! wp_verify_nonce( $ss_nonce, 'ltms_shipping_statement' ) ) {
+    wp_die( __( 'Token inválido. Recarga la página.', 'ltms' ) );
+}
+
+$year  = (int) ( $_GET['year']  ?? current_time( 'Y' ) ); // phpcs:ignore
+$month = (int) ( $_GET['month'] ?? current_time( 'n' ) ); // phpcs:ignore
 
 $statement = LTMS_Shipping_Cost_Ledger::get_vendor_statement( $vendor_id, $year, $month );
 $budget    = $statement['budget'];
@@ -63,6 +69,7 @@ $fmt = function( $v ) use ( $currency ) {
 
     <!-- Selector de período -->
     <form method="get" style="margin:16px 0;">
+        <?php wp_nonce_field( 'ltms_shipping_statement', 'ltms_ss_nonce' ); ?>
         <input type="hidden" name="year" value="<?php echo esc_attr( $year ); ?>" />
         <select name="month" onchange="this.form.submit()">
             <?php for ( $m = 1; $m <= 12; $m++ ) : ?>

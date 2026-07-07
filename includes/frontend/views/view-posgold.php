@@ -137,7 +137,7 @@ if ( empty( $seo_template ) ) {
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
                     <form id="ltms-posgold-config-form" method="post">
-                        <?php wp_nonce_field( 'ltms_posgold_save', 'ltms_posgold_nonce' ); ?>
+                        <?php /* v2.9.70 P3-4: Dead nonce removed — JS uses ltms_dashboard_nonce via AJAX */ ?>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
                             <div>
@@ -257,7 +257,7 @@ if ( empty( $seo_template ) ) {
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
                     <form id="ltms-posgold-categories-form" method="post">
-                        <?php wp_nonce_field( 'ltms_posgold_save_categories', 'ltms_posgold_categories_nonce' ); ?>
+                        <?php /* v2.9.70 P3-4: Dead nonce removed */ ?>
 
                         <div style="margin-bottom:16px;">
                             <label style="display:block;font-weight:600;margin-bottom:4px;">
@@ -310,7 +310,7 @@ if ( empty( $seo_template ) ) {
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
                     <form id="ltms-posgold-rules-form" method="post">
-                        <?php wp_nonce_field( 'ltms_posgold_save_rules', 'ltms_posgold_rules_nonce' ); ?>
+                        <?php /* v2.9.70 P3-4: Dead nonce removed */ ?>
 
                         <!-- Toggle ReDi -->
                         <div style="padding:12px 16px;background:#f0f4ff;border-radius:8px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
@@ -477,7 +477,7 @@ if ( empty( $seo_template ) ) {
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
                     <form id="ltms-posgold-seo-form" method="post">
-                        <?php wp_nonce_field( 'ltms_posgold_save_seo', 'ltms_posgold_seo_nonce' ); ?>
+                        <?php /* v2.9.70 P3-4: Dead nonce removed */ ?>
 
                         <div style="margin-bottom:16px;">
                             <label for="ltms-posgold-seo-template" style="display:block;font-weight:600;margin-bottom:4px;">

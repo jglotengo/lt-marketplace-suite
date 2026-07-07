@@ -1620,22 +1620,27 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
         }
 
-        // Sanitizar comma-separated list de IDs.
-        $raw       = sanitize_text_field( $_POST['category_ids'] ?? '' );
-        $ids       = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
+        // v2.9.70 P3-9: Guardar como JSON en vez de CSV (más robusto).
+        // Mantener backward compatibility: si llega CSV, convertir a JSON.
+        $raw = sanitize_text_field( $_POST['category_ids'] ?? '' ); // phpcs:ignore
+        $ids = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
         $sanitized = [];
         foreach ( $ids as $id ) {
             if ( is_numeric( $id ) ) {
                 $sanitized[] = (string) absint( $id );
             }
         }
-        $clean = implode( ',', $sanitized );
+        // Guardar como JSON.
+        $clean_json = wp_json_encode( $sanitized );
+        update_user_meta( $user_id, 'ltms_posgold_category_ids', $clean_json );
 
-        update_user_meta( $user_id, 'ltms_posgold_category_ids', $clean );
+        // También guardar versión CSV para backward compatibility con sync engine.
+        $clean_csv = implode( ',', $sanitized );
+        update_user_meta( $user_id, 'ltms_posgold_category_ids_csv', $clean_csv );
 
         wp_send_json_success( [
-            'message' => __( 'Categorías guardadas correctamente.', 'ltms' ),
-            'category_ids' => $clean,
+            'message'      => __( 'Categorías guardadas correctamente.', 'ltms' ),
+            'category_ids' => $clean_csv, // Response sigue siendo CSV para el JS.
         ] );
     }
 
