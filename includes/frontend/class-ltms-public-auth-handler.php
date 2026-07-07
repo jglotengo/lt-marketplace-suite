@@ -42,6 +42,8 @@ final class LTMS_Public_Auth_Handler {
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
         // v2.9.60 MISSING-08: Endpoint para reenviar email de verificación.
         add_action( 'wp_ajax_ltms_resend_verification',    [ $instance, 'ajax_resend_verification' ] );
+        // v2.9.61 DEEP-AUDIT-002 UX-06: Endpoint para completar perfil (Google OAuth path).
+        add_action( 'wp_ajax_ltms_complete_profile',       [ $instance, 'ajax_complete_profile' ] );
 
         // M-73: /sellers/ usa Hello Elementor — Elementor no llama the_content() y el
         // shortcode no se renderiza. Interceptamos template_include con prioridad 999
@@ -960,5 +962,118 @@ final class LTMS_Public_Auth_Handler {
         );
 
         wp_send_json_success( [ 'message' => __( 'Email de verificación reenviado. Revisa tu bandeja de entrada.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.61 DEEP-AUDIT-002 UX-06: Completa el perfil de un vendor registrado via Google OAuth.
+     * Captura los campos faltantes: teléfono, documento, régimen tributario, SAGRILAFT, etc.
+     * Endpoint: wp_ajax_ltms_complete_profile
+     */
+    public function ajax_complete_profile(): void {
+        check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Debes iniciar sesión.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        // Verificar que el perfil esté marcado como incompleto.
+        if ( ! get_user_meta( $user_id, 'ltms_profile_incomplete', true ) ) {
+            wp_send_json_error( [ 'message' => __( 'Tu perfil ya está completo.', 'ltms' ) ] );
+        }
+
+        // Sanitizar y validar datos.
+        $phone           = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ); // phpcs:ignore
+        $document_type   = sanitize_text_field( wp_unslash( $_POST['document_type'] ?? '' ) ); // phpcs:ignore
+        $document_number = sanitize_text_field( wp_unslash( $_POST['document_number'] ?? '' ) ); // phpcs:ignore
+        $store_name      = sanitize_text_field( wp_unslash( $_POST['store_name'] ?? '' ) ); // phpcs:ignore
+        $store_address   = sanitize_text_field( wp_unslash( $_POST['store_address'] ?? '' ) ); // phpcs:ignore
+        $vendor_country  = strtoupper( sanitize_text_field( wp_unslash( $_POST['vendor_country'] ?? '' ) ) ); // phpcs:ignore
+        $tax_regime      = sanitize_key( wp_unslash( $_POST['tax_regime'] ?? '' ) ); // phpcs:ignore
+        $business_type   = sanitize_key( wp_unslash( $_POST['business_type'] ?? 'physical' ) ); // phpcs:ignore
+        $sagrilaft       = ! empty( $_POST['accept_sagrilaft'] ); // phpcs:ignore
+
+        // Validaciones.
+        $errors = [];
+        if ( empty( $phone ) || ! preg_match( '/^\+?[0-9\s\-\(\)]{7,20}$/', $phone ) ) {
+            $errors[] = [ 'field' => 'phone', 'message' => __( 'Teléfono inválido.', 'ltms' ) ];
+        }
+        if ( empty( $document_type ) ) {
+            $errors[] = [ 'field' => 'document_type', 'message' => __( 'Tipo de documento requerido.', 'ltms' ) ];
+        }
+        if ( empty( $document_number ) ) {
+            $errors[] = [ 'field' => 'document_number', 'message' => __( 'Número de documento requerido.', 'ltms' ) ];
+        }
+        if ( empty( $store_name ) ) {
+            $errors[] = [ 'field' => 'store_name', 'message' => __( 'Nombre de tienda requerido.', 'ltms' ) ];
+        }
+        if ( empty( $store_address ) ) {
+            $errors[] = [ 'field' => 'store_address', 'message' => __( 'Dirección requerida.', 'ltms' ) ];
+        }
+        if ( ! in_array( $vendor_country, [ 'CO', 'MX' ], true ) ) {
+            $errors[] = [ 'field' => 'vendor_country', 'message' => __( 'País inválido.', 'ltms' ) ];
+        }
+        if ( $vendor_country === 'CO' && empty( $tax_regime ) ) {
+            $errors[] = [ 'field' => 'tax_regime', 'message' => __( 'Régimen tributario requerido.', 'ltms' ) ];
+        }
+        if ( $vendor_country === 'CO' && ! $sagrilaft ) {
+            $errors[] = [ 'field' => 'accept_sagrilaft', 'message' => __( 'Debes autorizar SAGRILAFT.', 'ltms' ) ];
+        }
+
+        if ( ! empty( $errors ) ) {
+            wp_send_json_error( [
+                'message' => implode( ' ', array_column( $errors, 'message' ) ),
+                'errors'  => $errors,
+            ] );
+        }
+
+        // Guardar metas.
+        update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $phone ) );
+        update_user_meta( $user_id, 'ltms_document_type', $document_type );
+        update_user_meta( $user_id, 'ltms_document_number', $document_number );
+        update_user_meta( $user_id, 'ltms_store_name', $store_name );
+        update_user_meta( $user_id, 'ltms_store_address', $store_address );
+        update_user_meta( $user_id, 'ltms_vendor_country', $vendor_country );
+        update_user_meta( $user_id, 'ltms_tax_regime', $tax_regime );
+        update_user_meta( $user_id, 'ltms_business_type', $business_type );
+
+        // Cifrar el número de documento (AES-256-GCM).
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+            $encrypted = LTMS_Core_Security::encrypt( $document_number );
+            if ( $encrypted ) {
+                update_user_meta( $user_id, 'ltms_document_number_encrypted', $encrypted );
+            }
+        }
+
+        // Generar store slug.
+        if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
+            $store_slug = LTMS_Vendor_Storefront::generate_unique_slug( $store_name, $user_id );
+            update_user_meta( $user_id, 'ltms_store_slug', $store_slug );
+        }
+
+        // SAGRILAFT consent.
+        if ( $sagrilaft && class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::log_consent( $user_id, 'sagrilaft', true, '1.0', 'web' );
+        }
+
+        // Marcar perfil como completo.
+        delete_user_meta( $user_id, 'ltms_profile_incomplete' );
+
+        // Log.
+        LTMS_Core_Logger::info( 'PROFILE_COMPLETED', sprintf( 'Vendor #%d completó su perfil (Google OAuth path)', $user_id ) );
+
+        // Redirigir al dashboard.
+        $pages = get_option( 'ltms_installed_pages', [] );
+        $dashboard_id = $pages['ltms-dashboard'] ?? 0;
+        $redirect = $dashboard_id ? get_permalink( $dashboard_id ) : home_url( '/panel-vendedor/' );
+
+        wp_send_json_success( [
+            'redirect' => $redirect,
+            'message'  => __( '¡Perfil completado! Ya puedes publicar productos.', 'ltms' ),
+        ] );
     }
 }

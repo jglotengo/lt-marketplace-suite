@@ -1842,6 +1842,15 @@ final class LTMS_Dashboard_Logic {
     public function ajax_backorder_notify(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir abuso de wp_options.
+        $ip = LTMS_Utils::get_ip();
+        $throttle_key = 'ltms_backorder_' . md5( $ip );
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 10 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas solicitudes. Espera una hora.', 'ltms' ) ], 429 );
+        }
+        set_transient( $throttle_key, $attempts + 1, HOUR_IN_SECONDS );
+
         $product_id = absint( $_POST['product_id'] ?? 0 );
         $email      = sanitize_email( $_POST['email'] ?? '' );
 
@@ -1849,10 +1858,21 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
         }
 
-        // Guardar suscripción en user_meta o en una tabla custom.
-        // Por ahora, guardar en options como array simple.
+        // v2.9.61 FIX: Evitar duplicados — no agregar si ya existe la suscripción.
         $subscriptions = get_option( 'ltms_backorder_subscriptions', [] );
         if ( ! is_array( $subscriptions ) ) $subscriptions = [];
+
+        // Verificar si ya existe.
+        foreach ( $subscriptions as $sub ) {
+            if ( $sub['product_id'] === $product_id && $sub['email'] === $email ) {
+                wp_send_json_success( [ 'message' => __( 'Ya estás suscrito a este producto.', 'ltms' ) ] );
+            }
+        }
+
+        // Limitar el array a 1000 entradas para no inflar wp_options.
+        if ( count( $subscriptions ) > 1000 ) {
+            $subscriptions = array_slice( $subscriptions, -1000 );
+        }
 
         $subscriptions[] = [
             'product_id' => $product_id,
@@ -1900,9 +1920,26 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Reseña inválida.', 'ltms' ) ], 400 );
         }
 
+        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Prevenir vote inflation.
+        // Usar cookie + IP para deduplicar votos del mismo usuario.
+        $ip = LTMS_Utils::get_ip();
+        $voter_key = 'ltms_voted_' . md5( $ip . '_' . $review_id );
+
+        // Si ya votó (cookie o transient), no incrementar.
+        if ( isset( $_COOKIE[ 'ltms_voted_' . $review_id ] ) || get_transient( $voter_key ) ) {
+            $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
+            wp_send_json_success( [ 'count' => $helpful_count, 'already_voted' => true ] );
+        }
+
+        // Marcar como votado (transient 30 días + cookie 30 días).
+        set_transient( $voter_key, 1, 30 * DAY_IN_SECONDS );
+
         $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
         $helpful_count++;
         update_comment_meta( $review_id, 'ltms_helpful_count', $helpful_count );
+
+        // Set cookie para doble deduplicación.
+        setcookie( 'ltms_voted_' . $review_id, '1', time() + 30 * DAY_IN_SECONDS, '/' );
 
         wp_send_json_success( [ 'count' => $helpful_count ] );
     }
@@ -1936,6 +1973,15 @@ final class LTMS_Dashboard_Logic {
     public function ajax_submit_question(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir spam de preguntas.
+        $ip = LTMS_Utils::get_ip();
+        $throttle_key = 'ltms_question_' . md5( $ip );
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 5 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas preguntas. Espera una hora.', 'ltms' ) ], 429 );
+        }
+        set_transient( $throttle_key, $attempts + 1, HOUR_IN_SECONDS );
+
         $product_id = absint( $_POST['product_id'] ?? 0 );
         $question   = sanitize_textarea_field( $_POST['question'] ?? '' );
         $name       = sanitize_text_field( $_POST['name'] ?? '' );
@@ -1943,6 +1989,11 @@ final class LTMS_Dashboard_Logic {
 
         if ( ! $product_id || empty( $question ) || ! is_email( $email ) ) {
             wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
+        }
+
+        // v2.9.61 FIX: Validar longitud mínima de pregunta.
+        if ( strlen( $question ) < 10 ) {
+            wp_send_json_error( [ 'message' => __( 'La pregunta debe tener al menos 10 caracteres.', 'ltms' ) ], 400 );
         }
 
         // Guardar la pregunta como comentario pendiente.

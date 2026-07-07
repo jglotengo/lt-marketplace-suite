@@ -482,6 +482,16 @@ class LTMS_TOTP_2FA {
         self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
+
+        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir brute force de códigos TOTP.
+        // TOTP tiene 1,000,000 combinaciones (6 dígitos) con ventana de 30s.
+        // Sin rate limit, un atacante con el session cookie podría probar 100 códigos/min.
+        $throttle_key = 'ltms_2fa_confirm_attempts_' . $user_id;
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 10 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Espera 15 minutos.', 'ltms' ) ], 429 );
+        }
+
         $code = sanitize_text_field( $_POST['code'] ?? '' );
         $secret = get_user_meta( $user_id, '_ltms_2fa_pending_secret', true );
 
@@ -490,8 +500,20 @@ class LTMS_TOTP_2FA {
         }
 
         if ( ! self::verify_code( $secret, $code ) ) {
-            wp_send_json_error( [ 'message' => __( 'Código incorrecto. Verifica que tu app esté configurada.', 'ltms' ) ], 401 );
+            // Incrementar contador de intentos fallidos.
+            set_transient( $throttle_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
+            $remaining = 10 - $attempts - 1;
+            wp_send_json_error( [
+                'message' => sprintf(
+                    /* translators: %d: intentos restantes */
+                    _n( 'Código incorrecto. %d intento restante.', 'Código incorrecto. %d intentos restantes.', $remaining, 'ltms' ),
+                    $remaining
+                ),
+            ], 401 );
         }
+
+        // Limpiar contador en éxito.
+        delete_transient( $throttle_key );
 
         // Activar 2FA.
         update_user_meta( $user_id, '_ltms_2fa_secret', $secret );
@@ -524,6 +546,14 @@ class LTMS_TOTP_2FA {
         self::check_2fa_nonce();
 
         $user_id = get_current_user_id();
+
+        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir brute force.
+        $throttle_key = 'ltms_2fa_disable_attempts_' . $user_id;
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 10 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Espera 15 minutos.', 'ltms' ) ], 429 );
+        }
+
         $code = sanitize_text_field( $_POST['code'] ?? '' );
         $secret = get_user_meta( $user_id, '_ltms_2fa_secret', true );
 
@@ -533,8 +563,18 @@ class LTMS_TOTP_2FA {
 
         // Verificar código antes de desactivar.
         if ( ! self::verify_code( $secret, $code ) && ! self::verify_backup_code( $user_id, $code ) ) {
-            wp_send_json_error( [ 'message' => __( 'Código incorrecto. No se puede desactivar 2FA sin verificación.', 'ltms' ) ], 401 );
+            set_transient( $throttle_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
+            $remaining = 10 - $attempts - 1;
+            wp_send_json_error( [
+                'message' => sprintf(
+                    _n( 'Código incorrecto. %d intento restante.', 'Código incorrecto. %d intentos restantes.', $remaining, 'ltms' ),
+                    $remaining
+                ),
+            ], 401 );
         }
+
+        // Limpiar contador en éxito.
+        delete_transient( $throttle_key );
 
         // Desactivar.
         delete_user_meta( $user_id, '_ltms_2fa_secret' );

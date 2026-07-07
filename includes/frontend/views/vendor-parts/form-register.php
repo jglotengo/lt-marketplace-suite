@@ -9,6 +9,12 @@
 defined( 'ABSPATH' ) || exit;
 
 $country = LTMS_Core_Config::get_country();
+
+// v2.9.61 DEEP-AUDIT-002 UX-06: Detectar si el vendor viene del flujo de Google OAuth
+// con perfil incompleto y necesita completar datos.
+$complete_profile = isset( $_GET['complete_profile'] ) && $_GET['complete_profile'] === '1'; // phpcs:ignore
+$current_user_id = get_current_user_id();
+$profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms_profile_incomplete', true );
 ?>
 
 <div class="ltms-auth-card ltms-register-card" id="ltms-register-wrap">
@@ -24,8 +30,16 @@ $country = LTMS_Core_Config::get_country();
         ?>
     </div>
 
+    <?php if ( $complete_profile || $profile_incomplete ) : ?>
+        <h2 class="ltms-auth-title"><?php esc_html_e( 'Completa tu Perfil de Vendedor', 'ltms' ); ?></h2>
+        <p class="ltms-auth-subtitle"><?php esc_html_e( 'Necesitamos algunos datos adicionales para activar tu cuenta.', 'ltms' ); ?></p>
+        <div class="ltms-notice ltms-notice-info" role="alert">
+            <p>ℹ️ <?php esc_html_e( 'Tu cuenta fue creada con Google. Completa estos campos para poder publicar productos.', 'ltms' ); ?></p>
+        </div>
+    <?php else : ?>
     <h2 class="ltms-auth-title"><?php esc_html_e( 'Crear Cuenta de Vendedor', 'ltms' ); ?></h2>
     <p class="ltms-auth-subtitle"><?php esc_html_e( 'Únete a la plataforma y empieza a vender.', 'ltms' ); ?></p>
+    <?php endif; ?>
 
     <div id="ltms-register-notice" class="ltms-notice" style="display:none;" role="alert"></div>
 
