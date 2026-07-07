@@ -545,6 +545,11 @@
     // ═══════════════════════════════════════════════════════════
 
     function initAjaxErrorInterceptor() {
+        // v2.9.56: Completamente desactivado. El interceptor generaba spam
+        // en la consola con errores AJAX de terceros y del JS viejo cacheado.
+        // Los errores AJAX ya se manejan en cada función individual.
+        return;
+
         if (typeof jQuery === 'undefined') return;
 
         // v2.9.31: DISABLED — el interceptor mostraba toast por cada AJAX
@@ -5485,103 +5490,27 @@
     }
 
     function updateCartQty(key, change) {
-        // v2.9.52: Usar SIEMPRE el endpoint de LTMS (ltms_drawer_update_qty).
-        // Antes intentaba usar woocommerce_set_cart_quantity que NO EXISTE en WC core,
-        // causando que los botones +/- no funcionaran.
-        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)
-            || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
-            || '/wp-admin/admin-ajax.php';
+        // v2.9.56: NO-OP — El manejo del carrito ahora lo hace el script inline
+        // en class-ltms-cart-drawer.php (render_cart_buttons_script).
+        // Esta función existe solo para compatibilidad con versiones cacheadas
+        // del JS que la llaman. Si se ejecuta, no hace nada (evita el error 400
+        // del woocommerce_set_cart_quantity que no existe).
+        // El script inline usa capture=true + stopImmediatePropagation para
+        // interceptar el click ANTES que este handler.
+        return;
 
-        // Buscar la cantidad actual en el DOM
-        const qtyEl = document.querySelector(`[data-cart-item-key="${key}"] .ltms-cart-qty-value`);
-        const currentQty = qtyEl ? parseInt(qtyEl.textContent) : 1;
-        const newQty = Math.max(1, currentQty + change);
-
-        const body = new URLSearchParams();
-        body.append('action', 'ltms_drawer_update_qty');
-        body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
-        body.append('cart_item_key', key);
-        body.append('qty', newQty);
-
-        // Feedback visual inmediato: actualizar el número antes de que llegue la respuesta
-        if (qtyEl) qtyEl.textContent = newQty;
-
-        fetch(ajaxUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-            body: body.toString(),
-        }).then((r) => r.json()).then((response) => {
-            // El PHP devuelve los datos del drawer actualizados; usarlos para re-renderizar
-            if (response && response.success && response.data) {
-                const itemsContainer = document.querySelector('#ltms-cart-drawer-items');
-                if (itemsContainer) {
-                    if (response.data.items && response.data.items.length > 0) {
-                        renderCartItems(itemsContainer, response.data);
-                    } else {
-                        renderCartEmpty(itemsContainer);
-                    }
-                }
-                // Actualizar badge de contador
-                updateCartCount(response.data.count || 0);
-            } else {
-                // Fallback: recargar todo el carrito
-                loadCartContents();
-            }
-            announce('Carrito actualizado');
-        }).catch(() => {
-            // Fallback: recargar todo el carrito
-            loadCartContents();
-        });
+        // Código legacy (NO se ejecuta, pero se mantiene para referencia):
+        // const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)...
+        // fetch(ajaxUrl, {...})...
     }
 
     function removeCartItem(key) {
-        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)
-            || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
-            || '/wp-admin/admin-ajax.php';
+        // v2.9.56: NO-OP — El manejo del carrito ahora lo hace el script inline.
+        return;
 
-        // v2.9.52: Usar ltms_drawer_remove_item (soporta guests).
-        const body = new URLSearchParams();
-        body.append('action', 'ltms_drawer_remove_item');
-        body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
-        body.append('cart_item_key', key);
-
-        // Feedback visual inmediato: ocultar el item antes de que llegue la respuesta
-        const itemEl = document.querySelector(`[data-cart-item-key="${key}"]`);
-        if (itemEl) {
-            itemEl.style.opacity = '0.5';
-            itemEl.style.pointerEvents = 'none';
-        }
-
-        fetch(ajaxUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-            body: body.toString(),
-        }).then((r) => r.json()).then((response) => {
-            // El PHP devuelve los datos del drawer actualizados; usarlos para re-renderizar
-            if (response && response.success && response.data) {
-                const itemsContainer = document.querySelector('#ltms-cart-drawer-items');
-                if (itemsContainer) {
-                    if (response.data.items && response.data.items.length > 0) {
-                        renderCartItems(itemsContainer, response.data);
-                    } else {
-                        renderCartEmpty(itemsContainer);
-                    }
-                }
-                updateCartCount(response.data.count || 0);
-            } else {
-                loadCartContents();
-            }
-            announce('Producto eliminado del carrito');
-        }).catch(() => {
-            // Restaurar el item si falló
-            if (itemEl) {
-                itemEl.style.opacity = '';
-                itemEl.style.pointerEvents = '';
-            }
-            loadCartContents();
-        });
+        // Código legacy (NO se ejecuta):
+        // const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)...
+        // fetch(ajaxUrl, {...})...
     }
 
     /**
