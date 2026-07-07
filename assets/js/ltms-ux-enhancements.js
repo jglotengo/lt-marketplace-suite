@@ -5925,10 +5925,13 @@
      */
 
     function initCookieConsent() {
+        // Verificar SIEMPRE la cookie ltms_cookie_consent (la leen PHP y JS).
+        var cookieMatch = document.cookie.match(/(?:^|;\s*)ltms_cookie_consent=([^;]+)/);
+        if (cookieMatch) return; // ya aceptó/rechazó
         try {
             const consent = localStorage.getItem('ltms-cookie-consent');
-            if (consent) return;
-        } catch (e) { return; }
+            if (consent) return; // compatibilidad con versiones anteriores
+        } catch (e) {}
 
         // No mostrar en admin o login
         if (document.querySelector('.ltms-auth-container')) return;
@@ -5960,8 +5963,23 @@
                 try {
                     localStorage.setItem('ltms-cookie-consent', JSON.stringify({ ...prefs, date: Date.now() }));
                 } catch (e) {}
+                // Setear cookie para que el servidor (PHP) lea el consentimiento.
+                var cookieValue = (prefs.analytics && prefs.marketing) ? 'full' : 'essential';
+                var secureFlag = location.protocol === 'https:' ? '; Secure' : '';
+                document.cookie = 'ltms_cookie_consent=' + cookieValue + '; max-age=31536000; path=/; SameSite=Lax' + secureFlag;
                 banner.classList.remove('visible');
                 setTimeout(() => banner.remove(), 400);
+
+                // Disparar eventos de consentimiento (GTM, fbq, gtag).
+                window.dataLayer = window.dataLayer || [];
+                dataLayer.push({ event: 'cookie_consent_update', consent: cookieValue });
+                if (typeof fbq !== 'undefined') {
+                    fbq('consent', cookieValue === 'full' ? 'grant' : 'revoke');
+                }
+                if (typeof gtag !== 'undefined') {
+                    var g = cookieValue === 'full' ? 'granted' : 'denied';
+                    gtag('consent', 'update', { ad_storage: g, analytics_storage: g, ad_user_data: g, ad_personalization: g });
+                }
 
                 // Disparar evento para que otros scripts reaccionen
                 document.dispatchEvent(new CustomEvent('ltms:cookie-consent', { detail: prefs }));

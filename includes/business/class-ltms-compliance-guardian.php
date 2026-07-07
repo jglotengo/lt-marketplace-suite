@@ -35,8 +35,11 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class LTMS_Compliance_Guardian {
 
     public static function init(): void {
-        // M5b: Cookie consent banner (antes que cualquier script).
-        add_action( 'wp_head', [ __CLASS__, 'render_cookie_banner' ], 1 );
+        // M5b: Cookie consent banner — DESACTIVADO en PHP.
+        // El banner JS (ltms-ux-enhancements.js initCookieConsent) es el único banner.
+        // El JS setea la cookie ltms_cookie_consent para que el servidor lea el consentimiento.
+        // Esto evita conflictos de doble banner y problemas de HTML escapado por caché/optimizer.
+        // add_action( 'wp_head', [ __CLASS__, 'render_cookie_banner' ], 1 );
 
         // M9: Consent Mode v2 — debe ir antes que gtag/fbq.
         add_action( 'wp_head', [ __CLASS__, 'inject_consent_mode_v2' ], 2 );
