@@ -233,7 +233,8 @@ class LTMS_Vendor_Settings_Saver {
                 'name'              => get_user_meta( $vendor_id, 'ltms_store_name',        true ),
                 'phone'             => $phone,
                 'description'       => get_user_meta( $vendor_id, 'ltms_store_description', true ),
-                'bank_info'            => get_user_meta( $vendor_id, 'ltms_bank_info',             true ),
+                // v2.9.68 P2-10: Removido ltms_bank_info (dead field) — los datos bancarios
+                // completos están en bank_name, bank_account_number, bank_account_type, etc.
                 // Campos bancarios completos para retiros
                 'bank_name'            => get_user_meta( $vendor_id, 'ltms_bank_name',            true ),
                 // HI-6: masked bank account number — never plaintext to the client.

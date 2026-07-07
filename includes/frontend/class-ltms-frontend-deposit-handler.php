@@ -67,6 +67,16 @@ final class LTMS_Frontend_Deposit_Handler {
             wp_send_json_error( __( 'El monto debe ser mayor a cero.', 'ltms' ) );
         }
 
+        // v2.9.68 DEEP-AUDIT-002 P2-15: Validar monto máximo configurable.
+        $max_deposit = (float) LTMS_Core_Config::get( 'ltms_max_deposit_amount', 100000000 );
+        if ( $amount > $max_deposit ) {
+            wp_send_json_error( sprintf(
+                /* translators: %s: monto máximo */
+                __( 'El monto excede el máximo permitido (%s).', 'ltms' ),
+                LTMS_Utils::format_money( $max_deposit )
+            ) );
+        }
+
         if ( empty( $method ) ) {
             wp_send_json_error( __( 'Selecciona un método de pago.', 'ltms' ) );
         }

@@ -590,6 +590,24 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( __( 'La certificación bancaria es obligatoria: nombre del representante legal, entidad bancaria, número de cuenta y archivo del certificado.', 'ltms' ) );
         }
 
+        // v2.9.68 DEEP-AUDIT-002 P1-12: Flag mismatch entre rep_legal_name y nombre del vendor.
+        // No bloquear el submit, pero registrar como 'notes' para que el admin lo revise.
+        $vendor_user = get_userdata( $vendor_id );
+        $vendor_full_name = trim( ( $vendor_user->first_name ?? '' ) . ' ' . ( $vendor_user->last_name ?? '' ) );
+        $name_mismatch_note = '';
+        if ( ! empty( $vendor_full_name ) && ! empty( $bank_rep_legal_name ) ) {
+            // Comparación case-insensitive, ignorando acentos.
+            $name1 = strtolower( $this->remove_accents( $vendor_full_name ) );
+            $name2 = strtolower( $this->remove_accents( $bank_rep_legal_name ) );
+            if ( $name1 !== $name2 && strpos( $name1, $name2 ) === false && strpos( $name2, $name1 ) === false ) {
+                $name_mismatch_note = sprintf(
+                    __( 'ATENCIÓN: El nombre del representante legal (%s) no coincide con el nombre registrado del vendedor (%s). Verificar identidad.', 'ltms' ),
+                    $bank_rep_legal_name,
+                    $vendor_full_name
+                );
+            }
+        }
+
         // Block re-submission if already approved or pending
         $existing = $wpdb->get_row( $wpdb->prepare(
             "SELECT id, status FROM `{$table}` WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
@@ -604,6 +622,8 @@ final class LTMS_Dashboard_Logic {
         }
 
         // Insert KYC record
+        // v2.9.68 P1-12: Incluir notes con mismatch flag si existe.
+        $kyc_notes = $name_mismatch_note ?: '';
         $inserted = $wpdb->insert( $table, [
             'vendor_id'       => $vendor_id,
             'document_type'   => $document_type,
@@ -613,7 +633,8 @@ final class LTMS_Dashboard_Logic {
             'status'          => 'pending',
             'submitted_at'    => current_time( 'mysql' ),
             'country_code'    => defined( 'LTMS_COUNTRY' ) ? LTMS_COUNTRY : 'CO',
-        ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ] );
+            'notes'           => $kyc_notes,
+        ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ] );
 
         if ( false === $inserted ) {
             wp_send_json_error( __( 'Error al guardar la solicitud. Intenta de nuevo.', 'ltms' ) );
@@ -2119,5 +2140,21 @@ final class LTMS_Dashboard_Logic {
         ], [ '%d', '%d', '%d', '%s', '%s', '%s', '%s' ] );
 
         wp_send_json_success( [ 'message' => __( 'Solicitud de devolución enviada. Te contactaremos pronto.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.68 DEEP-AUDIT-002 P1-12: Remueve acentos de un string para comparación.
+     */
+    private function remove_accents( string $str ): string {
+        if ( function_exists( 'remove_accents' ) ) {
+            return remove_accents( $str );
+        }
+        // Fallback si la función de WP no está disponible (ej: en tests).
+        $map = [
+            'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n',
+            'Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ñ'=>'N',
+            'ü'=>'u','Ü'=>'U',
+        ];
+        return strtr( $str, $map );
     }
 }

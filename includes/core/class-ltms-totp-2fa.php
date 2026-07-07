@@ -78,6 +78,8 @@ class LTMS_TOTP_2FA {
         add_action( 'wp_ajax_ltms_setup_2fa', [ __CLASS__, 'ajax_setup_2fa' ] );
         add_action( 'wp_ajax_ltms_confirm_2fa', [ __CLASS__, 'ajax_confirm_2fa' ] );
         add_action( 'wp_ajax_ltms_disable_2fa', [ __CLASS__, 'ajax_disable_2fa' ] );
+        // v2.9.68 P2-18: Admin force-disable 2FA (lost phone recovery).
+        add_action( 'wp_ajax_ltms_admin_reset_2fa', [ __CLASS__, 'ajax_admin_reset_2fa' ] );
 
         // Página intermedia de verificación 2FA.
         add_action( 'login_form_ltms_2fa', [ __CLASS__, 'render_2fa_challenge_page' ] );
@@ -596,6 +598,50 @@ class LTMS_TOTP_2FA {
         }
 
         wp_send_json_success( [ 'message' => __( '2FA desactivado.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.68 DEEP-AUDIT-002 P2-18: Admin force-disable 2FA (lost phone recovery).
+     * Permite a un admin desactivar el 2FA de un vendor que perdió su teléfono.
+     * Requiere capability manage_options y nonce ltms_admin_nonce.
+     */
+    public static function ajax_admin_reset_2fa(): void {
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 );
+        }
+
+        $user_id = absint( $_POST['user_id'] ?? 0 ); // phpcs:ignore
+        if ( ! $user_id ) {
+            wp_send_json_error( [ 'message' => __( 'Usuario inválido.', 'ltms' ) ], 400 );
+        }
+
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            wp_send_json_error( [ 'message' => __( 'Usuario no encontrado.', 'ltms' ) ], 404 );
+        }
+
+        // Eliminar todos los metas de 2FA.
+        delete_user_meta( $user_id, '_ltms_2fa_secret' );
+        delete_user_meta( $user_id, '_ltms_2fa_enabled' );
+        delete_user_meta( $user_id, '_ltms_2fa_enabled_at' );
+        delete_user_meta( $user_id, '_ltms_2fa_backup_codes' );
+        delete_user_meta( $user_id, '_ltms_2fa_pending_secret' );
+
+        // Log de auditoría.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::warning(
+                '2FA_ADMIN_RESET',
+                sprintf(
+                    'Admin #%d reseteó 2FA del usuario #%d (%s) — lost phone recovery',
+                    get_current_user_id(),
+                    $user_id,
+                    $user->user_login
+                )
+            );
+        }
+
+        wp_send_json_success( [ 'message' => sprintf( __( '2FA desactivado para %s.', 'ltms' ), $user->display_name ) ] );
     }
 
     // ================================================================
