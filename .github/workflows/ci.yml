@@ -180,7 +180,13 @@ jobs:
         run: composer update --no-interaction --prefer-dist --ignore-platform-reqs
 
       - name: Install SVN (requerido por install-wp-tests.sh)
-        run: sudo apt-get update -qq && sudo apt-get install -y subversion
+        run: |
+          # v2.9.67: apt-get update puede fallar por repositorios de terceros
+          # (ej: Microsoft Azure CLI) que están temporalmente rotos en el runner.
+          # Remover los repos problemáticos antes de update.
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/vscode.list 2>/dev/null || true
+          sudo apt-get update -qq || true
+          sudo apt-get install -y subversion
 
       - name: Cache WordPress test suite
         uses: actions/cache@v4
