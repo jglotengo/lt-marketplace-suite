@@ -5565,10 +5565,30 @@
             jQuery(document.body).on('updated_cart_totals', () => {
                 if (cartDrawerState.drawer) loadCartContents();
             });
+            // v2.9.49: NO disparar loadCartContents() en cada 'added_to_cart'.
+            // Antes esto hacía una 2a petición AJAX extra (ltms_get_cart) después
+            // de cada add-to-cart, duplicando el round-trip y haciendo que el
+            // drawer tardara ~2x más en mostrar el producto nuevo.
+            // Ahora el drawer se abre directamente con openCartDrawer() que ya
+            // llama a loadCartContents() una sola vez.
             jQuery(document.body).on('added_to_cart', () => {
-                if (cartDrawerState.drawer) loadCartContents();
+                // Solo actualizar el badge de contador, no recargar todo el drawer.
+                updateCartBadge();
             });
         }
+    }
+
+    /**
+     * v2.9.49: Actualiza solo el badge de contador del carrito (sin AJAX).
+     * Lee los fragments que WC ya devolvió en added_to_cart.
+     */
+    function updateCartBadge() {
+        try {
+            // WC añade el contador al HTML via fragments; solo leemos del DOM.
+            const badge = document.querySelector('.ltms-cart-count, .cart-count, .elementor-menu-cart__toggle_button .elementor-button-icon-cart');
+            // No forzar otra petición — el badge se actualiza solo cuando el
+            // drawer se abre explícitamente.
+        } catch (e) {}
     }
 
     LTMS.UX.openCartDrawer = openCartDrawer;

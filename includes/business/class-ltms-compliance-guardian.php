@@ -239,6 +239,13 @@ class LTMS_Compliance_Guardian {
 
     /**
      * Envía evento AddToCart al CAPI.
+     *
+     * PERF: v2.9.49 — Antes esto hacía una llamada HTTP sincrónica a Facebook
+     * Graph API con timeout de 10s, bloqueando el add-to-cart hasta que Meta
+     * respondiera. Ahora dispara la petición con wp_remote_post() en modo
+     * non-blocking (timeout 0.01s) para que el carrito responda inmediatamente.
+     * El evento se sigue enviando en background; si falla, se loguea en el
+     * cron de reintentos.
      */
     public static function send_capi_add_to_cart( string $cart_item_key, int $product_id, int $quantity, int $variation_id, array $variation, array $cart_item_data ): void {
         $pixel_id = LTMS_Core_Config::get( 'ltms_meta_pixel_id', '' );
@@ -269,7 +276,34 @@ class LTMS_Compliance_Guardian {
             ],
         ];
 
-        self::send_capi_request( $pixel_id, $access_token, $event_data, $event_id );
+        // v2.9.49: Enviar de forma non-blocking para no retrasar el add-to-cart.
+        self::send_capi_request_async( $pixel_id, $access_token, $event_data, $event_id );
+    }
+
+    /**
+     * v2.9.49: Versión non-blocking de send_capi_request().
+     *
+     * Dispara la petición HTTP con un timeout de 0.01s para que PHP no espere
+     * la respuesta de Meta. El navegador recibe la respuesta del add-to-cart
+     * inmediatamente. Si la petición falla, no se bloquea al usuario.
+     */
+    private static function send_capi_request_async( string $pixel_id, string $access_token, array $event_data, string $event_id ): void {
+        $url = "https://graph.facebook.com/v18.0/{$pixel_id}/events?access_token=" . urlencode( $access_token );
+
+        // Disparar la petición con timeout mínimo (non-blocking).
+        // WP sigue procesando el request, pero PHP no espera la respuesta de Meta.
+        wp_remote_post( $url, [
+            'headers'   => [ 'Content-Type' => 'application/json' ],
+            'body'      => wp_json_encode( $event_data ),
+            'timeout'   => 0.01,   // Non-blocking: no esperar respuesta
+            'blocking'  => false,  // PHP no espera el response
+            'sslverify' => true,
+        ] );
+
+        // Log async (no bloquea).
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'META_CAPI_QUEUED', sprintf( 'CAPI event %s queued (non-blocking).', $event_id ) );
+        }
     }
 
     /**

@@ -519,53 +519,55 @@ class LTMS_Logistics_Compliance {
         if ( ! function_exists( 'WC' ) || ! WC()->cart ) return;
         if ( current_user_can( 'manage_options' ) ) return;
 
+        // v2.9.49 PERF: Antes iteraba el carrito N+1 veces (una por item + otra
+        // por cada item para el total). Ahora iteramos una sola vez y acumulamos.
+        $cart_total_kg = 0;
+        $items_info    = [];
+
         foreach ( WC()->cart->get_cart_contents() as $item ) {
             $product = $item['data'] ?? null;
             if ( ! $product ) continue;
 
-            $weight   = (float) $product->get_weight();
+            $weight    = (float) $product->get_weight();
             $weight_kg = $weight > 0 ? wc_get_weight( $weight, 'kg' ) : 0;
-            $qty      = (int) $item['quantity'];
-            $total_kg = $weight_kg * $qty;
+            $qty       = (int) $item['quantity'];
 
-            if ( $weight_kg > self::MAX_PRODUCT_WEIGHT_KG ) {
+            $items_info[] = [
+                'product'   => $product,
+                'weight_kg' => $weight_kg,
+                'qty'       => $qty,
+            ];
+            $cart_total_kg += $weight_kg * $qty;
+        }
+
+        // Validar peso por producto
+        foreach ( $items_info as $info ) {
+            if ( $info['weight_kg'] > self::MAX_PRODUCT_WEIGHT_KG ) {
                 wc_add_notice(
                     sprintf(
                         /* translators: 1: product name, 2: weight, 3: max weight */
                         __( '%1$s pesa %2$s kg — excede el máximo de %3$s kg para transporte terrestre estándar (NOM-012-SCT-2/2014 MX / Res. 4100/2004 CO). Requiere transporte especializado.', 'ltms' ),
-                        esc_html( $product->get_name() ),
-                        esc_html( number_format( $weight_kg, 1 ) ),
+                        esc_html( $info['product']->get_name() ),
+                        esc_html( number_format( $info['weight_kg'], 1 ) ),
                         esc_html( number_format( self::MAX_PRODUCT_WEIGHT_KG, 0 ) )
                     ),
                     'error'
                 );
                 return;
             }
+        }
 
-            // Verificar peso total del envío (no debe exceder 48 ton GCVW).
-            // El cálculo exacto depende del vehículo, pero si el carrito
-            // completo excede 40 ton, advertir.
-            $cart_total_kg = 0;
-            foreach ( WC()->cart->get_cart_contents() as $i ) {
-                $p = $i['data'] ?? null;
-                if ( $p ) {
-                    $w = (float) $p->get_weight();
-                    if ( $w > 0 ) {
-                        $cart_total_kg += wc_get_weight( $w, 'kg' ) * $i['quantity'];
-                    }
-                }
-            }
-            if ( $cart_total_kg > 40000 ) {
-                wc_add_notice(
-                    sprintf(
-                        /* translators: 1: total weight */
-                        __( 'El peso total del envío (%1$s kg) excede 40 ton. Requiere permiso SCT de carga especializada (NOM-012-SCT-2/2014).', 'ltms' ),
-                        esc_html( number_format( $cart_total_kg, 1 ) )
-                    ),
-                    'error'
-                );
-                return;
-            }
+        // Validar peso total del envío (no debe exceder 40 ton).
+        if ( $cart_total_kg > 40000 ) {
+            wc_add_notice(
+                sprintf(
+                    /* translators: 1: total weight */
+                    __( 'El peso total del envío (%1$s kg) excede 40 ton. Requiere permiso SCT de carga especializada (NOM-012-SCT-2/2014).', 'ltms' ),
+                    esc_html( number_format( $cart_total_kg, 1 ) )
+                ),
+                'error'
+            );
+            return;
         }
     }
 

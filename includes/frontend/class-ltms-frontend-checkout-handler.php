@@ -148,7 +148,9 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'wp_ajax_ltms_get_recommendations',        [ __CLASS__, 'ajax_get_recommendations' ] );
         add_action( 'wp_ajax_nopriv_ltms_get_recommendations', [ __CLASS__, 'ajax_get_recommendations' ] );
 
-        // b. Quick view modal data.
+        // b. Quick view modal data (formato estructurado: {id,name,price,...}).
+        // v2.9.49 PERF: Solo este handler responde; el de LTMS_Quick_View se
+        // desactivó para evitar procesamiento doble del AJAX.
         add_action( 'wp_ajax_ltms_quick_view',        [ __CLASS__, 'ajax_quick_view' ] );
         add_action( 'wp_ajax_nopriv_ltms_quick_view', [ __CLASS__, 'ajax_quick_view' ] );
 

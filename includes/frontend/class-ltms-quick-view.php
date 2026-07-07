@@ -14,9 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class LTMS_Quick_View {
 
     public static function init(): void {
-        // AJAX endpoint para cargar contenido del modal.
-        add_action( 'wp_ajax_ltms_quick_view', [ __CLASS__, 'ajax_load_product' ] );
-        add_action( 'wp_ajax_nopriv_ltms_quick_view', [ __CLASS__, 'ajax_load_product' ] );
+        // v2.9.49 PERF: AJAX handler desactivado — estaba duplicado con
+        // LTMS_Frontend_Checkout_Handler::ajax_quick_view() que es el que usa
+        // el JS (formato estructurado {id,name,price,...}, no {html}).
+        // add_action( 'wp_ajax_ltms_quick_view', [ __CLASS__, 'ajax_load_product' ] );
+        // add_action( 'wp_ajax_nopriv_ltms_quick_view', [ __CLASS__, 'ajax_load_product' ] );
 
         // Botón "Quick view" en el loop de productos (woocommerce_after_shop_loop_item).
         add_action( 'woocommerce_after_shop_loop_item', [ __CLASS__, 'render_quick_view_button' ], 15 );

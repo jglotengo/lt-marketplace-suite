@@ -133,42 +133,72 @@ class LTMS_Product_Bundles {
      * Aplica el descuento del bundle en el carrito si todos los productos están.
      */
     public static function apply_bundle_discount( \WC_Cart $cart ): void {
+        // v2.9.49 PERF: Antes esto era O(N²) con consultas SQL por cada item.
+        // Ahora: una sola pasada para obtener IDs del carrito, una sola query
+        // para buscar bundles, y cache de precios de productos.
+
         $applied_bundles = [];
+        $cart_product_ids = [];
+        $cart_items = $cart->get_cart();
 
-        foreach ( $cart->get_cart() as $cart_item ) {
-            $product_id = $cart_item['product_id'] ?? 0;
-            $bundles = self::get_bundles_for_product( $product_id );
-            foreach ( $bundles as $bundle ) {
-                if ( isset( $applied_bundles[ $bundle['id'] ] ) ) continue;
+        // 1. Una sola pasada: recolectar IDs únicos de productos en el carrito.
+        foreach ( $cart_items as $cart_item ) {
+            $pid = (int) ( $cart_item['product_id'] ?? 0 );
+            if ( $pid && ! in_array( $pid, $cart_product_ids, true ) ) {
+                $cart_product_ids[] = $pid;
+            }
+        }
 
-                $child_ids = json_decode( $bundle['child_products'], true );
-                $required_ids = array_merge( [ (int) $bundle['parent_product_id'] ], array_map( 'intval', $child_ids ) );
+        if ( empty( $cart_product_ids ) ) return;
 
-                // Verificar que TODOS los productos del bundle están en el carrito.
-                $cart_product_ids = [];
-                foreach ( $cart->get_cart() as $ci ) {
-                    $cart_product_ids[] = (int) $ci['product_id'];
+        // 2. Una sola query para obtener TODOS los bundles relevantes.
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_product_bundles';
+        $placeholders = implode( ',', array_fill( 0, count( $cart_product_ids ), '%d' ) );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $bundles = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM `{$table}` WHERE parent_product_id IN ($placeholders) AND status = 'active'",
+            $cart_product_ids
+        ), ARRAY_A );
+
+        if ( empty( $bundles ) ) return;
+
+        // 3. Cache de precios: solo cargar cada producto una vez.
+        $price_cache = [];
+
+        foreach ( $bundles as $bundle ) {
+            if ( isset( $applied_bundles[ $bundle['id'] ] ) ) continue;
+
+            $child_ids = json_decode( $bundle['child_products'], true );
+            if ( ! is_array( $child_ids ) ) continue;
+
+            $required_ids = array_merge( [ (int) $bundle['parent_product_id'] ], array_map( 'intval', $child_ids ) );
+
+            // Verificar que TODOS los productos del bundle están en el carrito.
+            $all_present = true;
+            foreach ( $required_ids as $rid ) {
+                if ( ! in_array( $rid, $cart_product_ids, true ) ) {
+                    $all_present = false;
+                    break;
                 }
-                $all_present = true;
-                foreach ( $required_ids as $rid ) {
-                    if ( ! in_array( $rid, $cart_product_ids, true ) ) {
-                        $all_present = false;
-                        break;
-                    }
-                }
+            }
 
-                if ( $all_present ) {
-                    $total = 0;
-                    foreach ( $required_ids as $rid ) {
-                        $p = wc_get_product( $rid );
-                        if ( $p ) $total += (float) $p->get_price();
-                    }
-                    $discount = round( $total * ( (float) $bundle['discount_pct'] / 100 ), 2 );
-                    if ( $discount > 0 ) {
-                        $cart->add_fee( sprintf( __( 'Descuento bundle: %s', 'ltms' ), $bundle['title'] ), -$discount, true );
-                        $applied_bundles[ $bundle['id'] ] = true;
-                    }
+            if ( ! $all_present ) continue;
+
+            // Sumar precios (con cache).
+            $total = 0;
+            foreach ( $required_ids as $rid ) {
+                if ( ! isset( $price_cache[ $rid ] ) ) {
+                    $p = wc_get_product( $rid );
+                    $price_cache[ $rid ] = $p ? (float) $p->get_price() : 0;
                 }
+                $total += $price_cache[ $rid ];
+            }
+
+            $discount = round( $total * ( (float) $bundle['discount_pct'] / 100 ), 2 );
+            if ( $discount > 0 ) {
+                $cart->add_fee( sprintf( __( 'Descuento bundle: %s', 'ltms' ), $bundle['title'] ), -$discount, true );
+                $applied_bundles[ $bundle['id'] ] = true;
             }
         }
     }

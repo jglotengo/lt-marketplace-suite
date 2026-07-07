@@ -95,12 +95,16 @@ class LTMS_Cart_Drawer {
 
     /**
      * AJAX: refresca todo el contenido del drawer.
+     *
+     * PERF v2.9.49: skip_heavy_data por defecto. El frontend puede pasar
+     * ?full=1 para obtener upsells y badges.
      */
     public static function ajax_refresh_drawer(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
-        wp_send_json_success( self::get_drawer_data() );
+        $full = isset( $_POST['full'] ) && $_POST['full'] === '1';
+        wp_send_json_success( self::get_drawer_data( ! $full ) );
     }
 
     /**
@@ -112,37 +116,51 @@ class LTMS_Cart_Drawer {
         if ( $cart_item_key && WC()->cart ) {
             WC()->cart->remove_cart_item( $cart_item_key );
         }
-        wp_send_json_success( self::get_drawer_data() );
+        wp_send_json_success( self::get_drawer_data( true ) );
     }
 
     /**
      * AJAX: actualiza cantidad.
      */
     public static function ajax_update_qty(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         $qty = (int) ( $_POST['qty'] ?? 1 );
         if ( $cart_item_key && WC()->cart ) {
             WC()->cart->set_quantity( $cart_item_key, max( 1, $qty ), true );
         }
-        wp_send_json_success( self::get_drawer_data() );
+        wp_send_json_success( self::get_drawer_data( true ) );
     }
 
     /**
      * Construye todos los datos del drawer para AJAX.
+     *
+     * PERF v2.9.49: $skip_heavy_data = true omite los upsells (WP_Query costosa)
+     * y los badges de pago. Usar en el flujo de add-to-cart para respuesta rápida.
+     * El drawer completo se carga después con $skip_heavy_data = false si el
+     * usuario lo solicita explícitamente.
      */
-    private static function get_drawer_data(): array {
+    private static function get_drawer_data( bool $skip_heavy_data = false ): array {
         $cart = WC()->cart;
         if ( ! $cart ) return [ 'items_html' => '', 'count' => 0, 'subtotal' => '0' ];
 
         $items = [];
         $vendor_ids = [];
+
+        // v2.9.49: Cache de vendor names para evitar get_userdata() por item.
+        $vendor_name_cache = [];
+
         foreach ( $cart->get_cart() as $key => $item ) {
             $product = $item['data'];
             $vendor_id = (int) get_post_field( 'post_author', $item['product_id'] );
             $vendor_ids[ $vendor_id ] = true;
+
+            // Cache de vendor name
+            if ( ! isset( $vendor_name_cache[ $vendor_id ] ) ) {
+                $vendor_name_cache[ $vendor_id ] = self::get_vendor_name( $vendor_id );
+            }
 
             $items[] = [
                 'key' => $key,
@@ -152,15 +170,16 @@ class LTMS_Cart_Drawer {
                 'qty' => $item['quantity'],
                 'permalink' => $product->get_permalink(),
                 'subtotal' => wc_price( $item['line_subtotal'] ),
-                'vendor_name' => self::get_vendor_name( $vendor_id ),
+                'vendor_name' => $vendor_name_cache[ $vendor_id ],
             ];
         }
 
-        // Free shipping bar data.
+        // Free shipping bar data (liviana, siempre se calcula).
         $shipping_bar = self::get_shipping_bar_data( $cart );
 
-        // Upsells: productos del mismo vendor que NO están en el carrito.
-        $upsells = self::get_upsell_products( array_keys( $vendor_ids ), $cart );
+        // v2.9.49: Skip upsells si es un refresco rápido (add-to-cart).
+        // Los upsells hacen 1 WP_Query por vendor (hasta 3) — muy costoso.
+        $upsells = $skip_heavy_data ? [] : self::get_upsell_products( array_keys( $vendor_ids ), $cart );
 
         return [
             'count' => $cart->get_cart_contents_count(),
@@ -170,7 +189,7 @@ class LTMS_Cart_Drawer {
             'upsells' => $upsells,
             'cart_url' => wc_get_cart_url(),
             'checkout_url' => wc_get_checkout_url(),
-            'payment_badges' => self::get_payment_badges(),
+            'payment_badges' => $skip_heavy_data ? [] : self::get_payment_badges(),
             'checkout_note' => self::get_checkout_note(),
             'tnc_required' => self::is_tnc_required(),
             'tnc_url' => LTMS_Core_Config::get( 'ltms_terms_url', '' ),
