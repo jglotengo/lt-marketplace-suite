@@ -1928,28 +1928,54 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ], 400 );
         }
 
-        // v2.9.61 FIX: Evitar duplicados — no agregar si ya existe la suscripción.
-        $subscriptions = get_option( 'ltms_backorder_subscriptions', [] );
-        if ( ! is_array( $subscriptions ) ) $subscriptions = [];
+        // v2.9.69 DEEP-AUDIT-002 P2-24: Usar custom table en vez de wp_options.
+        // UNIQUE KEY (product_id, email) previene duplicados a nivel de DB.
+        $table = $wpdb->prefix . 'lt_backorder_subscriptions';
+        $user_id = get_current_user_id();
 
-        // Verificar si ya existe.
-        foreach ( $subscriptions as $sub ) {
-            if ( $sub['product_id'] === $product_id && $sub['email'] === $email ) {
+        // Verificar si la tabla existe (puede no estar migrada aún).
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table ) {
+            // Usar custom table.
+            $exists = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM `{$table}` WHERE product_id = %d AND email = %s LIMIT 1",
+                $product_id,
+                $email
+            ) );
+            if ( $exists ) {
                 wp_send_json_success( [ 'message' => __( 'Ya estás suscrito a este producto.', 'ltms' ) ] );
             }
-        }
 
-        // Limitar el array a 1000 entradas para no inflar wp_options.
-        if ( count( $subscriptions ) > 1000 ) {
-            $subscriptions = array_slice( $subscriptions, -1000 );
+            $wpdb->insert(
+                $table,
+                [
+                    'product_id' => $product_id,
+                    'email'      => $email,
+                    'user_id'    => $user_id,
+                    'ip_address' => $ip,
+                    'created_at' => current_time( 'mysql', true ),
+                    'status'     => 'pending',
+                ],
+                [ '%d', '%s', '%d', '%s', '%s', '%s' ]
+            );
+        } else {
+            // Fallback: wp_options (backward compatibility).
+            $subscriptions = get_option( 'ltms_backorder_subscriptions', [] );
+            if ( ! is_array( $subscriptions ) ) $subscriptions = [];
+            foreach ( $subscriptions as $sub ) {
+                if ( $sub['product_id'] === $product_id && $sub['email'] === $email ) {
+                    wp_send_json_success( [ 'message' => __( 'Ya estás suscrito a este producto.', 'ltms' ) ] );
+                }
+            }
+            if ( count( $subscriptions ) > 1000 ) {
+                $subscriptions = array_slice( $subscriptions, -1000 );
+            }
+            $subscriptions[] = [
+                'product_id' => $product_id,
+                'email'      => $email,
+                'created_at' => current_time( 'mysql', true ),
+            ];
+            update_option( 'ltms_backorder_subscriptions', $subscriptions );
         }
-
-        $subscriptions[] = [
-            'product_id' => $product_id,
-            'email'      => $email,
-            'created_at' => current_time( 'mysql', true ),
-        ];
-        update_option( 'ltms_backorder_subscriptions', $subscriptions );
 
         wp_send_json_success( [ 'message' => __( 'Te notificaremos cuando el producto vuelva a estar disponible.', 'ltms' ) ] );
     }
@@ -1984,32 +2010,54 @@ final class LTMS_Dashboard_Logic {
      */
     public function ajax_review_helpful(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
+        global $wpdb;
 
         $review_id = absint( $_POST['review_id'] ?? 0 );
         if ( ! $review_id ) {
             wp_send_json_error( [ 'message' => __( 'Reseña inválida.', 'ltms' ) ], 400 );
         }
 
-        // v2.9.61 DEEP-AUDIT-002 P1 FIX: Prevenir vote inflation.
-        // Usar cookie + IP para deduplicar votos del mismo usuario.
         $ip = LTMS_Utils::get_ip();
-        $voter_key = 'ltms_voted_' . md5( $ip . '_' . $review_id );
+        $user_id = get_current_user_id();
 
-        // Si ya votó (cookie o transient), no incrementar.
-        if ( isset( $_COOKIE[ 'ltms_voted_' . $review_id ] ) || get_transient( $voter_key ) ) {
+        // v2.9.69 DEEP-AUDIT-002 P2-25: Usar custom table para dedup atómica.
+        $votes_table = $wpdb->prefix . 'lt_review_votes';
+
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$votes_table}'" ) === $votes_table ) {
+            // Usar custom table con UNIQUE KEY (comment_id, ip_address).
+            // INSERT ignorará si ya existe (dedup atómica a nivel de DB).
+            $inserted = $wpdb->query( $wpdb->prepare(
+                "INSERT IGNORE INTO `{$votes_table}` (comment_id, user_id, ip_address, vote_type, created_at)
+                 VALUES (%d, %d, %s, 'helpful', %s)",
+                $review_id,
+                $user_id,
+                $ip,
+                current_time( 'mysql', true )
+            ) );
+
+            if ( ! $inserted ) {
+                // Ya votó — no incrementar.
+                $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
+                wp_send_json_success( [ 'count' => $helpful_count, 'already_voted' => true ] );
+            }
+
+            // Incrementar contador en comment_meta.
             $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
-            wp_send_json_success( [ 'count' => $helpful_count, 'already_voted' => true ] );
+            $helpful_count++;
+            update_comment_meta( $review_id, 'ltms_helpful_count', $helpful_count );
+        } else {
+            // Fallback: cookie + transient (backward compatibility).
+            $voter_key = 'ltms_voted_' . md5( $ip . '_' . $review_id );
+            if ( isset( $_COOKIE[ 'ltms_voted_' . $review_id ] ) || get_transient( $voter_key ) ) {
+                $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
+                wp_send_json_success( [ 'count' => $helpful_count, 'already_voted' => true ] );
+            }
+            set_transient( $voter_key, 1, 30 * DAY_IN_SECONDS );
+            $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
+            $helpful_count++;
+            update_comment_meta( $review_id, 'ltms_helpful_count', $helpful_count );
+            setcookie( 'ltms_voted_' . $review_id, '1', time() + 30 * DAY_IN_SECONDS, '/' );
         }
-
-        // Marcar como votado (transient 30 días + cookie 30 días).
-        set_transient( $voter_key, 1, 30 * DAY_IN_SECONDS );
-
-        $helpful_count = (int) get_comment_meta( $review_id, 'ltms_helpful_count', true );
-        $helpful_count++;
-        update_comment_meta( $review_id, 'ltms_helpful_count', $helpful_count );
-
-        // Set cookie para doble deduplicación.
-        setcookie( 'ltms_voted_' . $review_id, '1', time() + 30 * DAY_IN_SECONDS, '/' );
 
         wp_send_json_success( [ 'count' => $helpful_count ] );
     }

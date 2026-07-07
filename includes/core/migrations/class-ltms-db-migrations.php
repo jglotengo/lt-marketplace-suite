@@ -1441,6 +1441,34 @@ final class LTMS_DB_Migrations {
             KEY `country_active` (`country`, `is_active`)
         ) {$charset}";
 
+        // v2.9.69 DEEP-AUDIT-002 P2-24: Backorder subscriptions custom table.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_backorder_subscriptions` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `product_id` BIGINT UNSIGNED NOT NULL,
+            `email`      VARCHAR(255) NOT NULL,
+            `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `ip_address` VARCHAR(45) NOT NULL DEFAULT '',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `notified_at` DATETIME NULL DEFAULT NULL,
+            `status`     VARCHAR(20) NOT NULL DEFAULT 'pending',
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_product_email` (`product_id`, `email`),
+            KEY `idx_product_pending` (`product_id`, `status`)
+        ) {$charset}";
+
+        // v2.9.69 DEEP-AUDIT-002 P2-25: Review helpful votes custom table.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_review_votes` (
+            `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `comment_id` BIGINT UNSIGNED NOT NULL,
+            `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `ip_address` VARCHAR(45) NOT NULL DEFAULT '',
+            `vote_type`  VARCHAR(10) NOT NULL DEFAULT 'helpful',
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_comment_ip` (`comment_id`, `ip_address`),
+            KEY `idx_comment_id` (`comment_id`)
+        ) {$charset}";
+
     }
 
     /**
