@@ -21,6 +21,10 @@ class LTMS_Cart_Drawer {
         // Render drawer HTML en el footer de todas las páginas.
         add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ] );
 
+        // v2.9.54: Script inline con prioridad alta para que se renderice
+        // ANTES de que SiteGround SuperCacher cachee el HTML.
+        add_action( 'wp_footer', [ __CLASS__, 'render_cart_buttons_script' ], 1 );
+
         // AJAX: obtener contenido del drawer (refresh).
         add_action( 'wp_ajax_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
         add_action( 'wp_ajax_nopriv_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
@@ -91,12 +95,9 @@ class LTMS_Cart_Drawer {
             <div id="ltms-drawer-footer" style="padding:16px 20px;border-top:1px solid #e5e7eb;background:#fff;"></div>
         </div>
         <?php
-        // v2.9.53: Inline script para event delegation de botones del carrito.
-        // Este script se incrusta directamente en el HTML del footer y NO se
-        // puede cachear como un archivo JS externo. Garantiza que los botones
-        // +/- y eliminar funcionen incluso si el ltms-ux-enhancements.min.js
-        // está cacheado en versión vieja.
-        self::render_cart_buttons_script();
+        // v2.9.54: El script inline ahora se registra con add_action('wp_footer', 1)
+        // para que se renderice con prioridad alta. No se llama aquí para evitar
+        // doble renderizado.
     }
 
     /**
@@ -108,6 +109,7 @@ class LTMS_Cart_Drawer {
         $ajax_url = admin_url( 'admin-ajax.php' );
         $nonce = wp_create_nonce( 'ltms_ux_nonce' );
         ?>
+        <!-- LTMS-CART-SCRIPT-v2.9.54 START -->
         <script>
         (function() {
             'use strict';
@@ -289,6 +291,7 @@ class LTMS_Cart_Drawer {
             }
         })();
         </script>
+        <!-- LTMS-CART-SCRIPT-v2.9.54 END -->
         <?php
     }
 
