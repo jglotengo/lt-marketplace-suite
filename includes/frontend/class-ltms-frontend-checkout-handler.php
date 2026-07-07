@@ -302,9 +302,26 @@ final class LTMS_Frontend_Checkout_Handler {
             ];
         }
 
+        // v2.9.51: Decodificar entidades HTML (&#36; → $, &nbsp; → espacio) del total
+        // para que el JS pueda usar textContent de forma segura sin depender de innerHTML.
+        // Esto evita el bug del doble-escape cuando el valor pasa por wp_json_encode.
+        $total_formatted = wp_strip_all_tags( $cart->get_cart_total() );
+        $total_formatted = html_entity_decode( $total_formatted, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+        // También decodificar los precios de los items.
+        foreach ( $items as &$item_ref ) {
+            if ( ! empty( $item_ref['price_formatted'] ) ) {
+                $item_ref['price_formatted'] = html_entity_decode( $item_ref['price_formatted'], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+            }
+            if ( ! empty( $item_ref['single_price_formatted'] ) ) {
+                $item_ref['single_price_formatted'] = html_entity_decode( $item_ref['single_price_formatted'], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+            }
+        }
+        unset( $item_ref );
+
         wp_send_json_success( [
             'items'           => $items,
-            'total_formatted' => wp_strip_all_tags( $cart->get_cart_total() ),
+            'total_formatted' => $total_formatted,
             'count'           => $cart->get_cart_contents_count(),
             'cart_url'        => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
             'checkout_url'    => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '',
