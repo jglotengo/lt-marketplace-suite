@@ -5485,8 +5485,9 @@
     }
 
     function updateCartQty(key, change) {
-        // v2.9.36: usar ltms_get_cart para refrescar después de actualizar.
-        // Primero obtener la cantidad actual, luego actualizar via WC.
+        // v2.9.52: Usar SIEMPRE el endpoint de LTMS (ltms_drawer_update_qty).
+        // Antes intentaba usar woocommerce_set_cart_quantity que NO EXISTE en WC core,
+        // causando que los botones +/- no funcionaran.
         const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)
             || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
             || '/wp-admin/admin-ajax.php';
@@ -5496,38 +5497,42 @@
         const currentQty = qtyEl ? parseInt(qtyEl.textContent) : 1;
         const newQty = Math.max(1, currentQty + change);
 
-        // Usar WooCommerce's built-in cart update via fragments
-        if (typeof jQuery !== 'undefined' && typeof wc_add_to_cart_params !== 'undefined') {
-            jQuery.post(ajaxUrl, {
-                action: 'woocommerce_set_cart_quantity',
-                cart_key: key,
-                cart_quantity: newQty,
-            }, () => {
+        const body = new URLSearchParams();
+        body.append('action', 'ltms_drawer_update_qty');
+        body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
+        body.append('cart_item_key', key);
+        body.append('qty', newQty);
+
+        // Feedback visual inmediato: actualizar el número antes de que llegue la respuesta
+        if (qtyEl) qtyEl.textContent = newQty;
+
+        fetch(ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+        }).then((r) => r.json()).then((response) => {
+            // El PHP devuelve los datos del drawer actualizados; usarlos para re-renderizar
+            if (response && response.success && response.data) {
+                const itemsContainer = document.querySelector('#ltms-cart-drawer-items');
+                if (itemsContainer) {
+                    if (response.data.items && response.data.items.length > 0) {
+                        renderCartItems(itemsContainer, response.data);
+                    } else {
+                        renderCartEmpty(itemsContainer);
+                    }
+                }
+                // Actualizar badge de contador
+                updateCartCount(response.data.count || 0);
+            } else {
+                // Fallback: recargar todo el carrito
                 loadCartContents();
-                announce('Carrito actualizado');
-            }).fail(() => {
-                // Fallback: recargar datos del carrito
-                loadCartContents();
-            });
-        } else {
-            // Sin jQuery, usar fetch
-            const body = new URLSearchParams();
-            body.append('action', 'ltms_drawer_update_qty');
-            body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
-            body.append('cart_item_key', key);
-            body.append('qty', newQty);
-            fetch(ajaxUrl, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                body: body.toString(),
-            }).then(() => {
-                loadCartContents();
-                announce('Carrito actualizado');
-            }).catch(() => {
-                loadCartContents();
-            });
-        }
+            }
+            announce('Carrito actualizado');
+        }).catch(() => {
+            // Fallback: recargar todo el carrito
+            loadCartContents();
+        });
     }
 
     function removeCartItem(key) {
@@ -5535,22 +5540,56 @@
             || (typeof wc_cart_fragments_params !== 'undefined' && wc_cart_fragments_params.ajax_url)
             || '/wp-admin/admin-ajax.php';
 
-        // v2.9.36: usar ltms_drawer_remove_item (soporta guests) en vez de
-        // woocommerce_remove_cart_item (requiere nonce de WC que puede no estar).
+        // v2.9.52: Usar ltms_drawer_remove_item (soporta guests).
         const body = new URLSearchParams();
         body.append('action', 'ltms_drawer_remove_item');
         body.append('nonce', (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '');
         body.append('cart_item_key', key);
+
+        // Feedback visual inmediato: ocultar el item antes de que llegue la respuesta
+        const itemEl = document.querySelector(`[data-cart-item-key="${key}"]`);
+        if (itemEl) {
+            itemEl.style.opacity = '0.5';
+            itemEl.style.pointerEvents = 'none';
+        }
+
         fetch(ajaxUrl, {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
             body: body.toString(),
-        }).then(() => {
-            loadCartContents();
+        }).then((r) => r.json()).then((response) => {
+            // El PHP devuelve los datos del drawer actualizados; usarlos para re-renderizar
+            if (response && response.success && response.data) {
+                const itemsContainer = document.querySelector('#ltms-cart-drawer-items');
+                if (itemsContainer) {
+                    if (response.data.items && response.data.items.length > 0) {
+                        renderCartItems(itemsContainer, response.data);
+                    } else {
+                        renderCartEmpty(itemsContainer);
+                    }
+                }
+                updateCartCount(response.data.count || 0);
+            } else {
+                loadCartContents();
+            }
             announce('Producto eliminado del carrito');
         }).catch(() => {
+            // Restaurar el item si falló
+            if (itemEl) {
+                itemEl.style.opacity = '';
+                itemEl.style.pointerEvents = '';
+            }
             loadCartContents();
+        });
+    }
+
+    /**
+     * v2.9.52: Actualiza el badge de contador del carrito en el header.
+     */
+    function updateCartCount(count) {
+        document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach((el) => {
+            el.textContent = count;
         });
     }
 

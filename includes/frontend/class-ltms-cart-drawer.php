@@ -98,20 +98,23 @@ class LTMS_Cart_Drawer {
      *
      * PERF v2.9.49: skip_heavy_data por defecto. El frontend puede pasar
      * ?full=1 para obtener upsells y badges.
+     *
+     * v2.9.52: Guests permitidos (carrito funciona sin login).
+     * Nonce: ltms_ux_nonce (el que el JS ltms-ux-enhancements envía).
      */
     public static function ajax_refresh_drawer(): void {
-                // SEC-4 FIX (v2.9.26): auth required.
-                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
-        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
         $full = isset( $_POST['full'] ) && $_POST['full'] === '1';
         wp_send_json_success( self::get_drawer_data( ! $full ) );
     }
 
     /**
      * AJAX: elimina un item del carrito.
+     *
+     * v2.9.52: Guests permitidos. Nonce: ltms_ux_nonce.
      */
     public static function ajax_remove_item(): void {
-        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         if ( $cart_item_key && WC()->cart ) {
             WC()->cart->remove_cart_item( $cart_item_key );
@@ -121,11 +124,11 @@ class LTMS_Cart_Drawer {
 
     /**
      * AJAX: actualiza cantidad.
+     *
+     * v2.9.52: Guests permitidos. Nonce: ltms_ux_nonce.
      */
     public static function ajax_update_qty(): void {
-                // SEC-4 FIX (v2.9.26): auth required.
-                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
-        check_ajax_referer( 'ltms_drawer_nonce', 'nonce' );
+        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         $qty = (int) ( $_POST['qty'] ?? 1 );
         if ( $cart_item_key && WC()->cart ) {
