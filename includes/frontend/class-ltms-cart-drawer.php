@@ -91,6 +91,205 @@ class LTMS_Cart_Drawer {
             <div id="ltms-drawer-footer" style="padding:16px 20px;border-top:1px solid #e5e7eb;background:#fff;"></div>
         </div>
         <?php
+        // v2.9.53: Inline script para event delegation de botones del carrito.
+        // Este script se incrusta directamente en el HTML del footer y NO se
+        // puede cachear como un archivo JS externo. Garantiza que los botones
+        // +/- y eliminar funcionen incluso si el ltms-ux-enhancements.min.js
+        // está cacheado en versión vieja.
+        self::render_cart_buttons_script();
+    }
+
+    /**
+     * v2.9.53: Renderiza un script inline que maneja los botones del carrito
+     * con event delegation en document. Esto funciona sin importar si el JS
+     * externo está cacheado o no.
+     */
+    public static function render_cart_buttons_script(): void {
+        $ajax_url = admin_url( 'admin-ajax.php' );
+        $nonce = wp_create_nonce( 'ltms_ux_nonce' );
+        ?>
+        <script>
+        (function() {
+            'use strict';
+            // v2.9.53: Event delegation global para botones del carrito.
+            // Se asigna una sola vez al document y captura todos los clicks.
+            document.addEventListener('click', function(e) {
+                // No interferir si el click no fue en un botón del carrito
+                var incBtn = e.target.closest ? e.target.closest('.ltms-cart-qty-inc') : null;
+                var decBtn = e.target.closest ? e.target.closest('.ltms-cart-qty-dec') : null;
+                var removeBtn = e.target.closest ? e.target.closest('.ltms-cart-item-remove') : null;
+
+                if (!incBtn && !decBtn && !removeBtn) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                var ajaxUrl = '<?php echo esc_js( $ajax_url ); ?>';
+                var nonce = '<?php echo esc_js( $nonce ); ?>';
+
+                if (incBtn || decBtn) {
+                    var btn = incBtn || decBtn;
+                    var key = btn.dataset.key;
+                    var change = incBtn ? 1 : -1;
+
+                    // Buscar la cantidad actual en el DOM
+                    var itemEl = btn.closest('.ltms-cart-item');
+                    var qtyEl = itemEl ? itemEl.querySelector('.ltms-cart-qty-value') : null;
+                    var currentQty = qtyEl ? parseInt(qtyEl.textContent, 10) : 1;
+                    var newQty = Math.max(1, currentQty + change);
+
+                    // Feedback visual inmediato
+                    if (qtyEl) qtyEl.textContent = newQty;
+
+                    // Enviar AJAX
+                    var body = new URLSearchParams();
+                    body.append('action', 'ltms_drawer_update_qty');
+                    body.append('nonce', nonce);
+                    body.append('cart_item_key', key);
+                    body.append('qty', newQty);
+
+                    fetch(ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                        body: body.toString()
+                    }).then(function(r) { return r.json(); }).then(function(response) {
+                        // Recargar el carrito completo
+                        if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.openCartDrawer) {
+                            // Trigger loadCartContents via jQuery event
+                            if (typeof jQuery !== 'undefined') {
+                                jQuery(document.body).trigger('wc_fragment_refresh');
+                            }
+                        }
+                        // Actualizar badge
+                        if (response && response.data && response.data.count !== undefined) {
+                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
+                                el.textContent = response.data.count;
+                            });
+                        }
+                        // Recargar contenido del drawer
+                        reloadCartContents();
+                    }).catch(function() {
+                        reloadCartContents();
+                    });
+                }
+
+                if (removeBtn) {
+                    var key = removeBtn.dataset.key;
+                    var itemEl = removeBtn.closest('.ltms-cart-item');
+                    if (itemEl) {
+                        itemEl.style.opacity = '0.5';
+                        itemEl.style.pointerEvents = 'none';
+                    }
+
+                    var body = new URLSearchParams();
+                    body.append('action', 'ltms_drawer_remove_item');
+                    body.append('nonce', nonce);
+                    body.append('cart_item_key', key);
+
+                    fetch(ajaxUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                        body: body.toString()
+                    }).then(function(r) { return r.json(); }).then(function(response) {
+                        // Actualizar badge
+                        if (response && response.data && response.data.count !== undefined) {
+                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
+                                el.textContent = response.data.count;
+                            });
+                        }
+                        reloadCartContents();
+                    }).catch(function() {
+                        if (itemEl) {
+                            itemEl.style.opacity = '';
+                            itemEl.style.pointerEvents = '';
+                        }
+                        reloadCartContents();
+                    });
+                }
+            });
+
+            // Función para recargar el contenido del carrito vía AJAX
+            function reloadCartContents() {
+                var ajaxUrl = '<?php echo esc_js( $ajax_url ); ?>';
+                var nonce = '<?php echo esc_js( $nonce ); ?>';
+                var body = new URLSearchParams();
+                body.append('action', 'ltms_get_cart');
+                body.append('nonce', nonce);
+
+                fetch(ajaxUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                    body: body.toString()
+                }).then(function(r) { return r.json(); }).then(function(response) {
+                    if (response && response.success && response.data) {
+                        var container = document.querySelector('#ltms-cart-drawer-items');
+                        if (!container) return;
+
+                        if (!response.data.items || !response.data.items.length) {
+                            // Carrito vacío
+                            container.innerHTML = '<div class="ltms-cart-empty" style="text-align:center;padding:40px 20px;">' +
+                                '<p style="font-size:16px;margin-bottom:16px;">Tu carrito está vacío</p>' +
+                                '<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" onclick="document.getElementById(\'ltms-cart-drawer-overlay\').click()">Explorar productos</button>' +
+                                '</div>';
+                        } else {
+                            // Renderizar items
+                            container.innerHTML = response.data.items.map(function(item) {
+                                return '<div class="ltms-cart-item" data-cart-item-key="' + escapeAttr(item.key) + '">' +
+                                    '<div class="ltms-cart-item-img">' +
+                                        (item.image ? '<img src="' + escapeAttr(item.image) + '" alt="' + escapeAttr(item.name) + '" loading="lazy">' : '<div class="ltms-cart-item-no-img">📦</div>') +
+                                    '</div>' +
+                                    '<div class="ltms-cart-item-info">' +
+                                        '<a href="' + escapeAttr(item.product_url || '#') + '" class="ltms-cart-item-name">' + escapeHtml(item.name) + '</a>' +
+                                        (item.variation ? '<div class="ltms-cart-item-variation">' + escapeHtml(item.variation) + '</div>' : '') +
+                                        '<div class="ltms-cart-item-price">' + (item.price_formatted || '') + '</div>' +
+                                        '<div class="ltms-cart-item-qty">' +
+                                            '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-dec" data-key="' + escapeAttr(item.key) + '" aria-label="Disminuir">−</button>' +
+                                            '<span class="ltms-cart-qty-value">' + item.quantity + '</span>' +
+                                            '<button type="button" class="ltms-cart-qty-btn ltms-cart-qty-inc" data-key="' + escapeAttr(item.key) + '" aria-label="Aumentar">+</button>' +
+                                        '</div>' +
+                                    '</div>' +
+                                    '<button type="button" class="ltms-cart-item-remove" data-key="' + escapeAttr(item.key) + '" aria-label="Eliminar">' +
+                                        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>' +
+                                    '</button>' +
+                                '</div>';
+                            }).join('');
+                        }
+
+                        // Actualizar subtotal
+                        var subtotalEl = document.querySelector('#ltms-cart-subtotal');
+                        if (subtotalEl && response.data.total_formatted) {
+                            subtotalEl.innerHTML = response.data.total_formatted;
+                        }
+
+                        // Actualizar contador
+                        if (response.data.count !== undefined) {
+                            document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el) {
+                                el.textContent = response.data.count;
+                            });
+                        }
+                    }
+                }).catch(function() {
+                    // Silenciar errores
+                });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/[&<>"']/g, function(c) {
+                    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+                });
+            }
+
+            function escapeAttr(str) {
+                if (!str) return '';
+                return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+        })();
+        </script>
+        <?php
     }
 
     /**

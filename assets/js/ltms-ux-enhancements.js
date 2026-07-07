@@ -5612,6 +5612,36 @@
             openCartDrawer();
         });
 
+        // v2.9.53: EVENT DELEGATION para botones del carrito.
+        // Esto funciona incluso si el JS está cacheado (SiteGround Optimizer
+        // remueve el ?ver= del JS, causando que el navegador use versión vieja).
+        // Con event delegation en document, no importan los event listeners
+        // individuales — el click siempre se captura.
+        document.addEventListener('click', (e) => {
+            const incBtn = e.target.closest('.ltms-cart-qty-inc');
+            const decBtn = e.target.closest('.ltms-cart-qty-dec');
+            const removeBtn = e.target.closest('.ltms-cart-item-remove');
+
+            if (incBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                updateCartQty(incBtn.dataset.key, 1);
+                return;
+            }
+            if (decBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                updateCartQty(decBtn.dataset.key, -1);
+                return;
+            }
+            if (removeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                removeCartItem(removeBtn.dataset.key);
+                return;
+            }
+        });
+
         // Actualizar contador del carrito cuando cambia
         if (typeof jQuery !== 'undefined') {
             jQuery(document.body).on('updated_cart_totals', () => {
