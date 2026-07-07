@@ -284,6 +284,30 @@ $country = LTMS_Core_Config::get_country();
                     <span class="ltms-btn-spinner" style="display:none;">&#9696;</span>
                 </button>
             </div>
+
+            <?php
+            // v2.9.60 MISSING-03: Cloudflare Turnstile CAPTCHA (opcional).
+            // Solo se renderiza si el admin configura una site key en
+            // LTMS → Settings → Security → Turnstile Site Key.
+            // Si no hay key configurada, el honeypot sigue funcionando como fallback.
+            $turnstile_site_key = LTMS_Core_Config::get( 'ltms_turnstile_site_key', '' );
+            if ( ! empty( $turnstile_site_key ) ) :
+            ?>
+            <div class="ltms-form-group ltms-turnstile-wrap" style="margin-top:16px;">
+                <div class="cf-turnstile" data-sitekey="<?php echo esc_attr( $turnstile_site_key ); ?>" data-theme="light"></div>
+                <input type="hidden" name="ltms_turnstile_token" id="ltms-turnstile-token" value="">
+            </div>
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+            <script>
+            window.onloadTurnstileCallback = function() {
+                turnstile.render('.cf-turnstile', {
+                    callback: function(token) {
+                        document.getElementById('ltms-turnstile-token').value = token;
+                    }
+                });
+            };
+            </script>
+            <?php endif; ?>
         </div>
 
     

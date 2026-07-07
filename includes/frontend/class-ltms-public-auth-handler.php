@@ -40,6 +40,8 @@ final class LTMS_Public_Auth_Handler {
         add_action( 'wp_ajax_nopriv_ltms_vendor_register', [ $instance, 'ajax_vendor_register' ] );
         add_action( 'wp_ajax_ltms_vendor_register',        [ $instance, 'ajax_vendor_register' ] );
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
+        // v2.9.60 MISSING-08: Endpoint para reenviar email de verificación.
+        add_action( 'wp_ajax_ltms_resend_verification',    [ $instance, 'ajax_resend_verification' ] );
 
         // M-73: /sellers/ usa Hello Elementor — Elementor no llama the_content() y el
         // shortcode no se renderiza. Interceptamos template_include con prioridad 999
@@ -247,16 +249,99 @@ final class LTMS_Public_Auth_Handler {
         check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
 
         // C-4: Rate limit por IP (3 registros/hora).
+        // v2.9.60 REG-02 FIX: Usar increment atómico con $wpdb para evitar TOCTOU.
+        // Antes se hacía get_transient() + set_transient($tries+1) lo que permitía
+        // race conditions bajo requests concurrentes. Ahora usamos INSERT ON DUPLICATE
+        // KEY UPDATE que es atómico a nivel de MySQL.
         $ip          = LTMS_Utils::get_ip();
         $throttle_key = 'ltms_register_attempts_' . md5( $ip );
-        $tries        = (int) get_transient( $throttle_key );
 
-        if ( $tries >= self::REGISTER_MAX_PER_IP ) {
+        // Increment atómico via direct DB query (transients no son atómicos).
+        global $wpdb;
+        $option_name = '_transient_' . $throttle_key;
+        $timeout_name = '_transient_timeout_' . $throttle_key;
+        $now = time();
+        $expires = $now + self::REGISTER_WINDOW;
+
+        // Verificar si el transient ya expiró
+        $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $timeout_name
+        ) );
+
+        if ( $timeout_val && $timeout_val < $now ) {
+            // Expiró — resetear a 1
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s",
+                '1', $option_name
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $expires, $timeout_name
+            ) );
+            $tries = 1;
+        } else {
+            // Increment atómico con INSERT ... ON DUPLICATE KEY UPDATE
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+                 ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+                $option_name
+            ) );
+            // Asegurar que el timeout esté seteado
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+                 ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+                $timeout_name, $expires, $now, $expires
+            ) );
+            $tries = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+                $option_name
+            ) );
+        }
+
+        // El contador ya se incrementó. Si excede el límite, bloquear.
+        if ( $tries > self::REGISTER_MAX_PER_IP ) {
             LTMS_Core_Logger::security(
                 'REGISTER_THROTTLE',
                 sprintf( 'IP %s bloqueada por exceder %d registros en %ds', $ip, self::REGISTER_MAX_PER_IP, self::REGISTER_WINDOW )
             );
             wp_send_json_error( __( 'Demasiados registros desde tu IP. Intenta más tarde.', 'ltms' ), 429 );
+        }
+
+        // v2.9.60 MISSING-03: Verificar Cloudflare Turnstile si está configurado.
+        $turnstile_secret = LTMS_Core_Config::get( 'ltms_turnstile_secret_key', '' );
+        if ( ! empty( $turnstile_secret ) ) {
+            $turnstile_token = sanitize_text_field( wp_unslash( $_POST['ltms_turnstile_token'] ?? '' ) ); // phpcs:ignore
+            if ( empty( $turnstile_token ) ) {
+                wp_send_json_error([
+                    'message' => __( 'Por favor completa el captcha de verificación.', 'ltms' ),
+                    'errors'  => [ [ 'field' => 'turnstile', 'message' => __( 'Captcha requerido.', 'ltms' ) ] ],
+                ]);
+            }
+
+            // Verificar token con la API de Cloudflare.
+            $verify_response = wp_remote_post( 'https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                'timeout' => 10,
+                'body'    => [
+                    'secret'   => $turnstile_secret,
+                    'response' => $turnstile_token,
+                    'remoteip' => $ip,
+                ],
+            ] );
+
+            if ( is_wp_error( $verify_response ) ) {
+                LTMS_Core_Logger::warning( 'TURNSTILE_VERIFY_ERROR', $verify_response->get_error_message() );
+                wp_send_json_error( __( 'Error al verificar captcha. Intenta de nuevo.', 'ltms' ), 500 );
+            }
+
+            $verify_body = json_decode( wp_remote_retrieve_body( $verify_response ), true );
+            if ( empty( $verify_body['success'] ) ) {
+                LTMS_Core_Logger::security( 'TURNSTILE_FAILED', sprintf( 'IP %s falló verificación Turnstile', $ip ) );
+                wp_send_json_error([
+                    'message' => __( 'La verificación captcha falló. Intenta de nuevo.', 'ltms' ),
+                    'errors'  => [ [ 'field' => 'turnstile', 'message' => __( 'Captcha inválido.', 'ltms' ) ] ],
+                ]);
+            }
         }
 
         $data = [
@@ -287,8 +372,7 @@ final class LTMS_Public_Auth_Handler {
         // M-10: errors estructurados por campo.
         $errors = $this->validate_registration( $data );
         if ( ! empty( $errors ) ) {
-            // Incrementar contador incluso en validación fallida para evitar fuzz.
-            set_transient( $throttle_key, $tries + 1, self::REGISTER_WINDOW );
+            // v2.9.60 REG-02: El contador ya se incrementó atómicamente arriba.
             wp_send_json_error([
                 'message' => implode( ' ', array_column( $errors, 'message' ) ),
                 'errors'  => $errors,
@@ -296,7 +380,7 @@ final class LTMS_Public_Auth_Handler {
         }
 
         if ( email_exists( $data['email'] ) ) {
-            set_transient( $throttle_key, $tries + 1, self::REGISTER_WINDOW );
+            // v2.9.60 REG-02: El contador ya se incrementó atómicamente arriba.
             wp_send_json_error([
                 'message' => __( 'Este email ya está registrado.', 'ltms' ),
                 'errors'  => [ [ 'field' => 'email', 'message' => __( 'Este email ya está registrado.', 'ltms' ) ] ],
@@ -326,7 +410,9 @@ final class LTMS_Public_Auth_Handler {
         // M-4: bloque post-create con rollback ante cualquier fallo.
         try {
             $user = new \WP_User( $user_id );
-            $user->set_role( 'ltms_vendor' );
+            // v2.9.60 REG-11 FIX: Usar add_role en vez de set_role para no
+            // sobrescribir el rol de customer si el usuario ya existía como tal.
+            $user->add_role( 'ltms_vendor' );
 
             wp_update_user([
                 'ID'           => $user_id,
@@ -425,6 +511,9 @@ final class LTMS_Public_Auth_Handler {
             // C-2: enviar email de bienvenida con link de verificación.
             $this->send_welcome_email( $user_id, $verify_token );
 
+            // v2.9.60 MISSING-04: Notificar al admin del sitio sobre el nuevo registro.
+            $this->notify_admin_new_vendor( $user_id, $data );
+
         } catch ( \Throwable $e ) {
             // Rollback: borrar el usuario huérfano si algo post-creación falla.
             require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -476,8 +565,11 @@ final class LTMS_Public_Auth_Handler {
             $message  = __( '¡Registro exitoso! Revisa tu email para verificar tu cuenta.', 'ltms' );
         }
 
-        // Limpiar contador en éxito para no penalizar a usuarios legítimos en la misma red.
-        delete_transient( $throttle_key );
+        // v2.9.60 REG-01 FIX: NO borrar el contador en éxito.
+        // Antes se hacía delete_transient() lo que permitía a un atacante
+        // resetear su presupuesto alternando intentos válidos e inválidos.
+        // El transient expira naturalmente tras REGISTER_WINDOW segundos.
+        // delete_transient( $throttle_key );
 
         LTMS_Core_Logger::info(
             'VENDOR_REGISTERED',
@@ -625,6 +717,24 @@ final class LTMS_Public_Auth_Handler {
             $errors[] = [ 'field' => 'email', 'message' => __( 'Email inválido.', 'ltms' ) ];
         }
 
+        // v2.9.60 REG-07: Whitelist vendor_country (CO o MX únicamente).
+        if ( ! empty( $data['vendor_country'] ) && ! in_array( $data['vendor_country'], [ 'CO', 'MX' ], true ) ) {
+            $errors[] = [ 'field' => 'vendor_country', 'message' => __( 'País inválido. Solo se permite Colombia o México.', 'ltms' ) ];
+        }
+
+        // v2.9.60 REG-06: Whitelist document_type.
+        $valid_doc_types = ( $country === 'MX' )
+            ? [ 'RFC', 'CURP', 'PAS' ]
+            : [ 'CC', 'CE', 'NIT', 'PAS' ];
+        if ( ! empty( $data['document_type'] ) && ! in_array( $data['document_type'], $valid_doc_types, true ) ) {
+            $errors[] = [ 'field' => 'document_type', 'message' => __( 'Tipo de documento inválido.', 'ltms' ) ];
+        }
+
+        // v2.9.60 REG-05: Whitelist business_type.
+        if ( ! empty( $data['business_type'] ) && ! in_array( $data['business_type'], [ 'physical', 'digital', 'services', 'tourism' ], true ) ) {
+            $errors[] = [ 'field' => 'business_type', 'message' => __( 'Tipo de negocio inválido.', 'ltms' ) ];
+        }
+
         // M-6: password composition (>= 8, al menos una mayúscula y un número).
         if ( strlen( $data['password'] ) < 8 ) {
             $errors[] = [ 'field' => 'password', 'message' => __( 'La contraseña debe tener al menos 8 caracteres.', 'ltms' ) ];
@@ -643,6 +753,9 @@ final class LTMS_Public_Auth_Handler {
         }
         if ( empty( $data['phone'] ) ) {
             $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono es requerido.', 'ltms' ) ];
+        } elseif ( ! preg_match( '/^\+?[0-9\s\-\(\)]{7,20}$/', $data['phone'] ) ) {
+            // v2.9.60 REG-04: Validar formato de teléfono (E.164-like).
+            $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono tiene un formato inválido. Usa solo números, espacios, guiones y paréntesis (7-20 caracteres).', 'ltms' ) ];
         }
         if ( empty( $data['store_address'] ) ) {
             $errors[] = [ 'field' => 'store_address', 'message' => __( 'La dirección es requerida para el contrato de vinculación.', 'ltms' ) ];
@@ -695,12 +808,17 @@ final class LTMS_Public_Auth_Handler {
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
         $dashboard_url = $dashboard_id ? get_permalink( $dashboard_id ) : home_url();
 
+        // v2.9.60 REG-09 FIX: La URL de verificación debe apuntar a la página de
+        // login, no a home_url('/'). Antes, el usuario hacía click, se verificaba
+        // el email, pero luego el redirect al dashboard fallaba porque no estaba
+        // logueado. Ahora apunta al login con un parámetro de "verificación exitosa".
+        $login_url = wp_login_url();
         $verify_url = add_query_arg(
             [
                 'ltms_verify_email' => $verify_token,
                 'uid'               => $user_id,
             ],
-            home_url( '/' )
+            $login_url
         );
 
         $data = [
@@ -753,5 +871,94 @@ final class LTMS_Public_Auth_Handler {
             esc_url( $url ),
             esc_html__( 'Ir al panel', 'ltms' )
         );
+    }
+
+    /**
+     * v2.9.60 MISSING-04: Envía email al admin del sitio cuando un nuevo vendedor se registra.
+     * Permite al admin conocer los registros sin tener que revisar el panel.
+     */
+    private function notify_admin_new_vendor( int $user_id, array $data ): void {
+        $admin_email = get_option( 'admin_email' );
+        if ( empty( $admin_email ) ) return;
+
+        $user = get_userdata( $user_id );
+        if ( ! $user ) return;
+
+        $site_name = get_bloginfo( 'name' );
+        $subject = sprintf( '[%s] Nuevo vendedor registrado: %s', $site_name, $data['store_name'] );
+
+        $body = sprintf(
+            "Nuevo vendedor registrado en %s\n\n" .
+            "Nombre: %s %s\n" .
+            "Email: %s\n" .
+            "Tienda: %s\n" .
+            "País: %s\n" .
+            "Teléfono: %s\n" .
+            "Tipo de negocio: %s\n" .
+            "Régimen tributario: %s\n\n" .
+            "Revisa el panel de admin para aprobar el KYC:\n%s\n",
+            $site_name,
+            $data['first_name'],
+            $data['last_name'],
+            $data['email'],
+            $data['store_name'],
+            $data['vendor_country'] ?? 'N/A',
+            $data['phone'] ?? 'N/A',
+            $data['business_type'] ?? 'N/A',
+            $data['tax_regime'] ?? 'N/A',
+            admin_url( 'admin.php?page=ltms-kyc' )
+        );
+
+        $headers = [ 'Content-Type: text/plain; charset=UTF-8' ];
+
+        wp_mail( $admin_email, $subject, $body, $headers );
+
+        LTMS_Core_Logger::info(
+            'ADMIN_NOTIFIED_NEW_VENDOR',
+            sprintf( 'Admin %s notificado del nuevo vendedor #%d', $admin_email, $user_id )
+        );
+    }
+
+    /**
+     * v2.9.60 MISSING-08: Reenvía el email de verificación.
+     * Endpoint: wp_ajax_ltms_resend_verification
+     * Rate limited: 3 reenvíos por hora por usuario.
+     */
+    public function ajax_resend_verification(): void {
+        check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Debes iniciar sesión.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+
+        // Verificar que el email no esté ya verificado.
+        if ( get_user_meta( $user_id, 'ltms_email_verified', true ) ) {
+            wp_send_json_error( [ 'message' => __( 'Tu email ya está verificado.', 'ltms' ) ] );
+        }
+
+        // Rate limit: 3 reenvíos por hora.
+        $throttle_key = 'ltms_resend_attempts_' . $user_id;
+        $attempts = (int) get_transient( $throttle_key );
+        if ( $attempts >= 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados reenvíos. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+        set_transient( $throttle_key, $attempts + 1, HOUR_IN_SECONDS );
+
+        // Generar nuevo token.
+        $verify_token = wp_generate_password( 32, false );
+        update_user_meta( $user_id, 'ltms_email_verify_token', $verify_token );
+        update_user_meta( $user_id, 'ltms_email_verify_expires', time() + ( 48 * HOUR_IN_SECONDS ) );
+
+        // Enviar email.
+        $this->send_welcome_email( $user_id, $verify_token );
+
+        LTMS_Core_Logger::info(
+            'VERIFICATION_RESENT',
+            sprintf( 'Email de verificación reenviado a uid=%d', $user_id )
+        );
+
+        wp_send_json_success( [ 'message' => __( 'Email de verificación reenviado. Revisa tu bandeja de entrada.', 'ltms' ) ] );
     }
 }

@@ -208,6 +208,17 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( __( 'Acceso denegado.', 'ltms' ), 403 );
         }
 
+        // v2.9.60 UX-06: Si el perfil está incompleto (Google OAuth path),
+        // devolver flag para que el JS redirija al wizard de completado.
+        $profile_incomplete = get_user_meta( $user_id, 'ltms_profile_incomplete', true );
+        if ( $profile_incomplete ) {
+            wp_send_json_success( [
+                'profile_incomplete' => true,
+                'message' => __( 'Debes completar tu perfil antes de continuar.', 'ltms' ),
+                'redirect' => home_url( '/registro-vendedor/?complete_profile=1' ),
+            ] );
+        }
+
         $data = $this->get_vendor_home_metrics( $user_id );
         wp_send_json_success( $data );
     }

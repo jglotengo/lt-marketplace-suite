@@ -161,17 +161,29 @@ final class LTMS_Admin_Payouts {
         );
 
         // E-14 FIX: email al vendedor cuando se aprueba KYC
+        // v2.9.60 REG-08: Usar template HTML en vez de texto plano.
         if ( get_option( 'ltms_email_kyc_approved', 'yes' ) === 'yes' ) {
             $vendor_user = get_userdata( $vendor_id );
             if ( $vendor_user && $vendor_user->user_email ) {
                 $k_subject = __( '[Lo Tengo] ¡Tu identidad fue verificada exitosamente!', 'ltms' );
-                $k_body    = sprintf(
-                    /* translators: 1: nombre, 2: URL panel */
-                    __( 'Hola %1$s,\n\n¡Buenas noticias! Tu verificación de identidad (KYC) fue aprobada.\n\nYa puedes acceder a todas las funcionalidades de tu panel de vendedor, incluyendo solicitudes de retiro.\n\nIngresa a tu panel:\n%2$s', 'ltms' ),
-                    $vendor_user->display_name,
-                    home_url( '/panel-vendedor/' )
-                );
-                wp_mail( $vendor_user->user_email, $k_subject, $k_body );
+
+                // Intentar usar template HTML.
+                $template = LTMS_TEMPLATES_DIR . 'emails/email-kyc-approved.php';
+                if ( file_exists( $template ) ) {
+                    ob_start();
+                    include $template;
+                    $k_body = ob_get_clean();
+                } else {
+                    // Fallback a texto plano si no existe el template.
+                    $k_body = sprintf(
+                        "Hola %s,\n\n¡Buenas noticias! Tu verificación de identidad (KYC) fue aprobada.\n\nYa puedes acceder a todas las funcionalidades de tu panel de vendedor, incluyendo solicitudes de retiro.\n\nIngresa a tu panel:\n%s",
+                        $vendor_user->display_name,
+                        home_url( '/panel-vendedor/' )
+                    );
+                }
+
+                $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+                wp_mail( $vendor_user->user_email, $k_subject, $k_body, $headers );
             }
         }
 
@@ -264,17 +276,28 @@ final class LTMS_Admin_Payouts {
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'rejected' );
 
         // M-100: enviar email de notificación al vendedor cuando se rechaza KYC
+        // v2.9.60 REG-08: Usar template HTML si existe, con fallback a texto plano.
         $vendor_user = get_userdata( $vendor_id );
         if ( $vendor_user ) {
             $subject = __( '[Lo Tengo] Tu verificación de identidad necesita correcciones', 'ltms' );
-            $body    = sprintf(
-                /* translators: 1: nombre, 2: motivo, 3: URL */
-                __( "Hola %1\$s,\n\nTu solicitud de verificación de identidad fue revisada y necesita correcciones.\n\nMotivo: %2\$s\n\nPor favor ingresa a tu panel y envía una nueva solicitud con los documentos correctos:\n%3\$s\n\nSi tienes dudas, contáctanos.", 'ltms' ),
-                $vendor_user->display_name,
-                $reason,
-                home_url( '/panel-vendedor/' )
-            );
-            wp_mail( $vendor_user->user_email, $subject, $body );
+
+            $template = LTMS_TEMPLATES_DIR . 'emails/email-kyc-rejected.php';
+            if ( file_exists( $template ) ) {
+                ob_start();
+                include $template;
+                $body = ob_get_clean();
+            } else {
+                // Fallback a texto plano.
+                $body = sprintf(
+                    "Hola %s,\n\nTu solicitud de verificación de identidad fue revisada y necesita correcciones.\n\nMotivo: %s\n\nPor favor ingresa a tu panel y envía una nueva solicitud con los documentos correctos:\n%s\n\nSi tienes dudas, contáctanos.",
+                    $vendor_user->display_name,
+                    $reason,
+                    home_url( '/panel-vendedor/' )
+                );
+            }
+
+            $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+            wp_mail( $vendor_user->user_email, $subject, $body, $headers );
         }
 
         // M-100: disparar action para que otros listeners puedan reaccionar al rechazo

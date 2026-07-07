@@ -103,8 +103,10 @@ final class LTMS_Google_OAuth {
     // -------------------------------------------------------------------------
 
     public function ajax_redirect_to_google(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // v2.9.60 REG-10 FIX: El JS inline del botón de Google no envía nonce,
+                // y antes verificaba 'ltms_admin_nonce' que causaba 403. Ahora verificamos
+                // 'ltms_auth_nonce' que es el nonce que el JS SÍ envía (via ltmsAuth.nonce).
+                check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
         // Generar y guardar state anti-CSRF en una transient de corta vida.
         $state = wp_generate_uuid4();
         set_transient( self::STATE_META . '_' . $state, 1, self::STATE_TTL );
@@ -321,6 +323,13 @@ final class LTMS_Google_OAuth {
         update_user_meta( $user_id, 'ltms_referral_code',   wp_generate_password( 8, false ) );
         update_user_meta( $user_id, 'ltms_registration_method', 'google_oauth' );
 
+        // v2.9.60 UX-06 FIX: Marcar que el vendor necesita completar perfil.
+        // Google OAuth no captura: teléfono, documento, régimen tributario,
+        // SAGRILAFT consent, business_type, store_name, store_address.
+        // El dashboard debe redirigir a un wizard de completado antes de
+        // permitir publicar productos.
+        update_user_meta( $user_id, 'ltms_profile_incomplete', 1 );
+
         // Crear wallet.
         if ( class_exists( 'LTMS_Business_Wallet' ) ) {
             LTMS_Business_Wallet::get_or_create( $user_id );
@@ -400,7 +409,23 @@ final class LTMS_Google_OAuth {
             btn.addEventListener('click', function(){
                 btn.disabled = true;
                 btn.textContent = '<?php echo esc_js( __( 'Redirigiendo...', 'ltms' ) ); ?>';
-                fetch(btn.dataset.ajax + '?action=' + btn.dataset.action, {method:'POST'})
+                // v2.9.60 REG-10 FIX: Enviar nonce en el body del POST.
+                // Antes el fetch era GET sin nonce, causando 403 en check_ajax_referer.
+                var nonce = '';
+                if (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) {
+                    nonce = ltmsAuth.nonce;
+                } else if (typeof ltms !== 'undefined' && ltms.nonce) {
+                    nonce = ltms.nonce;
+                }
+                var body = new URLSearchParams();
+                body.append('action', btn.dataset.action);
+                body.append('nonce', nonce);
+                fetch(btn.dataset.ajax, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                    body: body.toString()
+                })
                     .then(function(r){ return r.json(); })
                     .then(function(data){
                         if (data.success && data.data.redirect_url) {
