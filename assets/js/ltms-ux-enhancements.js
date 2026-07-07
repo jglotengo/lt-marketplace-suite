@@ -5309,7 +5309,11 @@
         cartDrawerState.overlay.addEventListener('click', closeCartDrawer);
 
         cartDrawerState.drawer.querySelector('#ltms-cart-checkout-btn').addEventListener('click', () => {
-            window.location.href = '/checkout/';
+            // v2.9.50: Usar la URL de checkout que viene del backend (data.checkout_url)
+            // en vez de hardcoded /checkout/ — algunos sitios usan /finalizar-compra/ u otros slugs.
+            // Fallback a /checkout/ si no hay data.
+            const checkoutUrl = (cartDrawerState.checkoutUrl) || '/checkout/';
+            window.location.href = checkoutUrl;
         });
 
         // Keyboard
@@ -5382,6 +5386,10 @@
                 .then((r) => r.json())
                 .then((response) => {
                     if (response && response.success && response.data) {
+                        // v2.9.50: Guardar checkout_url para el botón de checkout.
+                        if (response.data.checkout_url) {
+                            cartDrawerState.checkoutUrl = response.data.checkout_url;
+                        }
                         renderCartItems(itemsContainer, response.data);
                     } else {
                         renderCartEmpty(itemsContainer);
@@ -5444,7 +5452,12 @@
 
         const subtotalEl = document.querySelector('#ltms-cart-subtotal');
         if (subtotalEl && data.total_formatted) {
-            subtotalEl.textContent = data.total_formatted;
+            // v2.9.50: Usar innerHTML (no textContent) porque total_formatted
+            // viene de wc_price() sanitizado con wp_strip_all_tags() y contiene
+            // entidades HTML como &#36; (símbolo $) y &nbsp; (espio).
+            // textContent muestra estas entidades como texto literal (&#36;&nbsp;735.000)
+            // en vez de renderizarlas ($ 735.000).
+            subtotalEl.innerHTML = data.total_formatted;
         }
 
         // Bind qty buttons
@@ -5468,7 +5481,7 @@
             </div>
         `;
         const subtotalEl = document.querySelector('#ltms-cart-subtotal');
-        if (subtotalEl) subtotalEl.textContent = '$0';
+        if (subtotalEl) subtotalEl.innerHTML = '$0';
     }
 
     function updateCartQty(key, change) {
