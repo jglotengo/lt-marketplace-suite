@@ -158,17 +158,22 @@
             const $banner = $('#ltms-onboarding-banner');
             if (!$banner.length) return;
 
+            // v2.9.71 P3-1: all_done ahora incluye store_configured check.
+            // v2.9.71 P3-2: Strings localizadas via ltmsDashboard.i18n.
+            const i18n = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.i18n) ? ltmsDashboard.i18n : {};
+            const t = (key, fallback) => i18n[key] || fallback;
+
             if (!ob || ob.all_done) {
                 $banner.hide().empty();
                 return;
             }
 
             const kycLabels = {
-                none: { text: 'Pendiente de iniciar', color: '#9ca3af' },
-                pending: { text: 'En revisión', color: '#f59e0b' },
-                approved: { text: 'Aprobado', color: '#10b981' },
-                rejected: { text: 'Rechazado — corrige y reenvía', color: '#ef4444' },
-                expired: { text: 'Expirado — renueva', color: '#6b7280' },
+                none: { text: t('kyc_none', 'Pendiente de iniciar'), color: '#9ca3af' },
+                pending: { text: t('kyc_pending', 'En revisión'), color: '#f59e0b' },
+                approved: { text: t('kyc_approved', 'Aprobado'), color: '#10b981' },
+                rejected: { text: t('kyc_rejected', 'Rechazado — corrige y reenvía'), color: '#ef4444' },
+                expired: { text: t('kyc_expired', 'Expirado — renueva'), color: '#6b7280' },
             };
             const kyc = kycLabels[ob.kyc_status] || kycLabels.none;
             const kycDone = ob.kyc_status === 'approved';
@@ -177,23 +182,30 @@
                 {
                     done: !!ob.email_verified,
                     icon: '✉️',
-                    title: 'Verifica tu email',
-                    detail: ob.email_verified ? 'Verificado' : 'Revisa tu bandeja de entrada (y spam) para confirmar tu cuenta.',
+                    title: t('ob_email_title', 'Verifica tu email'),
+                    detail: ob.email_verified ? t('ob_email_done', 'Verificado') : t('ob_email_pending', 'Revisa tu bandeja de entrada (y spam) para confirmar tu cuenta.'),
                     action: null,
                 },
                 {
                     done: kycDone,
                     icon: '🪪',
-                    title: 'Completa tu verificación de identidad (KYC)',
+                    title: t('ob_kyc_title', 'Completa tu verificación de identidad (KYC)'),
                     detail: kyc.text,
-                    action: kycDone ? null : { label: 'Completar KYC', url: ob.kyc_url },
+                    action: kycDone ? null : { label: t('ob_kyc_action', 'Completar KYC'), url: ob.kyc_url },
+                },
+                {
+                    done: !!ob.store_configured,
+                    icon: '🏪',
+                    title: t('ob_store_title', 'Configura tu tienda'),
+                    detail: ob.store_configured ? t('ob_store_done', 'Tienda configurada') : t('ob_store_pending', 'Añade logo, descripción y banner a tu tienda.'),
+                    action: ob.store_configured ? null : { label: t('ob_store_action', 'Configurar tienda'), view: 'settings' },
                 },
                 {
                     done: !!ob.has_products,
                     icon: '🛍️',
-                    title: 'Publica tu primer producto',
-                    detail: ob.has_products ? 'Ya tienes productos publicados' : 'Tu tienda aún no tiene productos visibles.',
-                    action: ob.has_products ? null : { label: 'Agregar producto', view: 'products' },
+                    title: t('ob_product_title', 'Publica tu primer producto'),
+                    detail: ob.has_products ? t('ob_product_done', 'Ya tienes productos publicados') : t('ob_product_pending', 'Tu tienda aún no tiene productos visibles.'),
+                    action: ob.has_products ? null : { label: t('ob_product_action', 'Agregar producto'), view: 'products' },
                 },
             ];
 
@@ -211,10 +223,10 @@
             $banner.html(`
                 <div class="ltms-card" style="padding:20px;border-left:4px solid #2563eb;">
                     <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:4px;">
-                        👋 ¡Bienvenido a Lo Tengo!
+                        👋 ${t('ob_welcome', '¡Bienvenido a Lo Tengo!')}
                     </div>
                     <div style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">
-                        Completa estos pasos para aprovechar al máximo tu tienda.
+                        ${t('ob_subtitle', 'Completa estos pasos para aprovechar al máximo tu tienda.')}
                     </div>
                     ${stepsHtml}
                 </div>

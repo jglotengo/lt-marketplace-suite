@@ -830,19 +830,26 @@ final class LTMS_Dashboard_Logic {
 
         $has_products = (bool) count_user_posts( $vendor_id, 'product', true );
 
+        // v2.9.71 P3-1: Verificar si la tienda está configurada (logo o descripción).
+        $store_name = get_user_meta( $vendor_id, 'ltms_store_name', true );
+        $store_desc = get_user_meta( $vendor_id, 'ltms_store_description', true );
+        $store_configured = ! empty( $store_name ) && ! empty( $store_desc );
+
         $pages   = get_option( 'ltms_installed_pages', [] );
         $kyc_url = ! empty( $pages['ltms-kyc'] )
             ? get_permalink( $pages['ltms-kyc'] )
             : wc_get_account_endpoint_url( 'ltms-kyc' );
 
-        $all_done = $email_verified && 'approved' === $kyc_status && $has_products;
+        // v2.9.71 P3-1: all_done ahora incluye store_configured.
+        $all_done = $email_verified && 'approved' === $kyc_status && $store_configured && $has_products;
 
         return [
-            'email_verified' => $email_verified,
-            'kyc_status'     => $kyc_status,
-            'kyc_url'        => $kyc_url,
-            'has_products'   => $has_products,
-            'all_done'       => $all_done,
+            'email_verified'   => $email_verified,
+            'kyc_status'       => $kyc_status,
+            'kyc_url'          => $kyc_url,
+            'has_products'     => $has_products,
+            'store_configured' => $store_configured,
+            'all_done'         => $all_done,
         ];
     }
 
