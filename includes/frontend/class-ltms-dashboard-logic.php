@@ -1553,9 +1553,16 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
         }
 
-        // Aumentar tiempo límite para sync grandes.
+        // v2.9.66 DEEP-AUDIT-002 P2-19: Limitar set_time_limit al máximo permitido.
+        // Antes usaba 600s (10 min) que puede exceder max_execution_time del servidor
+        // causando que el script se corte silenciosamente sin feedback al usuario.
+        $max_exec = (int) ini_get( 'max_execution_time' );
+        $desired_limit = 600; // 10 minutos ideal
+        if ( $max_exec > 0 && $max_exec < $desired_limit ) {
+            $desired_limit = max( 30, $max_exec - 5 ); // Dejar 5s de margen
+        }
         if ( function_exists( 'set_time_limit' ) ) {
-            @set_time_limit( 600 ); // 10 minutos.
+            @set_time_limit( $desired_limit );
         }
 
         $result = LTMS_PosGold_Sync::sync_vendor_products( $user_id );
@@ -1569,6 +1576,8 @@ final class LTMS_Dashboard_Logic {
                 'duplicates'   => $result['duplicates'] ?? 0,
                 'filtered_out' => $result['filtered_out'] ?? 0,
                 'errors'       => $result['errors'],
+                // v2.9.66 P2-19: Incluir info de tiempo límite para debug.
+                'time_limit'   => $desired_limit,
             ] );
         } else {
             wp_send_json_error( [ 'message' => $result['message'] ] );

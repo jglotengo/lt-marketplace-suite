@@ -141,6 +141,29 @@ final class LTMS_Admin_Payouts {
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
         update_user_meta( $vendor_id, 'ltms_kyc_approved_at', LTMS_Utils::now_utc() );
 
+        // v2.9.66 DEEP-AUDIT-002 P2-3: Sincronizar datos bancarios del KYC a user_meta.
+        // Antes había dos fuentes de truth: lt_vendor_kyc (tabla) y user_meta
+        // (ltms_bank_account_number). El payout scheduler leía de user_meta pero
+        // el KYC guardaba en la tabla — podían tener datos diferentes.
+        // Ahora al aprobar KYC, sincronizamos los datos bancarios verificados a user_meta.
+        if ( ! empty( $kyc->bank_name ) ) {
+            update_user_meta( $vendor_id, 'ltms_bank_name', $kyc->bank_name );
+        }
+        if ( ! empty( $kyc->bank_account_number ) ) {
+            // Cifrar el número de cuenta antes de guardarlo en user_meta.
+            $account_to_save = $kyc->bank_account_number;
+            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+                $encrypted = LTMS_Core_Security::encrypt( $account_to_save );
+                if ( $encrypted ) {
+                    $account_to_save = $encrypted;
+                }
+            }
+            update_user_meta( $vendor_id, 'ltms_bank_account_number', $account_to_save );
+        }
+        if ( ! empty( $kyc->bank_rep_legal_name ) ) {
+            update_user_meta( $vendor_id, 'ltms_bank_account_holder', $kyc->bank_rep_legal_name );
+        }
+
         // L-1: Registrar acceso/revisión de documentos KYC en vault log (Ley 1581/2012 art. 8)
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
             LTMS_Legal_Compliance::log_vault_access(
