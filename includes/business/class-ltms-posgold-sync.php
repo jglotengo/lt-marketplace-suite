@@ -32,6 +32,117 @@ final class LTMS_PosGold_Sync {
     const CODE_META_KEY = '_ltms_posgold_code';
 
     /**
+     * v2.9.72 P3-11: Cron hook para sync en background.
+     */
+    const CRON_HOOK = 'ltms_posgold_sync_cron';
+
+    /**
+     * v2.9.72 P3-11: Registra el cron hook.
+     */
+    public static function init(): void {
+        add_action( self::CRON_HOOK, [ __CLASS__, 'run_scheduled_sync' ] );
+    }
+
+    /**
+     * v2.9.72 P3-11: Programa una sync en background via WP-Cron.
+     * El vendor puede cerrar la pestaña y la sync continuará.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return array{success: bool, message: string}
+     */
+    public static function schedule_sync( int $vendor_id ): array {
+        // Verificar que el vendor tenga credenciales configuradas.
+        $creds = self::get_vendor_credentials( $vendor_id );
+        if ( ! $creds['configured'] ) {
+            return [
+                'success' => false,
+                'message' => __( 'No has configurado tus credenciales de PosGold.', 'ltms' ),
+            ];
+        }
+
+        // Verificar si ya hay una sync en curso para este vendor.
+        $in_progress = get_user_meta( $vendor_id, '_ltms_posgold_sync_in_progress', true );
+        if ( $in_progress && ( time() - (int) $in_progress ) < 600 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Ya tienes una sincronización en curso. Espera a que termine.', 'ltms' ),
+            ];
+        }
+
+        // Marcar como en progreso.
+        update_user_meta( $vendor_id, '_ltms_posgold_sync_in_progress', time() );
+
+        // Programar el cron event (single event, se ejecuta en próximo cron tick).
+        wp_schedule_single_event( time() + 5, self::CRON_HOOK, [ $vendor_id ] );
+
+        return [
+            'success' => true,
+            'message' => __( 'Sincronización programada. Recibirás una notificación cuando termine. Puedes cerrar esta página.', 'ltms' ),
+        ];
+    }
+
+    /**
+     * v2.9.72 P3-11: Ejecuta la sync programada por WP-Cron.
+     * Este método se ejecuta en background, sin conexión al navegador del vendor.
+     */
+    public static function run_scheduled_sync( int $vendor_id ): void {
+        // Aumentar tiempo límite.
+        $max_exec = (int) ini_get( 'max_execution_time' );
+        $desired = $max_exec > 0 ? max( 30, $max_exec - 5 ) : 600;
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( $desired );
+        }
+
+        // Ejecutar sync.
+        $result = self::sync_vendor_products( $vendor_id );
+
+        // Limpiar flag de en progreso.
+        delete_user_meta( $vendor_id, '_ltms_posgold_sync_in_progress' );
+
+        // Guardar resultado para que el vendor lo vea.
+        update_user_meta( $vendor_id, '_ltms_posgold_sync_last_result', [
+            'completed_at' => current_time( 'mysql', true ),
+            'success'      => $result['success'] ?? false,
+            'created'      => $result['created'] ?? 0,
+            'updated'      => $result['updated'] ?? 0,
+            'skipped'      => $result['skipped'] ?? 0,
+            'errors'       => $result['errors'] ?? [],
+            'message'      => $result['message'] ?? '',
+        ] );
+
+        // Enviar notificación al vendor.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'POSGOLD_SYNC_COMPLETE',
+                sprintf( 'Vendor #%d sync completed: %d created, %d updated', $vendor_id, $result['created'] ?? 0, $result['updated'] ?? 0 )
+            );
+        }
+
+        // Notificación in-dashboard.
+        global $wpdb;
+        $notifications_table = $wpdb->prefix . 'lt_notifications';
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$notifications_table}'" ) === $notifications_table ) {
+            $wpdb->insert(
+                $notifications_table,
+                [
+                    'user_id'    => $vendor_id,
+                    'type'       => 'posgold_sync',
+                    'title'      => __( 'Sincronización PosGold completada', 'ltms' ),
+                    'message'    => sprintf(
+                        __( 'Sincronización completada: %d productos creados, %d actualizados, %d omitidos.', 'ltms' ),
+                        $result['created'] ?? 0,
+                        $result['updated'] ?? 0,
+                        $result['skipped'] ?? 0
+                    ),
+                    'is_read'    => 0,
+                    'created_at' => LTMS_Utils::now_utc(),
+                ],
+                [ '%d', '%s', '%s', '%s', '%d', '%s' ]
+            );
+        }
+    }
+
+    /**
      * Sincroniza todos los productos de PosGold hacia WooCommerce para un vendor.
      *
      * @param int $vendor_id ID del vendedor.

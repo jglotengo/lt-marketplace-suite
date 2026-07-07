@@ -94,6 +94,11 @@ final class LTMS_Dashboard_Logic {
 
         // REST API endpoints del vendor dashboard
         add_action( 'rest_api_init', [ $instance, 'register_rest_routes' ] );
+
+        // v2.9.72 P3-11: Inicializar PosGold Sync cron hook.
+        if ( class_exists( 'LTMS_PosGold_Sync' ) && method_exists( 'LTMS_PosGold_Sync', 'init' ) ) {
+            LTMS_PosGold_Sync::init();
+        }
     }
 
     /**
@@ -1323,7 +1328,11 @@ final class LTMS_Dashboard_Logic {
      * @return void
      */
     public function ajax_get_shipping_quotes(): void {
-        check_ajax_referer( 'ltms_shipping_nonce', 'nonce' );
+        // v2.9.72 P3-5: Aceptar ltms_dashboard_nonce además de ltms_shipping_nonce.
+        $nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : ''; // phpcs:ignore
+        if ( ! wp_verify_nonce( $nonce, 'ltms_shipping_nonce' ) && ! wp_verify_nonce( $nonce, 'ltms_dashboard_nonce' ) && ! wp_verify_nonce( $nonce, 'ltms_ux_nonce' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
 
         $cart    = WC()->cart;
         $session = WC()->session;
