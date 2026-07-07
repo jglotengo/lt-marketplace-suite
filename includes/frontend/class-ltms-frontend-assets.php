@@ -351,9 +351,13 @@ final class LTMS_Frontend_Assets {
         );
 
         // JS — load in the footer so the DOM is ready when initAll() runs.
+        // v2.9.55: Añadir parámetro de cache-bust manual (?v=2.9.55) además del $ver
+        // porque SiteGround Optimizer remueve el ?ver= estándar de WP.
+        // El ?v= adicional es un query parameter que SiteGround no toca.
+        $js_url = $url . 'js/ltms-ux-enhancements' . $min . '.js?v=' . $ver;
         wp_enqueue_script(
             'ltms-ux-enhancements',
-            $url . 'js/ltms-ux-enhancements' . $min . '.js',
+            $js_url,
             [ 'jquery' ],
             $ver,
             true

@@ -109,12 +109,14 @@ class LTMS_Cart_Drawer {
         $ajax_url = admin_url( 'admin-ajax.php' );
         $nonce = wp_create_nonce( 'ltms_ux_nonce' );
         ?>
-        <!-- LTMS-CART-SCRIPT-v2.9.54 START -->
+        <!-- LTMS-CART-SCRIPT-v2.9.55-START -->
         <script>
         (function() {
             'use strict';
-            // v2.9.53: Event delegation global para botones del carrito.
-            // Se asigna una sola vez al document y captura todos los clicks.
+            // v2.9.55: Event delegation con CAPTURE=true para interceptar clicks
+            // ANTES que el JS externo (ltms-ux-enhancements.js) que está cacheado
+            // en versión vieja y dispara AJAX incorrectos.
+            // stopImmediatePropagation() previene que otros handlers se ejecuten.
             document.addEventListener('click', function(e) {
                 // No interferir si el click no fue en un botón del carrito
                 var incBtn = e.target.closest ? e.target.closest('.ltms-cart-qty-inc') : null;
@@ -123,11 +125,25 @@ class LTMS_Cart_Drawer {
 
                 if (!incBtn && !decBtn && !removeBtn) return;
 
+                // CRÍTICO: stopImmediatePropagation previene que el JS viejo
+                // (que tiene event listeners en los botones individuales) se ejecute.
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
 
                 var ajaxUrl = '<?php echo esc_js( $ajax_url ); ?>';
                 var nonce = '<?php echo esc_js( $nonce ); ?>';
+
+                // Desactivar el botón temporalmente para prevenir clicks dobles
+                var clickedBtn = incBtn || decBtn || removeBtn;
+                if (clickedBtn) {
+                    clickedBtn.style.pointerEvents = 'none';
+                    clickedBtn.style.opacity = '0.6';
+                    setTimeout(function() {
+                        clickedBtn.style.pointerEvents = '';
+                        clickedBtn.style.opacity = '';
+                    }, 1000);
+                }
 
                 if (incBtn || decBtn) {
                     var btn = incBtn || decBtn;
@@ -210,7 +226,7 @@ class LTMS_Cart_Drawer {
                         reloadCartContents();
                     });
                 }
-            });
+            }, true);  // capture: true — intercepta ANTES que otros handlers
 
             // Función para recargar el contenido del carrito vía AJAX
             function reloadCartContents() {
@@ -291,7 +307,7 @@ class LTMS_Cart_Drawer {
             }
         })();
         </script>
-        <!-- LTMS-CART-SCRIPT-v2.9.54 END -->
+        <!-- LTMS-CART-SCRIPT-v2.9.55-END -->
         <?php
     }
 
