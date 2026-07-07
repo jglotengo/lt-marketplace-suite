@@ -88,11 +88,8 @@ class LTMS_Compliance_Guardian {
         ?>
         <div id="ltms-cookie-banner" style="position:fixed;bottom:0;left:0;right:0;z-index:99997;background:#1f2937;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 20px rgba(0,0,0,0.15);">
             <div style="flex:1;min-width:250px;font-size:13px;line-height:1.5;">
-                <span style="font-size:18px;margin-right:6px;">&#x1F36A;</span>
-                <?php echo esc_html( sprintf(
-                    __( 'Usamos cookies para mejorar tu experiencia y analizar el tráfico. Al continuar, aceptas nuestra %s y el uso de tecnologías de seguimiento.', 'ltms' ),
-                    '<a href="' . esc_url( $privacy_url ) . '" style="color:#60a5fa;text-decoration:underline;">' . esc_html__( 'Política de Privacidad', 'ltms' ) . '</a>'
-                ) ); ?>
+                <span style="font-size:18px;margin-right:6px;">🍪</span>
+                Usamos cookies para mejorar tu experiencia y analizar el tráfico. Al continuar, aceptas nuestra <a href="<?php echo esc_url( $privacy_url ); ?>" style="color:#60a5fa;text-decoration:underline;">Política de Privacidad</a> y el uso de tecnologías de seguimiento.
             </div>
             <div style="display:flex;gap:8px;flex-shrink:0;">
                 <button type="button" id="ltms-cookie-reject"
