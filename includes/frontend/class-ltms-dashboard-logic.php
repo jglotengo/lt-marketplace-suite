@@ -868,10 +868,16 @@ final class LTMS_Dashboard_Logic {
      * @return array
      */
     private function get_vendor_orders( int $vendor_id, int $page, int $per_page, string $status ): array {
-        // AUDIT-REDI-UX-GAPS GAP-7 FIX: usar meta_query OR para retornar
+        // v2.9.74 FIX: Filtrar pedidos por vendor_id de forma estricta.
+        // AUDIT-REDI-UX-GAPS GAP-7: usar meta_query OR para retornar
         // también pedidos donde el vendor es el origin ReDi (no solo el
         // reseller). Antes el origin vendor nunca veía pedidos ReDi en su
         // dashboard a pesar de ser quien debe enviar el producto.
+        //
+        // v2.9.74: Antes la meta_query OR podía traer pedidos que no tenían
+        // _ltms_vendor_id ni _ltms_redi_origin_vendor_id (pedidos antiguos
+        // o de admin) porque WC interpreta 'compare' = '=' con 'value' = 0
+        // como "cualquier valor". Ahora forzamos que el value sea > 0.
         $args = [
             'meta_query' => [
                 'relation' => 'OR',
@@ -879,11 +885,13 @@ final class LTMS_Dashboard_Logic {
                     'key'     => '_ltms_vendor_id',
                     'value'   => $vendor_id,
                     'compare' => '=',
+                    'type'    => 'NUMERIC',
                 ],
                 [
                     'key'     => '_ltms_redi_origin_vendor_id',
                     'value'   => $vendor_id,
                     'compare' => '=',
+                    'type'    => 'NUMERIC',
                 ],
             ],
             'limit'       => $per_page,

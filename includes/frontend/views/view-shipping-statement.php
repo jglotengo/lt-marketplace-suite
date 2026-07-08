@@ -30,7 +30,18 @@ if ( ! empty( $ss_nonce ) && ! wp_verify_nonce( $ss_nonce, 'ltms_shipping_statem
 $year  = (int) ( $_GET['year']  ?? current_time( 'Y' ) ); // phpcs:ignore
 $month = (int) ( $_GET['month'] ?? current_time( 'n' ) ); // phpcs:ignore
 
-$statement = LTMS_Shipping_Cost_Ledger::get_vendor_statement( $vendor_id, $year, $month );
+// v2.9.74 FIX: Verificar que la clase existe antes de llamarla.
+if ( class_exists( 'LTMS_Shipping_Cost_Ledger' ) ) {
+    $statement = LTMS_Shipping_Cost_Ledger::get_vendor_statement( $vendor_id, $year, $month );
+} else {
+    $statement = [
+        'budget'   => [ 'budget_limit' => 0, 'spent_pct' => 0 ],
+        'spent'    => 0,
+        'remaining'=> 0,
+        'entries'  => [],
+        'monthly'  => [],
+    ];
+}
 $budget    = $statement['budget'];
 $spent     = $statement['spent'];
 $remaining = $statement['remaining'];
