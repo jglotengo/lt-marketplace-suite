@@ -46,6 +46,11 @@ $vacation_mode   = get_user_meta( $vendor_id, 'ltms_vacation_mode', true ) === '
 $vacation_msg    = get_user_meta( $vendor_id, 'ltms_vacation_message', true );
 $store_logo_id   = (int) get_user_meta( $vendor_id, 'ltms_store_logo_id', true );
 $store_logo_url  = $store_logo_id ? wp_get_attachment_image_url( $store_logo_id, 'thumbnail' ) : '';
+// v2.9.83 P2: Store schedule + social links
+$store_schedule  = get_user_meta( $vendor_id, 'ltms_store_schedule', true );
+$store_instagram = get_user_meta( $vendor_id, 'ltms_store_instagram', true );
+$store_facebook  = get_user_meta( $vendor_id, 'ltms_store_facebook', true );
+$store_whatsapp  = get_user_meta( $vendor_id, 'ltms_store_whatsapp', true );
 
 $kyc_badges = [
     'pending'  => [ 'class' => 'ltms-badge-warning',  'label' => __( 'Pendiente', 'ltms' ) ],
@@ -310,6 +315,39 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
                     <?php endif; ?>
                     <p style="font-size:0.75rem;color:#9ca3af;margin-top:6px;"><?php esc_html_e( 'JPG, PNG o WEBP. Máx 2MB. Recomendado: 400x400px.', 'ltms' ); ?></p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.9.83 P2: Horarios y Redes Sociales (Woodmart-inspired) -->
+    <div class="ltms-card" style="margin-bottom:20px;">
+        <div class="ltms-card-header">🕐 <?php esc_html_e( 'Horarios y Redes Sociales', 'ltms' ); ?></div>
+        <div class="ltms-card-body">
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Horario de atención', 'ltms' ); ?></label>
+                <input type="text" name="ltms_store_schedule" value="<?php echo esc_attr( $store_schedule ); ?>"
+                       placeholder="<?php esc_attr_e( 'Ej: Lun-Vie 9am-6pm, Sáb 10am-2pm', 'ltms' ); ?>"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">📷 Instagram</label>
+                    <input type="text" name="ltms_store_instagram" value="<?php echo esc_attr( $store_instagram ); ?>"
+                           placeholder="<?php esc_attr_e( '@mitienda', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">👍 Facebook</label>
+                    <input type="text" name="ltms_store_facebook" value="<?php echo esc_attr( $store_facebook ); ?>"
+                           placeholder="<?php esc_attr_e( 'facebook.com/mitienda', 'ltms' ); ?>"
+                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">💬 WhatsApp</label>
+                <input type="text" name="ltms_store_whatsapp" value="<?php echo esc_attr( $store_whatsapp ); ?>"
+                       placeholder="<?php esc_attr_e( '+57 300 000 0000', 'ltms' ); ?>"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
             </div>
         </div>
     </div>
