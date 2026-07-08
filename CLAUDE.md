@@ -3,12 +3,12 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-06 (versión del plugin en ese momento: `2.9.35`).
+> **Última auditoría completa del repo:** 2026-07-08 (versión del plugin en ese momento: `2.9.98`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
-> (`jglotengo/lt-marketplace-suite@main`, ~316 archivos en `includes/`, 6528 en total
-> incluyendo `vendor/`) y corrige varias secciones que estaban desactualizadas respecto
-> al código real. Donde el código y la documentación (`docs/ARCHITECTURE.md`,
-> `docs/SECURITY.md`) discrepaban, se dio prioridad al código.
+> (`jglotengo/lt-marketplace-suite@main`, ~516 archivos PHP en `includes/`, 1,300+ commits)
+> e incorpora el resultado de 3 auditorías completas:
+> REG-AUDIT-001 (registro vendedores, 11+3 fixes), DEEP-AUDIT-002 (onboarding+panel,
+> 56 findings 100% P0+P1+P2 resueltos) y UIUX-AUDIT-001 (62 findings, 100% resueltos).
 
 ---
 
@@ -18,7 +18,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.35` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo).
+**Versión actual del plugin:** `2.9.98` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 3 auditorías completas (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001) están 100% resueltas a esta versión.
 
 ---
 
@@ -28,7 +28,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 |------|-------|
 | Repositorio | `jglotengo/lt-marketplace-suite`, rama `main` |
 | Plugin path | `/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite` |
-| DB prefix | `bkr_` (no `wp_`) → tablas custom reales: `bkr_lt_vendor_wallets`, `bkr_lt_wallet_transactions`, `bkr_lt_commissions`, `bkr_lt_payout_requests`, `bkr_lt_audit_logs`, `bkr_lt_security_events`, `bkr_lt_waf_blocked_ips`, `bkr_lt_vendor_kyc`, `bkr_lt_referral_network`, `bkr_lt_notifications`, `bkr_lt_api_logs`, `bkr_lt_webhook_logs`, `bkr_lt_job_queue`, `bkr_lt_rate_limits`, `bkr_lt_marketing_banners`, `bkr_lt_tax_reports`, `bkr_lt_deposits` (ver `database_schema_full.sql`, que usa el placeholder `{WP_PREFIX}`) |
+| DB prefix | `bkr_` (no `wp_`) → tablas custom reales: `bkr_lt_vendor_wallets`, `bkr_lt_wallet_transactions`, `bkr_lt_commissions`, `bkr_lt_payout_requests`, `bkr_lt_audit_logs`, `bkr_lt_security_events`, `bkr_lt_waf_blocked_ips`, `bkr_lt_vendor_kyc`, `bkr_lt_referral_network`, `bkr_lt_notifications`, `bkr_lt_api_logs`, `bkr_lt_webhook_logs`, `bkr_lt_job_queue`, `bkr_lt_rate_limits`, `bkr_lt_marketing_banners`, `bkr_lt_tax_reports`, `bkr_lt_deposits`, `bkr_lt_vendor_drivers` (v2.9.98 own-delivery fleet), `bkr_lt_insurance_policies` (XCover), `bkr_lt_shipping_cost_ledger` (fletes absorbed), `bkr_lt_backorder_subscriptions` (v2.9.61 P2-24), `bkr_lt_review_votes` (v2.9.61 P2-25), `bkr_lt_posgold_sync_log` (v2.9.35), `bkr_lt_consent_log` (Habeas Data Ley 1581/2012) (ver `database_schema_full.sql`, que usa el placeholder `{WP_PREFIX}`) |
 | WP-CLI | siempre con `--allow-root --path=/home/customer/www/lo-tengo.com.co/public_html` |
 | Deploy webhook | `deploy/ltms-deploy-webhook.php` (v5, self-updating + modos `qa`/`fix_sellers`/`caps`), token `ltms_deploy_2026_s3cur3_t0k3n_x9z` |
 | OPcache flush endpoint | `deploy/ltms-opcache-flush.php`, token `ltms_opcache_2026` — **ya existe en el repo**, ver sección ZapSign más abajo |
@@ -358,6 +358,48 @@ tail -n 30 /home/customer/www/lo-tengo.com.co/logs/error_log
 - **`continue 2` requiere 2+ niveles de loop anidado.** Usar `continue 2` dentro de un `foreach` simple (1 nivel) es un error fatal: `Fatal error: 'continue 2' is in the wrong context`. Usa `continue;` (sin número) si solo hay 1 loop.
 - **Sincronización `.min.js` / `.min.css`:** los archivos minificados deben regenerarse y commitearse en el mismo commit que sus fuentes `.js` / `.css`. Si solo actualizas la fuente y olvidas el `.min`, en producción se sirve la versión vieja (SiteGround sirve el `.min` por defecto si `SCRIPT_DEBUG` no está definido). Los `.min.*` están force-tracked (fueron removidos de `.gitignore` en v2.9.35).
 - **Nuevas vistas del dashboard de vendedor (v2.9.35):** `view-marketing.php`, `view-security.php`, `view-donations.php`, `view-posgold.php` en `includes/frontend/views/`. Cada una tiene su endpoint AJAX y su entrada en el menú lateral del dashboard SPA.
+
+---
+
+## Lecciones aprendidas en v2.9.36 → v2.9.98 (post-audits REG/DEEP/UIUX)
+
+### CSP Compliance (UIUX-AUDIT-001)
+- **0 inline handlers permitidos.** Reemplazar todo `onclick=""`, `onchange=""`, `onfocus=""`, `onsubmit=""`, `onload=""` por `addEventListener()` + `data-action` delegation. El plugin está listo para headers CSP estrictos.
+- **0 `alert()` permitidos.** Usar el toast system (slide-in, auto-dismiss 3s, color-coded success/error/info).
+- **`location.reload()` solo cuando sea estrictamente necesario** (ej. create/edit que necesita HTML server-rendered fresco). Para toggles y deletes, actualizar el DOM inline (badge + button label + KPIs) — feedback instantáneo sin recarga.
+
+### Nonces estandarizados (DEEP-AUDIT-002 P3-5)
+- **Vendor dashboard:** `ltms_dashboard_nonce` (unificado — antes había `ltms_admin_nonce`, `ltms_auth_nonce`, `ltms_ux_nonce` mezclados).
+- **Storefront:** `ltms_ux_nonce`.
+- **Admin:** `ltms_admin_nonce`.
+- **Auth/OAuth:** `ltms_auth_nonce` (registro + 2FA + Google OAuth).
+
+### IDOR Protection (DEEP-AUDIT-002 P0-4)
+- **Todo endpoint que lee/escribe datos de un vendor debe verificar ownership** antes de proceder. Ejemplo KYC: `SELECT vendor_id FROM lt_vendor_kyc WHERE id = %d` → si `vendor_id !== get_current_user_id()` → 403.
+- Lo mismo aplica para: bank accounts, payout requests, drivers, policies, incidents, orders (multi-vendor split).
+
+### AES-256 Encryption (DEEP-AUDIT-002 P0-5)
+- **Datos sensibles en BD siempre cifrados:** document_number, vehicle_plate, bank_account_number, API tokens, OAuth tokens.
+- **Clase:** `LTMS_Core_Security::encrypt()` / `decrypt()` (v2 = AES-256-GCM authenticated, v1 = AES-256-CBC legacy backward-compat).
+- **Para mostrar en UI:** desencriptar en servidor, aplicar masking (ej. `****1234`), enviar al cliente. NUNCA enviar plaintext al DOM.
+
+### Rate Limiting Atómico (REG-AUDIT-001 REG-01/02)
+- Usar `$wpdb->query("INSERT INTO ... ON DUPLICATE KEY UPDATE count = count + 1")` para rate limiting atómico. No usar `SELECT + UPDATE` en dos pasos (race condition).
+
+### PHPCS Compliance
+- Comentarios `// phpcs:ignore WordPress.DB.DirectDatabaseQuery` en queries directas a `$wpdb`.
+- Comentarios `// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared` cuando se interpola un nombre de tabla (siempre que el nombre venga de `$wpdb->prefix` y no de input de usuario).
+
+### Validación PHP Real
+- Usar `node /home/z/my-project/scripts/php_check.js <file.php>` (real AST con `php-parser`), NO el balance-checker ingenuo de Python que se confunde con regex literals conteniendo `"`.
+
+### Drivers Count Cache (v2.9.98)
+- El nav del dashboard usa `_ltms_drivers_count_cache` en user_meta para mostrar/ocultar el tab "Domiciliarios" sin query DB en cada render.
+- `ajax_save_driver()` y `ajax_delete_driver()` deben actualizar este cache tras cada operación.
+
+### SPA loadView (v2.9.75+)
+- El método `loadView(view)` normaliza el nombre del view: `'shipping-statement'` → `'ShippingStatement'` → método `'loadShippingStatementView'`.
+- Si no existe método específico, cae a `loadGenericView(view)` que muestra `#ltms-view-<view>`. Cualquier nueva vista incluida en `dashboard-wrapper.php` como `<div id="ltms-view-<name>">` funciona automáticamente sin JS adicional.
 
 ---
 

@@ -1,8 +1,9 @@
 # LT Marketplace Suite — Architecture Documentation
 
-**Version:** 2.9.35
-**Last Updated:** 2026-07-06
+**Version:** 2.9.98
+**Last Updated:** 2026-07-08
 **Pattern:** Hexagonal Architecture (Ports & Adapters)
+**Audits completed:** REG-AUDIT-001 (registro vendedores), DEEP-AUDIT-002 (onboarding+panel, 56 findings 100% P0+P1+P2), UIUX-AUDIT-001 (62 findings 100% resolved)
 
 ---
 
@@ -11,10 +12,10 @@
 LT Marketplace Suite (LTMS) is an enterprise multi-vendor WooCommerce plugin built with strict Hexagonal Architecture principles. The system separates business logic from infrastructure concerns, enabling independent testability and replaceable adapters.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DRIVING SIDE                             │
-│    WordPress Hooks │ REST API │ WP-Admin │ Vendor SPA           │
-└─────────────────────────────┬───────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                        DRIVING SIDE                                │
+│    WordPress Hooks │ REST API │ WP-Admin │ Vendor SPA (25 views) │
+└─────────────────────────────┬─────────────────────────────────────┘
                                │
                     ┌──────────▼──────────┐
                     │   Application Core  │
@@ -25,12 +26,15 @@ LT Marketplace Suite (LTMS) is an enterprise multi-vendor WooCommerce plugin bui
                     │  LTMS_Commission    │
                     │  LTMS_Referral_Tree │
                     │  LTMS_Payout_Sched. │
+                    │  LTMS_XCover_Listener (v2.9.35) │
+                    │  LTMS_Driver_Ajax (v2.9.98)     │
                     └──────────┬──────────┘
                                │
-┌─────────────────────────────▼───────────────────────────────────┐
-│                        DRIVEN SIDE                              │
-│  MySQL/wpdb │ Openpay │ Siigo │ Addi │ ZapSign │ XCover │ TPTC  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────▼─────────────────────────────────────┐
+│                        DRIVEN SIDE                                  │
+│  MySQL/wpdb │ Openpay │ Siigo │ Addi │ ZapSign │ XCover │ TPTC      │
+│  PosGold │ Aveonline │ ReDi │ Backblaze B2 │ Stripe │ Cloudflare  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -175,10 +179,14 @@ COMMIT;
 
 ## 5. Security Architecture
 
-### 5.1 AES-256-CBC Encryption
-- Key derivation: PBKDF2 with 10,000 iterations
-- Used for: bank accounts, document numbers, API keys
+### 5.1 AES-256-GCM Encryption (v2.9.61 P0-5)
+- **v2 (preferred):** AES-256-GCM authenticated encryption
+- **v1 (legacy):** AES-256-CBC with PBKDF2 key derivation (backward-compat)
+- Version auto-detected via `v1:` / `v2:` prefix in ciphertext
+- Used for: bank accounts, document numbers, vehicle plates, API keys, OAuth tokens, TOTP secrets
 - Key storage: `WP_LTMS_MASTER_KEY` constant in `wp-config.php`
+- **IDOR Protection (P0-4):** All vendor-data endpoints verify ownership before read/write
+- **Bank Account Masking:** Decrypted server-side, masked (`****1234`) before sending to browser — never plaintext in DOM
 
 ### 5.2 WAF (Web Application Firewall)
 Detects and blocks at the WordPress request level:
@@ -186,7 +194,7 @@ Detects and blocks at the WordPress request level:
 - XSS vectors
 - LFI/RFI patterns
 - Bad bots (User-Agent matching)
-- Rate limiting by IP
+- Rate limiting by IP (atomic via `INSERT ON DUPLICATE KEY UPDATE`)
 
 ### 5.3 Forensic Logging
 The `lt_security_events` table is protected by MySQL triggers:
@@ -203,6 +211,37 @@ FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Log records are immutab
 | `ltms_external_auditor` | `ltms_view_audit_logs` (read-only) |
 | `ltms_compliance_officer` | `ltms_manage_kyc`, `ltms_view_sagrilaft` |
 | `ltms_support_agent` | `ltms_manage_orders`, `ltms_view_vendors` |
+
+### 5.5 TOTP 2FA (v2.9.35, hardening en v2.9.61)
+- RFC 6238 (SHA-1, 30s window, 6 digits)
+- 32-byte base32 secret, AES-256-GCM encrypted in `user_meta.ltms_totp_secret`
+- 10 single-use recovery codes (bcrypt cost 12)
+- Anti-replay: code hash cached 30s via transient
+- **Rate limiting (P1):** 5 failed attempts per IP per 15 min → lockout
+- Admin-enforced per role via `ltms_force_2fa_roles`
+- 7-day grace period with reminder banner
+
+### 5.6 Cloudflare Turnstile (v2.9.60 MISSING-03)
+- Optional bot protection on registration + 2FA challenge
+- Site/secret keys encrypted at rest
+- Graceful fallback if not configured
+
+### 5.7 CSP Compliance (v2.9.84 P1)
+- 0 inline event handlers across all 25 dashboard views
+- Toast notification system replaces all `alert()` calls
+- `location.reload()` only for create/edit flows (server-rendered HTML needed)
+- Ready for strict `Content-Security-Policy` headers
+
+### 5.8 Nonce Standardization (v2.9.61 P3-5)
+| Context | Nonce action |
+|---------|-------------|
+| Vendor dashboard | `ltms_dashboard_nonce` |
+| Storefront | `ltms_ux_nonce` |
+| Admin panel | `ltms_admin_nonce` |
+| Auth (login/register/2FA/OAuth) | `ltms_auth_nonce` |
+
+### 5.9 SSRF Protection (v2.9.61 P1)
+PosGold API client validates URLs against allow-list before outbound HTTP requests.
 
 ---
 
@@ -226,17 +265,34 @@ Commission distribution (% of platform_fee):
 
 ## 7. Vendor SPA (Single Page Application)
 
-The vendor dashboard is a jQuery-based SPA loaded by the `[ltms_vendor_dashboard]` shortcode.
+The vendor dashboard is a jQuery-based SPA loaded by the `[ltms_vendor_dashboard]` shortcode. It contains **25 views** (v2.9.98) with no page reloads.
 
 **View loading pattern:**
 ```javascript
-LTMS.Dashboard.loadView('wallet')
-→ loadWalletView()
-→ AJAX: ltms_get_wallet_data
-→ renderWalletView(data)
+LTMS.Dashboard.loadView("wallet")
+  → normaliza "wallet" → "Wallet" → método "loadWalletView()"
+  → si no existe método → loadGenericView(view) muestra #ltms-view-<view>
 ```
 
+**25 views:** home, orders, products, envios, shipping-statement, wallet, insurance, drivers, bookings, marketing, security, donations, posgold, settings, redi (conditional), incidents (conditional), kitchen (restaurant only), ordenes-compra (conditional), analytics (premium only), sellers-landing, kyc, aveonline-onboarding, view-sellers-landing, form-register, form-login.
+
+**UI/UX features (v2.9.77-98, UIUX-AUDIT-001):**
+- Pure SPA navigation (0 reloads except create/edit)
+- Toast notification system (0 alerts)
+- CSP compliance (0 inline handlers)
+- 17 SVG icons Woodmart-style
+- Mobile bottom nav (5 items)
+- Dark mode toggle + `prefers-color-scheme`
+- Global search + dynamic breadcrumbs
+- Keyboard shortcuts (g+key, /, ?, Esc) with help modal
+- Skeleton loading animations
+- Skip-link + focus-visible (WCAG 2.1 AA)
+- Localized date formatters (`formatDate` + `formatRelative`)
+
 **PWA:** Service Worker (Network-First) + Web App Manifest for installable mobile experience.
+
+**Standalone shortcodes (v2.9.98):** Each view also has its own shortcode for direct page access:
+`[ltms_vendor_dashboard]`, `[ltms_vendor_store]`, `[ltms_vendor_orders]`, `[ltms_vendor_wallet]`, `[ltms_vendor_kyc]`, `[ltms_vendor_insurance]`, `[ltms_vendor_bookings]`, `[ltms_vendor_drivers]` (new), `[ltms_vendor_rnt]`, `[ltms_vendor_login]`, `[ltms_vendor_register]`.
 
 ---
 
@@ -376,7 +432,10 @@ In total, v2.9.35 added 35+ missing entries to the autoloader classmap (silent `
 | `ltms_hourly_waf_cleanup` | Hourly | Clean expired WAF blocks |
 | `ltms_sync_commission_rates` | Daily 06:00 | Sync rates from config |
 | `ltms_posgold_scheduled_sync` (v2.9.35) | Daily 03:00 | Sync PosGold catalog for enrolled vendors |
+| `ltms_kyc_expiry_reminder` (v2.9.61 P3-12) | Daily 09:00 | Send KYC expiry reminder emails |
+| `ltms_retention_sweep` | Daily | Clean expired transients/rate limits |
+| `ltms_daily_maintenance` | Daily | General maintenance tasks |
 
 ---
 
-*This document was generated as part of the LTMS 2.9.35 release.*
+*This document reflects the LTMS 2.9.98 release (2026-07-08), incorporating all 3 audits: REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001.*

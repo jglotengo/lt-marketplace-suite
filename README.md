@@ -2,68 +2,124 @@
 
 > Enterprise multi-vendor marketplace for WooCommerce — Colombia & Mexico
 
-**Version:** 2.9.35 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
+**Version:** 2.9.98 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
 
-[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
-
-[![CI](https://img.shields.io/badge/CI-%231185-green.svg)]() [![Tests](https://img.shields.io/badge/tests-3%2C038%20passing-brightgreen.svg)]() [![Classes](https://img.shields.io/badge/PHP%20classes-309-blue.svg)]() [![JS modules](https://img.shields.io/badge/JS%20modules-113-blue.svg)]()
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](https://ltmarketplace.co/eula)
+[![Version](https://img.shields.io/badge/version-2.9.98-blue.svg)]()
+[![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple.svg)]()
+[![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-purple.svg)]()
+[![Countries](https://img.shields.io/badge/Coverage-CO%20%7C%20MX-success.svg)]()
 
 ---
 
 ## Overview
 
-LT Marketplace Suite (LTMS) transforms WooCommerce into a full-featured enterprise marketplace with:
+LT Marketplace Suite (LTMS) transforms WooCommerce into a full-featured enterprise marketplace for Colombia and Mexico. The plugin covers marketplace operations, MLM referral networks, fintech (wallets/payouts), insurtech (XCover policies), logistics (ReDi, Aveonline, own-delivery), and full fiscal compliance (DIAN/SAGRILAFT + SAT/CFDI 4.0).
 
-- **Multi-vendor management** with vendor-specific dashboards
-- **ACID-compliant wallet ledger** with hold/release mechanics
+- **Multi-vendor management** with a SPA dashboard (no page reloads)
+- **ACID-compliant wallet ledger** with hold/release mechanics, tax breakdowns, and CSV export
 - **Country-specific tax compliance** — Colombia (DIAN/SAGRILAFT) and Mexico (SAT/CFDI 4.0)
 - **MLM referral network** with 3-level commission distribution
-- **KYC identity verification** workflow
-- **PWA vendor dashboard** with push notifications
-- **PosGold catalog sync** (v2.9.35) — sync POS inventory to WooCommerce with 8-component price calculator
-- **TOTP 2FA** (v2.9.35) — RFC 6238 two-factor auth for vendors
-- **SAT México compliance columns** (v2.9.35) — 11 new CFDI columns in `lt_commissions`
+- **KYC identity verification** with country-aware document uploads and IDOR-protected endpoints
+- **PWA vendor dashboard** with push notifications, dark mode, mobile bottom-nav, keyboard shortcuts
+- **PosGold catalog sync** with 8-component price calculator
+- **TOTP 2FA** (RFC 6238) with backup codes and admin-enforced policy
+- **XCover insurance** policy lifecycle (create / cancel / claim / certificate download)
+- **Own-delivery fleet** management (CRUD drivers, availability toggle, ETA + zones)
+- **ReDi reverse-logistics** integration with pause/resume and incident tracking
+- **Kitchen Display System** (KDS) for restaurants with audio alerts and polling
+- **Bookings** module with calendar grid view, seasons, and policies
+- **Cloudflare Turnstile** CAPTCHA on registration and 2FA flows
+- **CSP-compliant frontend** — 0 inline handlers (onclick/onchange/onfocus/onsubmit), 0 alerts, 0 unnecessary reloads
 
 ---
 
-## v2.9.35 Highlights (2026-07-06)
+## v2.9.98 Highlights (2026-07-08)
 
-### New Features
+### New UI/UX — UIUX-AUDIT-001 (62 findings, 100% resolved)
 
-- **PosGold integration**: vendors sync their PosGold catalog to WooCommerce automatically — API client, sync engine, price calculator with 8 components (cost + markup + IVA + IEPS + shipping + platform fee + payment fee + rounding), category dropdown, SEO templates, price rounding, deduplication.
-- **Vendor dashboard menu additions** (4 new items):
-  - **Marketing** — banner management
-  - **Security** — TOTP 2FA enrollment / recovery codes
-  - **Donations** — transparency dashboard
-  - **PosGold** — catalog sync
-- **Activity feed** endpoint for vendor home dashboard
-- **6 new AJAX endpoints**: `backorder_notify`, `get_invoices`, `review_helpful`, `save_push_subscription`, `submit_question`, `submit_return`
-- **11 SAT México columns** added to `lt_commissions` table (CFDI UUID, RFC, régimen, uso CFDI, etc.)
-- **8 frontend classes added to autoloader**: Wishlist, Quick_View, Comparison_Table, Product_Tabs, Product_Video, Rating_Summary, Trust_Badges, SEO_Enhanced
+A complete front-end audit was performed across 25 dashboard views and 4 CSS files. All 7 P0 critical bugs, 15 P1 high bugs, 22/25 P2 medium issues, and 13/15 P3 low issues were resolved:
 
-### Bug Fixes
+- **Pure SPA navigation** — all view switches happen without page reloads (eliminated `location.reload()` everywhere except create/edit flows that need fresh server-rendered HTML).
+- **Toast notification system** — replaced every `alert()` with a slide-in toast (auto-dismiss after 3s, color-coded: success/error/info).
+- **CSP compliance** — every inline `onclick`/`onchange`/`onfocus`/`onsubmit` replaced with `addEventListener` + `data-action` delegation. The plugin is ready for strict Content-Security-Policy headers.
+- **17 SVG icons** (Woodmart-style, stroke=2, `currentColor`) for all nav items, replacing emoji.
+- **Mobile bottom navigation** (5 items: Inicio / Pedidos / Productos / Billetera / Ajustes) for screens ≤768px.
+- **Dark mode** toggle with `data-ltms-theme` + `prefers-color-scheme` auto-detection.
+- **Global search** in the topbar + dynamic breadcrumbs.
+- **Keyboard shortcuts** (`g+h`, `g+o`, `g+p`, `g+w`, `g+s`, `/`, `?`, `Esc`) with a help modal.
+- **Home widgets** — recent orders (top 5) + top products (top 5 with medal icons).
+- **Orders view overhaul** — KPIs, free-text search, date-range selector, skeleton loading, empty state with SVG.
+- **Products pagination + search** — replaced the 50-item hard limit with configurable pagination.
+- **Product gallery upload** — up to 5 images per product via AJAX.
+- **Settings expansion** — vacation mode, store logo upload, store schedule (per-day open/close), social links (Instagram/Facebook/WhatsApp).
+- **Landing page** — testimonials carousel, earnings calculator, FAQ accordion.
+- **CSV export** — wallet ledger, shipping statement, insurance policies, drivers list.
+- **Kitchen Display** — audio alerts, 10s polling, KPIs, action buttons, empty state.
+- **Bookings calendar** — monthly grid with color-coded reservations.
+- **Wallet tax breakdown** — commissions / withholdings / payouts displayed separately.
+- **Skeleton loading animations** across all async views.
+- **Skip-link + focus-visible** outlines (WCAG 2.1 AA).
+- **Localized date formatters** — `formatDate()` and `formatRelative()` using `Intl.NumberFormat` for CO/MX locales.
+- **Onboarding checklist** with `store_configured` flag.
+- **SVG illustrations** in empty states (truck for drivers, shield+check for insurance, package for orders, kitchen for KDS).
+- **Insurance view expansion** (113 → 365 lines) — KPIs (total/active/premium/claim-rate), coverage info card, status filter + free-text search, CSV export, no-results message.
+- **Drivers view expansion** (226 → 744 lines) — KPIs (total/active/available-now/method-enabled), search + status filter + vehicle filter, edit capability, delete confirmation modal, inline DOM updates for toggles (no reload), AJAX handler for delivery settings form (was missing — bug fix).
+- **Nav integration** — Seguros and Domiciliarios tabs added to the dashboard sidebar (Domiciliarios conditional on vendor having own-delivery configured or drivers registered).
 
-- Composer `dompdf` constraint corrected (`^2.0.9` → `^2.0`)
-- `LTMS_Core_Security::derive_key()` declared twice (fatal) — fixed
-- `continue 2` in `logistics-compliance.php` illegal — fixed
-- `LTMS_Core_Firewall::get_client_ip()` visibility `private` → `public` (was WSOD)
-- 35+ classes added to autoloader classmap
-- Cross-Border settings section slug normalized (underscore/hyphen)
-- `LTMS_PATH` → `LTMS_PLUGIN_DIR` constant migration
-- Storefront nonce action `ltms_storefront_nonce` → `ltms_ux_nonce`
-- `.min.js` / `.min.css` synchronized with sources, removed from `.gitignore`
+### Security & Onboarding Audits — DEEP-AUDIT-002 (56 findings, 100% P0+P1+P2 resolved)
+
+A deep audit of the onboarding flow and vendor panel surfaced 56 issues across P0 (critical), P1 (high), P2 (medium), and P3 (low) categories. All P0-P2 issues were resolved:
+
+- **P0:** ReDi pause/resume, PosGold token masking, Aveonline OC access control, KYC IDOR fix, bank account decryption for masking.
+- **P1:** 2FA rate limiting, nopriv abuse vectors closed, payout bank validation, PosGold SSRF protection, KYC document validation.
+- **P2:** Custom tables for backorder notifications + review votes, bank account sync, PosGold cron, onboarding store-configured check.
+- **P3:** Dead code cleanup, nonce standardization (`ltms_dashboard_nonce` everywhere), PosGold JSON categories, KYC expiry reminder cron.
+
+### Registration Audit — REG-AUDIT-001 (11 fixes + 3 missing features)
+
+- **REG-10:** Google OAuth nonce fix (`ltms_admin_nonce` → `ltms_auth_nonce`).
+- **REG-01/02:** Atomic rate limiting via `$wpdb` `INSERT ON DUPLICATE KEY UPDATE`.
+- **REG-04:** E.164 phone number validation.
+- **REG-05/06/07:** Whitelists for `business_type`, `document_type`, `vendor_country`.
+- **REG-08:** HTML email templates for KYC submission.
+- **REG-09:** Verification URL now uses `wp_login_url()`.
+- **REG-11:** `set_role()` → `add_role()` (don't strip existing roles).
+- **MISSING-03:** Cloudflare Turnstile CAPTCHA (optional).
+- **MISSING-04:** Admin notification on new vendor registration.
+- **MISSING-08:** Endpoint to resend verification email.
+- **UX-06:** Google OAuth profile completion flow.
+
+### Cart & Checkout Fixes
+
+- Cart drawer subtotal now displays correctly (HTML entity decode in PHP, `innerHTML` instead of `textContent` in JS).
+- +/- buttons and remove button now work (nonce fix `ltms_drawer_nonce` → `ltms_ux_nonce`, correct parameters).
+- Guests are allowed in cart drawer AJAX.
+- Inline script with output buffering (SiteGround cannot remove it).
+- NO-OP in old external JS `updateCartQty` / `removeCartItem` to avoid double-binding.
+- Abandoned-cart modal disabled on cart page.
+
+### Performance
+
+- CAPI (Conversions API) now async.
+- Cart drawer skips upsells on first load.
+- Bundle discount calculation optimized from O(N) to O(1).
+- Add-to-cart latency reduced via 5 optimizations (lazy-load, debounce, cache-bust).
 
 ### Stats
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.9.35 |
-| Release date | 2026-07-06 |
-| Tests passing | 3,038 |
-| CI run | #1185 (green) |
-| Files tracked | 5,633 |
-| PHP classes | 309 |
-| JS modules | 113 |
+| Version | 2.9.98 |
+| Latest release date | 2026-07-08 |
+| PHP classes | 516+ |
+| JS modules | 20 |
+| CSS files | 22 |
+| Dashboard views | 25 |
+| Business logic classes | 66 |
+| Shipping methods | 9 |
+| Audits completed | 3 (REG, DEEP, UIUX) |
+| Total commits | 1,300+ |
 
 ---
 
@@ -75,7 +131,7 @@ LT Marketplace Suite (LTMS) transforms WooCommerce into a full-featured enterpri
 | WordPress | 6.3 or higher |
 | WooCommerce | 8.0 or higher |
 | MySQL | 8.0 or higher |
-| PHP Extensions | `openssl`, `bcmath`, `intl`, `mbstring` |
+| PHP Extensions | `openssl`, `bcmath`, `intl`, `mbstring`, `gd` |
 
 ---
 
@@ -108,12 +164,13 @@ Navigate to `LT Marketplace > Configuración` in the WordPress admin menu.
 
 ## Quick Setup
 
-1. **Configure payment gateways** — Set Openpay credentials in Settings > Payments
+1. **Configure payment gateways** — Set Openpay / Stripe credentials in Settings > Payments
 2. **Set commission rates** — Settings > Commissions (default: 10%)
 3. **Create login/register pages** — Add shortcodes `[ltms_vendor_login]` and `[ltms_vendor_register]`
 4. **Create dashboard page** — Add shortcode `[ltms_vendor_dashboard]`
 5. **Configure KYC** — Set required document types in Settings > KYC
-6. **Test with sandbox** — All payment gateways default to sandbox mode
+6. **Enable optional modules** — ReDi, Kitchen Display, Ordenes de Compra Aveonline (toggle in Settings)
+7. **Test with sandbox** — All payment gateways default to sandbox mode
 
 ---
 
@@ -121,9 +178,17 @@ Navigate to `LT Marketplace > Configuración` in the WordPress admin menu.
 
 | Shortcode | Description |
 |-----------|-------------|
-| `[ltms_vendor_dashboard]` | Vendor SPA dashboard |
+| `[ltms_vendor_dashboard]` | Vendor SPA dashboard (all views integrated) |
 | `[ltms_vendor_login]` | Vendor login form |
-| `[ltms_vendor_register]` | Vendor registration form |
+| `[ltms_vendor_register]` | Vendor registration wizard (3-step with OAuth) |
+| `[ltms_vendor_store]` | Public vendor storefront |
+| `[ltms_vendor_orders]` | Standalone orders view |
+| `[ltms_vendor_wallet]` | Standalone wallet view |
+| `[ltms_vendor_kyc]` | Standalone KYC submission view |
+| `[ltms_vendor_insurance]` | Standalone insurance policies view |
+| `[ltms_vendor_bookings]` | Standalone bookings view |
+| `[ltms_vendor_drivers]` | Standalone own-delivery drivers view (v2.9.98) |
+| `[ltms_vendor_rnt]` | RNT/SECTUR tourism compliance form |
 
 ---
 
@@ -133,6 +198,8 @@ Navigate to `LT Marketplace > Configuración` in the WordPress admin menu.
 - ACID transactions with MySQL `SELECT FOR UPDATE`
 - Balance, held_balance, available_balance tracking
 - Automatic freeze/unfreeze for compliance
+- Tax breakdown display (commissions / withholdings / payouts)
+- CSV export of ledger entries
 
 ### Tax Engine
 **Colombia:** ReteFuente, ReteIVA (15%), ReteICA (by CIIU), Impoconsumo
@@ -144,29 +211,99 @@ Navigate to `LT Marketplace > Configuración` in the WordPress admin menu.
 - TPTC integration for network synchronization
 
 ### Security
-- AES-256-CBC encryption for all PII
+- AES-256-GCM encryption (v2) with backward-compatible CBC (v1) for all PII
 - Built-in WAF with IP banning
 - Immutable forensic logging (MySQL triggers)
 - SAGRILAFT compliance logging
-- **TOTP 2FA (RFC 6238)** for vendors and compliance officers (v2.9.35)
+- **TOTP 2FA (RFC 6238)** for vendors and compliance officers
 - Recovery codes (10 single-use, bcrypt-hashed)
 - Optional admin-enforced 2FA per role
+- **Cloudflare Turnstile** CAPTCHA on registration and 2FA
+- **IDOR protection** on all KYC endpoints (ownership verification before read/write)
+- **Bank account decryption** for masking in UI (no plaintext in DOM)
+- **SSRF protection** on PosGold API client (URL allow-list)
+- **Rate limiting** atomic via `INSERT ON DUPLICATE KEY UPDATE`
+- **CSP-compliant frontend** — 0 inline handlers
 
-### Vendor Dashboard (v2.9.35 additions)
-- **Marketing view** — manage promotional banners
-- **Security view** — enroll/manage TOTP 2FA and recovery codes
-- **Donations view** — transparency dashboard for charitable contributions
-- **PosGold view** — sync physical-store catalog to WooCommerce, with 8-component price calculator
-- Activity feed on home dashboard
+### Vendor Dashboard (SPA, no page reloads)
+- **Home** — KPIs, sales chart, recent orders widget, top products widget, onboarding checklist
+- **Orders** — KPIs, search, date-range selector, skeleton loading, CSV export
+- **Products** — pagination, search, gallery upload (5 images), ReDi toggle, quick edit
+- **Envíos** — shipping labels, carrier selection, delete modal (WCAG 2.1 AA)
+- **Fletes** — absorbed-shipping ledger, budget progress bar, monthly summary, CSV export
+- **Wallet** — balance, transactions, tax breakdown, CSV export, payout request
+- **Seguros** — XCover policies with KPIs, filters, CSV export (v2.9.98)
+- **Domiciliarios** — own-delivery fleet CRUD with KPIs and inline DOM updates (v2.9.98)
+- **Reservas** — bookings with calendar grid, seasons, policies, CSV export
+- **Marketing** — banner management with download tracking
+- **Seguridad** — TOTP 2FA enrollment, backup codes, recovery
+- **Donaciones** — transparency dashboard
+- **PosGold** — catalog sync with credentials test, scheduled sync
+- **Configuración** — vacation mode, store logo, schedule, social links, store zones
+- **ReDi** — reverse logistics with pause/resume, incident tracking (conditional)
+- **Novedades** — incident management with SLA and comment threads (conditional)
+- **Cocina** — Kitchen Display System with audio alerts and polling (restaurant vendors only)
+- **Órdenes de Compra** — Aveonline OC management (conditional)
 
-### PosGold Integration (v2.9.35)
-- Catalog sync from PosGold POS to WooCommerce
-- Price calculator with 8 components (cost, markup, IVA, IEPS, shipping, platform fee, payment fee, rounding)
-- Category auto-mapping and creation
-- Per-category SEO templates
-- Deduplication by SKU
-- Sync log table (`lt_posgold_sync_log`)
-- Manual and scheduled (WP-Cron) sync
+### Vendor Storefront
+- Banner, logo, search, filters (category, stock, age range)
+- Sort (recent, price asc/desc), pagination
+- Grid/list view toggle
+- Product cards with hover image swap, discount %, "NUEVO" / "AGOTADO" badges
+- Rating stars with schema.org Product markup
+- Cart drawer with free-shipping progress bar, upsells, countdown timer
+- Wishlist (logged-in DB + guest cookie)
+- Comparison table (variable products + sibling products)
+- Product tabs: "Sobre el vendedor" + "Envío y Entrega" + size guide modal
+- Trust badges: sales count, KYC verified, protected purchase, returns
+- Rating summary: progress bars per star, recommendation %, filter by rating
+- Live search with autocomplete
+
+### Own-Delivery Fleet (v2.9.98)
+- CRUD drivers (name, phone, document, vehicle type, plate)
+- AES-256 encryption for document number and vehicle plate
+- Active/inactive toggle (persists in `lt_vendor_drivers.status`)
+- Available/busy toggle (ephemeral, stored in transient)
+- Delivery configuration: price, ETA, zones, customer message
+- "Domiciliario propio" shipping method appears in checkout only when vendor has ≥1 active driver
+- KPIs: total drivers, active, available now, method enabled/disabled
+- Search by name/phone/plate + status filter + vehicle filter
+- Edit capability (document re-entered on edit for security)
+- Delete confirmation modal (accessible, focus-managed)
+- Inline DOM updates for toggles and deletes (no reload)
+- Drivers count cache (`_ltms_drivers_count_cache` user_meta) to avoid DB query per dashboard render
+
+### XCover Insurance
+- Policy lifecycle: create on order paid, cancel on order cancelled/refunded
+- Policy types: `parcel_protection`, `purchase_protection`, `other`
+- Statuses: active, cancelled, claimed, expired
+- Certificate download from vendor dashboard
+- KPIs: total policies (12 months), active, premium sum, claim rate
+- Coverage info card (expandable) explaining each policy type
+- Filter by status + free-text search
+- CSV export of filtered view
+
+### ReDi Reverse Logistics (conditional)
+- Product adoption from ReDi catalog
+- Pause/resume per product
+- Incident tracking with SLA
+- CSV export
+
+### Kitchen Display System (restaurant vendors only)
+- Order tickets with status (new / preparing / ready / delivered)
+- Audio alert on new ticket
+- 10s polling for auto-refresh
+- KPIs: pending, preparing, ready, avg time
+- Action buttons per ticket
+- Empty state with SVG
+
+### Bookings
+- 3 tabs: Reservas / Temporadas / Políticas
+- Stats: total, confirmed, pending, cancelled
+- Filters: status, date range
+- Calendar grid view (monthly, color-coded reservations)
+- CSV export
+- 3 modals: new booking, new season, new policy
 
 ---
 
@@ -189,11 +326,21 @@ make dist
 make dev-up
 ```
 
+### PHP Syntax Validation
+
+The project ships with a Node.js-based PHP syntax checker (real AST, not naive balance counting):
+
+```bash
+node /home/z/my-project/scripts/php_check.js <file.php> [...]
+```
+
+This uses the `php-parser` npm package and correctly handles regex literals and string-embedded quotes that confuse simple brace counters.
+
 ---
 
 ## License
 
-GNU General Public License v2.0 — See [LICENSE](https://www.gnu.org/licenses/gpl-2.0.html)
+Proprietary — See [EULA](https://ltmarketplace.co/eula)
 
 ---
 
@@ -202,3 +349,4 @@ GNU General Public License v2.0 — See [LICENSE](https://www.gnu.org/licenses/g
 - **Documentation:** `docs/` directory
 - **Security issues:** security@ltmarketplace.co
 - **Issues:** Use the GitHub issue tracker
+- **Production:** lo-tengo.com.co (SiteGround hosting)

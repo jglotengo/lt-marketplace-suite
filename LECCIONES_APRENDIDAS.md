@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-06
-> **Versión del plugin:** 2.9.35
-> **Total de lecciones:** 35
+> **Última actualización:** 2026-07-08
+> **Versión del plugin:** 2.9.98
+> **Total de lecciones:** 60 (35 originales + 25 nuevas de v2.9.36-98)
 
 ---
 
@@ -21,6 +21,7 @@
 9. [SiteGround — Errores de Cache y Producción](#9-siteground--errores-de-cache-y-producción)
 10. [Base de Datos — Errores de Migración](#10-base-de-datos--errores-de-migración)
 11. [Reglas Preventivas para la IA](#11-reglas-preventivas-para-la-ia)
+12. [**v2.9.36-98 — Lecciones Nuevas (REG/DEEP/UIUX Audits)**](#12-v2936-98--lecciones-nuevas-regdeepuiux-audits)
 
 ---
 
@@ -571,3 +572,280 @@ done
 ---
 
 *Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-06 con 35 lecciones documentadas.*
+
+---
+
+## 12. v2.9.36-98 — Lecciones Nuevas (REG/DEEP/UIUX Audits)
+
+25 lecciones adicionales extraídas de los 60+ commits entre v2.9.36 y v2.9.98, organizadas por auditoría.
+
+### LECCIÓN #36: Nonce action para Google OAuth (REG-AUDIT-001 REG-10)
+
+**Error:** Google OAuth fallaba silenciosamente porque el nonce action era `ltms_admin_nonce` (para admin) en lugar de `ltms_auth_nonce` (para auth).
+
+**Causa raíz:** Copy-paste de un handler admin sin ajustar el contexto.
+
+**Fix:** Cambiar `check_ajax_referer('ltms_admin_nonce', 'nonce')` → `check_ajax_referer('ltms_auth_nonce', 'nonce')` en el handler de Google OAuth.
+
+**Regla preventiva:** Usar el nonce action correcto según el contexto:
+- `ltms_dashboard_nonce` — vendor dashboard
+- `ltms_ux_nonce` — storefront
+- `ltms_admin_nonce` — admin panel
+- `ltms_auth_nonce` — auth (login, register, 2FA, OAuth)
+
+### LECCIÓN #37: Rate limiting no atómico = race condition (REG-AUDIT-001 REG-01/02)
+
+**Error:** El rate limiting usaba `SELECT count → if count < limit → INSERT` en dos pasos, permitiendo que múltiples requests concurrentes pasaran el check.
+
+**Causa raíz:** No se consideró concurrencia en el diseño original.
+
+**Fix:** Usar `INSERT INTO lt_rate_limits ... ON DUPLICATE KEY UPDATE count = count + 1` en una sola query atómica.
+
+**Regla preventiva:** Todo rate limiting debe ser atómico. Nunca uses `SELECT + INSERT/UPDATE` en dos pasos para controlar concurrencia.
+
+### LECCIÓN #38: `set_role()` sobreescribe roles (REG-AUDIT-001 REG-11)
+
+**Error:** Al aprobar un vendedor, `set_role('ltms_vendor')` eliminaba cualquier otro rol que tuviera (ej. `subscriber`, `customer`).
+
+**Causa raíz:** Confusión entre `WP_User::set_role()` (reemplaza) y `WP_User::add_role()` (añade).
+
+**Fix:** Usar `$user->add_role('ltms_vendor')` en lugar de `$user->set_role('ltms_vendor')`.
+
+**Regla preventiva:** En WordPress, `set_role()` REEMPLAZA todos los roles. Para AÑADIR un rol sin perder los existentes, usar `add_role()`.
+
+### LECCIÓN #39: IDOR en endpoints de vendor (DEEP-AUDIT-002 P0-4)
+
+**Error:** Cualquier vendor logueado podía leer/editar/eliminar datos de OTRO vendor (KYC, drivers, bank accounts, payouts) simplemente cambiando el ID en el request.
+
+**Causa raíz:** Los endpoints verificaban `is_user_logged_in()` pero no verificaban que el `vendor_id` del request coincidiera con `get_current_user_id()`.
+
+**Fix:** Antes de cada operación, verificar ownership:
+```php
+$existing_vendor = (int) $wpdb->get_var($wpdb->prepare(
+    "SELECT vendor_id FROM `{$table}` WHERE id = %d", $resource_id
+));
+if ( $existing_vendor !== get_current_user_id() ) {
+    wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
+    return;
+}
+```
+
+**Regla preventiva:** TODO endpoint que lee/escribe datos de un vendor debe verificar ownership. `is_user_logged_in()` NO es suficiente.
+
+### LECCIÓN #40: Bank account en plaintext en DOM (DEEP-AUDIT-002 P0-5)
+
+**Error:** El número de cuenta bancaria se enviaba al browser en plaintext para mostrarlo en la UI, exponiéndolo a ataques XSS.
+
+**Causa raíz:** Se desencriptaba para mostrar pero no se aplicaba masking.
+
+**Fix:** Desencriptar server-side, aplicar masking (`****1234`), enviar solo el valor enmascarado al browser.
+
+**Regla preventiva:** NUNCA enviar datos sensibles en plaintext al DOM. Siempre aplicar masking server-side antes de enviar al cliente.
+
+### LECCIÓN #41: 2FA sin rate limiting (DEEP-AUDIT-002 P1)
+
+**Error:** El challenge de TOTP 2FA no tenía rate limiting, permitiendo brute-force de códigos de 6 dígitos.
+
+**Causa raíz:** Se asumió que el código de 30s + anti-replay era suficiente.
+
+**Fix:** Rate limiting: 5 intentos fallidos por IP per 15 min → lockout temporal.
+
+**Regla preventiva:** Todo endpoint de autenticación (login, 2FA, password reset) debe tener rate limiting. No confiar solo en la entropía del código.
+
+### LECCIÓN #42: Nopriv abuse vectors (DEEP-AUDIT-002 P1)
+
+**Error:** Varios endpoints sensibles estaban registrados como `wp_ajax_nopriv_*` (accesibles sin login), permitiendo abuso.
+
+**Causa raíz:** Copy-paste de handlers sin revisar si necesitaban auth.
+
+**Fix:** Auditar todos los `nopriv` y eliminar los que no son estrictamente necesarios (guest checkout, product questions, back-in-stock notifications). Los demás deben verificar `get_current_user_id()` internamente.
+
+**Regla preventiva:** `wp_ajax_nopriv_*` es la excepción, no la regla. Solo usar para endpoints genuinamente públicos (checkout, product Q&A). Todo lo demás debe ser `wp_ajax_*` solo.
+
+### LECCIÓN #43: PosGold SSRF (DEEP-AUDIT-002 P1)
+
+**Error:** El cliente API de PosGold hacía requests HTTP a la URL configurada por el vendor sin validarla, permitiendo SSRF (Server-Side Request Forgery).
+
+**Causa raíz:** No se validó la URL antes de hacer el request.
+
+**Fix:** Validar URL contra allow-list antes de cada request HTTP outbound.
+
+**Regla preventiva:** Todo request HTTP outbound que use una URL configurable por el usuario debe validar contra allow-list para prevenir SSRF.
+
+### LECCIÓN #44: `onclick` inline rompe CSP (UIUX-AUDIT-001 P1)
+
+**Error:** Todos los views tenían `onclick=""`, `onchange=""` inline, impidiendo usar headers CSP estrictos.
+
+**Causa raíz:** Práctica común en WordPress legacy.
+
+**Fix:** Reemplazar todos los inline handlers con `addEventListener()` + `data-action` delegation.
+
+**Regla preventiva:** NUNCA usar `onclick=""`, `onchange=""`, `onfocus=""`, `onsubmit=""`, `onload=""` inline. Siempre usar `addEventListener()` en un `<script>` separado o `data-action` delegation.
+
+### LECCIÓN #45: `alert()` es mala UX (UIUX-AUDIT-001 P1)
+
+**Error:** Se usaba `alert()` para feedback al usuario, lo que bloquea el thread y es mala UX.
+
+**Causa raíz:** Práctica común en código legacy.
+
+**Fix:** Implementar toast system (slide-in, auto-dismiss 3s, color-coded success/error/info).
+
+**Regla preventiva:** NUNCA usar `alert()`, `confirm()`, `prompt()`. Usar toasts para notificaciones y modales para confirmaciones.
+
+### LECCIÓN #46: `location.reload()` rompe SPA (UIUX-AUDIT-001 P0)
+
+**Error:** Después de cada operación CRUD, se llamaba `location.reload()`, rompiendo la experiencia SPA.
+
+**Causa raíz:** Práctica común cuando no se quiere manejar actualización del DOM.
+
+**Fix:** Para toggles y deletes, actualizar el DOM inline (badge + button + KPIs). Para create/edit, recargar solo si es estrictamente necesario (HTML server-rendered fresco).
+
+**Regla preventiva:** Evitar `location.reload()` en SPAs. Para operaciones que cambian el estado, actualizar el DOM inline. Solo recargar cuando sea imprescindible (ej. crear/editar que necesita HTML server-rendered).
+
+### LECCIÓN #47: Memory leak en event bindings (UIUX-AUDIT-001 P0-3)
+
+**Error:** ReDi toggle estaba bound dentro de un click handler de img-preview, causando bindings duplicados en cada click.
+
+**Causa raíz:** Anidación incorrecta de event listeners.
+
+**Fix:** Mover el binding fuera del click handler, usar un solo listener con delegation.
+
+**Regla preventiva:** NUNCA anidar `addEventListener()` dentro de otro event handler. Usar event delegation: `document.addEventListener('click', e => { if (e.target.closest('[data-action]')) {...} })`.
+
+### LECCIÓN #48: `$country` undefined en do_action (UIUX-AUDIT-001 P0-4)
+
+**Error:** `do_action('ltms_kyc_extension', $country)` fallaba porque `$country` no estaba definida en ese scope.
+
+**Causa raíz:** Variable usada antes de ser inicializada.
+
+**Fix:** Inicializar `$country = $_POST['country'] ?? 'CO';` antes del do_action.
+
+**Regla preventiva:** Siempre inicializar variables antes de pasarlas a `do_action` o `apply_filters`. Usar null coalescing `??` con un default seguro.
+
+### LECCIÓN #49: Métricas muestran `...` en primera carga (UIUX-AUDIT-001 P0-5)
+
+**Error:** Las métricas del home mostraban `...` como valor inicial antes de que cargara el AJAX, dando impresión de que estaba roto.
+
+**Causa raíz:** Placeholder feo en lugar de skeleton loading.
+
+**Fix:** Usar skeleton loading animations (CSS shimmer) mientras carga el AJAX.
+
+**Regla preventiva:** Para cualquier vista async, usar skeleton loading (shimmer animation) en lugar de placeholders estáticos como `...` o `Loading...`.
+
+### LECCIÓN #50: Bell sin keyboard accessibility (UIUX-AUDIT-001 P0-7)
+
+**Error:** El icono de notificaciones (bell) en el topbar solo funcionaba con click, no con keyboard.
+
+**Causa raíz:** Era un `<div>` sin `role`, `tabindex`, ni handler de keyboard.
+
+**Fix:** Cambiar a `role="button"`, `tabindex="0"`, `aria-expanded`, y agregar handlers para Enter y Space.
+
+**Regla preventiva:** Todo elemento interactivo debe ser accesible por keyboard: `role="button"`, `tabindex="0"`, handlers para Enter y Space, `aria-expanded` para state.
+
+### LECCIÓN #51: Validación PHP con balance-checker ingenuo
+
+**Error:** El balance-checker de Python (`php_syntax_check.py`) reportaba falsos positivos de "IMBALANCED" en archivos con regex literals que contenían `"`.
+
+**Causa raíz:** El stripper de strings/comments se confundía con `"` dentro de regex literals.
+
+**Fix:** Crear `scripts/php_check.js` usando `php-parser` (npm) que hace parsing AST real.
+
+**Regla preventiva:** Para validar sintaxis PHP, usar un parser AST real (php-parser), no un balance-checker de llaves/paréntesis. Los regex literals con `"` confunden a los balance-checkers ingenuos.
+
+### LECCIÓN #52: Drivers count cache para nav visibility
+
+**Error:** El nav del dashboard hacía un `SELECT COUNT(*)` en cada render para decidir si mostrar el tab "Domiciliarios".
+
+**Causa raíz:** No había cache del count de drivers.
+
+**Fix:** Cachear el count en `user_meta._ltms_drivers_count_cache` y actualizarlo en `ajax_save_driver()` y `ajax_delete_driver()`.
+
+**Regla preventiva:** Para queries que se ejecutan en cada page load y dependen de datos que cambian infrecuentemente, usar cache en user_meta o transient. Invalidar el cache en cada operación que cambie los datos.
+
+### LECCIÓN #53: SPA loadView normalización de nombres
+
+**Error:** Views con guiones como `shipping-statement` generaban `loadShipping-statementView` que nunca existe como función.
+
+**Causa raíz:** No se normalizaba el nombre del view antes de construir el método.
+
+**Fix:** `view.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')` → `ShippingStatement` → `loadShippingStatementView`.
+
+**Regla preventiva:** Al construir nombres de métodos dinámicamente desde strings con guiones, normalizar primero (PascalCase). Si no existe el método específico, caer a `loadGenericView(view)` que muestra `#ltms-view-<view>`.
+
+### LECCIÓN #54: Output buffering para scripts inline (SiteGround)
+
+**Error:** SiteGround removía scripts inline del `<head>`, rompiendo funcionalidades críticas del cart drawer.
+
+**Causa raíz:** SiteGround Optimizer agresivo.
+
+**Fix:** Usar `ob_start()` + `ob_end_flush()` para envolver el output y que SiteGround no pueda remover el script.
+
+**Regla preventiva:** En SiteGround, si un script inline crítico se pierde, usar output buffering para protegerlo. Alternativamente, mover el script a un archivo `.js` externo.
+
+### LECCIÓN #55: NO-OP en JS viejo para evitar doble-binding
+
+**Error:** El JS externo viejo (cache-busteado) seguía ejecutando `updateCartQty` y `removeCartItem`, causando doble-binding con el nuevo JS.
+
+**Causa raíz:** No se podía remover el JS viejo (estaba en cache del browser).
+
+**Fix:** Hacer NO-OP en las funciones viejas: `window.updateCartQty = function() {}; window.removeCartItem = function() {};` al inicio del nuevo JS.
+
+**Regla preventiva:** Cuando reemplazas JS legacy que está en cache del browser, hacer NO-OP en las funciones viejas al inicio del nuevo JS para evitar doble-binding.
+
+### LECCIÓN #56: `html_entity_decode()` para subtotales
+
+**Error:** El subtotal del cart drawer mostraba `&#36;&nbsp;735.000` (HTML crudo) en lugar de `$ 735.000`.
+
+**Causa raíz:** `textContent` no interpreta entidades HTML; `innerHTML` sí.
+
+**Causa raíz PHP:** `wc_price()` devuelve HTML con entidades.
+
+**Fix:** En PHP, `html_entity_decode(wc_price($amount))` antes de enviar al cliente. En JS, usar `innerHTML` en lugar de `textContent` (con escape apropiado).
+
+**Regla preventiva:** Cuando pases HTML con entidades desde PHP a JS, asegúrate de que el JS lo renderice con `innerHTML` (no `textContent`), o decodifica las entidades en PHP antes de enviar.
+
+### LECCIÓN #57: Guests en cart drawer AJAX
+
+**Error:** El cart drawer no funcionaba para guests (no logueados) porque el AJAX requería login.
+
+**Causa raíz:** Endpoint registrado solo como `wp_ajax_*`, no `wp_ajax_nopriv_*`.
+
+**Fix:** Registrar también como `wp_ajax_nopriv_*` (con los apropiados checks de seguridad: nonce sin user_id, rate limiting).
+
+**Regla preventiva:** Para funcionalidades del carrito/checkout que deben funcionar para guests, registrar tanto `wp_ajax_*` como `wp_ajax_nopriv_*`. Pero SIEMPRE con nonce verification (sin user_id) y rate limiting.
+
+### LECCIÓN #58: AES-256-GCM v2 con backward-compat v1
+
+**Error:** Migrar de AES-256-CBC (v1) a AES-256-GCM (v2) rompía el decrypt de datos existentes.
+
+**Causa raíz:** Cambio de algoritmo sin backward-compat.
+
+**Fix:** Usar prefix `v1:` / `v2:` en el ciphertext. `decrypt()` auto-detecta la versión y usa el algoritmo correcto. Nuevos datos se cifran con v2, datos viejos se descifran con v1.
+
+**Regla preventiva:** Al migrar algoritmos de cifrado, mantener backward-compat con un prefix de versión. Nunca re-cifrar datos existentes en un migration masivo (riesgo de pérdida). Dejar que los datos se re-cifren naturalmente cuando se re-escriban.
+
+### LECCIÓN #59: `add_role()` no `set_role()` (confirmación LECCIÓN #38)
+
+**Error:** Confirmación de la lección #38 — este error se repitió en múltiples lugares.
+
+**Regla preventiva:** En WordPress, para AÑADIR un rol a un user sin perder los existentes, SIEMPRE usar `$user->add_role()`. `set_role()` REEMPLAZA todos los roles. Verificar con `grep -rn "set_role" includes/` periódicamente.
+
+### LECCIÓN #60: CSP compliance requiere 0 inline handlers
+
+**Error:** Múltiples vistas tenían inline handlers (`onclick`, `onchange`, etc.) que impedían usar headers CSP estrictos.
+
+**Causa raíz:** Práctica común en WordPress legacy.
+
+**Fix:** Auditoría completa (UIUX-AUDIT-001) que reemplazó TODOS los inline handlers con `addEventListener()` + `data-action` delegation.
+
+**Regla preventiva:** El plugin está ahora 100% CSP-compliant (0 inline handlers). Para mantenerlo, NUNCA agregar `onclick=""`, `onchange=""`, etc. inline. Siempre usar `addEventListener()` en un `<script>` al final del view o en un archivo `.js` externo.
+
+**Verificación periódica:**
+```bash
+grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/views/
+# Debe devolver 0 resultados
+```
+
+---
+
+*Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-08 (v2.9.98) con 60 lecciones documentadas (35 originales + 25 nuevas de los audits REG/DEEP/UIUX).*
