@@ -199,14 +199,18 @@ $has_bank_data     = ! empty( $saved_bank_acc );
         <div style="margin-bottom:20px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Cuenta bancaria', 'ltms' ); ?></label>
             <?php if ( $has_bank_data ) : ?>
+            <?php
+            // v2.9.77 P0-UI-2: Enmascarar el número de cuenta — mostrar solo últimos 4 dígitos.
+            $masked_acc = '****' . substr( preg_replace( '/\D/', '', $saved_bank_acc ), -4 );
+            ?>
             <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.82rem;color:#166534;">
                 <strong><?php echo esc_html( $saved_bank ); ?></strong>
                 · <?php echo esc_html( ucfirst( $saved_bank_type ) ); ?>
-                · <?php echo esc_html( $saved_bank_acc ); ?>
+                · <?php echo esc_html( $masked_acc ); ?>
                 <?php if ( $saved_bank_holder ) : ?> · <?php echo esc_html( $saved_bank_holder ); ?><?php endif; ?>
                 <br><span style="font-size:0.75rem;color:#4ade80;">✓ <?php esc_html_e( 'Cuenta guardada en Configuración', 'ltms' ); ?></span>
             </div>
-            <input type="hidden" id="ltms-payout-account" value="<?php echo esc_attr( $saved_bank_acc ); ?>">
+            <input type="hidden" id="ltms-payout-account" value="<?php echo esc_attr( $masked_acc ); ?>">
             <?php else : ?>
             <input type="text" id="ltms-payout-account"
                    placeholder="<?php esc_attr_e( 'Número de cuenta', 'ltms' ); ?>"

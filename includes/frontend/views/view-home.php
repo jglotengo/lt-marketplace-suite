@@ -60,22 +60,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         <div class="ltms-metric">
             <div class="ltms-metric-icon blue">💰</div>
             <div class="ltms-metric-label"><?php esc_html_e( 'Ventas del Mes', 'ltms' ); ?></div>
-            <div class="ltms-metric-value ltms-metric-sales">...</div>
+            <div class="ltms-metric-value ltms-metric-sales ltms-skeleton-loading">$0</div>
         </div>
         <div class="ltms-metric">
             <div class="ltms-metric-icon green">📦</div>
             <div class="ltms-metric-label"><?php esc_html_e( 'Pedidos', 'ltms' ); ?></div>
-            <div class="ltms-metric-value ltms-metric-orders">...</div>
+            <div class="ltms-metric-value ltms-metric-orders ltms-skeleton-loading">0</div>
         </div>
         <div class="ltms-metric">
             <div class="ltms-metric-icon orange">💵</div>
             <div class="ltms-metric-label"><?php esc_html_e( 'Comisiones', 'ltms' ); ?></div>
-            <div class="ltms-metric-value ltms-metric-commissions">...</div>
+            <div class="ltms-metric-value ltms-metric-commissions ltms-skeleton-loading">$0</div>
         </div>
         <div class="ltms-metric">
             <div class="ltms-metric-icon purple">👜</div>
             <div class="ltms-metric-label"><?php esc_html_e( 'Balance Billetera', 'ltms' ); ?></div>
-            <div class="ltms-metric-value ltms-metric-balance">...</div>
+            <div class="ltms-metric-value ltms-metric-balance ltms-skeleton-loading">$0</div>
         </div>
     </div>
 

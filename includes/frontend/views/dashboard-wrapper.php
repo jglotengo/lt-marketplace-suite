@@ -122,10 +122,15 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
 
             <div class="ltms-topbar-actions">
                 <!-- Notificaciones -->
-                <div class="ltms-topbar-notif">
+                <div class="ltms-topbar-notif"
+                     role="button"
+                     tabindex="0"
+                     aria-expanded="false"
+                     aria-label="<?php esc_attr_e( 'Notificaciones', 'ltms' ); ?>"
+                     id="ltms-notif-bell">
                     🔔
                     <?php if ( $unread_notif > 0 ) : ?>
-                    <span class="ltms-badge-count"><?php echo esc_html( min( 99, $unread_notif ) ); ?></span>
+                    <span class="ltms-badge-count" aria-label="<?php echo esc_attr( sprintf( _n( '%d notificación no leída', '%d notificaciones no leídas', $unread_notif, 'ltms' ), $unread_notif ) ); ?>"><?php echo esc_html( min( 99, $unread_notif ) ); ?></span>
                     <?php endif; ?>
                 </div>
 

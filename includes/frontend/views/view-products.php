@@ -257,13 +257,14 @@ $products  = wc_get_products([
     // ── Imagen: click en preview o botón ─────────────────────────
     $('#ltms-np-img-preview, #ltms-np-img-btn').on('click', function(){
         $('#ltms-np-img-input').trigger('click');
-        // CS-08: toggle ReDi rate field
-        $('#ltms-np-redi-enabled').on('change', function(){
-            $('#ltms-np-redi-rate-wrap').toggle($(this).is(':checked'));
-        });
-        $('#ltms-ep-redi-enabled').on('change', function(){
-            $('#ltms-ep-redi-rate-wrap').toggle($(this).is(':checked'));
-        });
+    });
+
+    // v2.9.77 P0-UI-3: ReDi toggle bindings fuera del click handler (memory leak fix).
+    $('#ltms-np-redi-enabled').on('change', function(){
+        $('#ltms-np-redi-rate-wrap').toggle($(this).is(':checked'));
+    });
+    $('#ltms-ep-redi-enabled').on('change', function(){
+        $('#ltms-ep-redi-rate-wrap').toggle($(this).is(':checked'));
     });
 
     $('#ltms-np-img-input').on('change', function(){
@@ -351,7 +352,8 @@ $products  = wc_get_products([
                     $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
                     $('#ltms-np-img-status').text('');
                     $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true).trigger('change');
-                    setTimeout(function(){ location.reload(); }, 1500);
+                    // v2.9.77 P0-UI-1: Usar loadView en vez de location.reload (SPA).
+                    setTimeout(function(){ LTMS.Dashboard.loadView('products', true); }, 1500);
                 } else {
                     $notice.removeClass('ltms-notice-success')
                            .addClass('ltms-notice-error')
@@ -489,7 +491,8 @@ $products  = wc_get_products([
                 $btn.prop('disabled',false).text('Guardar Cambios');
                 if(res.success){
                     $n.removeClass('ltms-notice-error').addClass('ltms-notice-success').text('✅ Cambios guardados. Recargando...').show();
-                    setTimeout(function(){ location.reload(); },1500);
+                    // v2.9.77 P0-UI-1: Usar loadView en vez de location.reload (SPA).
+                    setTimeout(function(){ LTMS.Dashboard.loadView('products', true); }, 1500);
                 } else {
                     $n.removeClass('ltms-notice-success').addClass('ltms-notice-error').text(res.data||'Error al guardar.').show();
                 }
@@ -506,7 +509,7 @@ $products  = wc_get_products([
         $.ajax({
             url:ltmsDashboard.ajax_url, method:'POST',
             data:{action:'ltms_delete_product', nonce:ltmsDashboard.nonce, product_id:pid},
-            success:function(res){ if(res.success){ location.reload(); } else { alert(res.data||'No se pudo eliminar.'); } },
+            success:function(res){ if(res.success){ LTMS.Dashboard.loadView('products', true); } else { alert(res.data||'No se pudo eliminar.'); } },
             error:function(){ alert('Error de conexión.'); }
         });
     });

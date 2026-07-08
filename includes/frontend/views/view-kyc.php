@@ -266,7 +266,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             // añadir campos adicionales al formulario KYC del vendor (registro
             // INVIMA/COFEPRIS para restaurantes, etc.). Antes de este fix, RT-2
             // era silent dead code desde v2.9.14. Recibe 2 args: ($vendor_id, $country).
-            do_action( 'ltms_kyc_fields_extra', (int) get_current_user_id(), $country ?? 'CO' );
+            do_action( 'ltms_kyc_fields_extra', (int) get_current_user_id(), $vendor_country ?? 'CO' );
             ?>
 
             <button type="button" id="ltms-kyc-submit-btn"
