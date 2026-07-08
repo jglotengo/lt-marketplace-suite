@@ -245,8 +245,11 @@ final class LTMS_Dashboard_Logic {
         $page     = max( 1, (int) ( $_POST['page'] ?? 1 ) ); // phpcs:ignore
         $per_page = min( 50, max( 10, (int) ( $_POST['per_page'] ?? 20 ) ) ); // phpcs:ignore
         $status   = sanitize_text_field( $_POST['status'] ?? '' ); // phpcs:ignore
+        // v2.9.89 P2: Date range filter + search
+        $date_filter = sanitize_text_field( $_POST['date_filter'] ?? '' ); // phpcs:ignore
+        $search   = sanitize_text_field( $_POST['search'] ?? '' ); // phpcs:ignore
 
-        $orders = $this->get_vendor_orders( $user_id, $page, $per_page, $status );
+        $orders = $this->get_vendor_orders( $user_id, $page, $per_page, $status, $date_filter, $search );
         wp_send_json_success( $orders );
     }
 
@@ -865,9 +868,11 @@ final class LTMS_Dashboard_Logic {
      * @param int    $page      Página.
      * @param int    $per_page  Items por página.
      * @param string $status    Filtro de estado.
+     * @param string $date_filter Filtro de rango de fecha (today/7days/30days/90days/thisyear).
+     * @param string $search    Búsqueda por número de pedido o cliente.
      * @return array
      */
-    private function get_vendor_orders( int $vendor_id, int $page, int $per_page, string $status ): array {
+    private function get_vendor_orders( int $vendor_id, int $page, int $per_page, string $status, string $date_filter = '', string $search = '' ): array {
         // v2.9.76 FIX: Filtrar pedidos por vendor de forma robusta.
         //
         // PROBLEMA: _ltms_vendor_id solo se guarda en pedidos single-vendor.
@@ -889,6 +894,51 @@ final class LTMS_Dashboard_Logic {
             $status_args[] = 'wc-' . sanitize_text_field( $status );
         }
 
+        // v2.9.89 P2: Date range filter
+        $date_clause = '';
+        $date_args = [];
+        if ( $date_filter ) {
+            $now = current_time( 'timestamp' );
+            switch ( $date_filter ) {
+                case 'today':
+                    $start = gmdate( 'Y-m-d 00:00:00', $now );
+                    $date_clause = "AND p.post_date >= %s";
+                    $date_args[] = $start;
+                    break;
+                case '7days':
+                    $start = gmdate( 'Y-m-d 00:00:00', $now - 7 * DAY_IN_SECONDS );
+                    $date_clause = "AND p.post_date >= %s";
+                    $date_args[] = $start;
+                    break;
+                case '30days':
+                    $start = gmdate( 'Y-m-d 00:00:00', $now - 30 * DAY_IN_SECONDS );
+                    $date_clause = "AND p.post_date >= %s";
+                    $date_args[] = $start;
+                    break;
+                case '90days':
+                    $start = gmdate( 'Y-m-d 00:00:00', $now - 90 * DAY_IN_SECONDS );
+                    $date_clause = "AND p.post_date >= %s";
+                    $date_args[] = $start;
+                    break;
+                case 'thisyear':
+                    $start = gmdate( 'Y-01-01 00:00:00', $now );
+                    $date_clause = "AND p.post_date >= %s";
+                    $date_args[] = $start;
+                    break;
+            }
+        }
+
+        // v2.9.89 P2: Search filter
+        $search_clause = '';
+        $search_args = [];
+        if ( $search ) {
+            $like = '%' . $wpdb->esc_like( $search ) . '%';
+            $search_clause = "AND (p.ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_billing_first_name' AND meta_value LIKE %s) OR p.ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_billing_last_name' AND meta_value LIKE %s) OR p.ID LIKE %s)";
+            $search_args[] = $like;
+            $search_args[] = $like;
+            $search_args[] = $like;
+        }
+
         // 1. Encontrar IDs de pedidos del vendor con paginación.
         $sql = "SELECT DISTINCT p.ID
              FROM {$wpdb->posts} p
@@ -900,12 +950,14 @@ final class LTMS_Dashboard_Logic {
              WHERE p.post_type = 'shop_order'
              AND (pm1.meta_id IS NOT NULL OR pm2.meta_id IS NOT NULL OR pm3.meta_id IS NOT NULL)
              {$status_clause}
+             {$date_clause}
+             {$search_clause}
              ORDER BY p.post_date DESC
              LIMIT %d OFFSET %d";
 
         $order_ids = $wpdb->get_col( $wpdb->prepare(
             $sql,
-            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args, [ $per_page, ( $page - 1 ) * $per_page ] )
+            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args, $date_args, $search_args, [ $per_page, ( $page - 1 ) * $per_page ] )
         ) );
 
         if ( empty( $order_ids ) ) {
@@ -927,11 +979,13 @@ final class LTMS_Dashboard_Logic {
              LEFT JOIN {$wpdb->postmeta} pm3 ON oim.meta_value = pm3.post_id AND pm3.meta_key = '_ltms_vendor_id' AND pm3.meta_value = %d
              WHERE p.post_type = 'shop_order'
              AND (pm1.meta_id IS NOT NULL OR pm2.meta_id IS NOT NULL OR pm3.meta_id IS NOT NULL)
-             {$status_clause}";
+             {$status_clause}
+             {$date_clause}
+             {$search_clause}";
 
         $total = (int) $wpdb->get_var( $wpdb->prepare(
             $count_sql,
-            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args )
+            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args, $date_args, $search_args )
         ) );
 
         // 3. Obtener los objetos WC_Order.

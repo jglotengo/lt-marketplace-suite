@@ -392,13 +392,13 @@
          * paginación y filtro trabajen sobre el mismo estado en vez de
          * mandar siempre page:1 (bug de la versión anterior).
          */
-        ordersState: { page: 1, perPage: 20, status: '', totalPages: 1 },
+        ordersState: { page: 1, perPage: 20, status: '', totalPages: 1, dateFilter: '', search: '' },
 
         /**
          * Carga la vista de Pedidos (primera carga / al navegar al tab).
          */
         loadOrdersView() {
-            this.ordersState = { page: 1, perPage: 20, status: '', totalPages: 1 };
+            this.ordersState = { page: 1, perPage: 20, status: '', totalPages: 1, dateFilter: '', search: '' };
             this.fetchOrders();
         },
 
@@ -420,6 +420,8 @@
                     page: self.ordersState.page,
                     per_page: self.ordersState.perPage,
                     status: self.ordersState.status,
+                    date_filter: self.ordersState.dateFilter || '',
+                    search: self.ordersState.search || '',
                 },
                 success(response) {
                     if (response.success) {
@@ -932,6 +934,13 @@
             const self = this;
             $(document).on('change', '#ltms-order-status-filter', function () {
                 self.ordersState.status = $(this).val() === 'all' ? '' : $(this).val();
+                self.ordersState.page = 1;
+                self.fetchOrders();
+            });
+
+            // v2.9.89 P2: Date range filter
+            $(document).on('change', '#ltms-order-date-filter', function () {
+                self.ordersState.dateFilter = $(this).val();
                 self.ordersState.page = 1;
                 self.fetchOrders();
             });

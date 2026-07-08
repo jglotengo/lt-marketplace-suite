@@ -27,6 +27,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 <option value="completed"><?php esc_html_e( 'Completado', 'ltms' ); ?></option>
                 <option value="cancelled"><?php esc_html_e( 'Cancelado', 'ltms' ); ?></option>
             </select>
+            <!-- v2.9.89 P2: Date range selector -->
+            <select id="ltms-order-date-filter" class="ltms-btn ltms-btn-outline ltms-btn-sm" style="cursor:pointer;">
+                <option value=""><?php esc_html_e( 'Todas las fechas', 'ltms' ); ?></option>
+                <option value="today"><?php esc_html_e( 'Hoy', 'ltms' ); ?></option>
+                <option value="7days"><?php esc_html_e( 'Últimos 7 días', 'ltms' ); ?></option>
+                <option value="30days"><?php esc_html_e( 'Últimos 30 días', 'ltms' ); ?></option>
+                <option value="90days"><?php esc_html_e( 'Últimos 90 días', 'ltms' ); ?></option>
+                <option value="thisyear"><?php esc_html_e( 'Este año', 'ltms' ); ?></option>
+            </select>
         </div>
     </div>
 
