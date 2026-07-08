@@ -156,27 +156,27 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
 
         <!-- Vistas del SPA -->
         <div class="ltms-view-section" id="ltms-view-home" style="display:none;">
-            <?php include __DIR__ . '/view-home.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-home.php' ) ) include __DIR__ . '/view-home.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-orders" style="display:none;">
-            <?php include __DIR__ . '/view-orders.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-orders.php' ) ) include __DIR__ . '/view-orders.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-products" style="display:none;">
-            <?php include __DIR__ . '/view-products.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-products.php' ) ) include __DIR__ . '/view-products.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-wallet" style="display:none;">
-            <?php include __DIR__ . '/view-wallet.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-wallet.php' ) ) include __DIR__ . '/view-wallet.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-settings" style="display:none;">
-            <?php include __DIR__ . '/view-settings.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-settings.php' ) ) include __DIR__ . '/view-settings.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-envios" style="display:none;">
-            <?php include __DIR__ . '/view-envios.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-envios.php' ) ) include __DIR__ . '/view-envios.php'; ?>
         </div>
 
         <?php
@@ -217,27 +217,27 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
         <?php endif; ?>
 
         <div class="ltms-view-section" id="ltms-view-ordenes-compra" style="display:none;">
-            <?php include __DIR__ . '/view-ordenes-compra.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-ordenes-compra.php' ) ) include __DIR__ . '/view-ordenes-compra.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-bookings" style="display:none;">
-            <?php include __DIR__ . '/view-bookings.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-bookings.php' ) ) include __DIR__ . '/view-bookings.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-marketing" style="display:none;">
-            <?php include __DIR__ . '/view-marketing.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-marketing.php' ) ) include __DIR__ . '/view-marketing.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-security" style="display:none;">
-            <?php include __DIR__ . '/view-security.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-security.php' ) ) include __DIR__ . '/view-security.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-donations" style="display:none;">
-            <?php include __DIR__ . '/view-donations.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-donations.php' ) ) include __DIR__ . '/view-donations.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-posgold" style="display:none;">
-            <?php include __DIR__ . '/view-posgold.php'; ?>
+            <?php if ( file_exists( __DIR__ . '/view-posgold.php' ) ) include __DIR__ . '/view-posgold.php'; ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">

@@ -39,7 +39,7 @@ $monthly   = $statement['monthly'];
 $limit     = (float) $budget['budget_limit'];
 $spent_pct = (float) $budget['spent_pct'];
 
-$currency = function_exists( 'LTMS_Core_Config::get_currency' ) ? LTMS_Core_Config::get_currency() : 'COP';
+$currency = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_currency() : 'COP';
 $fmt = function( $v ) use ( $currency ) {
     return '$ ' . number_format( (float) $v, 0, ',', '.' ) . ' ' . $currency;
 };
