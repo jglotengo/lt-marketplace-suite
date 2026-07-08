@@ -214,8 +214,92 @@
             // Cargar gráfica de ventas
             this.loadSalesChart();
 
+            // v2.9.90 P2: Cargar widgets adicionales
+            this.loadHomeWidgets();
+
             // Mostrar la sección
             this.showSection('#ltms-view-home');
+        },
+
+        /**
+         * v2.9.90 P2: Carga widgets de pedidos recientes y top productos en home.
+         */
+        loadHomeWidgets() {
+            const self = this;
+
+            // Pedidos recientes (reutiliza el endpoint de orders con page=1, per_page=5)
+            $.ajax({
+                url: ltmsDashboard.ajax_url,
+                method: 'POST',
+                data: { action: 'ltms_get_orders_data', nonce: ltmsDashboard.nonce, page: 1, per_page: 5 },
+                success: function(response) {
+                    if (!response.success || !response.data || !response.data.orders) return;
+                    var orders = response.data.orders;
+                    if (!orders.length) {
+                        $('#ltms-home-recent-orders').html(
+                            '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">' +
+                            'No tienes pedidos todavía</div>'
+                        );
+                        return;
+                    }
+                    var html = orders.map(function(o) {
+                        var statusColors = {
+                            'pending': '#f59e0b', 'processing': '#3b82f6',
+                            'completed': '#10b981', 'cancelled': '#ef4444',
+                            'ready-for-pickup': '#8b5cf6'
+                        };
+                        var color = statusColors[o.status] || '#6b7280';
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+                            '<div>' +
+                                '<div style="font-weight:600;font-size:0.82rem;color:#111827;">#' + o.number + '</div>' +
+                                '<div style="font-size:0.72rem;color:#9ca3af;">' + (o.customer || 'Cliente') + '</div>' +
+                            '</div>' +
+                            '<div style="text-align:right;">' +
+                                '<div style="font-weight:600;font-size:0.82rem;">' + o.formatted + '</div>' +
+                                '<div style="font-size:0.68rem;color:' + color + ';text-transform:capitalize;">' + o.status + '</div>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    $('#ltms-home-recent-orders').html(html);
+                },
+                error: function() {
+                    $('#ltms-home-recent-orders').html('<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">Error al cargar</div>');
+                }
+            });
+
+            // Top productos (reutiliza el endpoint de products con page=1, per_page=5)
+            $.ajax({
+                url: ltmsDashboard.ajax_url,
+                method: 'POST',
+                data: { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce, page: 1, per_page: 5 },
+                success: function(response) {
+                    if (!response.success || !response.data || !response.data.products) return;
+                    var products = response.data.products;
+                    if (!products.length) {
+                        $('#ltms-home-top-products').html(
+                            '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">' +
+                            'No tienes productos todavía</div>'
+                        );
+                        return;
+                    }
+                    var html = products.map(function(p, i) {
+                        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+                            '<span style="font-size:1rem;width:24px;text-align:center;">' + medal + '</span>' +
+                            (p.image ? '<img src="' + p.image + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#9ca3af;">📦</div>') +
+                            '<div style="flex:1;min-width:0;">' +
+                                '<div style="font-weight:600;font-size:0.82rem;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.name + '</div>' +
+                                '<div style="font-size:0.72rem;color:#9ca3af;">' + (p.stock !== null ? 'Stock: ' + p.stock : 'Sin stock') + '</div>' +
+                            '</div>' +
+                            '<div style="font-weight:600;font-size:0.82rem;color:#10b981;">$' + (p.price || 0).toLocaleString('es-CO') + '</div>' +
+                        '</div>';
+                    }).join('');
+                    $('#ltms-home-top-products').html(html);
+                },
+                error: function() {
+                    $('#ltms-home-top-products').html('<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">Error al cargar</div>');
+                }
+            });
         },
 
         /**

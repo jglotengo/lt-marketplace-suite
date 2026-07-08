@@ -102,4 +102,50 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </button>
     </div>
 
+    <!-- v2.9.90 P2: Widgets adicionales (Woodmart-inspired) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;" class="ltms-home-widgets">
+        <!-- Ventas recientes -->
+        <div class="ltms-card">
+            <div class="ltms-card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>📦 <?php esc_html_e( 'Pedidos Recientes', 'ltms' ); ?></span>
+                <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" data-action="load-view" data-view="orders" style="font-size:0.7rem;padding:4px 10px;">
+                    <?php esc_html_e( 'Ver todos', 'ltms' ); ?>
+                </button>
+            </div>
+            <div class="ltms-card-body" style="padding:0;">
+                <div id="ltms-home-recent-orders" style="padding:12px;">
+                    <div style="text-align:center;color:#9ca3af;padding:20px;font-size:0.85rem;">
+                        <div style="display:inline-block;width:20px;height:20px;border:2px solid #e5e7eb;border-top:2px solid #2563eb;border-radius:50%;animation:ltms-pulse 1s linear infinite;margin-bottom:8px;"></div>
+                        <div><?php esc_html_e( 'Cargando...', 'ltms' ); ?></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top productos -->
+        <div class="ltms-card">
+            <div class="ltms-card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>🏆 <?php esc_html_e( 'Productos Más Vendidos', 'ltms' ); ?></span>
+                <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" data-action="load-view" data-view="products" style="font-size:0.7rem;padding:4px 10px;">
+                    <?php esc_html_e( 'Ver todos', 'ltms' ); ?>
+                </button>
+            </div>
+            <div class="ltms-card-body" style="padding:0;">
+                <div id="ltms-home-top-products" style="padding:12px;">
+                    <div style="text-align:center;color:#9ca3af;padding:20px;font-size:0.85rem;">
+                        <div style="display:inline-block;width:20px;height:20px;border:2px solid #e5e7eb;border-top:2px solid #2563eb;border-radius:50%;animation:ltms-pulse 1s linear infinite;margin-bottom:8px;"></div>
+                        <div><?php esc_html_e( 'Cargando...', 'ltms' ); ?></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    @media (max-width: 768px) {
+        .ltms-home-widgets { grid-template-columns: 1fr !important; }
+    }
+    @keyframes ltms-pulse { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
 </div>
