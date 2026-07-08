@@ -60,6 +60,10 @@
                 $('.ltms-nav-item').removeClass('active');
                 $(this).addClass('active');
 
+                // v2.9.78 P1: Sincronizar bottom nav active state.
+                $('.ltms-bottom-nav-item').removeClass('active');
+                $('.ltms-bottom-nav-item[data-view="' + view + '"]').addClass('active');
+
                 // Actualizar el título del topbar
                 const title = $(this).find('.ltms-nav-label').text();
                 $('.ltms-topbar-title').text(title);
@@ -67,6 +71,27 @@
                 // Cerrar sidebar en móvil
                 if ($(window).width() <= 768) {
                     $('.ltms-sidebar').removeClass('ltms-sidebar-open');
+                }
+            });
+
+            // v2.9.78 P1: Bottom navigation handler (mobile).
+            $(document).on('click', '.ltms-bottom-nav-item[data-view]', function (e) {
+                e.preventDefault();
+                const view = $(this).data('view');
+                self.loadView(view);
+                $('.ltms-bottom-nav-item').removeClass('active');
+                $(this).addClass('active');
+                $('.ltms-nav-item').removeClass('active');
+                $('.ltms-nav-item[data-view="' + view + '"]').addClass('active');
+                const title = $(this).find('.ltms-bottom-nav-label').text();
+                $('.ltms-topbar-title').text(title);
+            });
+
+            // v2.9.78 P1: Bell keyboard support (a11y).
+            $(document).on('keydown', '#ltms-notif-bell', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    $(this).click();
                 }
             });
         },

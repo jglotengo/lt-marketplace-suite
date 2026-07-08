@@ -260,6 +260,45 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
 
     </main><!-- /ltms-main-content -->
 
-</div><!-- /ltms-dashboard-container -->
+    <!-- v2.9.78 P1: Mobile bottom navigation (Woodmart-inspired) -->
+    <nav class="ltms-bottom-nav" aria-label="<?php esc_attr_e( 'Navegación rápida', 'ltms' ); ?>">
+        <button class="ltms-bottom-nav-item active" data-view="home" aria-label="<?php esc_attr_e( 'Inicio', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">📊</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Inicio', 'ltms' ); ?></span>
+        </button>
+        <button class="ltms-bottom-nav-item" data-view="orders" aria-label="<?php esc_attr_e( 'Pedidos', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">📦</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Pedidos', 'ltms' ); ?></span>
+        </button>
+        <button class="ltms-bottom-nav-item" data-view="products" aria-label="<?php esc_attr_e( 'Productos', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">🛍️</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Productos', 'ltms' ); ?></span>
+        </button>
+        <button class="ltms-bottom-nav-item" data-view="wallet" aria-label="<?php esc_attr_e( 'Billetera', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">💰</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Billetera', 'ltms' ); ?></span>
+        </button>
+        <button class="ltms-bottom-nav-item" data-view="settings" aria-label="<?php esc_attr_e( 'Ajustes', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">⚙️</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Ajustes', 'ltms' ); ?></span>
+        </button>
+    </nav>
 
+    <style>
+    /* v2.9.78 P1: Mobile bottom nav styles */
+    .ltms-bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 999; background: #fff; border-top: 1px solid #e5e7eb; padding: 6px 0; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.06); }
+    .ltms-bottom-nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 10px; border-radius: 8px; color: #6b7280; font-size: 0.65rem; transition: all 0.2s; }
+    .ltms-bottom-nav-item.active { color: #2563eb; background: #eff6ff; }
+    .ltms-bottom-nav-icon { font-size: 1.3rem; line-height: 1; }
+    .ltms-bottom-nav-label { font-weight: 600; }
+    @media (max-width: 768px) {
+        .ltms-bottom-nav { display: flex; }
+        .ltms-main-content { padding-bottom: 70px !important; }
+    }
+    /* v2.9.78 P1: Skeleton loading animation */
+    .ltms-skeleton-loading { animation: ltms-pulse 1.5s ease-in-out infinite; opacity: 0.6; }
+    @keyframes ltms-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    </style>
+
+</div><!-- /ltms-dashboard-container -->
  
