@@ -748,7 +748,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                     var bg = dateStr === todayStr ? '#eff6ff' : '#fff';
                     var bookingHtml = dayBookings.map(function(b) {
                         var color = statusColors[b.status] || '#f3f4f6';
-                        return '<div style="background:' + color + ';border-radius:4px;padding:2px 4px;margin:2px 0;font-size:0.65rem;cursor:pointer;" onclick="document.querySelector(\'[data-target=&quot;ltms-bk-reservas&quot;]\').click()">' +
+                        return '<div style="background:' + color + ';border-radius:4px;padding:2px 4px;margin:2px 0;font-size:0.65rem;cursor:pointer;" data-cal-booking="1">' +
                             (b.guest_name || 'Reserva') + '</div>';
                     }).join('');
                     var isWeekend = d >= 5;
@@ -777,6 +777,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     $('#ltms-cal-today').on('click', function() {
         calDate = new Date();
         ltmsLoadCalendar();
+    });
+    // v2.9.93: Click en reserva del calendario → ir a tab reservas
+    $(document).on('click', '[data-cal-booking]', function() {
+        $('[data-target="ltms-bk-reservas"]').click();
     });
 
     function ltmsSeasonNotice(msg, type) {
