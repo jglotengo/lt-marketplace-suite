@@ -22,26 +22,47 @@ $notif_table  = $wpdb->prefix . 'lt_notifications';
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $unread_notif = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$notif_table}` WHERE user_id = %d AND is_read = 0", $user_id ) );
 
+// v2.9.94 P3: SVG icons en nav items (Woodmart-style).
+$svg_icons = [
+    'home'     => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    'orders'   => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+    'products' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+    'envios'   => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
+    'shipping-statement' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>',
+    'wallet'   => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>',
+    'bookings' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    'marketing' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10"/><path d="M12 2a15 15 0 0 0-4 10 15 15 0 0 0 4 10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+    'security' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    'donations' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+    'posgold'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+    'settings' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    'ordenes-compra' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
+    'redi'     => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    'incidents' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    'kitchen'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 2v8a3 3 0 0 0 6 0V2"/><line x1="8" y1="2" x2="8" y2="10"/><path d="M16 2v20"/><path d="M19 2c-1.5 1.5-3 4-3 7s1.5 3 3 3"/></svg>',
+    'analytics' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+];
+
 $nav_items = [
-    [ 'view' => 'home',     'icon' => '📊', 'label' => __( 'Inicio', 'ltms' ) ],
-    [ 'view' => 'orders',   'icon' => '📦', 'label' => __( 'Pedidos', 'ltms' ) ],
-    [ 'view' => 'products', 'icon' => '🛍️', 'label' => __( 'Productos', 'ltms' ) ],
-    [ 'view' => 'envios',        'icon' => '🚚', 'label' => __( 'Envíos', 'ltms' ) ],
-    [ 'view' => 'shipping-statement', 'icon' => '🧾', 'label' => __( 'Fletes', 'ltms' ) ],
-    [ 'view' => 'wallet',   'icon' => '💰', 'label' => __( 'Billetera', 'ltms' ) ],
-    [ 'view' => 'bookings', 'icon' => '🏨', 'label' => __( 'Reservas', 'ltms' ) ],
-    [ 'view' => 'marketing', 'icon' => '🎨', 'label' => __( 'Marketing', 'ltms' ) ],
-    [ 'view' => 'security', 'icon' => '🔐', 'label' => __( 'Seguridad', 'ltms' ) ],
-    [ 'view' => 'donations', 'icon' => '❤️', 'label' => __( 'Donaciones', 'ltms' ) ],
-    [ 'view' => 'posgold', 'icon' => '🔗', 'label' => __( 'PosGold', 'ltms' ) ],
-    [ 'view' => 'settings', 'icon' => '⚙️', 'label' => __( 'Configuración', 'ltms' ) ],
+    [ 'view' => 'home',     'icon' => $svg_icons['home'],     'label' => __( 'Inicio', 'ltms' ) ],
+    [ 'view' => 'orders',   'icon' => $svg_icons['orders'],   'label' => __( 'Pedidos', 'ltms' ) ],
+    [ 'view' => 'products', 'icon' => $svg_icons['products'], 'label' => __( 'Productos', 'ltms' ) ],
+    [ 'view' => 'envios',        'icon' => $svg_icons['envios'],   'label' => __( 'Envíos', 'ltms' ) ],
+    [ 'view' => 'shipping-statement', 'icon' => $svg_icons['shipping-statement'], 'label' => __( 'Fletes', 'ltms' ) ],
+    [ 'view' => 'wallet',   'icon' => $svg_icons['wallet'],   'label' => __( 'Billetera', 'ltms' ) ],
+    [ 'view' => 'bookings', 'icon' => $svg_icons['bookings'], 'label' => __( 'Reservas', 'ltms' ) ],
+    [ 'view' => 'marketing', 'icon' => $svg_icons['marketing'], 'label' => __( 'Marketing', 'ltms' ) ],
+    [ 'view' => 'security', 'icon' => $svg_icons['security'], 'label' => __( 'Seguridad', 'ltms' ) ],
+    [ 'view' => 'donations', 'icon' => $svg_icons['donations'], 'label' => __( 'Donaciones', 'ltms' ) ],
+    [ 'view' => 'posgold', 'icon' => $svg_icons['posgold'], 'label' => __( 'PosGold', 'ltms' ) ],
+    [ 'view' => 'settings', 'icon' => $svg_icons['settings'], 'label' => __( 'Configuración', 'ltms' ) ],
 ];
 
 // Órdenes de Compra Aveonline: oculto por defecto, controlado desde Configuración > Aveonline.
 if ( get_option( 'ltms_ordenes_compra_enabled', 'no' ) === 'yes' ) {
     array_splice( $nav_items, 4, 0, [[
         'view'  => 'ordenes-compra',
-        'icon'  => '🛒',
+        'icon'  => $svg_icons['ordenes-compra'],
         'label' => __( 'Órdenes de Compra', 'ltms' ),
     ]] );
 }
@@ -50,7 +71,7 @@ if ( get_option( 'ltms_ordenes_compra_enabled', 'no' ) === 'yes' ) {
 if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
     array_splice( $nav_items, 4, 0, [[
         'view'  => 'analytics',
-        'icon'  => '📈',
+        'icon'  => $svg_icons['analytics'],
         'label' => __( 'Analytics', 'ltms' ),
     ]] );
 }
@@ -59,13 +80,13 @@ if ( in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 if ( get_option( 'ltms_redi_enabled', 'no' ) === 'yes' ) {
     array_splice( $nav_items, 3, 0, [[
         'view'  => 'redi',
-        'icon'  => '🔁',
+        'icon'  => $svg_icons['redi'],
         'label' => __( 'ReDi', 'ltms' ),
     ]] );
     // GAP-9: tab Novedades.
     array_splice( $nav_items, 5, 0, [[
         'view'  => 'incidents',
-        'icon'  => '⚠️',
+        'icon'  => $svg_icons['incidents'],
         'label' => __( 'Novedades', 'ltms' ),
     ]] );
 }
@@ -75,12 +96,17 @@ $_user_id = get_current_user_id();
 if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'yes' ) {
     array_splice( $nav_items, 4, 0, [[
         'view'  => 'kitchen',
-        'icon'  => '🍳',
+        'icon'  => $svg_icons['kitchen'],
         'label' => __( 'Cocina', 'ltms' ),
     ]] );
 }
 ?>
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
+
+    <!-- v2.9.94 P3: Accessibility skip-link -->
+    <a href="#ltms-main-content" class="ltms-skip-link" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;" onfocus="this.style.cssText='position:fixed;top:0;left:0;width:auto;height:auto;padding:8px 16px;background:#2563eb;color:#fff;z-index:99999;border-radius:0 0 8px 0;'" onblur="this.style.cssText='position:absolute;left:-9999px;'">
+        <?php esc_html_e( 'Saltar al contenido principal', 'ltms' ); ?>
+    </a>
 
     <!-- Sidebar -->
     <div class="ltms-sidebar-overlay" id="ltms-sidebar-overlay"></div>
@@ -95,7 +121,7 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
             <button type="button"
                     class="ltms-nav-item <?php echo $item['view'] === 'home' ? 'active' : ''; ?>"
                     data-view="<?php echo esc_attr( $item['view'] ); ?>">
-                <span class="ltms-nav-icon"><?php echo esc_html( $item['icon'] ); ?></span>
+                <span class="ltms-nav-icon"><?php echo $item['icon']; // phpcs:ignore — SVG icons are hardcoded, safe ?></span>
                 <span class="ltms-nav-label"><?php echo esc_html( $item['label'] ); ?></span>
             </button>
             <?php endforeach; ?>
@@ -327,7 +353,36 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
     .ltms-breadcrumbs a { color: #6b7280; text-decoration: none; }
     .ltms-breadcrumbs a:hover { color: #2563eb; }
     .ltms-breadcrumbs span { color: #111827; font-weight: 600; }
+    /* v2.9.94 P3: Focus-visible outlines en nav items */
+    .ltms-nav-item:focus-visible, .ltms-bottom-nav-item:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .ltms-topbar-notif:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 8px; }
+    /* v2.9.94 P3: Nav icon sizing for SVG */
+    .ltms-nav-icon svg { width: 20px; height: 20px; display: block; }
+    .ltms-bottom-nav-icon svg { width: 22px; height: 22px; display: block; }
     </style>
+
+    <!-- v2.9.94 P3: Keyboard shortcut help modal -->
+    <div id="ltms-shortcuts-modal" class="ltms-modal" style="display:none;">
+        <div class="ltms-modal-backdrop" data-action="close-shortcuts"></div>
+        <div class="ltms-modal-inner" style="max-width:480px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0;font-size:1.1rem;">⌨️ <?php esc_html_e( 'Atajos de Teclado', 'ltms' ); ?></h3>
+                <button type="button" data-action="close-shortcuts" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
+            </div>
+            <table style="width:100%;font-size:0.85rem;">
+                <tbody>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">g + h</kbd></td><td><?php esc_html_e( 'Inicio', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">g + o</kbd></td><td><?php esc_html_e( 'Pedidos', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">g + p</kbd></td><td><?php esc_html_e( 'Productos', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">g + w</kbd></td><td><?php esc_html_e( 'Billetera', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">g + s</kbd></td><td><?php esc_html_e( 'Configuración', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">/</kbd></td><td><?php esc_html_e( 'Buscar', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">Esc</kbd></td><td><?php esc_html_e( 'Cerrar modales', 'ltms' ); ?></td></tr>
+                    <tr><td style="padding:6px 0;"><kbd style="background:#f3f4f6;padding:2px 8px;border-radius:4px;font-family:monospace;">?</kbd></td><td><?php esc_html_e( 'Esta ayuda', 'ltms' ); ?></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
 </div><!-- /ltms-dashboard-container -->
  

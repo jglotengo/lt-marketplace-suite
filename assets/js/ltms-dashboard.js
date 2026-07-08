@@ -2522,12 +2522,24 @@
                     keyBuffer = '';
                 }
 
+                // '?' show keyboard shortcuts help
+                if (key === '?') {
+                    e.preventDefault();
+                    $('#ltms-shortcuts-modal').show();
+                    keyBuffer = '';
+                }
+
                 // Escape cierra modales
                 if (key === 'escape') {
                     $('.ltms-modal').hide();
                     $('.ltms-notifications-panel').removeClass('open');
                     $('#ltms-notif-bell').attr('aria-expanded', 'false');
                 }
+            });
+
+            // v2.9.94 P3: Close shortcuts modal
+            $(document).on('click', '[data-action="close-shortcuts"]', function() {
+                $('#ltms-shortcuts-modal').hide();
             });
         },
     };
