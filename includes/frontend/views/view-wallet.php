@@ -37,7 +37,15 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Billetera', 'ltms' ); ?></h2>
-        <div style="display:flex;gap:10px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <!-- v2.9.82 P2: CSV Export -->
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-wallet-export-csv">
+                📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
+            </button>
+            <!-- v2.9.82 P2: Dark mode toggle -->
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-dark-mode-toggle" aria-label="<?php esc_attr_e( 'Cambiar tema', 'ltms' ); ?>">
+                🌙
+            </button>
             <button type="button" class="ltms-btn ltms-btn-secondary" data-ltms-modal-open="ltms-modal-deposit">
                 💳 <?php esc_html_e( 'Depositar', 'ltms' ); ?>
             </button>

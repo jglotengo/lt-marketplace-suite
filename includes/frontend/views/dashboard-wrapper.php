@@ -298,6 +298,24 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
     /* v2.9.78 P1: Skeleton loading animation */
     .ltms-skeleton-loading { animation: ltms-pulse 1.5s ease-in-out infinite; opacity: 0.6; }
     @keyframes ltms-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+    /* v2.9.82 P2: Dark mode */
+    .ltms-dark-mode { --ltms-bg: #1a1a2e; --ltms-card-bg: #16213e; --ltms-text: #e2e8f0; --ltms-text-muted: #94a3b8; --ltms-border: #334155; }
+    .ltms-dark-mode .ltms-main-content { background: var(--ltms-bg) !important; }
+    .ltms-dark-mode .ltms-card, .ltms-dark-mode .ltms-modal-inner { background: var(--ltms-card-bg) !important; border-color: var(--ltms-border) !important; }
+    .ltms-dark-mode .ltms-dtable th { background: #0f172a !important; color: var(--ltms-text) !important; }
+    .ltms-dark-mode .ltms-dtable td { color: var(--ltms-text) !important; border-color: var(--ltms-border) !important; }
+    .ltms-dark-mode .ltms-topbar { background: var(--ltms-card-bg) !important; }
+    .ltms-dark-mode .ltms-topbar-title, .ltms-dark-mode .ltms-view-header h2 { color: var(--ltms-text) !important; }
+    .ltms-dark-mode .ltms-sidebar { background: var(--ltms-card-bg) !important; }
+    .ltms-dark-mode .ltms-nav-item { color: var(--ltms-text-muted) !important; }
+    .ltms-dark-mode .ltms-nav-item.active { color: #60a5fa !important; background: rgba(96,165,250,0.1) !important; }
+    .ltms-dark-mode .ltms-bottom-nav { background: var(--ltms-card-bg) !important; border-color: var(--ltms-border) !important; }
+    .ltms-dark-mode input, .ltms-dark-mode textarea, .ltms-dark-mode select { background: #0f172a !important; color: var(--ltms-text) !important; border-color: var(--ltms-border) !important; }
+    /* v2.9.82 P2: Breadcrumbs */
+    .ltms-breadcrumbs { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #9ca3af; padding: 0 0 12px; }
+    .ltms-breadcrumbs a { color: #6b7280; text-decoration: none; }
+    .ltms-breadcrumbs a:hover { color: #2563eb; }
+    .ltms-breadcrumbs span { color: #111827; font-weight: 600; }
     </style>
 
 </div><!-- /ltms-dashboard-container -->

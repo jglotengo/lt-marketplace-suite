@@ -43,6 +43,9 @@
             this.initMobileMenu();
             this.bindLogout();
             this.bindOrderFilter();
+            this.initDarkMode();       // v2.9.82 P2
+            this.initCsvExport();       // v2.9.82 P2
+            this.initBreadcrumbs();     // v2.9.82 P2
         },
 
         /**
@@ -2241,6 +2244,83 @@
             const div = document.createElement('div');
             div.textContent = str || '';
             return div.innerHTML;
+        },
+
+        // ── v2.9.82 P2: Dark Mode Toggle ──────────────────────────────
+        initDarkMode() {
+            if (localStorage.getItem('ltms-dark-mode') === 'yes') {
+                document.body.classList.add('ltms-dark-mode');
+                $('#ltms-dark-mode-toggle').text('☀️');
+            }
+            $(document).on('click', '#ltms-dark-mode-toggle', function() {
+                var isDark = document.body.classList.toggle('ltms-dark-mode');
+                localStorage.setItem('ltms-dark-mode', isDark ? 'yes' : 'no');
+                $(this).text(isDark ? '☀️' : '🌙');
+            });
+        },
+
+        // ── v2.9.82 P2: CSV Export para Wallet ────────────────────────
+        initCsvExport() {
+            $(document).on('click', '#ltms-wallet-export-csv', function() {
+                $.ajax({
+                    url: ltmsDashboard.ajax_url,
+                    method: 'POST',
+                    data: { action: 'ltms_get_wallet_data', nonce: ltmsDashboard.nonce },
+                    success: function(response) {
+                        if (!response.success || !response.data) return;
+                        var txns = response.data.transactions || [];
+                        var csv = 'Fecha,Tipo,Descripcion,Monto,Balance\n';
+                        txns.forEach(function(t) {
+                            csv += [
+                                t.created_at || '',
+                                t.type || '',
+                                '"' + (t.description || '').replace(/"/g, '""') + '"',
+                                t.amount || 0,
+                                t.balance_after || 0
+                            ].join(',') + '\n';
+                        });
+                        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                        var link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = 'billetera_' + new Date().toISOString().slice(0,10) + '.csv';
+                        link.click();
+                        if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastSuccess) {
+                            LTMS.UX.toastSuccess('Exportado', 'Archivo CSV descargado.');
+                        }
+                    },
+                    error: function() {
+                        if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError) {
+                            LTMS.UX.toastError('Error', 'No se pudo exportar.');
+                        }
+                    }
+                });
+            });
+        },
+
+        // ── v2.9.82 P2: Breadcrumbs dinámicos ─────────────────────────
+        initBreadcrumbs() {
+            const self = this;
+            const labels = {
+                home: 'Inicio', orders: 'Pedidos', products: 'Productos',
+                wallet: 'Billetera', settings: 'Configuración', envios: 'Envíos',
+                'shipping-statement': 'Fletes', redi: 'ReDi', incidents: 'Novedades',
+                bookings: 'Reservas', marketing: 'Marketing', security: 'Seguridad',
+                donations: 'Donaciones', posgold: 'PosGold', kitchen: 'Cocina',
+                'ordenes-compra': 'Órdenes de Compra', analytics: 'Analytics'
+            };
+            const origLoadView = this.loadView.bind(this);
+            this.loadView = function(view, forceRefresh) {
+                origLoadView(view, forceRefresh);
+                const label = labels[view] || view;
+                if ($('.ltms-breadcrumbs').length === 0) {
+                    $('.ltms-topbar').after('<div class="ltms-breadcrumbs" id="ltms-breadcrumbs" style="padding:8px 24px;"></div>');
+                }
+                $('#ltms-breadcrumbs').html(
+                    '<a href="' + ltmsDashboard.ajax_url.replace('admin-ajax.php', '') + 'panel-vendedor/">Inicio</a>' +
+                    '<span>\u203a</span>' +
+                    '<span>' + label + '</span>'
+                );
+            };
         },
     };
 
