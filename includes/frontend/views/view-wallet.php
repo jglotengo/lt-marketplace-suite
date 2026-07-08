@@ -191,12 +191,12 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
 
 <!-- Modal de Retiro -->
-<div class="ltms-modal" id="ltms-modal-payout">
+<div class="ltms-modal" id="ltms-modal-payout" role="dialog" aria-modal="true" aria-labelledby="ltms-payout-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:440px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
-            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Solicitar Retiro', 'ltms' ); ?></h3>
-            <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+            <h3 id="ltms-payout-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Solicitar Retiro', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
         </div>
 
         <div class="ltms-balance-display" style="text-align:center;background:linear-gradient(135deg,#1a5276,#2980b9);color:#fff;border-radius:8px;padding:16px;margin-bottom:20px;">
@@ -228,6 +228,17 @@ $has_bank_data     = ! empty( $saved_bank_acc );
             <?php
             // v2.9.77 P0-UI-2: Enmascarar el número de cuenta — mostrar solo últimos 4 dígitos.
             $masked_acc = '****' . substr( preg_replace( '/\D/', '', $saved_bank_acc ), -4 );
+
+            // FIX-P1-BATCH-A: #ltms-payout-account must send the REAL account
+            // identifier (the encrypted user_meta blob stored in
+            // `ltms_bank_account_number`), NOT the masked display string.
+            // Sending `****1234` polluted the payouts table with unusable
+            // masked values and broke server-side reconciliation/audit. The
+            // Payout_Scheduler already decrypts this blob server-side to
+            // verify the last-4 digits, so we pass the encrypted blob through.
+            // If the raw meta is missing (legacy plaintext accounts), fall
+            // back to the decrypted value — still better than the mask.
+            $payout_account_value = ! empty( $saved_bank_acc_raw ) ? $saved_bank_acc_raw : $saved_bank_acc;
             ?>
             <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.82rem;color:#166534;">
                 <strong><?php echo esc_html( $saved_bank ); ?></strong>
@@ -236,7 +247,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                 <?php if ( $saved_bank_holder ) : ?> · <?php echo esc_html( $saved_bank_holder ); ?><?php endif; ?>
                 <br><span style="font-size:0.75rem;color:#4ade80;">✓ <?php esc_html_e( 'Cuenta guardada en Configuración', 'ltms' ); ?></span>
             </div>
-            <input type="hidden" id="ltms-payout-account" value="<?php echo esc_attr( $masked_acc ); ?>">
+            <input type="hidden" id="ltms-payout-account" value="<?php echo esc_attr( $payout_account_value ); ?>">
             <?php else : ?>
             <input type="text" id="ltms-payout-account"
                    placeholder="<?php esc_attr_e( 'Número de cuenta', 'ltms' ); ?>"
@@ -255,12 +266,12 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 </div>
 
 <!-- Modal de Depósito Manual -->
-<div class="ltms-modal" id="ltms-modal-deposit">
+<div class="ltms-modal" id="ltms-modal-deposit" role="dialog" aria-modal="true" aria-labelledby="ltms-deposit-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:480px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
-            <h3 style="margin:0;font-size:1.1rem;">💳 <?php esc_html_e( 'Depositar en Billetera', 'ltms' ); ?></h3>
-            <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
+            <h3 id="ltms-deposit-title" style="margin:0;font-size:1.1rem;">💳 <?php esc_html_e( 'Depositar en Billetera', 'ltms' ); ?></h3>
+            <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
         </div>
 
         <div class="ltms-deposit-error" style="display:none;color:#e74c3c;font-size:0.875rem;margin-bottom:12px;padding:10px;background:#fdf0ef;border-radius:6px;"></div>

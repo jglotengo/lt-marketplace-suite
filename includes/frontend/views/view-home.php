@@ -7,6 +7,14 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+// FIX-P1-BATCH-A: $user_id may be undefined when this view is loaded via
+// [ltms_vendor_store] shortcode context (no outer variable scope). Resolve
+// from the current session and bail safely for anonymous visitors.
+$user_id = get_current_user_id();
+if ( ! $user_id ) {
+        return;
+}
 ?>
 <div style="padding:24px;">
 

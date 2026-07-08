@@ -91,7 +91,7 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 </div>
 
 <!-- Modal: detalle de incidencia -->
-<div id="ltms-modal-incident-detail" class="ltms-modal" style="display:none;">
+<div id="ltms-modal-incident-detail" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-incident-detail-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:720px;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;">
@@ -116,11 +116,11 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 </div>
 
 <!-- Modal: nueva incidencia -->
-<div id="ltms-modal-incident-new" class="ltms-modal" style="display:none;">
+<div id="ltms-modal-incident-new" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-incident-new-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:520px;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;">
-            <h3 style="margin:0;font-size:1.05rem;"><?php esc_html_e( 'Nueva Novedad ReDi', 'ltms' ); ?></h3>
+            <h3 id="ltms-incident-new-title" style="margin:0;font-size:1.05rem;"><?php esc_html_e( 'Nueva Novedad ReDi', 'ltms' ); ?></h3>
             <button type="button" class="ltms-modal-close" aria-label="Cerrar" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6b7280;">✕</button>
         </div>
         <form id="ltms-incident-new-form" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -518,11 +518,15 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                         // Recargar el detalle para mostrar el nuevo comentario.
                         self.openDetail( incidentId );
                     } else {
-                        alert( res && res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( 'Error al enviar comentario', 'ltms' ) ); ?>' );
+                        if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError ) {
+                            LTMS.UX.toastError( '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', res && res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( 'Error al enviar comentario', 'ltms' ) ); ?>' );
+                        }
                     }
                 },
                 error: function() {
-                    alert( '<?php echo esc_js( __( 'Error de conexión', 'ltms' ) ); ?>' );
+                    if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError ) {
+                        LTMS.UX.toastError( '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', '<?php echo esc_js( __( 'Error de conexión', 'ltms' ) ); ?>' );
+                    }
                 }
             });
         },
@@ -534,7 +538,9 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             var desc    = $( '#ltms-incident-new-desc' ).val().trim();
 
             if ( ! orderId || ! type || ! desc ) {
-                alert( '<?php echo esc_js( __( 'Todos los campos son obligatorios', 'ltms' ) ); ?>' );
+                if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError ) {
+                    LTMS.UX.toastError( '<?php echo esc_js( __( 'Atención', 'ltms' ) ); ?>', '<?php echo esc_js( __( 'Todos los campos son obligatorios', 'ltms' ) ); ?>' );
+                }
                 return;
             }
 
@@ -552,26 +558,43 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     if ( res && res.success ) {
                         self.closeModal( '#ltms-modal-incident-new' );
                         self.loadIncidents();
-                        alert( res.data.message || '<?php echo esc_js( __( 'Novedad creada', 'ltms' ) ); ?>' );
+                        if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastSuccess ) {
+                            LTMS.UX.toastSuccess( '<?php echo esc_js( __( 'Listo', 'ltms' ) ); ?>', res.data.message || '<?php echo esc_js( __( 'Novedad creada', 'ltms' ) ); ?>' );
+                        }
                     } else {
-                        alert( res && res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( 'Error al crear novedad', 'ltms' ) ); ?>' );
+                        if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError ) {
+                            LTMS.UX.toastError( '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', res && res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( 'Error al crear novedad', 'ltms' ) ); ?>' );
+                        }
                     }
                 },
                 error: function() {
-                    alert( '<?php echo esc_js( __( 'Error de conexión', 'ltms' ) ); ?>' );
+                    if ( typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError ) {
+                        LTMS.UX.toastError( '<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', '<?php echo esc_js( __( 'Error de conexión', 'ltms' ) ); ?>' );
+                    }
                 }
             });
         },
 
         openModal: function( sel ) {
-            $( sel ).css( 'display', 'flex' );
+            var id = String( sel ).replace( /^#/, '' );
+            if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.open === 'function' ) {
+                LTMS.Modal.open( id );
+            } else {
+                $( sel ).css( 'display', 'flex' ).attr( 'aria-hidden', 'false' );
+            }
         },
 
         closeModal: function( sel ) {
+            var id;
             if ( typeof sel === 'string' ) {
-                $( sel ).css( 'display', 'none' );
+                id = sel.replace( /^#/, '' );
             } else {
-                $( sel ).css( 'display', 'none' );
+                id = $( sel ).attr( 'id' );
+            }
+            if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.close === 'function' ) {
+                LTMS.Modal.close( id );
+            } else {
+                $( '#' + id ).css( 'display', 'none' ).attr( 'aria-hidden', 'true' );
             }
         },
 

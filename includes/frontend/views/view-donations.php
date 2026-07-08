@@ -88,7 +88,21 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ( $donations as $don ) : ?>
+                <?php foreach ( $donations as $don ) :
+                    // FIX-P1-BATCH-A: $don['customer_name'] doesn't exist in the
+                    // LTMS_Donation_Manager::get_vendor_donations() result (the
+                    // query selects d.* + order_title only — no customer column).
+                    // Fetch the billing name directly from the WC order so the
+                    // vendor sees the actual customer; fall back to 'Cliente'
+                    // when the order is gone or has no billing name.
+                    $donation_customer_name = '';
+                    if ( ! empty( $don['order_id'] ) ) {
+                        $donation_order = wc_get_order( (int) $don['order_id'] );
+                        if ( $donation_order && method_exists( $donation_order, 'get_billing_name' ) ) {
+                            $donation_customer_name = trim( $donation_order->get_billing_name() );
+                        }
+                    }
+                ?>
                 <tr>
                     <td style="white-space:nowrap;">
                         <?php echo esc_html( date_i18n( 'd M Y', strtotime( $don['created_at'] ) ) ); ?>
@@ -99,7 +113,7 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
                         </a>
                     </td>
                     <td>
-                        <?php echo esc_html( $don['customer_name'] ?? __( 'Cliente', 'ltms' ) ); ?>
+                        <?php echo esc_html( $donation_customer_name !== '' ? $donation_customer_name : __( 'Cliente', 'ltms' ) ); ?>
                     </td>
                     <td style="font-weight:600;color:#dc2626;">
                         <?php echo esc_html( LTMS_Utils::format_money( (float) $don['total_donation'] ) ); ?>

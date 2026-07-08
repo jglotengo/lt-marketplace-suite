@@ -10,8 +10,15 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-$user_id      = get_current_user_id();
-$user         = get_userdata( $user_id );
+// FIX-P1-BATCH-A: guard against deleted user accounts. get_userdata() returns
+// false when the user no longer exists; dereferencing ->display_name would
+// fatal. Redirect anonymous/deleted sessions to the login screen instead.
+$user_id    = get_current_user_id();
+$user       = $user_id ? get_userdata( $user_id ) : null;
+if ( ! $user ) {
+    wp_safe_redirect( wp_login_url() );
+    exit;
+}
 $store_name   = get_user_meta( $user_id, 'ltms_store_name', true ) ?: $user->display_name;
 $wallet       = class_exists( 'LTMS_Business_Wallet' ) ? LTMS_Business_Wallet::get_or_create( $user_id ) : [ 'balance' => 0, 'balance_reserved' => 0 ];
 $unread_notif = 0;

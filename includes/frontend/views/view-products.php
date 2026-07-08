@@ -104,12 +104,12 @@ $products  = wc_get_products([
      MODAL: Nuevo Producto  (id="ltms-modal-new-product")
      Requerido por los botones data-ltms-modal-open="ltms-modal-new-product"
      ═══════════════════════════════════════════════════════════════ -->
-<div class="ltms-modal" id="ltms-modal-new-product">
+<div class="ltms-modal" id="ltms-modal-new-product" role="dialog" aria-modal="true" aria-labelledby="ltms-np-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?></h3>
+            <h3 id="ltms-np-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?></h3>
             <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>">✕</button>
         </div>
 
@@ -574,15 +574,74 @@ $products  = wc_get_products([
     });
 
     // CS-07: Eliminar producto
+    // FIX-P1-BATCH-A: native confirm() is a blocking dialog, can't be styled,
+    // breaks SPA flow, and is on the CSP no-no list. Replaced with an inline
+    // WCAG-compliant modal (mirrors view-envios.php delete modal pattern).
+    // State is held in `deleteTarget` while the modal is open.
+    var deleteTarget = { pid: null, name: '' };
+
+    function openDeleteProductModal(pid, name) {
+        deleteTarget.pid  = pid;
+        deleteTarget.name = name;
+        $('#ltms-dp-name').text(name);
+        $('#ltms-dp-notice').hide().text('');
+        if (typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.open === 'function') {
+            LTMS.Modal.open('ltms-modal-delete-product');
+        } else {
+            $('#ltms-modal-delete-product').addClass('ltms-modal-open');
+            $('body').addClass('ltms-modal-body-lock');
+        }
+    }
+
+    function closeDeleteProductModal() {
+        if (typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.close === 'function') {
+            LTMS.Modal.close('ltms-modal-delete-product');
+        } else {
+            $('#ltms-modal-delete-product').removeClass('ltms-modal-open');
+            $('body').removeClass('ltms-modal-body-lock');
+        }
+        deleteTarget.pid  = null;
+        deleteTarget.name = '';
+    }
+
     $(document).on('click', '.ltms-delete-product-btn', function(){
         var pid  = $(this).data('product-id');
         var name = $(this).data('product-name');
-        if(!confirm('¿Eliminar el producto "'+name+'"? Esta acción no se puede deshacer.')) return;
+        if (!pid) return;
+        openDeleteProductModal(pid, name);
+    });
+
+    $('#ltms-dp-confirm').on('click', function(){
+        var $btn = $(this);
+        var pid  = deleteTarget.pid;
+        if (!pid) return;
+        $btn.prop('disabled', true).text('<?php echo esc_js( __( 'Eliminando…', 'ltms' ) ); ?>');
         $.ajax({
-            url:ltmsDashboard.ajax_url, method:'POST',
-            data:{action:'ltms_delete_product', nonce:ltmsDashboard.nonce, product_id:pid},
-            success:function(res){ if(res.success){ LTMS.Dashboard.loadView('products', true); } else { LTMS.UX.toastError('Error', res.data||'No se pudo eliminar.'); } },
-            error:function(){ LTMS.UX.toastError('Error', 'Error de conexión.'); }
+            url: ltmsDashboard.ajax_url, method: 'POST',
+            data: { action: 'ltms_delete_product', nonce: ltmsDashboard.nonce, product_id: pid },
+            success: function(res){
+                $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Eliminar', 'ltms' ) ); ?>');
+                if (res.success) {
+                    closeDeleteProductModal();
+                    if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastSuccess === 'function') {
+                        LTMS.UX.toastSuccess('<?php echo esc_js( __( 'Producto eliminado', 'ltms' ) ); ?>', '<?php echo esc_js( __( 'El producto fue eliminado correctamente.', 'ltms' ) ); ?>');
+                    }
+                    LTMS.Dashboard.loadView('products', true);
+                } else {
+                    var msg = res.data || '<?php echo esc_js( __( 'No se pudo eliminar.', 'ltms' ) ); ?>';
+                    $('#ltms-dp-notice').text(msg).show();
+                    if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastError === 'function') {
+                        LTMS.UX.toastError('<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', msg);
+                    }
+                }
+            },
+            error: function(){
+                $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Eliminar', 'ltms' ) ); ?>');
+                $('#ltms-dp-notice').text('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>').show();
+                if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastError === 'function') {
+                    LTMS.UX.toastError('<?php echo esc_js( __( 'Error', 'ltms' ) ); ?>', '<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+                }
+            }
         });
     });
 
@@ -593,12 +652,12 @@ $products  = wc_get_products([
      MODAL: Editar Producto  (id="ltms-modal-edit-product")
      CS-07: edición inline en panel vendedor sin redirigir a wp-admin
      ═══════════════════════════════════════════════════════════════ -->
-<div class="ltms-modal" id="ltms-modal-edit-product">
+<div class="ltms-modal" id="ltms-modal-edit-product" role="dialog" aria-modal="true" aria-labelledby="ltms-ep-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Editar Producto', 'ltms' ); ?></h3>
+            <h3 id="ltms-ep-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Editar Producto', 'ltms' ); ?></h3>
             <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;" aria-label="Cerrar">✕</button>
         </div>
 
@@ -723,6 +782,41 @@ $products  = wc_get_products([
             </button>
             <button type="button" id="ltms-ep-submit" style="padding:10px 22px;background:#1a5276;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">
                 💾 <?php esc_html_e( 'Guardar Cambios', 'ltms' ); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MODAL: Eliminar Producto  (id="ltms-modal-delete-product")
+     FIX-P1-BATCH-A: replaces native confirm() with an accessible
+     dialog (role/aria-modal/aria-labelledby/tabindex) — mirrors the
+     WCAG pattern already used in view-envios.php.
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="ltms-modal" id="ltms-modal-delete-product"
+     role="dialog" aria-modal="true" aria-labelledby="ltms-dp-title" tabindex="-1">
+    <div class="ltms-modal-backdrop"></div>
+    <div class="ltms-modal-inner" role="document" style="max-width:420px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 id="ltms-dp-title" style="margin:0;font-size:1.1rem;color:#111827;">
+                ⚠️ <?php esc_html_e( 'Eliminar producto', 'ltms' ); ?>
+            </h3>
+            <button type="button" class="ltms-modal-close" style="background:none;border:none;cursor:pointer;font-size:1.1rem;" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>">✕</button>
+        </div>
+        <p style="margin:0 0 8px;font-size:0.875rem;color:#374151;">
+            <?php esc_html_e( '¿Eliminar el producto', 'ltms' ); ?>
+            <strong id="ltms-dp-name" style="font-weight:600;"></strong>?
+        </p>
+        <p style="margin:0 0 20px;font-size:0.78rem;color:#6b7280;">
+            <?php esc_html_e( 'Esta acción no se puede deshacer.', 'ltms' ); ?>
+        </p>
+        <div id="ltms-dp-notice" class="ltms-modal-error" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;font-size:0.875rem;"></div>
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button type="button" class="ltms-modal-close" style="padding:10px 20px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;cursor:pointer;">
+                <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
+            </button>
+            <button type="button" id="ltms-dp-confirm" style="padding:10px 22px;background:#dc2626;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">
+                🗑 <?php esc_html_e( 'Eliminar', 'ltms' ); ?>
             </button>
         </div>
     </div>

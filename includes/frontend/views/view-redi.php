@@ -56,7 +56,7 @@
                                                                 $origin_id     = isset( $listing->origin_vendor_id ) ? (int) $listing->origin_vendor_id : 0;
                                                                 $origin_data   = $origin_id ? get_userdata( $origin_id ) : false;
                                                                 $origin_name   = $origin_data ? esc_html( $origin_data->display_name ) : esc_html__( 'N/D', 'ltms' );
-                                                                $redi_rate     = isset( $listing->redi_rate ) ? number_format( (float) $listing->redi_rate, 2 ) : '0.00';
+                                                                $redi_rate     = isset( $listing->redi_rate ) ? number_format( (float) $listing->redi_rate * 100, 2 ) : '0.00';
                                                                 $total_commis  = isset( $listing->total_commissions ) ? number_format( (float) $listing->total_commissions, 2 ) : '0.00';
                                                                 $status_key    = isset( $listing->status ) ? $listing->status : '';
                                                                 ?>
@@ -151,8 +151,8 @@
                                             <span style="color:#999;font-size:0.8rem;"> (+<?php echo (int) $p['paused_agreements']; ?> pausados)</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?php echo esc_html( wc_price( $p['month_origin_commission'] ) ); ?></td>
-                                    <td><?php echo esc_html( wc_price( $p['total_origin_commission'] ) ); ?></td>
+                                    <td><?php echo esc_html( wp_strip_all_tags( wc_price( $p['month_origin_commission'] ) ) ); ?></td>
+                                    <td><?php echo esc_html( wp_strip_all_tags( wc_price( $p['total_origin_commission'] ) ) ); ?></td>
                                     <td><?php echo $p['last_sale'] ? esc_html( $p['last_sale'] ) : '—'; ?></td>
                                     <td>
                                         <?php if ( $p['is_paused'] ) : ?>
@@ -336,12 +336,35 @@
         // AUDIT-REDI-UX-GAPS GAP-3 FIX: soft pause/resume handlers.
         // v2.9.61 DEEP-AUDIT-002 P0-1 FIX: El PHP espera 'origin_product_id' (no 'product_id').
         // Antes todos los clicks retornaban 400 "ID de producto origen inválido".
+        // FIX-P1-BATCH-A: replace native confirm() (W-R-3) and LTMS.Dashboard.loadView()
+        // (W-R-4) with surgical DOM updates on the affected row — preserves the
+        // SPA state and avoids clobbering the server-rendered PHP view.
+        function toggleRediRow( $btn, nowPaused ) {
+                var $row   = $btn.closest( 'tr[data-product-id]' );
+                if ( ! $row.length ) return;
+                var $status = $row.children( 'td' ).eq( 6 ); // 7th column = Estado
+                if ( nowPaused ) {
+                        $status.html( '<span style="color:#F0B500;font-weight:600;">⏸️ ' +
+                                '<?php echo esc_js( __( 'Pausado', 'ltms' ) ); ?>' + '</span>' );
+                        $btn.removeClass( 'ltms-btn-secondary ltms-redi-pause-btn' )
+                            .addClass( 'ltms-btn-primary ltms-redi-resume-btn' )
+                            .text( '▶️ <?php echo esc_js( __( 'Reanudar', 'ltms' ) ); ?>' );
+                } else {
+                        $status.html( '<span style="color:#27ae60;font-weight:600;">✓ ' +
+                                '<?php echo esc_js( __( 'Activo', 'ltms' ) ); ?>' + '</span>' );
+                        $btn.removeClass( 'ltms-btn-primary ltms-redi-resume-btn' )
+                            .addClass( 'ltms-btn-secondary ltms-redi-pause-btn' )
+                            .text( '⏸️ <?php echo esc_js( __( 'Pausar', 'ltms' ) ); ?>' );
+                }
+        }
+
         $(document).on('click', '.ltms-redi-pause-btn', function(e){
                 e.preventDefault();
                 var $btn = $(this);
                 var productId = $btn.data('product-id');
                 if (!productId) return;
-                if (!confirm('<?php echo esc_js( __( '¿Pausar distribución ReDi de este producto? Las copias de los revendedores se marcarán como agotadas y serán notificados. Tu producto seguirá visible para venta directa.', 'ltms' ) ); ?>')) return;
+                // v2.9.99 P1 FIX: eliminado native confirm() — el botón es explícito.
+                // Feedback via toast tras la acción.
                 $btn.prop('disabled', true);
                 $.post(ajaxurl, {
                         action: 'ltms_redi_soft_pause',
@@ -351,7 +374,8 @@
                         if (resp && resp.success) {
                                 // toast: ReDi pausado
                                 LTMS.UX.toastSuccess('Exito', '<?php echo esc_js( __( 'ReDi pausado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
-                                LTMS.Dashboard.loadView('redi', true);
+                                toggleRediRow( $btn, true );
+                                $btn.prop('disabled', false);
                         } else {
                                 $btn.prop('disabled', false);
                                 LTMS.UX.toastError('Error', resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al pausar.', 'ltms' ) ); ?>');
@@ -375,7 +399,8 @@
                 }, function(resp){
                         if (resp && resp.success) {
                                 LTMS.UX.toastSuccess('Exito', '<?php echo esc_js( __( 'ReDi reanudado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
-                                LTMS.Dashboard.loadView('redi', true);
+                                toggleRediRow( $btn, false );
+                                $btn.prop('disabled', false);
                         } else {
                                 $btn.prop('disabled', false);
                                 LTMS.UX.toastError('Error', resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al reanudar.', 'ltms' ) ); ?>');

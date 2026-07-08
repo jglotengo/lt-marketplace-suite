@@ -6,6 +6,7 @@ class LTMS_Products_Ajax {
     public function __construct() {
         add_action( 'wp_ajax_ltms_get_products_data',    [ $this, 'get_products_data' ] );
         add_action( 'wp_ajax_ltms_save_vendor_settings', [ $this, 'save_vendor_settings' ] );
+        add_action( 'wp_ajax_ltms_upload_store_logo',    [ $this, 'upload_store_logo' ] ); // v2.9.99
         // C5-1 FIX: ltms_get_vendor_settings eliminado — lo maneja LTMS_Vendor_Settings_Saver
         // con respuesta más completa (bank_info, delivery_zone, store_address, etc).
         add_action( 'wp_ajax_ltms_create_product',        [ $this, 'create_product' ] );
@@ -134,10 +135,39 @@ class LTMS_Products_Ajax {
                 'ltms_tax_regime', 'ltms_nit', 'ltms_ciiu_code', 'ltms_municipality',
                 // v2.3.0 — Analytics por vendedor
                 'ltms_vendor_ga4_id', 'ltms_vendor_pixel_id',
+                // v2.9.99 P0-2 FIX: 7 campos de view-settings.php que se descartaban silenciosamente.
+                'ltms_vacation_mode', 'ltms_vacation_message',
+                'ltms_store_logo_id',
+                'ltms_store_schedule',
+                'ltms_store_instagram', 'ltms_store_facebook', 'ltms_store_whatsapp',
             ];
             foreach ( $allowed as $field ) {
                 if ( isset( $_POST['settings'][ $field ] ) ) { // phpcs:ignore
-                    $settings_map[ $field ] = $_POST['settings'][ $field ]; // phpcs:ignore
+                    $raw = wp_unslash( $_POST['settings'][ $field ] ); // phpcs:ignore
+                    // v2.9.99: sanitization per-field type.
+                    if ( $field === 'ltms_store_logo_id' ) {
+                        $settings_map[ $field ] = absint( $raw );
+                    } elseif ( $field === 'ltms_store_schedule' ) {
+                        // JSON array of per-day open/close — sanitize as wp_json_encode after decoding.
+                        $decoded = json_decode( $raw, true );
+                        $settings_map[ $field ] = is_array( $decoded ) ? wp_json_encode( $decoded ) : '';
+                    } elseif ( $field === 'ltms_vacation_message' ) {
+                        $settings_map[ $field ] = sanitize_textarea_field( $raw );
+                    } elseif ( in_array( $field, [ 'ltms_store_instagram', 'ltms_store_facebook', 'ltms_store_whatsapp' ], true ) ) {
+                        $settings_map[ $field ] = esc_url_raw( $raw );
+                    } elseif ( $field === 'ltms_store_logo_id' ) {
+                        // v2.9.99 REG-2 FIX: IDOR protection — verify attachment ownership.
+                        $logo_id = absint( $raw );
+                        $attach = get_post( $logo_id );
+                        if ( $attach && $attach->post_type === 'attachment' && (int) $attach->post_author === $user_id ) {
+                            $settings_map[ $field ] = $logo_id;
+                        } else {
+                            // Vendor tried to set someone else's attachment — silently ignore.
+                            continue;
+                        }
+                    } else {
+                        $settings_map[ $field ] = sanitize_text_field( $raw );
+                    }
                 }
             }
             // Handle encrypted bank account number
@@ -151,7 +181,19 @@ class LTMS_Products_Ajax {
         }
 
         foreach ( $settings_map as $meta_key => $value ) {
-            if ( $value !== null ) {
+            if ( $value === null ) {
+                continue;
+            }
+            // v2.9.99: respetar el tipo de dato ya sanitizado arriba para los campos especiales.
+            if ( $meta_key === 'ltms_store_logo_id' ) {
+                update_user_meta( $user_id, $meta_key, absint( $value ) );
+            } elseif ( $meta_key === 'ltms_store_schedule' ) {
+                update_user_meta( $user_id, $meta_key, $value ); // ya viene como wp_json_encode
+            } elseif ( $meta_key === 'ltms_vacation_message' ) {
+                update_user_meta( $user_id, $meta_key, sanitize_textarea_field( wp_unslash( $value ) ) );
+            } elseif ( in_array( $meta_key, [ 'ltms_store_instagram', 'ltms_store_facebook', 'ltms_store_whatsapp' ], true ) ) {
+                update_user_meta( $user_id, $meta_key, esc_url_raw( $value ) );
+            } else {
                 update_user_meta( $user_id, $meta_key, sanitize_text_field( wp_unslash( $value ) ) );
             }
         }
@@ -395,6 +437,66 @@ class LTMS_Products_Ajax {
             'attachment_id' => $attachment_id,
             'url'           => $final_url,
             'size_kb'       => round( $final_size / 1024 ),
+        ] );
+    }
+
+    /**
+     * v2.9.99: Upload store logo via AJAX (fallback when wp.media not available).
+     * Reuses the same validation/optimization as upload_product_image but with field name 'file'.
+     */
+    public function upload_store_logo(): void {
+        $this->check_nonce();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
+            wp_send_json_error( 'Sin permiso', 403 );
+        }
+        if ( empty( $_FILES['file'] ) || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) { // phpcs:ignore
+            wp_send_json_error( 'No se recibió ninguna imagen.', 400 );
+        }
+
+        $file = $_FILES['file']; // phpcs:ignore
+
+        // Validar tipo MIME.
+        $allowed_mimes = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ];
+        $finfo         = new finfo( FILEINFO_MIME_TYPE );
+        $real_mime     = $finfo->file( $file['tmp_name'] );
+        if ( ! in_array( $real_mime, $allowed_mimes, true ) ) {
+            wp_send_json_error( sprintf( 'Tipo de archivo no permitido: %s', esc_html( $real_mime ) ), 415 );
+        }
+
+        // Validar tamaño (máx 2 MB para logos).
+        if ( $file['size'] > 2 * 1024 * 1024 ) {
+            wp_send_json_error( 'El logo supera el límite de 2 MB.', 413 );
+        }
+
+        // Optimizar.
+        $optimized_path = $this->optimize_image( $file['tmp_name'], $real_mime );
+        if ( $optimized_path && $optimized_path !== $file['tmp_name'] ) {
+            $original_tmp = $file['tmp_name'];
+            $new_ext = pathinfo( $optimized_path, PATHINFO_EXTENSION );
+            if ( 'webp' === $new_ext ) {
+                $file['name'] = pathinfo( $file['name'], PATHINFO_FILENAME ) . '.webp';
+            }
+            copy( $optimized_path, $original_tmp );
+            @unlink( $optimized_path ); // phpcs:ignore
+            $file['size'] = filesize( $original_tmp );
+            $_FILES['file'] = $file; // phpcs:ignore
+        }
+
+        // Guardar en Media Library.
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
+        $attachment_id = media_handle_upload( 'file', 0 );
+        if ( is_wp_error( $attachment_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Error al subir el logo.', 'ltms' ) ], 500 );
+        }
+
+        $final_url = wp_get_attachment_url( $attachment_id );
+
+        wp_send_json_success( [
+            'attachment_id' => $attachment_id,
+            'url'           => $final_url,
         ] );
     }
 

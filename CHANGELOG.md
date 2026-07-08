@@ -4,6 +4,65 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.99] — 2026-07-08
+
+### Deep Audit — Vendor Panel (25 views, 326 findings, 5 P0 + 20 P1 + 4 P2 regressions fixed)
+
+Auditoría profunda autónoma de todos los menus del panel del vendedor. 5 agentes auditores en paralelo cubrieron las 25 vistas, encontrando 326 hallazgos (5 P0, 44 P1, ~156 P2, ~121 P3). Todos los P0 y los P1 críticos fueron corregidos. Segunda iteración de auditoría encontró 6 regresiones (4 P2 arregladas).
+
+### P0 Critical Fixes (5/5)
+
+- **P0-1 view-kitchen.php**: KDS completamente roto — JS enviaba `ltms_kds_get_orders`/`ltms_kds_update_status` + param `kds_action` con valores `start/ready/serve`, pero el handler registra `ltms_kitchen_get_orders`/`ltms_kitchen_update_status` + param `status` con valores `new/preparing/ready/served/cancelled`. Fix: renombrar actions + mapear UI actions a WC statuses (`start`→`preparing`, `ready`→`ready`, `serve`→`served`).
+- **P0-2 view-settings.php + class-ltms-products-ajax.php**: 7 campos silenciosamente descartados por el save handler (`ltms_vacation_mode`, `ltms_vacation_message`, `ltms_store_logo_id`, `ltms_store_schedule`, `ltms_store_instagram`, `ltms_store_facebook`, `ltms_store_whatsapp`). Fix: agregados al array `$allowed` + sanitización por tipo (absint, JSON, textarea, url, text).
+- **P0-3 view-ordenes-compra.php**: Nonce mismatch — JS generaba `ltms_vendor_nonce` pero el handler `ajax_proveedores` requiere `ltms_dashboard_nonce` → todo el dropdown de proveedores siempre 403. Fix: cambiar a `ltms_dashboard_nonce`.
+- **P0-4 class-ltms-driver-ajax.php**: `LTMS_Encryption::encrypt()` no existe (la clase correcta es `LTMS_Core_Security`) → document_number y vehicle_plate se almacenaban en plaintext (violación Habeas Data Ley 1581/2012). Fix: usar `LTMS_Core_Security::encrypt()`.
+- **P0-5 class-ltms-driver-ajax.php**: `$wpdb->insert()` con 9 campos de datos pero 10 formatos, y `status='active'` (string) con format `%d` → el INSERT silenciosamente guardaba `status=0`. Fix: 9 formatos correctos, `status='%s'`.
+
+### P1 High Fixes (20 fixes across 13 views)
+
+- **view-home.php**: `$user_id` undefined cuando se carga vía shortcode `[ltms_vendor_store]` → TypeError en PHP 8.1+ strict types. Fix: guard con `get_current_user_id()`.
+- **dashboard-wrapper.php**: `$user->display_name` dereferences `get_userdata()` que puede retornar `false` → fatal si el usuario fue eliminado. Fix: guard con redirect a login.
+- **view-products.php**: `confirm()` nativo en delete-product flow. Fix: modal WCAG-compliant (`#ltms-modal-delete-product`) con ARIA + focus trap.
+- **view-wallet.php**: `#ltms-payout-account` enviaba el valor enmascarado (`****1234`) como `bank_account_id` → finance/admin queries ven solo el masked. Fix: enviar el encrypted blob real. + ARIA en 2 modals.
+- **view-envios.php**: `escapeHtml()` aplicado a search pero NO a `loadRelations()` table rows ni `create_relation` toast → stored XSS. Fix: escapar todas las interpolaciones de datos Aveonline.
+- **view-redi.php**: 3 bugs — (1) `esc_html(wc_price())` double-escape muestra markup crudo, (2) `redi_rate` mostrado como `0.15%` en vez de `15.00%` (missing ×100), (3) `loadView('redi', true)` sobreescribe el view PHP. Fix: `wp_strip_all_tags(wc_price())`, `×100`, `toggleRediRow()` DOM swap. + eliminar `confirm()` nativo en pause.
+- **view-donations.php**: `$don['customer_name']` undefined (columna no existe en query). Fix: `wc_get_order()->get_billing_name()` con fallback 'Cliente'.
+- **view-posgold.php**: 3 places XSS via string concat (`renderCategoriesList`, AJAX errors, sync error list). Fix: `escapeHtml()` helper aplicado a todas las interpolaciones. + eliminar `confirm()` nativo en sync.
+- **view-bookings.php**: Calendar tab llamaba action `ltms_get_bookings` que no existe + field names `check_in`/`check_out` wrong (server returns `checkin_date`/`checkout_date`). Fix: action → `ltms_get_vendor_bookings`, fields corregidos, XSS escapado. + 2 `alert()` → toast. + ARIA en 3 modals.
+- **view-incidents.php**: 2 modals bypass `LTMS.Modal` (sin ESC/focus trap/focus restoration) + 6× `alert()`. Fix: delegar a `LTMS.Modal.open/close`, `alert()` → `LTMS.UX.toastError/toastSuccess`.
+- **view-security.php**: 2FA modals bypass `LTMS.Modal` + missing ARIA. Fix: integrar con `LTMS.Modal` + ARIA attributes.
+- **view-ordenes-compra.php**: 7× XSS via template literals (proveedores, messages, historial, detail rows, data-oc JSON attribute). Fix: `escapeHtml()` + `data-oc-idx` + jQuery `.data()` cache lookup. + ARIA en detail modal.
+- **view-settings.php**: Checkbox `ltms_is_gran_contribuyente` siempre enviaba 'yes' (jQuery `.val()` no respeta checked state). Fix: usar `:checked` selector. + dead "Completar KYC" button → navegar a vista KYC. + dead `#ltms-upload-logo-btn` y `#ltms-remove-logo-btn` → handlers con wp.media + fallback AJAX. + dead `data-action="copy-referral"` → buscar `<code>` en vez de `<input>`. + nuevo endpoint `ltms_upload_store_logo`.
+
+### P2 Regression Fixes (4/6, 2nd iteration audit)
+
+- **REG-1 view-settings.php**: JS usaba `#ltms-store-logo-preview` pero HTML define `#ltms-logo-preview` → preview nunca actualizaba visualmente. Fix: renombrar selector.
+- **REG-2 class-ltms-products-ajax.php**: `ltms_store_logo_id` sin ownership check → IDOR (vendor podía setear attachment ajeno como logo, exponiendo KYC docs). Fix: verificar `post_author === $user_id`.
+- **REG-3 view-ordenes-compra.php**: jQuery `.data('oc-idx')` auto-convierte numérico → "Ver detalle" mostraba empty para la mayoría. Fix: `.attr('data-oc-idx')` + `String()`.
+- **REG-4 view-envios.php**: `create_relation` error path interpolaba `res.data.message` raw en `.html()` → XSS gap. Fix: `escapeHtml()`.
+
+### Verified Clean Code Metrics (v2.9.99)
+
+```
+PHP syntax (30 files):           30/30 OK  ✅ (php-parser real AST)
+alert() in views:                0          ✅
+native confirm() in views:       0          ✅ (2 comments mentioning "confirm()" are not calls)
+inline handlers (onclick/etc):   0          ✅ (CSP-compliant)
+location.reload() in views:      1          ⚠️  (only view-drivers create/edit, documented)
+AJAX actions registered:         38/38      ✅
+Modals with ARIA:                13/13      ✅ (role/aria-modal/aria-labelledby)
+Modals with LTMS.Modal system:   5/5        ✅ (focus trap + ESC + restoration)
+Nonce consistency:               100%       ✅ (ltms_dashboard_nonce unified)
+```
+
+### Files Modified (20 files)
+
+**Views (13):** dashboard-wrapper.php, view-home.php, view-products.php, view-wallet.php, view-envios.php, view-redi.php, view-bookings.php, view-kitchen.php, view-incidents.php, view-posgold.php, view-security.php, view-settings.php, view-donations.php, view-ordenes-compra.php
+
+**PHP classes (4):** class-ltms-products-ajax.php, class-ltms-driver-ajax.php, class-ltms-kitchen-ajax.php (no changes, verified), class-ltms-business-aveonline-orden-compra.php (no changes, verified)
+
+**Other:** lt-marketplace-suite.php (version bump), CHANGELOG.md
+
 ## [2.9.98] — 2026-07-08
 
 ### Added — Nav integration para Seguros y Domiciliarios

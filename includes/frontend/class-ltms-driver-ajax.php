@@ -70,8 +70,9 @@ class LTMS_Driver_Ajax {
         $table = $wpdb->prefix . 'lt_vendor_drivers';
 
         // Encrypt sensitive fields if encryption helper available.
-        $doc_stored   = class_exists( 'LTMS_Encryption' ) && $doc_raw   ? LTMS_Encryption::encrypt( $doc_raw )   : '';
-        $plate_stored = class_exists( 'LTMS_Encryption' ) && $plate_raw ? LTMS_Encryption::encrypt( $plate_raw ) : $plate_raw;
+        // v2.9.99 P0-4 FIX: LTMS_Encryption no existe — la clase correcta es LTMS_Core_Security.
+        $doc_stored   = class_exists( 'LTMS_Core_Security' ) && $doc_raw   ? LTMS_Core_Security::encrypt( $doc_raw )   : '';
+        $plate_stored = class_exists( 'LTMS_Core_Security' ) && $plate_raw ? LTMS_Core_Security::encrypt( $plate_raw ) : $plate_raw;
 
         if ( $driver_id > 0 ) {
             // Update — verify ownership first.
@@ -102,6 +103,7 @@ class LTMS_Driver_Ajax {
             return;
         }
 
+        // v2.9.99 P0-5 FIX: format array now matches data array (9 fields, 9 formats, status='%s').
         $wpdb->insert(
             $table,
             [
@@ -115,7 +117,7 @@ class LTMS_Driver_Ajax {
                 'created_at'      => current_time( 'mysql' ),
                 'updated_at'      => current_time( 'mysql' ),
             ],
-            [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s' ]
+            [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
         );
 
         if ( ! $wpdb->insert_id ) {

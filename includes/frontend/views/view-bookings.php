@@ -314,7 +314,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 </div><!-- .ltms-view-pad -->
 
 <!-- Modal: Detalle de reserva -->
-<div class="ltms-modal" id="ltms-modal-booking-detail">
+<div class="ltms-modal" id="ltms-modal-booking-detail" role="dialog" aria-modal="true" aria-labelledby="ltms-bk-modal-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
@@ -337,11 +337,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 </div>
 
 <!-- Modal: Confirmar cancelación de reserva -->
-<div class="ltms-modal" id="ltms-modal-booking-cancel">
+<div class="ltms-modal" id="ltms-modal-booking-cancel" role="dialog" aria-modal="true" aria-labelledby="ltms-bk-cancel-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:440px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-            <h3 style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?></h3>
+            <h3 id="ltms-bk-cancel-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Cancelar Reserva', 'ltms' ); ?></h3>
             <button type="button" class="ltms-modal-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;cursor:pointer;font-size:1.1rem;">✕</button>
         </div>
         <p style="color:#6b7280;margin-bottom:12px;">
@@ -366,7 +366,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 </div>
 
 <!-- Modal: Confirmar eliminación (reutilizable para Temporada y Política) -->
-<div class="ltms-modal" id="ltms-modal-booking-confirm-delete">
+<div class="ltms-modal" id="ltms-modal-booking-confirm-delete" role="dialog" aria-modal="true" aria-labelledby="ltms-bk-confirm-delete-title">
     <div class="ltms-modal-backdrop"></div>
     <div class="ltms-modal-inner" style="max-width:400px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
@@ -422,6 +422,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     function fmtCOP(v) {
         return 'COP ' + parseFloat(v||0).toLocaleString('es-CO', {minimumFractionDigits:0});
     }
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        var $div = $('<div/>');
+        $div.text(String(text));
+        return $div.html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
     function statusBadge(s) {
         var lbl = BK.statusLabels[s] || s;
         var col = BK.statusColors[s] || '#6b7280';
@@ -446,7 +452,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             },
             success: function(res) {
                 if (!res.success) {
-                    $('#ltms-bk-tbody').html('<tr><td colspan="9" style="text-align:center;padding:20px;color:#dc2626;">' + (res.data || '<?php esc_html_e("Error al cargar reservas.","ltms"); ?>') + '</td></tr>');
+                    $('#ltms-bk-tbody').html('<tr><td colspan="9" style="text-align:center;padding:20px;color:#dc2626;">' + escapeHtml(res.data || '<?php esc_html_e("Error al cargar reservas.","ltms"); ?>') + '</td></tr>');
                     return;
                 }
                 var d = res.data;
@@ -469,18 +475,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         var rows = '';
         $.each(bookings, function(i, b) {
             var canCancel = (b.status === 'pending' || b.status === 'confirmed');
+            var bId = escapeHtml(b.id);
             rows += '<tr>'
-                + '<td><a href="#" class="ltms-bk-detail-link" data-id="' + b.id + '" style="font-weight:600;color:#1a5276;">#' + b.id + '</a></td>'
-                + '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (b.product_name || '—') + '</td>'
-                + '<td>' + (b.customer_name || '—') + '</td>'
-                + '<td>' + fmtDate(b.checkin_date) + '</td>'
-                + '<td>' + fmtDate(b.checkout_date) + '</td>'
-                + '<td style="text-align:center;">' + (b.guests || 1) + '</td>'
-                + '<td style="white-space:nowrap;">' + fmtCOP(b.total_price) + '</td>'
+                + '<td><a href="#" class="ltms-bk-detail-link" data-id="' + bId + '" style="font-weight:600;color:#1a5276;">#' + bId + '</a></td>'
+                + '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(b.product_name || '—') + '</td>'
+                + '<td>' + escapeHtml(b.customer_name || '—') + '</td>'
+                + '<td>' + escapeHtml(fmtDate(b.checkin_date)) + '</td>'
+                + '<td>' + escapeHtml(fmtDate(b.checkout_date)) + '</td>'
+                + '<td style="text-align:center;">' + escapeHtml(b.guests || 1) + '</td>'
+                + '<td style="white-space:nowrap;">' + escapeHtml(fmtCOP(b.total_price)) + '</td>'
                 + '<td>' + statusBadge(b.status) + '</td>'
                 + '<td style="white-space:nowrap;">'
-                +   '<button class="ltms-btn ltms-btn-outline ltms-btn-xs ltms-bk-detail-link" data-id="' + b.id + '" style="margin-right:4px;">Ver</button>'
-                +   (canCancel ? '<button class="ltms-btn ltms-btn-xs ltms-bk-quick-cancel" data-id="' + b.id + '" style="background:#dc2626;color:#fff;border-color:#dc2626;">Cancelar</button>' : '')
+                +   '<button class="ltms-btn ltms-btn-outline ltms-btn-xs ltms-bk-detail-link" data-id="' + bId + '" style="margin-right:4px;">Ver</button>'
+                +   (canCancel ? '<button class="ltms-btn ltms-btn-xs ltms-bk-quick-cancel" data-id="' + bId + '" style="background:#dc2626;color:#fff;border-color:#dc2626;">Cancelar</button>' : '')
                 + '</td>'
                 + '</tr>';
         });
@@ -518,7 +525,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             method: 'POST',
             data: { action:'ltms_get_vendor_booking_detail', nonce:ltmsDashboard.nonce, booking_id: bookingId },
             success: function(res) {
-                if (!res.success) { $('#ltms-bk-modal-body').html('<p style="color:#dc2626;">' + (res.data||'Error') + '</p>'); return; }
+                if (!res.success) { $('#ltms-bk-modal-body').html('<p style="color:#dc2626;">' + escapeHtml(res.data||'Error') + '</p>'); return; }
                 var b = res.data;
                 var canCancel = (b.status === 'pending' || b.status === 'confirmed');
                 $('#ltms-bk-cancel-btn').toggle(canCancel);
@@ -532,19 +539,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
                 $('#ltms-bk-modal-body').html(
                     '<table style="width:100%;border-collapse:collapse;font-size:0.875rem;">' +
-                    row('<?php esc_html_e("Producto","ltms"); ?>', '<strong>' + (b.product_name||'—') + '</strong>') +
+                    row('<?php esc_html_e("Producto","ltms"); ?>', '<strong>' + escapeHtml(b.product_name||'—') + '</strong>') +
                     row('<?php esc_html_e("Estado","ltms"); ?>', statusBadge(b.status)) +
-                    row('<?php esc_html_e("Huésped","ltms"); ?>', (b.customer_name||'—') + (b.customer_email ? ' &lt;' + b.customer_email + '&gt;' : '')) +
-                    row('<?php esc_html_e("Check-in","ltms"); ?>', fmtDate(b.checkin_date) + (b.checkin_time ? ' · ' + b.checkin_time : '')) +
-                    row('<?php esc_html_e("Check-out","ltms"); ?>', fmtDate(b.checkout_date) + (b.checkout_time ? ' · ' + b.checkout_time : '')) +
+                    row('<?php esc_html_e("Huésped","ltms"); ?>', escapeHtml(b.customer_name||'—') + (b.customer_email ? ' &lt;' + escapeHtml(b.customer_email) + '&gt;' : '')) +
+                    row('<?php esc_html_e("Check-in","ltms"); ?>', escapeHtml(fmtDate(b.checkin_date) + (b.checkin_time ? ' · ' + b.checkin_time : ''))) +
+                    row('<?php esc_html_e("Check-out","ltms"); ?>', escapeHtml(fmtDate(b.checkout_date) + (b.checkout_time ? ' · ' + b.checkout_time : ''))) +
                     row('<?php esc_html_e("Noches","ltms"); ?>', nights || '—') +
-                    row('<?php esc_html_e("Huéspedes","ltms"); ?>', b.guests || 1) +
-                    row('<?php esc_html_e("Total","ltms"); ?>', fmtCOP(b.total_price)) +
-                    row('<?php esc_html_e("Neto vendedor","ltms"); ?>', fmtCOP(b.vendor_net)) +
-                    row('<?php esc_html_e("Modo de pago","ltms"); ?>', b.payment_mode || '—') +
-                    row('<?php esc_html_e("Orden WC","ltms"); ?>', b.wc_order_id ? '#' + b.wc_order_id : '—') +
-                    (b.notes ? row('<?php esc_html_e("Notas","ltms"); ?>', b.notes) : '') +
-                    (b.cancel_notes ? row('<?php esc_html_e("Motivo cancel.","ltms"); ?>', '<span style="color:#dc2626;">' + b.cancel_notes + '</span>') : '') +
+                    row('<?php esc_html_e("Huéspedes","ltms"); ?>', escapeHtml(b.guests || 1)) +
+                    row('<?php esc_html_e("Total","ltms"); ?>', escapeHtml(fmtCOP(b.total_price))) +
+                    row('<?php esc_html_e("Neto vendedor","ltms"); ?>', escapeHtml(fmtCOP(b.vendor_net))) +
+                    row('<?php esc_html_e("Modo de pago","ltms"); ?>', escapeHtml(b.payment_mode || '—')) +
+                    row('<?php esc_html_e("Orden WC","ltms"); ?>', b.wc_order_id ? '#' + escapeHtml(b.wc_order_id) : '—') +
+                    (b.notes ? row('<?php esc_html_e("Notas","ltms"); ?>', escapeHtml(b.notes)) : '') +
+                    (b.cancel_notes ? row('<?php esc_html_e("Motivo cancel.","ltms"); ?>', '<span style="color:#dc2626;">' + escapeHtml(b.cancel_notes) + '</span>') : '') +
                     '</table>'
                 );
             }
@@ -704,7 +711,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         var monthStr = calDate.getFullYear() + '-' + String(calDate.getMonth() + 1).padStart(2, '0');
         $.ajax({
             url: ltmsDashboard.ajax_url, method: 'POST',
-            data: { action: 'ltms_get_bookings', nonce: ltmsDashboard.nonce, per_page: 100 },
+            data: { action: 'ltms_get_vendor_bookings', nonce: ltmsDashboard.nonce, per_page: 50 },
             success: function(res) {
                 if (res.success && res.data && res.data.bookings) {
                     calBookings = res.data.bookings;
@@ -743,13 +750,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                 } else if (day <= daysInMonth) {
                     var dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
                     var dayBookings = calBookings.filter(function(b) {
-                        return (b.check_in || '').startsWith(dateStr) || (b.check_out || '').startsWith(dateStr);
+                        return (b.checkin_date || '').startsWith(dateStr) || (b.checkout_date || '').startsWith(dateStr);
                     });
                     var bg = dateStr === todayStr ? '#eff6ff' : '#fff';
                     var bookingHtml = dayBookings.map(function(b) {
                         var color = statusColors[b.status] || '#f3f4f6';
                         return '<div style="background:' + color + ';border-radius:4px;padding:2px 4px;margin:2px 0;font-size:0.65rem;cursor:pointer;" data-cal-booking="1">' +
-                            (b.guest_name || 'Reserva') + '</div>';
+                            escapeHtml(b.customer_name || 'Reserva') + '</div>';
                     }).join('');
                     var isWeekend = d >= 5;
                     html += '<td style="padding:4px;border:1px solid #e5e7eb;vertical-align:top;min-height:60px;background:' + bg + ';' + (isWeekend ? 'background:#fafafa;' : '') + '">' +
@@ -966,12 +973,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                     $('#ltms-policies-list').removeData('loaded'); ltmsLoadPolicies();
                 }
             } else {
-                alert(res.data || '<?php echo esc_js( __( 'Error al eliminar.', 'ltms' ) ); ?>');
+                var errMsg = res.data || '<?php echo esc_js( __( 'Error al eliminar.', 'ltms' ) ); ?>';
+                if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError) {
+                    LTMS.UX.toastError('Error', errMsg);
+                }
             }
             pendingDelete = null;
         }).fail(function() {
             $btn.prop('disabled', false).text('<?php echo esc_js( __( 'Sí, eliminar', 'ltms' ) ); ?>');
-            alert('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+            if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError) {
+                LTMS.UX.toastError('Error', '<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+            }
         });
     });
 

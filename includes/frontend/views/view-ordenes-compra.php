@@ -170,12 +170,12 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
 
         <!-- Modal detalle OC -->
-        <div id="ltms-oc-detail-modal"
-             style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">
+        <div id="ltms-oc-detail-modal" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-oc-detail-title"
+             style="background:rgba(0,0,0,0.55);z-index:9999;">
             <div style="background:#fff;border-radius:12px;padding:0;max-width:800px;width:95%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
                 <div style="padding:18px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
                     <h4 style="margin:0;font-size:1rem;color:#111827;">📋 <span id="ltms-oc-detail-title"><?php esc_html_e( 'Detalle de Orden', 'ltms' ); ?></span></h4>
-                    <button type="button" id="ltms-oc-detail-close"
+                    <button type="button" id="ltms-oc-detail-close" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>"
                             style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:#6b7280;line-height:1;">✕</button>
                 </div>
                 <div id="ltms-oc-detail-body" style="padding:20px;overflow-y:auto;flex:1;"></div>
@@ -190,11 +190,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 (function($) {
     'use strict';
 
-    const nonce   = '<?php echo esc_js( wp_create_nonce( 'ltms_vendor_nonce' ) ); ?>';
+    const nonce   = '<?php echo esc_js( wp_create_nonce( 'ltms_dashboard_nonce' ) ); ?>'; // v2.9.99 P0-3 fix: era ltms_vendor_nonce, mismatch con handler
     const ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
     let lineaCount = 0;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        var $div = $('<div/>');
+        $div.text(String(text));
+        return $div.html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function openModal( id ) {
+        if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.open === 'function' ) {
+            LTMS.Modal.open( id );
+        } else {
+            $( '#' + id ).css( 'display', 'flex' ).attr( 'aria-hidden', 'false' );
+        }
+    }
+    function closeModal( id ) {
+        if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.close === 'function' ) {
+            LTMS.Modal.close( id );
+        } else {
+            $( '#' + id ).css( 'display', 'none' ).attr( 'aria-hidden', 'true' );
+        }
+    }
+
     function showMsg(el, html, type) {
         const c = {
             success: { bg:'#f0fdf4', border:'#bbf7d0', color:'#166534' },
@@ -242,7 +264,7 @@ if ( ! defined( 'ABSPATH' ) ) {
             }
             let opts = '<option value="">— Selecciona proveedor —</option>';
             res.data.proveedores.forEach(p => {
-                opts += `<option value="${p.idproveedor}">${p.nombreproveedor} (${p.ciudadproveedor})</option>`;
+                opts += `<option value="${escapeHtml(p.idproveedor)}">${escapeHtml(p.nombreproveedor)} (${escapeHtml(p.ciudadproveedor)})</option>`;
             });
             $sel.html(opts);
         }).fail(function() {
@@ -358,10 +380,10 @@ if ( ! defined( 'ABSPATH' ) ) {
         }, function(res) {
             $('#ltms-oc-generar-btn').prop('disabled', false).text('✅ Generar Orden de Compra');
             if (!res.success) {
-                showMsg($res, `❌ ${res.data?.message || 'Error desconocido.'}`, 'error');
+                showMsg($res, '❌ ' + escapeHtml(res.data?.message || 'Error desconocido.'), 'error');
                 return;
             }
-            showMsg($res, `✅ OC <strong style="font-family:monospace;">${res.data.ordencompra}</strong> generada correctamente en Aveonline.`, 'success');
+            showMsg($res, '✅ OC <strong style="font-family:monospace;">' + escapeHtml(res.data.ordencompra) + '</strong> generada correctamente en Aveonline.', 'success');
             // Reset form
             $('#ltms-oc-numero').val('');
             $('#ltms-oc-lineas-tbody').empty();
@@ -379,15 +401,15 @@ if ( ! defined( 'ABSPATH' ) ) {
                 return;
             }
             let rows = '';
-            res.data.ordenes.forEach(o => {
+            res.data.ordenes.forEach((o, i) => {
                 rows += `<tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:10px 16px;font-family:monospace;font-size:0.78rem;color:#4b5563;">${o.ordencompra}</td>
-                    <td style="padding:10px 16px;color:#374151;">${o.nombreproveedor || '—'}</td>
-                    <td style="padding:10px 16px;text-align:center;color:#374151;">${(o.detalle||[]).length}</td>
+                    <td style="padding:10px 16px;font-family:monospace;font-size:0.78rem;color:#4b5563;">${escapeHtml(o.ordencompra)}</td>
+                    <td style="padding:10px 16px;color:#374151;">${escapeHtml(o.nombreproveedor || '—')}</td>
+                    <td style="padding:10px 16px;text-align:center;color:#374151;">${escapeHtml((o.detalle||[]).length)}</td>
                     <td style="padding:10px 16px;text-align:center;">${estadoBadge(o.estado)}</td>
-                    <td style="padding:10px 16px;color:#6b7280;white-space:nowrap;">${formatDate(o.created_at)}</td>
+                    <td style="padding:10px 16px;color:#6b7280;white-space:nowrap;">${escapeHtml(formatDate(o.created_at))}</td>
                     <td style="padding:10px 16px;text-align:center;">
-                        <button type="button" class="ltms-oc-ver-detalle" data-oc='${JSON.stringify(o)}'
+                        <button type="button" class="ltms-oc-ver-detalle" data-oc-idx="${escapeHtml(o.id || o.ordencompra || i)}"
                                 style="padding:4px 10px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:0.75rem;cursor:pointer;">
                             🔍 Ver
                         </button>
@@ -395,6 +417,11 @@ if ( ! defined( 'ABSPATH' ) ) {
                 </tr>`;
             });
             $('#ltms-oc-historial-tbody').html(rows);
+            // Caché de órdenes para que el botón "Ver" pueda recuperar el
+            // objeto completo sin necesidad de interpolar JSON en el DOM (lo
+            // que sería un vector de XSS si la respuesta contiene comillas
+            // simples o dobles).
+            $('#ltms-oc-historial-tbody').data('ordenes', res.data.ordenes);
         });
     }
 
@@ -402,8 +429,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 
     // ── Modal detalle ─────────────────────────────────────────────────────────
     $(document).on('click', '.ltms-oc-ver-detalle', function() {
-        const o = $(this).data('oc');
-        $('#ltms-oc-detail-title').text(`OC ${o.ordencompra} — ${o.nombreproveedor}`);
+        const idx  = String( $(this).attr('data-oc-idx') ); // v2.9.99 REG-3 FIX: .attr() preserves string, .data() auto-converts numeric
+        const ordenes = $('#ltms-oc-historial-tbody').data('ordenes') || [];
+        let o = null;
+        if (typeof idx === 'number') {
+            o = ordenes[idx] || null;
+        } else {
+            for (let i = 0; i < ordenes.length; i++) {
+                if (String(ordenes[i].id || ordenes[i].ordencompra) === String(idx)) {
+                    o = ordenes[i];
+                    break;
+                }
+            }
+        }
+        o = o || {};
+        $('#ltms-oc-detail-title').text('OC ' + (o.ordencompra || '') + ' — ' + (o.nombreproveedor || ''));
 
         const detalle = o.detalle || [];
         let html = '';
@@ -424,13 +464,13 @@ if ( ! defined( 'ABSPATH' ) ) {
                     <tbody>`;
             detalle.forEach(d => {
                 html += `<tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:8px 12px;font-family:monospace;font-size:0.75rem;">${d.pedido||'—'}</td>
-                    <td style="padding:8px 12px;">${d.nombre_articulo||'—'}</td>
-                    <td style="padding:8px 12px;text-align:center;">${d.cantidad||1}</td>
-                    <td style="padding:8px 12px;text-align:right;">$${Number(d.precio||0).toLocaleString('es-CO')}</td>
-                    <td style="padding:8px 12px;">${d.cliente||'—'}</td>
-                    <td style="padding:8px 12px;">${d.ciudad||'—'}</td>
-                    <td style="padding:8px 12px;text-align:center;"><span style="padding:2px 6px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:0.7rem;">${d.estado_linea||'PENDIENTE'}</span></td>
+                    <td style="padding:8px 12px;font-family:monospace;font-size:0.75rem;">${escapeHtml(d.pedido||'—')}</td>
+                    <td style="padding:8px 12px;">${escapeHtml(d.nombre_articulo||'—')}</td>
+                    <td style="padding:8px 12px;text-align:center;">${escapeHtml(d.cantidad||1)}</td>
+                    <td style="padding:8px 12px;text-align:right;">$${escapeHtml(Number(d.precio||0).toLocaleString('es-CO'))}</td>
+                    <td style="padding:8px 12px;">${escapeHtml(d.cliente||'—')}</td>
+                    <td style="padding:8px 12px;">${escapeHtml(d.ciudad||'—')}</td>
+                    <td style="padding:8px 12px;text-align:center;"><span style="padding:2px 6px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:0.7rem;">${escapeHtml(d.estado_linea||'PENDIENTE')}</span></td>
                 </tr>`;
             });
             html += '</tbody></table></div>';
@@ -439,15 +479,15 @@ if ( ! defined( 'ABSPATH' ) ) {
         }
 
         if (o.mensaje) {
-            html += `<div style="margin-top:12px;padding:10px 14px;background:#f9fafb;border-radius:6px;font-size:0.8rem;color:#6b7280;">💬 ${o.mensaje}</div>`;
+            html += '<div style="margin-top:12px;padding:10px 14px;background:#f9fafb;border-radius:6px;font-size:0.8rem;color:#6b7280;">💬 ' + escapeHtml(o.mensaje) + '</div>';
         }
 
         $('#ltms-oc-detail-body').html(html);
-        $('#ltms-oc-detail-modal').css('display','flex');
+        openModal('ltms-oc-detail-modal');
     });
 
     $('#ltms-oc-detail-close').on('click', function() {
-        $('#ltms-oc-detail-modal').hide();
+        closeModal('ltms-oc-detail-modal');
     });
 
     // ── Init ──────────────────────────────────────────────────────────────────

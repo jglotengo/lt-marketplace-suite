@@ -84,11 +84,11 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
     </div>
 
     <!-- Modal de configuración (oculto por defecto) -->
-    <div id="ltms-2fa-setup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+    <div id="ltms-2fa-setup-modal" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-setup-title" style="background:rgba(0,0,0,0.5);z-index:9999;padding:20px;">
         <div style="background:#fff;border-radius:12px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;">
             <div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
-                <h3 style="margin:0;">🔐 <?php esc_html_e( 'Configurar 2FA', 'ltms' ); ?></h3>
-                <button type="button" id="ltms-2fa-close-modal" style="background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;">×</button>
+                <h3 id="ltms-2fa-setup-title" style="margin:0;">🔐 <?php esc_html_e( 'Configurar 2FA', 'ltms' ); ?></h3>
+                <button type="button" id="ltms-2fa-close-modal" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>" style="background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;">×</button>
             </div>
             <div style="padding:24px;">
                 <!-- Paso 1: QR -->
@@ -135,10 +135,10 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
     </div>
 
     <!-- Modal de desactivación -->
-    <div id="ltms-2fa-disable-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+    <div id="ltms-2fa-disable-modal" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-disable-title" style="background:rgba(0,0,0,0.5);z-index:9999;padding:20px;">
         <div style="background:#fff;border-radius:12px;max-width:420px;width:100%;">
             <div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;">
-                <h3 style="margin:0;color:#dc2626;">⚠ <?php esc_html_e( 'Desactivar 2FA', 'ltms' ); ?></h3>
+                <h3 id="ltms-2fa-disable-title" style="margin:0;color:#dc2626;">⚠ <?php esc_html_e( 'Desactivar 2FA', 'ltms' ); ?></h3>
             </div>
             <div style="padding:24px;">
                 <p style="margin:0 0 16px;">
@@ -175,6 +175,21 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
         $(sel).text(msg).show();
     }
 
+    function openModal( id ) {
+        if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.open === 'function' ) {
+            LTMS.Modal.open( id );
+        } else {
+            $( '#' + id ).css( 'display', 'flex' ).attr( 'aria-hidden', 'false' );
+        }
+    }
+    function closeModal( id ) {
+        if ( typeof LTMS !== 'undefined' && LTMS.Modal && typeof LTMS.Modal.close === 'function' ) {
+            LTMS.Modal.close( id );
+        } else {
+            $( '#' + id ).css( 'display', 'none' ).attr( 'aria-hidden', 'true' );
+        }
+    }
+
     // Abrir modal de setup
     $('#ltms-setup-2fa-btn').on('click', function(){
         var $btn = $(this);
@@ -189,7 +204,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
                 $('#ltms-2fa-secret').text(resp.data.secret);
                 $('#ltms-2fa-error').hide();
                 $('#ltms-2fa-verify-code').val('');
-                $('#ltms-2fa-setup-modal').css('display', 'flex');
+                openModal('ltms-2fa-setup-modal');
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || 'Error al generar código 2FA');
             }
@@ -215,7 +230,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
         }).done(function(resp){
             $btn.prop('disabled', false).html('✓ Confirmar y activar');
             if (resp.success) {
-                $('#ltms-2fa-setup-modal').hide();
+                closeModal('ltms-2fa-setup-modal');
                 LTMS.UX.toastSuccess('Éxito', '2FA activado correctamente. Guarda tus códigos de respaldo.');
                 LTMS.Dashboard.loadView('security', true);
             } else {
@@ -229,14 +244,14 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
 
     // Cancelar setup
     $('#ltms-2fa-cancel-btn, #ltms-2fa-close-modal').on('click', function(){
-        $('#ltms-2fa-setup-modal').hide();
+        closeModal('ltms-2fa-setup-modal');
     });
 
     // Abrir modal de desactivación
     $('#ltms-disable-2fa-btn').on('click', function(){
         $('#ltms-2fa-disable-error').hide();
         $('#ltms-2fa-disable-code').val('');
-        $('#ltms-2fa-disable-modal').css('display', 'flex');
+        openModal('ltms-2fa-disable-modal');
     });
 
     // Confirmar desactivación
@@ -255,7 +270,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
         }).done(function(resp){
             $btn.prop('disabled', false).html('Desactivar');
             if (resp.success) {
-                $('#ltms-2fa-disable-modal').hide();
+                closeModal('ltms-2fa-disable-modal');
                 LTMS.UX.toastSuccess('Éxito', '2FA desactivado.');
                 LTMS.Dashboard.loadView('security', true);
             } else {
@@ -269,7 +284,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
 
     // Cancelar desactivación
     $('#ltms-2fa-disable-cancel-btn').on('click', function(){
-        $('#ltms-2fa-disable-modal').hide();
+        closeModal('ltms-2fa-disable-modal');
     });
 
 })(jQuery);

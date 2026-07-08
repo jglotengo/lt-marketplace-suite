@@ -182,7 +182,7 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
             $.ajax({
                 url: ltmsDashboard.ajax_url,
                 method: 'POST',
-                data: { action: 'ltms_kds_get_orders', nonce: ltmsDashboard.nonce },
+                data: { action: 'ltms_kitchen_get_orders', nonce: ltmsDashboard.nonce },
                 success: function(response) {
                     if (!response.success) return;
                     var data = response.data;
@@ -254,14 +254,23 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
 
             $('#ltms-kds-grid').html(html);
 
-            // Bind action buttons
+            // Bind action buttons (v2.9.99 P0-1 fix: action name + param name + value mapping)
             $('[data-kds-action]').off('click').on('click', function() {
-                var action = $(this).data('kds-action');
+                var uiAction = $(this).data('kds-action');
                 var orderId = $(this).data('order-id');
+                // Map UI action → WC kitchen status (verified against ALL_KITCHEN_STATUSES).
+                var statusMap = { 'start': 'preparing', 'ready': 'ready', 'serve': 'served' };
+                var newStatus = statusMap[uiAction] || '';
+                if (!newStatus) return;
                 $.ajax({
                     url: ltmsDashboard.ajax_url, method: 'POST',
-                    data: { action: 'ltms_kds_update_status', nonce: ltmsDashboard.nonce, order_id: orderId, kds_action: action },
-                    success: function() { fetchKDSOrders(); }
+                    data: { action: 'ltms_kitchen_update_status', nonce: ltmsDashboard.nonce, order_id: orderId, status: newStatus },
+                    success: function() { fetchKDSOrders(); },
+                    error: function() {
+                        if (typeof LTMS !== 'undefined' && LTMS.UX && LTMS.UX.toastError) {
+                            LTMS.UX.toastError('Error', 'No se pudo actualizar el estado.');
+                        }
+                    }
                 });
             });
         }

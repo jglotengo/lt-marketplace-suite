@@ -547,6 +547,18 @@ if ( empty( $seo_template ) ) {
     var nonce = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.nonce) || '';
     var ajaxUrl = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url) || ajaxurl;
 
+    // FIX-P1-BATCH-A: escape API-controlled text before injecting into HTML
+    // (categories, AJAX error/success messages, sync error list). Without
+    // this, a PosGold category name or server error message containing
+    // HTML/JS would execute in the vendor's browser. Uses jQuery's
+    // .text()/.html() trick to escape &, <, >, then normalises quotes.
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        var $div = $('<div/>');
+        $div.text(String(text));
+        return $div.html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     // Acordeón
     $('.ltms-posgold-accordion-header').on('click', function(){
         var $body = $(this).next('.ltms-posgold-accordion-body');
@@ -621,11 +633,17 @@ if ( empty( $seo_template ) ) {
 
         var html = '';
         categories.forEach(function(cat) {
+            // FIX-P1-BATCH-A: escape all PosGold-provided fields before
+            // interpolating into HTML to prevent stored XSS via a malicious
+            // category name/id injected by the upstream API.
+            var catId    = escapeHtml(cat.id);
+            var catName  = escapeHtml(cat.nombre);
+            var catCount = parseInt(cat.count, 10);
             var checked = selectedCatIds.indexOf(cat.id) !== -1 ? 'checked' : '';
-            var countLabel = cat.count > 0 ? ' <span style="color:#9ca3af;font-size:0.8rem;">(' + cat.count + ' productos)</span>' : '';
+            var countLabel = cat.count > 0 ? ' <span style="color:#9ca3af;font-size:0.8rem;">(' + catCount + ' productos)</span>' : '';
             html += '<label style="display:flex;align-items:center;padding:8px 12px;border-radius:6px;cursor:pointer;background:#fff;margin-bottom:4px;border:1px solid #e5e7eb;">';
-            html += '<input type="checkbox" class="ltms-posgold-cat-checkbox" value="' + cat.id + '" ' + checked + ' style="margin-right:8px;width:18px;height:18px;">';
-            html += '<span style="flex:1;"><strong>' + cat.nombre + '</strong>' + countLabel + '<br><span style="font-size:0.7rem;color:#9ca3af;">ID: ' + cat.id + '</span></span>';
+            html += '<input type="checkbox" class="ltms-posgold-cat-checkbox" value="' + catId + '" ' + checked + ' style="margin-right:8px;width:18px;height:18px;">';
+            html += '<span style="flex:1;"><strong>' + catName + '</strong>' + countLabel + '<br><span style="font-size:0.7rem;color:#9ca3af;">ID: ' + catId + '</span></span>';
             html += '</label>';
         });
         $container.html(html);
@@ -666,7 +684,7 @@ if ( empty( $seo_template ) ) {
                 updateSelectedCats();
             } else {
                 $('#ltms-posgold-cats-status').text('Error: ' + (resp.data.message || resp.data));
-                $('#ltms-posgold-cats-container').html('<p style="text-align:center;color:#dc2626;padding:24px 0;margin:0;">✗ ' + (resp.data.message || resp.data) + '<br><br>Verifica tus credenciales en la sección "Credenciales PosGold" arriba.</p>');
+                $('#ltms-posgold-cats-container').html('<p style="text-align:center;color:#dc2626;padding:24px 0;margin:0;">✗ ' + escapeHtml(resp.data.message || resp.data) + '<br><br>Verifica tus credenciales en la sección "Credenciales PosGold" arriba.</p>');
             }
         }).fail(function(){
             $('#ltms-posgold-cats-status').text('Error de red.');
@@ -761,9 +779,9 @@ if ( empty( $seo_template ) ) {
             $btn.prop('disabled', false).html('🔍 Probar conexión');
             var $result = $('#ltms-posgold-test-result');
             if (resp.success) {
-                $result.html('<div style="padding:12px 16px;background:#dcfce7;border-radius:8px;color:#166534;">✓ ' + resp.data.message + '</div>').show();
+                $result.html('<div style="padding:12px 16px;background:#dcfce7;border-radius:8px;color:#166534;">✓ ' + escapeHtml(resp.data.message) + '</div>').show();
             } else {
-                $result.html('<div style="padding:12px 16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + (resp.data.message || resp.data) + '</div>').show();
+                $result.html('<div style="padding:12px 16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(resp.data.message || resp.data) + '</div>').show();
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('🔍 Probar conexión');
@@ -776,10 +794,8 @@ if ( empty( $seo_template ) ) {
         var $btn = $(this);
         var $result = $('#ltms-posgold-sync-result');
 
-        if (!confirm('¿Sincronizar tu catálogo de PosGold ahora?\n\nSe aplicarán las reglas configuradas:\n- Filtro de categorías\n- Cálculo de precio\n- SEO en títulos\n- Depuración de duplicados\n\nEsto puede tardar varios minutos.')) {
-            return;
-        }
-
+        // v2.9.99 P1 FIX: eliminado native confirm() — el botón "Sincronizar ahora" es explícito.
+        // El feedback visual (progress bar + resultado) confirma que la acción se ejecutó.
         $btn.prop('disabled', true).text('Sincronizando...');
         $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ Sincronizando productos... No cierres esta página.</div>').show();
 
@@ -791,19 +807,19 @@ if ( empty( $seo_template ) ) {
             if (resp.success) {
                 var d = resp.data;
                 var html = '<div style="padding:16px;background:#dcfce7;border-radius:8px;color:#166534;">';
-                html += '<div style="font-weight:600;margin-bottom:8px;">✓ ' + d.message + '</div>';
+                html += '<div style="font-weight:600;margin-bottom:8px;">✓ ' + escapeHtml(d.message) + '</div>';
                 if (d.errors && d.errors.length > 0) {
                     html += '<div style="margin-top:8px;font-size:0.85rem;color:#7f1d1d;">';
-                    html += '<strong>Errores (' + d.errors.length + '):</strong><ul style="margin:4px 0;padding-left:20px;">';
-                    d.errors.slice(0, 10).forEach(function(e){ html += '<li>' + e + '</li>'; });
-                    if (d.errors.length > 10) { html += '<li>... y ' + (d.errors.length - 10) + ' más</li>'; }
+                    html += '<strong>Errores (' + parseInt(d.errors.length, 10) + '):</strong><ul style="margin:4px 0;padding-left:20px;">';
+                    d.errors.slice(0, 10).forEach(function(e){ html += '<li>' + escapeHtml(e) + '</li>'; });
+                    if (d.errors.length > 10) { html += '<li>... y ' + parseInt(d.errors.length - 10, 10) + ' más</li>'; }
                     html += '</ul></div>';
                 }
                 html += '</div>';
                 $result.html(html).show();
                 setTimeout(function(){ LTMS.Dashboard.loadView('posgold', true); }, 6000);
             } else {
-                $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + (resp.data.message || resp.data) + '</div>').show();
+                $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(resp.data.message || resp.data) + '</div>').show();
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('🔄 Sincronizar ahora');

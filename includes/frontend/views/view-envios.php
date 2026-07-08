@@ -286,20 +286,28 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
             }
             let rows = '';
             res.data.relations.forEach(r => {
+                // FIX-P1-BATCH-A: escape every Aveonline-provided field before
+                // injecting into HTML — both text content and attributes
+                // (data-relacion, guias badges) — to prevent stored XSS if the
+                // API returns HTML/JS in any field. Mirrors the escapeHtml()
+                // already applied to the recipient-search results.
                 const guias = (r.guias || '').split(',').map(g => g.trim()).filter(Boolean);
                 const guiasBadge = guias.slice(0, 2).map(g =>
-                    `<span style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:0.72rem;font-family:monospace;margin:1px;">${g}</span>`
+                    `<span style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:0.72rem;font-family:monospace;margin:1px;">${escapeHtml(g)}</span>`
                 ).join('') + (guias.length > 2 ? `<span style="font-size:0.72rem;color:#9ca3af;"> +${guias.length - 2}</span>` : '');
+                const relEsc    = escapeHtml(r.relacionenvio);
+                const transpEsc = escapeHtml(r.transportadora || '—');
+                const fechaEsc  = escapeHtml(formatDate(r.fecha_aveonline || r.created_at));
 
                 rows += `<tr style="border-bottom:1px solid #f3f4f6;">
-                    <td style="padding:10px 16px;font-family:monospace;font-size:0.78rem;color:#4b5563;">${r.relacionenvio}</td>
-                    <td style="padding:10px 16px;color:#374151;">${r.transportadora || '—'}</td>
+                    <td style="padding:10px 16px;font-family:monospace;font-size:0.78rem;color:#4b5563;">${relEsc}</td>
+                    <td style="padding:10px 16px;color:#374151;">${transpEsc}</td>
                     <td style="padding:10px 16px;">${guiasBadge}</td>
-                    <td style="padding:10px 16px;color:#6b7280;white-space:nowrap;">${formatDate(r.fecha_aveonline || r.created_at)}</td>
+                    <td style="padding:10px 16px;color:#6b7280;white-space:nowrap;">${fechaEsc}</td>
                     <td style="padding:10px 16px;text-align:center;">
                         <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
                             ${r.rutaimpresion ? `<a href="${safeUrl(r.rutaimpresion)}" target="_blank" rel="noopener noreferrer" style="padding:4px 10px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:0.75rem;text-decoration:none;white-space:nowrap;">🖨 Imprimir</a>` : ''}
-                            <button type="button" class="ltms-envios-delete-btn" data-relacion="${r.relacionenvio}"
+                            <button type="button" class="ltms-envios-delete-btn" data-relacion="${relEsc}"
                                     style="padding:4px 10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:5px;font-size:0.75rem;cursor:pointer;white-space:nowrap;">
                                 🗑 Eliminar
                             </button>
@@ -328,14 +336,20 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
         $.post(ajaxUrl, { action: 'ltms_vendor_create_relation', nonce, transportadora: carrier, guias }, function(res) {
             $('#ltms-envios-create-btn').prop('disabled', false).text('✅ Crear relación de envío');
             if (!res.success) {
-                showMsg($res, '❌ ' + (res.data?.message || 'Error desconocido.'), 'error');
+                // v2.9.99 REG-4 FIX: escape server message before HTML injection.
+                var errMsg = (res.data && res.data.message) ? res.data.message : 'Error desconocido.';
+                showMsg($res, '❌ ' + escapeHtml(errMsg), 'error');
                 return;
             }
             const d = res.data;
+            // FIX-P1-BATCH-A: escape Aveonline-controlled fields before
+            // interpolating into the success toast HTML.
+            const relEsc   = escapeHtml(d.relacionenvio);
+            const fechaEsc = escapeHtml(d.fecha);
             const printBtn = d.rutaimpresion
                 ? `<a href="${safeUrl(d.rutaimpresion)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:10px;padding:7px 14px;background:#1d4ed8;color:#fff;border-radius:6px;text-decoration:none;font-size:0.82rem;">🖨 Imprimir manifiesto</a>`
                 : '';
-            showMsg($res, `✅ Relación creada: <strong style="font-family:monospace;">${d.relacionenvio}</strong><br><span style="font-size:0.8rem;color:#6b7280;">${d.fecha}</span>${printBtn}`, 'success');
+            showMsg($res, `✅ Relación creada: <strong style="font-family:monospace;">${relEsc}</strong><br><span style="font-size:0.8rem;color:#6b7280;">${fechaEsc}</span>${printBtn}`, 'success');
             $('#ltms-envios-guias').val('');
             loadRelations();
         });
