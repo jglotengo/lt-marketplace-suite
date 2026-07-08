@@ -403,7 +403,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                 depositReceiptUrl = '';
                 btn.text('✅ Solicitud enviada');
                 // Recargar la vista tras 3s
-                setTimeout(function() { location.reload(); }, 3000);
+                setTimeout(function() { LTMS.Dashboard.loadView('wallet', true); }, 3000);
             } else {
                 errEl.text(res.data || 'Error desconocido.').show();
                 btn.prop('disabled', false).text('Enviar Solicitud de Depósito');

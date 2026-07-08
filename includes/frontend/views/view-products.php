@@ -509,7 +509,7 @@ $products  = wc_get_products([
         $.ajax({
             url:ltmsDashboard.ajax_url, method:'POST',
             data:{action:'ltms_delete_product', nonce:ltmsDashboard.nonce, product_id:pid},
-            success:function(res){ if(res.success){ LTMS.Dashboard.loadView('products', true); } else { alert(res.data||'No se pudo eliminar.'); } },
+            success:function(res){ if(res.success){ LTMS.Dashboard.loadView('products', true); } else { LTMS.UX.toastError('Error', res.data||'No se pudo eliminar.'); } },
             error:function(){ LTMS.UX.toastError('Error', 'Error de conexión.'); }
         });
     });

@@ -393,7 +393,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                             $btn.prop('disabled', false).text('Enviar para Verificación');
                             if (r.success) {
                                 showNotice('✓ Solicitud enviada. Te notificaremos por correo cuando sea revisada.', 'success');
-                                setTimeout(function(){ location.reload(); }, 2500);
+                                setTimeout(function(){ LTMS.Dashboard.loadView('home', true); }, 2500);
                             } else {
                                 showNotice('Error: ' + (r.data || 'intente de nuevo'), 'error');
                             }

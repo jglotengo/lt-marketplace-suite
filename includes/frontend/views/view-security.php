@@ -191,11 +191,11 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
                 $('#ltms-2fa-verify-code').val('');
                 $('#ltms-2fa-setup-modal').css('display', 'flex');
             } else {
-                alert(resp.data.message || 'Error al generar código 2FA');
+                LTMS.UX.toastError('Error', resp.data.message || 'Error al generar código 2FA');
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('🔐 Activar 2FA');
-            alert('Error de red. Intenta de nuevo.');
+            LTMS.UX.toastError('Error', 'Error de red. Intenta de nuevo.');
         });
     });
 
@@ -216,8 +216,8 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
             $btn.prop('disabled', false).html('✓ Confirmar y activar');
             if (resp.success) {
                 $('#ltms-2fa-setup-modal').hide();
-                alert('✓ 2FA activado correctamente. Guarda tus códigos de respaldo.');
-                window.location.reload();
+                LTMS.UX.toastSuccess('Éxito', '2FA activado correctamente. Guarda tus códigos de respaldo.');
+                LTMS.Dashboard.loadView('security', true);
             } else {
                 showError('#ltms-2fa-error', resp.data.message || 'Código incorrecto');
             }
@@ -256,8 +256,8 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
             $btn.prop('disabled', false).html('Desactivar');
             if (resp.success) {
                 $('#ltms-2fa-disable-modal').hide();
-                alert('2FA desactivado.');
-                window.location.reload();
+                LTMS.UX.toastSuccess('Éxito', '2FA desactivado.');
+                LTMS.Dashboard.loadView('security', true);
             } else {
                 showError('#ltms-2fa-disable-error', resp.data.message || 'Código incorrecto');
             }

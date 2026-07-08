@@ -573,7 +573,7 @@ if ( empty( $seo_template ) ) {
             $btn.prop('disabled', false).html('💾 Guardar credenciales');
             if (resp.success) {
                 LTMS.UX.toastSuccess('Exito', resp.data.message);
-                window.location.reload();
+                LTMS.Dashboard.loadView('posgold', true);
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
@@ -801,7 +801,7 @@ if ( empty( $seo_template ) ) {
                 }
                 html += '</div>';
                 $result.html(html).show();
-                setTimeout(function(){ window.location.reload(); }, 6000);
+                setTimeout(function(){ LTMS.Dashboard.loadView('posgold', true); }, 6000);
             } else {
                 $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + (resp.data.message || resp.data) + '</div>').show();
             }

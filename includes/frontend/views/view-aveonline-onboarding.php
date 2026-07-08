@@ -379,7 +379,7 @@ $current_step = $step_labels[ $onboarding_status ] ?? 1;
             if (r.success) {
                 $('.ltms-ave-step').hide();
                 $('#ave-ob-success').show();
-                setTimeout(function() { location.reload(); }, 2000);
+                setTimeout(function() { LTMS.Dashboard.loadView('envios', true); }, 2000);
             } else { showError(r.data || 'Error'); }
         }).fail(function() { hideLoading(); showError('Error de conexión'); });
     });

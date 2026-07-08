@@ -461,7 +461,7 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
             if (res.success) {
                 loadRelations();
             } else {
-                alert(res.data?.message || 'Error al eliminar.');
+                LTMS.UX.toastError('Error', res.data?.message || 'Error al eliminar.');
             }
         });
     });
