@@ -69,6 +69,24 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                 <div style="font-size:1.1rem;font-weight:600;"><?php echo esc_html( LTMS_Utils::format_money( $held ) ); ?></div>
             </div>
         </div>
+        <!-- v2.9.86 P2: Tax breakdown display -->
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.06);">
+            <div style="font-size:0.75rem;font-weight:600;margin-bottom:8px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;"><?php esc_html_e( 'Resumen Fiscal', 'ltms' ); ?></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:0.8rem;">
+                <div>
+                    <div style="color:#9ca3af;">Comisiones</div>
+                    <div style="font-weight:600;" id="ltms-wallet-total-commissions">—</div>
+                </div>
+                <div>
+                    <div style="color:#9ca3af;">Retenciones</div>
+                    <div style="font-weight:600;" id="ltms-wallet-total-withholdings">—</div>
+                </div>
+                <div>
+                    <div style="color:#9ca3af;">Retiros</div>
+                    <div style="font-weight:600;" id="ltms-wallet-total-payouts">—</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Historial de movimientos -->
