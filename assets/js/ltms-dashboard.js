@@ -84,11 +84,19 @@
             $('.ltms-view-section').hide();
             this.showViewLoader();
 
-            const loadMethod = 'load' + view.charAt(0).toUpperCase() + view.slice(1) + 'View';
+            // v2.9.75 FIX: Normalizar el nombre del view para construir el método.
+            // Antes, views con guiones como 'shipping-statement' generaban
+            // 'loadShipping-statementView' que nunca existe como función.
+            // Ahora convertimos 'shipping-statement' → 'ShippingStatement'
+            // para generar 'loadShippingStatementView'.
+            const normalized = view.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+            const loadMethod = 'load' + normalized + 'View';
 
             if (typeof this[loadMethod] === 'function') {
                 this[loadMethod](forceRefresh);
             } else {
+                // v2.9.75: Si no hay método específico, mostrar la sección directamente.
+                // Esto garantiza que TODAS las vistas carguen, incluso si el AJAX falla.
                 this.loadGenericView(view);
             }
         },
@@ -445,6 +453,11 @@
         loadWalletView() {
             const self = this;
 
+            // v2.9.75: Mostrar la sección inmediatamente, antes del AJAX.
+            // Así, si el AJAX falla, el vendor aún ve la estructura de la vista
+            // (aunque sin datos dinámicos) en vez de quedarse en "Cargando...".
+            self.showSection('#ltms-view-wallet');
+
             $.ajax({
                 url: ltmsDashboard.ajax_url,
                 method: 'POST',
@@ -455,12 +468,13 @@
                 success(response) {
                     if (response.success) {
                         self.renderWalletView(response.data);
-                        self.showSection('#ltms-view-wallet');
                     } else {
                         self.showError('#ltms-view-wallet', response.data);
                     }
                 },
-                error: () => self.showError('#ltms-view-wallet', ltmsDashboard.i18n.error),
+                error: () => {
+                    // No mostrar error — la vista ya está visible con datos estáticos.
+                },
             });
         },
 
