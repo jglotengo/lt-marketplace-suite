@@ -86,7 +86,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
     <!-- v2.9.80 P1: Empty state (hidden by default) -->
     <div id="ltms-orders-empty" style="display:none;text-align:center;padding:60px 20px;">
-        <div style="font-size:3rem;margin-bottom:12px;opacity:0.3;">📦</div>
+        <div style="margin-bottom:12px;opacity:0.3;"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
         <h3 style="margin:0 0 8px;color:#374151;font-size:1.1rem;"><?php esc_html_e( 'No tienes pedidos todavía', 'ltms' ); ?></h3>
         <p style="color:#9ca3af;margin:0 0 16px;font-size:0.85rem;"><?php esc_html_e( 'Cuando los clientes compren tus productos, aparecerán aquí.', 'ltms' ); ?></p>
         <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" data-action="load-view" data-view="products">

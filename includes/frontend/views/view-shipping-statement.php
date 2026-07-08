@@ -82,14 +82,14 @@ $fmt = function( $v ) use ( $currency ) {
     <form method="get" style="margin:16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <?php wp_nonce_field( 'ltms_shipping_statement', 'ltms_ss_nonce' ); ?>
         <input type="hidden" name="year" value="<?php echo esc_attr( $year ); ?>" />
-        <select name="month" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
+        <select name="month" data-action="submit-form" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
             <?php for ( $m = 1; $m <= 12; $m++ ) : ?>
                 <option value="<?php echo esc_attr( $m ); ?>" <?php selected( $month, $m ); ?>>
                     <?php echo esc_html( wp_date( 'F Y', mktime( 0, 0, 0, $m, 1, $year ) ) ); ?>
                 </option>
             <?php endfor; ?>
         </select>
-        <select name="year" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
+        <select name="year" data-action="submit-form" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
             <?php for ( $y = (int) current_time( 'Y' ); $y >= 2024; $y-- ) : ?>
                 <option value="<?php echo esc_attr( $y ); ?>" <?php selected( $year, $y ); ?>><?php echo esc_html( $y ); ?></option>
             <?php endfor; ?>
@@ -250,4 +250,8 @@ $fmt = function( $v ) use ( $currency ) {
         link.click();
     });
 })();
+// v2.9.96 P3: CSP-compliant form submit (replaces inline onchange)
+document.querySelectorAll('[data-action="submit-form"]').forEach(function(el) {
+    el.addEventListener('change', function() { this.form.submit(); });
+});
 </script>

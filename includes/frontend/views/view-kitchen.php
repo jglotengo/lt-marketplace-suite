@@ -43,7 +43,7 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
     <?php if ( ! $is_restaurant ) : ?>
     <!-- v2.9.92 P2: Improved empty state -->
     <div style="padding:60px;text-align:center;background:#f9fafb;border-radius:12px;border:2px dashed #e5e7eb;">
-        <div style="font-size:3rem;margin-bottom:12px;opacity:0.3;">🍽️</div>
+        <div style="margin-bottom:12px;opacity:0.3;"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 2v8a3 3 0 0 0 6 0V2"/><line x1="8" y1="2" x2="8" y2="10"/><path d="M16 2v20"/><path d="M19 2c-1.5 1.5-3 4-3 7s1.5 3 3 3"/></svg></div>
         <p style="font-size:1.1rem;font-weight:600;margin:0 0 8px;color:#374151;">
             <?php esc_html_e( 'Tu cuenta no tiene el modo restaurante activado.', 'ltms' ); ?>
         </p>
@@ -97,7 +97,7 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
 
     <!-- v2.9.92 P2: Empty state -->
     <div id="ltms-kds-empty" style="display:none;text-align:center;padding:60px 20px;">
-        <div style="font-size:3rem;margin-bottom:12px;opacity:0.3;">🍳</div>
+        <div style="margin-bottom:12px;opacity:0.3;"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 2v8a3 3 0 0 0 6 0V2"/><line x1="8" y1="2" x2="8" y2="10"/><path d="M16 2v20"/><path d="M19 2c-1.5 1.5-3 4-3 7s1.5 3 3 3"/></svg></div>
         <h3 style="margin:0 0 8px;color:#374151;font-size:1.1rem;"><?php esc_html_e( 'No hay pedidos activos', 'ltms' ); ?></h3>
         <p style="color:#9ca3af;margin:0;font-size:0.85rem;"><?php esc_html_e( 'Los nuevos pedidos aparecerán aquí automáticamente.', 'ltms' ); ?></p>
     </div>
