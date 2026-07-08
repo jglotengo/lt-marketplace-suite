@@ -79,21 +79,26 @@ $fmt = function( $v ) use ( $currency ) {
     <?php endif; ?>
 
     <!-- Selector de período -->
-    <form method="get" style="margin:16px 0;">
+    <form method="get" style="margin:16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <?php wp_nonce_field( 'ltms_shipping_statement', 'ltms_ss_nonce' ); ?>
         <input type="hidden" name="year" value="<?php echo esc_attr( $year ); ?>" />
-        <select name="month" onchange="this.form.submit()">
+        <select name="month" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
             <?php for ( $m = 1; $m <= 12; $m++ ) : ?>
                 <option value="<?php echo esc_attr( $m ); ?>" <?php selected( $month, $m ); ?>>
                     <?php echo esc_html( wp_date( 'F Y', mktime( 0, 0, 0, $m, 1, $year ) ) ); ?>
                 </option>
             <?php endfor; ?>
         </select>
-        <select name="year" onchange="this.form.submit()">
+        <select name="year" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;">
             <?php for ( $y = (int) current_time( 'Y' ); $y >= 2024; $y-- ) : ?>
                 <option value="<?php echo esc_attr( $y ); ?>" <?php selected( $year, $y ); ?>><?php echo esc_html( $y ); ?></option>
             <?php endfor; ?>
         </select>
+        <!-- v2.9.88 P2: CSV Export button -->
+        <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-shipping-export-csv"
+                style="margin-left:auto;">
+            📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
+        </button>
     </form>
 
     <!-- KPIs -->
@@ -220,3 +225,29 @@ $fmt = function( $v ) use ( $currency ) {
     <?php endif; ?>
 
 </div>
+
+<script>
+// v2.9.88 P2: CSV Export para shipping-statement
+(function() {
+    var btn = document.getElementById('ltms-shipping-export-csv');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        var rows = document.querySelectorAll('.ltms-table tbody tr');
+        var csv = 'Fecha,Pedido,Transportadora,Costo Absorbido,Costo Real\n';
+        rows.forEach(function(row) {
+            var cells = row.querySelectorAll('td');
+            if (cells.length >= 5) {
+                var line = Array.from(cells).slice(0, 5).map(function(c) {
+                    return '"' + (c.textContent || '').trim().replace(/"/g, '""') + '"';
+                }).join(',');
+                csv += line + '\n';
+            }
+        });
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'fletes_<?php echo esc_js( $year ); ?>_<?php echo esc_js( $month ); ?>.csv';
+        link.click();
+    });
+})();
+</script>

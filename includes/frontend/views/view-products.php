@@ -129,6 +129,20 @@ $products  = wc_get_products([
             <span id="ltms-np-img-status" style="font-size:0.8rem;color:#6b7280;margin-left:8px;"></span>
         </div>
 
+        <!-- v2.9.88 P1: Gallery upload (multiple images) -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Galería (imágenes adicionales)', 'ltms' ); ?></label>
+            <div id="ltms-np-gallery-preview" style="display:flex;gap:8px;flex-wrap:wrap;min-height:60px;padding:8px;border:2px dashed #e5e7eb;border-radius:8px;background:#f9fafb;align-items:center;">
+                <span style="color:#d1d5db;font-size:0.8rem;"><?php esc_html_e( 'Click para añadir imágenes', 'ltms' ); ?></span>
+            </div>
+            <input type="file" id="ltms-np-gallery-input" accept="image/*" multiple style="display:none;">
+            <input type="hidden" id="ltms-np-gallery-ids" value="">
+            <button type="button" style="padding:6px 14px;border:1.5px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:0.85rem;margin-top:6px;" id="ltms-np-gallery-btn">
+                📁 <?php esc_html_e( 'Añadir imágenes', 'ltms' ); ?>
+            </button>
+            <span style="font-size:0.75rem;color:#9ca3af;margin-left:8px;"><?php esc_html_e( 'Máx 5 imágenes. JPG, PNG, WEBP.', 'ltms' ); ?></span>
+        </div>
+
         <!-- Nombre -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Nombre del Producto *', 'ltms' ); ?></label>
@@ -267,6 +281,63 @@ $products  = wc_get_products([
         $('#ltms-ep-redi-rate-wrap').toggle($(this).is(':checked'));
     });
 
+    // v2.9.88 P1: Gallery upload (multiple images)
+    var galleryIds = [];
+    $('#ltms-np-gallery-btn, #ltms-np-gallery-preview').on('click', function(){
+        if (galleryIds.length >= 5) {
+            LTMS.UX.toastError('Límite', 'Máximo 5 imágenes en la galería.');
+            return;
+        }
+        $('#ltms-np-gallery-input').trigger('click');
+    });
+    $('#ltms-np-gallery-input').on('change', function(){
+        var files = this.files;
+        if (!files || !files.length) return;
+        var remaining = 5 - galleryIds.length;
+        var toUpload = Math.min(files.length, remaining);
+        if (files.length > remaining) {
+            LTMS.UX.toastWarning('Límite', 'Solo se subirán ' + remaining + ' imágenes más (máx 5).');
+        }
+        for (var i = 0; i < toUpload; i++) {
+            (function(file) {
+                var fd = new FormData();
+                fd.append('action', 'ltms_upload_product_image');
+                fd.append('nonce', ltmsDashboard.nonce);
+                fd.append('file', file);
+                $.ajax({
+                    url: ltmsDashboard.ajax_url, method: 'POST', data: fd,
+                    processData: false, contentType: false,
+                    success: function(res) {
+                        if (res.success && res.data.attachment_id) {
+                            galleryIds.push(res.data.attachment_id);
+                            $('#ltms-np-gallery-ids').val(galleryIds.join(','));
+                            var $preview = $('#ltms-np-gallery-preview');
+                            $preview.find('span').remove(); // Remove placeholder
+                            $preview.append(
+                                '<div style="position:relative;width:50px;height:50px;border-radius:6px;overflow:hidden;">' +
+                                '<img src="' + res.data.url + '" style="width:100%;height:100%;object-fit:cover;">' +
+                                '<button type="button" data-gallery-remove="' + res.data.attachment_id + '" style="position:absolute;top:0;right:0;background:rgba(239,68,68,0.9);color:#fff;border:none;font-size:0.6rem;cursor:pointer;width:16px;height:16px;line-height:1;">✕</button>' +
+                                '</div>'
+                            );
+                        }
+                    }
+                });
+            })(files[i]);
+        }
+        $(this).val(''); // Reset input
+    });
+    // Remove gallery image
+    $(document).on('click', '[data-gallery-remove]', function(e) {
+        e.preventDefault();
+        var id = parseInt($(this).data('gallery-remove'));
+        galleryIds = galleryIds.filter(function(v) { return v !== id; });
+        $('#ltms-np-gallery-ids').val(galleryIds.join(','));
+        $(this).parent().remove();
+        if (galleryIds.length === 0) {
+            $('#ltms-np-gallery-preview').html('<span style="color:#d1d5db;font-size:0.8rem;">Click para añadir imágenes</span>');
+        }
+    });
+
     $('#ltms-np-img-input').on('change', function(){
         const file = this.files[0];
         if (!file) return;
@@ -332,6 +403,7 @@ $products  = wc_get_products([
                 stock:        $('#ltms-np-stock').val(),
                 category_id:  $('#ltms-np-category').val(),
                 image_id:     $('#ltms-np-image-id').val(),
+                gallery_ids:  $('#ltms-np-gallery-ids').val(),
                 status:       $('#ltms-np-status').val(),
                 product_type:    $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
                 redi_enabled:    $('#ltms-np-redi-enabled').is(':checked') ? 'yes' : 'no',
