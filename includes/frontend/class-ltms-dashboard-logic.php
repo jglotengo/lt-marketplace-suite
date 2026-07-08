@@ -868,46 +868,81 @@ final class LTMS_Dashboard_Logic {
      * @return array
      */
     private function get_vendor_orders( int $vendor_id, int $page, int $per_page, string $status ): array {
-        // v2.9.74 FIX: Filtrar pedidos por vendor_id de forma estricta.
-        // AUDIT-REDI-UX-GAPS GAP-7: usar meta_query OR para retornar
-        // también pedidos donde el vendor es el origin ReDi (no solo el
-        // reseller). Antes el origin vendor nunca veía pedidos ReDi en su
-        // dashboard a pesar de ser quien debe enviar el producto.
+        // v2.9.76 FIX: Filtrar pedidos por vendor de forma robusta.
         //
-        // v2.9.74: Antes la meta_query OR podía traer pedidos que no tenían
-        // _ltms_vendor_id ni _ltms_redi_origin_vendor_id (pedidos antiguos
-        // o de admin) porque WC interpreta 'compare' = '=' con 'value' = 0
-        // como "cualquier valor". Ahora forzamos que el value sea > 0.
-        $args = [
-            'meta_query' => [
-                'relation' => 'OR',
-                [
-                    'key'     => '_ltms_vendor_id',
-                    'value'   => $vendor_id,
-                    'compare' => '=',
-                    'type'    => 'NUMERIC',
-                ],
-                [
-                    'key'     => '_ltms_redi_origin_vendor_id',
-                    'value'   => $vendor_id,
-                    'compare' => '=',
-                    'type'    => 'NUMERIC',
-                ],
-            ],
-            'limit'       => $per_page,
-            'paged'       => $page,
-            'orderby'     => 'date',
-            'order'       => 'DESC',
-            'type'        => 'shop_order',
-            'paginate'    => true,
-        ];
+        // PROBLEMA: _ltms_vendor_id solo se guarda en pedidos single-vendor.
+        // Para multi-vendor, el vendor se identifica por los items (productos
+        // que tienen _ltms_vendor_id en post_meta). La query anterior con
+        // meta_query no encontraba pedidos multi-vendor.
+        //
+        // SOLUCIÓN: SQL directo que busca en 3 lugares:
+        // 1. _ltms_vendor_id en el meta del pedido (single-vendor)
+        // 2. _ltms_redi_origin_vendor_id en el meta del pedido (ReDi origin)
+        // 3. _ltms_vendor_id en los productos de los items del pedido (multi-vendor)
+        global $wpdb;
 
+        // Construir cláusula WHERE para status si se especificó.
+        $status_clause = '';
+        $status_args = [];
         if ( $status ) {
-            $args['status'] = sanitize_text_field( $status );
+            $status_clause = "AND p.post_status = %s";
+            $status_args[] = 'wc-' . sanitize_text_field( $status );
         }
 
-        $result       = wc_get_orders( $args );
-        $orders_query = $result->orders ?? [];
+        // 1. Encontrar IDs de pedidos del vendor con paginación.
+        $sql = "SELECT DISTINCT p.ID
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->postmeta} pm1 ON p.ID = pm1.post_id AND pm1.meta_key = '_ltms_vendor_id' AND pm1.meta_value = %d
+             LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = '_ltms_redi_origin_vendor_id' AND pm2.meta_value = %d
+             LEFT JOIN {$wpdb->prefix}woocommerce_order_items oi ON p.ID = oi.order_id
+             LEFT JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id AND oim.meta_key = '_product_id'
+             LEFT JOIN {$wpdb->postmeta} pm3 ON oim.meta_value = pm3.post_id AND pm3.meta_key = '_ltms_vendor_id' AND pm3.meta_value = %d
+             WHERE p.post_type = 'shop_order'
+             AND (pm1.meta_id IS NOT NULL OR pm2.meta_id IS NOT NULL OR pm3.meta_id IS NOT NULL)
+             {$status_clause}
+             ORDER BY p.post_date DESC
+             LIMIT %d OFFSET %d";
+
+        $order_ids = $wpdb->get_col( $wpdb->prepare(
+            $sql,
+            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args, [ $per_page, ( $page - 1 ) * $per_page ] )
+        ) );
+
+        if ( empty( $order_ids ) ) {
+            return [
+                'orders'      => [],
+                'total'       => 0,
+                'total_pages' => 0,
+                'page'        => $page,
+            ];
+        }
+
+        // 2. Contar total.
+        $count_sql = "SELECT COUNT(DISTINCT p.ID)
+             FROM {$wpdb->posts} p
+             LEFT JOIN {$wpdb->postmeta} pm1 ON p.ID = pm1.post_id AND pm1.meta_key = '_ltms_vendor_id' AND pm1.meta_value = %d
+             LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = '_ltms_redi_origin_vendor_id' AND pm2.meta_value = %d
+             LEFT JOIN {$wpdb->prefix}woocommerce_order_items oi ON p.ID = oi.order_id
+             LEFT JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id AND oim.meta_key = '_product_id'
+             LEFT JOIN {$wpdb->postmeta} pm3 ON oim.meta_value = pm3.post_id AND pm3.meta_key = '_ltms_vendor_id' AND pm3.meta_value = %d
+             WHERE p.post_type = 'shop_order'
+             AND (pm1.meta_id IS NOT NULL OR pm2.meta_id IS NOT NULL OR pm3.meta_id IS NOT NULL)
+             {$status_clause}";
+
+        $total = (int) $wpdb->get_var( $wpdb->prepare(
+            $count_sql,
+            array_merge( [ $vendor_id, $vendor_id, $vendor_id ], $status_args )
+        ) );
+
+        // 3. Obtener los objetos WC_Order.
+        $orders_query = wc_get_orders( [
+            'orderby'  => 'date',
+            'order'    => 'DESC',
+            'type'     => 'shop_order',
+            'include'  => $order_ids,
+            'limit'    => $per_page,
+        ] );
+
         $orders       = [];
 
         foreach ( $orders_query as $order ) {
@@ -974,14 +1009,13 @@ final class LTMS_Dashboard_Logic {
             ];
         }
 
-        $total_results = (int) ( $result->total ?? count( $orders ) );
-
+        // v2.9.76: Usar $total calculado con SQL en vez de $result->total.
         return [
             'orders'        => $orders,
-            'total'         => $total_results,
+            'total'         => $total,
             'page'          => $page,
             'per_page'      => $per_page,
-            'total_pages'   => (int) ( $result->max_num_pages ?? max( 1, (int) ceil( $total_results / max( 1, $per_page ) ) ) ),
+            'total_pages'   => max( 1, (int) ceil( $total / max( 1, $per_page ) ) ),
         ];
     }
 
