@@ -41,6 +41,11 @@ $vendor_ga4_id    = get_user_meta( $vendor_id, 'ltms_vendor_ga4_id',    true );
 $vendor_pixel_id  = get_user_meta( $vendor_id, 'ltms_vendor_pixel_id',  true );
 $platform_ga4_on  = get_option( 'ltms_vendor_ga4_enabled',   'yes' ) === 'yes';
 $platform_pix_on  = get_option( 'ltms_vendor_pixel_enabled', 'yes' ) === 'yes';
+// v2.9.81 P1: Vacation mode + store logo (Woodmart-inspired)
+$vacation_mode   = get_user_meta( $vendor_id, 'ltms_vacation_mode', true ) === 'yes';
+$vacation_msg    = get_user_meta( $vendor_id, 'ltms_vacation_message', true );
+$store_logo_id   = (int) get_user_meta( $vendor_id, 'ltms_store_logo_id', true );
+$store_logo_url  = $store_logo_id ? wp_get_attachment_image_url( $store_logo_id, 'thumbnail' ) : '';
 
 $kyc_badges = [
     'pending'  => [ 'class' => 'ltms-badge-warning',  'label' => __( 'Pendiente', 'ltms' ) ],
@@ -253,6 +258,59 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
             <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-save-settings-btn">
                 💾 <?php esc_html_e( 'Guardar Cambios', 'ltms' ); ?>
             </button>
+        </div>
+    </div>
+
+    <!-- v2.9.81 P1: Vacation Mode (Woodmart-inspired) -->
+    <div class="ltms-card" style="margin-bottom:20px;">
+        <div class="ltms-card-header">🏖️ <?php esc_html_e( 'Modo Vacaciones', 'ltms' ); ?></div>
+        <div class="ltms-card-body">
+            <p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">
+                <?php esc_html_e( 'Activa el modo vacaciones para pausar temporalmente tus ventas. Tus productos seguirán visibles pero no se podrán comprar.', 'ltms' ); ?>
+            </p>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" name="ltms_vacation_mode" id="ltms-vacation-mode" value="yes" <?php checked( $vacation_mode ); ?>>
+                    <span style="font-weight:600;font-size:0.9rem;"><?php esc_html_e( 'Activar modo vacaciones', 'ltms' ); ?></span>
+                </label>
+            </div>
+            <div>
+                <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Mensaje para clientes (opcional)', 'ltms' ); ?></label>
+                <textarea name="ltms_vacation_message" id="ltms-vacation-message" rows="2"
+                          placeholder="<?php esc_attr_e( 'Ej: Estaremos de vacaciones del 1 al 15 de enero.', 'ltms' ); ?>"
+                          style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;font-size:0.85rem;"><?php echo esc_textarea( $vacation_msg ); ?></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.9.81 P1: Store Logo Upload -->
+    <div class="ltms-card" style="margin-bottom:20px;">
+        <div class="ltms-card-header">🖼️ <?php esc_html_e( 'Logo de tu Tienda', 'ltms' ); ?></div>
+        <div class="ltms-card-body">
+            <p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">
+                <?php esc_html_e( 'Sube un logo para tu tienda. Se mostrará en tu vitrina pública.', 'ltms' ); ?>
+            </p>
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div id="ltms-logo-preview" style="width:80px;height:80px;border:2px dashed #d1d5db;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;background:#f9fafb;">
+                    <?php if ( $store_logo_url ) : ?>
+                        <img src="<?php echo esc_url( $store_logo_url ); ?>" alt="Logo" style="width:100%;height:100%;object-fit:cover;">
+                    <?php else : ?>
+                        <span style="font-size:1.5rem;color:#d1d5db;">📷</span>
+                    <?php endif; ?>
+                </div>
+                <div>
+                    <input type="hidden" name="ltms_store_logo_id" id="ltms-store-logo-id" value="<?php echo esc_attr( $store_logo_id ); ?>">
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-upload-logo-btn">
+                        <?php esc_html_e( 'Subir logo', 'ltms' ); ?>
+                    </button>
+                    <?php if ( $store_logo_id ) : ?>
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-remove-logo-btn" style="margin-left:8px;color:#ef4444;">
+                        <?php esc_html_e( 'Quitar', 'ltms' ); ?>
+                    </button>
+                    <?php endif; ?>
+                    <p style="font-size:0.75rem;color:#9ca3af;margin-top:6px;"><?php esc_html_e( 'JPG, PNG o WEBP. Máx 2MB. Recomendado: 400x400px.', 'ltms' ); ?></p>
+                </div>
+            </div>
         </div>
     </div>
 
