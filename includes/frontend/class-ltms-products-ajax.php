@@ -36,12 +36,22 @@ class LTMS_Products_Ajax {
     public function get_products_data() {
         $this->check_nonce();
         $user_id  = get_current_user_id();
+        // v2.9.85 P2: Paginación configurable (antes hardcodeado a 50).
+        $page     = max( 1, (int) ( $_POST['page'] ?? 1 ) ); // phpcs:ignore
+        $per_page = min( 100, max( 10, (int) ( $_POST['per_page'] ?? 20 ) ) ); // phpcs:ignore
+        $search   = sanitize_text_field( $_POST['search'] ?? '' ); // phpcs:ignore
         $args     = [
             'post_type'      => 'product',
             'post_status'    => [ 'publish', 'pending', 'draft' ],
             'author'         => $user_id,
-            'posts_per_page' => 50,
+            'posts_per_page' => $per_page,
+            'paged'          => $page,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
         ];
+        if ( ! empty( $search ) ) {
+            $args['s'] = $search;
+        }
         $query    = new WP_Query( $args );
         $products = [];
         foreach ( $query->posts as $p ) {
@@ -57,7 +67,14 @@ class LTMS_Products_Ajax {
                     'product_type' => get_post_meta( $p->ID, '_ltms_product_type', true ) ?: 'product',
             ];
         }
-        wp_send_json_success( [ 'products' => $products ] );
+        // v2.9.85 P2: Incluir info de paginación en la respuesta.
+        wp_send_json_success( [
+            'products'    => $products,
+            'total'       => (int) $query->found_posts,
+            'page'        => $page,
+            'per_page'    => $per_page,
+            'total_pages' => (int) $query->max_num_pages,
+        ] );
     }
 
     public function get_vendor_settings() {
