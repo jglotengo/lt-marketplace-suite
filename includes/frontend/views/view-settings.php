@@ -96,7 +96,7 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
                     <?php echo esc_html( $referral_code ); ?>
                 </code>
                 <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm"
-                        onclick="navigator.clipboard.writeText('<?php echo esc_js( $referral_code ); ?>').then(()=>{this.textContent='✓ Copiado!'})">
+                        data-action="copy-referral">
                     📋 <?php esc_html_e( 'Copiar', 'ltms' ); ?>
                 </button>
             </div>

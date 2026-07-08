@@ -224,12 +224,12 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                    placeholder="<?php esc_attr_e( 'Número de cuenta', 'ltms' ); ?>"
                    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
             <p style="font-size:0.75rem;color:#f59e0b;margin-top:6px;">
-                ⚠️ <a href="#" onclick="LTMS.Dashboard.navigate('settings');return false;" style="color:#f59e0b;"><?php esc_html_e( 'Configura tu cuenta bancaria en Configuración para agilizar tus retiros.', 'ltms' ); ?></a>
+                ⚠️ <a href="#" data-action="load-view" data-view="settings" style="color:#f59e0b;"><?php esc_html_e( 'Configura tu cuenta bancaria en Configuración para agilizar tus retiros.', 'ltms' ); ?></a>
             </p>
             <?php endif; ?>
         </div>
 
-        <button type="button" onclick="LTMS.Dashboard.submitPayoutRequest()"
+        <button type="button" data-action="submit-payout"
                 class="ltms-btn ltms-btn-primary" style="width:100%;justify-content:center;padding:12px;">
             <?php esc_html_e( 'Confirmar Retiro', 'ltms' ); ?>
         </button>

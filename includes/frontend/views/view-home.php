@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Resumen del Mes', 'ltms' ); ?></h2>
         <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm"
-                onclick="LTMS.Dashboard.loadView('home', true)">
+                data-action="load-view" data-view="home" data-refresh="1">
             🔄 <?php esc_html_e( 'Actualizar', 'ltms' ); ?>
         </button>
     </div>
@@ -48,7 +48,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </div>
         <div style="flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
             <button type="button" class="ltms-btn ltms-btn-primary" style="white-space:nowrap;"
-                    onclick="LTMS.Dashboard.loadView('redi');">
+                    data-action="load-view" data-view="redi">
                 <?php esc_html_e( 'Explorar ReDi', 'ltms' ); ?>
             </button>
         </div>
@@ -91,13 +91,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
     <!-- Botones de acción rápida -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
-        <button type="button" class="ltms-btn ltms-btn-primary" onclick="LTMS.Dashboard.openPayoutModal()">
+        <button type="button" class="ltms-btn ltms-btn-primary" data-action="open-payout">
             💸 <?php esc_html_e( 'Solicitar Retiro', 'ltms' ); ?>
         </button>
-        <button type="button" class="ltms-btn ltms-btn-outline" onclick="LTMS.Dashboard.loadView('orders')">
+        <button type="button" class="ltms-btn ltms-btn-outline" data-action="load-view" data-view="orders">
             📦 <?php esc_html_e( 'Ver Pedidos', 'ltms' ); ?>
         </button>
-        <button type="button" class="ltms-btn ltms-btn-outline" onclick="LTMS.Dashboard.loadView('products')">
+        <button type="button" class="ltms-btn ltms-btn-outline" data-action="load-view" data-view="products">
             ➕ <?php esc_html_e( 'Agregar Producto', 'ltms' ); ?>
         </button>
     </div>

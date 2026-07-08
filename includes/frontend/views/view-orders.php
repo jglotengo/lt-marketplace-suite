@@ -80,7 +80,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         <div style="font-size:3rem;margin-bottom:12px;opacity:0.3;">📦</div>
         <h3 style="margin:0 0 8px;color:#374151;font-size:1.1rem;"><?php esc_html_e( 'No tienes pedidos todavía', 'ltms' ); ?></h3>
         <p style="color:#9ca3af;margin:0 0 16px;font-size:0.85rem;"><?php esc_html_e( 'Cuando los clientes compren tus productos, aparecerán aquí.', 'ltms' ); ?></p>
-        <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" onclick="LTMS.Dashboard.loadView('products')">
+        <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" data-action="load-view" data-view="products">
             <?php esc_html_e( 'Publicar mi primer producto', 'ltms' ); ?>
         </button>
     </div>

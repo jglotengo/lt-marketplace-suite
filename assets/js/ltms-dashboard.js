@@ -46,6 +46,7 @@
             this.initDarkMode();       // v2.9.82 P2
             this.initCsvExport();       // v2.9.82 P2
             this.initBreadcrumbs();     // v2.9.82 P2
+            this.initGlobalSearch();    // v2.9.84 P1
         },
 
         /**
@@ -95,6 +96,39 @@
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     $(this).click();
+                }
+            });
+
+            // v2.9.84 P1: Delegated handlers for data-action (CSP compliance — no inline onclick).
+            $(document).on('click', '[data-action]', function(e) {
+                e.preventDefault();
+                var action = $(this).data('action');
+                var view = $(this).data('view');
+                var refresh = $(this).data('refresh');
+                switch (action) {
+                    case 'load-view':
+                        self.loadView(view, refresh === '1' || refresh === 1);
+                        break;
+                    case 'open-payout':
+                        if (typeof self.openPayoutModal === 'function') self.openPayoutModal();
+                        else $('[data-ltms-modal-open="ltms-modal-payout"]').click();
+                        break;
+                    case 'submit-payout':
+                        if (typeof self.submitPayoutRequest === 'function') self.submitPayoutRequest();
+                        break;
+                    case 'close-notif-panel':
+                        $('.ltms-notifications-panel').removeClass('open');
+                        $('#ltms-notif-bell').attr('aria-expanded', 'false');
+                        break;
+                    case 'copy-referral':
+                        var code = $(this).prev('input').val() || $(this).closest('.ltms-form-group').find('input').val() || '';
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(code).then(() => {
+                                $(this).text('✓ Copiado!');
+                                setTimeout(() => { $(this).text('Copiar'); }, 2000);
+                            });
+                        }
+                        break;
                 }
             });
         },
@@ -2321,6 +2355,35 @@
                     '<span>' + label + '</span>'
                 );
             };
+        },
+
+        // ── v2.9.84 P1: Global Search en topbar ───────────────────────
+        initGlobalSearch() {
+            let searchTimer = null;
+            $(document).on('input', '#ltms-topbar-search-input', function() {
+                clearTimeout(searchTimer);
+                const query = $(this).val().trim();
+                if (query.length < 2) return;
+                searchTimer = setTimeout(function() {
+                    // Buscar en pedidos si estamos en vista de pedidos.
+                    if ($('#ltms-order-search').length) {
+                        $('#ltms-order-search').val(query).trigger('input');
+                    }
+                    // Buscar en productos si estamos en vista de productos.
+                    if ($('#ltms-product-search').length) {
+                        $('#ltms-product-search').val(query).trigger('input');
+                    }
+                    // Si no estamos en una vista con search, ir a pedidos.
+                    if (!$('#ltms-order-search').length && !$('#ltms-product-search').length) {
+                        if (typeof LTMS !== 'undefined' && LTMS.Dashboard) {
+                            LTMS.Dashboard.loadView('orders');
+                            setTimeout(function() {
+                                $('#ltms-order-search').val(query).trigger('input');
+                            }, 500);
+                        }
+                    }
+                }, 300);
+            });
         },
     };
 

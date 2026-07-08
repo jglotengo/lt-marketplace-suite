@@ -120,6 +120,17 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
             <button type="button" class="ltms-mobile-menu-btn" id="ltms-mobile-menu-btn">☰</button>
             <h2 class="ltms-topbar-title"><?php esc_html_e( 'Inicio', 'ltms' ); ?></h2>
 
+            <!-- v2.9.84 P1: Global search (Woodmart-inspired) -->
+            <div class="ltms-topbar-search" style="flex:1;max-width:300px;margin:0 16px;display:none;" id="ltms-topbar-search-wrap">
+                <div style="position:relative;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#9ca3af;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="search" id="ltms-topbar-search-input" placeholder="<?php esc_attr_e( 'Buscar en el panel...', 'ltms' ); ?>"
+                           style="width:100%;padding:7px 12px 7px 32px;border:1px solid #d1d5db;border-radius:8px;font-size:0.82rem;background:#f9fafb;"
+                           aria-label="<?php esc_attr_e( 'Buscar', 'ltms' ); ?>">
+                </div>
+            </div>
+            <style>@media (min-width:769px){#ltms-topbar-search-wrap{display:block !important;}}</style>
+
             <div class="ltms-topbar-actions">
                 <!-- Notificaciones -->
                 <div class="ltms-topbar-notif"
@@ -148,7 +159,7 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
         <div class="ltms-notifications-panel" id="ltms-notif-panel">
             <div class="ltms-notif-header">
                 <span><?php esc_html_e( 'Notificaciones', 'ltms' ); ?></span>
-                <button type="button" style="background:none;border:none;cursor:pointer;font-size:1rem;" onclick="$('.ltms-notifications-panel').removeClass('open')">✕</button>
+                <button type="button" style="background:none;border:none;cursor:pointer;font-size:1rem;" data-action="close-notif-panel" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>">✕</button>
             </div>
             <div id="ltms-notif-list">
                 <?php if ( $unread_notif === 0 ) : ?>
