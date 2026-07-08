@@ -33,6 +33,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
                        cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
             📋 <?php esc_html_e( 'Políticas', 'ltms' ); ?>
         </button>
+        <!-- v2.9.93 P2: Calendar tab -->
+        <button type="button" class="ltms-booking-tab"
+                data-target="ltms-bk-calendar"
+                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
+                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+            🗓️ <?php esc_html_e( 'Calendario', 'ltms' ); ?>
+        </button>
     </div>
     <div id="ltms-bk-reservas">
 
@@ -264,6 +271,46 @@ if ( ! defined( 'ABSPATH' ) ) exit;
             </div>
         </div>
     </div><!-- #ltms-bk-policies -->
+
+    <!-- v2.9.93 P2: Calendar view -->
+    <div id="ltms-bk-calendar" style="display:none;">
+        <div class="ltms-view-header">
+            <h2>🗓️ <?php esc_html_e( 'Calendario de Reservas', 'ltms' ); ?></h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button type="button" id="ltms-cal-prev" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="<?php esc_attr_e( 'Mes anterior', 'ltms' ); ?>">‹</button>
+                <span id="ltms-cal-month-label" style="font-weight:600;font-size:0.9rem;min-width:160px;text-align:center;"></span>
+                <button type="button" id="ltms-cal-next" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="<?php esc_attr_e( 'Mes siguiente', 'ltms' ); ?>">›</button>
+                <button type="button" id="ltms-cal-today" class="ltms-btn ltms-btn-outline ltms-btn-sm"><?php esc_html_e( 'Hoy', 'ltms' ); ?></button>
+            </div>
+        </div>
+        <div class="ltms-card">
+            <div class="ltms-card-body" style="overflow-x:auto;">
+                <table id="ltms-cal-table" style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                    <thead>
+                        <tr style="background:#f9fafb;">
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Lun</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Mar</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Mié</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Jue</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Vie</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Sáb</th>
+                            <th style="padding:8px;text-align:center;border:1px solid #e5e7eb;width:14.28%;">Dom</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ltms-cal-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Legend -->
+        <div style="display:flex;gap:16px;margin-top:12px;font-size:0.75rem;color:#6b7280;">
+            <span><span style="display:inline-block;width:12px;height:12px;background:#dbeafe;border-radius:3px;margin-right:4px;"></span> Pendiente</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#d1fae5;border-radius:3px;margin-right:4px;"></span> Confirmada</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#fef3c7;border-radius:3px;margin-right:4px;"></span> En curso</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#e5e7eb;border-radius:3px;margin-right:4px;"></span> Completada</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#fee2e2;border-radius:3px;margin-right:4px;"></span> Cancelada</span>
+        </div>
+    </div><!-- #ltms-bk-calendar -->
+
 </div><!-- .ltms-view-pad -->
 
 <!-- Modal: Detalle de reserva -->
@@ -635,13 +682,101 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         var target = $(this).data('target');
         $('.ltms-booking-tab').css({ color: '#6b7280', 'border-bottom-color': 'transparent' }).removeClass('ltms-booking-tab-active');
         $(this).css({ color: '#1a5276', 'border-bottom-color': '#1a5276' }).addClass('ltms-booking-tab-active');
-        $('#ltms-bk-reservas, #ltms-bk-seasons, #ltms-bk-policies').hide();
+        $('#ltms-bk-reservas, #ltms-bk-seasons, #ltms-bk-policies, #ltms-bk-calendar').hide();
         $('#' + target).show();
         if (target === 'ltms-bk-seasons') {
             if (!productsLoaded) ltmsLoadVendorProducts();
             if (!$('#ltms-seasons-tbody').data('loaded')) ltmsLoadSeasons();
         }
         if (target === 'ltms-bk-policies' && !$('#ltms-policies-list').data('loaded')) ltmsLoadPolicies();
+        // v2.9.93 P2: Load calendar
+        if (target === 'ltms-bk-calendar') ltmsLoadCalendar();
+    });
+
+    // v2.9.93 P2: Calendar logic
+    var calDate = new Date();
+    var calBookings = [];
+
+    function ltmsLoadCalendar() {
+        calDate.setDate(1);
+        renderCalendar();
+        // Fetch bookings for this month
+        var monthStr = calDate.getFullYear() + '-' + String(calDate.getMonth() + 1).padStart(2, '0');
+        $.ajax({
+            url: ltmsDashboard.ajax_url, method: 'POST',
+            data: { action: 'ltms_get_bookings', nonce: ltmsDashboard.nonce, per_page: 100 },
+            success: function(res) {
+                if (res.success && res.data && res.data.bookings) {
+                    calBookings = res.data.bookings;
+                    renderCalendar();
+                }
+            }
+        });
+    }
+
+    function renderCalendar() {
+        var year = calDate.getFullYear();
+        var month = calDate.getMonth();
+        var monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        $('#ltms-cal-month-label').text(monthNames[month] + ' ' + year);
+
+        var firstDay = new Date(year, month, 1).getDay();
+        // Convert Sunday(0) to Monday-based (0=Mon, 6=Sun)
+        firstDay = firstDay === 0 ? 6 : firstDay - 1;
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        var today = new Date();
+        var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+
+        var statusColors = {
+            'pending': '#dbeafe', 'confirmed': '#d1fae5',
+            'checked_in': '#fef3c7', 'completed': '#e5e7eb', 'cancelled': '#fee2e2'
+        };
+
+        var html = '';
+        var day = 1;
+        for (var w = 0; w < 6; w++) {
+            if (day > daysInMonth) break;
+            html += '<tr>';
+            for (var d = 0; d < 7; d++) {
+                if (w === 0 && d < firstDay) {
+                    html += '<td style="padding:4px;border:1px solid #e5e7eb;min-height:60px;background:#f9fafb;">&nbsp;</td>';
+                } else if (day <= daysInMonth) {
+                    var dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+                    var dayBookings = calBookings.filter(function(b) {
+                        return (b.check_in || '').startsWith(dateStr) || (b.check_out || '').startsWith(dateStr);
+                    });
+                    var bg = dateStr === todayStr ? '#eff6ff' : '#fff';
+                    var bookingHtml = dayBookings.map(function(b) {
+                        var color = statusColors[b.status] || '#f3f4f6';
+                        return '<div style="background:' + color + ';border-radius:4px;padding:2px 4px;margin:2px 0;font-size:0.65rem;cursor:pointer;" onclick="document.querySelector(\'[data-target=&quot;ltms-bk-reservas&quot;]\').click()">' +
+                            (b.guest_name || 'Reserva') + '</div>';
+                    }).join('');
+                    var isWeekend = d >= 5;
+                    html += '<td style="padding:4px;border:1px solid #e5e7eb;vertical-align:top;min-height:60px;background:' + bg + ';' + (isWeekend ? 'background:#fafafa;' : '') + '">' +
+                        '<div style="font-weight:600;font-size:0.75rem;' + (dateStr === todayStr ? 'color:#2563eb;' : 'color:#374151;') + '">' + day + '</div>' +
+                        bookingHtml +
+                    '</td>';
+                    day++;
+                } else {
+                    html += '<td style="padding:4px;border:1px solid #e5e7eb;background:#f9fafb;">&nbsp;</td>';
+                }
+            }
+            html += '</tr>';
+        }
+        $('#ltms-cal-tbody').html(html);
+    }
+
+    $('#ltms-cal-prev').on('click', function() {
+        calDate.setMonth(calDate.getMonth() - 1);
+        ltmsLoadCalendar();
+    });
+    $('#ltms-cal-next').on('click', function() {
+        calDate.setMonth(calDate.getMonth() + 1);
+        ltmsLoadCalendar();
+    });
+    $('#ltms-cal-today').on('click', function() {
+        calDate = new Date();
+        ltmsLoadCalendar();
     });
 
     function ltmsSeasonNotice(msg, type) {
