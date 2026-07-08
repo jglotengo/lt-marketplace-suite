@@ -155,7 +155,24 @@ final class LTMS_Core_Firewall {
     private static function is_authenticated_admin(): bool {
         // is_user_logged_in() requiere que las cookies ya hayan sido procesadas.
         // En el hook 'init' con priority 1, la sesión WP ya está disponible.
-        return is_user_logged_in() && current_user_can( 'manage_options' );
+        if ( ! is_user_logged_in() ) {
+            return false;
+        }
+        // v2.9.99 FIX: permitir también a vendedores autenticados en rutas admin-ajax.
+        // Antes solo se excluía a admins (manage_options), lo que hacía que los
+        // vendors (rol ltms_vendor, sin manage_options) fueran inspeccionados por
+        // el WAF en cada AJAX → falsos positivos → 403 en admin-ajax.php.
+        if ( current_user_can( 'manage_options' ) ) {
+            return true;
+        }
+        // Vendedor autenticado (cualquier rol ltms_*) en ruta admin-ajax.
+        if ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
+            return LTMS_Utils::is_ltms_vendor( get_current_user_id() );
+        }
+        // Fallback: verificar roles directamente.
+        $user = wp_get_current_user();
+        $ltms_roles = array_filter( (array) $user->roles, fn( $r ) => str_starts_with( $r, 'ltms_' ) );
+        return ! empty( $ltms_roles );
     }
 
     /**

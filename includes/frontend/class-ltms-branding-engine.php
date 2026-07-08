@@ -245,8 +245,11 @@ class LTMS_Branding_Engine {
         // Mask icon (Safari pinned tab).
         echo '<link rel="mask-icon" href="' . esc_url( $logo_url ) . '" color="' . esc_attr( self::COLOR_PALETTE['primary'] ) . '" />' . "\n";
 
-        // Manifest link (PWA).
-        echo '<link rel="manifest" href="' . esc_url( home_url( '/manifest.json' ) ) . '" />' . "\n";
+        // Manifest link (PWA) — v2.9.99 fix: apuntar al manifest real del plugin (no a home_url que no existe).
+        $manifest_url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL . 'json/manifest.json' : '';
+        if ( $manifest_url ) {
+            echo '<link rel="manifest" href="' . esc_url( $manifest_url ) . '" />' . "\n";
+        }
 
         // og:logo (Facebook认可的 marca logo).
         echo '<meta property="og:logo" content="' . esc_url( $logo_url ) . '" />' . "\n";
