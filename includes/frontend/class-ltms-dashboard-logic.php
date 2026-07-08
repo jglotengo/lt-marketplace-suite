@@ -42,6 +42,7 @@ final class LTMS_Dashboard_Logic {
         add_shortcode( 'ltms_vendor_insurance', [ $instance, 'render_insurance_shortcode' ] );
         add_shortcode( 'ltms_vendor_bookings',  [ $instance, 'render_bookings_shortcode' ] );  // M-QA-PAGES-01
         add_shortcode( 'ltms_vendor_rnt',       [ $instance, 'render_rnt_shortcode' ] );       // M-QA-PAGES-01
+        add_shortcode( 'ltms_vendor_drivers',   [ $instance, 'render_drivers_shortcode' ] );   // v2.9.98
 
         // AJAX handlers autenticados
         add_action( 'wp_ajax_ltms_get_dashboard_data',    [ $instance, 'ajax_get_dashboard_data' ] );
@@ -162,6 +163,21 @@ final class LTMS_Dashboard_Logic {
         if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
         ob_start();
         $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-bookings.php';
+        if ( file_exists( $view_path ) ) include $view_path;
+        return ob_get_clean();
+    }
+
+    /**
+     * Shortcode [ltms_vendor_drivers] — v2.9.98
+     * Renderiza view-drivers.php directamente (sin pasar por el SPA del dashboard).
+     * Útil si el admin crea una página con este shortcode como acceso directo
+     * a la gestión de domiciliarios propios del vendedor.
+     */
+    public function render_drivers_shortcode( array $atts = [] ): string {
+        if ( ! is_user_logged_in() ) return $this->render_login_redirect();
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) return $this->render_not_vendor_notice();
+        ob_start();
+        $view_path = LTMS_INCLUDES_DIR . 'frontend/views/view-drivers.php';
         if ( file_exists( $view_path ) ) include $view_path;
         return ob_get_clean();
     }

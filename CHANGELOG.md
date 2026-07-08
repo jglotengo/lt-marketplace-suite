@@ -4,7 +4,30 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.98] — 2026-07-08
+
+### Added — Nav integration para Seguros y Domiciliarios
+
+- **Tab "Seguros" en el nav del dashboard** (`dashboard-wrapper.php`):
+  - SVG icon (shield + check) Woodmart-style.
+  - Siempre visible para vendors con `view-insurance.php` presente (transparencia sobre pólizas XCover).
+  - Insertado después de "Billetera".
+- **Tab "Domiciliarios" en el nav del dashboard** (`dashboard-wrapper.php`):
+  - SVG icon (truck) Woodmart-style.
+  - Condicional: visible solo si el vendor tiene own-delivery configurado (`ltms_own_delivery_zones` no vacío) o tiene al menos 1 repartidor registrado.
+  - Usa `_ltms_drivers_count_cache` en user_meta para evitar query DB en cada render del dashboard. Fallback: query DB si cache vacío, y actualiza cache.
+  - Insertado después de "Envíos".
+- **2 SPA view sections nuevas**: `#ltms-view-insurance` y `#ltms-view-drivers` en `dashboard-wrapper.php`. El SPA `loadView()` automáticamente carga estas vistas vía `loadGenericView()` (no requiere JS adicional).
+- **Shortcode `[ltms_vendor_drivers]`** (`class-ltms-dashboard-logic.php`):
+  - Renderiza `view-drivers.php` directamente (acceso directo vía página standalone).
+  - Mismo patrón que `[ltms_vendor_bookings]` y `[ltms_vendor_insurance]`.
+
+### Changed
+
+- **`class-ltms-driver-ajax.php`**: `ajax_save_driver()` y `ajax_delete_driver()` ahora mantienen actualizado `_ltms_drivers_count_cache` en user_meta, para que el nav del dashboard refleje correctamente la presencia/ausencia de repartidores sin requerir query DB en cada render.
+
 ## [2.9.97] — 2026-07-08
+
 
 ### Added — UIUX-AUDIT-001 P3 (Batch 20 — Final)
 

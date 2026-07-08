@@ -39,8 +39,8 @@ class LTMS_Driver_Ajax {
     // ── Guardar / crear domiciliario ─────────────────────────────────────
 
     public function ajax_save_driver(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
@@ -123,6 +123,10 @@ class LTMS_Driver_Ajax {
             return;
         }
 
+        // v2.9.98: Update drivers count cache (used by dashboard-wrapper to show/hide nav tab).
+        $new_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$table` WHERE vendor_id = %d", $vendor_id ) );
+        update_user_meta( $vendor_id, '_ltms_drivers_count_cache', $new_count );
+
         wp_send_json_success( [ 'driver_id' => (int) $wpdb->insert_id, 'message' => __( 'Repartidor agregado.', 'ltms' ) ] );
     }
 
@@ -161,6 +165,10 @@ class LTMS_Driver_Ajax {
             return;
         }
 
+        // v2.9.98: Update drivers count cache (used by dashboard-wrapper to show/hide nav tab).
+        $new_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `$table` WHERE vendor_id = %d", $vendor_id ) );
+        update_user_meta( $vendor_id, '_ltms_drivers_count_cache', $new_count );
+
         wp_send_json_success( __( 'Repartidor eliminado.', 'ltms' ) );
     }
 
@@ -175,8 +183,8 @@ class LTMS_Driver_Ajax {
     // ── Configuración de entrega propia ──────────────────────────────────
 
     public function ajax_save_delivery_settings(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();

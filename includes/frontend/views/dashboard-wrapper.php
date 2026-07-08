@@ -41,6 +41,9 @@ $svg_icons = [
     'incidents' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
     'kitchen'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 2v8a3 3 0 0 0 6 0V2"/><line x1="8" y1="2" x2="8" y2="10"/><path d="M16 2v20"/><path d="M19 2c-1.5 1.5-3 4-3 7s1.5 3 3 3"/></svg>',
     'analytics' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    // v2.9.98: SVG icons for insurance + drivers nav items (Woodmart-style, stroke=2).
+    'insurance' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L3 7v6c0 5 4 9 9 10 5-1 9-5 9-10V7l-9-5z"/><path d="M9 12l2 2 4-4"/></svg>',
+    'drivers'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
 ];
 
 $nav_items = [
@@ -99,6 +102,60 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
         'icon'  => $svg_icons['kitchen'],
         'label' => __( 'Cocina', 'ltms' ),
     ]] );
+}
+
+// v2.9.98: tab Seguros siempre visible para vendors (transparencia sobre pólizas XCover).
+if ( file_exists( __DIR__ . '/view-insurance.php' ) ) {
+    // Insertar después de wallet (índice del bloque wallet varía según nav_items previos).
+    $_wallet_idx = array_search( 'wallet', array_column( $nav_items, 'view' ), true );
+    if ( false !== $_wallet_idx ) {
+        array_splice( $nav_items, $_wallet_idx + 1, 0, [[
+            'view'  => 'insurance',
+            'icon'  => $svg_icons['insurance'],
+            'label' => __( 'Seguros', 'ltms' ),
+        ]] );
+    }
+}
+
+// v2.9.98: tab Domiciliarios si el vendor tiene own-delivery configurado o repartidores registrados.
+$_show_drivers = false;
+if ( $_user_id && file_exists( __DIR__ . '/view-drivers.php' ) ) {
+    $_delivery_zones = (string) get_user_meta( $_user_id, 'ltms_own_delivery_zones', true );
+    // Quick check: any driver row? Use cached count first (set on save).
+    $_drivers_count = (int) get_user_meta( $_user_id, '_ltms_drivers_count_cache', true );
+    if ( $_drivers_count > 0 || '' !== $_delivery_zones ) {
+        $_show_drivers = true;
+    } else {
+        // Fallback: actual DB count (only when cache is empty).
+        global $wpdb;
+        $_drivers_table = $wpdb->prefix . 'lt_vendor_drivers';
+        $_drivers_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM `{$_drivers_table}` WHERE vendor_id = %d", $_user_id ) ); // phpcs:ignore
+        if ( $_drivers_count > 0 ) {
+            update_user_meta( $_user_id, '_ltms_drivers_count_cache', $_drivers_count );
+            $_show_drivers = true;
+        }
+    }
+}
+if ( $_show_drivers ) {
+    // Insertar después de envíos (envios está en el nav principal).
+    $_envios_idx = array_search( 'envios', array_column( $nav_items, 'view' ), true );
+    if ( false !== $_envios_idx ) {
+        array_splice( $nav_items, $_envios_idx + 1, 0, [[
+            'view'  => 'drivers',
+            'icon'  => $svg_icons['drivers'],
+            'label' => __( 'Domiciliarios', 'ltms' ),
+        ]] );
+    } else {
+        // Fallback: al final del nav (antes de settings).
+        $_settings_idx = array_search( 'settings', array_column( $nav_items, 'view' ), true );
+        if ( false !== $_settings_idx ) {
+            array_splice( $nav_items, $_settings_idx, 0, [[
+                'view'  => 'drivers',
+                'icon'  => $svg_icons['drivers'],
+                'label' => __( 'Domiciliarios', 'ltms' ),
+            ]] );
+        }
+    }
 }
 ?>
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
@@ -279,6 +336,24 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
         <div class="ltms-view-section" id="ltms-view-posgold" style="display:none;">
             <?php if ( file_exists( __DIR__ . '/view-posgold.php' ) ) { try { include __DIR__ . '/view-posgold.php'; } catch ( \Throwable $e ) { echo '<div class="ltms-notice ltms-notice-error"><p>Error: ' . esc_html( $e->getMessage() ) . '</p></div>'; } } ?>
         </div>
+
+        <?php
+        // v2.9.98: Vista Seguros — siempre incluida (transparencia sobre pólizas XCover).
+        if ( file_exists( __DIR__ . '/view-insurance.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-insurance" style="display:none;">
+            <?php if ( file_exists( __DIR__ . '/view-insurance.php' ) ) { try { include __DIR__ . '/view-insurance.php'; } catch ( \Throwable $e ) { echo '<div class="ltms-notice ltms-notice-error"><p>Error: ' . esc_html( $e->getMessage() ) . '</p></div>'; } } ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // v2.9.98: Vista Domiciliarios — incluida solo cuando el vendor la necesita ( coincide con nav ).
+        if ( $_show_drivers && file_exists( __DIR__ . '/view-drivers.php' ) ) :
+        ?>
+        <div class="ltms-view-section" id="ltms-view-drivers" style="display:none;">
+            <?php if ( file_exists( __DIR__ . '/view-drivers.php' ) ) { try { include __DIR__ . '/view-drivers.php'; } catch ( \Throwable $e ) { echo '<div class="ltms-notice ltms-notice-error"><p>Error: ' . esc_html( $e->getMessage() ) . '</p></div>'; } } ?>
+        </div>
+        <?php endif; ?>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">
             <div class="ltms-view-section">
