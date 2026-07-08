@@ -572,14 +572,14 @@ if ( empty( $seo_template ) ) {
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar credenciales');
             if (resp.success) {
-                alert('✓ ' + resp.data.message);
+                LTMS.UX.toastSuccess('Exito', resp.data.message);
                 window.location.reload();
             } else {
-                alert('Error: ' + (resp.data.message || resp.data));
+                LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('💾 Guardar credenciales');
-            alert('Error de red.');
+            LTMS.UX.toastError('Error', 'Error de red.');
         });
     });
 
@@ -596,13 +596,13 @@ if ( empty( $seo_template ) ) {
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar categorías seleccionadas');
             if (resp.success) {
-                alert('✓ ' + resp.data.message);
+                LTMS.UX.toastSuccess('Exito', resp.data.message);
             } else {
-                alert('Error: ' + (resp.data.message || resp.data));
+                LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('💾 Guardar categorías seleccionadas');
-            alert('Error de red.');
+            LTMS.UX.toastError('Error', 'Error de red.');
         });
     });
 
@@ -714,14 +714,14 @@ if ( empty( $seo_template ) ) {
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar reglas de precio');
             if (resp.success) {
-                alert('✓ ' + resp.data.message);
+                LTMS.UX.toastSuccess('Exito', resp.data.message);
                 updatePriceExample();
             } else {
-                alert('Error: ' + (resp.data.message || resp.data));
+                LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('💾 Guardar reglas de precio');
-            alert('Error de red.');
+            LTMS.UX.toastError('Error', 'Error de red.');
         });
     });
 
@@ -738,14 +738,14 @@ if ( empty( $seo_template ) ) {
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar plantilla SEO');
             if (resp.success) {
-                alert('✓ ' + resp.data.message);
+                LTMS.UX.toastSuccess('Exito', resp.data.message);
                 updateSeoPreview();
             } else {
-                alert('Error: ' + (resp.data.message || resp.data));
+                LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('💾 Guardar plantilla SEO');
-            alert('Error de red.');
+            LTMS.UX.toastError('Error', 'Error de red.');
         });
     });
 
@@ -767,7 +767,7 @@ if ( empty( $seo_template ) ) {
             }
         }).fail(function(){
             $btn.prop('disabled', false).html('🔍 Probar conexión');
-            alert('Error de red.');
+            LTMS.UX.toastError('Error', 'Error de red.');
         });
     });
 

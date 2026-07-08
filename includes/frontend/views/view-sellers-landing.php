@@ -100,6 +100,87 @@ $vendor_earn  = 100 - $vendor_fee;
         </div>
     </section>
 
+    <!-- ── TESTIMONIOS ────────────────────────────────────────────── -->
+    <section class="ltms-sl-testimonials">
+        <h2 class="ltms-sl-section-title">Vendedores que ya crecen con nosotros</h2>
+        <div class="ltms-sl-grid ltms-sl-grid--3">
+            <div class="ltms-sl-testimonial">
+                <div class="ltms-sl-testimonial__stars">★★★★★</div>
+                <p class="ltms-sl-testimonial__text">"Empecé con 5 productos y en 2 meses ya tengo más de 50. El panel es muy fácil de usar."</p>
+                <div class="ltms-sl-testimonial__author">
+                    <strong>María González</strong> · Tienda: Artesanías MG
+                </div>
+            </div>
+            <div class="ltms-sl-testimonial">
+                <div class="ltms-sl-testimonial__stars">★★★★★</div>
+                <p class="ltms-sl-testimonial__text">"Los retiros a mi cuenta bancaria son rápidos. En 24 horas tengo el dinero disponible."</p>
+                <div class="ltms-sl-testimonial__author">
+                    <strong>Carlos Ramírez</strong> · Tienda: TechStore CO
+                </div>
+            </div>
+            <div class="ltms-sl-testimonial">
+                <div class="ltms-sl-testimonial__stars">★★★★★</div>
+                <p class="ltms-sl-testimonial__text">"La integración con transportadores me ahorra horas. Solo imprimo la guía y envío."</p>
+                <div class="ltms-sl-testimonial__author">
+                    <strong>Laura Torres</strong> · Tienda: Moda Express
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── CALCULADORA DE GANANCIAS ──────────────────────────────── -->
+    <section class="ltms-sl-calculator">
+        <h2 class="ltms-sl-section-title">Calcula tus ganancias</h2>
+        <div class="ltms-sl-calc-box">
+            <label for="ltms-calc-price">Precio de tu producto</label>
+            <div class="ltms-sl-calc-input-wrap">
+                <span class="ltms-sl-calc-currency">$</span>
+                <input type="number" id="ltms-calc-price" placeholder="50000" min="0" step="1000" value="50000">
+            </div>
+            <div class="ltms-sl-calc-result" id="ltms-calc-result">
+                <div class="ltms-sl-calc-row">
+                    <span>Precio de venta</span>
+                    <strong id="ltms-calc-total">$50.000</strong>
+                </div>
+                <div class="ltms-sl-calc-row ltms-sl-calc-row--fee">
+                    <span>Comisión (<?php echo esc_html( $vendor_fee ); ?>%)</span>
+                    <strong id="ltms-calc-fee">-$<?php echo esc_html( number_format( 50000 * $commission, 0, ',', '.' ) ); ?></strong>
+                </div>
+                <div class="ltms-sl-calc-row ltms-sl-calc-row--earn">
+                    <span>Tu ganancia</span>
+                    <strong id="ltms-calc-earn">$<?php echo esc_html( number_format( 50000 * (1 - $commission), 0, ',', '.' ) ); ?></strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── FAQ ────────────────────────────────────────────────────── -->
+    <section class="ltms-sl-faq">
+        <h2 class="ltms-sl-section-title">Preguntas frecuentes</h2>
+        <div class="ltms-sl-faq-list">
+            <details class="ltms-sl-faq-item">
+                <summary>¿Cuánto cuesta registrarme como vendedor?</summary>
+                <p>El registro es completamente gratis. No hay mensualidades ni costos ocultos. Solo pagas una comisión del <?php echo esc_html( $vendor_fee ); ?>% cuando realizas una venta.</p>
+            </details>
+            <details class="ltms-sl-faq-item">
+                <summary>¿Cómo recibo mis pagos?</summary>
+                <p>Las ganancias se acumulan en tu billetera virtual. Puedes solicitar retiros a tu cuenta bancaria cuando quieras, procesados en 1-2 días hábiles.</p>
+            </details>
+            <details class="ltms-sl-faq-item">
+                <summary>¿Qué productos puedo vender?</summary>
+                <p>Puedes vender productos físicos, digitales y servicios. Algunas categorías requieren verificación adicional (alimentos, medicamentos, etc.).</p>
+            </details>
+            <details class="ltms-sl-faq-item">
+                <summary>¿Necesito tener una empresa constituida?</summary>
+                <p>No. Puedes vender como persona natural. Solo necesitas tu documento de identidad y completar la verificación KYC.</p>
+            </details>
+            <details class="ltms-sl-faq-item">
+                <summary>¿Cómo funcionan los envíos?</summary>
+                <p>Integramos con operadores logísticos certificados. Generas la guía desde tu panel, imprimes y entregas al transportador. El seguimiento es automático.</p>
+            </details>
+        </div>
+    </section>
+
     <!-- ── CTA FINAL ──────────────────────────────────────────────── -->
     <section class="ltms-sl-cta">
         <div class="ltms-sl-cta__inner">
@@ -110,5 +191,23 @@ $vendor_earn  = 100 - $vendor_fee;
             </a>
         </div>
     </section>
+
+    <script>
+    // v2.9.79 P1: Calculadora de ganancias interactiva.
+    (function() {
+        var input = document.getElementById('ltms-calc-price');
+        if (!input) return;
+        var commission = <?php echo (float) $commission; ?>;
+        var fmt = function(v) { return '$' + new Intl.NumberFormat('es-CO').format(Math.round(v)); };
+        input.addEventListener('input', function() {
+            var price = parseFloat(input.value) || 0;
+            var fee = price * commission;
+            var earn = price - fee;
+            document.getElementById('ltms-calc-total').textContent = fmt(price);
+            document.getElementById('ltms-calc-fee').textContent = '-' + fmt(fee);
+            document.getElementById('ltms-calc-earn').textContent = fmt(earn);
+        });
+    })();
+    </script>
 
 </div><!-- .ltms-sellers-landing -->

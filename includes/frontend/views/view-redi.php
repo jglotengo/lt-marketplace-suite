@@ -349,15 +349,16 @@
                         origin_product_id: productId
                 }, function(resp){
                         if (resp && resp.success) {
-                                alert('<?php echo esc_js( __( 'ReDi pausado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
-                                location.reload();
+                                // toast: ReDi pausado
+                                LTMS.UX.toastSuccess('Exito', '<?php echo esc_js( __( 'ReDi pausado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
+                                LTMS.Dashboard.loadView('redi', true);
                         } else {
                                 $btn.prop('disabled', false);
-                                alert(resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al pausar.', 'ltms' ) ); ?>');
+                                LTMS.UX.toastError('Error', resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al pausar.', 'ltms' ) ); ?>');
                         }
                 }, 'json').fail(function(){
                         $btn.prop('disabled', false);
-                        alert('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+                        LTMS.UX.toastError('Error', '<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
                 });
         });
 
@@ -373,15 +374,15 @@
                         origin_product_id: productId
                 }, function(resp){
                         if (resp && resp.success) {
-                                alert('<?php echo esc_js( __( 'ReDi reanudado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
-                                location.reload();
+                                LTMS.UX.toastSuccess('Exito', '<?php echo esc_js( __( 'ReDi reanudado. Los revendedores han sido notificados.', 'ltms' ) ); ?>');
+                                LTMS.Dashboard.loadView('redi', true);
                         } else {
                                 $btn.prop('disabled', false);
-                                alert(resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al reanudar.', 'ltms' ) ); ?>');
+                                LTMS.UX.toastError('Error', resp && resp.data ? resp.data.message : '<?php echo esc_js( __( 'Error al reanudar.', 'ltms' ) ); ?>');
                         }
                 }, 'json').fail(function(){
                         $btn.prop('disabled', false);
-                        alert('<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
+                        LTMS.UX.toastError('Error', '<?php echo esc_js( __( 'Error de conexión.', 'ltms' ) ); ?>');
                 });
         });
 }( jQuery ) );
