@@ -2300,6 +2300,33 @@
             return new Intl.NumberFormat(locale, opts).format(amount);
         },
 
+        // v2.9.95 P3: Localized date formatter
+        formatDate(dateStr, includeTime = false) {
+            if (!dateStr) return '—';
+            try {
+                var d = new Date(dateStr);
+                var locale = ltmsDashboard.country === 'MX' ? 'es-MX' : 'es-CO';
+                var opts = { year: 'numeric', month: 'short', day: 'numeric' };
+                if (includeTime) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+                return d.toLocaleDateString(locale, opts);
+            } catch(e) { return dateStr; }
+        },
+
+        // v2.9.95 P3: Relative time formatter
+        formatRelative(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                var d = new Date(dateStr);
+                var now = new Date();
+                var diff = (now - d) / 1000;
+                if (diff < 60) return 'Hace un momento';
+                if (diff < 3600) return 'Hace ' + Math.floor(diff / 60) + ' min';
+                if (diff < 86400) return 'Hace ' + Math.floor(diff / 3600) + ' h';
+                if (diff < 604800) return 'Hace ' + Math.floor(diff / 86400) + ' días';
+                return this.formatDate(dateStr);
+            } catch(e) { return dateStr; }
+        },
+
         /**
          * Obtiene la clase CSS para el estado de un pedido.
          *

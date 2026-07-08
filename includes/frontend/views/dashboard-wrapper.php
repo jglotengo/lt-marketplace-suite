@@ -103,10 +103,8 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
 ?>
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
 
-    <!-- v2.9.94 P3: Accessibility skip-link -->
-    <a href="#ltms-main-content" class="ltms-skip-link" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;" onfocus="this.style.cssText='position:fixed;top:0;left:0;width:auto;height:auto;padding:8px 16px;background:#2563eb;color:#fff;z-index:99999;border-radius:0 0 8px 0;'" onblur="this.style.cssText='position:absolute;left:-9999px;'">
-        <?php esc_html_e( 'Saltar al contenido principal', 'ltms' ); ?>
-    </a>
+    <!-- v2.9.95 P3: Accessibility skip-link (CSS-only, no inline handlers) -->
+    <a href="#ltms-main-content" class="ltms-skip-link"><?php esc_html_e( 'Saltar al contenido principal', 'ltms' ); ?></a>
 
     <!-- Sidebar -->
     <div class="ltms-sidebar-overlay" id="ltms-sidebar-overlay"></div>
@@ -359,6 +357,9 @@ if ( $_user_id && get_user_meta( $_user_id, 'ltms_is_restaurant', true ) === 'ye
     /* v2.9.94 P3: Nav icon sizing for SVG */
     .ltms-nav-icon svg { width: 20px; height: 20px; display: block; }
     .ltms-bottom-nav-icon svg { width: 22px; height: 22px; display: block; }
+    /* v2.9.95 P3: Skip-link (CSS-only, CSP compliant) */
+    .ltms-skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; z-index: 99999; }
+    .ltms-skip-link:focus { position: fixed; top: 0; left: 0; width: auto; height: auto; padding: 10px 20px; background: #2563eb; color: #fff !important; border-radius: 0 0 8px 0; font-size: 0.85rem; font-weight: 600; text-decoration: none; }
     </style>
 
     <!-- v2.9.94 P3: Keyboard shortcut help modal -->
