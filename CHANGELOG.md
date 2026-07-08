@@ -4,6 +4,51 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.97] — 2026-07-08
+
+### Added — UIUX-AUDIT-001 P3 (Batch 20 — Final)
+
+- **view-insurance.php expansion** (113 → 365 lines):
+  - KPIs grid: total pólizas (12 meses), activas, prima acumulada, tasa de reclamación.
+  - Filtro por estado (Todas / Activas / Canceladas / Reclamadas / Expiradas) + búsqueda libre por # pedido o # póliza.
+  - Tarjeta informativa expandible (`<details>`) explicando cobertura de cada tipo de póliza y cómo reclamar.
+  - Empty state con SVG (shield + check), tanto para "tabla no existe" como "sin pólizas".
+  - Status badges usando clases CSS (`ltms-status-badge delivered/cancelled/pending/failed`) en lugar de estilos inline.
+  - Tipos de póliza localizados (`parcel_protection` / `purchase_protection` / `other`).
+  - Fechas localizadas vía `wp_date('d M Y')`.
+  - Exportación CSV de la vista filtrada.
+  - Link al pedido desde la tabla.
+  - Mensaje "no results" dinámico cuando los filtros no devuelven filas.
+- **view-drivers.php expansion** (226 → 744 lines):
+  - KPIs grid: total repartidores, activos, disponibles ahora, método habilitado/deshabilitado.
+  - Búsqueda por nombre / teléfono / placa + filtro por estado + filtro por tipo de vehículo.
+  - Editar repartidor (botón ✏️ en cada fila, pre-puebla el modal con datos existentes; documento se re-ingresa por seguridad).
+  - Modal de confirmación para eliminar (con nombre del repartidor y foco accesible).
+  - Empty state con SVG (truck).
+  - Badges CSS para estado y disponibilidad (reemplaza estilos inline).
+  - Vehículo mostrado con icono + label + placa en `<code>`.
+  - Teléfono como link `tel:` clickeable.
+  - Fecha de alta localizada (`wp_date('d M Y')`).
+  - Toggle activo/disponible actualiza DOM inline (sin reload): badge, botón, KPIs.
+  - Delete remueve fila del DOM + actualiza KPIs (sin reload).
+  - Create/edit recarga la página (necesario para HTML server-rendered del nuevo row).
+  - Toast system (0 alerts).
+  - Handler JS completo para el formulario de configuración de entrega (faltaba handler — era un bug).
+  - Soporte para tipos de vehículo legacy (`bici`, `carro`, `pie`) además de los nuevos (`bicycle`, `car`, `walking`).
+
+### Fixed
+
+- **view-drivers.php**: formularios y botones no tenían JS handlers — ahora todos funcionan (agregar, editar, toggle active, toggle available, delete, save delivery settings).
+- **view-drivers.php**: configuración de entrega ahora guarda vía AJAX con feedback visual (spinner + mensaje de éxito/error).
+
+## [2.9.96] — 2026-07-08
+
+### Added — UIUX-AUDIT-001 P3 (Batch 19)
+
+- SVG illustrations en empty states (`view-orders.php`, `view-kitchen.php`) — reemplaza emojis.
+- CSP fix: inline `onchange` en `view-shipping-statement.php` → `data-action="submit-form"` + JS delegated handler.
+- `view-drivers.php`: removida columna "Pedido actual" muerta (siempre mostraba "—").
+
 ## [2.9.35] — 2026-07-06
 
 ### Added
