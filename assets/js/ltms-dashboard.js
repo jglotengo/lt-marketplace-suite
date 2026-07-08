@@ -47,6 +47,7 @@
             this.initCsvExport();       // v2.9.82 P2
             this.initBreadcrumbs();     // v2.9.82 P2
             this.initGlobalSearch();    // v2.9.84 P1
+            this.initKeyboardShortcuts(); // v2.9.91 P3
         },
 
         /**
@@ -2458,15 +2459,12 @@
                 const query = $(this).val().trim();
                 if (query.length < 2) return;
                 searchTimer = setTimeout(function() {
-                    // Buscar en pedidos si estamos en vista de pedidos.
                     if ($('#ltms-order-search').length) {
                         $('#ltms-order-search').val(query).trigger('input');
                     }
-                    // Buscar en productos si estamos en vista de productos.
                     if ($('#ltms-product-search').length) {
                         $('#ltms-product-search').val(query).trigger('input');
                     }
-                    // Si no estamos en una vista con search, ir a pedidos.
                     if (!$('#ltms-order-search').length && !$('#ltms-product-search').length) {
                         if (typeof LTMS !== 'undefined' && LTMS.Dashboard) {
                             LTMS.Dashboard.loadView('orders');
@@ -2476,6 +2474,60 @@
                         }
                     }
                 }, 300);
+            });
+        },
+
+        // ── v2.9.91 P3: Keyboard Shortcuts ────────────────────────────
+        initKeyboardShortcuts() {
+            const self = this;
+            const shortcuts = {
+                'g+h': 'home', 'g+o': 'orders', 'g+p': 'products',
+                'g+w': 'wallet', 'g+s': 'settings', 'g+k': 'kyc',
+                'g+r': 'redi', 'g+e': 'envios', 'g+m': 'marketing',
+                'g+d': 'donations', 'g+u': 'security', 'g+f': 'posgold'
+            };
+            let keyBuffer = '';
+            let keyTimer = null;
+
+            $(document).on('keydown', function(e) {
+                // Ignorar si está escribiendo en un input/textarea
+                if ($(e.target).is('input, textarea, select, [contenteditable]')) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+                const key = e.key.toLowerCase();
+                keyBuffer += key;
+                clearTimeout(keyTimer);
+                keyTimer = setTimeout(function() { keyBuffer = ''; }, 800);
+
+                // Verificar si el buffer coincide con un shortcut
+                for (const [combo, view] of Object.entries(shortcuts)) {
+                    if (keyBuffer === combo) {
+                        e.preventDefault();
+                        self.loadView(view);
+                        keyBuffer = '';
+                        return;
+                    }
+                }
+
+                // 'd' toggle dark mode
+                if (keyBuffer === 'd' && keyBuffer.length === 1) {
+                    // Solo si no hay 'g' antes
+                    return;
+                }
+
+                // '/' focus search
+                if (key === '/' ) {
+                    e.preventDefault();
+                    $('#ltms-topbar-search-input').focus();
+                    keyBuffer = '';
+                }
+
+                // Escape cierra modales
+                if (key === 'escape') {
+                    $('.ltms-modal').hide();
+                    $('.ltms-notifications-panel').removeClass('open');
+                    $('#ltms-notif-bell').attr('aria-expanded', 'false');
+                }
             });
         },
     };
