@@ -69,6 +69,7 @@ define( 'LTMS_PLUGIN_URL',       plugin_dir_url( __FILE__ ) );
 define( 'LTMS_PLUGIN_BASENAME',  plugin_basename( __FILE__ ) );
 define( 'LTMS_INCLUDES_DIR',     LTMS_PLUGIN_DIR . 'includes/' );
 define( 'LTMS_ASSETS_URL',       LTMS_PLUGIN_URL . 'assets/' );
+define( 'LTMS_ASSETS_DIR',       LTMS_PLUGIN_DIR . 'assets/' ); // v2.9.99: needed for file_exists checks in get_suffix()
 define( 'LTMS_TEMPLATES_DIR',    LTMS_PLUGIN_DIR . 'templates/' );
 define( 'LTMS_LANGUAGES_DIR',    LTMS_PLUGIN_DIR . 'languages/' );
 define( 'LTMS_LOG_DIR',          WP_CONTENT_DIR . '/uploads/ltms-logs/' );

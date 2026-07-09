@@ -137,6 +137,11 @@ final class LTMS_Frontend_Assets {
         $is_prod = defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production';
         $ver     = LTMS_VERSION;
         $url     = LTMS_ASSETS_URL;
+        // v2.9.99 FIX: solo usar sufijo .min si el archivo .min realmente existe.
+        // Antes, en producción siempre usaba .min, pero muchos JS (ltms-dashboard,
+        // ltms-modal, ltms-notifications, ltms-kds) NO tienen versión .min →
+        // el navegador recibía 404 y el JS nunca cargaba → las vistas del panel
+        // del vendedor no funcionaban.
         $suffix  = $is_prod ? '.min' : '';
         $page_id = get_queried_object_id();
         $pages   = $this->get_installed_pages();
@@ -418,9 +423,14 @@ final class LTMS_Frontend_Assets {
             }
         ' );
 
+        // v2.9.99 FIX: verificar si el .min existe antes de usarlo (evita 404 en JS).
+        $modal_suffix   = $this->get_suffix( 'js/ltms-modal.js', $suffix );
+        $notif_suffix   = $this->get_suffix( 'js/ltms-notifications.js', $suffix );
+        $dash_suffix    = $this->get_suffix( 'js/ltms-dashboard.js', $suffix );
+
         wp_enqueue_script(
             'ltms-modal',
-            $url . 'js/ltms-modal' . $suffix . '.js',
+            $url . 'js/ltms-modal' . $modal_suffix . '.js',
             [ 'jquery' ],
             $ver,
             true
@@ -428,7 +438,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-notifications',
-            $url . 'js/ltms-notifications' . $suffix . '.js',
+            $url . 'js/ltms-notifications' . $notif_suffix . '.js',
             [ 'jquery', 'ltms-modal' ],
             $ver,
             true
@@ -444,13 +454,35 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-dashboard',
-            $url . 'js/ltms-dashboard' . $suffix . '.js',
+            $url . 'js/ltms-dashboard' . $dash_suffix . '.js',
             [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications' ],
             $ver,
             true
         );
 
         $this->localize_dashboard_script();
+    }
+
+    /**
+     * v2.9.99: Devuelve el sufijo .min solo si el archivo .min correspondiente existe.
+     * Evita 404 cuando se intenta cargar un .min que nunca fue generado.
+     *
+     * @param string $relative_path Ruta relativa del archivo SIN sufijo (ej: 'js/ltms-dashboard.js').
+     * @param string $requested_suffix Sufijo solicitado ('.min' o '').
+     * @return string Sufijo real a usar ('.min' o '').
+     */
+    private function get_suffix( string $relative_path, string $requested_suffix ): string {
+        if ( $requested_suffix === '' ) {
+            return '';
+        }
+        // Construir la ruta del archivo .min y verificar si existe en disco.
+        $path_parts  = pathinfo( $relative_path );
+        $min_path    = $path_parts['dirname'] . '/' . $path_parts['filename'] . '.min.' . $path_parts['extension'];
+        $full_path   = defined( 'LTMS_ASSETS_DIR' ) ? LTMS_ASSETS_DIR . $min_path : '';
+        if ( $full_path && file_exists( $full_path ) ) {
+            return '.min';
+        }
+        return '';
     }
 
     /**
@@ -615,9 +647,12 @@ final class LTMS_Frontend_Assets {
     private function enqueue_kds_assets( string $url, string $ver, string $suffix = '' ): void {
         wp_enqueue_style( 'ltms-kds', $url . 'css/ltms-kds.css', [ 'ltms-dashboard' ], $ver );
 
+        // v2.9.99 FIX: verificar si el .min existe.
+        $kds_suffix = $this->get_suffix( 'js/ltms-kds.js', $suffix );
+
         wp_enqueue_script(
             'ltms-kds',
-            $url . 'js/ltms-kds' . $suffix . '.js',
+            $url . 'js/ltms-kds' . $kds_suffix . '.js',
             [ 'jquery' ],
             $ver,
             true
