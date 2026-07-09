@@ -140,8 +140,9 @@ if ( ! function_exists( 'ltms_ajax_url' ) ) {
 }
 
 // Handler que procesa las requests AJAX del frontend.
-// Se ejecuta en 'init' con prioridad 1 para capturar la request antes que
-// cualquier output. Reutiliza los mismos handlers wp_ajax_* ya registrados.
+// Se ejecuta en 'init' con prioridad 100 (DESPUÉS de que todos los handlers
+// wp_ajax_* se registren, que suele ser en init priority 10-20).
+// Reutiliza los mismos handlers wp_ajax_* ya registrados.
 add_action( 'init', function() {
     // Solo procesar si es una request ltms_ajax.
     if ( ! isset( $_REQUEST['ltms_ajax'] ) ) {
@@ -164,13 +165,19 @@ add_action( 'init', function() {
         wp_die( '0' );
     }
 
+    // Verificar que el handler esté registrado antes de dispararlo.
+    $hook_name = "wp_ajax_{$action}";
+    if ( ! has_action( $hook_name ) ) {
+        wp_send_json_error( [ 'message' => "Unknown action: {$action}" ], 400 );
+    }
+
     // Disparar el mismo hook que admin-ajax.php dispararía.
     // Los handlers wp_ajax_* ya están registrados via add_action.
-    do_action( "wp_ajax_{$action}" );
+    do_action( $hook_name );
 
     // Si el handler no hizo wp_die/wp_send_json, morir con 0.
     wp_die( '0' );
-}, 1 );
+}, 100 );
 
 // v2.9.99: Filtro para que admin_url('admin-ajax.php') devuelva la URL del
 // frontend cuando se use en contexto frontend. Esto permite que TODAS las

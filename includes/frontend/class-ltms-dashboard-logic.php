@@ -330,7 +330,7 @@ final class LTMS_Dashboard_Logic {
         // Without this, any logged-in user could read the notification stream
         // for their own user_id (even if they are not a vendor) and pollute
         // the notifications table via other endpoints.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 
@@ -386,7 +386,7 @@ final class LTMS_Dashboard_Logic {
 
         // HI-8 FIX: capability check — marking notifications as read is a
         // vendor-only action.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 

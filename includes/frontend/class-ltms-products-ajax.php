@@ -29,7 +29,7 @@ class LTMS_Products_Ajax {
         // delete_product, upload_product_image, ...) mutate vendor data. Without
         // a capability check, any logged-in user (subscriber, customer) could
         // call them. Require ltms_vendor or manage_options.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
     }

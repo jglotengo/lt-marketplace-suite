@@ -52,7 +52,7 @@ final class LTMS_Frontend_Deposit_Handler {
         // HI-3 FIX: capability check — deposit creation is a vendor-only action.
         // Without this, any authenticated user (subscriber, customer) could
         // create deposit requests on their own user_id, polluting the deposit queue.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 
@@ -129,7 +129,7 @@ final class LTMS_Frontend_Deposit_Handler {
         }
 
         // HI-4 FIX: vendor role check — receipt uploads are a vendor-only action.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 
@@ -201,7 +201,7 @@ final class LTMS_Frontend_Deposit_Handler {
         }
 
         // HI-3 FIX: capability check — vendor deposit history is vendor-only.
-        if ( ! current_user_can( 'ltms_vendor' ) && ! current_user_can( 'manage_options' ) ) {
+        if ( ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Insufficient permissions', 'ltms' ) ], 403 );
         }
 
