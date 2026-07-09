@@ -115,6 +115,91 @@ if ( ! defined( 'LTMS_CIPHER_ALGO' ) ) {
 }
 
 // ============================================================
+// v2.9.99: AJAX FRONTEND BYPASS — evita SiteGround anti-bot en /wp-admin/
+// ============================================================
+// SiteGround bloquea /wp-admin/admin-ajax.php con 403 cuando la request
+// viene de un browser UA (anti-bot protection). Esto rompe TODO el panel
+// del vendedor. La solución es rutear las llamadas AJAX a través del
+// frontend (index.php) en lugar de wp-admin/admin-ajax.php.
+//
+// En lugar de POST a /wp-admin/admin-ajax.php, el JS hace POST a
+// /?ltms_ajax=1 que va a index.php (frontend) y es procesado en 'init'.
+// Esto bypasa completamente el bloqueo de SiteGround.
+
+if ( ! function_exists( 'ltms_ajax_url' ) ) {
+    /**
+     * Devuelve la URL de AJAX del frontend (bypass de wp-admin/admin-ajax.php).
+     * Usa home_url('/?ltms_ajax=1') en lugar de admin_url('admin-ajax.php')
+     * para evitar el bloqueo anti-bot de SiteGround en /wp-admin/.
+     *
+     * @return string
+     */
+    function ltms_ajax_url(): string {
+        return home_url( '/?ltms_ajax=1' );
+    }
+}
+
+// Handler que procesa las requests AJAX del frontend.
+// Se ejecuta en 'init' con prioridad 1 para capturar la request antes que
+// cualquier output. Reutiliza los mismos handlers wp_ajax_* ya registrados.
+add_action( 'init', function() {
+    // Solo procesar si es una request ltms_ajax.
+    if ( ! isset( $_REQUEST['ltms_ajax'] ) ) {
+        return;
+    }
+
+    // Simular el entorno de admin-ajax.php.
+    if ( ! defined( 'DOING_AJAX' ) ) {
+        define( 'DOING_AJAX', true );
+    }
+
+    // WordPress usa este header para identificar requests AJAX.
+    if ( ! isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) {
+        $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+    }
+
+    $action = sanitize_key( $_REQUEST['action'] ?? '' );
+
+    if ( ! $action ) {
+        wp_die( '0' );
+    }
+
+    // Disparar el mismo hook que admin-ajax.php dispararía.
+    // Los handlers wp_ajax_* ya están registrados via add_action.
+    do_action( "wp_ajax_{$action}" );
+
+    // Si el handler no hizo wp_die/wp_send_json, morir con 0.
+    wp_die( '0' );
+}, 1 );
+
+// v2.9.99: Filtro para que admin_url('admin-ajax.php') devuelva la URL del
+// frontend cuando se use en contexto frontend. Esto permite que TODAS las
+// llamadas existentes admin_url('admin-ajax.php') en localize_script se
+// redirijan automáticamente al bypass del frontend.
+// IMPORTANTE: Solo se aplica cuando NO estamos en admin real (is_admin() = false)
+// y NO estamos procesando un AJAX real (para no romper handlers internos).
+add_filter( 'admin_url', function( $url, $path, $blog_id ) {
+    // Solo interceptar admin-ajax.php.
+    if ( $path !== 'admin-ajax.php' ) {
+        return $url;
+    }
+    // No interceptar si estamos en admin real.
+    if ( is_admin() ) {
+        return $url;
+    }
+    // No interceptar si ya estamos procesando AJAX (evita recursión).
+    if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+        return $url;
+    }
+    // No interceptar si estamos haciendo cron o CLI.
+    if ( defined( 'DOING_CRON' ) || defined( 'WP_CLI' ) ) {
+        return $url;
+    }
+    // En contexto frontend, devolver la URL del bypass.
+    return ltms_ajax_url();
+}, 10, 3 );
+
+// ============================================================
 // CAPTURA DE ERRORES FATALES — Diagnóstico sin email
 // ============================================================
 // Registrado lo antes posible para capturar cualquier fatal PHP.
