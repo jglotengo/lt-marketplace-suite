@@ -1225,17 +1225,12 @@
         },
         loadProductsView(forceRefresh = false) {
             const self = this;
-            self.showViewLoader();
-            $.ajax({
-                url: ltmsDashboard.ajax_url, method: 'POST',
-                data: { action: 'ltms_get_products_data', nonce: ltmsDashboard.nonce },
-                success(response) {
-                    $('.ltms-view-loader').hide();
-                    self.renderProductsView(response.success ? response.data : {});
-                    self.showSection('#ltms-view-products');
-                },
-                error: () => { $('.ltms-view-loader').hide(); self.showSection('#ltms-view-products'); },
-            });
+            // v2.9.99 FIX: mostrar la vista PHP directamente (loadGenericView) en lugar de
+            // sobreescribirla con renderProductsView(). La vista PHP tiene pagination,
+            // search, gallery upload, ReDi toggle, etc. — el JS render era una versión
+            // simplificada que perdía todas esas features.
+            self.showSection('#ltms-view-products');
+            // La vista PHP ya tiene su propia lógica de carga via AJAX inline.
         },
         renderProductsView(data) {
             const products = (data && data.products) ? data.products : [];
@@ -1749,17 +1744,11 @@
 
         loadSettingsView(forceRefresh = false) {
             const self = this;
-            self.showViewLoader();
-            $.ajax({
-                url: ltmsDashboard.ajax_url, method: 'POST',
-                data: { action: 'ltms_get_vendor_settings', nonce: ltmsDashboard.nonce },
-                success(response) {
-                    $('.ltms-view-loader').hide();
-                    self.renderSettingsView(response.success ? response.data : {});
-                    self.showSection('#ltms-view-settings');
-                },
-                error: () => { $('.ltms-view-loader').hide(); self.renderSettingsView({}); self.showSection('#ltms-view-settings'); },
-            });
+            // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene los 7
+            // campos nuevos (vacation_mode, store_logo, schedule, social links), logo
+            // upload, copy-referral, checkbox fix — el JS render era una versión
+            // simplificada que sobreescribía todos esos fixes.
+            self.showSection('#ltms-view-settings');
         },
         renderSettingsView(data) {
             const kyc = data.kyc_status || 'pending';
@@ -2044,20 +2033,10 @@
         // ── Vista: Seguros ────────────────────────────────────────
         loadInsuranceView(forceRefresh = false) {
             const self = this;
-            if (!forceRefresh && this.dataCache['insurance']) {
-                this.renderInsuranceView(this.dataCache['insurance']);
-                return;
-            }
-            $.ajax({
-                url: ltmsDashboard.ajax_url, method: 'POST',
-                data: { action: 'ltms_get_insurance_data', nonce: ltmsDashboard.nonce },
-                success(r) {
-                    const data = r.success ? r.data : { policies: [] };
-                    self.dataCache['insurance'] = data;
-                    self.renderInsuranceView(data);
-                },
-                error() { self.renderInsuranceView({ policies: [] }); }
-            });
+            // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene KPIs,
+            // coverage info card, filtros, CSV export, empty state SVG — el JS render
+            // era una versión simplificada que perdía todas esas features.
+            self.showSection('#ltms-view-insurance');
         },
 
         renderInsuranceView(data) {
@@ -2095,20 +2074,10 @@
         // ── Vista: ReDi ───────────────────────────────────────────
         loadRediView(forceRefresh = false) {
             const self = this;
-            if (!forceRefresh && this.dataCache['redi']) {
-                this.renderRediView(this.dataCache['redi']);
-                return;
-            }
-            $.ajax({
-                url: ltmsDashboard.ajax_url, method: 'POST',
-                data: { action: 'ltms_get_redi_data', nonce: ltmsDashboard.nonce },
-                success(r) {
-                    const data = r.success ? r.data : { agreements: [], available_products: [] };
-                    self.dataCache['redi'] = data;
-                    self.renderRediView(data);
-                },
-                error() { self.renderRediView({ agreements: [], available_products: [] }); }
-            });
+            // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene
+            // wc_price correcto, redi_rate ×100, toggleRediRow DOM swap — el JS render
+            // era una versión simplificada que sobreescribía todos esos fixes.
+            self.showSection('#ltms-view-redi');
         },
 
         renderRediView(data) {
