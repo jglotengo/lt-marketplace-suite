@@ -161,6 +161,21 @@ add_action( 'init', function() {
 
     $action = sanitize_key( $_REQUEST['action'] ?? '' );
 
+    // v2.9.99 DEBUG: log temporal para identificar el origen de los 403.
+    $debug_log = sprintf(
+        "[LTMS_AJAX_DEBUG] action=%s user_id=%d logged_in=%s is_vendor=%s nonce_present=%s\n",
+        $action,
+        get_current_user_id(),
+        is_user_logged_in() ? 'yes' : 'no',
+        ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) )
+            ? ( LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ? 'yes' : 'no' ) : 'unknown',
+        isset( $_REQUEST['nonce'] ) ? 'yes' : 'no'
+    );
+    if ( defined( 'WP_CONTENT_DIR' ) ) {
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+        @file_put_contents( WP_CONTENT_DIR . '/ltms-ajax-debug.log', $debug_log, FILE_APPEND );
+    }
+
     if ( ! $action ) {
         wp_die( '0' );
     }
