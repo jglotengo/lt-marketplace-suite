@@ -176,6 +176,25 @@ final class LTMS_Core_Firewall {
     }
 
     /**
+     * v2.9.99: Comprueba si la request actual viene de un vendor autenticado.
+     * Usado para excluir las requests ltms_ajax del bypass del frontend de la
+     * inspección de patrones del WAF (evita falsos positivos en POST bodies).
+     *
+     * @return bool True si es un vendor autenticado.
+     */
+    private static function is_authenticated_vendor(): bool {
+        if ( ! is_user_logged_in() ) {
+            return false;
+        }
+        if ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
+            return LTMS_Utils::is_ltms_vendor( get_current_user_id() );
+        }
+        $user = wp_get_current_user();
+        $ltms_roles = array_filter( (array) $user->roles, fn( $r ) => str_starts_with( $r, 'ltms_' ) );
+        return ! empty( $ltms_roles );
+    }
+
+    /**
      * Comprueba si la REQUEST_URI actual está en la whitelist de rutas admin.
      *
      * @return bool
@@ -219,6 +238,22 @@ final class LTMS_Core_Firewall {
             return;
         }
         // ── FIN EXCLUSIÓN ADMIN ──────────────────────────────────────────────────
+
+        // ── v2.9.99: EXCLUSIÓN PARA BYPASS AJAX DEL FRONTEND ──────────────────────
+        // Las requests a /?ltms_ajax=1 son llamadas AJAX del panel del vendedor
+        // que se rutearon a través del frontend para bypasear el bloqueo de
+        // SiteGround a /wp-admin/admin-ajax.php. El firewall puede generar falsos
+        // positivos al inspeccionar el POST body (que puede contener legítimamente
+        // palabras como "SELECT", "UPDATE", etc. en descripciones de productos).
+        // Si el usuario es un vendor autenticado, omitimos la inspección de patrones
+        // (la verificación de IP blacklist sigue aplicándose).
+        if ( isset( $_REQUEST['ltms_ajax'] ) && self::is_authenticated_vendor() ) {
+            if ( self::is_ip_blocked( $ip ) ) {
+                self::block_request( 'IP_BLACKLISTED', $ip );
+            }
+            return;
+        }
+        // ── FIN EXCLUSIÓN BYPASS AJAX ─────────────────────────────────────────────
 
         // 1. Verificar blacklist de IPs
         if ( self::is_ip_blocked( $ip ) ) {
