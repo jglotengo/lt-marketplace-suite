@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.99
+ * Version:           2.9.100
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.99' );
+define( 'LTMS_VERSION', '2.9.100' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -160,21 +160,6 @@ add_action( 'init', function() {
     }
 
     $action = sanitize_key( $_REQUEST['action'] ?? '' );
-
-    // v2.9.99 DEBUG: log temporal para identificar el origen de los 403.
-    $debug_log = sprintf(
-        "[LTMS_AJAX_DEBUG] action=%s user_id=%d logged_in=%s is_vendor=%s nonce_present=%s\n",
-        $action,
-        get_current_user_id(),
-        is_user_logged_in() ? 'yes' : 'no',
-        ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) )
-            ? ( LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ? 'yes' : 'no' ) : 'unknown',
-        isset( $_REQUEST['nonce'] ) ? 'yes' : 'no'
-    );
-    if ( defined( 'WP_CONTENT_DIR' ) ) {
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-        @file_put_contents( WP_CONTENT_DIR . '/ltms-ajax-debug.log', $debug_log, FILE_APPEND );
-    }
 
     if ( ! $action ) {
         wp_die( '0' );
