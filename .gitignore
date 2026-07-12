@@ -88,3 +88,12 @@ test-results.xml
 *.min.css
 bin/ltms-run-diag.php
 /contrato-vendedor-test.pdf
+
+# v2.9.100: Archivos basura que NO deben estar en el repo
+.kyc_v3_done
+composer.phar
+diag.php
+run-tests.sh
+deploy/ltms-fpm-opcache-reset.php
+ltms-ajax-debug.log
+ltms-fatal-debug.txt
