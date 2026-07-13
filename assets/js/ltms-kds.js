@@ -367,7 +367,7 @@ LTMS.KDS = (function ($) {
 
 })(jQuery);
 
-jQuery(function () {
+jQuery(function ($) {
     if ($('#ltms-kds-grid').length) {
         LTMS.KDS.init();
     }
