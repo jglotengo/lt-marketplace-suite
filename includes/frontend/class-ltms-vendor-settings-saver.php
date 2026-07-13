@@ -26,8 +26,9 @@ class LTMS_Vendor_Settings_Saver {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
-        if ( ! $vendor_id ) {
-            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        // v2.9.100 SEC-5 FIX: verificar que es vendor, no solo logged_in.
+        if ( ! $vendor_id || ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( $vendor_id ) ) ) {
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
         }
 
         $fields = [
@@ -155,8 +156,9 @@ class LTMS_Vendor_Settings_Saver {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
-        if ( ! $vendor_id ) {
-            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        // v2.9.100 SEC-5 FIX: verificar que es vendor, no solo logged_in.
+        if ( ! $vendor_id || ! ( class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor( $vendor_id ) ) ) {
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
         }
 
         $zone_data = [

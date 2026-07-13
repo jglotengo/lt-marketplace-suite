@@ -64,7 +64,9 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
     // =========================================================================
 
     public function ajax_create_oxxo_reference(): void {
-        check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce verification failed.', 'ltms' ) ], 403 );
+        }
 
         $order_id = absint( $_POST['order_id'] ?? 0 );
         $order    = $order_id ? wc_get_order( $order_id ) : $this->get_order_from_session();
@@ -137,7 +139,9 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
     // =========================================================================
 
     public function ajax_download_oxxo_voucher(): void {
-        check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce verification failed.', 'ltms' ) ], 403 );
+        }
 
         $order_id  = absint( $_POST['order_id'] ?? 0 );
         $reference = sanitize_text_field( $_POST['reference'] ?? '' );
@@ -170,7 +174,9 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
     // =========================================================================
 
     public function ajax_create_spei_reference(): void {
-        check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce verification failed.', 'ltms' ) ], 403 );
+        }
 
         $order_id = absint( $_POST['order_id'] ?? 0 );
         $order    = $order_id ? wc_get_order( $order_id ) : $this->get_order_from_session();
@@ -256,7 +262,9 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
     // =========================================================================
 
     public function ajax_get_msi_options(): void {
-        check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Nonce verification failed.', 'ltms' ) ], 403 );
+        }
 
         $amount = (float) ( $_POST['amount'] ?? 0 );
 

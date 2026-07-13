@@ -26,7 +26,17 @@ final class LTMS_Data_Masking {
      * @return bool
      */
     public static function is_external_auditor(): bool {
-        return current_user_can( 'ltms_external_auditor' );
+        // v2.9.100 SEC-1 FIX: 'ltms_external_auditor' is a ROLE, not a capability.
+        // current_user_can() checks capabilities, so it always returned false.
+        // This silently disabled PII masking for auditors → GDPR/SAGRILAFT violation.
+        // Fix: check the user's roles array directly (like LTMS_Utils::is_ltms_vendor does).
+        if ( ! is_user_logged_in() ) {
+            return false;
+        }
+        $user = wp_get_current_user();
+        return in_array( 'ltms_external_auditor', (array) $user->roles, true )
+            || in_array( 'ltms_compliance_officer', (array) $user->roles, true )
+            || current_user_can( 'manage_options' );
     }
 
     /**
