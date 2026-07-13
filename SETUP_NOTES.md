@@ -1,12 +1,12 @@
-# LTMS Setup Notes — 2026-07-08
+# LTMS Setup Notes — 2026-07-13
 
-> Notas operativas de la instancia de producción de LT Marketplace Suite v2.9.98.
+> Notas operativas de la instancia de producción de LT Marketplace Suite v2.9.102.
 >
-> **Histórico:** Este documento se actualizó desde v2.9.35 (2026-07-06) hasta v2.9.98 (2026-07-08), reflejando 3 auditorías completas (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001) y 60+ commits de mejoras.
+> **Histórico:** Este documento se actualizó desde v2.9.35 (2026-07-06) hasta v2.9.102 (2026-07-13), reflejando 3 auditorías completas (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001), 1 auditoría de seguridad (SEC-1), 1 QA completo (21/21 vistas), build pipeline + CI, y 25+ commits de mejoras.
 
 ---
 
-## Estado BD (v2.9.98)
+## Estado BD (v2.9.102)
 
 ### Tablas existentes (verificadas en producción)
 
@@ -263,31 +263,38 @@ wp cron event list --allow-root --path=/home/customer/www/lo-tengo.com.co/public
 
 ---
 
-## Post-deploy obligatorio (v2.9.98)
+## Post-deploy obligatorio (v2.9.102)
 
 ```bash
-# 1. Limpiar cache del SiteGround Optimizer
-rm -rf /home/customer/www/lo-tengo.com.co/public_html/wp-content/uploads/siteground-optimizer-assets/*
-rm -rf /home/customer/www/lo-tengo.com.co/public_html/wp-content/cache/supercache/*
+cd /home/customer/www/lo-tengo.com.co/public_html
+
+# 1. Deploy del código
+cd wp-content/plugins/lt-marketplace-suite
+git fetch origin && git reset --hard origin/main
+grep "Version:" lt-marketplace-suite.php | head -1  # Debe mostrar 2.9.102
 
 # 2. Flush object cache de WordPress
-wp cache flush --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+cd /home/customer/www/lo-tengo.com.co/public_html
+wp cache flush --allow-root
 
-# 3. Flush OPcache (pool web en SiteGround — preferido vía HTTP)
-curl 'https://lo-tengo.com.co/wp-content/plugins/lt-marketplace-suite/deploy/ltms-opcache-flush.php?token=ltms_opcache_2026'
+# 3. Limpiar cache del SiteGround Optimizer
+rm -rf wp-content/cache/supercache/*
+rm -rf wp-content/uploads/siteground-optimizer-assets/*
 
-# 4. Verificar tablas DB nuevas
-wp db query 'SHOW TABLES LIKE "bkr_lt_vendor_drivers";' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
-wp db query 'SHOW TABLES LIKE "bkr_lt_insurance_policies";' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+# 4. Flush OPcache (pool CLI)
+wp eval 'opcache_reset();' --allow-root
 
-# 5. Verificar migración SAT México
-wp db query 'DESCRIBE lt_commissions;' --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html | grep -E 'cfdi|rfc|regimen'
+# 5. Verificar que el sitio responde
+curl -sI -A "Mozilla/5.0" "https://lo-tengo.com.co/" | head -3
+# Debe mostrar HTTP/2 200
 
-# 6. Verificar crons
-wp cron event list --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html | grep ltms
+# 6. Verificar versión
+grep "Version:" wp-content/plugins/lt-marketplace-suite/lt-marketplace-suite.php | head -1
+# Debe mostrar: 2.9.102
 
-# 7. Verificar versión del plugin
-grep "Version:" /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/lt-marketplace-suite.php
+# 7. Verificar CSP compliance
+grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' wp-content/plugins/lt-marketplace-suite/includes/frontend/views/
+# Debe devolver 0 resultados
 # Debe mostrar: 2.9.98
 
 # 8. Verificar CSP compliance (0 inline handlers)

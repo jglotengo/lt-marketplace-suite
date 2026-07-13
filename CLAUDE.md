@@ -3,12 +3,14 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-08 (versión del plugin en ese momento: `2.9.98`).
+> **Última auditoría completa del repo:** 2026-07-13 (versión del plugin en ese momento: `2.9.102`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
 > (`jglotengo/lt-marketplace-suite@main`, ~516 archivos PHP en `includes/`, 1,300+ commits)
-> e incorpora el resultado de 3 auditorías completas:
+> e incorpora el resultado de 4 auditorías completas:
 > REG-AUDIT-001 (registro vendedores, 11+3 fixes), DEEP-AUDIT-002 (onboarding+panel,
-> 56 findings 100% P0+P1+P2 resueltos) y UIUX-AUDIT-001 (62 findings, 100% resueltos).
+> 56 findings 100% P0+P1+P2 resueltos), UIUX-AUDIT-001 (62 findings, 100% resueltos),
+> SEC-1 (security audit, 9/10 vulnerabilidades arregladas), QA completo (21/21 vistas),
+> build pipeline + CI (GitHub Actions).
 
 ---
 
@@ -18,7 +20,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.98` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 3 auditorías completas (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001) están 100% resueltas a esta versión.
+**Versión actual del plugin:** `2.9.102` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 3 auditorías (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001), 1 auditoría de seguridad (SEC-1: 9/10 vulnerabilidades arregladas), QA completo (21/21 vistas), build pipeline + CI (GitHub Actions) están completadas a esta versión.
 
 ---
 
@@ -356,7 +358,23 @@ tail -n 30 /home/customer/www/lo-tengo.com.co/logs/error_log
 - **Nonce action para AJAX del storefront:** el action correcto es `ltms_ux_nonce`, NO `ltms_storefront_nonce`. Si un handler usa `check_ajax_referer('ltms_storefront_nonce', 'nonce')`, todos los AJAX del storefront fallan con 403 silencioso.
 - **Visibilidad de métodos importa:** `LTMS_Core_Firewall::get_client_ip()` debe ser `public` (no `private`). Es llamada desde `LTMS_Data_Masking` para enmascarar IPs en logs. Si la declaras `private`, el WSOD es inmediato en cualquier página que dispare data masking.
 - **`continue 2` requiere 2+ niveles de loop anidado.** Usar `continue 2` dentro de un `foreach` simple (1 nivel) es un error fatal: `Fatal error: 'continue 2' is in the wrong context`. Usa `continue;` (sin número) si solo hay 1 loop.
-- **Sincronización `.min.js` / `.min.css`:** los archivos minificados deben regenerarse y commitearse en el mismo commit que sus fuentes `.js` / `.css`. Si solo actualizas la fuente y olvidas el `.min`, en producción se sirve la versión vieja (SiteGround sirve el `.min` por defecto si `SCRIPT_DEBUG` no está definido). Los `.min.*` están force-tracked (fueron removidos de `.gitignore` en v2.9.35).
+- **Sincronización `.min.js` / `.min.css`:** los archivos minificados deben regenerarse con `npm run build` antes de cada commit que toque fuentes `.js` / `.css`. El CI (GitHub Actions) verifica que todos los `.min` existan. Los `.min.*` están force-tracked (fueron removidos de `.gitignore` en v2.9.35). El helper `get_suffix()` en `class-ltms-frontend-assets.php` verifica `file_exists()` antes de usar `.min`.
+
+### v2.9.100+: SiteGround Anti-Bot Bypass (CRÍTICO)
+SiteGround WAF bloquea `/wp-admin/admin-ajax.php` con HTTP 403 cuando la request tiene User-Agent de navegador. **No se puede arreglar con `.htaccess`** (es a nivel nginx). Solución implementada:
+- Las llamadas AJAX se rutearon a través del frontend: `/?ltms_ajax=1` en lugar de `/wp-admin/admin-ajax.php`
+- Handler en `init` priority 100 (después de que los handlers `wp_ajax_*` se registren)
+- Filtro `admin_url` que redirige `admin-ajax.php` → `ltms_ajax_url()` en contexto frontend
+- El firewall del plugin (`LTMS_Core_Firewall`) excluye a vendors autenticados de la inspección de patrones
+- **Pendiente:** Contactar a SiteGround para desactivar el anti-bot. Cuando lo hagan, ejecutar `scripts/remove-ajax-bypass.sh`
+
+### v2.9.100+: Build Pipeline + CI
+- `npm run build` — genera todos los `.min.js` (terser) y `.min.css` (clean-css)
+- `npm run lint` — valida sintaxis PHP + JS
+- `.github/workflows/ci-lint.yml` — CI que corre en cada push/PR:
+  - PHP syntax, JS syntax, CSP compliance, alert/confirm, .min sync
+- `scripts/deploy.sh` — deploy automático (push + SSH + cache flush)
+- `scripts/rollback.sh` — rollback rápido
 - **Nuevas vistas del dashboard de vendedor (v2.9.35):** `view-marketing.php`, `view-security.php`, `view-donations.php`, `view-posgold.php` en `includes/frontend/views/`. Cada una tiene su endpoint AJAX y su entrada en el menú lateral del dashboard SPA.
 
 ---
