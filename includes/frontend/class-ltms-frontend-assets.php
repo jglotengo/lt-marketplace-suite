@@ -461,7 +461,7 @@ final class LTMS_Frontend_Assets {
         );
 
         // v2.9.100: External view scripts (moved from inline <script> blocks).
-        $view_scripts = [ 'ltms-drivers-view' ];
+        $view_scripts = [ 'ltms-drivers-view', 'ltms-insurance-view', 'ltms-kitchen-view', 'ltms-redi-view' ];
         foreach ( $view_scripts as $vs ) {
             $vs_suffix = $this->get_suffix( "js/{$vs}.js", $suffix );
             wp_enqueue_script(
