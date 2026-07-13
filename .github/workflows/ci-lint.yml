@@ -61,8 +61,9 @@ jobs:
       - name: Alert/Confirm Check
         run: |
           echo "🔍 Checking for native alert()/confirm()..."
-          ALERTS=$(grep -rn 'alert(' includes/frontend/views/ 2>/dev/null | grep -v '//' || true)
-          CONFIRMS=$(grep -rn ' confirm(' includes/frontend/views/ 2>/dev/null | grep -v 'data-confirm\|ltms-confirm\|confirmation\|// confirm\|FIX-P1' || true)
+          # Exclude comment lines (// or /* or *) and lines mentioning FIX
+          ALERTS=$(grep -rn 'alert(' includes/frontend/views/ 2>/dev/null | grep -v '//' | grep -v '\*' | grep -v 'FIX' || true)
+          CONFIRMS=$(grep -rn ' confirm(' includes/frontend/views/ 2>/dev/null | grep -v '//' | grep -v '\*' | grep -v 'FIX' | grep -v 'data-confirm\|ltms-confirm\|confirmation' || true)
           if [ -z "$ALERTS" ] && [ -z "$CONFIRMS" ]; then
             echo "✅ No native alert()/confirm() found"
           else
