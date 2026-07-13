@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-07-08
 > **Versión del plugin:** 2.9.98
-> **Total de lecciones:** 60 (35 originales + 25 nuevas de v2.9.36-98)
+> **Total de lecciones:** 70 (35 originales + 25 nuevas de v2.9.36-98)
 
 ---
 
@@ -849,3 +849,111 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 ---
 
 *Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-08 (v2.9.98) con 60 lecciones documentadas (35 originales + 25 nuevas de los audits REG/DEEP/UIUX).*
+
+---
+
+## 13. v2.9.99-102 — Lecciones de la sesión de estabilización (10 lecciones nuevas)
+
+### LECCIÓN #61: `.min` suffix sin archivo — JS nunca carga en producción
+
+**Error:** `LTMS_ENVIRONMENT='production'` hace que `$suffix='.min'`, pero la mayoría de JS no tenían versión `.min`. El navegador recibía 404 y el JS del dashboard nunca cargaba.
+
+**Causa raíz:** No había build pipeline. Los `.min` se generaban manualmente y la mayoría nunca se crearon.
+
+**Fix:** Crear `scripts/build.js` con terser + clean-css. CI verifica que todos los `.min` existan.
+
+**Regla preventiva:** NUNCA usar `$suffix='.min'` en producción sin verificar que el archivo `.min` existe con `file_exists()`. El helper `get_suffix()` hace esta verificación.
+
+### LECCIÓN #62: `current_user_can()` verifica capabilities, NO roles
+
+**Error:** `current_user_can('ltms_vendor')` siempre devuelve `false` porque `ltms_vendor` es un ROL, no una CAPABILITY.
+
+**Causa raíz:** Confusión común en WordPress. `current_user_can()` verifica capabilities, no roles.
+
+**Fix:** Usar `LTMS_Utils::is_ltms_vendor(get_current_user_id())` que verifica el array de roles.
+
+**Regla preventiva:** NUNCA usar `current_user_can('ltms_*')` para verificar roles. Usar `in_array('ltms_vendor', (array) $user->roles)` o `LTMS_Utils::is_ltms_vendor()`.
+
+### LECCIÓN #63: `check_ajax_referer(..., false)` — el `false` significa "no morir", no "ignorar"
+
+**Error:** 4 handlers en Mexico checkout llamaban `check_ajax_referer('nonce', 'nonce', false)` sin verificar el return value. El nonce se validaba pero el resultado se ignoraba → CSRF bypass.
+
+**Causa raíz:** El tercer parámetro `$die=false` significa "no hacer wp_die() automáticamente", pero el return value debe verificarse manualmente.
+
+**Fix:** `if ( ! check_ajax_referer('nonce', 'nonce', false) ) { wp_send_json_error(..., 403); }`
+
+**Regla preventiva:** Siempre verificar el return de `check_ajax_referer()` cuando se usa `$die=false`.
+
+### LECCIÓN #64: JS render*View sobreescribe vistas PHP
+
+**Error:** El SPA tenía métodos `loadProductsView()`, `loadSettingsView()`, etc. que hacían `$('#ltms-view-xxx').html(...)` con versiones simplificadas, sobreescribiendo las vistas PHP cuidadosamente construidas.
+
+**Causa raíz:** El JS y el PHP se desarrollaron por separado y el JS nunca se actualizó cuando las vistas PHP mejoraron.
+
+**Fix:** Los métodos `load*View()` ahora solo llaman `showSection()` para mostrar el PHP renderizado.
+
+**Regla preventiva:** Si una vista PHP tiene su propio JS inline, el método `load*View()` del SPA solo debe llamar `showSection()`. NUNCA renderizar HTML desde JS si ya existe una vista PHP.
+
+### LECCIÓN #65: SiteGround anti-bot bloquea `/wp-admin/admin-ajax.php`
+
+**Error:** SiteGround WAF bloquea POST requests a `/wp-admin/admin-ajax.php` cuando el User-Agent es de navegador. No se puede arreglar con `.htaccess` (es a nivel nginx).
+
+**Causa raíz:** SiteGround escaló su anti-bot tras detectar tráfico anómalo.
+
+**Fix:** Bypass vía frontend: rutear AJAX a `/?ltms_ajax=1` en lugar de `/wp-admin/admin-ajax.php`.
+
+**Regla preventiva:** Si SiteGround bloquea `wp-admin`, rutear a través del frontend con un handler en `init`. Contactar a soporte para desactivar el anti-bot permanentemente.
+
+### LECCIÓN #66: IIFE en JS externo se ejecuta antes de que el DOM esté listo
+
+**Error:** Al extraer inline `<script>` a archivos JS externos, los IIFE se ejecutan inmediatamente pero los elementos del DOM pueden no existir todavía.
+
+**Causa raíz:** `wp_enqueue_script` con `$in_footer=true` carga el JS después del HTML, pero no garantiza que `ltmsDashboard` esté disponible.
+
+**Fix:** Envolver en `document.addEventListener('DOMContentLoaded', ...)` o `jQuery(function($) { ... })`.
+
+**Regla preventiva:** TODO JS externo que referencia elementos del DOM debe estar envuelto en un DOM-ready handler.
+
+### LECCIÓN #67: `LTMS_Encryption::encrypt()` no existe — la clase correcta es `LTMS_Core_Security`
+
+**Error:** El handler de drivers llamaba `LTMS_Encryption::encrypt()` que no existe. Los document numbers se almacenaban en plaintext.
+
+**Causa raíz:** Confusión de nombres. La clase de cifrado se llama `LTMS_Core_Security`, no `LTMS_Encryption`.
+
+**Fix:** Usar `LTMS_Core_Security::encrypt()` con `class_exists()` guard.
+
+**Regla preventiva:** Siempre usar `class_exists()` antes de llamar métodos estáticos. Verificar el nombre de la clase con `grep -rn "class LTMS_"`.
+
+### LECCIÓN #68: `wpdb->insert` con format array desalineado
+
+**Error:** 9 campos de datos pero 10 formatos, con `status='active'` (string) usando `%d` (integer). El INSERT silenciosamente guardaba `status=0`.
+
+**Causa raíz:** El format array se copió de otra tabla sin verificar que los campos coincidieran.
+
+**Fix:** 9 formatos correctos, `status='%s'`.
+
+**Regla preventiva:** SIEMPRE verificar que el count de `$data` y `$format` coincidan en `$wpdb->insert()`. Usar PHPStan para detectar esto estáticamente.
+
+### LECCIÓN #69: WAF inspecciona POST body de vendors autenticados
+
+**Error:** El firewall del plugin inspeccionaba `$_POST` de vendors autenticados buscando patrones de ataque. Descripciones de productos legítimas con palabras como "SELECT" o "UPDATE" eran bloqueadas.
+
+**Causa raíz:** El WAF no excluía a vendors autenticados de la inspección de patrones.
+
+**Fix:** Agregar `is_authenticated_vendor()` check para saltar la inspección de patrones (la verificación de IP blacklist sigue activa).
+
+**Regla preventiva:** El WAF solo debe inspeccionar patrones de usuarios no autenticados. Los usuarios autenticados ya tienen nonce + capability checks en cada handler.
+
+### LECCIÓN #70: Sin CI = bugs críticos no detectados
+
+**Error:** 10 bugs críticos (KDS roto, .min 404, encryption inexistente, etc.) llegaron a producción sin ser detectados.
+
+**Causa raíz:** No había CI. Los commits iban directo a main sin verificación automática.
+
+**Fix:** GitHub Actions CI con 5 checks: PHP syntax, JS syntax, CSP compliance, alert/confirm, .min sync.
+
+**Regla preventiva:** TODO commit a main debe pasar CI. Los checks mínimos son: syntax (PHP+JS), CSP compliance, y .min sync. Considerar agregar PHPCS + PHPUnit en el futuro.
+
+---
+
+*Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-13 (v2.9.102) con 70 lecciones documentadas (35 originales + 25 de audits + 10 de estabilización).*
