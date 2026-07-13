@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.104
+ * Version:           2.9.105
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.104' );
+define( 'LTMS_VERSION', '2.9.105' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -149,9 +149,14 @@ add_action( 'init', function() {
         return;
     }
 
-    // Simular el entorno de admin-ajax.php.
-    if ( ! defined( 'DOING_AJAX' ) ) {
-        define( 'DOING_AJAX', true );
+    // v2.9.104 FIX: NO definir DOING_AJAX — interfiere con el procesamiento
+    // de cookies de WordPress en contexto frontend. En admin-ajax.php real,
+    // WordPress procesa las cookies ANTES de definir DOING_AJAX. En nuestro
+    // bypass, definir DOING_AJAX en init hace que WordPress asuma contexto
+    // admin y puede saltarse el procesamiento de auth del frontend.
+    // En su lugar, usamos un flag propio que check_ajax_referer respetará.
+    if ( ! defined( 'LTMS_DOING_AJAX' ) ) {
+        define( 'LTMS_DOING_AJAX', true );
     }
 
     // WordPress usa este header para identificar requests AJAX.
