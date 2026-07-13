@@ -814,6 +814,11 @@ class LTMS_Sales_Booster {
      * AJAX: get social proof data (compra reciente para toast).
      */
     public static function ajax_get_social_proof(): void {
+        // v2.9.100 SEC-3 FIX: add nonce to prevent PII disclosure to public.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
+
         global $wpdb;
 
         // Buscar una orden completada recientemente con producto con imagen.

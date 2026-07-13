@@ -277,7 +277,9 @@ JS;
      * Nonce: ltms_ux_nonce (el que el JS ltms-ux-enhancements envía).
      */
     public static function ajax_refresh_drawer(): void {
-        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
         $full = isset( $_POST['full'] ) && $_POST['full'] === '1';
         wp_send_json_success( self::get_drawer_data( ! $full ) );
     }
@@ -288,7 +290,9 @@ JS;
      * v2.9.52: Guests permitidos. Nonce: ltms_ux_nonce.
      */
     public static function ajax_remove_item(): void {
-        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         if ( $cart_item_key && WC()->cart ) {
             WC()->cart->remove_cart_item( $cart_item_key );
@@ -302,7 +306,9 @@ JS;
      * v2.9.52: Guests permitidos. Nonce: ltms_ux_nonce.
      */
     public static function ajax_update_qty(): void {
-        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         $qty = (int) ( $_POST['qty'] ?? 1 );
         if ( $cart_item_key && WC()->cart ) {

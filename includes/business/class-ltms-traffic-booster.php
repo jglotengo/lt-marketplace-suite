@@ -471,7 +471,21 @@ class LTMS_Traffic_Booster {
      * AJAX: suscribe email al newsletter.
      */
     public static function ajax_subscribe_newsletter(): void {
-        $email = sanitize_email( $_POST['email'] ?? '' );
+        // v2.9.100 SEC-2 FIX: add nonce + rate limit to prevent email enumeration + DB pollution.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+        }
+
+        // Rate limit: max 3 subscripciones por IP cada 15 minutos.
+        $ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( $_SERVER['REMOTE_ADDR'] ) : '';
+        $key  = 'ltms_newsletter_rl_' . md5( $ip );
+        $count = (int) get_transient( $key );
+        if ( $count >= 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+        set_transient( $key, $count + 1, 15 * MINUTE_IN_SECONDS );
+
+        $email = sanitize_email( $_POST['email'] ?? '' ); // phpcs:ignore
         if ( ! is_email( $email ) ) {
             wp_send_json_error( [ 'message' => __( 'Email inválido.', 'ltms' ) ], 400 );
         }
