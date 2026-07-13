@@ -648,7 +648,8 @@ final class LTMS_Frontend_Assets {
         wp_enqueue_style( 'ltms-kds', $url . 'css/ltms-kds.css', [ 'ltms-dashboard' ], $ver );
 
         // v2.9.99 FIX: verificar si el .min existe.
-        $kds_suffix = $this->get_suffix( 'js/ltms-kds.js', $suffix );
+        // v2.9.106 FIX: forzar .min para KDS (el archivo existe y el source está roto sin $).
+        $kds_suffix = '.min';
 
         wp_enqueue_script(
             'ltms-kds',
