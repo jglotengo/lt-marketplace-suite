@@ -280,10 +280,17 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
             $('#ltms-kds-clock').text(now.toLocaleTimeString('es-CO'));
         }
 
-        // Start polling
-        startPolling();
-        fetchKDSOrders();
-        setInterval(updateClock, 1000);
+        // Start polling — v2.9.103 FIX: wait for ltmsDashboard to be defined
+        function initKDS() {
+            if (typeof ltmsDashboard === 'undefined') {
+                setTimeout(initKDS, 100);
+                return;
+            }
+            startPolling();
+            fetchKDSOrders();
+            setInterval(updateClock, 1000);
+        }
+        initKDS();
     })(jQuery);
     </script>
 
