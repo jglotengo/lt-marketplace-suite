@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.107
+ * Version:           2.9.108
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.107' );
+define( 'LTMS_VERSION', '2.9.108' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -140,23 +140,22 @@ if ( ! function_exists( 'ltms_ajax_url' ) ) {
 }
 
 // Handler que procesa las requests AJAX del frontend.
-// Se ejecuta en 'init' con prioridad 100 (DESPUÉS de que todos los handlers
-// wp_ajax_* se registren, que suele ser en init priority 10-20).
+// Se ejecuta en 'template_redirect' (DESPUÉS de que WordPress procese auth,
+// cookies, y todos los handlers wp_ajax_* se registren).
 // Reutiliza los mismos handlers wp_ajax_* ya registrados.
-add_action( 'init', function() {
+add_action( 'template_redirect', function() {
     // Solo procesar si es una request ltms_ajax.
     if ( ! isset( $_REQUEST['ltms_ajax'] ) ) {
         return;
     }
 
-    // v2.9.104 FIX: NO definir DOING_AJAX — interfiere con el procesamiento
-    // de cookies de WordPress en contexto frontend. En admin-ajax.php real,
-    // WordPress procesa las cookies ANTES de definir DOING_AJAX. En nuestro
-    // bypass, definir DOING_AJAX en init hace que WordPress asuma contexto
-    // admin y puede saltarse el procesamiento de auth del frontend.
-    // En su lugar, usamos un flag propio que check_ajax_referer respetará.
-    if ( ! defined( 'LTMS_DOING_AJAX' ) ) {
-        define( 'LTMS_DOING_AJAX', true );
+    // v2.9.108 FIX: mover a template_redirect para que is_user_logged_in()
+    // funcione correctamente. En init priority 100, algo interfería con
+    // el procesamiento de auth del frontend.
+
+    // Simular el entorno de admin-ajax.php.
+    if ( ! defined( 'DOING_AJAX' ) ) {
+        define( 'DOING_AJAX', true );
     }
 
     // WordPress usa este header para identificar requests AJAX.
@@ -177,12 +176,11 @@ add_action( 'init', function() {
     }
 
     // Disparar el mismo hook que admin-ajax.php dispararía.
-    // Los handlers wp_ajax_* ya están registrados via add_action.
     do_action( $hook_name );
 
     // Si el handler no hizo wp_die/wp_send_json, morir con 0.
     wp_die( '0' );
-}, 100 );
+} );
 
 // v2.9.99: Filtro para que admin_url('admin-ajax.php') devuelva la URL del
 // frontend cuando se use en contexto frontend. Esto permite que TODAS las
