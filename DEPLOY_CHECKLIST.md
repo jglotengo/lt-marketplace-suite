@@ -1,14 +1,146 @@
-# Deploy Checklist — LT Marketplace Suite v2.9.98
+# Deploy Checklist — LT Marketplace Suite v2.9.101
 
-Checklist paso a paso para desplegar la nueva capa UX de forma segura en producción.
+Checklist paso a paso para desplegar de forma segura en producción.
 
-> **Notas v2.9.98 (2026-07-08):** versión que completa 3 auditorías (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001) con 100% de findings P0+P1+P2 resueltos. Incluye 25 vistas del dashboard SPA, 2 nuevos tabs de nav (Seguros + Domiciliarios), CSP compliance (0 inline handlers), toast system, dark mode, mobile bottom nav, keyboard shortcuts, y mucho más.
+> **Notas v2.9.101 (2026-07-13):** Build pipeline + CI + security hardening. 20 commits con 9 vulnerabilidades de seguridad arregladas, QA de 21/21 vistas, GitHub Actions CI, y 4 vistas refactorizadas (inline JS → external files).
 
 ---
 
-## Pre-despliegue (en local / staging)
+## Pre-despliegue (en local / desarrollo)
 
-### 1. Verificación de versión y sintaxis PHP
+### 1. Build — generar .min files
+```bash
+cd /home/z/my-project/lt-marketplace-suite
+npm install        # si es primera vez
+npm run build      # genera todos los .min.js y .min.css
+```
+Verificar: 0 errores, todos los .min generados.
+
+### 2. Lint — validar sintaxis
+```bash
+npm run lint       # PHP + JS syntax check
+```
+Verificar: 0 errores.
+
+### 3. CI — verificar que GitHub Actions pasa verde
+Ir a: https://github.com/jglotengo/lt-marketplace-suite/actions
+Verificar: ✅ en el último commit.
+
+### 4. Verificar CSP compliance
+```bash
+grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/views/
+# Debe devolver 0 resultados
+```
+
+### 5. Verificar que no hay alert()/confirm() nativos
+```bash
+grep -rn 'alert(' includes/frontend/views/ | grep -v '//'
+grep -rn ' confirm(' includes/frontend/views/ | grep -v 'data-confirm\|ltms-confirm\|confirmation\|//\|FIX'
+# Ambos deben devolver 0 resultados
+```
+
+---
+
+## Despliegue (en producción)
+
+### 6. Deploy automático
+```bash
+bash /home/z/my-project/scripts/deploy.sh
+```
+El script hace automáticamente:
+- `git push origin main`
+- SSH al servidor
+- `git fetch origin && git reset --hard origin/main`
+- `wp cache flush`
+- `rm -rf wp-content/cache/supercache/* wp-content/uploads/siteground-optimizer-assets/*`
+- `wp eval 'opcache_reset();'`
+- Verificación HTTP 200
+
+### 6b. Deploy manual (si el script falla)
+```bash
+# Local: push
+cd /home/z/my-project/lt-marketplace-suite
+git push origin main
+
+# SSH al servidor
+ssh -p 18765 u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co
+cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
+git fetch origin && git reset --hard origin/main
+
+# Verificar versión
+grep "Version:" lt-marketplace-suite.php | head -1
+# Debe mostrar: 2.9.101
+
+# Flush de caches
+cd /home/customer/www/lo-tengo.com.co/public_html
+wp cache flush --allow-root
+rm -rf wp-content/cache/supercache/* wp-content/uploads/siteground-optimizer-assets/*
+wp eval 'opcache_reset();' --allow-root
+```
+
+---
+
+## Post-despliegue
+
+### 7. Verificación básica
+- [ ] `curl -sI -A "Mozilla/5.0" "https://lo-tengo.com.co/" | head -3` → HTTP/2 200
+- [ ] Panel del vendedor (`/mi-tienda/`) carga sin errores
+- [ ] Hard refresh (Ctrl+Shift+R) en navegador incógnito
+- [ ] Console (F12) sin errores 403/404/500
+
+### 8. Verificación de vistas
+- [ ] Inicio: KPIs y widgets cargan
+- [ ] Pedidos: tabla de pedidos carga
+- [ ] Productos: lista de productos carga
+- [ ] Billetera: balance y transacciones cargan
+- [ ] Configuración: guardar cambios funciona
+- [ ] ReDi: productos disponibles cargan
+- [ ] Novedades: lista de incidentes carga
+
+### 9. Rollback (si es necesario)
+```bash
+bash /home/z/my-project/scripts/rollback.sh [commit-hash]
+```
+O manualmente:
+```bash
+cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
+git log --oneline -5           # ver commits recientes
+git reset --hard <commit-hash> # rollback
+cd /home/customer/www/lo-tengo.com.co/public_html
+wp cache flush --allow-root
+rm -rf wp-content/cache/supercache/* wp-content/uploads/siteground-optimizer-assets/*
+wp eval 'opcache_reset();' --allow-root
+```
+
+---
+
+## Notas importantes
+
+### SiteGround Anti-Bot Bypass
+El panel del vendedor usa `/?ltms_ajax=1` en lugar de `/wp-admin/admin-ajax.php` para evitar el bloqueo del WAF de SiteGround. Cuando SiteGround desactive el anti-bot:
+```bash
+bash /home/z/my-project/scripts/remove-ajax-bypass.sh
+```
+
+### SG Optimizer
+- `combine_javascript`: ✅ activado
+- `optimize_javascript`: ✅ activado
+- Si algo se rompe después de un deploy, desactivar temporalmente:
+```bash
+wp option update siteground_optimizer_combine_javascript 0 --allow-root
+wp option update siteground_optimizer_optimize_javascript 0 --allow-root
+wp cache flush --allow-root
+```
+
+### Vistas condicionales
+| Vista | Condición |
+|-------|-----------|
+| Domiciliarios | `ltms_own_delivery_zones` no vacío O drivers registrados |
+| ReDi | `ltms_redi_enabled = 'yes'` |
+| Novedades | `ltms_redi_enabled = 'yes'` |
+| Cocina | `ltms_is_restaurant = 'yes'` |
+| Órdenes de Compra | `ltms_ordenes_compra_enabled = 'yes'` |
+| Analytics | Rol `ltms_vendor_premium` |
 - [ ] `LTMS_VERSION` en `lt-marketplace-suite.php` = `2.9.98`
 - [ ] `Version:` en header del plugin = `2.9.98`
 - [ ] Validar todos los archivos PHP modificados con parser real (no balance-checker ingenuo):
