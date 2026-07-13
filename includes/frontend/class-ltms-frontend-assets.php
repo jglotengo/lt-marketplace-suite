@@ -460,6 +460,19 @@ final class LTMS_Frontend_Assets {
             true
         );
 
+        // v2.9.100: External view scripts (moved from inline <script> blocks).
+        $view_scripts = [ 'ltms-drivers-view' ];
+        foreach ( $view_scripts as $vs ) {
+            $vs_suffix = $this->get_suffix( "js/{$vs}.js", $suffix );
+            wp_enqueue_script(
+                $vs,
+                $url . 'js/' . $vs . $vs_suffix . '.js',
+                [ 'jquery', 'ltms-dashboard' ],
+                $ver,
+                true
+            );
+        }
+
         $this->localize_dashboard_script();
     }
 
