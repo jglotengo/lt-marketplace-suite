@@ -2,12 +2,13 @@
 
 > Enterprise multi-vendor marketplace for WooCommerce — Colombia & Mexico
 
-**Version:** 2.9.98 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
+**Version:** 2.9.102 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](https://ltmarketplace.co/eula)
-[![Version](https://img.shields.io/badge/version-2.9.98-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.9.102-blue.svg)]()
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple.svg)]()
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-purple.svg)]()
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-green.svg)]()
 [![Countries](https://img.shields.io/badge/Coverage-CO%20%7C%20MX-success.svg)]()
 
 ---
@@ -309,32 +310,68 @@ Navigate to `LT Marketplace > Configuración` in the WordPress admin menu.
 
 ## Development
 
+### Build Pipeline (v2.9.100+)
+
 ```bash
 # Install dependencies
-make install
+npm install
 
-# Run tests
-make test
+# Generate all .min.js and .min.css files
+npm run build
 
-# Run linter
-make lint
+# Validate PHP syntax (real AST parser)
+npm run lint:php
 
-# Build for production
-make dist
+# Validate JS syntax
+npm run lint:js
 
-# Start Docker dev environment
-make dev-up
+# Run all linters
+npm run lint
+
+# Deploy to production (automated)
+npm run deploy
+
+# Rollback to previous commit
+npm run rollback
 ```
+
+### CI (GitHub Actions)
+
+The CI pipeline (`.github/workflows/ci-lint.yml`) runs on every push/PR to `main`:
+- ✅ PHP syntax check (`php -l` on all `.php` files)
+- ✅ JS syntax check (`vm.Script` on all `.js` files)
+- ✅ CSP compliance check (0 inline handlers in views)
+- ✅ alert()/confirm() check (0 native calls in views)
+- ✅ .min files sync check (all .min.js must exist)
 
 ### PHP Syntax Validation
 
-The project ships with a Node.js-based PHP syntax checker (real AST, not naive balance counting):
-
 ```bash
-node /home/z/my-project/scripts/php_check.js <file.php> [...]
+node scripts/php_check.js <file.php> [...]
 ```
 
-This uses the `php-parser` npm package and correctly handles regex literals and string-embedded quotes that confuse simple brace counters.
+Uses `php-parser` npm package (real AST, not naive balance counting).
+
+### Deploy
+
+```bash
+# Automated (recommended)
+bash scripts/deploy.sh
+
+# Manual
+cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
+git fetch origin && git reset --hard origin/main
+cd /home/customer/www/lo-tengo.com.co/public_html
+wp cache flush --allow-root
+rm -rf wp-content/cache/supercache/* wp-content/uploads/siteground-optimizer-assets/*
+wp eval 'opcache_reset();' --allow-root
+```
+
+### Rollback
+
+```bash
+bash scripts/rollback.sh [commit-hash]
+```
 
 ---
 
