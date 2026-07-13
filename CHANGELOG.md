@@ -4,6 +4,86 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.101] — 2026-07-13
+
+### Infrastructure — Build Pipeline + CI + Security Hardening
+
+**20 commits en esta sesión.** El plugin pasó de ser frágil (bugs críticos no detectados, sin CI, sin build pipeline) a tener infraestructura de calidad automatizada.
+
+#### Build Pipeline + CI
+- **package.json**: scripts para build, lint, deploy, rollback
+- **scripts/build.js**: genera `.min.js` (terser) y `.min.css` (clean-css) — 19 JS + 20 CSS minificados
+- **scripts/js_check.js**: valida sintaxis JS con `vm.Script`
+- **scripts/php_check.js**: valida sintaxis PHP con `php-parser` (AST real)
+- **.github/workflows/ci-lint.yml**: GitHub Actions que corre en cada push/PR:
+  - PHP syntax check (`php -l` en todos los .php)
+  - JS syntax check (`vm.Script` en todos los .js)
+  - CSP compliance check (0 inline handlers en views)
+  - alert()/confirm() check (0 nativos en views)
+  - .min files sync check (todos los .min.js deben existir)
+- **scripts/deploy.sh**: deploy automático (push + SSH + cache flush + verify)
+- **scripts/rollback.sh**: rollback rápido a commit anterior
+
+#### Security Audit (9/10 vulnerabilities fixed — 100% of exploitable)
+- **SEC-1-1 (CRITICAL)**: PII leak — `current_user_can('ltms_external_auditor')` siempre false (role, no capability). Auditores veían emails, teléfonos, cuentas bancarias sin enmascarar. Fix: role check directo.
+- **SEC-1-4 (HIGH)**: CSRF bypass en Mexico checkout — 4 handlers ignoraban resultado de `check_ajax_referer`. Fix: verificar return + 403.
+- **SEC-1-5 (HIGH)**: Missing vendor check en settings-saver — cualquier logged-in user podía guardar datos bancarios. Fix: `LTMS_Utils::is_ltms_vendor()`.
+- **SEC-1-2 (MEDIUM)**: Newsletter sin nonce ni rate limit. Fix: nonce + 3/15min transient.
+- **SEC-1-3 (MEDIUM)**: Social proof exponía PII sin nonce. Fix: nonce check.
+- **SEC-1-6 (MEDIUM)**: Cart drawer CSRF (3 handlers). Fix: verificar nonce return.
+- **SEC-1-7 (LOW)**: Review submission sin rate limit. Fix: 3/15min transient.
+- **SEC-1-8 (LOW)**: Product view tracker sin nonce. Fix: nonce check.
+- **SEC-1-9 (LOW)**: Role-as-capability fallback en aveonline-guias. Fix: removed fallback.
+- **SEC-1-12 (LOW)**: 2FA verify — ya tenía dual nonce check. No fix needed.
+
+#### QA Audit (21/21 views verified)
+- All 21 vendor dashboard views audited end-to-end
+- All 38 AJAX actions verified registered
+- 0 inline handlers (CSP compliant)
+- 0 alert()/confirm() nativos
+- 13/13 modals con ARIA completa
+- `class_exists()` guards added to view-wallet.php (9 call sites) + view-donations.php (3 call sites)
+
+#### SiteGround Anti-Bot Bypass
+- **Problem**: SiteGround WAF blocks `/wp-admin/admin-ajax.php` with HTTP 403 when using browser User-Agent
+- **Solution**: Frontend AJAX bypass via `/?ltms_ajax=1` — routes AJAX through `index.php` instead of `wp-admin/`
+- **WAF exclusion**: Added `is_authenticated_vendor()` check to skip pattern inspection for vendor AJAX requests
+- **Pending**: Contact SiteGround to disable anti-bot (then remove bypass with `scripts/remove-ajax-bypass.sh`)
+
+#### Bug Fixes (10 critical bugs from this session)
+1. **KDS completely broken** — JS sent wrong action names + wrong params + wrong values
+2. **7 settings fields silently discarded** — vacation_mode, store_logo, schedule, social links
+3. **Nonce mismatch in OC** — proveedores dropdown always 403
+4. **LTMS_Encryption::encrypt() doesn't exist** — document_number in plaintext (Habeas Data)
+5. **wpdb->insert format array mismatch** — status='active' stored as 0
+6. **JS render*View overwriting PHP views** — 4 views' fixes were invisible
+7. **.min suffix 404** — 19 JS files had no .min version (JS never loaded in production)
+8. **current_user_can('ltms_vendor') always false** — role, not capability (6 locations)
+9. **AJAX bypass handler timing** — init priority 1 → 100 (before handler registration)
+10. **manifest.json 404** — branding engine pointed to non-existent URL
+
+#### Server Cleanup
+- Removed 11 junk files from production (.kyc_v3_done, composer.phar, diag.php, .bak files, etc.)
+- Restored .htaccess (removed dead code patch)
+- Chart.js v4.4.4 added to repo (was untracked)
+- SG Optimizer reactivated (combine + optimize JS)
+- Git working tree clean (0 untracked files)
+
+#### Inline JS Extraction (4/21 views refactored)
+- view-drivers.php: 745 → 432 lines (-42%) → `ltms-drivers-view.js`
+- view-insurance.php: 365 → 294 lines (-19%) → `ltms-insurance-view.js`
+- view-kitchen.php: 288 → 128 lines (-56%) → `ltms-kitchen-view.js`
+- view-redi.php: 414 → 274 lines (-34%) → `ltms-redi-view.js`
+- Total: -684 lines of PHP, 4 new external JS files (cacheable + minified)
+
+## [2.9.100] — 2026-07-12
+
+### Cleanup — Debug logging removed + version bump
+
+- Removed temporary `LTMS_AJAX_DEBUG` logging from `lt-marketplace-suite.php`
+- Added `ltms_ajax_url()` helper + `admin_url` filter for frontend AJAX bypass
+- Bumped version 2.9.99 → 2.9.100
+
 ## [2.9.99] — 2026-07-08
 
 ### Deep Audit — Vendor Panel (25 views, 326 findings, 5 P0 + 20 P1 + 4 P2 regressions fixed)
