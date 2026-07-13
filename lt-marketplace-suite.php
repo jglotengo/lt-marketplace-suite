@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.102
+ * Version:           2.9.103
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.102' );
+define( 'LTMS_VERSION', '2.9.103' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -194,10 +194,11 @@ add_filter( 'admin_url', function( $url, $path, $blog_id ) {
     if ( is_admin() ) {
         return $url;
     }
-    // No interceptar si ya estamos procesando AJAX (evita recursión).
-    if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
-        return $url;
-    }
+    // v2.9.102 FIX: remover check DOING_AJAX — interfiere con localize_script
+    // porque DOING_AJAX se define en init priority 100, ANTES de wp_enqueue_scripts.
+    // Esto hacía que el filtro NO redirigiera a ltms_ajax_url, y el JS recibía
+    // la URL original /wp-admin/admin-ajax.php (que SiteGround bloquea con 403).
+    // El bypass handler no llama admin_url(), así que no hay riesgo de recursión.
     // No interceptar si estamos haciendo cron o CLI.
     if ( defined( 'DOING_CRON' ) || defined( 'WP_CLI' ) ) {
         return $url;
