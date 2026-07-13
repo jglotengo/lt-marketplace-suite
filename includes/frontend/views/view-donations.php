@@ -20,7 +20,15 @@ $offset   = ( $page_num - 1 ) * $per_page;
 $donations      = [];
 $total_donation = 0.0;
 $total_orders   = 0;
-$currency       = LTMS_Core_Config::get_currency();
+// QA-G5: guard with class_exists() to match sibling views (view-drivers/insurance/shipping-statement).
+$currency       = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_currency() : 'COP';
+// QA-G5: defensive money formatter — falls back to plain number_format if LTMS_Utils is unavailable.
+$fmt_money      = static function ( float $amount ) use ( $currency ): string {
+    if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'format_money' ) ) {
+        return LTMS_Utils::format_money( $amount );
+    }
+    return '$' . number_format( $amount, 0, ',', '.' );
+};
 
 if ( class_exists( 'LTMS_Donation_Manager' ) ) {
     $donations      = LTMS_Donation_Manager::get_vendor_donations( $user_id, $per_page, $offset );
@@ -47,7 +55,7 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
                 <?php esc_html_e( 'Total donado', 'ltms' ); ?>
             </div>
             <div style="font-size:1.75rem;font-weight:700;color:#dc2626;">
-                <?php echo esc_html( LTMS_Utils::format_money( $total_donation ) ); ?>
+                <?php echo esc_html( $fmt_money( $total_donation ) ); ?>
             </div>
         </div>
         <div class="ltms-stat-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;text-align:center;">
@@ -116,7 +124,7 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
                         <?php echo esc_html( $donation_customer_name !== '' ? $donation_customer_name : __( 'Cliente', 'ltms' ) ); ?>
                     </td>
                     <td style="font-weight:600;color:#dc2626;">
-                        <?php echo esc_html( LTMS_Utils::format_money( (float) $don['total_donation'] ) ); ?>
+                        <?php echo esc_html( $fmt_money( (float) $don['total_donation'] ) ); ?>
                     </td>
                     <td>
                         <?php

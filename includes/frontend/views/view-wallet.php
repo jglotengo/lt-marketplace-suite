@@ -9,9 +9,20 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 $vendor_id    = get_current_user_id();
-$wallet       = LTMS_Business_Wallet::get_or_create( $vendor_id );
-$balance      = (float) $wallet['balance'];
+if ( ! $vendor_id ) return;
+
+// v2.9.100 QA FIX: guard class_exists para evitar fatal si el autoloader falla.
+$wallet       = class_exists( 'LTMS_Business_Wallet' ) ? LTMS_Business_Wallet::get_or_create( $vendor_id ) : [ 'balance' => 0, 'balance_pending' => 0, 'balance_reserved' => 0 ];
+$balance      = (float) ( $wallet['balance'] ?? 0 );
 $held         = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
+// v2.9.100 QA FIX: shim for format_money in case LTMS_Utils is not loaded.
+$fmt_money = function( $amount ) {
+    if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'format_money' ) ) {
+        return LTMS_Utils::format_money( $amount );
+    }
+    return '$ ' . number_format( (float) $amount, 0, ',', '.' );
+};
+
 $available    = max( 0, $balance - $held );
 $saved_bank        = get_user_meta( $vendor_id, 'ltms_bank_name',           true );
 $saved_bank_acc_raw = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
@@ -58,15 +69,15 @@ $has_bank_data     = ! empty( $saved_bank_acc );
     <!-- Widget de Balance -->
     <div class="ltms-wallet-widget" style="margin-bottom:24px;">
         <div class="ltms-wallet-label"><?php esc_html_e( 'Balance Total', 'ltms' ); ?></div>
-        <div class="ltms-wallet-balance"><?php echo esc_html( LTMS_Utils::format_money( $balance ) ); ?></div>
+        <div class="ltms-wallet-balance"><?php echo esc_html( $fmt_money( $balance ) ); ?></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
             <div>
                 <div style="font-size:0.75rem;opacity:0.8;"><?php esc_html_e( 'Disponible', 'ltms' ); ?></div>
-                <div style="font-size:1.1rem;font-weight:600;"><?php echo esc_html( LTMS_Utils::format_money( $available ) ); ?></div>
+                <div style="font-size:1.1rem;font-weight:600;"><?php echo esc_html( $fmt_money( $available ) ); ?></div>
             </div>
             <div>
                 <div style="font-size:0.75rem;opacity:0.8;"><?php esc_html_e( 'En Tránsito', 'ltms' ); ?></div>
-                <div style="font-size:1.1rem;font-weight:600;"><?php echo esc_html( LTMS_Utils::format_money( $held ) ); ?></div>
+                <div style="font-size:1.1rem;font-weight:600;"><?php echo esc_html( $fmt_money( $held ) ); ?></div>
             </div>
         </div>
         <!-- v2.9.86 P2: Tax breakdown display -->
@@ -115,7 +126,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
     <!-- Historial de Depósitos Manuales -->
     <?php
-    $my_deposits = LTMS_Deposit::get_by_vendor( $vendor_id, '', 10, 0 );
+    $my_deposits = class_exists( 'LTMS_Deposit' ) ? LTMS_Deposit::get_by_vendor( $vendor_id, '', 10, 0 ) : [];
     ?>
     <div class="ltms-card" style="margin-top:20px;">
         <div class="ltms-card-header" style="display:flex;justify-content:space-between;align-items:center;">
@@ -159,7 +170,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                 ?>
                     <tr>
                         <td style="white-space:nowrap;font-size:.82rem;"><?php echo esc_html( substr( $dep['created_at'], 0, 10 ) ); ?></td>
-                        <td><strong><?php echo esc_html( LTMS_Utils::format_money( (float) $dep['amount'] ) ); ?></strong></td>
+                        <td><strong><?php echo esc_html( $fmt_money( (float) $dep['amount'] ) ); ?></strong></td>
                         <td style="font-size:.82rem;"><?php echo esc_html( strtoupper( $dep['method'] ) ); ?></td>
                         <td style="font-size:.82rem;"><?php echo esc_html( $dep['reference'] ?: '—' ); ?></td>
                         <td>
@@ -201,7 +212,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
         <div class="ltms-balance-display" style="text-align:center;background:linear-gradient(135deg,#1a5276,#2980b9);color:#fff;border-radius:8px;padding:16px;margin-bottom:20px;">
             <div style="font-size:0.8rem;opacity:0.8;"><?php esc_html_e( 'Balance disponible', 'ltms' ); ?></div>
-            <div id="ltms-payout-balance-display" style="font-size:1.8rem;font-weight:800;"><?php echo esc_html( LTMS_Utils::format_money( $available ) ); ?></div>
+            <div id="ltms-payout-balance-display" style="font-size:1.8rem;font-weight:800;"><?php echo esc_html( $fmt_money( $available ) ); ?></div>
         </div>
 
         <div class="ltms-modal-error" style="display:none;color:#e74c3c;font-size:0.875rem;margin-bottom:12px;"></div>
@@ -210,7 +221,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Monto a retirar', 'ltms' ); ?></label>
             <input type="number" id="ltms-payout-amount" min="1" step="1000"
                    max="<?php echo esc_attr( $available ); ?>"
-                   placeholder="<?php echo esc_attr( LTMS_Utils::format_money( $available ) ); ?>"
+                   placeholder="<?php echo esc_attr( $fmt_money( $available ) ); ?>"
                    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
         </div>
 
@@ -283,7 +294,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                    placeholder="Ej: 100000"
                    style="width:100%;padding:10px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:0.9rem;">
             <small style="color:#9ca3af;font-size:0.75rem;">
-                Mínimo: <?php echo esc_html( LTMS_Utils::format_money( (float) get_option('ltms_min_deposit_amount', 10000) ) ); ?>
+                Mínimo: <?php echo esc_html( $fmt_money( (float) get_option('ltms_min_deposit_amount', 10000) ) ); ?>
             </small>
         </div>
 
