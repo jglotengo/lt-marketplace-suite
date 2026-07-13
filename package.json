@@ -1,0 +1,23 @@
+{
+  "name": "lt-marketplace-suite",
+  "version": "2.9.100",
+  "description": "LT Marketplace Suite — Enterprise Multi-Vendor WooCommerce Plugin",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:js": "node scripts/build.js --js-only",
+    "build:css": "node scripts/build.js --css-only",
+    "lint:php": "node scripts/php_check.js $(find includes/ -name '*.php' -not -path '*/vendor/*') $(find lt-marketplace-suite.php -maxdepth 0)",
+    "lint:js": "node scripts/js_check.js",
+    "lint": "npm run lint:php && npm run lint:js",
+    "test": "npm run lint",
+    "deploy": "bash scripts/deploy.sh",
+    "rollback": "bash scripts/rollback.sh"
+  },
+  "devDependencies": {
+    "php-parser": "^3.1.5",
+    "terser": "^5.31.0",
+    "clean-css": "^5.3.3",
+    "glob": "^10.4.1"
+  }
+}

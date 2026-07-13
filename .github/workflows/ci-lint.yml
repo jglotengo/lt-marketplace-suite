@@ -1,0 +1,96 @@
+name: CI — PHP + JS Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: PHP Syntax Check
+        run: |
+          echo "🔍 Checking PHP syntax..."
+          EXIT_CODE=0
+          while IFS= read -r file; do
+            RESULT=$(php -l "$file" 2>&1)
+            if echo "$RESULT" | grep -q "No syntax errors"; then
+              echo "✅ $file"
+            else
+              echo "❌ $file"
+              echo "$RESULT"
+              EXIT_CODE=1
+            fi
+          done < <(find includes/ lt-marketplace-suite.php -name '*.php' -not -path '*/vendor/*')
+          exit $EXIT_CODE
+
+      - name: JS Syntax Check
+        run: npm run lint:js
+
+      - name: CSP Compliance Check
+        run: |
+          echo "🔍 Checking CSP compliance (0 inline handlers)..."
+          RESULTS=$(grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=\|onmouseover=' includes/frontend/views/ 2>/dev/null || true)
+          if [ -z "$RESULTS" ]; then
+            echo "✅ No inline handlers found — CSP compliant"
+          else
+            echo "❌ Inline handlers found:"
+            echo "$RESULTS"
+            exit 1
+          fi
+
+      - name: Alert/Confirm Check
+        run: |
+          echo "🔍 Checking for native alert()/confirm()..."
+          ALERTS=$(grep -rn 'alert(' includes/frontend/views/ 2>/dev/null | grep -v '//' || true)
+          CONFIRMS=$(grep -rn ' confirm(' includes/frontend/views/ 2>/dev/null | grep -v 'data-confirm\|ltms-confirm\|confirmation\|// confirm\|FIX-P1' || true)
+          if [ -z "$ALERTS" ] && [ -z "$CONFIRMS" ]; then
+            echo "✅ No native alert()/confirm() found"
+          else
+            echo "❌ Native alert()/confirm() found:"
+            [ -n "$ALERTS" ] && echo "alerts: $ALERTS"
+            [ -n "$CONFIRMS" ] && echo "confirms: $CONFIRMS"
+            exit 1
+          fi
+
+      - name: Min files sync check
+        run: |
+          echo "🔍 Checking if .min files are in sync with sources..."
+          EXIT_CODE=0
+          for JS_FILE in assets/js/*.js; do
+            # Skip .min.js and 3rd party
+            [[ "$JS_FILE" == *.min.js ]] && continue
+            [[ "$JS_FILE" == *chart.umd* ]] && continue
+            [[ "$JS_FILE" == *jquery* ]] && continue
+
+            MIN_FILE="${JS_FILE%.js}.min.js"
+            if [ ! -f "$MIN_FILE" ]; then
+              echo "⚠️  Missing: $MIN_FILE (run 'npm run build:js' to generate)"
+              EXIT_CODE=1
+            fi
+          done
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ All .min.js files present"
+          else
+            echo "❌ Some .min.js files are missing"
+            exit $EXIT_CODE
+          fi
