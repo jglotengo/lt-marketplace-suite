@@ -1,5 +1,5 @@
 // v2.9.97 P3: filtros client-side para view-insurance (CSP-compliant, sin inline handlers).
-(function() {
+document.addEventListener("DOMContentLoaded", function() {
     var search = document.getElementById('ltms-insurance-search');
     var filter = document.getElementById('ltms-insurance-status-filter');
     var rows   = document.querySelectorAll('#ltms-insurance-table tbody tr');
@@ -66,4 +66,4 @@
             link.click();
         });
     }
-})();
+});

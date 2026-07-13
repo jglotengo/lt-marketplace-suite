@@ -1,5 +1,5 @@
 /* global jQuery, ltmsDashboard */
-(function( $ ) {
+jQuery(function($) {
         'use strict';
 
         $( '#ltms-explore-redi-btn' ).on( 'click', function( e ) {
@@ -135,4 +135,4 @@
                         LTMS.UX.toastError('Error', 'Error de conexión.');
                 });
         });
-}( jQuery ) );
+});

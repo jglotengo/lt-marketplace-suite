@@ -158,4 +158,4 @@
         startPolling();
         fetchKDSOrders();
         setInterval(updateClock, 1000);
-    })(jQuery);
+    });

@@ -1,6 +1,6 @@
 // v2.9.97 P3: Handlers JS para view-drivers (CSP-compliant, sin inline handlers).
 // Cubre: modal agregar/editar, toggle active, toggle available, delete, filtros, settings.
-(function() {
+document.addEventListener("DOMContentLoaded", function() {
     var ajaxUrl = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url) || '/wp-admin/admin-ajax.php';
     var nonce   = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.nonce) || '';
 
@@ -307,4 +307,4 @@
         if (sFilter) sFilter.addEventListener('change', applyFilters);
         if (vFilter) vFilter.addEventListener('change', applyFilters);
     }
-})();
+});
