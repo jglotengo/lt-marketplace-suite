@@ -2074,7 +2074,16 @@ final class LTMS_Frontend_Checkout_Handler {
     public static function ajax_submit_review(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
-        $product_id = absint( $_POST['product_id'] ?? 0 );
+        // v2.9.100 SEC-7 FIX: rate limit review submissions (3 per IP per 15 min).
+        $ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( $_SERVER['REMOTE_ADDR'] ) : '';
+        $rl_key = 'ltms_review_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count >= 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas reseñas. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, 15 * MINUTE_IN_SECONDS );
+
+        $product_id = absint( $_POST['product_id'] ?? 0 ); // phpcs:ignore
         if ( ! $product_id ) {
             wp_send_json_error( [ 'message' => __( 'Producto no especificado', 'ltms' ) ], 400 );
         }

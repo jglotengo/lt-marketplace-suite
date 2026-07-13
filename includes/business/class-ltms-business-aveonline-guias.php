@@ -91,7 +91,8 @@ class LTMS_Business_Aveonline_Guias {
         // AO-BUG-6 FIX: `is_user_logged_in()` solo verifica sesión — cualquier
         // cliente (incluso `subscriber`) puede llegar hasta aquí. Exigimos rol
         // `ltms_vendor` o capacidad `manage_options` (admin).
-        $is_vendor = class_exists( 'LTMS_Utils' ) ? LTMS_Utils::is_ltms_vendor() : current_user_can( 'ltms_vendor' );
+        // v2.9.100 SEC-9 FIX: removed role-as-capability fallback, use is_ltms_vendor only.
+        $is_vendor = class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor();
         if ( ! $is_vendor && ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Insufficient permissions' ], 403 );
         }
@@ -181,10 +182,10 @@ class LTMS_Business_Aveonline_Guias {
      *              valorrecaudo, contraentrega, idasumecosto
      */
     public static function ajax_cotizar(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-		// SEC-4 FIX (v2.9.26): capability check.
-		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+                // SEC-3 FIX (v2.9.26): CSRF protection.
+                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // SEC-4 FIX (v2.9.26): capability check.
+                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         $origen  = sanitize_text_field( $_POST['origen']  ?? '' );  // phpcs:ignore
@@ -386,10 +387,10 @@ class LTMS_Business_Aveonline_Guias {
      * Devuelve las guías del vendedor logueado desde la tabla local.
      */
     public static function ajax_mis_guias(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-		// SEC-4 FIX (v2.9.26): capability check.
-		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+                // SEC-3 FIX (v2.9.26): CSRF protection.
+                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // SEC-4 FIX (v2.9.26): capability check.
+                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         global $wpdb;
@@ -462,10 +463,10 @@ class LTMS_Business_Aveonline_Guias {
      * POST params: idoperador (int), guias (string separado por comas)
      */
     public static function ajax_reimprimir_guia(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-		// SEC-4 FIX (v2.9.26): capability check.
-		if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+                // SEC-3 FIX (v2.9.26): CSRF protection.
+                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // SEC-4 FIX (v2.9.26): capability check.
+                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
         self::check_vendor_nonce();
 
         $idoperador = (int) ( $_POST['idoperador'] ?? 0 ); // phpcs:ignore

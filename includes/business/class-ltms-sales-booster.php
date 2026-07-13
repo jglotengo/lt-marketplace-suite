@@ -791,7 +791,12 @@ class LTMS_Sales_Booster {
      * AJAX: track product view (viewer count).
      */
     public static function ajax_track_product_view(): void {
-        $product_id = absint( $_POST['product_id'] ?? 0 );
+        // v2.9.100 SEC-8 FIX: add nonce to prevent viewer count inflation.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error();
+        }
+
+        $product_id = absint( $_POST['product_id'] ?? 0 ); // phpcs:ignore
         if ( ! $product_id ) wp_send_json_error();
 
         $transient_key = 'ltms_viewers_' . $product_id;
