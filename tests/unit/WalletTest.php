@@ -843,27 +843,28 @@ class WalletTest extends LTMS_Unit_Test_Case {
     // ════════════════════════════════════════════════════════════════════════
 
     public function test_reversal_no_esta_en_whitelist_de_is_valid_transaction_type(): void {
-        // El código fuente tiene reversal en execute_transaction pero
-        // is_valid_transaction_type usa una whitelist diferente (de negocio)
+        // v2.9.117 P1-8: reversal AHORA está en la whitelist (antes era un bug)
         if ( ! method_exists( $this->wallet, 'is_valid_transaction_type' ) ) {
             $this->markTestSkipped();
         }
-        // reversal no está en la whitelist del método de validación
-        $this->assertFalse( $this->wallet->is_valid_transaction_type( 'reversal' ) );
+        // reversal está en la whitelist del método de validación (fix P1-8)
+        $this->assertTrue( $this->wallet->is_valid_transaction_type( 'reversal' ) );
     }
 
     public function test_fee_no_esta_en_whitelist_de_is_valid_transaction_type(): void {
+        // v2.9.117 P1-8: fee AHORA está en la whitelist (antes era un bug)
         if ( ! method_exists( $this->wallet, 'is_valid_transaction_type' ) ) {
             $this->markTestSkipped();
         }
-        $this->assertFalse( $this->wallet->is_valid_transaction_type( 'fee' ) );
+        $this->assertTrue( $this->wallet->is_valid_transaction_type( 'fee' ) );
     }
 
     public function test_tax_withholding_no_esta_en_whitelist_de_is_valid_transaction_type(): void {
+        // v2.9.117 P1-8: tax_withholding AHORA está en la whitelist (antes era un bug)
         if ( ! method_exists( $this->wallet, 'is_valid_transaction_type' ) ) {
             $this->markTestSkipped();
         }
-        $this->assertFalse( $this->wallet->is_valid_transaction_type( 'tax_withholding' ) );
+        $this->assertTrue( $this->wallet->is_valid_transaction_type( 'tax_withholding' ) );
     }
 
     // ════════════════════════════════════════════════════════════════════════
