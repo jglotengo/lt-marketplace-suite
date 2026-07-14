@@ -85,6 +85,12 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         $this->private_key = str_starts_with( (string) $private_raw, 'v1:' )
             ? LTMS_Core_Security::decrypt( $private_raw )
             : (string) $private_raw;
+
+        // INTEGRATIONS-AUDIT P1 FIX: call parent::__construct() so the admin-
+        // configurable timeout / retries / retry_delay apply. Re-apply the
+        // Openpay-specific 45s timeout afterwards (parent may reset to 30s).
+        parent::__construct();
+        $this->timeout = 45;
     }
 
     /**
@@ -109,13 +115,24 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         string $device_id = '',
         bool   $capture   = true
     ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate amount (reject NaN/INF/negative).
+        if ( ! is_finite( $amount ) || $amount <= 0 ) {
+            throw new \InvalidArgumentException( '[openpay] Monto inválido para cargo.' );
+        }
+        // INTEGRATIONS-AUDIT P1 FIX: sanitize token_id and order_id.
+        $token_id_safe = sanitize_text_field( $token_id );
+        $order_id_safe = sanitize_text_field( $order_id );
+        if ( '' === $token_id_safe ) {
+            throw new \InvalidArgumentException( '[openpay] token_id vacío.' );
+        }
+
         $payload = [
             'method'        => 'card',
-            'source_id'     => $token_id,
+            'source_id'     => $token_id_safe,
             'amount'        => $this->format_amount( $amount ),
             'currency'      => $this->country === 'MX' ? 'MXN' : 'COP',
             'description'   => substr( sanitize_text_field( $description ), 0, 250 ),
-            'order_id'      => $order_id,
+            'order_id'      => $order_id_safe,
             'capture'       => $capture,
             'customer'      => [
                 'name'         => sanitize_text_field( $customer['name'] ?? '' ),
@@ -125,13 +142,16 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         ];
 
         if ( ! empty( $device_id ) ) {
-            $payload['device_session_id'] = $device_id;
+            $payload['device_session_id'] = sanitize_text_field( $device_id );
         }
 
+        // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on charge to prevent
+        // duplicate charges on 5xx retry. Openpay supports this header.
         $response = $this->perform_request(
             'POST',
-            "/{$this->merchant_id}/charges",
-            $payload
+            "/" . rawurlencode( $this->merchant_id ) . "/charges",
+            $payload,
+            [ 'Idempotency-Key' => 'ltms_charge_' . $order_id_safe ]
         );
 
         return [
@@ -277,16 +297,31 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException Si el reembolso falla.
      */
     public function create_refund( string $charge_id, float $amount = 0.0, string $description = '' ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate charge_id format (Openpay uses
+        // tr_[a-z0-9]+ pattern) to prevent path traversal via /charges/{id}/refund.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $charge_id ) ) {
+            return [
+                'success' => false,
+                'error'   => '[openpay] charge_id inválido.',
+            ];
+        }
+        // INTEGRATIONS-AUDIT P1 FIX: validate amount (reject NaN/INF/negative).
+        if ( ! is_finite( $amount ) || $amount < 0 ) {
+            throw new \InvalidArgumentException( '[openpay] Monto de reembolso inválido.' );
+        }
         $payload = [ 'description' => substr( $description ?: 'Reembolso', 0, 250 ) ];
 
         if ( $amount > 0 ) {
             $payload['amount'] = $this->format_amount( $amount );
         }
 
+        // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on refund — duplicate
+        // refunds are a direct financial loss.
         return $this->perform_request(
             'POST',
-            "/{$this->merchant_id}/charges/{$charge_id}/refund",
-            $payload
+            "/" . rawurlencode( $this->merchant_id ) . "/charges/" . $charge_id . "/refund",
+            $payload,
+            [ 'Idempotency-Key' => 'ltms_refund_' . $charge_id . '_' . ( $amount > 0 ? (string) $amount : 'full' ) ]
         );
     }
 
@@ -297,9 +332,13 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_charge( string $charge_id ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate charge_id format.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $charge_id ) ) {
+            return [ 'error' => '[openpay] charge_id inválido.' ];
+        }
         return $this->perform_request(
             'GET',
-            "/{$this->merchant_id}/charges/{$charge_id}"
+            "/" . rawurlencode( $this->merchant_id ) . "/charges/" . $charge_id
         );
     }
 
@@ -385,6 +424,21 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         string $description,
         string $order_id
     ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate amount, bank_account, bank_code.
+        if ( ! is_finite( $amount ) || $amount <= 0 ) {
+            throw new \InvalidArgumentException( '[openpay] Monto inválido para desembolso.' );
+        }
+        $bank_account_safe = preg_replace( '/\D/', '', $bank_account );
+        $bank_code_safe    = preg_replace( '/\D/', '', $bank_code );
+        // CLABE (MX) = 18 digits, account (CO) = 11-17 digits.
+        if ( strlen( $bank_account_safe ) < 8 || strlen( $bank_account_safe ) > 20 ) {
+            throw new \InvalidArgumentException( '[openpay] Cuenta bancaria inválida.' );
+        }
+        if ( strlen( $bank_code_safe ) < 2 || strlen( $bank_code_safe ) > 5 ) {
+            throw new \InvalidArgumentException( '[openpay] Código de banco inválido.' );
+        }
+        $order_id_safe = sanitize_text_field( $order_id );
+
         $currency = $this->country === 'MX' ? 'MXN' : 'COP';
 
         $payload = [
@@ -392,18 +446,20 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             'amount'      => $this->format_amount( $amount ),
             'currency'    => $currency,
             'description' => substr( sanitize_text_field( $description ), 0, 250 ),
-            'order_id'    => $order_id,
+            'order_id'    => $order_id_safe,
             'bank_account' => [
-                'clabe'        => $bank_account, // CLABE en MX, cuenta en CO
-                'bank_code'    => $bank_code,
+                'clabe'        => $bank_account_safe,
+                'bank_code'    => $bank_code_safe,
                 'holder_name'  => sanitize_text_field( $holder_name ),
             ],
         ];
 
+        // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on payout.
         $response = $this->perform_request(
             'POST',
-            "/{$this->merchant_id}/payouts",
-            $payload
+            "/" . rawurlencode( $this->merchant_id ) . "/payouts",
+            $payload,
+            [ 'Idempotency-Key' => 'ltms_payout_' . $order_id_safe ]
         );
 
         if ( empty( $response['id'] ) ) {
@@ -470,7 +526,7 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      *
      * @inheritDoc
      */
-    protected function perform_request(
+    public function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
@@ -492,6 +548,12 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      * @return float|int
      */
     private function format_amount( float $amount ): float|int {
+        // INTEGRATIONS-AUDIT P1 FIX: guard against NaN/INF (caller should have
+        // validated, but defense-in-depth). round(NAN) returns NAN which wp_json_encode
+        // serializes as 0 → silent zero-peso charge.
+        if ( ! is_finite( $amount ) ) {
+            throw new \InvalidArgumentException( '[openpay] format_amount: monto no finito.' );
+        }
         return $this->country === 'CO'
             ? (int) round( $amount ) // COP sin decimales
             : round( $amount, 2 );   // MXN con 2 decimales

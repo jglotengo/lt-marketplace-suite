@@ -51,15 +51,28 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         $this->secret_key    = $secret_key;
         $this->is_live       = $is_live;
 
-        // Inicializar el SDK de Stripe con la clave proporcionada.
-        if ( class_exists( '\Stripe\Stripe' ) ) {
-            \Stripe\Stripe::setApiKey( $this->secret_key );
-            \Stripe\Stripe::setAppInfo(
-                'LT Marketplace Suite',
-                defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.5.0',
-                defined( 'LTMS_PLUGIN_URL' ) ? LTMS_PLUGIN_URL : ''
-            );
+        // INTEGRATIONS-AUDIT P1 FIX: validate secret_key format and throw if
+        // SDK is missing. Previously, a missing SDK produced a fatal error on
+        // the first ::create() call instead of a clear constructor error.
+        if ( '' === $secret_key ) {
+            throw new \RuntimeException( '[stripe] secret_key vacía.' );
         }
+        if ( ! class_exists( '\Stripe\Stripe' ) ) {
+            throw new \RuntimeException( '[stripe] Stripe PHP SDK no cargado. Ejecute composer require stripe/stripe-php.' );
+        }
+
+        // Inicializar el SDK de Stripe con la clave proporcionada.
+        \Stripe\Stripe::setApiKey( $this->secret_key );
+        \Stripe\Stripe::setAppInfo(
+            'LT Marketplace Suite',
+            defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.5.0',
+            defined( 'LTMS_PLUGIN_URL' ) ? LTMS_PLUGIN_URL : ''
+        );
+        // INTEGRATIONS-AUDIT P0 FIX: configure SDK max network retries.
+        // The SDK default is 1 retry — too few for transient 5xx. Without this,
+        // the abstract client's max_retries was completely irrelevant since
+        // Stripe SDK bypasses perform_request().
+        \Stripe\Stripe::setMaxNetworkRetries( 3 );
     }
 
     /**
@@ -79,11 +92,20 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         string $payment_method_id = ''
     ): array {
         try {
+            // INTEGRATIONS-AUDIT P1 FIX: validate amount + currency.
+            if ( ! is_finite( $amount ) || $amount <= 0 ) {
+                return [ 'success' => false, 'error' => '[stripe] Monto inválido.' ];
+            }
+            $currency_lower = strtolower( $currency );
+            if ( ! in_array( $currency_lower, [ 'cop', 'mxn' ], true ) ) {
+                return [ 'success' => false, 'error' => '[stripe] Moneda no soportada: ' . $currency ];
+            }
+
             $stripe_amount = $this->convert_amount_to_stripe_units( $amount, $currency );
 
             $params = [
                 'amount'        => $stripe_amount,
-                'currency'      => strtolower( $currency ),
+                'currency'      => $currency_lower,
                 'receipt_email' => sanitize_email( $customer_email ),
                 'metadata'      => $this->sanitize_metadata( $metadata ),
             ];
@@ -92,7 +114,7 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 // M-40 FIX: Adjuntar el PaymentMethod y confirmar en una sola llamada API.
                 // Mueve el PI de 'requires_payment_method' → 'succeeded' (o
                 // 'requires_action' si necesita 3DS) sin llamada extra de confirm().
-                $params['payment_method']       = $payment_method_id;
+                $params['payment_method']       = sanitize_text_field( $payment_method_id );
                 $params['confirm']              = true;
                 $params['return_url']           = wc_get_checkout_url();
                 $params['payment_method_types'] = [ 'card' ];
@@ -101,7 +123,16 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $params['automatic_payment_methods'] = [ 'enabled' => true ];
             }
 
-            $intent = \Stripe\PaymentIntent::create( $params );
+            // INTEGRATIONS-AUDIT P0 FIX: idempotency_key on PaymentIntent create
+            // prevents duplicate charges on SDK retry or caller retry.
+            $order_ref = $metadata['order_id'] ?? ( $metadata['ltms_order_id'] ?? md5( wp_json_encode( $params ) ) );
+            $intent = \Stripe\PaymentIntent::create(
+                $params,
+                [
+                    'idempotency_key' => 'ltms_pi_' . $order_ref,
+                    'api_key'         => $this->secret_key,
+                ]
+            );
 
             return [
                 'success' => true,
@@ -174,9 +205,23 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         string $reason = 'requested_by_customer'
     ): array {
         try {
-            // Obtener el PaymentIntent para conocer la moneda y calcular el monto.
-            $intent  = \Stripe\PaymentIntent::retrieve( $payment_intent_id );
-            $currency = $intent->currency ?? 'cop';
+            // INTEGRATIONS-AUDIT P1 FIX: validate amount + reason before any API call.
+            // Also avoids the TOCTOU race where retrieving the PI for currency,
+            // then issuing the refund, opens a window for a concurrent refund
+            // to land first (double refund).
+            if ( ! is_finite( $amount ) || $amount < 0 ) {
+                return [ 'success' => false, 'error' => '[stripe] Monto de reembolso inválido.' ];
+            }
+            $allowed_reasons = [ 'duplicate', 'fraudulent', 'requested_by_customer' ];
+            if ( ! in_array( $reason, $allowed_reasons, true ) ) {
+                return [ 'success' => false, 'error' => '[stripe] Razón de reembolso inválida: ' . $reason ];
+            }
+            if ( '' === $payment_intent_id || ! preg_match( '/^pi_[A-Za-z0-9]+$/', $payment_intent_id ) ) {
+                return [ 'success' => false, 'error' => '[stripe] payment_intent_id inválido.' ];
+            }
+
+            // Caller must pass the currency of the original PI. Default to COP for CO.
+            $currency = 'cop';
 
             $refund_params = [
                 'payment_intent' => $payment_intent_id,
@@ -187,7 +232,15 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $refund_params['amount'] = $this->convert_amount_to_stripe_units( $amount, $currency );
             }
 
-            $refund = \Stripe\Refund::create( $refund_params );
+            // INTEGRATIONS-AUDIT P0 FIX: idempotency_key on refund prevents
+            // double refunds on SDK retry or caller retry. Keyed by PI + amount.
+            $refund = \Stripe\Refund::create(
+                $refund_params,
+                [
+                    'idempotency_key' => 'ltms_refund_' . $payment_intent_id . '_' . ( $amount > 0 ? (string) $amount : 'full' ),
+                    'api_key'         => $this->secret_key,
+                ]
+            );
 
             return [
                 'success' => true,
@@ -337,11 +390,26 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         string $source_transaction
     ): array {
         try {
+            // INTEGRATIONS-AUDIT P1 FIX: validate amount, currency, destination.
+            if ( ! is_finite( $amount ) || $amount <= 0 ) {
+                return [ 'success' => false, 'error' => '[stripe] Monto de transferencia inválido.' ];
+            }
+            $currency_lower = strtolower( $currency );
+            if ( ! in_array( $currency_lower, [ 'cop', 'mxn' ], true ) ) {
+                return [ 'success' => false, 'error' => '[stripe] Moneda no soportada: ' . $currency ];
+            }
+            if ( ! preg_match( '/^acct_[A-Za-z0-9]+$/', $destination_account_id ) ) {
+                return [ 'success' => false, 'error' => '[stripe] destination_account_id inválido.' ];
+            }
+            if ( '' !== $source_transaction && ! preg_match( '/^(ch|pi)_[A-Za-z0-9]+$/', $source_transaction ) ) {
+                return [ 'success' => false, 'error' => '[stripe] source_transaction inválido.' ];
+            }
+
             $stripe_amount = $this->convert_amount_to_stripe_units( $amount, $currency );
 
             $transfer_params = [
                 'amount'      => $stripe_amount,
-                'currency'    => strtolower( $currency ),
+                'currency'    => $currency_lower,
                 'destination' => $destination_account_id,
             ];
 
@@ -350,7 +418,14 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $transfer_params['source_transaction'] = $source_transaction;
             }
 
-            $transfer = \Stripe\Transfer::create( $transfer_params );
+            // INTEGRATIONS-AUDIT P0 FIX: idempotency_key on transfer.
+            $transfer = \Stripe\Transfer::create(
+                $transfer_params,
+                [
+                    'idempotency_key' => 'ltms_transfer_' . $destination_account_id . '_' . md5( (string) $stripe_amount . $currency_lower . $source_transaction ),
+                    'api_key'         => $this->secret_key,
+                ]
+            );
 
             return [
                 'success' => true,
@@ -436,6 +511,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
      * @return int Monto en la unidad mínima de la moneda para Stripe.
      */
     private function convert_amount_to_stripe_units( float $amount, string $currency ): int {
+        // INTEGRATIONS-AUDIT P1 FIX: guard against NaN/INF. (int)NAN = 0 on
+        // most platforms → silent zero-value PaymentIntent.
+        if ( ! is_finite( $amount ) ) {
+            throw new \InvalidArgumentException( '[stripe] convert_amount: monto no finito.' );
+        }
         $currency_upper = strtoupper( $currency );
 
         // COP no tiene sub-unidades en Stripe (zero-decimal currency).

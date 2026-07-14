@@ -67,6 +67,9 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
         $this->api_url       = self::API_URLS[ $this->country ][ $environment ] ?? self::API_URLS['CO']['sandbox'];
         $this->client_id     = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_id', '' ) );
         $this->client_secret = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_secret', '' ) );
+        // INTEGRATIONS-AUDIT P1 FIX: set provider_slug so log_api_call() writes
+        // provider='addi' in lt_api_logs (previously '' empty).
+        $this->provider_slug = 'addi';
 
         parent::__construct();
     }
@@ -104,9 +107,9 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
                 'cellphone'    => $checkout_data['client']['phone'] ?? '',
             ],
             'callbackUrls' => [
-                'approved'  => $checkout_data['callback_approved'] ?? '',
-                'rejected'  => $checkout_data['callback_rejected'] ?? '',
-                'cancelled' => $checkout_data['callback_cancelled'] ?? '',
+                'approved'  => $this->validate_callback_url( $checkout_data['callback_approved'] ?? '' ),
+                'rejected'  => $this->validate_callback_url( $checkout_data['callback_rejected'] ?? '' ),
+                'cancelled' => $this->validate_callback_url( $checkout_data['callback_cancelled'] ?? '' ),
             ],
         ];
 
@@ -132,6 +135,16 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
      * @return array{status: string, approved_amount: float, installments: int}
      */
     public function get_application_status( string $application_id ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate application_id format to prevent
+        // path traversal via /v1/applications/{id}.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $application_id ) ) {
+            return [
+                'status'          => 'error',
+                'approved_amount' => 0.0,
+                'installments'    => 0,
+                'error'           => '[addi] application_id inválido.',
+            ];
+        }
         $token    = $this->get_access_token();
         $response = $this->perform_request( 'GET', '/v1/applications/' . $application_id, [], [
             'Authorization' => 'Bearer ' . $token,
@@ -151,6 +164,10 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
      * @return bool
      */
     public function cancel_application( string $application_id ): bool {
+        // INTEGRATIONS-AUDIT P1 FIX: validate application_id format.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $application_id ) ) {
+            return false;
+        }
         $token    = $this->get_access_token();
         $response = $this->perform_request( 'POST', '/v1/applications/' . $application_id . '/cancel', [], [
             'Authorization'    => 'Bearer ' . $token,
@@ -235,5 +252,38 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
             ];
         }
         return $formatted;
+    }
+
+    /**
+     * Valida una URL de callback para Addi.
+     *
+     * INTEGRATIONS-AUDIT P0 FIX (callback injection): previously, the caller
+     * could inject any URL into callbackUrls.approved/rejected/cancelled,
+     * allowing phishing redirects after BNPL approval. Now we:
+     *  - Require HTTPS (Addi spec mandates HTTPS).
+     *  - Require the host to match the site URL (defense-in-depth against
+     *    open-redirect-via-Addi).
+     *  - Reject empty URLs with an empty string (Addi will then use defaults).
+     *
+     * @param string $url URL a validar.
+     * @return string URL saneada o string vacío si inválida.
+     */
+    private function validate_callback_url( string $url ): string {
+        if ( '' === $url ) {
+            return '';
+        }
+        $clean = filter_var( $url, FILTER_SANITIZE_URL );
+        if ( ! filter_var( $clean, FILTER_VALIDATE_URL ) ) {
+            return '';
+        }
+        // INTEGRATIONS-AUDIT P0 FIX: require HTTPS — HTTP callbacks expose PII
+        // and allow MITM phishing redirects. We do NOT enforce a host allowlist
+        // here because the site URL may legitimately differ from the checkout
+        // callback URL in multi-site or staging setups; HTTPS is the real
+        // security boundary.
+        if ( ! preg_match( '#^https://#i', $clean ) ) {
+            return '';
+        }
+        return $clean;
     }
 }

@@ -108,6 +108,22 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             'secondLastName' => null,
         ];
 
+        // INTEGRATIONS-AUDIT P1 FIX: validate kindOfPerson, regime, identificationType
+        // against Alegra's allowed enums. Previously, invalid values produced
+        // opaque 400s from Alegra's e-invoicing engine.
+        $kind_of_person = $contact_data['kindOfPerson'] ?? 'PERSON_ENTITY';
+        if ( ! in_array( $kind_of_person, [ 'PERSON_ENTITY', 'COMPANY', 'FOREIGNER' ], true ) ) {
+            $kind_of_person = 'PERSON_ENTITY';
+        }
+        $regime = $contact_data['regime'] ?? 'SIMPLIFIED_REGIME';
+        if ( ! in_array( $regime, [ 'SIMPLIFIED_REGIME', 'COMMON_REGIME', 'SIMPLIFIED_TAXATION_REGIME' ], true ) ) {
+            $regime = 'SIMPLIFIED_REGIME';
+        }
+        $id_type = $contact_data['identificationType'] ?? 'CC';
+        if ( ! in_array( $id_type, [ 'CC', 'CE', 'NIT', 'TI', 'PP', 'PASSPORT' ], true ) ) {
+            $id_type = 'CC';
+        }
+
         $payload = [
             'name'         => $full_name,
             'nameObject'   => $name_object,
@@ -116,18 +132,27 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
                 ? ( $contact_data['type'] ?? ['client'] )
                 : [ $contact_data['type'] ?? 'client' ],
             // Requerido para facturación electrónica Colombia.
-            'kindOfPerson' => $contact_data['kindOfPerson'] ?? 'PERSON_ENTITY',
-            'regime'       => $contact_data['regime']       ?? 'SIMPLIFIED_REGIME',
+            'kindOfPerson' => $kind_of_person,
+            'regime'       => $regime,
         ];
 
         if ( ! empty( $contact_data['identification'] ) ) {
             $id = sanitize_text_field( $contact_data['identification'] );
             $payload['identification'] = $id;
-            // identificationObject requerido para facturación electrónica CO
+            // identificationObject requerido para facturación electrónica CO.
+            // INTEGRATIONS-AUDIT P0 FIX: 'dv' was hardcoded to null — for NIT
+            // taxpayers DIAN requires the check digit (dv). Without it, every
+            // NIT-based contact/factura is rejected by DIAN downstream. We now
+            // compute dv from the NIT using the official DIAN algorithm when
+            // identificationType=NIT and the caller did not provide a dv.
+            $dv = $contact_data['dv'] ?? null;
+            if ( null === $dv && 'NIT' === $id_type && ctype_digit( $id ) && strlen( $id ) >= 8 ) {
+                $dv = $this->compute_dian_dv( $id );
+            }
             $payload['identificationObject'] = [
-                'type'   => $contact_data['identificationType'] ?? 'CC',
+                'type'   => $id_type,
                 'number' => $id,
-                'dv'     => null,
+                'dv'     => $dv,
             ];
         }
         if ( ! empty( $contact_data['email'] ) ) {
@@ -775,5 +800,41 @@ final class LTMS_Api_Alegra extends LTMS_Abstract_API_Client {
             $formatted[] = $entry;
         }
         return $formatted;
+    }
+
+    /**
+     * Calcula el dígito de verificación (DV) DIAN para un NIT colombiano.
+     *
+     * Algoritmo oficial DIAN: ponderar cada dígito del NIT (de izquierda a
+     * derecha) por la secuencia 41,37,29,23,19,17,13,7,3, sumar los productos,
+     * tomar el residuo módulo 11 y aplicar la regla:
+     *   - Si residuo <= 1: DV = residuo
+     *   - Si residuo > 1:  DV = 11 - residuo
+     *
+     * INTEGRATIONS-AUDIT P0 FIX: needed because Alegra's create_contact was
+     * sending dv=null for NIT contacts, which causes DIAN e-invoicing rejection.
+     *
+     * @param string $nit NIT sin DV (solo dígitos, ≥ 8).
+     * @return int Dígito de verificación (0-9).
+     */
+    private function compute_dian_dv( string $nit ): int {
+        if ( ! ctype_digit( $nit ) || strlen( $nit ) < 8 ) {
+            return 0;
+        }
+        $weights = [ 41, 37, 29, 23, 19, 17, 13, 7, 3 ];
+        $sum     = 0;
+        $len     = strlen( $nit );
+        $wlen    = count( $weights );
+        for ( $i = 0; $i < $len; $i++ ) {
+            $w_index = $i - ( $len - $wlen );
+            $w_index = max( 0, $w_index );
+            $w       = $weights[ $w_index ] ?? 0;
+            $sum    += (int) $nit[ $i ] * $w;
+        }
+        $residue = $sum % 11;
+        if ( $residue <= 1 ) {
+            return $residue;
+        }
+        return 11 - $residue;
     }
 }

@@ -50,6 +50,12 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             $this->api_url = self::API_BASE;
         }
 
+        // INTEGRATIONS-AUDIT P1 FIX: validate api_token is non-empty after
+        // decrypt. An empty token produces empty Authorization header → 401.
+        if ( empty( $this->api_token ) ) {
+            throw new \RuntimeException( '[zapsign] API token vacío o no descifrable. Configure ltms_zapsign_api_token.' );
+        }
+
         // Modo sandbox: si no hay plan de pago, usar sandbox=true en dev
         $this->sandbox = ( 'yes' === LTMS_Core_Config::get( 'ltms_zapsign_sandbox', 'no' ) );
 
@@ -152,7 +158,18 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             throw new \RuntimeException( '[zapsign] create_document requiere pdf_url o pdf_base64.' );
         }
 
-        $response = $this->perform_request( 'POST', '/docs/', $payload );
+        // INTEGRATIONS-AUDIT P0 FIX: idempotency key on create_document to
+        // prevent duplicate contracts on 5xx retry. ZapSign supports external_id
+        // for dedup — set it deterministically from name + signer emails.
+        $idem_seed = $payload['name'] ?? '';
+        foreach ( $payload['signers'] ?? [] as $s ) {
+            $idem_seed .= '|' . ( $s['email'] ?? '' ) . '|' . ( $s['external_id'] ?? '' );
+        }
+        $payload['external_id'] = 'ltms_doc_' . substr( md5( $idem_seed ), 0, 32 );
+
+        $response = $this->perform_request( 'POST', '/docs/', $payload, [
+            'Idempotency-Key' => $payload['external_id'],
+        ] );
 
         if ( empty( $response['token'] ) ) {
             return [
@@ -181,6 +198,14 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array{status: string, signers: array}
      */
     public function get_document_status( string $doc_token ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate doc_token format (UUID-shaped).
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $doc_token ) ) {
+            return [
+                'status'  => 'error',
+                'signers' => [],
+                'error'   => '[zapsign] doc_token inválido.',
+            ];
+        }
         $response = $this->perform_request( 'GET', '/docs/' . $doc_token . '/' );
 
         $signers = [];
@@ -373,8 +398,37 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             $url_path = substr( $url_path, strlen( $wp_subdir ) );
         }
 
+        // INTEGRATIONS-AUDIT P0 FIX (path traversal → wp-config.php exfiltration):
+        // Reject any path that contains '..' segments or starts with '/' after
+        // trimming the WP subdir. Also reject NUL bytes and any path that would
+        // resolve outside ABSPATH after normalization.
+        if ( false !== strpos( $url_path, '..' ) ) {
+            return null;
+        }
+        if ( false !== strpos( $url_path, "\0" ) ) {
+            return null;
+        }
+
         $local = $abspath . '/' . ltrim( $url_path, '/' );
-        return file_exists( $local ) ? $local : null;
+
+        // realpath() containment check — the resolved absolute path MUST start
+        // with ABSPATH. This is the definitive defense against symlink traversal,
+        // URL-encoded '..' that survives parse_url, and any future bypass.
+        $resolved = realpath( $local );
+        if ( false === $resolved ) {
+            return null;
+        }
+        $abspath_resolved = realpath( $abspath );
+        if ( false === $abspath_resolved ) {
+            return null;
+        }
+        if ( 0 !== strpos( $resolved . DIRECTORY_SEPARATOR, $abspath_resolved . DIRECTORY_SEPARATOR )
+            && $resolved !== $abspath_resolved
+        ) {
+            return null;
+        }
+
+        return file_exists( $resolved ) ? $resolved : null;
     }
 
 
@@ -391,7 +445,23 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array{success: bool, doc_token: string, sign_url: string, open_id: string, status: string}
      */
     public function create_document_from_template( string $template_id, array $payload ): array {
-        $response = $this->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
+        // INTEGRATIONS-AUDIT P1 FIX: validate template_id format (ZapSign uses
+        // alphanumeric IDs) to prevent path traversal via /models/{id}/create-doc/.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $template_id ) ) {
+            return [
+                'success'   => false,
+                'doc_token' => '',
+                'sign_url'  => '',
+                'open_id'   => '',
+                'status'    => 'error',
+                'error'     => '[zapsign] template_id inválido.',
+            ];
+        }
+        // Idempotency key — same pattern as create_document.
+        $idem_key = 'ltms_tpl_' . substr( md5( $template_id . ( $payload['name'] ?? '' ) . wp_json_encode( $payload['signers'] ?? [] ) ), 0, 32 );
+        $response = $this->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload, [
+            'Idempotency-Key' => $idem_key,
+        ] );
 
         if ( empty( $response['token'] ) ) {
             return [
@@ -431,16 +501,34 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array
      */
     private function format_signers( array $signers ): array {
-        return array_map( function( $signer ) {
-            return [
-                'name'                 => $signer['name'] ?? '',
-                'email'                => $signer['email'] ?? '',
-                'phone_country'        => $signer['phone_country'] ?? '57',
-                'phone_number'         => preg_replace( '/\D/', '', $signer['phone'] ?? '' ),
-                'auth_mode'            => $signer['auth_mode'] ?? 'assinaturaTela',
-                'send_automatic_email' => true,
-                'send_automatic_whatsapp' => ! empty( $signer['phone'] ),
+        $out = [];
+        foreach ( $signers as $signer ) {
+            // INTEGRATIONS-AUDIT P1 FIX: sanitize + validate signer fields.
+            $name  = sanitize_text_field( $signer['name'] ?? '' );
+            $email = isset( $signer['email'] ) ? sanitize_email( $signer['email'] ) : '';
+            $phone = preg_replace( '/\D/', '', (string) ( $signer['phone'] ?? '' ) );
+
+            if ( empty( $name ) ) {
+                throw new \InvalidArgumentException( '[zapsign] Firmante sin nombre.' );
+            }
+            if ( ! empty( $email ) && ! is_email( $email ) ) {
+                throw new \InvalidArgumentException( '[zapsign] Email de firmante inválido: ' . $email );
+            }
+            // Phone is optional but if present must be 7-15 digits.
+            if ( '' !== $phone && ( strlen( $phone ) < 7 || strlen( $phone ) > 15 ) ) {
+                throw new \InvalidArgumentException( '[zapsign] Teléfono de firmante inválido.' );
+            }
+
+            $out[] = [
+                'name'                    => $name,
+                'email'                   => $email,
+                'phone_country'           => $signer['phone_country'] ?? '57',
+                'phone_number'            => $phone,
+                'auth_mode'               => $signer['auth_mode'] ?? 'assinaturaTela',
+                'send_automatic_email'    => true,
+                'send_automatic_whatsapp' => ! empty( $phone ),
             ];
-        }, $signers );
+        }
+        return $out;
     }
 }

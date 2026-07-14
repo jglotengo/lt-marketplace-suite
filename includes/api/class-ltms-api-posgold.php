@@ -44,16 +44,28 @@ final class LTMS_Api_PosGold {
      */
     public static function build_base_url( string $subdomain ): string {
         $subdomain = trim( strtolower( $subdomain ) );
+        // Strip any leading protocol the vendor may have pasted.
         $subdomain = preg_replace( '/^https?:\/\//', '', $subdomain );
         $subdomain = rtrim( $subdomain, '/' );
 
-        // Si el vendor ingresó el dominio completo, usarlo tal cual.
-        if ( strpos( $subdomain, '.' ) !== false ) {
+        // INTEGRATIONS-AUDIT P0 FIX (SSRF + JWT leak): previously, any string
+        // containing a dot was accepted verbatim and prepended with 'https://'.
+        // A vendor (or anyone able to write to user_meta 'ltms_posgold_subdomain')
+        // could set $subdomain = 'evil.com' and the resulting request — including
+        // the Bearer JWT — would be sent to https://evil.com. We now enforce a
+        // strict hostname pattern AND a hardcoded .goldpos.com.co suffix unless
+        // the input is already a fully-qualified goldpos.com.co host.
+        if ( preg_match( '/^[a-z0-9-]+\.goldpos\.com\.co$/i', $subdomain ) ) {
             return 'https://' . $subdomain;
         }
-
-        // Si solo ingresó el slug, construir el subdominio canónico.
-        return 'https://' . $subdomain . '.goldpos.com.co';
+        // Pure subdomain slug (no dots, no slashes, no port, no auth) → safe.
+        if ( preg_match( '/^[a-z0-9][a-z0-9-]{0,63}$/', $subdomain ) ) {
+            return 'https://' . $subdomain . '.goldpos.com.co';
+        }
+        // Anything else (contains dots but not goldpos.com.co, contains slashes,
+        // contains @, contains a port, etc.) is rejected with an empty string
+        // so callers fail loudly instead of leaking the JWT.
+        return '';
     }
 
     /**
@@ -74,6 +86,16 @@ final class LTMS_Api_PosGold {
         int $per_page = 50000
     ): array {
         $base_url   = self::build_base_url( $subdomain );
+        // INTEGRATIONS-AUDIT P0 FIX: build_base_url() now returns '' for invalid
+        // hostnames (SSRF guard). Bail out cleanly instead of leaking the JWT.
+        if ( '' === $base_url ) {
+            return [
+                'success' => false,
+                'data'    => [],
+                'error'   => 'Subdominio PosGold inválido (posible intento de SSRF).',
+                'status'  => 0,
+            ];
+        }
         $endpoint   = $base_url . self::ENDPOINT_PRODUCTS;
 
         $defaults = [
@@ -330,6 +352,14 @@ final class LTMS_Api_PosGold {
     ): array {
         // 1. Intentar endpoint dedicado de categorías.
         $base_url = self::build_base_url( $subdomain );
+        if ( '' === $base_url ) {
+            return [
+                'success' => false,
+                'data'    => [],
+                'error'   => 'Subdominio PosGold inválido (posible intento de SSRF).',
+                'status'  => 0,
+            ];
+        }
         $endpoint = $base_url . self::ENDPOINT_CATEGORIES;
         $url      = add_query_arg( [
             'empresaid' => $empresaid,

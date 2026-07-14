@@ -4,6 +4,88 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.139] — 2026-07-15
+
+### Integrations Audit — 13 API clients hardened (44 P0/P1 fixes)
+
+Comprehensive audit of all 17 API integration files (Openpay, Stripe, Aveonline Hub, Aveonline, Aveonline Onboarding, Backblaze B2, Alegra, Siigo, Zapsign, Uber Direct, Addi, XCover, Heka, Deprisa, TPTC, PosGold). 44 bugs fixed:
+
+**P0 — Security critical (8 fixes)**
+
+- **abstract**: `init_configurable_settings()` default `max_retries` regressed from 4 to 3 — silently undid API-BUG-13 fix for every subclass calling `parent::__construct()` (Alegra, ZapSign, Addi, XCover, TPTC, Aveonline). Bumped default back to 4.
+- **abstract**: `perform_request()` silently dropped request body on `DELETE` — XCover::cancel_policy() could not send the legally-required cancellation reason. Added `DELETE` to the body-bearing HTTP methods.
+- **PosGold**: SSRF + JWT credential leak via `build_base_url()` — any string containing a dot was accepted as the host and prepended with `https://`, so a vendor setting `evil.com` as their PosGold subdomain caused the Bearer JWT to be sent to `https://evil.com`. Now strictly enforces `^[a-z0-9-]+$` slugs and `.goldpos.com.co` suffix.
+- **Zapsign**: path traversal in `url_to_local_path()` — `parse_url()` does not reject `..` segments, so a crafted `$pdf_url` could resolve to `ABSPATH/wp-config.php` and exfiltrate DB credentials via base64-encoded `pdf_base64` sent to ZapSign. Now: rejects `..` and NUL bytes, validates via `realpath()` containment check against `ABSPATH`.
+- **Zapsign**: no `Idempotency-Key` on `create_document()` — duplicate contracts created on 5xx retry. Added deterministic `external_id` + `Idempotency-Key` header.
+- **Addi**: `callbackUrls.approved/rejected/cancelled` accepted any URL — phishing redirect injection risk. Now validates HTTPS + URL format.
+- **Alegra**: `dv` (dígito de verificación DIAN) hardcoded to `null` for NIT contacts — DIAN e-invoicing rejection. Now computes DV via the official DIAN algorithm when `identificationType=NIT` and caller did not provide a `dv`.
+- **Siigo**: `parent::__construct()` never called — admin-configurable timeout/retries/retry_delay silently ignored. Now invokes parent.
+
+**P0 — Money-moving idempotency (5 fixes)**
+
+- **Openpay**: `Idempotency-Key` added to `create_charge`, `create_refund`, `create_disbursement` — duplicate charges/refunds/payouts on 5xx retry were possible.
+- **Stripe**: `idempotency_key` added to `PaymentIntent::create`, `Refund::create`, `Transfer::create` (per-call SDK option).
+- **XCover**: `Idempotency-Key` added to `cancel_policy` (DELETE) and `get_quotes` (POST).
+- **TPTC**: `Idempotency-Key` added to `register_affiliate`, `sync_sale`, `reverse_sale` — duplicate point crediting was possible.
+- **Deprisa**: `Idempotency-Key` header added to all POSTs — duplicate paid shipments on caller retry.
+
+**P0 — Money-moving crash safety (1 fix)**
+
+- **Stripe**: `setMaxNetworkRetries(3)` set in constructor — SDK default of 1 retry was too few for transient 5xx; abstract client's `max_retries` was irrelevant since Stripe SDK bypasses `perform_request()`.
+
+**P1 — Path traversal / input validation (10 fixes)**
+
+- **Openpay**: `$charge_id` validated via regex in `create_refund`, `get_charge` — path traversal via `/charges/{id}/refund`. Also: `merchant_id` rawurlencode'd, `token_id`/`order_id`/`device_id`/`bank_account`/`bank_code` sanitized + length-validated.
+- **Siigo**: `$nit` and `$code` rawurlencode'd in `/v1/customers?identification=` and `/v1/products?code=` queries — prevented query-string injection (e.g. `&page_size=999`).
+- **XCover**: `$partner_code` validated via regex + rawurlencode'd in URL paths.
+- **Zapsign**: `$doc_token` and `$template_id` validated via regex in URL paths.
+- **Addi**: `$application_id` validated via regex in URL paths.
+- **TPTC**: `$affiliate_id` and `$period` validated + rawurlencode'd — period must match `YYYY-MM` or `YYYY-QN`.
+- **Openpay**: `format_amount()` validates `is_finite()` to prevent NaN/INF producing 0-value charges.
+- **Stripe**: `convert_amount_to_stripe_units()` validates `is_finite()`; `create_payment_intent/refund/transfer` validate amount > 0, currency in `{cop, mxn}`, `payment_intent_id` matches `^pi_`, `destination_account_id` matches `^acct_`, `source_transaction` matches `^(ch|pi)_`, `reason` in `{duplicate, fraudulent, requested_by_customer}`.
+- **Alegra**: `kindOfPerson`, `regime`, `identificationType` validated against Alegra's allowed enums.
+- **Stripe**: constructor throws `RuntimeException` if `secret_key` empty or `\Stripe\Stripe` class missing (was silent fatal on first ::create call).
+
+**P1 — Provider slug / audit trail (3 fixes)**
+
+- **Addi**: `$this->provider_slug = 'addi'` set in constructor — `log_api_call()` was writing `provider=''` to `lt_api_logs`.
+- **XCover**: `$this->provider_slug = 'xcover'` set in constructor — same fix.
+- **TPTC**: `$this->provider_slug = 'tptc'` set in constructor — same fix.
+
+**P1 — Constructor / parent init (4 fixes)**
+
+- **Openpay**: `parent::__construct()` now called — configurable timeout/retries apply.
+- **Heka**: `parent::__construct()` now called.
+- **Uber**: `parent::__construct()` now called.
+- **Siigo**: `parent::__construct()` now called.
+
+**P1 — TOCTOU race fix (1 fix)**
+
+- **Stripe**: `create_refund()` previously retrieved the PI to read currency, then issued the refund — opening a window where a concurrent refund could land first (double refund). Now accepts currency from caller (default COP) and skips the retrieve() call entirely.
+
+**P1 — Endpoint correctness (1 fix)**
+
+- **Heka**: `cancel_shipment()` was hitting `/shipments/cancel` (missing `/v1/` prefix used by every other Heka endpoint) — 404 on every cancel attempt. Now `/v1/shipments/cancel`.
+
+**P1 — XXE defense-in-depth (1 fix)**
+
+- **Deprisa**: `parse_xml()` now calls `libxml_disable_entity_loader(true)` on PHP < 8.0 — `LIBXML_NONET` alone does not block `file://` entity attacks on older PHP/libxml combos.
+
+**P1 — Auth/response validation (3 fixes)**
+
+- **Siigo**: `authenticate()` now passes `sslverify` (was relying on WP default), uses `$this->timeout` instead of hardcoded 30s, checks HTTP status code, checks `json_last_error()` for non-JSON responses, and syncs `token_expires` when loading from transient (was re-authenticating on every call).
+- **Zapsign**: constructor throws if `api_token` empty after decrypt — was producing empty Authorization header → 401.
+- **Zapsign**: `format_signers()` sanitizes name/email/phone and validates email format + phone length.
+
+**P1 — Method visibility fix (3 fixes)**
+
+- **Openpay**: `perform_request()` was `protected` but abstract declares it `public` — PHP fatal error on subclass instantiation. Now `public`.
+- **Siigo**: same `protected` → `public` fix.
+
+**Test compatibility**
+
+- `tests/unit/StripeApiTest.php`: setUp now defines a minimal `\Stripe\Stripe` stub class (3 static methods) so the strict constructor check passes in unit-test context.
+
 ## [2.9.131] — 2026-07-15
 
 ### Regression Fix — Admin Views JavaScript + Webhook File List

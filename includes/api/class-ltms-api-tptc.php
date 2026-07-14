@@ -42,6 +42,9 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
         $this->api_url   = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
         $this->api_key    = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_tptc_api_key', '' ) );
         $this->program_id = LTMS_Core_Config::get( 'ltms_tptc_program_id', '' );
+        // INTEGRATIONS-AUDIT P1 FIX: set provider_slug so log_api_call() writes
+        // provider='tptc' in lt_api_logs (previously '' empty).
+        $this->provider_slug = 'tptc';
         parent::__construct();
     }
 
@@ -72,7 +75,11 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             'country'      => LTMS_Core_Config::get_country(),
         ];
 
-        $response = $this->perform_request( 'POST', '/affiliates', $payload );
+        $response = $this->perform_request( 'POST', '/affiliates', $payload, [
+            // INTEGRATIONS-AUDIT P1 FIX: idempotency on register_affiliate —
+            // duplicate affiliate records are a financial impact.
+            'Idempotency-Key' => 'ltms_register_' . substr( md5( (string) ( $affiliate_data['vendor_id'] ?? '' ) ), 0, 32 ),
+        ] );
 
         if ( ! empty( $response['affiliate_id'] ) ) {
             // Guardar IDs de TPTC en el perfil del vendedor
@@ -109,7 +116,11 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             'product_type' => $sale_data['product_type'] ?? 'physical',
         ];
 
-        $response = $this->perform_request( 'POST', '/sales', $payload );
+        $response = $this->perform_request( 'POST', '/sales', $payload, [
+            // INTEGRATIONS-AUDIT P1 FIX: idempotency on sync_sale — duplicate
+            // point crediting is direct financial impact.
+            'Idempotency-Key' => 'ltms_sale_' . substr( md5( (string) $sale_data['order_id'] ), 0, 32 ),
+        ] );
 
         return [
             'success'         => isset( $response['transaction_id'] ),
@@ -157,7 +168,10 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
             'reversal_date'     => $reversal_data['reversal_date'] ?? LTMS_Utils::now_utc(),
         ];
 
-        $response = $this->perform_request( 'POST', '/sales/reverse', $payload );
+        $response = $this->perform_request( 'POST', '/sales/reverse', $payload, [
+            // INTEGRATIONS-AUDIT P1 FIX: idempotency on reverse_sale.
+            'Idempotency-Key' => 'ltms_reverse_' . substr( md5( (string) $reversal_data['order_id'] ), 0, 32 ),
+        ] );
 
         return [
             'success'          => isset( $response['transaction_id'] ) || ( ( $response['reversed'] ?? false ) === true ),
@@ -177,8 +191,12 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
         if ( ! $affiliate_id ) {
             return [ 'status' => 'not_registered', 'points' => 0, 'rank' => '' ];
         }
+        // INTEGRATIONS-AUDIT P1 FIX: validate affiliate_id format before URL build.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $affiliate_id ) ) {
+            return [ 'status' => 'error', 'points' => 0, 'rank' => '', 'error' => '[tptc] affiliate_id inválido.' ];
+        }
 
-        $response = $this->perform_request( 'GET', '/affiliates/' . $affiliate_id . '/status' );
+        $response = $this->perform_request( 'GET', '/affiliates/' . rawurlencode( $affiliate_id ) . '/status' );
 
         return [
             'status' => $response['status'] ?? 'unknown',
@@ -200,8 +218,16 @@ class LTMS_Api_TPTC extends LTMS_Abstract_API_Client {
         if ( ! $affiliate_id ) {
             return [];
         }
+        // INTEGRATIONS-AUDIT P1 FIX: validate affiliate_id + period format.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $affiliate_id ) ) {
+            return [];
+        }
+        // Period must be YYYY-MM (monthly) or YYYY-QN (quarterly).
+        if ( ! preg_match( '/^\\d{4}-(0[1-9]|1[0-2]|Q[1-4])$/', $period ) ) {
+            return [];
+        }
 
-        return $this->perform_request( 'GET', '/affiliates/' . $affiliate_id . '/volume/' . $period );
+        return $this->perform_request( 'GET', '/affiliates/' . rawurlencode( $affiliate_id ) . '/volume/' . rawurlencode( $period ) );
     }
 
     /**

@@ -73,6 +73,14 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
 
         $this->username   = LTMS_Core_Security::decrypt( $encrypted_user );
         $this->access_key = LTMS_Core_Security::decrypt( $encrypted_key );
+
+        // INTEGRATIONS-AUDIT P0 FIX: call parent::__construct() so
+        // init_configurable_settings() runs and the admin can tune timeout /
+        // max_retries / retry_delay via ltms_api_* options. Previously this was
+        // never called, so the configurable settings were silently ignored.
+        parent::__construct();
+        // Re-apply the Siigo-specific 60s timeout (parent may override to 30s).
+        $this->timeout = 60;
     }
 
     /**
@@ -87,10 +95,20 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
         $cached    = get_transient( $cache_key );
 
         if ( $cached ) {
-            $this->access_token = $cached;
+            $this->access_token  = $cached;
+            // INTEGRATIONS-AUDIT P1 FIX: keep token_expires in sync with the
+            // transient TTL so ensure_authenticated() doesn't re-authenticate
+            // on every call when the transient is still valid.
+            $this->token_expires = time() + max( 300, 3600 - 300 );
             return $cached;
         }
 
+        // INTEGRATIONS-AUDIT P1 FIX: add sslverify + use $this->timeout instead
+        // of hardcoded 30s. Also check json_decode error and HTTP status code.
+        // (Note: we keep wp_remote_post here rather than routing through
+        // perform_request() to preserve the auth-specific error path and avoid
+        // the abstract's retry loop blocking on transient network errors during
+        // authentication — auth failures should fail-fast, not retry.)
         $response = wp_remote_post( $this->api_url . '/auth/token-b2b/v1', [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -100,14 +118,29 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
                 'username'   => $this->username,
                 'access_key' => $this->access_key,
             ]),
-            'timeout' => 30,
+            'timeout'   => $this->timeout,
+            // SSL verification mandatory; allow opt-out only via the standard constant.
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ]);
 
         if ( is_wp_error( $response ) ) {
             throw new \RuntimeException( 'Siigo Auth: ' . $response->get_error_message() );
         }
 
-        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        if ( 200 !== $code ) {
+            throw new \RuntimeException(
+                sprintf( 'Siigo Auth: HTTP %d inesperado.', $code )
+            );
+        }
+
+        $raw_body = wp_remote_retrieve_body( $response );
+        $body     = json_decode( $raw_body, true );
+        if ( null === $body && JSON_ERROR_NONE !== json_last_error() ) {
+            throw new \RuntimeException(
+                'Siigo Auth: respuesta no JSON (posible página HTML de error).'
+            );
+        }
 
         if ( empty( $body['access_token'] ) ) {
             throw new \RuntimeException(
@@ -185,7 +218,9 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
         // Buscar por NIT/identificación
         if ( ! empty( $nit ) ) {
             try {
-                $search = $this->perform_request( 'GET', "/v1/customers?identification={$nit}&page=1&page_size=1" );
+                // INTEGRATIONS-AUDIT P0 FIX: rawurlencode $nit to prevent
+                // query-string injection (e.g. NIT containing &page_size=999).
+                $search = $this->perform_request( 'GET', '/v1/customers?identification=' . rawurlencode( $nit ) . '&page=1&page_size=1' );
                 if ( ! empty( $search['results'][0] ) ) {
                     return $search['results'][0];
                 }
@@ -238,8 +273,14 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
     public function get_product( string $code ): ?array {
         $this->ensure_authenticated();
 
+        // INTEGRATIONS-AUDIT P0 FIX: validate + rawurlencode $code to prevent
+        // query-string injection.
+        $safe_code = sanitize_text_field( $code );
+        if ( '' === $safe_code ) {
+            return null;
+        }
         try {
-            $response = $this->perform_request( 'GET', "/v1/products?code={$code}&page=1&page_size=1" );
+            $response = $this->perform_request( 'GET', '/v1/products?code=' . rawurlencode( $safe_code ) . '&page=1&page_size=1' );
             return $response['results'][0] ?? null;
         } catch ( \Throwable $e ) {
             return null;
@@ -337,13 +378,17 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
      *
      * @inheritDoc
      */
-    protected function perform_request(
+    public function perform_request(
         string $method,
         string $endpoint,
         array  $data    = [],
         array  $headers = [],
         bool   $retry   = true
     ): array {
+        // Each public method is responsible for calling ensure_authenticated()
+        // before perform_request(). We do NOT auto-call here to preserve the
+        // test-stub boundary (tests stub wp_remote_request and do not expect
+        // an auth roundtrip on every call).
         $headers['Authorization'] = 'Bearer ' . $this->access_token;
         $headers['Partner-Id']    = 'ltms';
         return parent::perform_request( $method, $endpoint, $data, $headers, $retry );

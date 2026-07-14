@@ -76,7 +76,12 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
     protected function init_configurable_settings(): void {
         if ( class_exists( 'LTMS_Core_Config' ) ) {
             $this->timeout     = (int) LTMS_Core_Config::get( 'ltms_api_timeout_seconds', 30 );
-            $this->max_retries = (int) LTMS_Core_Config::get( 'ltms_api_max_retries', 3 );
+            // INTEGRATIONS-AUDIT P0 FIX: default bumped from 3 to 4 to preserve
+            // the API-BUG-13 fix (1 initial attempt + 3 retries = 1s/2s/4s backoff).
+            // Previously, the option default of 3 silently regressed max_retries for
+            // every subclass that called parent::__construct() (Alegra, ZapSign,
+            // Addi, XCover, TPTC, Aveonline).
+            $this->max_retries = (int) LTMS_Core_Config::get( 'ltms_api_max_retries', 4 );
             $this->retry_delay = (int) LTMS_Core_Config::get( 'ltms_api_retry_delay_seconds', 1 );
         }
     }
@@ -155,7 +160,11 @@ abstract class LTMS_Abstract_API_Client implements LTMS_API_Client_Interface {
             'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ];
 
-        if ( ! empty( $data ) && in_array( $method, [ 'POST', 'PUT', 'PATCH' ], true ) ) {
+        if ( ! empty( $data ) && in_array( $method, [ 'POST', 'PUT', 'PATCH', 'DELETE' ], true ) ) {
+            // INTEGRATIONS-AUDIT P0 FIX: include DELETE so XCover::cancel_policy()
+            // can send the legally-required cancellation reason. WP HTTP API and
+            // the underlying cURL both support a body on DELETE; some servers
+            // ignore it but those that require it (XCover) must receive it.
             $args['body'] = wp_json_encode( $data );
         }
 
