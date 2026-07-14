@@ -164,7 +164,7 @@ function ltms_wallets_url( array $overrides = [] ): string {
                     <td>
                         <?php if ( $is_frozen ) : ?>
                         <button type="button" class="ltms-btn ltms-btn-success ltms-btn-sm"
-                                onclick="if(confirm('<?php esc_attr_e( '¿Descongelar esta billetera?', 'ltms' ); ?>')) LTMS.Admin.ajaxAction('ltms_unfreeze_wallet',{vendor_id:<?php echo esc_js( $wallet['vendor_id'] ); ?>},function(r){if(r.success)location.reload();else alert(r.data||'Error');})">
+                                data-action="ltms_unfreeze_wallet" data-vendor-id="<?php echo esc_attr( $wallet['vendor_id'] ); ?>" data-confirm="<?php esc_attr_e( '¿Descongelar esta billetera?', 'ltms' ); ?>">
                             🔓 <?php esc_html_e( 'Descongelar', 'ltms' ); ?>
                         </button>
                         <?php else : ?>

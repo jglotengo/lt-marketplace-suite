@@ -320,7 +320,7 @@ $base_url    = admin_url( 'admin.php?page=ltms-security' );
                             <input type="hidden" name="block_ip" value="<?php echo esc_attr( $event['ip_address'] ); ?>">
                             <button type="submit" name="ltms_block_ip"
                                     class="ltms-btn ltms-btn-danger ltms-btn-sm"
-                                    onclick="return confirm('Bloquear esta IP?')">
+                                    data-confirm="'Bloquear esta IP?'">
                                 &#x1F6AB;
                             </button>
                         </form>

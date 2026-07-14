@@ -205,7 +205,7 @@ $pending_kyc = (int) $wpdb->get_var(
                         <?php if ( $enabled ) : ?>
                             <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm"
                                     data-provider="<?php echo esc_attr( $intg['provider'] ); ?>"
-                                    onclick="LTMS.Admin.testApiConnection('<?php echo esc_js( $intg['provider'] ); ?>', this)">
+                                    data-action="ltms-test-api" data-provider="<?php echo esc_attr( $intg['provider'] ); ?>">
                                 <?php esc_html_e( 'Probar conexión', 'ltms' ); ?>
                             </button>
                         <?php else : ?>

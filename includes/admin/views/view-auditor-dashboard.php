@@ -1301,11 +1301,11 @@ $critical_sec  = count( array_filter( $security_events, fn($e) => strtolower($e[
     </div>
 
     <div class="ltms-tabs">
-        <button class="ltms-tab-btn active" onclick="ltmsTab(this,'frac1')">
+        <button class="ltms-tab-btn active" data-tab="frac1">
             📋 <?php esc_html_e( 'Frac. I — Servicios / Operaciones', 'ltms' ); ?>
             <span class="ltms-tab-count"><?php echo ltms_int( $tx_total ); ?></span>
         </button>
-        <button class="ltms-tab-btn" onclick="ltmsTab(this,'frac2')">
+        <button class="ltms-tab-btn" data-tab="frac2">
             🏪 <?php esc_html_e( 'Frac. II — Vendedores Intermediados', 'ltms' ); ?>
             <span class="ltms-tab-count"><?php echo count( $vendors_detail ); ?></span>
         </button>

@@ -229,7 +229,7 @@ jQuery( function( $ ) {
             notes:     notes,
             nonce:     pendingNonce
         }, function( r ) {
-            r.success ? location.reload() : alert( r.data );
+            r.success ? location.reload() : console.warn( r.data );
         } );
     }
 

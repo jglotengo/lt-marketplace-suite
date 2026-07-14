@@ -245,7 +245,7 @@ $orders = wc_get_orders( $query_args );
         var $btn    = $( this );
         var orderId = $btn.data( 'order-id' );
         var nonce   = $btn.data( 'nonce' );
-        if ( ! confirm( '<?php echo esc_js( __( "Confirmar que el pedido fue recogido por el cliente?", "ltms" ) ); ?>' ) ) return;
+        if ( ! window.confirm( '<?php echo esc_js( __( "Confirmar que el pedido fue recogido por el cliente?", "ltms" ) ); ?>' ) ) return;
         $btn.prop( 'disabled', true ).text( '<?php echo esc_js( __( "Procesando...", "ltms" ) ); ?>' );
         $.post( ajaxurl, {
             action:   'ltms_mark_pickup_completed',
@@ -255,11 +255,11 @@ $orders = wc_get_orders( $query_args );
             if ( res.success ) {
                 $btn.closest( 'tr' ).fadeOut( 400, function() { $( this ).remove(); } );
             } else {
-                alert( res.data || '<?php echo esc_js( __( "Error al actualizar el pedido.", "ltms" ) ); ?>' );
+                console.warn( res.data || '<?php echo esc_js( __( "Error al actualizar el pedido.", "ltms" ) ); ?>' );
                 $btn.prop( 'disabled', false ).text( '<?php echo esc_js( __( "Marcar Entregado", "ltms" ) ); ?>' );
             }
         } ).fail( function() {
-            alert( '<?php echo esc_js( __( "Error de conexion. Intente nuevamente.", "ltms" ) ); ?>' );
+            console.warn( '<?php echo esc_js( __( "Error de conexion. Intente nuevamente.", "ltms" ) ); ?>' );
             $btn.prop( 'disabled', false ).text( '<?php echo esc_js( __( "Marcar Entregado", "ltms" ) ); ?>' );
         } );
     } );

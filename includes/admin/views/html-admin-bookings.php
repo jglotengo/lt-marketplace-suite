@@ -198,7 +198,7 @@ $active_filters = $current_status || $df || $dt;
 /* global jQuery */
 jQuery( function( $ ) {
     $( '.ltms-cancel-booking' ).on( 'click', function() {
-        if ( ! confirm( '<?php echo esc_js( __( "¿Cancelar esta reserva? Esta acción no se puede deshacer.", "ltms" ) ); ?>' ) ) return;
+        if ( ! window.confirm( '<?php echo esc_js( __( "¿Cancelar esta reserva? Esta acción no se puede deshacer.", "ltms" ) ); ?>' ) ) return;
         var $btn = $( this ).prop( 'disabled', true );
         $.post( ajaxurl, {
             action:         'ltms_admin_booking_action',
@@ -206,7 +206,7 @@ jQuery( function( $ ) {
             booking_id:     $btn.data( 'id' ),
             nonce:          $btn.data( 'nonce' )
         }, function( r ) {
-            r.success ? location.reload() : alert( r.data );
+            r.success ? location.reload() : console.warn( r.data );
         } );
     } );
 } );

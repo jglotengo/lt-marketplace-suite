@@ -182,7 +182,7 @@ $base_url = admin_url( 'admin.php?page=ltms-commission-tiers' );
                             ✏ <?php esc_html_e( 'Editar', 'ltms' ); ?>
                         </a>
                         <form method="post" style="display:inline;"
-                              onsubmit="return confirm('<?php esc_attr_e( '¿Eliminar este nivel?', 'ltms' ); ?>')">
+                              onsubmit="return window.confirm('<?php esc_attr_e( '¿Eliminar este nivel?', 'ltms' ); ?>')">
                             <?php wp_nonce_field( 'ltms_commission_tiers' ); ?>
                             <input type="hidden" name="ltms_tier_action" value="delete">
                             <input type="hidden" name="tier_id" value="<?php echo esc_attr( $tier['id'] ); ?>">

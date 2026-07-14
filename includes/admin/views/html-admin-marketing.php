@@ -172,12 +172,12 @@ if ( $mlm_enabled ) {
                         </a>
                         <button type="button"
                                 class="ltms-btn ltms-btn-sm <?php echo (int) $banner['is_active'] ? 'ltms-btn-success' : 'ltms-btn-outline'; ?>"
-                                onclick="ltmsToggleBanner(<?php echo esc_js( $banner['id'] ); ?>, this)">
+                                data-action="ltms-toggle-banner" data-banner-id="<?php echo esc_attr( $banner['id'] ); ?>">
                             <?php echo (int) $banner['is_active'] ? esc_html__( 'Activo', 'ltms' ) : esc_html__( 'Inactivo', 'ltms' ); ?>
                         </button>
                         <button type="button"
                                 class="ltms-btn ltms-btn-danger ltms-btn-sm"
-                                onclick="ltmsDeleteBanner(<?php echo esc_js( $banner['id'] ); ?>, this)">
+                                data-action="ltms-delete-banner" data-banner-id="<?php echo esc_attr( $banner['id'] ); ?>">
                             🗑
                         </button>
                     </div>
@@ -292,7 +292,7 @@ if ( $mlm_enabled ) {
                      ondragover="event.preventDefault();this.style.borderColor='#6366f1';this.style.background='#f5f3ff';"
                      ondragleave="this.style.borderColor='#d1d5db';this.style.background='';"
                      ondrop="ltmsHandleDrop(event)"
-                     onclick="document.getElementById('ltms-file-input').click()">
+                     data-action="ltms-trigger-file-input">
                     <div style="font-size:2rem;margin-bottom:8px;">📁</div>
                     <p style="margin:0;color:#6b7280;font-size:0.875rem;">
                         <?php esc_html_e( 'Arrastra el archivo aquí o haz clic para seleccionar', 'ltms' ); ?>
@@ -483,13 +483,13 @@ if ( $mlm_enabled ) {
             .then(function(res){
                 btn.disabled = false;
                 if (res.success) location.reload();
-                else alert(res.data || 'Error');
+                else console.warn(res.data || 'Error');
             });
     };
 
     // Eliminar banner
     window.ltmsDeleteBanner = function(id, btn) {
-        if (!confirm('¿Eliminar este material? Se borrará de Backblaze B2 también.')) return;
+        if (!window.confirm('¿Eliminar este material? Se borrará de Backblaze B2 también.')) return;
         btn.disabled = true;
         var formData = new FormData();
         formData.append('action', 'ltms_delete_banner');
@@ -500,7 +500,7 @@ if ( $mlm_enabled ) {
             .then(function(res){
                 btn.disabled = false;
                 if (res.success) location.reload();
-                else alert(res.data || 'Error al eliminar');
+                else console.warn(res.data || 'Error al eliminar');
             });
     };
 

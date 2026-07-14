@@ -206,13 +206,13 @@ $has_filters = $status_filter || $vendor_filter || $search || $date_from || $dat
                         </a>
                         <?php if ( 'pending' === $status || 'on-hold' === $status ) : ?>
                         <button type="button" class="ltms-btn ltms-btn-success ltms-btn-sm"
-                                onclick="if(confirm('<?php esc_attr_e( '¿Marcar este pedido como Procesando?', 'ltms' ); ?>')) LTMS.Admin.ajaxAction('ltms_update_order_status',{order_id:<?php echo esc_js( $order->get_id() ); ?>,status:'processing'},function(r){if(r.success)location.reload();else alert(r.data||'Error');})">
+                                data-action="ltms_update_order_status" data-order-id="<?php echo esc_attr( $order->get_id() ); ?>" data-status="processing" data-confirm="<?php esc_attr_e( '¿Marcar este pedido como Procesando?', 'ltms' ); ?>">
                             ▶ <?php esc_html_e( 'Procesar', 'ltms' ); ?>
                         </button>
                         <?php endif; ?>
                         <?php if ( ! in_array( $status, [ 'cancelled', 'refunded', 'completed' ], true ) ) : ?>
                         <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm"
-                                onclick="if(confirm('<?php esc_attr_e( '¿Cancelar este pedido?', 'ltms' ); ?>')) LTMS.Admin.ajaxAction('ltms_update_order_status',{order_id:<?php echo esc_js( $order->get_id() ); ?>,status:'cancelled'},function(r){if(r.success)location.reload();else alert(r.data||'Error');})">
+                                data-action="ltms_update_order_status" data-order-id="<?php echo esc_attr( $order->get_id() ); ?>" data-status="cancelled" data-confirm="<?php esc_attr_e( '¿Cancelar este pedido?', 'ltms' ); ?>">
                             ✕ <?php esc_html_e( 'Cancelar', 'ltms' ); ?>
                         </button>
                         <?php endif; ?>

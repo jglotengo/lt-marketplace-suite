@@ -850,7 +850,7 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
     // ── Consultar estados de ejemplo ─────────────────────────────────────────
     $('#ltms-sb-btn-estados').on('click', function(){
         if ( ! sbToken() ) {
-            alert('<?php echo esc_js( __( 'Ingresa el token de Aveonline primero.', 'ltms' ) ); ?>');
+            console.warn('<?php echo esc_js( __( 'Ingresa el token de Aveonline primero.', 'ltms' ) ); ?>');
             return;
         }
         sbSetLoading( true );
@@ -878,7 +878,7 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
     // ── Avanzar estado (automático) ──────────────────────────────────────────
     $('#ltms-sb-btn-avanzar').on('click', function(){
         if ( ! sbToken() || ! sbGuia() ) {
-            alert('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
+            console.warn('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
             return;
         }
         sbSetLoading( true );
@@ -906,7 +906,7 @@ $carriers_for_select = class_exists( 'LTMS_Business_Aveonline_Carriers' )
     // ── Forzar estado específico ─────────────────────────────────────────────
     $('#ltms-sb-btn-forzar').on('click', function(){
         if ( ! sbToken() || ! sbGuia() ) {
-            alert('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
+            console.warn('<?php echo esc_js( __( 'Ingresa el token y el número de guía.', 'ltms' ) ); ?>');
             return;
         }
         sbSetLoading( true );

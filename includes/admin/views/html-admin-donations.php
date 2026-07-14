@@ -736,7 +736,7 @@ $nonce = wp_create_nonce( 'ltms_admin_donations' );
     $(document).on('click', '.ltms-pay-batch', function(){
         var $btn = $(this);
         var id = $btn.data('id');
-        if (!confirm('¿Transferir el lote #' + id + ' ahora?')) return;
+        if (!window.confirm('¿Transferir el lote #' + id + ' ahora?')) return;
         $btn.prop('disabled', true).text('…');
         $.post(ajaxurl, { action: 'ltms_manual_payout', nonce: nonce, batch_id: id })
         .done(function(res){
