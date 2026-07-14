@@ -1026,8 +1026,9 @@ final class LTMS_Public_Auth_Handler {
 
         // Validaciones.
         $errors = [];
-        if ( empty( $phone ) || ! preg_match( '/^\+?[0-9\s\-\(\)]{7,20}$/', $phone ) ) {
-            $errors[] = [ 'field' => 'phone', 'message' => __( 'Teléfono inválido.', 'ltms' ) ];
+        // v2.9.113 FIX: Usar el mismo regex E.164 que validate_registration.
+        if ( empty( $phone ) || ! preg_match( '/^\+[1-9][0-9]{6,19}$/', preg_replace( '/[\s\-\(\)]/', '', $phone ) ) ) {
+            $errors[] = [ 'field' => 'phone', 'message' => __( 'Teléfono inválido. Usa formato internacional E.164 (ej: +573001112233).', 'ltms' ) ];
         }
         if ( empty( $document_type ) ) {
             $errors[] = [ 'field' => 'document_type', 'message' => __( 'Tipo de documento requerido.', 'ltms' ) ];
