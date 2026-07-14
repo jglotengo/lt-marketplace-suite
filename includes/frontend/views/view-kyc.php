@@ -64,7 +64,11 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
             </p>
             <?php if ( $kyc && $kyc->expires_at ) : ?>
                 <p style="color:#9ca3af;font-size:.85rem;">
-                    <?php printf( esc_html__( 'Válido hasta: %s', 'ltms' ), esc_html( $kyc->expires_at ) ); ?>
+                    <?php
+                    // v2.9.114 P1-8: format expires_at as localized date instead of raw datetime.
+                    $exp_formatted = date_i18n( get_option( 'date_format' ), strtotime( $kyc->expires_at ) );
+                    printf( esc_html__( 'Válido hasta: %s', 'ltms' ), esc_html( $exp_formatted ) );
+                    ?>
                 </p>
             <?php endif; ?>
         </div>
@@ -146,7 +150,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 <label><?php echo $is_mx
     ? esc_html__( '📄 Identificación Oficial — INE/IFE o Pasaporte, frente y reverso (obligatorio)', 'ltms' )
     : esc_html__( '📄 Cédula de Ciudadanía o NIT — frente y reverso (obligatorio)', 'ltms' ); ?></label>
-                <input type="file" id="ltms-kyc-file" name="kyc_doc" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;">
+                <input type="file" id="ltms-kyc-file" name="kyc_doc" accept="image/*,application/pdf" class="ltms-form-control" style="padding:8px;" required>
                 <span class="ltms-field-hint"><?php esc_html_e( 'Foto o escáner claro. JPG, PNG o PDF. Máx 10 MB.', 'ltms' ); ?></span>
                 <div id="ltms-kyc-upload-status" style="display:none;font-size:.85rem;color:#6b7280;margin-top:4px;"></div>
                 <input type="hidden" id="ltms-kyc-file-path" value="">
@@ -224,11 +228,24 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                            placeholder="<?php esc_attr_e( '18 dígitos, ej: 012345678901234567', 'ltms' ); ?>"
                            <?php else : ?>inputmode="numeric"
                            placeholder="<?php esc_attr_e( 'Ej: 2050123456789', 'ltms' ); ?>"
-                           <?php endif; ?>>
+                           <?php endif; ?> required>
                     <span class="ltms-field-hint"><?php echo $is_mx
                         ? esc_html__( 'CLABE de 18 dígitos. La encuentras en tu app bancaria o estado de cuenta.', 'ltms' )
                         : esc_html__( 'Número de cuenta de ahorros o corriente en banco colombiano vigilado por la SFC.', 'ltms' ); ?></span>
                 </div>
+
+                <?php if ( ! $is_mx ) : ?>
+                <!-- v2.9.114 KYC-AUDIT P1-3: tipo de cuenta (ahorros/corriente) para CO. -->
+                <div class="ltms-form-group" style="margin-bottom:12px;">
+                    <label style="font-size:.875rem;"><?php esc_html_e( 'Tipo de cuenta', 'ltms' ); ?></label>
+                    <select id="ltms-kyc-account-type" class="ltms-form-control" required>
+                        <option value="ahorros"><?php esc_html_e( 'Ahorros', 'ltms' ); ?></option>
+                        <option value="corriente"><?php esc_html_e( 'Corriente', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <?php else : ?>
+                <input type="hidden" id="ltms-kyc-account-type" value="clabe">
+                <?php endif; ?>
 
                 <div class="ltms-form-group" style="margin-bottom:4px;">
                     <label style="font-size:.875rem;"><?php echo $is_mx
@@ -242,6 +259,31 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     <input type="hidden" id="ltms-kyc-path-banco" value="">
                 </div>
             </div>
+
+            <?php if ( $is_mx ) : ?>
+            <!-- v2.9.114 KYC-AUDIT P1-3: MX-specific fiscal fields (Art. 30-B CFF / SAT). -->
+            <div class="ltms-form-group" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;margin-bottom:16px;">
+                <p style="font-size:.85rem;color:#1e40af;margin:0 0 12px;">
+                    <strong>🇲🇽 <?php esc_html_e( 'Información Fiscal SAT (México)', 'ltms' ); ?></strong><br>
+                    <?php esc_html_e( 'Requerido por Art. 30-B del Código Fiscal de la Federación (CFF) para intermediarios de plataforma.', 'ltms' ); ?>
+                </p>
+                <div class="ltms-form-group" style="margin-bottom:12px;">
+                    <label style="font-size:.875rem;"><?php esc_html_e( 'Régimen fiscal SAT', 'ltms' ); ?></label>
+                    <select id="ltms-kyc-fiscal-regime-mx" class="ltms-form-control">
+                        <option value=""><?php esc_html_e( '— Selecciona —', 'ltms' ); ?></option>
+                        <option value="resico"><?php esc_html_e( 'RESICO (Régimen Simplificado de Confianza)', 'ltms' ); ?></option>
+                        <option value="pf_actividad"><?php esc_html_e( 'PF con Actividad Empresarial', 'ltms' ); ?></option>
+                        <option value="pm"><?php esc_html_e( 'Persona Moral', 'ltms' ); ?></option>
+                        <option value="arrendamiento"><?php esc_html_e( 'Arrendamiento', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div class="ltms-form-group" style="margin-bottom:0;">
+                    <label style="font-size:.875rem;"><?php esc_html_e( 'Domicilio fiscal completo', 'ltms' ); ?></label>
+                    <input type="text" id="ltms-kyc-domicilio-fiscal-mx" class="ltms-form-control"
+                           placeholder="<?php esc_attr_e( 'Calle, número, colonia, CP, municipio, estado', 'ltms' ); ?>">
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- L-6: Consentimiento Habeas Data / Ley 1581 antes del envío -->
             <div class="ltms-form-group" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:16px;">
@@ -346,10 +388,18 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     return;
                 }
 
+                // v2.9.114 KYC-AUDIT P0-7: cédula/ID file is mandatory.
+                var cedulaFile = $('#ltms-kyc-file')[0] && $('#ltms-kyc-file')[0].files[0];
+                if (!cedulaFile && !$('#ltms-kyc-file-path').val()) {
+                    showNotice('Debes subir tu documento de identidad (cédula/INE/pasaporte).', 'error');
+                    return;
+                }
+
                 // Validar campos obligatorios de certificación bancaria
                 var repLegalName  = $.trim($('#ltms-kyc-rep-legal-name').val());
                 var bankName      = $.trim($('#ltms-kyc-bank-name').val());
                 var accountNumber = $.trim($('#ltms-kyc-account-number').val());
+                var accountType   = $('#ltms-kyc-account-type').val() || 'ahorros';
                 var bancoFile     = $('#ltms-kyc-file-banco')[0] && $('#ltms-kyc-file-banco')[0].files[0];
 
                 if (!repLegalName || !bankName || !accountNumber || !bancoFile) {
@@ -363,15 +413,32 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                     return;
                 }
 
+                // v2.9.114 KYC-AUDIT P0-2: collect sanitary registration fields if present.
+                var sanitaryReg     = $.trim($('input[name="ltms_sanitary_registration"]').val() || '');
+                var sanitaryExpires = $.trim($('input[name="ltms_sanitary_registration_expires"]').val() || '');
+                if (sanitaryReg && !sanitaryExpires) {
+                    showNotice('La fecha de vencimiento del registro sanitario es obligatoria.', 'error');
+                    return;
+                }
+
+                // v2.9.114 P1-3: collect MX-specific fields if MX vendor.
+                var fiscalRegimeMx    = $.trim($('#ltms-kyc-fiscal-regime-mx').val() || '');
+                var domicilioFiscalMx = $.trim($('#ltms-kyc-domicilio-fiscal-mx').val() || '');
+
                 var $btn = $(this).prop('disabled', true).text('Procesando...');
 
                 uploadDocument(function(cedulaPath, rutPath, camaraPath, bancoPath) {
+                    if (!cedulaPath && !$('#ltms-kyc-file-path').val()) {
+                        $btn.prop('disabled', false).text('Enviar para Verificación');
+                        showNotice('Error al subir el documento de identidad. Verifica el archivo e intenta de nuevo.', 'error');
+                        return;
+                    }
                     if (!bancoPath) {
                         $btn.prop('disabled', false).text('Enviar para Verificación');
                         showNotice('Error al subir la certificación bancaria. Verifica el archivo e intenta de nuevo.', 'error');
                         return;
                     }
-                    var filePath = cedulaPath || '';
+                    var filePath = cedulaPath || $('#ltms-kyc-file-path').val() || '';
                     $.ajax({ url: ajaxUrl, method: 'POST',
                         data: {
                             action:              'ltms_submit_kyc',
@@ -386,8 +453,15 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                             bank_rep_legal_name: repLegalName,
                             bank_name:           bankName,
                             bank_account_number: accountNumber,
+                            bank_account_type:   accountType,
                             privacy_consent:     '1',
                             consent_ts:          new Date().toISOString(),
+                            // v2.9.114 P0-2: sanitary registration fields for restaurants.
+                            sanitary_registration:         sanitaryReg,
+                            sanitary_registration_expires: sanitaryExpires,
+                            // v2.9.114 P1-3: MX-specific fields.
+                            fiscal_regime_mx:    fiscalRegimeMx,
+                            domicilio_fiscal_mx: domicilioFiscalMx
                         },
                         success: function(r) {
                             $btn.prop('disabled', false).text('Enviar para Verificación');

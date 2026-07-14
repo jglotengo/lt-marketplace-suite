@@ -225,11 +225,40 @@ $total_kyc = array_sum( $count_map );
 <!-- Modal docs -->
 <div id="ltms-kyc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:12px;padding:24px;max-width:700px;width:90%;max-height:85vh;overflow-y:auto;position:relative;">
-        <button id="ltms-kyc-modal-close" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">&times;</button>
+        <button id="ltms-kyc-modal-close" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;" aria-label="<?php esc_attr_e( 'Cerrar', 'ltms' ); ?>">&times;</button>
         <h3 style="margin:0 0 16px;"><?php esc_html_e( 'Documentos KYC', 'ltms' ); ?></h3>
         <div id="ltms-kyc-modal-content" style="display:flex;flex-wrap:wrap;gap:12px;"></div>
     </div>
 </div>
+
+<!-- v2.9.114 KYC-AUDIT P2-4: modern confirm modal (replaces native confirm) -->
+<div id="ltms-kyc-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:90%;">
+        <h3 style="margin:0 0 12px;"><?php esc_html_e( 'Confirmar aprobación', 'ltms' ); ?></h3>
+        <p class="ltms-confirm-message" style="color:#374151;margin-bottom:20px;"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="ltms-confirm-no ltms-btn ltms-btn-outline"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            <button type="button" class="ltms-confirm-yes ltms-btn ltms-btn-success"><?php esc_html_e( 'Aprobar', 'ltms' ); ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- v2.9.114 P2-4: modern reject modal (replaces native prompt) -->
+<div id="ltms-kyc-reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;">
+        <h3 style="margin:0 0 12px;"><?php esc_html_e( 'Motivo del rechazo', 'ltms' ); ?></h3>
+        <p style="color:#6b7280;font-size:.85rem;margin:0 0 8px;"><?php esc_html_e( 'El motivo será notificado al vendedor por correo.', 'ltms' ); ?></p>
+        <textarea rows="4" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;resize:vertical;" placeholder="<?php esc_attr_e( 'Ej: La cédula no es legible. Sube una foto más clara…', 'ltms' ); ?>"></textarea>
+        <p class="ltms-reject-error" style="display:none;color:#dc2626;font-size:.85rem;margin:8px 0 0;"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+            <button type="button" class="ltms-reject-cancel ltms-btn ltms-btn-outline"><?php esc_html_e( 'Cancelar', 'ltms' ); ?></button>
+            <button type="button" class="ltms-reject-submit ltms-btn ltms-btn-danger"><?php esc_html_e( 'Rechazar', 'ltms' ); ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- v2.9.114 P2-4: error toast -->
+<div id="ltms-kyc-error-message" style="display:none;position:fixed;top:20px;right:20px;background:#dc2626;color:#fff;padding:12px 16px;border-radius:6px;z-index:100001;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>
 
 <script type="text/javascript">
 /* global jQuery */
@@ -237,30 +266,53 @@ $total_kyc = array_sum( $count_map );
     'use strict';
 
     // Modal docs — carga URLs pre-firmadas via AJAX para evitar links caducados
+    function escapeHtml( s ) {
+        // v2.9.114 KYC-AUDIT P2-3 FIX: prevent XSS via decoded URL filename.
+        return String( s == null ? '' : s )
+            .replace( /&/g, '&amp;' )
+            .replace( /</g, '&lt;' )
+            .replace( />/g, '&gt;' )
+            .replace( /"/g, '&quot;' )
+            .replace( /'/g, '&#39;' );
+    }
+    function escapeAttr( s ) { return escapeHtml( s ); }
+
     function ltmsRenderKycDocs( docs ) {
-        var html = '';
+        var $container = $( '#ltms-kyc-modal-content' ).empty();
         if ( ! docs || ! docs.length ) {
-            html = '<p style="color:#6b7280;">No hay documentos disponibles.</p>';
-        } else {
-            $.each( docs, function( i, url ) {
-                if ( ! url || url === '#' ) return;
-                var ext = url.split('.').pop().toLowerCase().split('?')[0];
-                var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
-                var label = decodeURIComponent( url.split('/').pop().split('?')[0] );
-                html += '<div style="flex:1;min-width:200px;margin-bottom:8px;">';
-                if ( isImg ) {
-                    html += '<a href="' + url + '" target="_blank">' +
-                        '<img src="' + url + '" style="width:100%;border-radius:6px;border:1px solid #e5e7eb;" ' +
-                        'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\';"/>' +
-                        '<span style="display:none;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">&#x1F4C4; ' + label + '</span>' +
-                        '</a>';
-                } else {
-                    html += '<a href="' + url + '" target="_blank" style="display:inline-block;padding:8px 12px;background:#f3f4f6;border-radius:4px;font-size:12px;text-decoration:none;color:#1d4ed8;">&#x1F4C4; ' + label + '</a>';
-                }
-                html += '</div>';
-            } );
+            $container.append( $( '<p>' ).css( 'color', '#6b7280' ).text( 'No hay documentos disponibles.' ) );
+            return;
         }
-        $( '#ltms-kyc-modal-content' ).html( html );
+        $.each( docs, function( i, url ) {
+            if ( ! url || url === '#' ) return;
+            var ext = url.split('.').pop().toLowerCase().split('?')[0];
+            var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
+            var label = decodeURIComponent( url.split('/').pop().split('?')[0] );
+            var $wrapper = $( '<div>' ).css({ 'flex': '1', 'min-width': '200px', 'margin-bottom': '8px' });
+            var $link = $( '<a>' ).attr({ 'href': url, 'target': '_blank' });
+            if ( isImg ) {
+                // v2.9.114 P2-2 FIX: replace inline onerror with jQuery .on('error').
+                var $img = $( '<img>' ).attr({ 'src': url }).css({
+                    'width': '100%', 'border-radius': '6px', 'border': '1px solid #e5e7eb'
+                });
+                $img.on( 'error', function() {
+                    $img.hide();
+                    $fallback.show();
+                });
+                var $fallback = $( '<span>' ).css({
+                    'display': 'none', 'padding': '8px', 'background': '#f3f4f6',
+                    'border-radius': '4px', 'font-size': '12px'
+                }).text( '📄 ' + label );
+                $link.append( $img ).append( $fallback );
+            } else {
+                $link.css({
+                    'display': 'inline-block', 'padding': '8px 12px', 'background': '#f3f4f6',
+                    'border-radius': '4px', 'font-size': '12px', 'text-decoration': 'none', 'color': '#1d4ed8'
+                }).text( '📄 ' + label );
+            }
+            $wrapper.append( $link );
+            $container.append( $wrapper );
+        } );
         $( '#ltms-kyc-modal' ).removeAttr( 'style' ).css({ display: 'flex', position: 'fixed', inset: '0', background: 'rgba(0,0,0,.6)', zIndex: '99999', alignItems: 'center', justifyContent: 'center' });
     }
 
@@ -302,35 +354,76 @@ $total_kyc = array_sum( $count_map );
     $( '#ltms-kyc-modal-close, #ltms-kyc-modal' ).on( 'click', function( e ) {
         if ( e.target === this ) $( '#ltms-kyc-modal' ).hide();
     } );
+    // v2.9.114 P2-4: ESC closes any open modal.
+    $( document ).on( 'keydown', function( e ) {
+        if ( e.key === 'Escape' ) {
+            $( '#ltms-kyc-modal, #ltms-kyc-confirm-modal, #ltms-kyc-reject-modal' ).hide();
+        }
+    } );
 
     // Aprobar
+    // v2.9.114 KYC-AUDIT P2-4 FIX: replace native confirm() with modern modal dialog.
+    // The native confirm() is blocked by some browsers (notably iOS Safari in some
+    // configurations) and violates the UIUX-AUDIT-001 rule of no native dialogs.
+    function ltmsConfirmKycApprove( kycId, nonce, $btn ) {
+        var $modal = $( '#ltms-kyc-confirm-modal' );
+        $modal.find( '.ltms-confirm-message' ).text( '<?php echo esc_js( __( "Aprobar este KYC?", "ltms" ) ); ?>' );
+        $modal.find( '.ltms-confirm-yes' ).off( 'click' ).on( 'click', function() {
+            $modal.hide();
+            $btn.prop( 'disabled', true );
+            $.post( ajaxurl, {
+                action: 'ltms_approve_kyc',
+                kyc_id: kycId,
+                nonce:  nonce
+            }, function( res ) {
+                if ( res.success ) { window.location.reload(); }
+                else { ltmsShowKycError( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
+            } ).fail( function() { $btn.prop( 'disabled', false ); ltmsShowKycError( 'Error de conexión.' ); } );
+        } );
+        $modal.find( '.ltms-confirm-no' ).off( 'click' ).on( 'click', function() { $modal.hide(); });
+        $modal.show();
+    }
+
+    function ltmsShowKycError( msg ) {
+        var $err = $( '#ltms-kyc-error-message' ).text( msg ).show();
+        setTimeout( function() { $err.fadeOut(); }, 4000 );
+    }
+
     $( document ).on( 'click', '.ltms-kyc-approve', function() {
-        if ( ! confirm( '<?php echo esc_js( __( "Aprobar este KYC?", "ltms" ) ); ?>' ) ) return;
-        var $btn = $( this ).prop( 'disabled', true );
-        $.post( ajaxurl, {
-            action: 'ltms_approve_kyc',
-            kyc_id: $btn.data( 'id' ),
-            nonce:  $btn.data( 'nonce' )
-        }, function( res ) {
-            if ( res.success ) { window.location.reload(); }
-            else { alert( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
-        } ).fail( function() { $btn.prop( 'disabled', false ); } );
+        var $btn = $( this );
+        ltmsConfirmKycApprove( $btn.data( 'id' ), $btn.data( 'nonce' ), $btn );
     } );
 
     // Rechazar
+    // v2.9.114 P2-4 FIX: replace native prompt() with modal containing a textarea.
+    function ltmsPromptKycReject( kycId, nonce, $btn ) {
+        var $modal = $( '#ltms-kyc-reject-modal' );
+        $modal.find( 'textarea' ).val( '' );
+        $modal.find( '.ltms-reject-submit' ).off( 'click' ).on( 'click', function() {
+            var reason = $.trim( $modal.find( 'textarea' ).val() );
+            if ( ! reason ) {
+                $modal.find( '.ltms-reject-error' ).text( '<?php echo esc_js( __( "El motivo es obligatorio.", "ltms" ) ); ?>' ).show();
+                return;
+            }
+            $modal.hide();
+            $btn.prop( 'disabled', true );
+            $.post( ajaxurl, {
+                action: 'ltms_reject_kyc',
+                kyc_id: kycId,
+                reason: reason,
+                nonce:  nonce
+            }, function( res ) {
+                if ( res.success ) { window.location.reload(); }
+                else { ltmsShowKycError( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
+            } ).fail( function() { $btn.prop( 'disabled', false ); ltmsShowKycError( 'Error de conexión.' ); } );
+        } );
+        $modal.find( '.ltms-reject-cancel' ).off( 'click' ).on( 'click', function() { $modal.hide(); });
+        $modal.show();
+    }
+
     $( document ).on( 'click', '.ltms-kyc-reject', function() {
-        var reason = prompt( '<?php echo esc_js( __( "Motivo del rechazo (requerido):", "ltms" ) ); ?>' );
-        if ( ! reason ) return;
-        var $btn = $( this ).prop( 'disabled', true );
-        $.post( ajaxurl, {
-            action: 'ltms_reject_kyc',
-            kyc_id: $btn.data( 'id' ),
-            reason: reason,
-            nonce:  $btn.data( 'nonce' )
-        }, function( res ) {
-            if ( res.success ) { window.location.reload(); }
-            else { alert( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
-        } ).fail( function() { $btn.prop( 'disabled', false ); } );
+        var $btn = $( this );
+        ltmsPromptKycReject( $btn.data( 'id' ), $btn.data( 'nonce' ), $btn );
     } );
 
 }( jQuery ) );

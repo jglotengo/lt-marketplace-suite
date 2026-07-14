@@ -106,6 +106,26 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'KYC no encontrado.', 'ltms' ) );
         }
 
+        // v2.9.114 KYC-AUDIT P0-3 FIX: fetch the actual KYC row so we can sync bank data.
+        // Before, $kyc was never defined, so $kyc->bank_name etc. triggered PHP warnings
+        // AND the entire bank-sync block (lines 144-165 below) was dead code.
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_vendor_kyc';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $kyc = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM `{$table}` WHERE id = %d", $kyc_id ),
+            ARRAY_A
+        );
+        if ( ! $kyc ) {
+            wp_send_json_error( __( 'Registro KYC no encontrado.', 'ltms' ) );
+        }
+
+        // v2.9.114 KYC-AUDIT P1-12 FIX: don't approve an already-approved KYC (silent no-op
+        // that overwrites reviewed_by/reviewed_at and re-fires ltms_vendor_approved).
+        if ( 'approved' === ( $kyc['status'] ?? '' ) ) {
+            wp_send_json_error( __( 'Este KYC ya está aprobado.', 'ltms' ) );
+        }
+
         // RB-9 FIX (v2.9.19): Disparar filter ltms_kyc_pre_approve para que
         // los listeners (FT-2 screen_against_sanctions_lists, RT-2 validate_sanitary_registration)
         // puedan BLOQUEAR la aprobación si el vendor está en listas restrictivas o
@@ -122,8 +142,10 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'Aprobación bloqueada por política de cumplimiento (screening listas restrictivas o registro sanitario). Revisar logs.', 'ltms' ), 403 );
         }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'lt_vendor_kyc';
+        // v2.9.114 KYC-AUDIT P1-8 FIX: set expires_at (1 year from approval).
+        // Before, expires_at was never set, so the KYC record showed "Válido hasta: NULL"
+        // in the vendor dashboard and the 'expired' status branch was unreachable.
+        $expires_at = gmdate( 'Y-m-d', strtotime( '+1 year' ) );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->update(
@@ -132,9 +154,10 @@ final class LTMS_Admin_Payouts {
                 'status'      => 'approved',
                 'reviewed_by' => get_current_user_id(),
                 'reviewed_at' => LTMS_Utils::now_utc(),
+                'expires_at'  => $expires_at,
             ],
             [ 'id' => $kyc_id ],
-            [ '%s', '%d', '%s' ],
+            [ '%s', '%d', '%s', '%s' ],
             [ '%d' ]
         );
 
@@ -146,22 +169,22 @@ final class LTMS_Admin_Payouts {
         // (ltms_bank_account_number). El payout scheduler leía de user_meta pero
         // el KYC guardaba en la tabla — podían tener datos diferentes.
         // Ahora al aprobar KYC, sincronizamos los datos bancarios verificados a user_meta.
-        if ( ! empty( $kyc->bank_name ) ) {
-            update_user_meta( $vendor_id, 'ltms_bank_name', $kyc->bank_name );
+        // v2.9.114 KYC-AUDIT P0-3 FIX: $kyc is now an ARRAY_A (was undefined before).
+        if ( ! empty( $kyc['bank_name'] ) ) {
+            update_user_meta( $vendor_id, 'ltms_bank_name', $kyc['bank_name'] );
         }
-        if ( ! empty( $kyc->bank_account_number ) ) {
-            // Cifrar el número de cuenta antes de guardarlo en user_meta.
-            $account_to_save = $kyc->bank_account_number;
-            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
-                $encrypted = LTMS_Core_Security::encrypt( $account_to_save );
-                if ( $encrypted ) {
-                    $account_to_save = $encrypted;
-                }
-            }
-            update_user_meta( $vendor_id, 'ltms_bank_account_number', $account_to_save );
+        if ( ! empty( $kyc['bank_account_number'] ) ) {
+            // The KYC table stores the account ENCRYPTED; copy it through as-is so
+            // payout scheduler reads the same ciphertext. Decrypt only at display time.
+            update_user_meta( $vendor_id, 'ltms_bank_account_number', $kyc['bank_account_number'] );
         }
-        if ( ! empty( $kyc->bank_rep_legal_name ) ) {
-            update_user_meta( $vendor_id, 'ltms_bank_account_holder', $kyc->bank_rep_legal_name );
+        if ( ! empty( $kyc['bank_account_type'] ) ) {
+            update_user_meta( $vendor_id, 'ltms_bank_account_type', $kyc['bank_account_type'] );
+        }
+        // v2.9.114 P1-5: also sync the rep legal name from user_meta (set during submit).
+        $bank_rep_legal = get_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal', true );
+        if ( ! empty( $bank_rep_legal ) ) {
+            update_user_meta( $vendor_id, 'ltms_bank_account_holder', $bank_rep_legal );
         }
 
         // L-1: Registrar acceso/revisión de documentos KYC en vault log (Ley 1581/2012 art. 8)
@@ -237,6 +260,20 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'Vendedor no encontrado.', 'ltms' ) );
         }
 
+        // v2.9.114 KYC-AUDIT P1-13 FIX: quick-approve MUST run the same compliance
+        // screening as normal approve. Before, this endpoint bypassed ltms_kyc_pre_approve,
+        // so a vendor on the OFAC sanctions list or with missing sanitary registration
+        // could be approved via the "quick" path.
+        $allow = (bool) apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        if ( ! $allow ) {
+            LTMS_Core_Logger::warning(
+                'KYC_QUICK_APPROVE_BLOCKED_BY_FILTER',
+                sprintf( 'Quick-approve del vendedor #%d bloqueado por filter ltms_kyc_pre_approve.', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id() ]
+            );
+            wp_send_json_error( __( 'Aprobación bloqueada por política de cumplimiento. Revisar logs.', 'ltms' ), 403 );
+        }
+
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );
         update_user_meta( $vendor_id, 'ltms_vendor_status', 'approved' );
         update_user_meta( $vendor_id, 'ltms_kyc_approved_at', LTMS_Utils::now_utc() );
@@ -282,12 +319,31 @@ final class LTMS_Admin_Payouts {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_vendor_kyc';
 
+        // v2.9.114 KYC-AUDIT P1-18 FIX: don't re-reject an already-rejected KYC.
+        // Before, admin could re-reject, overwriting notes/reviewed_at and re-sending
+        // the rejection email to the vendor.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $current_status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM `{$table}` WHERE id = %d", $kyc_id ) );
+        if ( 'rejected' === $current_status ) {
+            wp_send_json_error( __( 'Este KYC ya está rechazado.', 'ltms' ) );
+        }
+
+        // v2.9.114 P1-28 FIX: preserve name_mismatch_note in notes by appending the
+        // rejection reason rather than overwriting the whole notes column.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $kyc_id ) );
+        $new_notes = $reason;
+        if ( ! empty( $existing_notes ) && stripos( $existing_notes, 'ATENCIÓN:' ) === 0 ) {
+            // Keep the mismatch flag at the top, append the rejection reason.
+            $new_notes = $existing_notes . "\n---\nMotivo del rechazo: " . $reason;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->update(
             $table,
             [
                 'status'       => 'rejected',
-                'notes'        => $reason,
+                'notes'        => $new_notes,
                 'reviewed_by'  => get_current_user_id(),
                 'reviewed_at'  => LTMS_Utils::now_utc(),
             ],
@@ -487,7 +543,10 @@ final class LTMS_Admin_Payouts {
      */
     public function ajax_get_kyc_details(): void {
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        // v2.9.114 KYC-AUDIT P2-1 FIX: use ltms_manage_kyc (not manage_woocommerce) for
+        // consistency with ajax_approve_kyc / ajax_reject_kyc. Before, shop_managers
+        // (manage_woocommerce) could view KYC details but not approve — confusing.
+        if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
             wp_send_json_error( [ 'message' => 'Sin permisos.' ], 403 );
         }
 
@@ -584,8 +643,29 @@ final class LTMS_Admin_Payouts {
         $doc_masked      = class_exists( 'LTMS_Legal_Compliance' )
             ? LTMS_Legal_Compliance::get_masked_document( $vendor_id )
             : '****';
+        // v2.9.114 KYC-AUDIT P1-12 FIX: read ltms_kyc_consent_at (set by log_kyc_consent),
+        // not ltms_kyc_consent_date (legacy wrong key). Also expose consent_ver for audit.
         $kyc_consent_at  = get_user_meta( $vendor_id, 'ltms_kyc_consent_at',  true );
         $kyc_consent_ip  = get_user_meta( $vendor_id, 'ltms_kyc_consent_ip',  true );
+        $kyc_consent_ver = get_user_meta( $vendor_id, 'ltms_kyc_data_version', true );
+
+        // v2.9.114 P0-4: expose bank data from KYC table (now populated by submit handler).
+        $bank_name_db     = $kyc['bank_name']           ?? '';
+        $bank_acc_type_db = $kyc['bank_account_type']   ?? '';
+        $bank_acc_num_db  = $kyc['bank_account_number'] ?? '';
+        // Mask the account number for display (decrypt first if needed).
+        $bank_acc_masked = '****';
+        if ( ! empty( $bank_acc_num_db ) && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+            try {
+                $plain = LTMS_Core_Security::decrypt( $bank_acc_num_db );
+                if ( $plain ) {
+                    $bank_acc_masked = str_repeat( '*', max( 0, strlen( $plain ) - 4 ) ) . substr( $plain, -4 );
+                }
+            } catch ( \Throwable $e ) {
+                $bank_acc_masked = '****';
+            }
+        }
+        $bank_rep_legal  = get_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal', true );
 
         wp_send_json_success([
             'kyc_id'        => $kyc_id,
@@ -600,9 +680,20 @@ final class LTMS_Admin_Payouts {
             'status'        => $kyc['status'],
             'submitted_at'  => $kyc['submitted_at'],
             'notes'         => $kyc['notes'] ?? '',
-            'rejection_reason' => $kyc['rejection_reason'] ?? '',
-            'kyc_consent_at'=> $kyc_consent_at,
-            'kyc_consent_ip'=> $kyc_consent_ip,
+            // v2.9.114 P1-11 FIX: rejection_reason was reading a non-existent column.
+            // The rejection reason is stored in `notes` (see ajax_reject_kyc). Expose
+            // it under both keys for backward compat with any JS that reads rejection_reason.
+            'rejection_reason' => $kyc['notes'] ?? '',
+            'kyc_consent_at'   => $kyc_consent_at,
+            'kyc_consent_ip'   => $kyc_consent_ip,
+            'kyc_consent_ver'  => $kyc_consent_ver,
+            // v2.9.114 P0-4: bank data from KYC table.
+            'bank_name'         => $bank_name_db,
+            'bank_account_type' => $bank_acc_type_db,
+            'bank_account_masked' => $bank_acc_masked,
+            'bank_rep_legal'    => $bank_rep_legal,
+            'country_code'      => $kyc['country_code'] ?? 'CO',
+            'expires_at'        => $kyc['expires_at'] ?? null,
             'docs' => [
                 'cedula'  => $doc_url_cedula  ? esc_url( $doc_url_cedula )  : '',
                 'rut'     => $doc_url_rut     ? esc_url( $doc_url_rut )     : '',

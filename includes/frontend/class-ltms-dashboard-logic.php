@@ -55,7 +55,14 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_mark_notification_read', [ $instance, 'ajax_mark_notification_read' ] );
         add_action( 'wp_ajax_ltms_get_analytics_data',    [ $instance, 'ajax_get_analytics_data' ] );
         add_action( 'wp_ajax_ltms_submit_kyc',            [ $instance, 'ajax_submit_kyc' ] );
-        add_action( 'wp_ajax_ltms_upload_kyc_document',   [ $instance, 'ajax_upload_kyc_document' ] );
+        // v2.9.114 KYC-AUDIT P0-9 FIX: do NOT register ajax_upload_kyc_document here.
+        // LTMS_Media_Guard::init() (called earlier in kernel) already registers the same
+        // action 'wp_ajax_ltms_upload_kyc_document' → handle_kyc_upload_ajax(). Both handlers
+        // were running on every upload, with Media Guard winning (registered first) and the
+        // Dashboard_Logic handler never executing. Worse: if Media Guard failed, Dashboard_Logic
+        // would attempt to upload the file AGAIN (duplicate B2 upload). Removing this duplicate
+        // registration eliminates the double-handler race and the dead code below.
+        // ajax_upload_kyc_document() is kept for backward compat but is now dead code.
 
         // v1.6.0 — Nuevos módulos enterprise
         add_action( 'wp_ajax_ltms_get_insurance_data',    [ $instance, 'ajax_get_insurance_data' ] );
@@ -543,6 +550,14 @@ final class LTMS_Dashboard_Logic {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_vendor_kyc';
 
+        // v2.9.114 KYC-AUDIT P0-8: country from vendor meta (not site-wide constant).
+        // Vendor may be MX registering on CO site; KYC record must reflect their country.
+        $vendor_country = strtoupper( (string) get_user_meta( $vendor_id, 'ltms_country', true ) );
+        if ( ! in_array( $vendor_country, [ 'CO', 'MX' ], true ) ) {
+            $vendor_country = strtoupper( LTMS_Core_Config::get_country() );
+        }
+        $is_mx = ( 'MX' === $vendor_country );
+
         // Sanitise inputs
         $full_name       = sanitize_text_field( wp_unslash( $_POST['full_name']       ?? '' ) ); // phpcs:ignore
         $document_type   = sanitize_key(        $_POST['document_type']   ?? 'cc' );             // phpcs:ignore
@@ -552,13 +567,22 @@ final class LTMS_Dashboard_Logic {
         $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
         $file_path_banco  = sanitize_text_field( wp_unslash( $_POST['file_path_banco']  ?? '' ) ); // phpcs:ignore
 
-        // v2.9.61 DEEP-AUDIT-002 P0-5 FIX: Validar que los file_path pertenecen al vendor.
-        // Antes un vendor podía enviar el path de otro vendor (IDOR) y usar sus documentos.
-        // Los paths deben empezar con kyc/{vendor_id}/.
-        $expected_prefix = 'kyc/' . $vendor_id . '/';
+        // v2.9.114 KYC-AUDIT P0-7: cédula/ID file_path is mandatory.
+        // Before, the JS only blocked submit if banco (bank cert) was missing. The PHP
+        // handler did not check $file_path at all, so a vendor could submit KYC without
+        // uploading any ID document. Now we enforce it server-side.
+        if ( empty( $file_path ) ) {
+            wp_send_json_error( __( 'Debes subir tu documento de identidad (cédula/INE/pasaporte).', 'ltms' ) );
+        }
+
+        // v2.9.114 KYC-AUDIT P0-1 FIX: IDOR path check must accept both bare B2 keys
+        // ('kyc/{vid}/uuid.pdf') AND vault URLs ('https://site/ltms-vault/kyc/{vid}/uuid.pdf').
+        // Before, only bare keys passed validation, but the upload handler returns vault URLs,
+        // so EVERY submit was blocked with "Error de seguridad: archivo no válido".
+        $expected_segment = 'kyc/' . $vendor_id . '/';
         $paths_to_check = [ $file_path, $file_path_rut, $file_path_camara, $file_path_banco ];
         foreach ( $paths_to_check as $path ) {
-            if ( ! empty( $path ) && strpos( $path, $expected_prefix ) !== 0 ) {
+            if ( ! empty( $path ) && strpos( $path, $expected_segment ) === false ) {
                 LTMS_Core_Logger::security(
                     'KYC_IDOR_ATTEMPT',
                     sprintf( 'Vendor #%d intentó usar path que no le pertenece: %s', $vendor_id, $path )
@@ -566,21 +590,34 @@ final class LTMS_Dashboard_Logic {
                 wp_send_json_error( __( 'Error de seguridad: archivo no válido.', 'ltms' ), 403 );
             }
         }
+
         // KYC-BANCO-1: Certificación bancaria — representante legal
         $bank_rep_legal_name = sanitize_text_field( wp_unslash( $_POST['bank_rep_legal_name'] ?? '' ) ); // phpcs:ignore
         $bank_name           = sanitize_text_field( wp_unslash( $_POST['bank_name']           ?? '' ) ); // phpcs:ignore
         $bank_account_number = sanitize_text_field( wp_unslash( $_POST['bank_account_number'] ?? '' ) ); // phpcs:ignore
+        // v2.9.114 KYC-AUDIT P1-3: Bank account type (savings/checking/clabe).
+        $bank_account_type = sanitize_key( $_POST['bank_account_type'] ?? '' ); // phpcs:ignore
+        if ( ! in_array( $bank_account_type, [ 'ahorros', 'corriente', 'clabe', 'otro' ], true ) ) {
+            $bank_account_type = $is_mx ? 'clabe' : 'ahorros';
+        }
 
-        $allowed_types = [ 'cc', 'ce', 'nit', 'passport' ];
+        // v2.9.114 KYC-AUDIT P0-6 FIX: Country-aware document type whitelist.
+        // Before, allowed_types was always [cc,ce,nit,passport]; MX vendors sending
+        // 'rfc' or 'curp' had their type silently overwritten to 'cc' (Colombian),
+        // which then failed the CC regex and blocked all MX submissions.
+        $co_types = [ 'cc', 'ce', 'nit', 'passport' ];
+        $mx_types = [ 'rfc', 'curp', 'passport' ];
+        $allowed_types = $is_mx ? $mx_types : $co_types;
         if ( ! in_array( $document_type, $allowed_types, true ) ) {
-            $document_type = 'cc';
+            $document_type = $is_mx ? 'rfc' : 'cc';
         }
 
         if ( empty( $full_name ) || empty( $document_number ) ) {
             wp_send_json_error( __( 'El nombre completo y número de documento son obligatorios.', 'ltms' ) );
         }
 
-        // v2.9.63 DEEP-AUDIT-002 P2-9: Validación estricta de número de documento por tipo.
+        // v2.9.114 KYC-AUDIT P0-6/P0-7 FIX: Document number validation by type AND country.
+        // Added MX types (RFC 12-13 alnum, CURP 18 alnum) which were missing entirely.
         $doc_clean = preg_replace( '/[\s\-\.]/', '', $document_number );
         $doc_valid = true;
         switch ( $document_type ) {
@@ -588,11 +625,17 @@ final class LTMS_Dashboard_Logic {
             case 'ce':       // Cédula de Extranjería: 6-12 dígitos
                 $doc_valid = (bool) preg_match( '/^\d{6,12}$/', $doc_clean );
                 break;
-            case 'nit':      // NIT: 9-11 dígitos + posible dígito de verificación
+            case 'nit':      // NIT: 8-11 dígitos + posible dígito de verificación
                 $doc_valid = (bool) preg_match( '/^\d{8,11}$/', $doc_clean );
                 break;
             case 'passport': // Pasaporte: 6-20 alfanuméricos
                 $doc_valid = (bool) preg_match( '/^[A-Z0-9]{6,20}$/i', $doc_clean );
+                break;
+            case 'rfc':      // MX RFC: 12 (PF) o 13 (PM) alfanuméricos
+                $doc_valid = (bool) preg_match( '/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i', $document_number );
+                break;
+            case 'curp':     // MX CURP: 18 alfanuméricos
+                $doc_valid = (bool) preg_match( '/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$/i', $document_number );
                 break;
         }
         if ( ! $doc_valid ) {
@@ -603,15 +646,43 @@ final class LTMS_Dashboard_Logic {
             ) );
         }
 
-        // v2.9.63 P2-9: Validar número de cuenta bancaria (solo dígitos, 6-20).
+        // v2.9.114 KYC-AUDIT P1-9 FIX: MX CLABE must be exactly 18 digits.
+        // Before, the regex was /^\d{6,20}$/ which accepted any 6-20 digit number,
+        // allowing malformed CLABEs that would fail at the bank.
         $bank_acc_clean = preg_replace( '/[\s\-]/', '', $bank_account_number );
-        if ( ! preg_match( '/^\d{6,20}$/', $bank_acc_clean ) ) {
-            wp_send_json_error( __( 'Número de cuenta bancaria inválido. Debe tener entre 6 y 20 dígitos.', 'ltms' ) );
+        if ( $is_mx ) {
+            if ( ! preg_match( '/^\d{18}$/', $bank_acc_clean ) ) {
+                wp_send_json_error( __( 'CLABE interbancaria inválida. Debe tener exactamente 18 dígitos.', 'ltms' ) );
+            }
+        } else {
+            if ( ! preg_match( '/^\d{6,20}$/', $bank_acc_clean ) ) {
+                wp_send_json_error( __( 'Número de cuenta bancaria inválido. Debe tener entre 6 y 20 dígitos.', 'ltms' ) );
+            }
         }
 
         // KYC-BANCO-1: Validar datos bancarios obligatorios (certificación representante legal)
         if ( empty( $bank_rep_legal_name ) || empty( $bank_name ) || empty( $bank_account_number ) || empty( $file_path_banco ) ) {
             wp_send_json_error( __( 'La certificación bancaria es obligatoria: nombre del representante legal, entidad bancaria, número de cuenta y archivo del certificado.', 'ltms' ) );
+        }
+
+        // v2.9.114 KYC-AUDIT P0-2 FIX: Persist sanitary registration fields submitted via JS.
+        // The render_sanitary_registration_fields() listener adds INVIMA/COFEPRIS inputs to
+        // the form, but the JS submit was not sending them, so validate_sanitary_registration()
+        // always returned false → no restaurant could ever get KYC approved.
+        $is_restaurant = get_user_meta( $vendor_id, 'ltms_is_restaurant', true ) === 'yes';
+        if ( $is_restaurant ) {
+            $sanitary_reg      = sanitize_text_field( wp_unslash( $_POST['sanitary_registration'] ?? '' ) ); // phpcs:ignore
+            $sanitary_expires  = sanitize_text_field( wp_unslash( $_POST['sanitary_registration_expires'] ?? '' ) ); // phpcs:ignore
+            if ( empty( $sanitary_reg ) || empty( $sanitary_expires ) ) {
+                wp_send_json_error( __( 'El registro sanitario (INVIMA/COFEPRIS) y su fecha de vencimiento son obligatorios para restaurantes.', 'ltms' ) );
+            }
+            // Validate date format and not expired.
+            $exp_ts = strtotime( $sanitary_expires );
+            if ( ! $exp_ts || $exp_ts < time() ) {
+                wp_send_json_error( __( 'La fecha de vencimiento del registro sanitario es inválida o ya está vencida.', 'ltms' ) );
+            }
+            update_user_meta( $vendor_id, 'ltms_sanitary_registration',          $sanitary_reg );
+            update_user_meta( $vendor_id, 'ltms_sanitary_registration_expires',  $sanitary_expires );
         }
 
         // v2.9.68 DEEP-AUDIT-002 P1-12: Flag mismatch entre rep_legal_name y nombre del vendor.
@@ -647,18 +718,69 @@ final class LTMS_Dashboard_Logic {
 
         // Insert KYC record
         // v2.9.68 P1-12: Incluir notes con mismatch flag si existe.
+        // v2.9.114 KYC-AUDIT P0-4 FIX: persist ALL KYC table fields (bank_name, bank_account_number,
+        // bank_account_type, tax_regime, ciiu_code, etc.) so the table is the single source of
+        // truth. Before, only the cédula file_path and basic fields were saved; bank data went
+        // only to user_meta, causing ajax_approve_kyc() to read null values and skip bank sync.
         $kyc_notes = $name_mismatch_note ?: '';
-        $inserted = $wpdb->insert( $table, [
-            'vendor_id'       => $vendor_id,
-            'document_type'   => $document_type,
-            'document_number' => $document_number,
-            'full_name'       => $full_name,
-            'file_path'       => $file_path,
-            'status'          => 'pending',
-            'submitted_at'    => current_time( 'mysql' ),
-            'country_code'    => defined( 'LTMS_COUNTRY' ) ? LTMS_COUNTRY : 'CO',
-            'notes'           => $kyc_notes,
-        ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ] );
+
+        // Encrypt bank account number before storing in the KYC table (column is VARCHAR(50)).
+        $bank_account_to_store = $bank_account_number;
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+            $encrypted_acc = LTMS_Core_Security::encrypt( $bank_account_number );
+            if ( $encrypted_acc ) {
+                $bank_account_to_store = $encrypted_acc;
+            }
+        }
+
+        // Compute file hash for dedup / forensic matching.
+        $file_hash = '';
+        if ( ! empty( $file_path ) && class_exists( 'LTMS_Api_Factory' ) ) {
+            try {
+                $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket', 'lotengo-kyc-docs' );
+                $b2        = LTMS_Api_Factory::get( 'backblaze' );
+                $obj       = $b2->get_object( $b2_bucket, $this->extract_b2_key_from_path( $file_path ) );
+                if ( $obj && ! empty( $obj['hash_sha256'] ) ) {
+                    $file_hash = $obj['hash_sha256'];
+                }
+            } catch ( \Throwable $e ) {
+                // Hash is best-effort; don't block submit if B2 query fails.
+            }
+        }
+
+        $insert_data = [
+            'vendor_id'           => $vendor_id,
+            'document_type'       => $document_type,
+            'document_number'     => $document_number,
+            'full_name'           => $full_name,
+            'file_path'           => $file_path,
+            'file_hash'           => $file_hash ?: null,
+            'status'              => 'pending',
+            'submitted_at'        => current_time( 'mysql' ),
+            'country_code'        => $vendor_country,
+            'notes'               => $kyc_notes,
+            // v2.9.114 P0-4: bank fields persisted to KYC table.
+            'bank_name'           => $bank_name,
+            'bank_account_type'   => $bank_account_type,
+            'bank_account_number' => $bank_account_to_store,
+        ];
+        $insert_format = [ '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ];
+
+        // MX-specific fields (RFC/CURP/CLABE/domicilio fiscal).
+        if ( $is_mx ) {
+            $insert_data['rfc_mx']              = ( 'rfc' === $document_type )      ? $document_number : '';
+            $insert_data['curp_mx']             = ( 'curp' === $document_type )     ? $document_number : '';
+            $insert_data['clabe_mx']            = $bank_acc_clean;
+            $insert_data['fiscal_regime_mx']    = sanitize_text_field( wp_unslash( $_POST['fiscal_regime_mx'] ?? '' ) ); // phpcs:ignore
+            $insert_data['domicilio_fiscal_mx'] = sanitize_text_field( wp_unslash( $_POST['domicilio_fiscal_mx'] ?? '' ) ); // phpcs:ignore
+            $insert_format[] = '%s';
+            $insert_format[] = '%s';
+            $insert_format[] = '%s';
+            $insert_format[] = '%s';
+            $insert_format[] = '%s';
+        }
+
+        $inserted = $wpdb->insert( $table, $insert_data, $insert_format );
 
         if ( false === $inserted ) {
             wp_send_json_error( __( 'Error al guardar la solicitud. Intenta de nuevo.', 'ltms' ) );
@@ -667,6 +789,9 @@ final class LTMS_Dashboard_Logic {
         // Sync user meta so dashboard/settings show correct status immediately
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'pending' );
         update_user_meta( $vendor_id, 'ltms_full_name',   $full_name );
+        // v2.9.114 P0-4: also sync document_type so admin modal and downstream consumers see it.
+        update_user_meta( $vendor_id, 'ltms_document_type', $document_type );
+        update_user_meta( $vendor_id, 'ltms_country',        $vendor_country );
 
         // M-120: guardar documentos adicionales (RUT, Cámara de Comercio) como user_meta
         $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
@@ -682,12 +807,20 @@ final class LTMS_Dashboard_Logic {
         update_user_meta( $vendor_id, 'ltms_kyc_bank_verified_at', current_time( 'mysql', true ) );
 
         // L-8: registrar consentimiento de Habeas Data con timestamp e IP (trazabilidad legal)
+        // v2.9.114 KYC-AUDIT P1-12 FIX: use LTMS_Legal_Compliance::log_kyc_consent() which sets
+        // ltms_kyc_consent_at (the key read by ajax_get_kyc_details). Before, this code set
+        // ltms_kyc_consent_date (wrong key) so admin always saw empty consent timestamp.
         $privacy_consent = sanitize_text_field( wp_unslash( $_POST['privacy_consent'] ?? '' ) ); // phpcs:ignore
         if ( '1' === $privacy_consent ) {
-            update_user_meta( $vendor_id, 'ltms_kyc_consent',      '1' );
-            update_user_meta( $vendor_id, 'ltms_kyc_consent_date', gmdate( 'Y-m-d H:i:s' ) );
-            update_user_meta( $vendor_id, 'ltms_kyc_consent_ip',   sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
-            update_user_meta( $vendor_id, 'ltms_kyc_consent_ver',  '1581-2012-v1' ); // versión de la política aceptada
+            update_user_meta( $vendor_id, 'ltms_kyc_consent', '1' );
+            if ( class_exists( 'LTMS_Legal_Compliance' ) && method_exists( 'LTMS_Legal_Compliance', 'log_kyc_consent' ) ) {
+                LTMS_Legal_Compliance::log_kyc_consent( $vendor_id );
+            } else {
+                // Fallback: write the keys log_kyc_consent() would have written.
+                update_user_meta( $vendor_id, 'ltms_kyc_consent_at',     gmdate( 'Y-m-d H:i:s' ) );
+                update_user_meta( $vendor_id, 'ltms_kyc_consent_ip',     sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
+                update_user_meta( $vendor_id, 'ltms_kyc_data_version',   '1581-2012-v1' );
+            }
         }
 
 
@@ -717,6 +850,26 @@ final class LTMS_Dashboard_Logic {
         }
 
         wp_send_json_success( [ 'message' => __( 'Solicitud enviada. Recibirás una respuesta en 1-2 días hábiles.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.114 KYC-AUDIT P0-1 helper: extract the bare B2 key from a vault URL or path.
+     *
+     * Accepts both:
+     *   - 'https://site.com/ltms-vault/kyc/168/uuid.pdf'  (vault URL)
+     *   - 'kyc/168/uuid.pdf'                              (bare B2 key)
+     *
+     * Returns the bare B2 key (kyc/168/uuid.pdf).
+     *
+     * @param string $path The path/URL to normalize.
+     * @return string
+     */
+    private function extract_b2_key_from_path( string $path ): string {
+        if ( empty( $path ) ) return '';
+        if ( str_starts_with( $path, 'http' ) && str_contains( $path, '/ltms-vault/' ) ) {
+            return preg_replace( '#^.*/ltms-vault/#', '', $path );
+        }
+        return $path;
     }
 
     /**
