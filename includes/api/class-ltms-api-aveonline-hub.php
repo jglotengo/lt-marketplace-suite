@@ -98,6 +98,7 @@ class LTMS_Api_Aveonline_Hub {
                 ],
             ] ),
             'timeout' => 20,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -159,6 +160,7 @@ class LTMS_Api_Aveonline_Hub {
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -182,6 +184,7 @@ class LTMS_Api_Aveonline_Hub {
                 ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ] );
 
             $http_code = wp_remote_retrieve_response_code( $response );
@@ -240,6 +243,7 @@ class LTMS_Api_Aveonline_Hub {
                 'Ave-Hub-signature' => $token,
             ],
             'timeout' => 20, // v2.9.134 P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -261,6 +265,7 @@ class LTMS_Api_Aveonline_Hub {
                     'Ave-Hub-signature' => $token,
                 ],
                 'timeout' => 20, // v2.9.134 P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ] );
             $http_code = wp_remote_retrieve_response_code( $response );
         }

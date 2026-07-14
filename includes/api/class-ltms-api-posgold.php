@@ -103,6 +103,7 @@ final class LTMS_Api_PosGold {
 
         $response = wp_remote_get( $url, [
             'timeout' => self::HTTP_TIMEOUT,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
                 'Accept'        => 'application/json',
@@ -338,6 +339,7 @@ final class LTMS_Api_PosGold {
 
         $response = wp_remote_get( $url, [
             'timeout' => self::HTTP_TIMEOUT,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
                 'Accept'        => 'application/json',

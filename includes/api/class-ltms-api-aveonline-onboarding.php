@@ -317,6 +317,7 @@ class LTMS_Api_Aveonline_Onboarding {
         $url      = self::API_BASE . $endpoint;
         $response = wp_remote_post( $url, [
             'timeout'     => $timeout,
+            'sslverify'   => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             'headers'     => [
                 'Content-Type'  => 'application/json',
                 'Accept'        => 'application/json',
