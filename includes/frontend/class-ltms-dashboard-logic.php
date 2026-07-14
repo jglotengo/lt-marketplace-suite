@@ -734,18 +734,20 @@ final class LTMS_Dashboard_Logic {
         }
 
         // Compute file hash for dedup / forensic matching.
+        // v2.9.114 P0-4: file_hash is best-effort. We read from lt_media_files
+        // (populated by LTMS_Media_Guard::handle_kyc_upload at upload time). If the
+        // record isn't found (e.g. legacy file from before media-guard existed), we
+        // leave file_hash as NULL — the KYC submit is not blocked.
         $file_hash = '';
-        if ( ! empty( $file_path ) && class_exists( 'LTMS_Api_Factory' ) ) {
-            try {
-                $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket', 'lotengo-kyc-docs' );
-                $b2        = LTMS_Api_Factory::get( 'backblaze' );
-                $obj       = $b2->get_object( $b2_bucket, $this->extract_b2_key_from_path( $file_path ) );
-                if ( $obj && ! empty( $obj['hash_sha256'] ) ) {
-                    $file_hash = $obj['hash_sha256'];
-                }
-            } catch ( \Throwable $e ) {
-                // Hash is best-effort; don't block submit if B2 query fails.
-            }
+        if ( ! empty( $file_path ) ) {
+            $media_table = $wpdb->prefix . 'lt_media_files';
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $file_hash = (string) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT file_hash FROM `{$media_table}` WHERE file_key = %s LIMIT 1",
+                    $this->extract_b2_key_from_path( $file_path )
+                )
+            );
         }
 
         $insert_data = [
