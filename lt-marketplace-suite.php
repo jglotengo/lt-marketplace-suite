@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.134
+ * Version:           2.9.135
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.134' );
+define( 'LTMS_VERSION', '2.9.135' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -477,6 +477,71 @@ function ltms_load_autoloader(): void {
                 'ltms-coupon-attribution-listener'  => 'business/listeners/class-ltms-coupon-attribution-listener.php',
                 // v2.9.132: Audit listeners
                 'ltms-audit-listeners'              => 'business/listeners/class-ltms-audit-listeners.php',
+                // v2.9.135 AUTOLOADER-AUDIT: Safety net — classes only in Composer classmap or
+                // found via subdir search. Adding to SPL exceptions ensures loading without Composer.
+                'ltms-product-bookable'             => 'wc-types/class-ltms-product-bookable.php',
+                'ltms-sitemap'                      => 'frontend/class-ltms-sitemap.php',
+                'ltms-geo-detector'                 => 'frontend/class-ltms-geo-detector.php',
+                'ltms-seo-manager'                  => 'frontend/class-ltms-seo-manager.php',
+                'ltms-analytics-manager'            => 'frontend/class-ltms-analytics-manager.php',
+                'ltms-api-webhook-router'           => 'api/webhooks/class-ltms-api-webhook-router.php',
+                'ltms-api-factory'                  => 'api/factories/class-ltms-api-factory.php',
+                'ltms-fiscal-exporter'              => 'admin/class-ltms-fiscal-exporter.php',
+                'ltms-shipping-mode'                => 'business/class-ltms-shipping-mode.php',
+                // v2.9.135: Classes from audit cycle not yet in classmap
+                'ltms-frontend-notifications'       => 'frontend/class-ltms-frontend-notifications.php',
+                'ltms-frontend-customer-bookings'   => 'frontend/class-ltms-frontend-customer-bookings.php',
+                'ltms-frontend-booking-handler'     => 'frontend/class-ltms-frontend-booking-handler.php',
+                'ltms-frontend-checkout-aveonline-office' => 'frontend/class-ltms-frontend-checkout-aveonline-office.php',
+                'ltms-frontend-checkout-municipality-field' => 'frontend/class-ltms-frontend-checkout-municipality-field.php',
+                'ltms-frontend-payout-handler'      => 'frontend/class-ltms-frontend-payout-handler.php',
+                'ltms-admin-bookable-meta'          => 'admin/class-ltms-admin-bookable-meta.php',
+                'ltms-admin-bookings'               => 'admin/class-ltms-admin-bookings.php',
+                'ltms-admin-marketing-manager'      => 'admin/class-ltms-admin-marketing-manager.php',
+                'ltms-admin-product-meta'           => 'admin/class-ltms-admin-product-meta.php',
+                'ltms-admin-redi'                   => 'admin/class-ltms-admin-redi.php',
+                'ltms-admin-sat-report'             => 'admin/class-ltms-admin-sat-report.php',
+                'ltms-api-addi'                     => 'api/class-ltms-api-addi.php',
+                'ltms-api-alegra'                   => 'api/class-ltms-api-alegra.php',
+                'ltms-api-aveonline-hub'            => 'api/class-ltms-api-aveonline-hub.php',
+                'ltms-api-backblaze'                => 'api/class-ltms-api-backblaze.php',
+                'ltms-api-heka'                     => 'api/class-ltms-api-heka.php',
+                'ltms-api-openpay'                  => 'api/class-ltms-api-openpay.php',
+                'ltms-api-stripe'                   => 'api/class-ltms-api-stripe.php',
+                'ltms-api-tptc'                     => 'api/class-ltms-api-tptc.php',
+                'ltms-api-uber'                     => 'api/class-ltms-api-uber.php',
+                'ltms-api-xcover'                   => 'api/class-ltms-api-xcover.php',
+                'ltms-api-zapsign'                  => 'api/class-ltms-api-zapsign.php',
+                'ltms-booking-calendar'             => 'booking/class-ltms-booking-calendar.php',
+                'ltms-booking-manager'              => 'booking/class-ltms-booking-manager.php',
+                'ltms-booking-notifications'        => 'booking/class-ltms-booking-notifications.php',
+                'ltms-booking-policy-handler'       => 'booking/class-ltms-booking-policy-handler.php',
+                'ltms-booking-season-manager'       => 'booking/class-ltms-booking-season-manager.php',
+                'ltms-business-aveonline-agents'    => 'business/class-ltms-business-aveonline-agents.php',
+                'ltms-business-aveonline-carriers'  => 'business/class-ltms-business-aveonline-carriers.php',
+                'ltms-business-aveonline-cities'    => 'business/class-ltms-business-aveonline-cities.php',
+                'ltms-business-aveonline-guias'     => 'business/class-ltms-business-aveonline-guias.php',
+                'ltms-business-aveonline-hub-log'   => 'business/class-ltms-business-aveonline-hub-log.php',
+                'ltms-business-aveonline-offices'   => 'business/class-ltms-business-aveonline-offices.php',
+                'ltms-business-aveonline-sandbox'   => 'business/class-ltms-business-aveonline-sandbox.php',
+                'ltms-business-consumer-protection' => 'business/class-ltms-business-consumer-protection.php',
+                'ltms-business-pickup-handler'      => 'business/class-ltms-business-pickup-handler.php',
+                'ltms-business-redi-manager'        => 'business/class-ltms-business-redi-manager.php',
+                'ltms-business-redi-order-split'    => 'business/class-ltms-business-redi-order-split.php',
+                'ltms-business-tourism-compliance'  => 'business/class-ltms-business-tourism-compliance.php',
+                'ltms-core-cache-manager'           => 'core/class-ltms-core-cache-manager.php',
+                'ltms-core-cron-manager'            => 'core/class-ltms-core-cron-manager.php',
+                'ltms-core-hpos-compat'             => 'core/class-ltms-core-hpos-compat.php',
+                'ltms-core-rest-controller'         => 'core/class-ltms-core-rest-controller.php',
+                'ltms-roles'                        => 'roles/class-ltms-roles.php',
+                'ltms-shipping-method-aveonline'    => 'shipping/class-ltms-shipping-method-aveonline.php',
+                'ltms-shipping-method-free-absorbed'=> 'shipping/class-ltms-shipping-method-free-absorbed.php',
+                'ltms-shipping-method-heka'         => 'shipping/class-ltms-shipping-method-heka.php',
+                'ltms-shipping-method-own-delivery' => 'shipping/class-ltms-shipping-method-own-delivery.php',
+                'ltms-shipping-method-pickup'       => 'shipping/class-ltms-shipping-method-pickup.php',
+                'ltms-shipping-method-uber-direct'  => 'shipping/class-ltms-shipping-method-uber-direct.php',
+                'ltms-shipping-parallel-quoter'     => 'shipping/class-ltms-shipping-parallel-quoter.php',
+                'ltms-gateway-stripe'               => 'gateway/class-ltms-gateway-stripe.php',
                 // Frontend v1.7.4
                 'ltms-kitchen-ajax'                 => 'frontend/class-ltms-kitchen-ajax.php',
                 'ltms-vendor-settings-saver'        => 'frontend/class-ltms-vendor-settings-saver.php',
