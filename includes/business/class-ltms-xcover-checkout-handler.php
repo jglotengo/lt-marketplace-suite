@@ -80,6 +80,18 @@ class LTMS_XCover_Checkout_Handler {
     public function ajax_get_quotes(): void {
         check_ajax_referer( 'ltms_xcover_nonce', 'nonce' );
 
+        // v2.9.121 INSURANCE-AUDIT P0-1 FIX: rate limit XCover quote requests.
+        // Before, every checkout page load triggered an API call to XCover. A bot
+        // could trigger thousands of quote requests, hitting XCover rate limits and
+        // potentially costing money. Now capped at 10 per IP per 5 minutes.
+        $ip       = LTMS_Core_Security::get_client_ip_safe();
+        $rl_key   = 'ltms_xcover_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count >= 10 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas solicitudes. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, 5 * MINUTE_IN_SECONDS );
+
         $cart    = WC()->cart;
         $total   = $cart ? (float) $cart->get_total( 'numeric' ) : 0;
         $country = LTMS_Core_Config::get_country();
@@ -91,7 +103,7 @@ class LTMS_XCover_Checkout_Handler {
                 $xcover = LTMS_Api_Factory::get( 'xcover' );
                 $result = $xcover->get_quotes( [
                     'insurance_type' => $type,
-                    'order_total'    => $total,
+                    'price'          => $total, // v2.9.121 P0-3 FIX: pass 'price' key (API expects 'price', not 'order_total')
                     'currency'       => LTMS_Core_Config::get_currency(),
                     'country'        => $country,
                 ] );

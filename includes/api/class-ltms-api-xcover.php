@@ -129,6 +129,10 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_policy( string $policy_id ): array {
+        // v2.9.121 INSURANCE-AUDIT P1-1 FIX: validate policy_id format.
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $policy_id ) ) {
+            return [];
+        }
         return $this->perform_request( 'GET', '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/' );
     }
 
@@ -140,6 +144,16 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array{success: bool, refund_amount: float}
      */
     public function cancel_policy( string $policy_id, string $reason ): array {
+        // v2.9.121 INSURANCE-AUDIT P1-2 FIX: validate policy_id format.
+        // Before, $policy_id was used directly in the URL path without validation
+        // — path traversal characters could access unintended API endpoints.
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $policy_id ) ) {
+            return [
+                'success'       => false,
+                'refund_amount' => 0.0,
+            ];
+        }
+
         $payload  = [ 'reason' => sanitize_text_field( $reason ) ];
         $response = $this->perform_request(
             'DELETE',
