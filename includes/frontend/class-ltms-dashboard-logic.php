@@ -400,17 +400,33 @@ final class LTMS_Dashboard_Logic {
         $user_id         = get_current_user_id();
         $notification_id = (int) ( $_POST['notification_id'] ?? 0 ); // phpcs:ignore
 
+        if ( ! $notification_id ) {
+            wp_send_json_error( [ 'message' => __( 'ID de notificación inválido.', 'ltms' ) ] );
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_notifications';
 
+        // v2.9.119 NOTIFICATIONS-AUDIT P1-2 FIX: verify the notification belongs to the user.
+        // Before, the WHERE clause included user_id (so 0 rows affected if mismatch), but
+        // the handler returned success regardless — the frontend would think it was marked
+        // read when it wasn't. Now we check affected rows and return error if 0.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
+        $updated = $wpdb->update(
             $table,
             [ 'is_read' => 1, 'read_at' => LTMS_Utils::now_utc() ],
-            [ 'id' => $notification_id, 'user_id' => $user_id ],
+            [ 'id' => $notification_id, 'user_id' => $user_id, 'is_read' => 0 ],
             [ '%d', '%s' ],
-            [ '%d', '%d' ]
+            [ '%d', '%d', '%d' ]
         );
+
+        if ( false === $updated ) {
+            wp_send_json_error( [ 'message' => __( 'Error al marcar la notificación.', 'ltms' ) ] );
+        }
+        if ( 0 === $updated ) {
+            // Either the notification doesn't exist, belongs to another user, or was already read.
+            wp_send_json_error( [ 'message' => __( 'Notificación no encontrada o ya leída.', 'ltms' ) ] );
+        }
 
         wp_send_json_success();
     }

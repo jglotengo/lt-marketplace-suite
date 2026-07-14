@@ -68,6 +68,24 @@ class LTMS_Frontend_Notifications {
     public static function create( int $user_id, string $type, string $title, string $message, array $data = [] ): int|false {
         if ( ! self::table_exists() ) return false;
 
+        // v2.9.119 NOTIFICATIONS-AUDIT P0-1 FIX: rate limit notification creation.
+        // Before, any caller could create unlimited notifications for a user —
+        // a bug in a listener could spam a vendor with thousands of notifications.
+        // Now capped at 50 per hour per user (configurable).
+        $rate_key = 'ltms_notif_rate_' . $user_id;
+        $count    = (int) get_transient( $rate_key );
+        if ( $count > 50 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'NOTIFICATION_RATE_LIMITED',
+                    sprintf( 'User #%d: notification rate limit exceeded (%d/h). Type: %s, Title: %s', $user_id, $count, $type, $title ),
+                    [ 'user_id' => $user_id, 'type' => $type, 'count' => $count ]
+                );
+            }
+            return false;
+        }
+        set_transient( $rate_key, $count + 1, HOUR_IN_SECONDS );
+
         global $wpdb;
 
         $res = $wpdb->insert(
