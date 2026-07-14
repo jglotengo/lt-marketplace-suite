@@ -159,10 +159,28 @@ final class LTMS_Frontend_Payout_Handler {
             );
         } catch ( \Throwable $e ) {
             $this->log_error( 'ajax_request_payout: ' . $e->getMessage() );
+            // v2.9.115 PAYOUT-AUDIT P1-6: log security event for unexpected exceptions.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::security(
+                    'PAYOUT_REQUEST_EXCEPTION',
+                    sprintf( 'Vendor #%d: excepción inesperada al crear retiro: %s', $vendor_id, $e->getMessage() ),
+                    [ 'vendor_id' => $vendor_id, 'amount' => $amount, 'method' => $method, 'exception' => get_class( $e ) ]
+                );
+            }
             wp_send_json_error( __( 'Error interno al procesar la solicitud. Inténtalo de nuevo.', 'ltms' ), 500 );
         }
 
         if ( ! ( $result['success'] ?? false ) ) {
+            // v2.9.115 PAYOUT-AUDIT P1-6: log security event for failed payout attempts
+            // (insufficient balance, KYC missing, bank mismatch, frozen wallet, etc.).
+            // These could indicate fraud attempts or configuration issues that need review.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'PAYOUT_REQUEST_FAILED',
+                    sprintf( 'Vendor #%d: retiro rechazado: %s', $vendor_id, $result['message'] ?? '(sin mensaje)' ),
+                    [ 'vendor_id' => $vendor_id, 'amount' => $amount, 'method' => $method, 'reason' => $result['message'] ?? '' ]
+                );
+            }
             wp_send_json_error( $result['message'] ?? __( 'Error desconocido.', 'ltms' ) );
         }
 

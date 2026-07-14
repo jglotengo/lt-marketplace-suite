@@ -89,18 +89,28 @@ final class LTMS_Payout_Scheduler {
         }
 
         // Verificar balance disponible
-        $wallet  = LTMS_Business_Wallet::get_or_create( $vendor_id );
-        $balance = (float) $wallet['balance'];
+        // v2.9.115 PAYOUT-AUDIT P0-1 FIX: use AVAILABLE balance (balance - held), not raw balance.
+        // Before, vendor could request payout of HELD funds (already earmarked for another
+        // pending payout) → double-spend of held funds when both payouts are approved.
+        $wallet    = LTMS_Business_Wallet::get_or_create( $vendor_id );
+        $balance   = (float) $wallet['balance'];
+        $held      = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
+        $available = max( 0.0, $balance - $held );
 
-        if ( $amount > $balance ) {
+        if ( $amount > $available ) {
             return [
                 'success'   => false,
-                'message'   => __( 'Saldo insuficiente para realizar este retiro.', 'ltms' ),
+                'message'   => $held > 0
+                    ? sprintf( __( 'Saldo disponible insuficiente. Tienes %s retenidos por retiros pendientes. Disponible: %s.', 'ltms' ), LTMS_Utils::format_money( $held ), LTMS_Utils::format_money( $available ) )
+                    : __( 'Saldo insuficiente para realizar este retiro.', 'ltms' ),
                 'payout_id' => 0,
             ];
         }
 
         // Verificar que no tenga demasiados retiros pendientes
+        // v2.9.115 PAYOUT-AUDIT P1-3 FIX: include 'processing' status in the count.
+        // Before, a vendor with 3 'pending' + 1 'processing' could create a 4th request,
+        // bypassing the MAX_PENDING_PER_VENDOR limit.
         if ( self::get_pending_count( $vendor_id ) >= self::MAX_PENDING_PER_VENDOR ) {
             return [
                 'success'   => false,
@@ -111,9 +121,49 @@ final class LTMS_Payout_Scheduler {
 
         // Verificar KYC aprobado
         if ( ! self::vendor_has_approved_kyc( $vendor_id ) ) {
+            LTMS_Core_Logger::security(
+                'PAYOUT_REQUEST_BLOCKED_NO_KYC',
+                sprintf( 'Vendor #%d intentó solicitar retiro sin KYC aprobado.', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'amount' => $amount, 'method' => $method ]
+            );
             return [
                 'success'   => false,
                 'message'   => __( 'Debes completar la verificación KYC para solicitar retiros.', 'ltms' ),
+                'payout_id' => 0,
+            ];
+        }
+
+        // v2.9.115 PAYOUT-AUDIT P1-9 FIX: check if wallet is frozen.
+        // Before, a vendor with a frozen wallet (e.g., under fraud investigation)
+        // could still request payouts, which would then be approved by an admin
+        // who didn't notice the freeze flag.
+        if ( ! empty( $wallet['is_frozen'] ) ) {
+            LTMS_Core_Logger::security(
+                'PAYOUT_REQUEST_BLOCKED_FROZEN',
+                sprintf( 'Vendor #%d intentó solicitar retiro con billetera congelada: %s', $vendor_id, $wallet['freeze_reason'] ?? '(sin motivo)' ),
+                [ 'vendor_id' => $vendor_id, 'amount' => $amount, 'freeze_reason' => $wallet['freeze_reason'] ?? '' ]
+            );
+            return [
+                'success'   => false,
+                'message'   => __( 'Tu billetera está temporalmente congelada. Contacta a soporte para más información.', 'ltms' ),
+                'payout_id' => 0,
+            ];
+        }
+
+        // v2.9.115 PAYOUT-AUDIT P1-7 FIX: apply ltms_payout_pre_create filter.
+        // Before, listeners (fraud detection, sanctions screening at request time)
+        // had no way to block payout creation — only approval. A vendor on a sanctions
+        // list could create a payout that would sit 'pending' until manual review.
+        $allow = (bool) apply_filters( 'ltms_payout_pre_create', true, $vendor_id, $amount, $method );
+        if ( ! $allow ) {
+            LTMS_Core_Logger::security(
+                'PAYOUT_REQUEST_BLOCKED_BY_FILTER',
+                sprintf( 'Vendor #%d: creación de retiro bloqueada por filter ltms_payout_pre_create.', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'amount' => $amount, 'method' => $method ]
+            );
+            return [
+                'success'   => false,
+                'message'   => __( 'Solicitud bloqueada por política de cumplimiento. Contacta a soporte.', 'ltms' ),
                 'payout_id' => 0,
             ];
         }
@@ -561,10 +611,18 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         }
 
         // Fallo en el gateway — mantener en pending con nota
+        // v2.9.115 PAYOUT-AUDIT P1-5 FIX: append error to existing notes, don't overwrite.
+        // Before, this update overwrote any existing notes (e.g., name mismatch flag
+        // from KYC submit) with just the gateway error message.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
+        $new_notes = sprintf( 'Error gateway: %s', $payment_result['message'] );
+        if ( ! empty( $existing_notes ) ) {
+            $new_notes = $existing_notes . "\n---\n" . $new_notes;
+        }
         $wpdb->update(
             $table,
-            [ 'notes' => sprintf( 'Error gateway: %s', $payment_result['message'] ) ],
+            [ 'notes' => $new_notes ],
             [ 'id' => $payout_id ],
             [ '%s' ],
             [ '%d' ]
@@ -585,6 +643,20 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         $payout = self::get_payout( $payout_id );
         if ( ! $payout || $payout['status'] !== 'pending' ) {
             return [ 'success' => false, 'message' => __( 'Solicitud no encontrada o ya procesada.', 'ltms' ) ];
+        }
+
+        // v2.9.115 PAYOUT-AUDIT P0-4 FIX: validate non-empty reason.
+        // Before, an empty reason could be passed (admin clicks "Confirmar Rechazo" without
+        // typing anything in the textarea). The frontend had validation, but the PHP
+        // handler did not — so a direct AJAX call with empty reason would succeed.
+        // Vendor would receive a rejection email with empty reason, unable to fix.
+        $reason = trim( $reason );
+        if ( $reason === '' ) {
+            return [ 'success' => false, 'message' => __( 'El motivo del rechazo es obligatorio.', 'ltms' ) ];
+        }
+        // Limit reason length to fit in the rejection_reason column (VARCHAR 500).
+        if ( mb_strlen( $reason ) > 480 ) {
+            $reason = mb_substr( $reason, 0, 480 ) . '…';
         }
 
         // PO-BUG-C FIX: wrap Wallet::release() in try/catch.
@@ -632,17 +704,26 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // v2.9.115 PAYOUT-AUDIT P0-5 FIX: save reason to rejection_reason column (NOT notes).
+        // Before, reject() saved the reason to 'notes' column, but the admin view
+        // reads 'rejection_reason' column → admin could never see the reason in the
+        // list view. Also preserve any existing notes (e.g., name mismatch flag).
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
+        $reason_clean = sanitize_textarea_field( $reason );
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->update(
             $table,
             [
-                'status'       => 'rejected',
-                'notes'        => sanitize_textarea_field( $reason ),
-                'approved_by'  => $admin_id,
-                'processed_at' => LTMS_Utils::now_utc(),
+                'status'           => 'rejected',
+                'rejection_reason' => $reason_clean,
+                'notes'            => $existing_notes ?: null,
+                'approved_by'      => $admin_id,
+                'processed_at'     => LTMS_Utils::now_utc(),
             ],
             [ 'id' => $payout_id ],
-            [ '%s', '%s', '%d', '%s' ],
+            [ '%s', '%s', '%s', '%d', '%s' ],
             [ '%d' ]
         );
 
@@ -650,6 +731,11 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
             'PAYOUT_REJECTED',
             sprintf( 'Retiro #%d rechazado por admin #%d. Motivo: %s', $payout_id, $admin_id, $reason )
         );
+
+        // v2.9.115 PAYOUT-AUDIT P1-4 FIX: fire ltms_payout_rejected action.
+        // Before, only ltms_payout_completed existed — listeners (accounting reversal,
+        // fraud scoring, notification) had no way to react to rejections.
+        do_action( 'ltms_payout_rejected', (int) $payout_id, (int) $payout['vendor_id'], (float) $payout['amount'], $reason );
 
         // E-13 FIX: email al vendedor cuando se rechaza retiro
         if ( get_option( 'ltms_email_payout_rejected', 'yes' ) === 'yes' ) {
@@ -714,6 +800,15 @@ Puedes enviar una nueva solicitud desde tu panel.
         $max_auto_amount = (float) LTMS_Core_Config::get( 'ltms_auto_approve_max_amount', 500000 );
         $min_auto_amount = self::get_minimum_payout_amount();
 
+        // v2.9.115 PAYOUT-AUDIT P0-6 FIX: batch limit reduced from 50 to 5.
+        // Before, the cron could process up to 50 payouts in one run. Each approve()
+        // call makes a synchronous HTTP request to Openpay (5-15s per call) →
+        // 50 payouts × 10s = 500s, exceeding typical WP-Cron timeout (300s).
+        // The cron would silently die mid-batch, leaving some payouts 'processing'
+        // forever. Now we process 5 per run; WP-Cron will re-spawn for the rest.
+        $batch_limit = (int) LTMS_Core_Config::get( 'ltms_payout_cron_batch_size', 5 );
+        $batch_limit = max( 1, min( $batch_limit, 20 ) ); // hard cap at 20.
+
         // B7 FIX: solo seleccionar payouts 'pending' (no 'processing' ni 'completed').
         // El atomic claim en approve() ya previene double-approval, pero esta query
         // reduce el número de intentos inútiles.
@@ -726,9 +821,10 @@ Puedes enviar una nueva solicitud desde tu panel.
                  AND amount <= %f
                  AND created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)
                  ORDER BY created_at ASC
-                 LIMIT 50",
+                 LIMIT %d",
                 $min_auto_amount,
-                $max_auto_amount
+                $max_auto_amount,
+                $batch_limit
             ),
             ARRAY_A
         );
@@ -781,11 +877,38 @@ Puedes enviar una nueva solicitud desde tu panel.
 
         try {
             if ( $method === 'openpay' || $method === 'nequi' ) {
-                // Leer datos bancarios del vendedor registrados en user_meta
-                $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account', true )
-                             ?: get_user_meta( $vendor_id, 'ltms_clabe', true );
+                // v2.9.115 PAYOUT-AUDIT P0-2 FIX: read from the CORRECT user_meta keys.
+                // Before, code read 'ltms_bank_account' (a key that is NEVER set) — so
+                // $bank_account was always empty → ALL Openpay/Nequi disbursements failed
+                // with "no tiene cuenta bancaria registrada". The correct keys are:
+                //   - ltms_bank_account_number (synced from KYC table on approval, encrypted)
+                //   - ltms_kyc_bank_account (set at KYC submit time, plaintext)
+                //   - ltms_clabe (MX-specific, set at KYC submit)
+                // We try each in order, decrypting if needed.
+                $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account_number', true );
+                if ( empty( $bank_account ) ) {
+                    $bank_account = get_user_meta( $vendor_id, 'ltms_kyc_bank_account', true );
+                }
+                if ( empty( $bank_account ) ) {
+                    $bank_account = get_user_meta( $vendor_id, 'ltms_clabe', true );
+                }
+
+                // Decrypt if it looks like a ciphertext (encrypted values are base64-ish
+                // and longer than the plain account number).
+                if ( ! empty( $bank_account ) && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+                    try {
+                        $decrypted = LTMS_Core_Security::decrypt( $bank_account );
+                        if ( $decrypted ) {
+                            $bank_account = $decrypted;
+                        }
+                    } catch ( \Throwable $e ) {
+                        // Maybe it's already plaintext — keep as-is.
+                    }
+                }
+
                 $bank_code    = get_user_meta( $vendor_id, 'ltms_bank_code', true ) ?: '';
-                $holder_name  = get_user_meta( $vendor_id, 'ltms_bank_holder', true );
+                $holder_name  = get_user_meta( $vendor_id, 'ltms_bank_account_holder', true )
+                            ?: get_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal', true );
 
                 if ( empty( $bank_account ) ) {
                     return [
@@ -825,38 +948,48 @@ Puedes enviar una nueva solicitud desde tu panel.
                 // Pago manual: registrar referencia y notificar al equipo de finanzas
                 $reference = LTMS_Utils::generate_reference( 'MAN' );
 
-                // Notificar al admin para ejecutar transferencia manual
+                // v2.9.115 PAYOUT-AUDIT P0-3 FIX: do NOT leak plaintext bank account in email.
+                // Before, the admin email contained the full bank account number in clear
+                // text — a PII leak (Ley 1581/2012 art. 9). Now we send only the masked
+                // version (last 4 digits) and link to the admin panel for full details.
                 $admin_email = (string) get_option( 'admin_email' );
                 if ( $admin_email ) {
                     $vendor_user = get_userdata( $vendor_id );
-                    $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account', true ) ?: 'No registrada';
-                    $bank_name    = get_user_meta( $vendor_id, 'ltms_bank_name', true ) ?: '';
+                    $bank_name    = get_user_meta( $vendor_id, 'ltms_bank_name', true )
+                                ?: get_user_meta( $vendor_id, 'ltms_kyc_bank_name', true )
+                                ?: '';
+                    $bank_acc_raw = get_user_meta( $vendor_id, 'ltms_bank_account_number', true )
+                                ?: get_user_meta( $vendor_id, 'ltms_kyc_bank_account', true )
+                                ?: '';
+                    // Decrypt for masking only.
+                    $bank_acc_plain = $bank_acc_raw;
+                    if ( ! empty( $bank_acc_raw ) && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+                        try {
+                            $dec = LTMS_Core_Security::decrypt( $bank_acc_raw );
+                            if ( $dec ) $bank_acc_plain = $dec;
+                        } catch ( \Throwable $e ) {}
+                    }
+                    $acc_masked = ! empty( $bank_acc_plain )
+                        ? str_repeat( '*', max( 0, strlen( $bank_acc_plain ) - 4 ) ) . substr( $bank_acc_plain, -4 )
+                        : 'No registrada';
 
                     wp_mail(
                         $admin_email,
                         sprintf( '[LTMS] Retiro #%d pendiente de transferencia manual', $payout_id ),
                         sprintf(
-                            "Retiro #%d aprobado requiere transferencia manual.
-
-" .
-                            "Vendedor: %s (#%d)
-" .
-                            "Monto neto: $%s COP
-" .
-                            "Banco: %s
-" .
-                            "Cuenta: %s
-" .
-                            "Referencia: %s
-
-" .
-                            "Accede al panel: %s",
+                            "Retiro #%d aprobado requiere transferencia manual.\n\n" .
+                            "Vendedor: %s (#%d)\n" .
+                            "Monto neto: %s\n" .
+                            "Banco: %s\n" .
+                            "Cuenta: %s  (ver detalle en panel)\n" .
+                            "Referencia: %s\n\n" .
+                            "Accede al panel para ver los datos completos: %s",
                             $payout_id,
                             $vendor_user ? $vendor_user->display_name : '#' . $vendor_id,
                             $vendor_id,
-                            number_format( $amount, 0, ',', '.' ),
-                            $bank_name,
-                            $bank_account,
+                            LTMS_Utils::format_money( $amount ),
+                            $bank_name ?: '(no registrado)',
+                            $acc_masked,
                             $reference,
                             admin_url( 'admin.php?page=ltms-payouts' )
                         )
@@ -920,9 +1053,15 @@ Puedes enviar una nueva solicitud desde tu panel.
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // v2.9.115 PAYOUT-AUDIT P1-3 FIX: count both 'pending' AND 'processing'.
+        // A 'processing' payout still holds funds; treating it as "not pending" allowed
+        // vendors to bypass MAX_PENDING_PER_VENDOR by rapidly re-submitting.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         return (int) $wpdb->get_var(
-            $wpdb->prepare( "SELECT COUNT(*) FROM `{$table}` WHERE vendor_id = %d AND status = 'pending'", $vendor_id )
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$table}` WHERE vendor_id = %d AND status IN ('pending','processing')",
+                $vendor_id
+            )
         );
     }
 

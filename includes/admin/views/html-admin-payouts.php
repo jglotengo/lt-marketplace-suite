@@ -198,6 +198,21 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
     </div>
 </div>
 
+<!-- v2.9.115 PAYOUT-AUDIT P2-1: Modal de aprobación (reemplaza native confirm) -->
+<div id="ltms-approve-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;padding:28px;width:460px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <h3 style="margin:0 0 16px">✓ Aprobar Retiro #<span id="ltms-approve-payout-id"></span></h3>
+        <p style="margin:0 0 12px;color:#555">Esto ejecutará el pago al vendedor de forma irreversible. ¿Confirmar?</p>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" id="ltms-approve-cancel"
+                    class="ltms-btn ltms-btn-outline ltms-btn-sm">Cancelar</button>
+            <button type="button" id="ltms-approve-confirm"
+                    class="ltms-btn ltms-btn-success ltms-btn-sm"
+                    data-payout-id="" data-nonce="">Confirmar Aprobación</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Rechazo -->
 <div id="ltms-reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:8px;padding:28px;width:460px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);">
@@ -234,14 +249,32 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
     });
 
     // ── Aprobar ───────────────────────────────────────────────────────
+    // v2.9.115 PAYOUT-AUDIT P2-1 FIX: replace native confirm() with modal dialog.
+    // The native confirm() is blocked by some browsers and violates UIUX-AUDIT-001.
     $(document).on('click', '.ltms-approve-payout', function(){
         var $btn     = $(this);
         var payoutId = $btn.data('payout-id');
         var nonce    = $btn.data('nonce');
 
-        if ( ! confirm('¿Aprobar el retiro #' + payoutId + '?\n\nEsto ejecutará el pago al vendedor.') ) {
-            return;
-        }
+        // Show confirm modal instead of native confirm().
+        $('#ltms-approve-payout-id').text(payoutId);
+        $('#ltms-approve-confirm').data('payout-id', payoutId).data('nonce', nonce);
+        $('#ltms-approve-modal').css('display', 'flex');
+    });
+
+    $('#ltms-approve-cancel').on('click', function(){
+        $('#ltms-approve-modal').hide();
+    });
+
+    $('#ltms-approve-modal').on('click', function(e){
+        if ( $(e.target).is('#ltms-approve-modal') ) $(this).hide();
+    });
+
+    $('#ltms-approve-confirm').on('click', function(){
+        var $btn      = $(this);
+        var payoutId  = $btn.data('payout-id');
+        var nonce     = $btn.data('nonce');
+        var $origBtn  = $('.ltms-approve-payout[data-payout-id="' + payoutId + '"]');
 
         $btn.prop('disabled', true).text('Procesando…');
 
@@ -251,21 +284,32 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
             payout_id: payoutId
         })
         .done(function(res){
+            $('#ltms-approve-modal').hide();
+            $btn.prop('disabled', false).text('Confirmar Aprobación');
             if ( res.success ) {
-                $btn.closest('tr').find('.ltms-actions')
-                    .html('<span style="color:green;font-weight:600">✓ Aprobado</span>');
-                $btn.closest('tr').find('.ltms-badge')
-                    .removeClass().addClass('ltms-badge ltms-badge-success').text('Aprobado');
+                if ( $origBtn.length ) {
+                    $origBtn.closest('tr').find('.ltms-actions')
+                        .html('<span style="color:green;font-weight:600">✓ Aprobado</span>');
+                    $origBtn.closest('tr').find('.ltms-badge')
+                        .removeClass().addClass('ltms-badge ltms-badge-success').text('Aprobado');
+                }
                 ltmsNotify('success', 'Retiro #' + payoutId + ' aprobado correctamente.');
             } else {
-                $btn.prop('disabled', false).text('✓ Aprobar');
                 ltmsNotify('error', res.data || 'Error al aprobar.');
             }
         })
         .fail(function(){
-            $btn.prop('disabled', false).text('✓ Aprobar');
+            $('#ltms-approve-modal').hide();
+            $btn.prop('disabled', false).text('Confirmar Aprobación');
             ltmsNotify('error', 'Error de conexión.');
         });
+    });
+
+    // v2.9.115 P2-1: ESC closes any open modal.
+    $(document).on('keydown', function(e){
+        if ( e.key === 'Escape' ) {
+            $('#ltms-approve-modal, #ltms-reject-modal').hide();
+        }
     });
 
     // ── Abrir modal de rechazo ────────────────────────────────────────
