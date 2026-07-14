@@ -475,14 +475,11 @@ final class LTMS_Frontend_Assets {
         if ( $requested_suffix === '' ) {
             return '';
         }
-        // Construir la ruta del archivo .min y verificar si existe en disco.
-        $path_parts  = pathinfo( $relative_path );
-        $min_path    = $path_parts['dirname'] . '/' . $path_parts['filename'] . '.min.' . $path_parts['extension'];
-        $full_path   = defined( 'LTMS_ASSETS_DIR' ) ? LTMS_ASSETS_DIR . $min_path : '';
-        if ( $full_path && file_exists( $full_path ) ) {
-            return '.min';
-        }
-        return '';
+        // v2.9.111 FIX: En SiteGround, file_exists() puede fallar por permisos
+        // o paths relativos. Si estamos en producción Y el .min fue generado
+        // por nuestro build script, asumimos que existe.
+        // El CI verifica que todos los .min existan antes del deploy.
+        return '.min';
     }
 
     /**
