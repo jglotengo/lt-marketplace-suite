@@ -188,10 +188,15 @@
                         self.dataCache[cacheKey] = response.data;
                         self.renderHomeView(response.data);
                     } else {
-                        self.showError('#ltms-view-home', response.data || ltmsDashboard.i18n.error);
+                        // v2.9.110: No mostrar error — la vista PHP ya está visible.
+                        console.log('[LTMS] AJAX returned error on home view:', response.data);
                     }
                 },
-                error: () => self.showError('#ltms-view-home', ltmsDashboard.i18n.error),
+                error: () => {
+                    // v2.9.110: No mostrar error — la vista PHP ya está visible.
+                    // Solo log en consola para debug.
+                    console.log('[LTMS] AJAX error on home view (expected if bypass fails)');
+                },
             });
         },
 
