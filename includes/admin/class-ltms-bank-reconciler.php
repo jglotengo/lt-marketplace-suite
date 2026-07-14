@@ -152,7 +152,12 @@ class LTMS_Bank_Reconciler {
      */
     public function ajax_get_reconciliation(): void {
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-        if ( ! current_user_can( 'ltms_access_dashboard' ) ) {
+        // v2.9.115 PAYOUT-AUDIT P2-3 FIX: use ltms_manage_platform_settings for consistency
+        // with ajax_import_statement and ajax_mark_reconciled. Before, this endpoint used
+        // ltms_access_dashboard (a broader cap) — inconsistent with the other reconciliation
+        // endpoints, allowing users with dashboard access to view reconciliation data but
+        // not import statements or mark reconciled.
+        if ( ! current_user_can( 'ltms_manage_platform_settings' ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
         }
 
