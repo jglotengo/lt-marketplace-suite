@@ -308,11 +308,19 @@ class LTMS_Booking_Season_Manager {
 
         public static function ajax_get_vendor_seasons(): void {
                 check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+                // v2.9.128 BATCH-AUDIT P0-6 FIX: add vendor role check.
+                if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) && ! current_user_can( 'manage_options' ) ) {
+                    wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+                }
                 wp_send_json_success( self::get_vendor_rules( get_current_user_id() ) );
         }
 
         public static function ajax_save_vendor_season(): void {
                 check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+                // v2.9.128 P0-6: add vendor role check.
+                if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) && ! current_user_can( 'manage_options' ) ) {
+                    wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+                }
 
                 $vendor_id  = get_current_user_id();
                 $rule_id    = absint( $_POST['rule_id'] ?? 0 );
@@ -385,6 +393,10 @@ class LTMS_Booking_Season_Manager {
 
         public static function ajax_delete_vendor_season(): void {
                 check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+                // v2.9.128 P0-6: add vendor role check.
+                if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) && ! current_user_can( 'manage_options' ) ) {
+                    wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+                }
 
                 $vendor_id = get_current_user_id();
                 $rule_id   = absint( $_POST['rule_id'] ?? 0 );
