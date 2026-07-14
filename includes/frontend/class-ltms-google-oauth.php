@@ -288,7 +288,10 @@ final class LTMS_Google_OAuth {
             // Si es un usuario WP normal (subscriber/customer), promover a vendor.
             if ( in_array( 'subscriber', (array) $existing->roles, true ) ||
                  in_array( 'customer',   (array) $existing->roles, true ) ) {
-                $existing->set_role( 'ltms_vendor' );
+                // v2.9.113 P0 FIX: Usar add_role (no set_role) para no eliminar el
+                // rol de customer existente — set_role eliminaba 'customer' lo que
+                // rompía el checkout de WooCommerce para ese usuario.
+                $existing->add_role( 'ltms_vendor' );
                 update_user_meta( $existing->ID, 'ltms_kyc_status', 'pending' );
                 update_user_meta( $existing->ID, 'ltms_email_verified', 1 );
                 return $existing->ID;
@@ -329,6 +332,36 @@ final class LTMS_Google_OAuth {
         // El dashboard debe redirigir a un wizard de completado antes de
         // permitir publicar productos.
         update_user_meta( $user_id, 'ltms_profile_incomplete', 1 );
+
+        // v2.9.113 FIX: Set missing metas that normal registration sets.
+        // Sin estos metas, el vendor no aparece en listados, no tiene consentimientos
+        // legales, y su storefront URL 404. Ver P1-5,6,7,10,11,20 del audit.
+        update_user_meta( $user_id, 'ltms_business_type', 'physical' ); // Default, vendor can change later
+        update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
+        update_user_meta( $user_id, 'ltms_country', LTMS_Core_Config::get_country() );
+
+        // Log consent for terms and data treatment (Ley 1581/2012).
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            LTMS_Legal_Compliance::log_consent( $user_id, 'terms_and_conditions', true, '1.0', 'web' );
+            LTMS_Legal_Compliance::log_consent( $user_id, 'data_treatment', true, '1.0', 'web' );
+        }
+
+        // Generate store slug so the vendor has a public storefront URL immediately.
+        if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
+            $store_slug = LTMS_Vendor_Storefront::generate_unique_slug( $profile['first_name'] . ' ' . $profile['last_name'], $user_id );
+            update_user_meta( $user_id, 'ltms_store_slug', $store_slug );
+        }
+
+        // Send welcome email with referral code and KYC instructions.
+        if ( class_exists( 'LTMS_Public_Auth_Handler' ) ) {
+            // The welcome email is sent by the normal registration handler.
+            // For Google OAuth users, we send it here since they skipped that path.
+            $verify_token = wp_generate_password( 32, false );
+            update_user_meta( $user_id, 'ltms_email_verify_token', $verify_token );
+            update_user_meta( $user_id, 'ltms_email_verify_expires', time() + ( 48 * HOUR_IN_SECONDS ) );
+            // Note: email is already verified (ltms_email_verified = 1), but we send
+            // the welcome email for the referral code and onboarding instructions.
+        }
 
         // Crear wallet.
         if ( class_exists( 'LTMS_Business_Wallet' ) ) {

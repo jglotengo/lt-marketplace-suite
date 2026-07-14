@@ -136,13 +136,14 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                  en bkr_lt_tourism_compliance al aprobarse el KYC. -->
             <div class="ltms-form-group">
                 <label><?php esc_html_e( '¿Qué tipo de productos o servicios ofreces? *', 'ltms' ); ?></label>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">
                     <?php
                     $business_types = [
-                        'physical'  => [ 'icon' => '📦', 'label' => 'Productos físicos',   'hint' => 'Ropa, electrónica, accesorios…' ],
-                        'digital'   => [ 'icon' => '💻', 'label' => 'Productos digitales',  'hint' => 'Cursos, software, diseños…' ],
-                        'services'  => [ 'icon' => '🛠️', 'label' => 'Servicios',            'hint' => 'Consultoría, reparaciones…' ],
-                        'tourism'   => [ 'icon' => '🏨', 'label' => 'Turismo / Alojamiento','hint' => 'Hoteles, hostales, tours, glamping…' ],
+                        'physical'   => [ 'icon' => '📦', 'label' => 'Productos físicos',   'hint' => 'Ropa, electrónica, accesorios…' ],
+                        'digital'    => [ 'icon' => '💻', 'label' => 'Productos digitales',  'hint' => 'Cursos, software, diseños…' ],
+                        'services'   => [ 'icon' => '🛠️', 'label' => 'Servicios',            'hint' => 'Consultoría, reparaciones…' ],
+                        'tourism'    => [ 'icon' => '🏨', 'label' => 'Turismo / Alojamiento','hint' => 'Hoteles, hostales, tours, glamping…' ],
+                        'restaurant' => [ 'icon' => '🍽️', 'label' => 'Restaurante',          'hint' => 'Comida, bebidas, café, pastelería…' ],
                     ];
                     foreach ( $business_types as $val => $bt ) :
                     ?>

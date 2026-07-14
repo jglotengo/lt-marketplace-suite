@@ -389,6 +389,21 @@ final class LTMS_Public_Auth_Handler {
             ]);
         }
 
+        // v2.9.113 P2 FIX: Validate referral code if provided.
+        if ( ! empty( $data['referral_code'] ) ) {
+            $referrer = get_users( [
+                'meta_key'   => 'ltms_referral_code',
+                'meta_value' => $data['referral_code'],
+                'number'     => 1,
+                'fields'     => 'ID',
+            ] );
+            if ( empty( $referrer ) ) {
+                // Invalid code — don't fail registration, just clear it.
+                LTMS_Core_Logger::info( 'INVALID_REFERRAL_CODE', sprintf( 'Code %s not found', $data['referral_code'] ) );
+                $data['referral_code'] = '';
+            }
+        }
+
         // M-9: generación de username con retry tolerante a race.
         $username = $this->generate_username( $data['first_name'], $data['last_name'] );
         $user_id  = wp_create_user( $username, $data['password'], $data['email'] );
@@ -470,12 +485,18 @@ final class LTMS_Public_Auth_Handler {
                 : LTMS_Core_Config::get_country();
             update_user_meta( $user_id, 'ltms_country', $vendor_country );
             // M-TURISMO-01: tipo de negocio principal del vendedor.
-            $allowed_btypes = [ 'physical', 'digital', 'services', 'tourism' ];
+            $allowed_btypes = [ 'physical', 'digital', 'services', 'tourism', 'restaurant' ];
             $btype = in_array( $data['business_type'] ?? '', $allowed_btypes, true )
                 ? $data['business_type']
                 : 'physical';
             update_user_meta( $user_id, 'ltms_business_type', $btype );
+            // v2.9.113 P0-4 FIX: marca restaurantes para routing de compliance.
+            if ( $btype === 'restaurant' ) {
+                update_user_meta( $user_id, 'ltms_is_restaurant', 'yes' );
+            }
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
+            // v2.9.113 P2-14 FIX: flag inicial de configuración de tienda (se setea en 1 al configurar).
+            update_user_meta( $user_id, 'ltms_store_configured', 0 );
             update_user_meta( $user_id, 'ltms_terms_accepted_at', LTMS_Utils::now_utc() );
             update_user_meta( $user_id, 'ltms_email_verified', 0 );
 
@@ -496,7 +517,13 @@ final class LTMS_Public_Auth_Handler {
 
             // Crear billetera inicial con la moneda del país del vendedor.
             $wallet_currency = ( $vendor_country === 'MX' ) ? 'MXN' : 'COP';
-            LTMS_Business_Wallet::get_or_create( $user_id, $wallet_currency );
+            // v2.9.113 P2-16 FIX: wrap en try-catch para que un fallo de wallet no rompa el registro.
+            try {
+                LTMS_Business_Wallet::get_or_create( $user_id, $wallet_currency );
+            } catch ( \Throwable $e ) {
+                LTMS_Core_Logger::error( 'WALLET_CREATE_FAILED', sprintf( 'uid=%d: %s', $user_id, $e->getMessage() ) );
+                // Continue — wallet can be created later.
+            }
 
             // Disparar listeners (Affiliates genera ltms_referral_code, Alegra crea contacto).
             do_action( 'ltms_vendor_registered', $user_id, $data['referral_code'] ?? '' );
@@ -733,7 +760,7 @@ final class LTMS_Public_Auth_Handler {
         }
 
         // v2.9.60 REG-05: Whitelist business_type.
-        if ( ! empty( $data['business_type'] ) && ! in_array( $data['business_type'], [ 'physical', 'digital', 'services', 'tourism' ], true ) ) {
+        if ( ! empty( $data['business_type'] ) && ! in_array( $data['business_type'], [ 'physical', 'digital', 'services', 'tourism', 'restaurant' ], true ) ) {
             $errors[] = [ 'field' => 'business_type', 'message' => __( 'Tipo de negocio inválido.', 'ltms' ) ];
         }
 
@@ -755,9 +782,9 @@ final class LTMS_Public_Auth_Handler {
         }
         if ( empty( $data['phone'] ) ) {
             $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono es requerido.', 'ltms' ) ];
-        } elseif ( ! preg_match( '/^\+?[0-9\s\-\(\)]{7,20}$/', $data['phone'] ) ) {
-            // v2.9.60 REG-04: Validar formato de teléfono (E.164-like).
-            $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono tiene un formato inválido. Usa solo números, espacios, guiones y paréntesis (7-20 caracteres).', 'ltms' ) ];
+        } elseif ( ! preg_match( '/^\+[1-9][0-9]{6,19}$/', preg_replace( '/[\s\-\(\)]/', '', $data['phone'] ) ) ) {
+            // v2.9.113 P2-12 FIX: Validar formato E.164 estricto (+CC seguido de 7-19 dígitos, sin espacios/guiones/paréntesis).
+            $errors[] = [ 'field' => 'phone', 'message' => __( 'El teléfono debe estar en formato internacional E.164 (ej: +573001112233). Incluye el código de país con + al inicio.', 'ltms' ) ];
         }
         if ( empty( $data['store_address'] ) ) {
             $errors[] = [ 'field' => 'store_address', 'message' => __( 'La dirección es requerida para el contrato de vinculación.', 'ltms' ) ];
@@ -1024,6 +1051,15 @@ final class LTMS_Public_Auth_Handler {
             $errors[] = [ 'field' => 'accept_sagrilaft', 'message' => __( 'Debes autorizar SAGRILAFT.', 'ltms' ) ];
         }
 
+        // v2.9.113 P1 FIX: validate document_type and business_type against whitelists.
+        $valid_doc_types = ( $vendor_country === 'MX' ) ? [ 'RFC', 'CURP', 'PAS' ] : [ 'CC', 'CE', 'NIT', 'PAS' ];
+        if ( ! in_array( $document_type, $valid_doc_types, true ) ) {
+            $errors[] = [ 'field' => 'document_type', 'message' => __( 'Tipo de documento inválido para tu país.', 'ltms' ) ];
+        }
+        if ( ! in_array( $business_type, [ 'physical', 'digital', 'services', 'tourism', 'restaurant' ], true ) ) {
+            $errors[] = [ 'field' => 'business_type', 'message' => __( 'Tipo de negocio inválido.', 'ltms' ) ];
+        }
+
         if ( ! empty( $errors ) ) {
             wp_send_json_error( [
                 'message' => implode( ' ', array_column( $errors, 'message' ) ),
@@ -1034,20 +1070,23 @@ final class LTMS_Public_Auth_Handler {
         // Guardar metas.
         update_user_meta( $user_id, 'ltms_phone', LTMS_Utils::format_phone_e164( $phone ) );
         update_user_meta( $user_id, 'ltms_document_type', $document_type );
-        update_user_meta( $user_id, 'ltms_document_number', $document_number );
-        update_user_meta( $user_id, 'ltms_store_name', $store_name );
-        update_user_meta( $user_id, 'ltms_store_address', $store_address );
-        update_user_meta( $user_id, 'ltms_vendor_country', $vendor_country );
-        update_user_meta( $user_id, 'ltms_tax_regime', $tax_regime );
-        update_user_meta( $user_id, 'ltms_business_type', $business_type );
-
-        // Cifrar el número de documento (AES-256-GCM).
+        // v2.9.113 P0-2 FIX: Use same meta key as normal registration (ltms_document) and encrypt.
+        // Before: stored plain in ltms_document_number + encrypted in ltms_document_number_encrypted.
+        // Now: single encrypted ltms_document key, consistent with normal registration.
         if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
             $encrypted = LTMS_Core_Security::encrypt( $document_number );
-            if ( $encrypted ) {
-                update_user_meta( $user_id, 'ltms_document_number_encrypted', $encrypted );
-            }
+            update_user_meta( $user_id, 'ltms_document', $encrypted );
+        } else {
+            update_user_meta( $user_id, 'ltms_document', $document_number );
         }
+        // Also store type (normal registration stores in ltms_document_type).
+        update_user_meta( $user_id, 'ltms_document_type', $document_type );
+        update_user_meta( $user_id, 'ltms_store_name', $store_name );
+        update_user_meta( $user_id, 'ltms_store_address', $store_address );
+        // v2.9.113 P0-3 FIX: use ltms_country (consistent with normal registration), not ltms_vendor_country.
+        update_user_meta( $user_id, 'ltms_country', $vendor_country );
+        update_user_meta( $user_id, 'ltms_tax_regime', $tax_regime );
+        update_user_meta( $user_id, 'ltms_business_type', $business_type );
 
         // Generar store slug.
         if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
@@ -1060,8 +1099,20 @@ final class LTMS_Public_Auth_Handler {
             LTMS_Legal_Compliance::log_consent( $user_id, 'sagrilaft', true, '1.0', 'web' );
         }
 
+        // v2.9.113 P2-15 FIX: persist SAGRILAFT acceptance timestamp for audit trail.
+        if ( $sagrilaft ) {
+            update_user_meta( $user_id, 'ltms_sagrilaft_accepted_at', LTMS_Utils::now_utc() );
+        }
+
+        // v2.9.113 P3-17 FIX: mark email as verified (Google path already verified it).
+        update_user_meta( $user_id, 'ltms_email_verified', 1 );
+        update_user_meta( $user_id, 'ltms_email_verified_at', LTMS_Utils::now_utc() );
+
         // Marcar perfil como completo.
         delete_user_meta( $user_id, 'ltms_profile_incomplete' );
+
+        // v2.9.113 P3-18 FIX: Fire action so listeners (Alegra, Affiliates) can run.
+        do_action( 'ltms_vendor_registered', $user_id, '' );
 
         // Log.
         LTMS_Core_Logger::info( 'PROFILE_COMPLETED', sprintf( 'Vendor #%d completó su perfil (Google OAuth path)', $user_id ) );
