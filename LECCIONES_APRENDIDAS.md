@@ -3,8 +3,8 @@
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
 > **Última actualización:** 2026-07-15
-> **Versión del plugin:** 2.9.116
-> **Total de lecciones:** 80 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 10 nuevas de auditorías v2.9.113-116)
+> **Versión del plugin:** 2.9.118
+> **Total de lecciones:** 85 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 nuevas de auditorías v2.9.113-118)
 
 ---
 
@@ -1063,3 +1063,53 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Fix:** Hacer un empty commit para forzar un nuevo ref en GitHub (invalida el cache). Re-trigger el webhook múltiples veces hasta que el fetch traiga el último commit.
 
 **Regla preventiva:** Si el deploy webhook muestra `HEAD is now at <commit-viejo>` cuando GitHub ya tiene un commit más reciente, hacer un empty commit (`git commit --allow-empty -m "force refresh"`) y re-push. Esto invalida el cache HTTP de GitHub en SiteGround. Considerar agregar `git fetch --no-cache` o `git remote set-url` con un timestamp en el webhook futuro.
+
+### LECCIÓN #81: Meta key mismatch — verificar consistencia entre writer y reader
+
+**Error:** `get_policy_for_booking()` leía `_ltms_policy_id` pero `create_booking()` guarda en `_ltms_booking_policy_id` (different key). La política de cancelación SIEMPRE caía al default del vendor, las políticas específicas por producto NUNCA se aplicaban.
+
+**Causa raíz:** Dos métodos independientes (writer y reader) usaban meta keys ligeramente diferentes sin coordinación. No hay warning de PHP ni de WordPress cuando esto pasa.
+
+**Fix:** Probar ambas meta keys + booking row's `policy_id` column.
+
+**Regla preventiva:** Toda meta key que se escribe en un lugar debe leerse con el MISMO nombre en otro. Grep por el meta key completo (`_ltms_policy_id` vs `_ltms_booking_policy_id`) para verificar consistencia entre writer y reader. Considerar centralizar meta keys en constantes de clase.
+
+### LECCIÓN #82: Double refund sin idempotencia en cancelaciones
+
+**Error:** `process_cancellation_refund()` no tenía protección contra double refund. Si `cancel_booking` se llamaba dos veces (race condition o retry), `wc_create_refund` creaba DOS refund objects → double money back al cliente.
+
+**Causa raíz:** El método no verificaba si ya existía un refund para ese booking antes de crear uno nuevo. WooCommerce's `wc_create_refund` no es idempotente por defecto.
+
+**Fix:** Verificar refunds existentes por reason prefix (que incluye el booking_id) antes de crear uno nuevo.
+
+**Regla preventiva:** Toda función que cree refunds, payouts, o transacciones financieras debe ser idempotente. Verificar si ya existe una transacción con el mismo identificador (booking_id, order_id, idempotency_key) antes de crear una nueva. Para refunds de WC, buscar en `$order->get_refunds()` por reason prefix.
+
+### LECCIÓN #83: AJAX handler sin verificación de rol específico
+
+**Error:** `ajax_save_vendor_policy()` no verificaba que el usuario fuera vendor. Cualquier logged-in user (incluido customers con rol `subscriber` o `customer`) podía llamarlo y crear/editar políticas de cancelación.
+
+**Causa raíz:** El handler solo tenía `check_ajax_referer` (que verifica sesión) pero no verificaba el rol. `is_user_logged_in()` no es suficiente — cualquier cuenta registrada pasa el check.
+
+**Fix:** Agregar `LTMS_Utils::is_ltms_vendor()` check al inicio del handler.
+
+**Regla preventiva:** TODO AJAX handler que modifique datos de vendor debe verificar `LTMS_Utils::is_ltms_vendor()` además de `check_ajax_referer`. `is_user_logged_in()` solo verifica sesión, no rol. Los customers tienen cuentas válidas pero no deben acceder a endpoints de vendor.
+
+### LECCIÓN #84: IDOR en endpoints de save/update con ID numérico
+
+**Error:** `ajax_save_vendor_policy()` IDOR — un vendor podía pasar `policy_id` de OTRA vendor's policy y el método `save_policy` intentaría UPDATE (con vendor_id en WHERE, 0 rows affected) luego INSERT. El risk real: probe policy_ids para descubrir nombres/tipos de políticas ajenas.
+
+**Causa raíz:** El handler recibía `policy_id` del cliente pero no verificaba ownership antes de pasarlo a `save_policy`. Aunque `save_policy` tiene `vendor_id` en el WHERE del UPDATE, el INSERT fallback permite crear políticas duplicadas.
+
+**Fix:** Verificar ownership del policy_id antes de update + log `BOOKING_POLICY_IDOR_ATTEMPT`.
+
+**Regla preventiva:** TODO endpoint AJAX que acepte un ID numérico (policy_id, booking_id, order_id, driver_id) debe verificar ownership antes de procesar. El patrón: `SELECT vendor_id FROM table WHERE id = %d` → comparar con `get_current_user_id()`. Log security event si mismatch.
+
+### LECCIÓN #85: valorrecaudo (cash-on-delivery) sin bound = fraude
+
+**Error:** `ajax_generar_guia()` `valorrecaudo` (cash-on-delivery amount) no tenía bound. Vendor podía declarar recaudo inflado (customer paga más en delivery) o 0 recaudo para pedido pagado (vendor pocketing cash).
+
+**Causa raíz:** El handler aceptaba cualquier valor entero de `$_POST['valorrecaudo']` sin verificar contra el total del pedido. Aveonline procesa el recaudo literalmente — si el vendor dice 500000, el transportador cobra 500000 al cliente.
+
+**Fix:** Verificar `valorrecaudo <= order total` cuando el order existe.
+
+**Regla preventiva:** TODO campo financiero que represente un monto a cobrar/pagar (valorrecaudo, delivery_price, payout_amount) debe tener bounds razonables. Para cash-on-delivery, el monto nunca debe superar el total del pedido. Para delivery_price, cap a un máximo configurable. Validar contra el order total cuando aplique.

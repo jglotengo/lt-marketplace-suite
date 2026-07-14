@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.118] — 2026-07-15
+
+### Shipping / Logística — Auditoría Completa (6 bugs: 3 P0 + 3 P1)
+
+Sexta auditoría del ciclo de vida del marketplace. Módulo de envíos físicos: Aveonline (guías, tracking webhooks), ReDi (incidencias), own-delivery (domiciliarios propios).
+
+#### P0 (CRITICAL — money/security)
+
+- **P0-1**: `ajax_save_driver()` aceptaba cualquier string como teléfono → vendors podían almacenar datos arbitrarios (SQL injection attempts, XSS payloads). Ahora valida E.164 (7-20 dígitos, optional +).
+- **P0-2**: `ajax_generar_guia()` sin ownership check en `order_id` (IDOR) → vendor podía generar guía de envío para pedido de OTRO vendor. Ahora verifica `_ltms_vendor_id` + log `AVEONLINE_GUIDE_IDOR_ATTEMPT`.
+- **P0-3**: `ajax_generar_guia()` `valorrecaudo` (cash-on-delivery) sin bound → vendor podía declarar recaudo inflado (defrauding customer at delivery) o 0 para pedido pagado (pocketing cash). Ahora bounded a order total.
+
+#### P1 (HIGH)
+
+- **P1-1**: `ajax_save_delivery_settings()` `delivery_price` sin upper bound → vendor podía setear precio absurdo (999999999). Ahora capped at 1,000,000 COP (configurable via `ltms_max_own_delivery_price`).
+- **P1-2**: `ajax_mark_delivered()` sin idempotency check → vendor podía marcar mismo pedido como entregado múltiples veces, cada call disparaba `ltms_shipping_delivered`. Ahora check `_ltms_shipping_delivered_fired` meta.
+- **P1-3**: ReDi `ajax_get_incidents()` `status_filter` sin validate contra allowlist → cualquier string pasaba a SQL query. Ahora allowlisted to `[open, in_progress, resolved, closed, pending, escalated]`.
+
+#### CI Fix
+- Updated 3 WalletTest assertions from `assertFalse` to `assertTrue` for `fee`, `tax_withholding`, `reversal` types (P1-8 fix from v2.9.116 added them to `is_valid_transaction_type()` whitelist).
+
+## [2.9.117] — 2026-07-15
+
+### Bookings / Reservas — Auditoría Completa (6 bugs: 4 P0 + 2 P1)
+
+Quinta auditoría del ciclo de vida del marketplace. Módulo de reservas (turismo): create → confirm → lifecycle → cancel → refund.
+
+#### P0 (CRITICAL)
+
+- **P0-1**: `get_policy_for_booking()` leía `_ltms_policy_id` pero `create_booking()` guarda en `_ltms_booking_policy_id` (different key) → policy lookup SIEMPRE caía al default del vendor, las políticas específicas por producto NUNCA se aplicaban. Ahora prueba ambas meta keys + booking row's `policy_id` column.
+- **P0-2**: `process_cancellation_refund()` sin protección double refund → si cancel se llamaba dos veces (race o retry), `wc_create_refund` creaba DOS refund objects → double money back. Ahora verifica refunds existentes por reason prefix.
+- **P0-3**: `ajax_save_vendor_policy()` sin verificación de vendor → cualquier logged-in user (incluido customers) podía llamarlo. Ahora requires `LTMS_Utils::is_ltms_vendor()`.
+- **P0-4**: IDOR en `ajax_save_vendor_policy()` → vendor podía pasar `policy_id` ajeno y probe policy_ids para descubrir nombres/tipos de políticas ajenas. Ahora verifica ownership + log `BOOKING_POLICY_IDOR_ATTEMPT`.
+
+#### P1 (HIGH)
+
+- **P1-1**: `cleanup_pending_bookings()` no disparaba `ltms_booking_cancelled` para auto-expired bookings → listeners (notifications, refund, commission reversal) nunca corrían. Ahora dispara action + `process_cancellation_refund`.
+- **P1-2**: `save_policy()` no sanitizaba `policy_type` contra allowlist → vendor podía setear cualquier string, rompiendo `calculate_refund_amount`'s switch. Ahora allowlisted to `[flexible, moderate, strict, non_refundable]`.
+
 ## [2.9.116] — 2026-07-15
 
 ### Wallet / Comisiones — Auditoría Completa (9 bugs: 4 P0 + 5 P1)

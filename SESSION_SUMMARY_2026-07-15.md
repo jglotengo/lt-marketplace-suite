@@ -1,8 +1,8 @@
 # 📋 RESUMEN DE TRABAJO — Sesión 2026-07-15
 
-## Auditorías del Ciclo de Vida del Vendedor (4 módulos, 55 bugs)
+## Auditorías del Ciclo de Vida del Marketplace (6 módulos, 71 bugs)
 
-Cuatro auditorías completas iterativas del flujo crítico del vendedor: registro → KYC → payouts → wallet/comisiones. Cada auditoría siguió el mismo proceso: explorar → auditar → identificar P0/P1/P2 → aplicar fixes → reauditar → documentar.
+Seis auditorías completas iterativas del flujo crítico del marketplace: registro → KYC → payouts → wallet/comisiones → bookings → shipping. Cada auditoría siguió el mismo proceso: explorar → auditar → identificar P0/P1/P2 → aplicar fixes → reauditar → documentar.
 
 | # | Módulo | Versión | P0 | P1 | P2 | P3 | Total | Commits |
 |---|--------|---------|----|----|----|----|-------|---------|
@@ -10,9 +10,11 @@ Cuatro auditorías completas iterativas del flujo crítico del vendedor: registr
 | 2 | KYC | 2.9.114 | 9 | 7 | 4 | 0 | 20 | 818e1d3, df3948b |
 | 3 | Payouts | 2.9.115 | 6 | 6 | 2 | 0 | 14 | b1fadbb, 4865952 |
 | 4 | Wallet/Comisiones | 2.9.116 | 4 | 5 | 0 | 0 | 9 | 00f5385, 89a6539, 8300a4d |
-| **Total** | | | **23** | **23** | **11** | **2** | **59** | **9 commits** |
+| 5 | Bookings/Reservas | 2.9.117 | 4 | 2 | 0 | 0 | 6 | 562cac9 |
+| 6 | Shipping/Logística | 2.9.118 | 3 | 3 | 0 | 0 | 6 | 1fd9746, 50ab2b5, 61a4071 |
+| **Total** | | | **30** | **28** | **11** | **2** | **71** | **13 commits** |
 
-## Commits de la sesión (9 commits)
+## Commits de la sesión (13 commits)
 
 | # | Commit | Tipo | Descripción |
 |---|--------|------|-------------|
@@ -25,6 +27,12 @@ Cuatro auditorías completas iterativas del flujo crítico del vendedor: registr
 | 7 | `00f5385` | fix(wallet) | 9 bugs fixed — P0×4 + P1×5 — full wallet audit |
 | 8 | `89a6539` | fix(deploy) | expand webhook file list with wallet/payouts/commission files |
 | 9 | `8300a4d` | chore | force deploy refresh — invalidate GitHub HTTP cache |
+| 10 | `b4bd9ad` | docs | update all MD files — CHANGELOG, LECCIONES, CLAUDE, SESSION_SUMMARY |
+| 11 | `562cac9` | fix(bookings) | 6 bugs fixed — P0×4 + P1×2 — full bookings audit |
+| 12 | `42fb617` | test(wallet) | update 3 tests for P1-8 fix — fee/tax_withholding/reversal now in whitelist |
+| 13 | `1fd9746` | fix(shipping) | 6 bugs fixed — P0×3 + P1×3 — full shipping/logistics audit |
+| 14 | `50ab2b5` | chore | force deploy refresh for v2.9.118 shipping audit |
+| 15 | `61a4071` | chore | force cache bust for deploy |
 
 ## Bugs críticos más impactantes (P0)
 
@@ -87,10 +95,11 @@ Cuatro auditorías completas iterativas del flujo crítico del vendedor: registr
 
 ## Pendiente
 
-- 🔲 Continuar auditorías con: Bookings/Reservas (turismo), Shipping/Logística (Aveonline, ReDi)
+- 🔲 Continuar auditorías con: Notifications/Emails, Product Reviews/Ratings, Insurance (XCover)
 - 🔲 SiteGround WAF — aún pendiente desactivación por Contra Cultura
 - 🔲 Backfill: para KYCs aprobados antes de v2.9.114, setear expires_at (script one-shot)
 - 🔲 Backfill: para payouts rechazados antes de v2.9.115, migrar notes → rejection_reason
 - 🔲 Agregar listeners ltms_wallet_frozen / ltms_wallet_unfrozen para fraud scoring
 - 🔲 Agregar listener ltms_payout_rejected para reversal contable
 - 🔲 Agregar listener ltms_payout_pre_create para sanctions screening al request time
+- 🔲 Considerar agregar ltms_booking_cancelled listener para commission reversal automático
