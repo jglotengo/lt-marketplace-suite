@@ -92,13 +92,13 @@ class LTMS_Kitchen_Ajax {
      * filtrado por restaurante, soporte para table_number/order_type/item notes.
      */
     public function ajax_get_orders(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
-        if ( ! $vendor_id ) {
-            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) { // v2.9.126 P0-3: add vendor role check
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
         }
 
         $since = sanitize_text_field( $_POST['since'] ?? '' );
@@ -180,11 +180,16 @@ class LTMS_Kitchen_Ajax {
      * PHP validaba contra WC statuses → siempre fallaba con "Estado no permitido".
      */
     public function ajax_update_status(): void {
+        // v2.9.126 BATCH-AUDIT P0-2 FIX: add is_user_logged_in + is_ltms_vendor check.
+        // Before, only checked get_current_user_id() (which returns 0 for non-logged-in),
+        // but did NOT check vendor role — a customer could call this endpoint with a
+        // valid dashboard nonce and change kitchen_status of any order.
+        if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
-        if ( ! $vendor_id ) {
-            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) {
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
         }
 
         $order_id       = absint( $_POST['order_id'] ?? 0 );
@@ -239,13 +244,13 @@ class LTMS_Kitchen_Ajax {
      * de wc_get_orders con limit=-1 (que carga todos los IDs en memoria).
      */
     public function ajax_get_stats(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         $vendor_id = get_current_user_id();
-        if ( ! $vendor_id ) {
-            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 401 );
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) { // v2.9.126 P0-4: add vendor role check
+            wp_send_json_error( __( 'No autorizado.', 'ltms' ), 403 );
         }
 
         global $wpdb;
