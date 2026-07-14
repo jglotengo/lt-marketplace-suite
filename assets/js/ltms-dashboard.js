@@ -143,25 +143,23 @@
         loadView(view, forceRefresh = false) {
             this.currentView = view;
 
-            // Ocultar todas las secciones y mostrar el loader
+            // Ocultar todas las secciones
             $('.ltms-view-section').hide();
-            this.showViewLoader();
+
+            // v2.9.110 FIX: Mostrar la sección INMEDIATAMENTE antes del AJAX.
+            // Esto garantiza que el contenido PHP renderizado sea visible incluso
+            // si el AJAX falla (403, 500, etc.). El AJAX solo actualiza datos
+            // dinámicos dentro de la sección, no la reemplaza.
+            this.showSection('#ltms-view-' + view);
 
             // v2.9.75 FIX: Normalizar el nombre del view para construir el método.
-            // Antes, views con guiones como 'shipping-statement' generaban
-            // 'loadShipping-statementView' que nunca existe como función.
-            // Ahora convertimos 'shipping-statement' → 'ShippingStatement'
-            // para generar 'loadShippingStatementView'.
             const normalized = view.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
             const loadMethod = 'load' + normalized + 'View';
 
             if (typeof this[loadMethod] === 'function') {
                 this[loadMethod](forceRefresh);
-            } else {
-                // v2.9.75: Si no hay método específico, mostrar la sección directamente.
-                // Esto garantiza que TODAS las vistas carguen, incluso si el AJAX falla.
-                this.loadGenericView(view);
             }
+            // Si no hay método específico, la sección ya está visible arriba.
         },
 
         /**
