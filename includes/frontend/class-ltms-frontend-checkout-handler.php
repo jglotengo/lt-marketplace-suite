@@ -1834,6 +1834,17 @@ final class LTMS_Frontend_Checkout_Handler {
     public static function ajax_validate_coupon(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // v2.9.123 CHECKOUT-AUDIT P1-2 FIX: rate limit coupon validation.
+        // Before, bots could brute-force coupon codes at high speed.
+        // Now capped at 10 per IP per 5 minutes.
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $rl_key = 'ltms_coupon_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count > 10 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, 5 * MINUTE_IN_SECONDS );
+
         $code = sanitize_text_field( wp_unslash( $_POST['coupon_code'] ?? '' ) );
         if ( '' === $code ) {
             wp_send_json_error( [ 'message' => __( 'Ingresa un código de cupón', 'ltms' ) ], 400 );
@@ -1959,7 +1970,14 @@ final class LTMS_Frontend_Checkout_Handler {
 
         // Also store the frequency if provided.
         if ( isset( $_POST['frequency'] ) ) {
+            // v2.9.123 CHECKOUT-AUDIT P1-3 FIX: validate frequency against allowlist.
+            // Before, any integer was accepted → a malicious value could be stored
+            // in session and later used in subscription creation. Now allowlisted.
             $frequency = absint( $_POST['frequency'] );
+            $valid_frequencies = [ 7, 14, 30, 60, 90 ]; // days
+            if ( ! in_array( $frequency, $valid_frequencies, true ) ) {
+                $frequency = 30; // default monthly
+            }
             WC()->session->set( 'ltms_subscription_freq_' . $product_id, $frequency );
         }
 
