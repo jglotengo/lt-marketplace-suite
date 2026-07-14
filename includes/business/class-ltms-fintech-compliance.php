@@ -517,7 +517,8 @@ class LTMS_Fintech_Compliance {
                 // Notificar al oficial de cumplimiento.
                 $email = LTMS_Core_Config::get( 'ltms_compliance_officer_email', get_option( 'admin_email' ) );
                 if ( $email ) {
-                    wp_mail(
+                    // v2.9.134 ERROR-AUDIT P1-1: log if compliance-critical email fails.
+                    $sent = wp_mail(
                         $email,
                         __( '[LTMS ALERTA] Coincidencia en lista restrictiva', 'ltms' ),
                         sprintf(
@@ -526,6 +527,13 @@ class LTMS_Fintech_Compliance {
                             $vendor_id, $name, $list_key
                         )
                     );
+                    if ( ! $sent && class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::critical(
+                            'FT_SANCTIONS_EMAIL_FAILED',
+                            sprintf( 'Failed to send sanctions match notification email for vendor #%d to %s', $vendor_id, $email ),
+                            [ 'vendor_id' => $vendor_id, 'email' => $email ]
+                        );
+                    }
                 }
                 return false;
             }

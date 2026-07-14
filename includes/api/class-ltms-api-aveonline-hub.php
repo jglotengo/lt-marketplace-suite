@@ -158,7 +158,7 @@ class LTMS_Api_Aveonline_Hub {
                 'Ave-Hub-signature'  => $token,
             ],
             'body'    => wp_json_encode( $payload ),
-            'timeout' => 30,
+            'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -181,7 +181,7 @@ class LTMS_Api_Aveonline_Hub {
                     'Ave-Hub-signature'  => $token,
                 ],
                 'body'    => wp_json_encode( $payload ),
-                'timeout' => 30,
+                'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
             ] );
 
             $http_code = wp_remote_retrieve_response_code( $response );
@@ -239,7 +239,7 @@ class LTMS_Api_Aveonline_Hub {
                 'Accept'            => 'application/json',
                 'Ave-Hub-signature' => $token,
             ],
-            'timeout' => 20,
+            'timeout' => 20, // v2.9.134 P0-1: add timeout
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -260,7 +260,7 @@ class LTMS_Api_Aveonline_Hub {
                     'Accept'            => 'application/json',
                     'Ave-Hub-signature' => $token,
                 ],
-                'timeout' => 20,
+                'timeout' => 20, // v2.9.134 P0-1: add timeout
             ] );
             $http_code = wp_remote_retrieve_response_code( $response );
         }
