@@ -200,7 +200,9 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             // AO-BUG-10 FIX: Idempotency-Key determinista por orden_compra (o hash
             // del payload) para que un doble-clic en "Generar guía" no cree dos
             // guías en Aveonline. La API v2 ignora el header si no lo soporta.
-            'Idempotency-Key' => 'ltms_ave_generar_guia_' . ( $shipment_data['orden_compra'] ?? md5( wp_json_encode( $shipment_data ) ) ),
+            // INTEGRATIONS-AUDIT P0 FIX: hash the orden_compra to prevent
+            // header-injection via CRLF in user-supplied order references.
+            'Idempotency-Key' => 'ltms_ave_generar_guia_' . md5( (string) ( $shipment_data['orden_compra'] ?? '' ) . wp_json_encode( $shipment_data ) ),
         ] );
 
         // La guía llega en resultado.guia
@@ -419,6 +421,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                 ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -475,6 +479,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                     'idempresa' => $this->idempresa,
                 ] ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -523,6 +529,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -566,6 +574,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                     'id'             => $agent_nit,
                 ] ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -625,6 +635,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                 ],
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -663,6 +675,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                     'idempresa' => $this->idempresa,
                 ] ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -776,6 +790,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'headers' => [ 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 15,
+            // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ]);
 
         if ( is_wp_error( $raw_response ) ) {
@@ -813,6 +829,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'headers' => $headers,
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30,
+            // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ]);
 
         if ( is_wp_error( $raw ) ) {
@@ -835,6 +853,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                 'headers' => $headers,
                 'body'    => wp_json_encode( $payload ),
                 'timeout' => 30,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]);
             $body = is_wp_error( $raw ) ? [] : json_decode( wp_remote_retrieve_body( $raw ), true );
         }
@@ -926,6 +946,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                     'registros' => $registros ?: '',
                 ] ),
                 'timeout' => 15,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -962,6 +984,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
 
         $response = wp_remote_get( $url, [
             'timeout' => 15,
+            // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             'headers' => [
                 'Accept'        => 'application/json',
                 'Authorization' => 'Bearer ' . $token,
@@ -1020,6 +1044,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             $this->api_url . self::ENDPOINT_TRANSPORTADORAS,
             [
                 'timeout' => 15,
+                // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
             ]
@@ -1084,7 +1110,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
 
         // AO-BUG-10 FIX: Idempotency-Key determinista para evitar duplicados de
         // relación de envíos en caso de retry por timeout de red.
-        $idem_key = 'ltms_ave_relacion_' . $transportadora . '_' . md5( $guias );
+        // INTEGRATIONS-AUDIT P0 FIX: hash transportadora to prevent header injection.
+        $idem_key = 'ltms_ave_relacion_' . md5( $transportadora . '_' . $guias );
 
         $response = $this->aveonline_request( self::ENDPOINT_GUIA, $payload, [
             'Idempotency-Key' => $idem_key,
@@ -1184,13 +1211,18 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
         $raw = wp_remote_post( $url, [
             'headers' => [
                 'Content-Type'     => 'application/json',
-                'Authorization'    => $token,
+                // INTEGRATIONS-AUDIT P0 FIX: add 'Bearer ' prefix — Aveonline v2.0
+                // JWT endpoints expect 'Bearer <token>', not the raw token.
+                'Authorization'    => 'Bearer ' . $token,
                 // AO-BUG-10 FIX: Idempotency-Key determinista por número de
                 // relación para que un retry no elimine dos veces.
-                'Idempotency-Key'  => 'ltms_ave_eliminar_relacion_' . $numero_relacion,
+                // INTEGRATIONS-AUDIT P0 FIX: hash numero_relacion to prevent header injection.
+                'Idempotency-Key'  => 'ltms_ave_eliminar_relacion_' . md5( (string) $numero_relacion ),
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 20,
+            // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $raw ) ) {
@@ -1230,6 +1262,8 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
             'headers' => [ 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 15,
+            // INTEGRATIONS-AUDIT P1 FIX: sslverify explicit (was missing).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $raw ) ) {

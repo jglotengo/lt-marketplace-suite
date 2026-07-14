@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.140] — 2026-07-15
+
+### Integrations Audit Phase 2 — Backblaze B2 + Aveonline (3 files) hardened
+
+Continuation of the integrations audit (v2.9.139 covered 13 API clients). This release covers the remaining 4 most complex files where structural issues (bypass of `perform_request()`) made the bugs higher-impact.
+
+**P0 — Security critical (6 fixes)**
+
+- **Backblaze `upload_file()`**: path traversal + Sig V4 canonical-URI mismatch — `$bucket` and `$key` were raw-concatenated into both the wire URL and the AWS Sig V4 canonical request, but `wp_remote_request` URL-encodes the path before sending while the signature was computed over the raw string. Now: bucket name validated via `^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`, object key rejected if it contains `..` segments or `\r\n`, key path URI-encoded via `rawurlencode` per segment so wire URL = canonical URI.
+- **Backblaze `upload_file()`**: no MIME whitelist, no size limit — a caller could upload `application/x-php` or 2 GB of data, enabling phishing / malware hosting under the plugin's B2 account. Now: MIME restricted to `{image/jpeg, image/png, image/gif, image/webp, application/pdf, text/plain}`, size capped at 25 MB.
+- **Backblaze `delete_file()`** + **`list_files()`**: same path-traversal validation applied (bucket name regex, key `..`/CRLF rejection, URI-encoding).
+- **Aveonline `create_shipment()`**: Idempotency-Key was built from raw `$shipment_data['orden_compra']` (line 203) — header-injection risk via CRLF. Now hashed with `md5()`.
+- **Aveonline `create_shipment_relation()`**: Idempotency-Key was built from raw `$transportadora` (line 1087) — same header-injection risk. Now hashed.
+- **Aveonline `delete_shipment_relation()`**: three bugs in one call: (1) `Authorization: $token` missing `Bearer ` prefix → Aveonline v2.0 endpoints return 401; (2) Idempotency-Key was raw `$numero_relacion` (header-injection); (3) `sslverify` was not set. All three fixed.
+
+**P0 — Money-moving crash safety (1 fix)**
+
+- **Aveonline `delete_shipment_relation()`**: no `sslverify` set, no `Bearer ` prefix — the call has been broken since v2.9.131 (the Aveonline Hub audit added `Bearer` to other v2 endpoints but missed this one). Every delete attempt returned 401 silently because the caller's error path returned `success=false` with an empty `message`.
+
+**P1 — SSL verification hardening (14 fixes)**
+
+- **Aveonline**: all 14 `wp_remote_*` calls now explicitly set `sslverify => ! ( defined('LTMS_DISABLE_SSL_VERIFY') && LTMS_DISABLE_SSL_VERIFY )`. Previously, none of the 14 calls set this key — they relied on WordPress's default (`true`) but ignored the `LTMS_DISABLE_SSL_VERIFY` escape hatch used by every other API client. A developer following the documented `LTMS_DISABLE_SSL_VERIFY` constant for local dev would have been confused when Aveonline still failed on self-signed certs.
+
+**P1 — Constructor hardening (4 fixes)**
+
+- **Backblaze**: constructor now enforces HTTPS endpoint (rejects `http://` URLs — app_key travels in AWS Sig V4 Authorization header, HTTP would expose it to MITM).
+- **Backblaze**: constructor throws if `key_id` or `app_key` empty after decrypt — previously produced invalid signatures → cryptic 403 SignatureDoesNotMatch.
+- **Backblaze**: `parent::__construct()` now called — admin-configurable timeout/retries apply.
+- **Backblaze `health_check()`**: bails out cleanly if `default_bucket` is unconfigured (was producing a malformed request to `/?list-type=2&prefix=`).
+
+**P1 — Idempotency (3 fixes)**
+
+- **Aveonline Hub `push_events()`**: no `Idempotency-Key` — a network timeout followed by caller retry would push duplicate status events into the Hub. Now deterministic key based on payload hash.
+- **Aveonline Onboarding `post()`**: no `Idempotency-Key` on any of the 4 onboarding POSTs (`accept_terms`, `create_lead`, `company_step_one`, `company_step_two`). `company_step_one` triggers a paid CIFIN credit-bureau check — duplicate calls cost real money. `company_step_two` creates real AVE companies — duplicate calls cascade into all future shipments. Now: deterministic key on every onboarding POST.
+- **Aveonline Onboarding `file_to_base64()`**: no size cap and extension-only MIME check (trivially spoofable — `evil.pdf` containing arbitrary binary was accepted and base64-encoded). Now: 10 MB size cap, `finfo` MIME validation as defense-in-depth.
+
+**Test compatibility**
+
+- No test changes needed — Backblaze tests don't exercise `upload_file`/`delete_file`/`list_files` (they only test the constructor, `extract_region_from_endpoint`, `derive_signing_key`, and `sign_request` via Reflection). The HTTPS check in the constructor is skipped for non-URL endpoints (e.g., `'not-a-url'` in `endpoint_region_provider`) so existing tests pass.
+
+**Files modified**: 4 (Backblaze, Aveonline, Aveonline Hub, Aveonline Onboarding) + plugin main + CHANGELOG.
+
 ## [2.9.139] — 2026-07-15
 
 ### Integrations Audit — 13 API clients hardened (44 P0/P1 fixes)
