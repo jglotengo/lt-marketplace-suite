@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.108
+ * Version:           2.9.109
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.108' );
+define( 'LTMS_VERSION', '2.9.109' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -140,18 +140,13 @@ if ( ! function_exists( 'ltms_ajax_url' ) ) {
 }
 
 // Handler que procesa las requests AJAX del frontend.
-// Se ejecuta en 'template_redirect' (DESPUÉS de que WordPress procese auth,
+// Se ejecuta en 'wp_loaded' (DESPUÉS de que WordPress procese auth,
 // cookies, y todos los handlers wp_ajax_* se registren).
-// Reutiliza los mismos handlers wp_ajax_* ya registrados.
-add_action( 'template_redirect', function() {
+add_action( 'wp_loaded', function() {
     // Solo procesar si es una request ltms_ajax.
     if ( ! isset( $_REQUEST['ltms_ajax'] ) ) {
         return;
     }
-
-    // v2.9.108 FIX: mover a template_redirect para que is_user_logged_in()
-    // funcione correctamente. En init priority 100, algo interfería con
-    // el procesamiento de auth del frontend.
 
     // Simular el entorno de admin-ajax.php.
     if ( ! defined( 'DOING_AJAX' ) ) {
