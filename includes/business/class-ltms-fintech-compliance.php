@@ -485,7 +485,23 @@ class LTMS_Fintech_Compliance {
             }
 
             // Match simple por nombre (case-insensitive, sin acentos).
+            // v2.9.124 COMPLIANCE-AUDIT P0-3 FIX: require minimum name length for matching.
+            // Before, a 2-character name (e.g., "Li") would match thousands of entries
+            // in the OFAC list (Lisa, Liu, Lin, etc.) → false positives blocking
+            // legitimate vendors. Now requires minimum 4 characters for matching.
             $normalized_name = self::normalize_for_match( $name );
+            if ( strlen( $normalized_name ) < 4 ) {
+                // Name too short for reliable substring matching — skip this list
+                // and log for manual review by compliance officer.
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'FT_SANCTIONS_NAME_TOO_SHORT',
+                        sprintf( 'Vendor #%d (%s) — name too short for automated sanctions match, requires manual review.', $vendor_id, $name ),
+                        [ 'vendor_id' => $vendor_id, 'name' => $name, 'list_key' => $list_key ]
+                    );
+                }
+                continue;
+            }
             $pattern         = preg_quote( $normalized_name, '/' );
             if ( preg_match( "/{$pattern}/i", $cached_list ) ) {
                 // Match encontrado — bloquear.
