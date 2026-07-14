@@ -3,8 +3,8 @@
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
 > **Última actualización:** 2026-07-15
-> **Versión del plugin:** 2.9.118
-> **Total de lecciones:** 85 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 nuevas de auditorías v2.9.113-118)
+> **Versión del plugin:** 2.9.132
+> **Total de lecciones:** 90 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132)
 
 ---
 
@@ -1113,3 +1113,53 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Fix:** Verificar `valorrecaudo <= order total` cuando el order existe.
 
 **Regla preventiva:** TODO campo financiero que represente un monto a cobrar/pagar (valorrecaudo, delivery_price, payout_amount) debe tener bounds razonables. Para cash-on-delivery, el monto nunca debe superar el total del pedido. Para delivery_price, cap a un máximo configurable. Validar contra el order total cuando aplique.
+
+### LECCIÓN #86: Webhook fail-open cuando secret/token no configurado
+
+**Error:** Los webhook handlers de Alegra y Siigo eran fail-open: si el secret/token estaba vacío, el check de auth se skipeaba completamente. Cualquier atacante podía enviar webhooks forjados.
+
+**Causa raíz:** El patrón `if ($expected) { ... check ... }` skipea el check cuando el secret está vacío. Otros handlers (Stripe, Openpay, Zapsign, Addi, Uber) ya eran fail-closed, pero Alegra y Siigo se quedaron con el patrón viejo.
+
+**Fix:** Cambiar a fail-closed: `if (empty($expected)) { return 403; }` antes del check.
+
+**Regla preventiva:** TODO webhook handler debe ser fail-closed: si el secret/token no está configurado, RECHAZAR el webhook con 403. Nunca usar `if ($expected) { check }` — usar `if (empty($expected)) { reject; } check;`.
+
+### LECCIÓN #87: Inline onclick reemplazado por data-* SIN agregar JS = botones rotos
+
+**Error:** Al reemplazar inline `onclick` con `data-action`/`data-confirm` attributes para cumplimiento CSP, NO se agregó el JavaScript que escucha esos attributes. Los botones de admin dejaron de funcionar.
+
+**Causa raíz:** El fix CSP fue incompleto — se hizo el cambio de HTML pero no el cambio de JS correspondiente.
+
+**Fix:** Agregar jQuery event delegation: `$(document).on('click', '[data-action]', function() { ... })` que dispatcha según el valor de `data-action`.
+
+**Regla preventiva:** Al migrar de inline onclick a data-* attributes, SIEMPRE agregar el JS de event delegation en el MISMO commit. Un cambio CSP sin el JS correspondiente es una regresión.
+
+### LECCIÓN #88: .min.js desactualizado después de modificar .js
+
+**Error:** Se modificó `ltms-admin.js` pero no se regeneró `ltms-admin.min.js`. En producción, el plugin carga `.min.js` (via `get_suffix()`), así que los cambios no se reflejaban.
+
+**Causa raíz:** Olvido de ejecutar `npm run build` después de modificar JS.
+
+**Fix:** Ejecutar `npm run build` para regenerar todos los `.min.js` y `.min.css`.
+
+**Regla preventiva:** DESPUÉS de modificar cualquier archivo `.js` o `.css`, ejecutar `npm run build` ANTES de commit. El CI verifica que `.min` files estén sincronizados, pero solo en GitHub Actions — localmente no hay check.
+
+### LECCIÓN #89: Webhook file list hardcoded — archivos no se sincronizan
+
+**Error:** El deploy webhook tiene una lista hardcoded de archivos a sincronizar desde GitHub. Si se modifica un archivo que NO está en la lista, ese archivo no se actualiza en producción via webhook.
+
+**Causa raíz:** El webhook fue diseñado con una lista mínima de archivos críticos. A medida que se modificaron más archivos, la lista se quedó corta.
+
+**Fix:** Actualizar la lista del webhook con TODOS los archivos modificados (de 16 a 56 archivos).
+
+**Regla preventiva:** Al agregar archivos modificados al repo, verificar que estén en la lista del webhook `deploy/ltms-deploy-webhook.php`. Idealmente, el webhook debería hacer `git reset --hard origin/main` (que sí sincroniza todo) en lugar de descargar archivos individuales.
+
+### LECCIÓN #90: Nonce action mismatch entre PHP y JS = endpoint roto
+
+**Error:** 4 admin AJAX handlers en Donations tenían `check_ajax_referer('ltms_admin_nonce', 'nonce')` seguido de `$this->verify()` que usa `NONCE_ACTION='ltms_admin_donations'`. El JS enviaba nonce de `wp_create_nonce('ltms_admin_donations')`, así que el primer check SIEMPRE fallaba y `wp_die()`'d.
+
+**Causa raíz:** Doble check de nonce con actions diferentes. El primer check (legacy SEC-3 FIX) usaba el nonce estándar del plugin, pero el JS usaba un nonce específico del módulo.
+
+**Fix:** Remover el check duplicado, manteniendo solo `$this->verify()` con el nonce correcto.
+
+**Regla preventiva:** NUNCA tener dos `check_ajax_referer` con actions diferentes en el mismo handler. Verificar qué nonce envía el JS (`wp_create_nonce`) y usar exactamente ese action en el `check_ajax_referer` del PHP.

@@ -3,15 +3,16 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-15 (versión del plugin en ese momento: `2.9.118`).
+> **Última auditoría completa del repo:** 2026-07-15 (versión del plugin en ese momento: `2.9.132`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
 > (`jglotengo/lt-marketplace-suite@main`, ~516 archivos PHP en `includes/`, 1,300+ commits)
-> e incorpora el resultado de 10 auditorías completas:
-> REG-AUDIT-001 (registro vendedores, 16 bugs), DEEP-AUDIT-002 (onboarding+panel, 56 findings),
-> UIUX-AUDIT-001 (62 findings), SEC-1 (9/10 vulns), SEC-2-3-5 (12 findings), QA completo (21/21 vistas),
-> build pipeline + CI (GitHub Actions), KYC-AUDIT-1 (16 bugs), PAYOUT-AUDIT-1 (14 bugs),
-> WALLET-AUDIT-1 (9 bugs), BOOKING-AUDIT-1 (6 bugs), SHIPPING-AUDIT-1 (6 bugs).
-> Total: 85 lecciones documentadas en LECCIONES_APRENDIDAS.md, 71 bugs fixeados en ciclo de vida.
+> e incorpora el resultado de 20 auditorías completas:
+> REG-AUDIT-001 (16 bugs), DEEP-AUDIT-002 (56 findings), UIUX-AUDIT-001 (62 findings),
+> SEC-1 (9/10 vulns), SEC-2-3-5 (12 findings), QA completo (21/21 vistas),
+> build pipeline + CI, KYC/PAYOUT/WALLET/BOOKING/SHIPPING/NOTIFICATIONS/REVIEWS/
+> INSURANCE/AFFILIATE/CHECKOUT/COMPLIANCE/DONATIONS audits (113 bugs),
+> batch audits (10 bugs), gap audit (4 bugs), CSP audit (33 fixes).
+> Total: 90 lecciones documentadas en LECCIONES_APRENDIDAS.md, 150+ bugs fixeados.
 
 ---
 
@@ -21,7 +22,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.118` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 6 auditorías del ciclo de vida del marketplace (Registration, KYC, Payouts, Wallet/Comisiones, Bookings/Reservas, Shipping/Logística) están completadas a esta versión, con 71 bugs fixeados (30 P0 + 28 P1 + 11 P2 + 2 P3).
+**Versión actual del plugin:** `2.9.132` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`). 20 auditorías completas del ciclo de vida del marketplace están completadas, con 150+ bugs fixeados (55 P0 + 49 P1 + 11 P2 + 33 CSP). 100% CSP compliant (0 inline onclick, 0 alert, 0 confirm en todas las views). 9/9 webhook handlers fail-closed. 0 AJAX handlers sin nonce. 0 SQL injection.
 
 ---
 
