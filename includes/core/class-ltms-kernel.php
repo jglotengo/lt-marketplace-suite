@@ -460,6 +460,10 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Redi_Order_Listener' ) ) {
             LTMS_Redi_Order_Listener::init();
         }
+        // v2.9.132 AUDIT-AUDIT: Listeners for actions added during audit cycle.
+        if ( class_exists( 'LTMS_Audit_Listeners' ) ) {
+            LTMS_Audit_Listeners::init();
+        }
         // AUDIT-REDI-UX-GAPS GAP-9 FIX: Incident Manager para el modelo ReDi.
         if ( class_exists( 'LTMS_Business_Redi_Incident' ) ) {
             LTMS_Business_Redi_Incident::init();

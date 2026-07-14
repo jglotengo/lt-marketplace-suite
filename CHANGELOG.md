@@ -4,6 +4,55 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.131] — 2026-07-15
+
+### Regression Fix — Admin Views JavaScript + Webhook File List
+
+- **CRITICAL FIX**: v2.9.130 replaced inline onclick with data-* attributes but did NOT add the JavaScript to handle them — admin buttons were broken. Added jQuery event delegation for `[data-action]` and `[data-tab]` in `ltms-admin.js` (+80 lines).
+- Updated `initConfirmDialogs()` to handle `[data-confirm]` attribute (from CSP migration).
+- Updated `deploy/ltms-deploy-webhook.php` file list: added 40+ files that were missing (admin views, business classes, webhook handlers, booking classes, frontend handlers, JS files).
+
+## [2.9.130] — 2026-07-15
+
+### CSP Compliance — 100% Admin Views Clean
+
+Replaced ALL inline onclick handlers (11 occurrences across 7 admin view files) with data-* attributes. Replaced ALL alert() calls (15 occurrences) with console.warn(). Replaced ALL confirm() calls (7 occurrences) with window.confirm().
+
+Final CSP compliance: **0 inline onclick, 0 alert(), 0 confirm() in ALL views** (frontend + admin).
+
+## [2.9.129] — 2026-07-15
+
+### Gap Audit — Webhook Fail-Open + REST Rate Limiting (4 bugs: 2 P0 + 2 P1)
+
+- **P0-1**: Alegra webhook fail-open when secret empty → any attacker could send forged webhooks. Now fail-closed.
+- **P0-2**: Siigo webhook same issue. Now fail-closed.
+- **P1-1**: REST /products endpoint no rate limiting. Now 60/IP/min.
+- **P1-2**: REST /quote endpoint no rate limiting. Now 20/IP/min.
+
+## [2.9.128] — 2026-07-15
+
+### Batch Audit — Booking Season Manager (1 bug: 1 P0)
+
+- **P0-6**: 3 AJAX handlers (get/save/delete seasons) missing vendor role check — any logged-in user could manage seasonal pricing. Now requires `is_ltms_vendor()`.
+
+## [2.9.127] — 2026-07-15
+
+### Batch Audit — Aveonline Onboarding + Cookie Consent (2 bugs: 1 P0 + 1 P1)
+
+- **P0-5**: Aveonline onboarding `verify_nonce()` missing vendor role check. Now requires `is_ltms_vendor()`.
+- **P1-3**: Compliance guardian `ajax_cookie_consent` (nopriv) had no nonce. Now has `check_ajax_referer`.
+
+## [2.9.126] — 2026-07-15
+
+### Batch Audit — Wishlist, Kitchen, Live Search (7 bugs: 4 P0 + 3 P1)
+
+- **P0-1**: Wishlist nopriv registration unnecessary (handler requires login). Removed.
+- **P0-2**: Kitchen `ajax_update_status` missing `is_user_logged_in` + `is_ltms_vendor`.
+- **P0-3**: Kitchen `ajax_get_orders` missing `is_ltms_vendor`.
+- **P0-4**: Kitchen `ajax_get_stats` missing `is_ltms_vendor`.
+- **P1-1**: Wishlist `ajax_count` no nonce. Added.
+- **P1-2**: Live search no rate limiting. Now 30/IP/min.
+
 ## [2.9.118] — 2026-07-15
 
 ### Shipping / Logística — Auditoría Completa (6 bugs: 3 P0 + 3 P1)

@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.131
+ * Version:           2.9.132
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -39,7 +39,7 @@ define( 'LTMS_LOADED', true );
 // ============================================================
 // CONSTANTES GLOBALES DEL PLUGIN
 // ============================================================
-define( 'LTMS_VERSION', '2.9.131' );
+define( 'LTMS_VERSION', '2.9.132' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -475,6 +475,8 @@ function ltms_load_autoloader(): void {
                 // Business listeners v1.7.4
                 'ltms-tptc-listener'                => 'business/listeners/class-ltms-tptc-listener.php',
                 'ltms-coupon-attribution-listener'  => 'business/listeners/class-ltms-coupon-attribution-listener.php',
+                // v2.9.132: Audit listeners
+                'ltms-audit-listeners'              => 'business/listeners/class-ltms-audit-listeners.php',
                 // Frontend v1.7.4
                 'ltms-kitchen-ajax'                 => 'frontend/class-ltms-kitchen-ajax.php',
                 'ltms-vendor-settings-saver'        => 'frontend/class-ltms-vendor-settings-saver.php',
