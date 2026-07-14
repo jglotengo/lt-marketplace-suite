@@ -66,6 +66,15 @@ class LTMS_Driver_Ajax {
             return;
         }
 
+        // v2.9.118 SHIPPING-AUDIT P0-1 FIX: validate phone format (E.164 or CO/MX local).
+        // Before, any string was accepted as phone — vendors could store arbitrary
+        // data in the phone field (SQL injection attempts, XSS payloads, etc.).
+        $phone_clean = preg_replace( '/[\s\-\(\)]/', '', $phone );
+        if ( ! preg_match( '/^\+?[0-9]{7,20}$/', $phone_clean ) ) {
+            wp_send_json_error( __( 'Teléfono inválido. Debe tener entre 7 y 20 dígitos (ej: +573001234567).', 'ltms' ) );
+            return;
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_vendor_drivers';
 
@@ -199,6 +208,15 @@ class LTMS_Driver_Ajax {
         $eta     = max( 1, min( 480, (int) ( $_POST['delivery_eta_minutes'] ?? 60 ) ) );
         $zones   = sanitize_textarea_field( wp_unslash( $_POST['delivery_zones']   ?? '' ) );
         $message = sanitize_text_field( wp_unslash( $_POST['delivery_message']     ?? '' ) );
+
+        // v2.9.118 SHIPPING-AUDIT P1-1 FIX: bound delivery price to reasonable max.
+        // Before, vendor could set any price (even 999999999) — a customer could
+        // be charged an absurd amount. Now capped at 1,000,000 COP (configurable).
+        $max_delivery_price = (float) ( method_exists( 'LTMS_Core_Config', 'get' ) ? LTMS_Core_Config::get( 'ltms_max_own_delivery_price', 1000000 ) : 1000000 );
+        if ( $price > $max_delivery_price ) {
+            wp_send_json_error( sprintf( __( 'El precio de entrega no puede superar %s.', 'ltms' ), LTMS_Utils::format_money( $max_delivery_price ) ) );
+            return;
+        }
 
         update_user_meta( $vendor_id, 'ltms_own_delivery_price',        $price );
         update_user_meta( $vendor_id, 'ltms_own_delivery_eta_minutes',  $eta );

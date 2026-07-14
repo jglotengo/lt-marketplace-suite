@@ -275,6 +275,50 @@ class LTMS_Business_Aveonline_Guias {
             wp_send_json_error( [ 'message' => 'Faltan campos requeridos.' ] );
         }
 
+        // v2.9.118 SHIPPING-AUDIT P0-2 FIX: verify order ownership (IDOR).
+        // Before, a vendor could pass order_id of ANOTHER vendor's order and
+        // generate a shipping guide for it — the guide would be created with
+        // the caller's vendor_id, but the order belongs to someone else.
+        // Now we verify that the order's _ltms_vendor_id matches the caller.
+        if ( $order_id ) {
+            $order = wc_get_order( $order_id );
+            if ( ! $order ) {
+                wp_send_json_error( [ 'message' => 'Pedido no encontrado.' ] );
+            }
+            $order_vendor = (int) $order->get_meta( '_ltms_vendor_id' );
+            if ( $order_vendor && $order_vendor !== $vendor_id && ! current_user_can( 'manage_options' ) ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::security(
+                        'AVEONLINE_GUIDE_IDOR_ATTEMPT',
+                        sprintf( 'Vendor #%d intentó generar guía para order #%d del vendor #%d', $vendor_id, $order_id, $order_vendor ),
+                        [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'order_vendor_id' => $order_vendor ]
+                    );
+                }
+                wp_send_json_error( [ 'message' => 'No tienes permiso para generar guía de este pedido.' ], 403 );
+            }
+        }
+
+        // v2.9.118 SHIPPING-AUDIT P0-3 FIX: bound valorrecaudo to order total.
+        // Before, vendor could set valorrecaudo (cash-on-delivery amount) to any
+        // value — they could declare 0 recaudo for a paid order (pocketing the
+        // cash) or declare an inflated recaudo (defrauding the customer at delivery).
+        // Now we verify it doesn't exceed the order total if the order exists.
+        if ( $order_id && $valorrecaudo > 0 ) {
+            $order = wc_get_order( $order_id );
+            if ( $order ) {
+                $order_total = (float) $order->get_total();
+                if ( $valorrecaudo > $order_total ) {
+                    wp_send_json_error( [
+                        'message' => sprintf(
+                            'El valor de recaudo (%s) no puede superar el total del pedido (%s).',
+                            number_format( $valorrecaudo, 0, ',', '.' ),
+                            number_format( $order_total, 0, ',', '.' )
+                        ),
+                    ] );
+                }
+            }
+        }
+
         // AO-BUG-11 FIX: dedup por order_id. Un doble-clic en "Generar guía"
         // disparaba dos POST a Aveonline y creaba dos guías para la misma
         // orden. Si ya existe una guía persistida para este order_id (o el

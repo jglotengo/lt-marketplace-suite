@@ -265,6 +265,14 @@ class LTMS_Shipping_Method_Own_Delivery extends WC_Shipping_Method {
                         wp_send_json_error( [ 'message' => __( 'Este pedido no usa domiciliario propio.', 'ltms' ) ] );
                 }
 
+                // v2.9.118 SHIPPING-AUDIT P1-2 FIX: check if already delivered (idempotency).
+                // Before, vendor could mark the same order as delivered multiple times —
+                // each call would fire ltms_shipping_delivered (though on_own_delivery_completed
+                // has a guard, the AJAX handler did not). Now we check _ltms_shipping_delivered_fired.
+                if ( $order->get_meta( '_ltms_shipping_delivered_fired' ) ) {
+                        wp_send_json_error( [ 'message' => __( 'Este pedido ya fue marcado como entregado.', 'ltms' ) ] );
+                }
+
                 $order->update_status( 'completed', __( 'Pedido entregado por domiciliario propio.', 'ltms' ) );
 
                 wp_send_json_success( [ 'message' => __( 'Pedido marcado como entregado.', 'ltms' ) ] );
