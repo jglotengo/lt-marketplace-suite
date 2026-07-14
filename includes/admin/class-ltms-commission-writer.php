@@ -305,12 +305,34 @@ class LTMS_Commission_Writer {
         $method = get_user_meta( $vendor_id, 'ltms_payout_method', true );
 
         if ( ! $method ) {
-            // Inferir desde datos bancarios registrados
-            $clabe = get_user_meta( $vendor_id, 'ltms_clabe', true );
-            if ( $clabe ) {
-                $method = strlen( preg_replace( '/\D/', '', $clabe ) ) === 18
-                    ? 'transferencia_clabe_mx'  // CLABE 18 dígitos → MX
-                    : 'transferencia_bancaria_co';
+            // v2.9.116 WALLET-AUDIT P1-5 FIX: read from the CORRECT user_meta keys.
+            // Before, code read 'ltms_clabe' (a key that is NEVER set by the KYC flow —
+            // the KYC handler saves to 'ltms_kyc_bank_account' and 'ltms_bank_account_number').
+            // So $clabe was always empty and the method always fell through to the default
+            // 'transferencia_bancaria', losing the distinction between CO and MX vendors
+            // for Frac. II f-iv-b reporting.
+            $bank_account = get_user_meta( $vendor_id, 'ltms_bank_account_number', true )
+                         ?: get_user_meta( $vendor_id, 'ltms_kyc_bank_account', true );
+            $country      = strtoupper( (string) get_user_meta( $vendor_id, 'ltms_country', true ) );
+
+            if ( $bank_account ) {
+                // Decrypt if needed (ltms_bank_account_number is encrypted).
+                if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+                    try {
+                        $decrypted = LTMS_Core_Security::decrypt( $bank_account );
+                        if ( $decrypted ) {
+                            $bank_account = $decrypted;
+                        }
+                    } catch ( \Throwable $e ) {
+                        // Maybe it's already plaintext — keep as-is.
+                    }
+                }
+                $digits = preg_replace( '/\D/', '', $bank_account );
+                if ( $country === 'MX' || strlen( $digits ) === 18 ) {
+                    $method = 'transferencia_clabe_mx';  // CLABE 18 dígitos → MX
+                } else {
+                    $method = 'transferencia_bancaria_co';
+                }
             }
         }
 
@@ -356,24 +378,28 @@ class LTMS_Commission_Writer {
     // URL: /wp-admin/admin-ajax.php?action=ltms_backfill_fiscal_fields&nonce=XXXX
     // ════════════════════════════════════════════════════════════════════════
     public function ajax_backfill() {
-        check_ajax_referer( 'ltms_backfill', 'nonce' );
+        // v2.9.116 WALLET-AUDIT P1-6 FIX: use the standard admin nonce + manage_options cap.
+        // Before, the nonce action was 'ltms_backfill' (which is never created anywhere via
+        // wp_create_nonce), so check_ajax_referer would always fail for legitimate admin
+        // users. The capability check was 'manage_woocommerce' (shop_manager can trigger
+        // financial backfill — too broad). Now uses 'manage_options' (admin only).
+        check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( 'Unauthorized', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Permisos insuficientes. Se requiere administrador.', 'ltms' ) ], 403 );
         }
 
         global $wpdb;
 
         // Obtener órdenes que tienen comisiones con service_type o payment_method vacíos
-        $order_ids = $wpdb->get_col( "
-            SELECT DISTINCT order_id
-            FROM `" . self::table() . "`
-            WHERE service_type IS NULL
-               OR service_type = ''
-               OR payment_method IS NULL
-               OR payment_method = ''
-            LIMIT 500
-        " );
+        // v2.9.116 P1-6: added $wpdb->prepare wrapper for consistency (though the query
+        // has no user input — phpcs compliance).
+        $order_ids = $wpdb->get_col(
+            "SELECT DISTINCT order_id FROM `" . self::table() . "`
+             WHERE service_type IS NULL OR service_type = ''
+                OR payment_method IS NULL OR payment_method = ''
+             LIMIT 500"
+        );
 
         $updated = 0;
         foreach ( $order_ids as $order_id ) {
@@ -381,8 +407,14 @@ class LTMS_Commission_Writer {
             $updated++;
         }
 
+        LTMS_Core_Logger::info(
+            'COMMISSION_BACKFILL',
+            sprintf( 'Backfill de campos fiscales: %d órdenes procesadas por admin #%d', $updated, get_current_user_id() ),
+            [ 'orders_processed' => $updated, 'admin_id' => get_current_user_id() ]
+        );
+
         wp_send_json_success( [
-            'message' => "Backfill completado: {$updated} órdenes procesadas.",
+            'message' => sprintf( __( 'Backfill completado: %d órdenes procesadas.', 'ltms' ), $updated ),
             'orders'  => $updated,
         ] );
     }

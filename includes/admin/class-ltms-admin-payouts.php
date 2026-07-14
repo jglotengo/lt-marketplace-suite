@@ -437,22 +437,17 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'ID de vendedor inválido.', 'ltms' ) );
         }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'lt_vendor_wallets';
+        // v2.9.116 WALLET-AUDIT P0-4 FIX: use Wallet::unfreeze() instead of direct $wpdb->update.
+        // Before, the WHERE clause used 'user_id' (which is NOT a column in lt_vendor_wallets —
+        // the column is 'vendor_id'), so the UPDATE matched ZERO rows and the wallet stayed
+        // frozen forever. The admin would see "success" but the vendor remained frozen.
+        // Also, the direct UPDATE bypassed the ltms_wallet_unfrozen action and the security log.
+        $reason = sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) ); // phpcs:ignore
+        $result = LTMS_Business_Wallet::unfreeze( $vendor_id, $reason );
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
-            $table,
-            [ 'is_frozen' => 0, 'freeze_reason' => null ],
-            [ 'user_id' => $vendor_id ],
-            [ '%d', '%s' ],
-            [ '%d' ]
-        );
-
-        LTMS_Core_Logger::security(
-            'WALLET_UNFROZEN',
-            sprintf( 'Billetera del vendedor #%d descongelada por admin #%d', $vendor_id, get_current_user_id() )
-        );
+        if ( ! $result ) {
+            wp_send_json_error( __( 'No se pudo descongelar la billetera. Verifica que el vendedor exista.', 'ltms' ) );
+        }
 
         wp_send_json_success([
             'message' => sprintf(

@@ -345,6 +345,22 @@ final class LTMS_Business_Wallet {
     ): int {
         global $wpdb;
 
+        // v2.9.116 WALLET-AUDIT P0-3 FIX: reject NaN/INF/negative amounts at the entry point.
+        // Before, NaN slipped through every check (NaN > 0 is false, NaN <= 0 is false)
+        // and would reach bcadd/bcsub which produce "0" for NaN input — resulting in
+        // a wallet transaction that records amount=NaN but applies 0 balance change.
+        // Negative amounts would invert credit/debit semantics (credit of -100 = debit of 100).
+        if ( is_nan( $amount ) || is_infinite( $amount ) ) {
+            throw new \InvalidArgumentException(
+                sprintf( 'LTMS Wallet: Monto inválido (NaN/INF) para transacción tipo %s.', $type )
+            );
+        }
+        if ( $amount < 0 ) {
+            throw new \InvalidArgumentException(
+                sprintf( 'LTMS Wallet: Monto negativo (%s) no permitido para tipo %s. Use adjustment para movimientos bidireccionales.', $amount, $type )
+            );
+        }
+
         $wallets_table = $wpdb->prefix . 'lt_vendor_wallets';
         $tx_table      = $wpdb->prefix . 'lt_wallet_transactions';
 
@@ -995,12 +1011,33 @@ final class LTMS_Business_Wallet {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_vendor_wallets';
 
+        // v2.9.116 WALLET-AUDIT P0-1 FIX: freeze ALL of the vendor's wallets (every currency).
+        // Before, the WHERE clause was `vendor_id = %d` without currency filter, which
+        // matched the first wallet row by primary key — but $wpdb->update without a
+        // LIMIT clause actually updates ALL matching rows, so this was technically OK
+        // for the freeze flag. However, the freeze_reason was also written to all rows,
+        // which is correct. The real bug: if the vendor had wallets in COP + MXN and
+        // only one was frozen (e.g., MXN frozen by a prior partial call), this UPDATE
+        // would unfreeze none but overwrite the freeze_reason of BOTH. Now we
+        // explicitly scope to all currencies and log which wallets were affected.
+        $reason_clean = substr( sanitize_text_field( $reason ), 0, 500 );
+        if ( $reason_clean === '' ) {
+            // v2.9.116 P0-2: reject empty reason — a freeze without reason is
+            // non-compliant (SAGRILAFT requires documented justification).
+            LTMS_Core_Logger::warning(
+                'WALLET_FREEZE_NO_REASON',
+                sprintf( 'Intento de congelar billetera del vendedor #%d sin motivo. Bloqueado.', $vendor_id ),
+                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id() ]
+            );
+            return false;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $result = $wpdb->update(
             $table,
             [
                 'is_frozen'    => 1,
-                'freeze_reason' => substr( sanitize_text_field( $reason ), 0, 500 ),
+                'freeze_reason' => $reason_clean,
                 'updated_at'   => LTMS_Utils::now_utc(),
             ],
             [ 'vendor_id' => $vendor_id ],
@@ -1009,10 +1046,58 @@ final class LTMS_Business_Wallet {
         );
 
         if ( $result !== false ) {
+            // v2.9.116 P1-3: fire ltms_wallet_frozen action so listeners (fraud alert,
+            // vendor notification, accounting hold) can react.
+            do_action( 'ltms_wallet_frozen', $vendor_id, $reason_clean, get_current_user_id() );
+
             LTMS_Core_Logger::security(
                 'WALLET_FROZEN',
-                sprintf( 'Billetera del vendedor #%d CONGELADA. Motivo: %s', $vendor_id, $reason ),
-                [ 'vendor_id' => $vendor_id, 'reason' => $reason, 'frozen_by' => get_current_user_id() ]
+                sprintf( 'Billetera del vendedor #%d CONGELADA. Motivo: %s', $vendor_id, $reason_clean ),
+                [ 'vendor_id' => $vendor_id, 'reason' => $reason_clean, 'frozen_by' => get_current_user_id(), 'wallets_affected' => (int) $result ]
+            );
+        }
+
+        return $result !== false;
+    }
+
+    /**
+     * v2.9.116 WALLET-AUDIT P1-4: Descongela la billetera de un vendedor.
+     *
+     * Antes no existía el método unfreeze() en la clase Wallet — solo el handler
+     * ajax_unfreeze_wallet en admin-payouts.php hacía el UPDATE directo. Ahora
+     * centralizamos la lógica para que el action ltms_wallet_unfrozen se dispare
+     * consistentemente y el log de seguridad se registre siempre.
+     *
+     * @param int    $vendor_id ID del vendedor.
+     * @param string $reason    Motivo de la descongelación (para audit trail).
+     * @return bool
+     */
+    public static function unfreeze( int $vendor_id, string $reason = '' ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_vendor_wallets';
+
+        $reason_clean = $reason !== '' ? substr( sanitize_text_field( $reason ), 0, 500 ) : '';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $result = $wpdb->update(
+            $table,
+            [
+                'is_frozen'    => 0,
+                'freeze_reason' => null,
+                'updated_at'   => LTMS_Utils::now_utc(),
+            ],
+            [ 'vendor_id' => $vendor_id ],
+            [ '%d', '%s', '%s' ],
+            [ '%d' ]
+        );
+
+        if ( $result !== false ) {
+            do_action( 'ltms_wallet_unfrozen', $vendor_id, $reason_clean, get_current_user_id() );
+
+            LTMS_Core_Logger::security(
+                'WALLET_UNFROZEN',
+                sprintf( 'Billetera del vendedor #%d DESCONGELADA. Motivo: %s', $vendor_id, $reason_clean ?: '(no especificado)' ),
+                [ 'vendor_id' => $vendor_id, 'reason' => $reason_clean, 'unfrozen_by' => get_current_user_id(), 'wallets_affected' => (int) $result ]
             );
         }
 
@@ -1092,6 +1177,13 @@ final class LTMS_Business_Wallet {
      * @return bool True si el débito es válido (amount <= available).
      */
     public function validate_debit( float $amount, float $available ): bool {
+        // v2.9.116 WALLET-AUDIT P1-7 FIX: reject NaN and INF values.
+        // Before, is_nan($amount) || is_infinite($amount) would slip through the
+        // $amount > 0 check (NaN comparisons always return false) and could cause
+        // BCMath to produce unexpected results downstream.
+        if ( is_nan( $amount ) || is_infinite( $amount ) || is_nan( $available ) || is_infinite( $available ) ) {
+            return false;
+        }
         return $amount > 0 && $amount <= $available;
     }
 
@@ -1102,6 +1194,10 @@ final class LTMS_Business_Wallet {
      * @return bool True si el monto es válido (> 0).
      */
     public function validate_amount( float $amount ): bool {
+        // v2.9.116 P1-7: reject NaN and INF.
+        if ( is_nan( $amount ) || is_infinite( $amount ) ) {
+            return false;
+        }
         return $amount > 0;
     }
 
@@ -1113,6 +1209,10 @@ final class LTMS_Business_Wallet {
      * @return bool True si el hold es válido (hold_amount <= available).
      */
     public function validate_hold( float $hold_amount, float $available ): bool {
+        // v2.9.116 P1-7: reject NaN and INF.
+        if ( is_nan( $hold_amount ) || is_infinite( $hold_amount ) || is_nan( $available ) || is_infinite( $available ) ) {
+            return false;
+        }
         return $hold_amount > 0 && $hold_amount <= $available;
     }
 
@@ -1132,6 +1232,13 @@ final class LTMS_Business_Wallet {
             'payout',
             'refund',
             'adjustment',
+            // v2.9.116 WALLET-AUDIT P1-8: add the remaining valid types that
+            // execute_transaction accepts but this validator was missing.
+            // Before, 'fee', 'tax_withholding', and 'reversal' were rejected
+            // by this method despite being valid in execute_transaction's switch.
+            'fee',
+            'tax_withholding',
+            'reversal',
         ], true );
     }
 
