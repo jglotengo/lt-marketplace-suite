@@ -60,21 +60,29 @@ final class LTMS_Alegra_Webhook_Handler {
         set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
 
         // 1. Verificar token compartido
+        // v2.9.129 GAP-AUDIT P0-1 FIX: fail-closed when secret not configured.
+        // Before, if ltms_alegra_webhook_secret was empty, the entire auth check
+        // was skipped — any attacker could send forged webhooks. Now rejects.
         $expected_secret = (string) LTMS_Core_Config::get( 'ltms_alegra_webhook_secret', '' );
-        if ( $expected_secret ) {
-            $received_secret = (string) (
-                $request->get_header( 'x-alegra-secret' )
-                ?: $request->get_param( 'secret' )
-                ?: ''
+        if ( empty( $expected_secret ) ) {
+            LTMS_Core_Logger::warning(
+                'ALEGRA_WEBHOOK_NOT_CONFIGURED',
+                'Alegra webhook secret no configurado — webhook rechazado (fail-closed).'
             );
-            if ( ! hash_equals( $expected_secret, $received_secret ) ) {
-                LTMS_Core_Logger::warning(
-                    'ALEGRA_WEBHOOK_AUTH',
-                    'Token de webhook Alegra inválido o ausente',
-                    [ 'ip' => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ]
-                );
-                return new \WP_REST_Response( [ 'error' => 'Unauthorized' ], 401 );
-            }
+            return new \WP_REST_Response( [ 'error' => 'Webhook not configured' ], 403 );
+        }
+        $received_secret = (string) (
+            $request->get_header( 'x-alegra-secret' )
+            ?: $request->get_param( 'secret' )
+            ?: ''
+        );
+        if ( ! hash_equals( $expected_secret, $received_secret ) ) {
+            LTMS_Core_Logger::warning(
+                'ALEGRA_WEBHOOK_AUTH',
+                'Token de webhook Alegra inválido o ausente',
+                [ 'ip' => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ]
+            );
+            return new \WP_REST_Response( [ 'error' => 'Unauthorized' ], 401 );
         }
 
         // 2. Parsear payload

@@ -20,9 +20,18 @@ class LTMS_Siigo_Webhook_Handler {
         set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
 
         // M-104: Verificar token compartido (configurable en Ajustes → APIs → Siigo)
+        // v2.9.129 GAP-AUDIT P0-2 FIX: fail-closed when token not configured.
+        // Before, if ltms_siigo_webhook_token was empty, the auth check was skipped
+        // — any attacker could send forged webhooks. Now rejects.
         $expected = LTMS_Core_Config::get( 'ltms_siigo_webhook_token', '' );
+        if ( empty( $expected ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'SIIGO_WEBHOOK_NOT_CONFIGURED', 'Siigo webhook token no configurado — webhook rechazado (fail-closed).' );
+            }
+            return new WP_REST_Response( [ 'error' => 'Webhook not configured' ], 403 );
+        }
         $received = $request->get_header( 'x-siigo-token' ) ?: (string) $request->get_param( 'token' );
-        if ( $expected && ! hash_equals( $expected, $received ) ) {
+        if ( ! hash_equals( $expected, $received ) ) {
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::warning( 'SIIGO_WEBHOOK_AUTH', 'Token inválido o ausente en webhook Siigo' );
             }
