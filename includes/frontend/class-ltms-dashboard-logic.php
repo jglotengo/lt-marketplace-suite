@@ -2321,7 +2321,15 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Reseña inválida.', 'ltms' ) ], 400 );
         }
 
-        $ip = LTMS_Utils::get_ip();
+        // v2.9.120 REVIEWS-AUDIT P1-4 FIX: use LTMS_Core_Security::get_client_ip_safe() for IP.
+        // Before, LTMS_Utils::get_ip() was used which may trust X-Forwarded-For headers
+        // that can be spoofed by the client. Now uses the safe method that validates
+        // against trusted proxy headers only.
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ) {
+            $ip = LTMS_Core_Security::get_client_ip_safe();
+        } else {
+            $ip = LTMS_Utils::get_ip();
+        }
         $user_id = get_current_user_id();
 
         // v2.9.69 DEEP-AUDIT-002 P2-25: Usar custom table para dedup atómica.

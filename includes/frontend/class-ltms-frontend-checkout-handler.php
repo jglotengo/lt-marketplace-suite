@@ -2088,6 +2088,13 @@ final class LTMS_Frontend_Checkout_Handler {
             wp_send_json_error( [ 'message' => __( 'Producto no especificado', 'ltms' ) ], 400 );
         }
 
+        // v2.9.120 REVIEWS-AUDIT P0-1 FIX: verify product exists.
+        // Before, a non-existent product_id would create an orphan comment.
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no encontrado.', 'ltms' ) ], 404 );
+        }
+
         $rating = absint( $_POST['rating'] ?? 0 );
         if ( $rating < 1 || $rating > 5 ) {
             wp_send_json_error( [ 'message' => __( 'Calificación inválida (debe ser 1-5)', 'ltms' ) ], 400 );
@@ -2098,9 +2105,43 @@ final class LTMS_Frontend_Checkout_Handler {
             wp_send_json_error( [ 'message' => __( 'El comentario no puede estar vacío', 'ltms' ) ], 400 );
         }
 
+        // v2.9.120 REVIEWS-AUDIT P0-2 FIX: limit comment length.
+        // Before, any length was accepted — a malicious user could submit a 1MB comment.
+        if ( mb_strlen( $comment ) > 2000 ) {
+            wp_send_json_error( [ 'message' => __( 'El comentario no puede superar 2000 caracteres.', 'ltms' ) ], 400 );
+        }
+
         $user = wp_get_current_user();
         $author = $user->ID ? $user->display_name : ( sanitize_text_field( $_POST['author'] ?? 'Cliente' ) );
         $email  = $user->ID ? $user->user_email   : ( sanitize_email( $_POST['email'] ?? '' ) );
+
+        // v2.9.120 REVIEWS-AUDIT P0-3 FIX: require email for non-logged-in users.
+        if ( ! $user->ID && ! is_email( $email ) ) {
+            wp_send_json_error( [ 'message' => __( 'Email válido requerido.', 'ltms' ) ], 400 );
+        }
+
+        // v2.9.120 REVIEWS-AUDIT P1-1 FIX: check if user already reviewed this product.
+        // Before, a user could submit unlimited reviews for the same product.
+        if ( $user->ID ) {
+            $existing = get_comments( [
+                'post_id' => $product_id,
+                'user_id' => $user->ID,
+                'type'    => 'review',
+                'count'   => true,
+            ] );
+            if ( $existing > 0 ) {
+                wp_send_json_error( [ 'message' => __( 'Ya has reseñado este producto.', 'ltms' ) ], 409 );
+            }
+        }
+
+        // v2.9.120 REVIEWS-AUDIT P1-2 FIX: auto-approve only for verified buyers.
+        // Before, comment_approved=1 for ALL reviews — spam could be published instantly.
+        // Now: auto-approve only if the user has purchased the product; others go to moderation.
+        $is_verified_buyer = false;
+        if ( $user->ID ) {
+            $is_verified_buyer = wc_customer_bought_product( $user->user_email, $user->ID, $product_id );
+        }
+        $comment_approved = $is_verified_buyer ? 1 : 0;
 
         $comment_id = wp_insert_comment( [
             'comment_post_ID'      => $product_id,
@@ -2111,9 +2152,10 @@ final class LTMS_Frontend_Checkout_Handler {
             'comment_type'         => 'review',
             'comment_parent'       => 0,
             'user_id'              => $user->ID ?: 0,
-            'comment_approved'     => 1,
+            'comment_approved'     => $comment_approved,
             'comment_meta'         => [
                 'rating' => $rating,
+                'verified' => $is_verified_buyer ? 1 : 0,
             ],
         ] );
 
@@ -2122,14 +2164,16 @@ final class LTMS_Frontend_Checkout_Handler {
         }
 
         // Recalculate product rating average so the storefront reflects the new review.
-        if ( $product = wc_get_product( $product_id ) ) {
-            // WooCommerce hooks into transition_post_status to recompute.
-            clean_post_cache( $product_id );
-        }
+        clean_post_cache( $product_id );
+
+        $message = $comment_approved
+            ? __( 'Reseña enviada', 'ltms' )
+            : __( 'Reseña enviada para moderación. Será visible tras aprobación.', 'ltms' );
 
         wp_send_json_success( [
-            'message'     => __( 'Reseña enviada', 'ltms' ),
+            'message'     => $message,
             'comment_id'  => (int) $comment_id,
+            'approved'    => (bool) $comment_approved,
         ] );
     }
 
