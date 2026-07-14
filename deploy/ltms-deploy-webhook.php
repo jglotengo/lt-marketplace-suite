@@ -245,6 +245,81 @@ if (isset($_GET['caps'])) {
     exit;
 }
 
+// ── BACKFILL MODE ────────────────────────────────────────────────────────────
+// Runs bin/ltms-backfill-audit-fixes.php in production.
+// Usage: ?token=...&backfill=1
+if (isset($_GET['backfill'])) {
+    $wp = __DIR__ . '/wp-load.php';
+    if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
+    require_once $wp;
+
+    echo "=== LTMS Backfill v2.9.132 (production) ===\n";
+    echo "Time: " . current_time('Y-m-d H:i:s') . "\n";
+    echo "PHP: " . PHP_VERSION . "\n\n";
+
+    global $wpdb;
+
+    // ── 1. KYC expires_at backfill ──────────────────────────────────────────
+    $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+    $approved_without_expiry = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$kyc_table}`
+         WHERE status = 'approved'
+           AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+    );
+    echo "1. KYC expires_at backfill:\n";
+    echo "   KYCs aprobados sin expires_at: {$approved_without_expiry}\n";
+    if ($approved_without_expiry > 0) {
+        $updated = $wpdb->query(
+            "UPDATE `{$kyc_table}`
+             SET expires_at = DATE_ADD(
+                 COALESCE(NULLIF(reviewed_at, '0000-00-00 00:00:00'), NULLIF(submitted_at, '0000-00-00 00:00:00'), NOW()),
+                 INTERVAL 1 YEAR
+             )
+             WHERE status = 'approved'
+               AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+        );
+        echo "   Actualizados: {$updated}\n";
+    } else {
+        echo "   No hay KYCs que actualizar.\n";
+    }
+
+    // ── 2. Payouts rejection_reason backfill ────────────────────────────────
+    $payouts_table = $wpdb->prefix . 'lt_payout_requests';
+    $rejected_without_reason = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$payouts_table}`
+         WHERE status = 'rejected'
+           AND notes IS NOT NULL AND notes != ''
+           AND (rejection_reason IS NULL OR rejection_reason = '')"
+    );
+    echo "\n2. Payouts rejection_reason backfill:\n";
+    echo "   Payouts rechazados con notes pero sin rejection_reason: {$rejected_without_reason}\n";
+    if ($rejected_without_reason > 0) {
+        $updated = $wpdb->query(
+            "UPDATE `{$payouts_table}`
+             SET rejection_reason = notes
+             WHERE status = 'rejected'
+               AND notes IS NOT NULL AND notes != ''
+               AND (rejection_reason IS NULL OR rejection_reason = '')"
+        );
+        echo "   Actualizados: {$updated}\n";
+    } else {
+        echo "   No hay payouts que migrar.\n";
+    }
+
+    // ── 3. Verificación final ───────────────────────────────────────────────
+    echo "\n=== Verificación ===\n";
+    $remaining_kyc = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$kyc_table}` WHERE status = 'approved' AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+    );
+    $remaining_payouts = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$payouts_table}` WHERE status = 'rejected' AND notes != '' AND (rejection_reason IS NULL OR rejection_reason = '')"
+    );
+    echo "KYCs aprobados sin expires_at restantes: {$remaining_kyc}\n";
+    echo "Payouts rechazados sin rejection_reason restantes: {$remaining_payouts}\n";
+    echo "\n=== Backfill completado ===\n";
+    exit;
+}
+
 // ── DEPLOY MODE ───────────────────────────────────────────────────────────────
 $ts = date('Y-m-d H:i:s');
 echo "[{$ts}] v5

@@ -40,3 +40,15 @@ jobs:
             echo "Webhook failed with status $HTTP_CODE"
             exit 0
           fi
+
+      - name: Trigger backfill (webhook self-updated on previous call)
+        run: |
+          sleep 5
+          HTTP_CODE=$(curl -s -o /tmp/backfill_response.txt -w "%{http_code}" \
+            --max-time 60 --retry 2 --retry-delay 10 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: text/plain,application/json" \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
+            "https://lo-tengo.com.co/ltms-deploy-webhook.php?token=${{ secrets.DEPLOY_TOKEN }}&backfill=1")
+          echo "Backfill HTTP status: $HTTP_CODE"
+          cat /tmp/backfill_response.txt
