@@ -118,7 +118,19 @@ class LTMS_Booking_Policy_Handler {
         );
         if ( ! $booking ) return null;
 
-        $policy_id = (int) get_post_meta( (int) $booking['product_id'], '_ltms_policy_id', true );
+        // v2.9.117 BOOKING-AUDIT P0-1 FIX: try BOTH meta keys for policy_id.
+        // Before, this method read '_ltms_policy_id' but create_booking() saves
+        // to '_ltms_booking_policy_id' (different key). The policy lookup ALWAYS
+        // fell through to the vendor default, ignoring product-specific policies.
+        // Now we try both keys (product-specific first, then vendor default).
+        $policy_id = (int) get_post_meta( (int) $booking['product_id'], '_ltms_booking_policy_id', true );
+        if ( ! $policy_id ) {
+            $policy_id = (int) get_post_meta( (int) $booking['product_id'], '_ltms_policy_id', true );
+        }
+        // Also check the booking row's policy_id (set at create time by create_booking).
+        if ( ! $policy_id && ! empty( $booking['policy_id'] ) ) {
+            $policy_id = (int) $booking['policy_id'];
+        }
         if ( $policy_id ) {
             $policy = $wpdb->get_row(
                 $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}lt_booking_policies WHERE id = %d", $policy_id ),
@@ -193,14 +205,34 @@ class LTMS_Booking_Policy_Handler {
      */
     public static function process_cancellation_refund( int $booking_id, array $booking, string $cancelled_by ): void {
         try {
-            $refund_amount = self::calculate_refund_amount( $booking_id, $booking );
-            if ( $refund_amount <= 0 ) return;
-
+            // v2.9.117 BOOKING-AUDIT P0-2 FIX: prevent double refund.
+            // Before, if cancel_booking was called twice (race condition or retry),
+            // process_cancellation_refund would run twice and wc_create_refund
+            // would create TWO refund objects for the same booking → double money back.
+            // Now we check if a refund already exists for this booking's WC order.
             $wc_order_id = (int) $booking['wc_order_id'];
             if ( ! $wc_order_id ) return;
 
             $order = wc_get_order( $wc_order_id );
             if ( ! $order ) return;
+
+            // Check if a refund with the booking_id in the reason already exists.
+            $refund_reason_prefix = sprintf( 'Cancelación de reserva #%d', $booking_id );
+            $existing_refunds = $order->get_refunds();
+            foreach ( $existing_refunds as $existing_refund ) {
+                if ( stripos( $existing_refund->get_reason(), $refund_reason_prefix ) !== false ) {
+                    // Already refunded for this booking — skip.
+                    self::log_info_static( 'booking', sprintf(
+                        'Booking #%d: refund already exists (amount=%s), skipping double refund.',
+                        $booking_id,
+                        $existing_refund->get_amount()
+                    ) );
+                    return;
+                }
+            }
+
+            $refund_amount = self::calculate_refund_amount( $booking_id, $booking );
+            if ( $refund_amount <= 0 ) return;
 
             // Only auto-refund if order is paid.
             if ( ! in_array( $order->get_status(), [ 'completed', 'processing' ], true ) ) return;
@@ -256,10 +288,20 @@ class LTMS_Booking_Policy_Handler {
             return new \WP_Error( 'invalid_vendor', __( 'Vendedor no válido.', 'ltms' ) );
         }
 
+        // v2.9.117 BOOKING-AUDIT P1-2 FIX: sanitize policy_type against allowlist.
+        // Before, policy_type was passed raw from $_POST → a vendor could set
+        // policy_type to any string, which would break calculate_refund_amount's
+        // switch statement (no default case → fallthrough to 0% refund).
+        $policy_type = sanitize_key( $data['policy_type'] ?? 'flexible' );
+        $valid_types = [ 'flexible', 'moderate', 'strict', 'non_refundable' ];
+        if ( ! in_array( $policy_type, $valid_types, true ) ) {
+            $policy_type = 'flexible';
+        }
+
         $fields = [
             'vendor_id'             => $vendor_id,
             'name'                  => sanitize_text_field( $data['name'] ?? '' ),
-            'policy_type'           => sanitize_text_field( $data['policy_type'] ?? 'flexible' ),
+            'policy_type'           => $policy_type,
             'free_cancel_hours'     => absint( $data['free_cancel_hours'] ?? 24 ),
             'partial_refund_pct'    => min( 100, absint( $data['partial_refund_pct'] ?? 50 ) ),
             'partial_refund_hours'  => absint( $data['partial_refund_hours'] ?? 0 ),
@@ -309,8 +351,8 @@ class LTMS_Booking_Policy_Handler {
     // ── AJAX (panel de vendedor) ────────────────────────────────────────
 
     public static function ajax_get_vendor_policies(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
         wp_send_json_success( self::get_vendor_policies( get_current_user_id() ) );
     }
@@ -318,16 +360,46 @@ class LTMS_Booking_Policy_Handler {
     public static function ajax_save_vendor_policy(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
+        // v2.9.117 BOOKING-AUDIT P0-3 FIX: verify vendor is authenticated.
+        // Before, any logged-in user (including customers) could call this endpoint.
         $vendor_id = get_current_user_id();
+        if ( ! $vendor_id || ! LTMS_Utils::is_ltms_vendor( $vendor_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        // v2.9.117 P0-4 FIX: if updating an existing policy, verify ownership (IDOR).
+        // Before, a vendor could pass policy_id of ANOTHER vendor's policy and
+        // the save_policy method would try to UPDATE (with vendor_id in WHERE,
+        // so 0 rows affected) then INSERT a new policy. The real risk: a vendor
+        // could probe policy_ids to discover other vendors' policy names/types.
+        $policy_id = absint( $_POST['policy_id'] ?? 0 );
+        if ( $policy_id ) {
+            global $wpdb;
+            $owner = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT vendor_id FROM {$wpdb->prefix}lt_booking_policies WHERE id = %d",
+                $policy_id
+            ) );
+            if ( $owner && $owner !== $vendor_id ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::security(
+                        'BOOKING_POLICY_IDOR_ATTEMPT',
+                        sprintf( 'Vendor #%d intentó editar política #%d que pertenece al vendor #%d', $vendor_id, $policy_id, $owner ),
+                        [ 'vendor_id' => $vendor_id, 'policy_id' => $policy_id, 'owner_id' => $owner ]
+                    );
+                }
+                wp_send_json_error( [ 'message' => __( 'No autorizado sobre esta política.', 'ltms' ) ], 403 );
+            }
+        }
+
         $result    = self::save_policy( [
-            'id'                    => absint( $_POST['policy_id'] ?? 0 ),
+            'id'                    => $policy_id,
             'vendor_id'             => $vendor_id,
-            'name'                  => wp_unslash( $_POST['policy_name'] ?? '' ),
-            'policy_type'           => $_POST['policy_type'] ?? 'flexible',
-            'free_cancel_hours'     => $_POST['free_cancel_hours'] ?? 24,
-            'partial_refund_pct'    => $_POST['partial_refund_pct'] ?? 50,
-            'partial_refund_hours'  => $_POST['partial_refund_hours'] ?? 0,
-            'is_default'            => $_POST['is_default'] ?? 0,
+            'name'                  => sanitize_text_field( wp_unslash( $_POST['policy_name'] ?? '' ) ),
+            'policy_type'           => sanitize_key( $_POST['policy_type'] ?? 'flexible' ),
+            'free_cancel_hours'     => absint( $_POST['free_cancel_hours'] ?? 24 ),
+            'partial_refund_pct'    => absint( $_POST['partial_refund_pct'] ?? 50 ),
+            'partial_refund_hours'  => absint( $_POST['partial_refund_hours'] ?? 0 ),
+            'is_default'            => ! empty( $_POST['is_default'] ) ? 1 : 0,
         ] );
 
         if ( is_wp_error( $result ) ) {

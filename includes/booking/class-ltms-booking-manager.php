@@ -613,6 +613,15 @@ class LTMS_Booking_Manager {
                 [ '%d' ]
             );
 
+            // v2.9.117 BOOKING-AUDIT P1-1 FIX: fire ltms_booking_cancelled action.
+            // Before, auto-expired bookings did NOT fire the action → listeners
+            // (notifications, refund processing, commission reversal) never ran
+            // for auto-expired bookings. Also process refund if applicable.
+            do_action( 'ltms_booking_cancelled', (int) $b['id'], $b, 'system' );
+            if ( class_exists( 'LTMS_Booking_Policy_Handler' ) ) {
+                LTMS_Booking_Policy_Handler::process_cancellation_refund( (int) $b['id'], $b, 'system' );
+            }
+
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::info( 'BOOKING_AUTO_EXPIRED',
                     sprintf( 'Booking #%d auto-expired (no payment after %d min, wc_order=%d)', $b['id'], $minutes, $b['wc_order_id'] ),
