@@ -51,7 +51,7 @@ class LTMS_Forensic_Log {
      * @return string Client IP (real IP behind proxy, or REMOTE_ADDR).
      */
     private static function get_client_ip(): string {
-        $remote = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        $remote = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
 
         // If behind a trusted proxy (loopback or Docker), consult X-Forwarded-For
         $trusted_proxies = [ '127.0.0.1', '::1', '172.16.0.0/12', '10.0.0.0/8' ];
@@ -109,8 +109,11 @@ class LTMS_Forensic_Log {
             $columns = $wpdb->get_col( "DESCRIBE `{$table}`" ) ?: [];
         }
 
-        $user_agent  = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        // v2.9.137 BACKEND-AUDIT P1-1: sanitize $_SERVER values before storing in DB.
+        // Before, raw user_agent and request_uri were stored — XSS risk if displayed
+        // in admin without esc_html. Now sanitized with substr to prevent overflow.
+        $user_agent  = isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ), 0, 500 ) : '';
+        $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? substr( sanitize_text_field( $_SERVER['REQUEST_URI'] ), 0, 2048 ) : '';
         $created_at  = current_time( 'mysql' );
 
         // H-6 FIX: wrap the SELECT (last hash) + INSERT in a transaction with
