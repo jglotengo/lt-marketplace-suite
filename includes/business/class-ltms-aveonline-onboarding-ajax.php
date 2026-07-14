@@ -293,6 +293,14 @@ class LTMS_Aveonline_Onboarding_Ajax {
         if ( ! wp_verify_nonce( $nonce, 'ltms_vendor_nonce' ) ) {
             wp_send_json_error( 'Sesión inválida. Recarga la página.', 403 );
         }
+        // v2.9.127 BATCH-AUDIT P0-5 FIX: verify vendor role.
+        // Before, any logged-in user (including customers) could call onboarding steps.
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( 'Login requerido.', 401 );
+        }
+        if ( class_exists( 'LTMS_Utils' ) && ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Acceso denegado.', 403 );
+        }
     }
 
     /**
