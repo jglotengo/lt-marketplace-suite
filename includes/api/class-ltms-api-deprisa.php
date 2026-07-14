@@ -494,7 +494,7 @@ class LTMS_Api_Deprisa {
          */
         private function parse_xml( string $body ): \SimpleXMLElement {
                 libxml_use_internal_errors( true );
-                $xml = simplexml_load_string( $body, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOENT );
+                $xml = simplexml_load_string( $body, 'SimpleXMLElement', LIBXML_NONET );
                 if ( false === $xml ) {
                         $errors = libxml_get_errors();
                         libxml_clear_errors();

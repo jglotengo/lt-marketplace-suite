@@ -334,6 +334,7 @@ class LTMS_TOTP_2FA {
         );
         ?>
         <form name="ltms-2fa-form" id="ltms-2fa-form" method="post">
+            <?php wp_nonce_field( 'ltms_2fa_verify', 'ltms_2fa_nonce' ); ?>
             <p>
                 <label for="ltms-2fa-code"><?php esc_html_e( 'Código de 6 dígitos', 'ltms' ); ?><br>
                 <input type="text" name="ltms_2fa_code" id="ltms-2fa-code"
@@ -357,10 +358,21 @@ class LTMS_TOTP_2FA {
             <a href="<?php echo esc_url( wp_logout_url() ); ?>">← <?php esc_html_e( 'Cancelar', 'ltms' ); ?></a>
         </p>
         <script>
+        // v2.9.133 CYBER-AUDIT: replaced alert() with inline error message.
         document.getElementById('ltms-2fa-form').addEventListener('submit', function(e) {
             var code = document.getElementById('ltms-2fa-code').value;
             var backup = document.getElementById('ltms-2fa-backup').value;
-            if (!code && !backup) { e.preventDefault(); alert('Ingresa un código.'); }
+            if (!code && !backup) {
+                e.preventDefault();
+                var err = document.getElementById('ltms-2fa-error');
+                if (!err) {
+                    err = document.createElement('p');
+                    err.id = 'ltms-2fa-error';
+                    err.style.cssText = 'color:#dc2626;font-size:13px;margin:8px 0;';
+                    this.insertBefore(err, this.firstChild);
+                }
+                err.textContent = '<?php echo esc_js( __( 'Ingresa un código.', 'ltms' ) ); ?>';
+            }
         });
         </script>
         <?php
