@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-08
-> **Versión del plugin:** 2.9.98
-> **Total de lecciones:** 70 (35 originales + 25 nuevas de v2.9.36-98)
+> **Última actualización:** 2026-07-15
+> **Versión del plugin:** 2.9.116
+> **Total de lecciones:** 80 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 10 nuevas de auditorías v2.9.113-116)
 
 ---
 
@@ -956,4 +956,110 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 
 ---
 
-*Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-13 (v2.9.102) con 70 lecciones documentadas (35 originales + 25 de audits + 10 de estabilización).*
+*Este documento se actualiza cada vez que se encuentra un nuevo error durante el desarrollo. La última actualización fue el 2026-07-15 (v2.9.116) con 80 lecciones documentadas.*
+
+---
+
+## 13. v2.9.113-116 — Lecciones de Auditorías de Ciclo de Vida (REG/KYC/PAYOUTS/WALLET)
+
+> 10 lecciones nuevas de las 4 auditorías completas del ciclo de vida del vendedor: Registration (16 bugs), KYC (16 bugs), Payouts (14 bugs), Wallet/Comisiones (9 bugs). Total: 55 bugs fixeados en una sesión.
+
+### LECCIÓN #71: `strpos() === 0` vs `strpos() === false` para checks de pertenencia
+
+**Error:** El check IDOR de KYC usaba `strpos($path, $expected_prefix) !== 0` para validar que el path pertenece al vendor. Pero el upload handler retorna vault URLs como `https://site.com/ltms-vault/kyc/168/uuid.pdf`, donde `kyc/168/` aparece en posición 30, no 0. El check fallaba para el 100% de los submits.
+
+**Causa raíz:** Confusión entre "empieza con" (`=== 0`) y "contiene" (`!== false`). El check fue escrito asumiendo que los paths serían bare B2 keys (`kyc/168/uuid.pdf`), pero el upload handler devuelve vault URLs.
+
+**Fix:** Cambiar `strpos($path, $expected_prefix) !== 0` por `strpos($path, $expected_prefix) === false` (negar la pertenencia en vez de verificar el prefijo exacto).
+
+**Regla preventiva:** Para checks de seguridad tipo "este path pertenece a este vendor", usar `strpos() === false` (no contiene) en vez de `strpos() !== 0` (no empieza con). El primero es más permisivo y soporta URLs completas.
+
+### LECCIÓN #72: `current_user_can('ltms_vendor')` siempre false — los roles NO son capabilities
+
+**Error:** 6 locations usaban `current_user_can('ltms_vendor')` para verificar si el usuario es vendor. Pero `ltms_vendor` es un ROL, no una CAPABILITY. `current_user_can()` solo devuelve true para capabilities, no para roles. Todos estos checks fallaban silenciosamente.
+
+**Causa raíz:** Confusión entre roles (conjuntos de capabilities) y capabilities individuales. WordPress no expone roles via `current_user_can()`.
+
+**Fix:** Usar `LTMS_Utils::is_ltms_vendor($user_id)` que hace `in_array('ltms_vendor', (array) $user->roles)`.
+
+**Regla preventiva:** NUNCA usar `current_user_can('ltms_vendor')` o cualquier nombre de rol. Siempre usar `LTMS_Utils::is_ltms_vendor()` o `in_array('role_name', (array) $user->roles)`.
+
+### LECCIÓN #73: NaN slips through every numeric comparison
+
+**Error:** `execute_transaction()` en Wallet aceptaba montos NaN. `NaN > 0` es false, `NaN <= 0` es false, `NaN === 0` es false — NaN slips through every check. `bcadd('100', 'NaN')` retorna '0'. Resultado: wallet tx registra amount=NaN pero aplica 0 balance change → desbalances silenciosos.
+
+**Causa raíz:** Las validaciones asumían que `> 0` y `<= 0` cubren todos los casos. Pero NaN no es ni > ni <= ni === a ningún número.
+
+**Fix:** Agregar `if (is_nan($amount) || is_infinite($amount)) throw ...` al entry point de toda función que reciba montos.
+
+**Regla preventiva:** Toda función que reciba `float $amount` debe validar `is_nan($amount) || is_infinite($amount)` ANTES de cualquier comparación. NaN e INF no son valores monetarios válidos.
+
+### LECCIÓN #74: Montos negativos invierten credit/debit semantics
+
+**Error:** `execute_transaction()` aceptaba montos negativos. `credit(-100)` actúa como `debit(100)` porque `bcadd('100', '-100')` = '0'. Un atacante podría extraer fondos via credit negativo.
+
+**Causa raíz:** El check `$amount <= 0` estaba en `credit()` y `debit()` pero NO en `execute_transaction()` (el método interno). Los métodos `_within_transaction` (que llaman execute_transaction directamente) no validaban.
+
+**Fix:** Agregar `if ($amount < 0) throw ...` al entry point de execute_transaction.
+
+**Regla preventiva:** Toda función financiera que acepte montos debe rechazar negativos al entry point, sin importar si los callers ya validan. Defense in depth: validar en el método público Y en el interno.
+
+### LECCIÓN #75: WHERE clause con columna inexistente = 0 rows affected = silent failure
+
+**Error:** `ajax_unfreeze_wallet()` usaba `$wpdb->update($table, $data, ['user_id' => $vendor_id])` pero la columna en `lt_vendor_wallets` es `vendor_id`, no `user_id`. El UPDATE afectaba 0 rows. El admin veía "success" pero la wallet quedaba congelada PARA SIEMPRE.
+
+**Causa raíz:** El developer copió el patrón de `wp_users` (que usa `ID` o `user_id`) sin verificar el schema de `lt_vendor_wallets`. MySQL no error si la columna del WHERE no existe — solo afecta 0 rows.
+
+**Fix:** Usar `Wallet::unfreeze()` con la columna correcta `vendor_id`.
+
+**Regla preventiva:** SIEMPRE verificar el schema de la tabla antes de escribir WHERE clauses. MySQL no errora en columnas inexistentes del WHERE — silenciosamente afecta 0 rows. Usar `$wpdb->update()` con `|| false` check no es suficiente; verificar `$result > 0` o usar `mysql_affected_rows()`.
+
+### LECCIÓN #76: Handler AJAX registrado dos veces = race condition
+
+**Error:** `wp_ajax_ltms_upload_kyc_document` estaba registrado en `LTMS_Media_Guard::init()` Y en `LTMS_Dashboard_Logic::init()`. Media_Guard se registraba primero (kernel order), así que ganaba. Dashboard_Logic era dead code que habría re-subido el archivo a B2 si Media_Guard fallaba.
+
+**Causa raíz:** Dos clases independientes registraron el mismo action sin coordinación. No hay warning de PHP ni de WordPress cuando esto pasa.
+
+**Fix:** Remover la registración duplicada en Dashboard_Logic.
+
+**Regla preventiva:** Antes de registrar un `add_action('wp_ajax_X', ...)`, grep por `wp_ajax_X` en todo el codebase para verificar que no esté ya registrado. WordPress permite múltiples callbacks para el mismo action sin warning.
+
+### LECCIÓN #77: Nonce action string mismatch = always fail for legit users
+
+**Error:** `commission-writer ajax_backfill()` usaba `check_ajax_referer('ltms_backfill', 'nonce')` pero el nonce action `'ltms_backfill'` nunca se creaba via `wp_create_nonce()` en ningún lado. El check siempre fallaba para admins legítimos.
+
+**Causa raíz:** El developer asumió que el nonce se crearía automáticamente, o planeaba crearlo en la UI admin pero nunca lo hizo.
+
+**Fix:** Usar el nonce estándar `ltms_admin_nonce` que ya se crea en todas las views admin.
+
+**Regla preventiva:** Toda llamada a `check_ajax_referer('action_name', 'nonce')` debe tener un `wp_create_nonce('action_name')` correspondiente en algún lugar del código (típicamente en la view que renderiza el form). Grep por ambos antes de commit.
+
+### LECCIÓN #78: Vault URL vs bare B2 key — normalizar antes de comparar
+
+**Error:** Múltiples lugares asumían que los paths de documentos KYC son bare B2 keys (`kyc/168/uuid.pdf`). Pero el upload handler devuelve vault URLs (`https://site.com/ltms-vault/kyc/168/uuid.pdf`). Las comparaciones fallaban.
+
+**Causa raíz:** No había un helper central para normalizar paths. Cada lugar hacía su propio parsing (o no lo hacía).
+
+**Fix:** Crear `extract_b2_key_from_path()` que acepta ambos formatos y devuelve el bare key.
+
+**Regla preventiva:** Cuando un sistema tiene múltiples formatos de path (URL vs key vs path relativo), crear UN helper de normalización y usarlo en TODOS los lugares que comparan o almacenan paths. No dejar que cada caller haga su propio parsing.
+
+### LECCIÓN #79: Country-aware validation — no asumir que el site country = vendor country
+
+**Error:** KYC `country_code` se tomaba de `LTMS_COUNTRY` (site-wide constant), no del vendor meta. Un vendor MX registrándose en un site CO recibía `country_code='CO'` en su KYC. Lo mismo para document_type whitelist (siempre CO) y CLABE validation (6-20 dígitos en vez de 18 exactos para MX).
+
+**Causa raíz:** El código fue escrito asumiendo un solo país por site. Cuando se agregó soporte MX, no se actualizaron todas las validaciones para ser country-aware.
+
+**Fix:** Leer `ltms_country` del vendor meta con fallback a `LTMS_Core_Config::get_country()`. Tener whitelists y regex separados para CO y MX.
+
+**Regla preventiva:** Toda validación que dependa del país (document types, formatos de cuenta bancaria, retenciones fiscales) debe leer el país del vendor meta, NO del site config. Un site CO puede tener vendors MX y viceversa.
+
+### LECCIÓN #80: GitHub HTTP cache en SiteGround = fetch intermitente
+
+**Error:** El deploy webhook hace `git fetch origin` en SiteGround. A veces el fetch trae el último commit, a veces trae un commit stale (varios commits atrás). Esto causó que el deploy de v2.9.116 requiriera múltiples triggers.
+
+**Causa raíz:** SiteGround tiene un proxy HTTP que cachea las respuestas de GitHub. El cache tiene un TTL corto pero no determinístico — a veces sirve stale, a veces fresh.
+
+**Fix:** Hacer un empty commit para forzar un nuevo ref en GitHub (invalida el cache). Re-trigger el webhook múltiples veces hasta que el fetch traiga el último commit.
+
+**Regla preventiva:** Si el deploy webhook muestra `HEAD is now at <commit-viejo>` cuando GitHub ya tiene un commit más reciente, hacer un empty commit (`git commit --allow-empty -m "force refresh"`) y re-push. Esto invalida el cache HTTP de GitHub en SiteGround. Considerar agregar `git fetch --no-cache` o `git remote set-url` con un timestamp en el webhook futuro.

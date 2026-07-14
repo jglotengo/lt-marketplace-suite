@@ -3,14 +3,14 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-13 (versión del plugin en ese momento: `2.9.102`).
+> **Última auditoría completa del repo:** 2026-07-15 (versión del plugin en ese momento: `2.9.116`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
 > (`jglotengo/lt-marketplace-suite@main`, ~516 archivos PHP en `includes/`, 1,300+ commits)
-> e incorpora el resultado de 4 auditorías completas:
-> REG-AUDIT-001 (registro vendedores, 11+3 fixes), DEEP-AUDIT-002 (onboarding+panel,
-> 56 findings 100% P0+P1+P2 resueltos), UIUX-AUDIT-001 (62 findings, 100% resueltos),
-> SEC-1 (security audit, 9/10 vulnerabilidades arregladas), QA completo (21/21 vistas),
-> build pipeline + CI (GitHub Actions).
+> e incorpora el resultado de 8 auditorías completas:
+> REG-AUDIT-001 (registro vendedores, 16 bugs), DEEP-AUDIT-002 (onboarding+panel, 56 findings),
+> UIUX-AUDIT-001 (62 findings), SEC-1 (9/10 vulns), SEC-2-3-5 (12 findings), QA completo (21/21 vistas),
+> build pipeline + CI (GitHub Actions), KYC-AUDIT-1 (16 bugs), PAYOUT-AUDIT-1 (14 bugs),
+> WALLET-AUDIT-1 (9 bugs). Total: 80 lecciones documentadas en LECCIONES_APRENDIDAS.md.
 
 ---
 
@@ -20,7 +20,7 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.102` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 3 auditorías (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001), 1 auditoría de seguridad (SEC-1: 9/10 vulnerabilidades arregladas), QA completo (21/21 vistas), build pipeline + CI (GitHub Actions) están completadas a esta versión.
+**Versión actual del plugin:** `2.9.116` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`, que es extenso y detallado — consúltalo antes de asumir el estado de un módulo). Las 4 auditorías del ciclo de vida del vendedor (Registration, KYC, Payouts, Wallet/Comisiones) están completadas a esta versión, con 55 bugs fixeados (23 P0 + 23 P1 + 11 P2 + 2 P3).
 
 ---
 

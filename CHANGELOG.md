@@ -4,6 +4,143 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.116] — 2026-07-15
+
+### Wallet / Comisiones — Auditoría Completa (9 bugs: 4 P0 + 5 P1)
+
+Cuarta auditoría del ciclo de vida del vendedor (registro → KYC → payouts → wallet). El módulo financiero del marketplace — todo el dinero que entra y sale pasa por aquí.
+
+#### P0 (CRITICAL — dinero permanentemente atascado o valores inválidos)
+
+- **P0-1**: `Wallet::freeze()` aceptaba reason vacío → non-compliant con SAGRILAFT (requiere justificación documentada). Ahora rechaza con `WALLET_FREEZE_NO_REASON` security log.
+- **P0-2**: `execute_transaction()` aceptaba montos NaN/INF → NaN slips through every check (`NaN > 0` is false), `bcadd('100', 'NaN')` returns '0' → wallet tx records amount=NaN but applies 0 balance change → desbalances silenciosos en el ledger. Ahora rechaza al entry point.
+- **P0-3**: `execute_transaction()` aceptaba montos negativos → `credit(-100)` actúa como `debit(100)`, invirtiendo semánticas (podría permitir extracción de fondos). Ahora rechaza con exception.
+- **P0-4**: `ajax_unfreeze_wallet()` WHERE clause usaba `'user_id'` (columna inexistente — la correcta es `vendor_id`) → 0 rows affected → billetera quedaba congelada PARA SIEMPRE a pesar de que admin veía "success". Ahora usa `Wallet::unfreeze()` con la columna correcta.
+
+#### P1 (HIGH — compliance/fraud prevention)
+
+- **P1-3**: `freeze()` ahora dispara `ltms_wallet_frozen` action (fraud alert, vendor notification, accounting hold).
+- **P1-4**: Agregado `Wallet::unfreeze()` method (no existía — solo el handler roto hacía UPDATE directo). Centraliza lógica, dispara `ltms_wallet_unfrozen` action, log security event.
+- **P1-5**: `commission-writer get_vendor_payout_method()` leía `ltms_clabe` (key NUNCA seteada por el flujo KYC) → siempre default CO, perdiendo distinción CO/MX para reporting fiscal Art. 30-B CFF. Ahora lee `ltms_bank_account_number` (cifrada) + `ltms_kyc_bank_account` con decrypt fallback.
+- **P1-6**: `commission-writer ajax_backfill()` usaba nonce action `ltms_backfill` (nunca creado) → siempre fallaba para admins legítimos. Cap check era `manage_woocommerce` (muy broad). Ahora usa `ltms_admin_nonce` + `manage_options`.
+- **P1-7**: `validate_debit/validate_amount/validate_hold` aceptaban NaN/INF. Ahora rechazan.
+- **P1-8**: `is_valid_transaction_type()` missing `fee`, `tax_withholding`, `reversal` (todos válidos en execute_transaction's switch). Ahora los incluye.
+
+#### Deploy
+- Webhook file list expandido con 10 archivos críticos (wallet, payouts, commission-writer, bank-reconciler, media-guard, restaurant-compliance, legal-compliance, frontend-payout-handler, admin-payouts view).
+- Empty commit para invalidar cache HTTP stale de GitHub en SiteGround.
+
+## [2.9.115] — 2026-07-15
+
+### Payouts / Retiros — Auditoría Completa (14 bugs: 6 P0 + 6 P1 + 2 P2)
+
+Tercera auditoría del ciclo de vida del vendedor. El módulo de retiros de ganancias — directamente ligado al KYC.
+
+#### P0 (CRITICAL — money/PII at risk)
+
+- **P0-1**: `create_request()` validaba `amount > balance` (raw), no `amount > available` (balance - held). Vendor podía solicitar retiro de fondos HELD → double-spend al aprobar ambos pending payouts.
+- **P0-2**: `execute_payout_payment()` leía `ltms_bank_account` (key inexistente). TODOS los desembolsos Openpay/Nequi fallaban con "no tiene cuenta bancaria". Ahora lee las keys correctas con fallback + decrypt.
+- **P0-3**: `bank_transfer` enviaba cuenta bancaria en plaintext al email del admin → PII leak (Ley 1581/2012 art. 9). Ahora envía solo masked (****1234) + link al panel.
+- **P0-4**: `reject()` aceptaba reason vacío. Frontend validaba pero PHP no → AJAX directo con reason='' succeed. Ahora valida non-empty + length cap (480 chars).
+- **P0-5**: `reject()` guardaba reason en `notes` pero admin lee `rejection_reason` → admin NUNCA veía el motivo del rechazo. Ahora guarda en `rejection_reason` column, preserva notes.
+- **P0-6**: Cron `process_pending_payouts()` procesaba 50 payouts/run (500s) excediendo timeout de WP-Cron (300s) → payouts stuck en 'processing' forever. Ahora batch=5 (configurable, hard cap 20).
+
+#### P1 (HIGH — compliance/fraud prevention)
+
+- **P1-3**: `get_pending_count()` solo contaba 'pending', no 'processing'. Vendor con 3 pending + 1 processing podía crear 4to, bypassing MAX_PENDING_PER_VENDOR.
+- **P1-4**: `reject()` no disparaba `ltms_payout_rejected` action. Listeners (accounting reversal, fraud scoring) no podían reaccionar.
+- **P1-5**: `approve()` gateway error sobreescribía notes existentes (e.g., name mismatch flag). Ahora appenda.
+- **P1-6**: `ajax_request_payout` (frontend) no logueaba security events. Ahora logs PAYOUT_REQUEST_FAILED y PAYOUT_REQUEST_EXCEPTION.
+- **P1-7**: `create_request()` no tenía filter para fraud detection al request time. Ahora dispara `ltms_payout_pre_create` filter.
+- **P1-9**: `create_request()` no verificaba wallet congelada. Vendor bajo investigación de fraude podía seguir solicitando retiros. Ahora bloquea.
+
+#### P2 (UX/Security hardening)
+
+- **P2-1**: Admin payouts view usaba native `confirm()` para approve (3 ocurrencias). Reemplazado con modal dialog + ESC handler.
+- **P2-3**: `bank-reconciler ajax_get_reconciliation` usaba `ltms_access_dashboard` (broader cap) mientras otros endpoints usaban `ltms_manage_platform_settings`. Ahora consistente.
+
+## [2.9.114] — 2026-07-15
+
+### KYC — Auditoría Completa (16 bugs: 9 P0 + 7 P1 + 4 P2 hardening)
+
+Segunda auditoría del ciclo de vida del vendedor. El flujo KYC estaba completamente roto para todos los vendors.
+
+#### P0 (CRITICAL — KYC completamente roto para todos los vendors)
+
+- **P0-1**: IDOR path check usaba `strpos()===0` contra vault URLs, bloqueando 100% de los submits. Ahora usa `strpos()===false` (segment match).
+- **P0-2**: Restaurant INVIMA/COFEPRIS fields se renderizaban pero el JS nunca los enviaba → `validate_sanitary_registration()` siempre fallaba → restaurantes jamás aprobados.
+- **P0-3**: `ajax_approve_kyc()` referenciaba `$kyc->bank_name` en `$kyc` indefinido (solo vendor_id se obtenía). PHP warnings + bank-sync block era dead code.
+- **P0-4**: `ajax_submit_kyc()` no persistía bank_name, bank_account_number, bank_account_type, rfc_mx, curp_mx, clabe_mx, fiscal_regime_mx, domicilio_fiscal_mx a la tabla KYC. Solo a user_meta.
+- **P0-5**: `file_path` (cédula/ID) no era validado como obligatorio. Vendor podía submit sin subir cédula.
+- **P0-6**: document_type whitelist siempre `[cc,ce,nit,passport]`. MX vendors enviando 'rfc'/'curp' eran forzados a 'cc' → CC regex fallaba → 100% MX bloqueado.
+- **P0-7**: MX document number validation missing (RFC/CURP). Agregados regex RFC y CURP.
+- **P0-8**: `country_code` tomado de `LTMS_COUNTRY` site constant, no del vendor meta. MX vendor en site CO → KYC decía country_code='CO'.
+- **P0-9**: Handler AJAX `wp_ajax_ltms_upload_kyc_document` registrado dos veces (Media_Guard + Dashboard_Logic). Media_Guard ganaba, Dashboard_Logic era dead code que habría re-subido el archivo.
+
+#### P1 (HIGH)
+
+- **P1-3**: bank_account_type no se persistía. Ahora select (ahorros/corriente CO, clabe MX) + guardado en KYC table.
+- **P1-5**: `ajax_approve_kyc` syncs rep_legal_name desde user_meta (antes leía de `$kyc` indefinido).
+- **P1-8**: `expires_at` nunca se seteaba en aprobación. Ahora +1 año.
+- **P1-9**: MX CLABE validation era `/^\d{6,20}$/` (6-20 dígitos). Ahora exactamente 18 para MX.
+- **P1-11**: `ajax_get_kyc_details` leía columna inexistente `rejection_reason`. Ahora lee `notes`.
+- **P1-12**: `ltms_kyc_consent_date` (key incorrecta) vs `ltms_kyc_consent_at` (correcta). Ahora llama `log_kyc_consent()`.
+- **P1-13**: `ajax_quick_approve_kyc` bypasseaba `ltms_kyc_pre_approve` filter (sanctions screening, sanitary reg). Ahora los ejecuta.
+- **P1-18**: `ajax_reject_kyc` permitía re-rechazar KYC ya rechazado, sobreescribiendo notes y re-enviando email.
+- **P1-28**: name_mismatch_note en `notes` era sobreescrito en rechazo. Ahora se preserva y appenda.
+
+#### P2 (UX/Security hardening)
+
+- **P2-1**: `ajax_get_kyc_details` usaba `manage_woocommerce` (shop_manager puede ver pero no aprobar). Ahora `ltms_manage_kyc`.
+- **P2-2**: Inline `onerror` handler en `<img>` del modal docs. Reemplazado con jQuery `.on('error')`.
+- **P2-3**: XSS via decoded URL filename en `ltmsRenderKycDocs`. Reemplazada concatenación con `.text()` y `.attr()`.
+- **P2-4**: `confirm()` y `prompt()` nativos (3 ocurrencias). Reemplazados con modales modernos + ESC handler.
+
+## [2.9.113] — 2026-07-15
+
+### Registration — Auditoría Completa (16 bugs: 4 P0 + 5 P1 + 5 P2 + 2 P3)
+
+Primera auditoría del ciclo de vida del vendedor. El flujo de registro tenía bugs críticos que afectaban a todos los tipos de vendedor (turismo, físico, digital, restaurantes, servicios).
+
+#### P0 (CRITICAL)
+
+- **P0-1**: `set_role('ltms_vendor')` en Google OAuth promovía customers eliminando el rol 'customer' → rompía WooCommerce checkout.
+- **P0-2**: `complete_profile` guardaba `ltms_document_number` + `ltms_document_number_encrypted` en vez de `ltms_document` (consistente con registro normal).
+- **P0-3**: `ltms_vendor_country` → `ltms_country` (meta key consistente).
+- **P0-4**: Restaurant no estaba en whitelist de `business_type`. Ahora permitido.
+
+#### P1 (HIGH)
+
+- **P1-5,6,7,10,11,20**: Google OAuth faltaba metas que el registro normal setea: `ltms_business_type`, `ltms_terms_accepted_at`, `ltms_country`, `log_consent()`, `ltms_store_slug`, `ltms_email_verify_token`.
+- **P1-8,9**: Whitelist validation para document_type (CO: CC/CE/NIT/PAS; MX: RFC/CURP/PAS) y business_type (5 valores incl. restaurant).
+
+#### P2 (MEDIUM)
+
+- **P2-12**: Phone regex tightened de permissive a strict E.164 `/^\+[1-9][0-9]{6,19}$/`.
+- **P2-13**: Referral code validation contra existing user meta antes de `wp_create_user`.
+- **P2-14**: `ltms_store_configured = 0` seteado después de `ltms_kyc_status`.
+- **P2-15**: `ltms_sagrilaft_accepted_at` persistido para audit trail.
+- **P2-16**: `Wallet::get_or_create()` envuelto en try/catch (antes trigger rollback que borraba el user).
+
+#### P3 (LOW)
+
+- **P3-17**: `ltms_email_verified=1` + `ltms_email_verified_at` antes de `delete_user_meta(ltms_profile_incomplete)`.
+- **P3-18**: `do_action('ltms_vendor_registered', $user_id, '')` después de profile complete.
+
+## [2.9.112] — 2026-07-14
+
+### SiteGround Anti-Bot Bypass — Producción Estabilizada
+
+(Finalización de la Fase 4 — bypass del frontend para AJAX bloqueado por SiteGround WAF)
+
+- Bypass handler en `wp_loaded` (no `init` ni `template_redirect`).
+- `admin_url` filter que redirige `admin-ajax.php` → `ltms_ajax_url()`.
+- WAF del plugin excluye a vendors autenticados de inspección de patrones.
+- `DOING_AJAX=true` definido en el handler (seguro en `wp_loaded`).
+- 12+ bugs críticos encontrados y arreglados durante el debugging (KDS roto, JS render*View sobreescribían vistas PHP, .min suffix 404, `current_user_can('ltms_vendor')` siempre false, etc.).
+
+
+
 ## [2.9.101] — 2026-07-13
 
 ### Infrastructure — Build Pipeline + CI + Security Hardening
