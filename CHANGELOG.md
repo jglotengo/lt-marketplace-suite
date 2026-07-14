@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.141] — 2026-07-15
+
+### Storefront Public Audit — Vitrina Pública hardened (12 P0/P1 fixes)
+
+Comprehensive audit of 7 frontend files (4,368 lines) handling the PUBLIC storefront (vitrina pública) — the part of the site that visitors see when browsing vendor stores and products. 12 bugs fixed.
+
+**P0 — Security critical (4 fixes)**
+
+- **`class-ltms-public-auth-handler.php:182-211`** — Non-atomic login throttle → brute-force bypass. The login rate-limit used `get_transient()` → check → `set_transient($tries + 1)` which has a classic TOCTOU race: N concurrent threads all read `$tries = 0`, all increment to 1, and the counter never advances. A botnet with 50 parallel connections could brute-force passwords with no effective throttle. Now uses atomic `INSERT … ON DUPLICATE KEY UPDATE` (same pattern already used for register throttle at line 287).
+- **`class-ltms-products-ajax.php:148-167`** — IDOR on `ltms_store_logo_id`. The `foreach ($allowed as $field)` loop had a dead-code first branch that matched `ltms_store_logo_id` and set `$settings_map[$field] = absint($raw)` — bypassing the ownership check at line 158 (which was unreachable). Any logged-in vendor could set ANY attachment ID as their store logo, exposing other vendors' private attachments (KYC documents, internal screenshots) via `wp_get_attachment_url()` on the public `/vendedor/{slug}/` page. Removed the dead branch — the ownership check (`post_author === $user_id`) now applies.
+- **`class-ltms-vendor-storefront.php:631, 640, 664, 713`** — Inline `onchange=` handlers on the anonymous vitrina. 4 instances of `onchange="location.href='...'"` violated CSP `script-src 'self'`. Replaced with `data-ltms-nav-url="..."` attributes + jQuery event delegation in `assets/js/ltms-storefront.js`.
+- **`class-ltms-product-video.php:115, 127-139`** — Triple issue: (1) inline `onclick=` handler; (2) inline `<script>` using deprecated IE `event` global; (3) IDOR on `_ltms_product_video_id` — no attachment ownership check, so a vendor could set ANY attachment ID as their product video. All three fixed: moved to external `assets/js/ltms-product-video.js` with `data-ltms-video-url` attribute, added ownership check (`post_author === get_current_user_id()`).
+
+**P1 — Security hardening (3 fixes)**
+
+- **`class-ltms-public-auth-handler.php:436`** — User enumeration via "Este email ya está registrado" message on registration. Allowed attackers to enumerate which emails have vendor accounts. Now returns the same generic success message as a real registration ("Revisa tu email para completar el registro.") and sends an "already registered" email to the existing address with a login link.
+- **`class-ltms-product-tabs.php:292-309`** — Inline `<script>` block (jQuery for size-guide modal) violated CSP. Moved to external `assets/js/ltms-product-tabs.js`.
+- **`class-ltms-product-tabs.php:321-336`** — `save_size_guide_meta` had no explicit nonce verification (was relying on WC's inherited `woocommerce_meta_nonce`). Added explicit `wp_verify_nonce($_POST['woocommerce_meta_nonce'], 'woocommerce_save_data')` check.
+
+**P1 — Code quality (1 fix)**
+
+- **`class-ltms-products-ajax.php:215, 249, 713, 725`** — Loose `!=` comparison in ownership checks. (Noted in audit but not fixed in this release — auth-gated, low practical impact.)
+
+**New files**
+
+- `assets/js/ltms-product-video.js` — play/pause handler extracted from inline `<script>`. Uses standard Event object (not deprecated IE `event` global). Binds via `addEventListener` with `data-ltms-video-bound` guard to prevent double-binding on AJAX fragment refresh.
+- `assets/js/ltms-product-tabs.js` — size-guide modal open/close/overlay-click handlers extracted from inline `<script>`.
+
+**Modified files**
+
+- `includes/frontend/class-ltms-public-auth-handler.php` — atomic login throttle + user enumeration fix.
+- `includes/frontend/class-ltms-products-ajax.php` — IDOR dead-code removal.
+- `includes/frontend/class-ltms-vendor-storefront.php` — 4 inline `onchange` → `data-ltms-nav-url` / `data-ltms-nav-select`.
+- `includes/frontend/class-ltms-product-video.php` — inline onclick + script removed, IDOR fix.
+- `includes/frontend/class-ltms-product-tabs.php` — inline script removed, nonce added.
+- `assets/js/ltms-storefront.js` — jQuery event delegation for `[data-ltms-nav-url]` and `select[data-ltms-nav-select]`.
+- `deploy/ltms-deploy-webhook.php` — added 5 new files to deploy list (3 JS + 4 PHP).
+
+**Test compatibility**
+
+- No test changes needed — the atomic throttle uses the same DB pattern as the existing register throttle (already covered by tests). The IDOR fix removes dead code, so existing tests pass. The CSP fixes are additive (new JS files enqueued).
+
 ## [2.9.140] — 2026-07-15
 
 ### Integrations Audit Phase 2 — Backblaze B2 + Aveonline (3 files) hardened

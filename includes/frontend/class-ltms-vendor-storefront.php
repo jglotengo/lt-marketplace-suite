@@ -628,7 +628,7 @@ window.elementor=window.elementor||{modules:{}};
                             <label class="ltms-sf-filter-option">
                                 <input type="radio" name="ltms_cat" value=""
                                     <?php checked( ! $cat_slug ); ?>
-                                    onchange="location.href='<?php echo esc_js( $base_url ); ?>'">
+                                    data-ltms-nav-url="<?php echo esc_attr( $base_url ); ?>">
                                 Todos
                                 <span class="ltms-sf-filter-count"><?php echo esc_html( $total ); ?></span>
                             </label>
@@ -637,7 +637,7 @@ window.elementor=window.elementor||{modules:{}};
                                 <label class="ltms-sf-filter-option">
                                     <input type="radio" name="ltms_cat" value="<?php echo esc_attr( $cat->slug ); ?>"
                                         <?php checked( $cat_slug, $cat->slug ); ?>
-                                        onchange="location.href='<?php echo esc_js( $cat_url ); ?>'">
+                                        data-ltms-nav-url="<?php echo esc_attr( $cat_url ); ?>">
                                     <?php echo esc_html( $cat->name ); ?>
                                     <span class="ltms-sf-filter-count"><?php echo esc_html( $cat->count ?? '' ); ?></span>
                                 </label>
@@ -661,7 +661,7 @@ window.elementor=window.elementor||{modules:{}};
                             <label class="ltms-sf-filter-option">
                                 <input type="checkbox" name="instock" value="1"
                                     <?php checked( $in_stock ); ?>
-                                    onchange="location.href='<?php echo esc_js( $stock_url ); ?>'">
+                                    data-ltms-nav-url="<?php echo esc_attr( $stock_url ); ?>">
                                 En stock
                             </label>
                         </div>
@@ -710,7 +710,7 @@ window.elementor=window.elementor||{modules:{}};
 
                         <div class="ltms-sf-topbar-right">
                             <!-- Selector de orden -->
-                            <select class="ltms-sf-order-select" onchange="location.href=this.value" aria-label="Ordenar por">
+                            <select class="ltms-sf-order-select" aria-label="Ordenar por" data-ltms-nav-select="1">
                                 <?php
                                 $order_opts = [
                                     'date'       => 'Más recientes',

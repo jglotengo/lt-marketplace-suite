@@ -551,7 +551,16 @@ $files = [
     'assets/js/ltms-dashboard.js',
     'assets/js/ltms-admin.js',
     'assets/js/ltms-admin.min.js',
+    // INTEGRATIONS-AUDIT v2.9.141: storefront CSP compliance JS
+    'assets/js/ltms-storefront.js',
+    'assets/js/ltms-product-video.js',
+    'assets/js/ltms-product-tabs.js',
     'includes/frontend/class-ltms-products-ajax.php',
+    // INTEGRATIONS-AUDIT v2.9.141: storefront public-facing files
+    'includes/frontend/class-ltms-vendor-storefront.php',
+    'includes/frontend/class-ltms-product-tabs.php',
+    'includes/frontend/class-ltms-product-video.php',
+    'includes/frontend/class-ltms-public-auth-handler.php',
     'includes/frontend/views/view-sellers-landing.php',
     'includes/frontend/views/dashboard-wrapper.php',
     'patchwork.json',
