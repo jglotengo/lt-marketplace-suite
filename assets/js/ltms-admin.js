@@ -287,6 +287,83 @@
                 const vendorId = $(this).data('vendor-id');
                 self.unfreezeWallet(vendorId, $(this));
             });
+
+            // v2.9.131: Event delegation for data-action attributes
+            // (replaces inline onclick handlers removed for CSP compliance)
+            $(document).on('click', '[data-action]', function (e) {
+                const $el = $(this);
+                const action = $el.data('action');
+
+                // data-confirm is handled by initConfirmDialogs() — if it returned false,
+                // this handler won't fire because stopImmediatePropagation was called.
+                // But just in case, check again:
+                const confirmMsg = $el.data('confirm');
+                if (confirmMsg && !window.confirm(confirmMsg)) {
+                    e.preventDefault();
+                    return;
+                }
+
+                switch (action) {
+                    case 'ltms-test-api':
+                        e.preventDefault();
+                        self.testApiConnection($el.data('provider'), $el);
+                        break;
+
+                    case 'ltms_update_order_status':
+                        e.preventDefault();
+                        self.ajaxAction('ltms_update_order_status', {
+                            order_id: $el.data('order-id'),
+                            status: $el.data('status'),
+                        }, function (r) {
+                            if (r.success) {
+                                location.reload();
+                            } else {
+                                self.showNotice('error', r.data || 'Error');
+                            }
+                        });
+                        break;
+
+                    case 'ltms_unfreeze_wallet':
+                        e.preventDefault();
+                        self.unfreezeWallet($el.data('vendor-id'), $el);
+                        break;
+
+                    case 'ltms-toggle-banner':
+                        e.preventDefault();
+                        if (typeof ltmsToggleBanner === 'function') {
+                            ltmsToggleBanner($el.data('banner-id'), $el[0]);
+                        }
+                        break;
+
+                    case 'ltms-delete-banner':
+                        e.preventDefault();
+                        if (typeof ltmsDeleteBanner === 'function') {
+                            ltmsDeleteBanner($el.data('banner-id'), $el[0]);
+                        }
+                        break;
+
+                    case 'ltms-trigger-file-input':
+                        e.preventDefault();
+                        const fileInput = document.getElementById('ltms-file-input');
+                        if (fileInput) fileInput.click();
+                        break;
+                }
+            });
+
+            // v2.9.131: Event delegation for data-tab attributes (auditor dashboard)
+            $(document).on('click', '[data-tab]', function (e) {
+                e.preventDefault();
+                const tabId = $(this).data('tab');
+                if (typeof ltmsTab === 'function') {
+                    ltmsTab(this, tabId);
+                } else {
+                    // Inline tab switching
+                    $('.ltms-tab-btn').removeClass('active');
+                    $(this).addClass('active');
+                    $('.ltms-tab-content').hide();
+                    $('#' + tabId).show();
+                }
+            });
         },
 
         /**
@@ -381,11 +458,23 @@
 
         /**
          * Reemplaza los confirm() nativos con diálogos personalizados.
+         * v2.9.131: Also handles data-confirm and data-action attributes
+         * (replaces inline onclick handlers removed for CSP compliance).
          */
         initConfirmDialogs() {
+            // Original: data-ltms-confirm attribute
             $(document).on('click', '[data-ltms-confirm]', function (e) {
                 const msg = $(this).data('ltms-confirm') || ltmsAdmin.i18n.confirm_delete;
-                if (!confirm(msg)) {
+                if (!window.confirm(msg)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            });
+
+            // v2.9.131: data-confirm attribute (from CSP migration of onclick="return confirm()")
+            $(document).on('click', '[data-confirm]', function (e) {
+                const msg = $(this).data('confirm');
+                if (msg && !window.confirm(msg)) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
                 }
