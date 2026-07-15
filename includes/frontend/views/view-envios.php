@@ -210,7 +210,8 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
     <!-- EV-BUG-4: WCAG 2.1 — added role="dialog", aria-modal, aria-labelledby,
          tabindex="-1" for keyboard focus, and role="document" on the inner
          container. Keyboard handling (Escape to close, focus trap, focus
-         restoration) is wired up in the <?php
+         restoration) is wired up in the external JS (ltms-envios.js). -->
+    <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-envios.js
 wp_enqueue_script( 'ltms-envios', LTMS_ASSETS_URL . 'js/ltms-envios.js', [ 'jquery' ], LTMS_VERSION, true );
 ?>
