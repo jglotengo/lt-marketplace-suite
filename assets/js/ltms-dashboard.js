@@ -189,13 +189,13 @@
                         self.renderHomeView(response.data);
                     } else {
                         // v2.9.110: No mostrar error — la vista PHP ya está visible.
-                        console.log('[LTMS] AJAX returned error on home view:', response.data);
+                        // FASE2B P1 FIX: removed console.log — production JS should not
+                        // leak internal AJAX responses to browser console.
                     }
                 },
                 error: () => {
                     // v2.9.110: No mostrar error — la vista PHP ya está visible.
-                    // Solo log en consola para debug.
-                    console.log('[LTMS] AJAX error on home view (expected if bypass fails)');
+                    // FASE2B P1 FIX: removed console.log — expected error, silent fail.
                 },
             });
         },
@@ -259,8 +259,8 @@
                                 '<div style="font-size:0.72rem;color:#9ca3af;">' + (o.customer || 'Cliente') + '</div>' +
                             '</div>' +
                             '<div style="text-align:right;">' +
-                                '<div style="font-weight:600;font-size:0.82rem;">' + o.formatted + '</div>' +
-                                '<div style="font-size:0.68rem;color:' + color + ';text-transform:capitalize;">' + o.status + '</div>' +
+                                '<div style="font-weight:600;font-size:0.82rem;">' + self.escapeHtml(o.formatted || '') + '</div>' +
+                                '<div style="font-size:0.68rem;color:' + color + ';text-transform:capitalize;">' + self.escapeHtml(o.status || '') + '</div>' +
                             '</div>' +
                         '</div>';
                     }).join('');
@@ -288,11 +288,14 @@
                     }
                     var html = products.map(function(p, i) {
                         var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                        // FASE2B P1 FIX (XSS): escape p.name and p.image from AJAX response.
+                        var safeName = self.escapeHtml(p.name || '');
+                        var safeImage = p.image ? self.escapeHtml(p.image) : '';
                         return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
                             '<span style="font-size:1rem;width:24px;text-align:center;">' + medal + '</span>' +
-                            (p.image ? '<img src="' + p.image + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#9ca3af;">📦</div>') +
+                            (safeImage ? '<img src="' + safeImage + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#9ca3af;">📦</div>') +
                             '<div style="flex:1;min-width:0;">' +
-                                '<div style="font-weight:600;font-size:0.82rem;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + p.name + '</div>' +
+                                '<div style="font-weight:600;font-size:0.82rem;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + safeName + '</div>' +
                                 '<div style="font-size:0.72rem;color:#9ca3af;">' + (p.stock !== null ? 'Stock: ' + p.stock : 'Sin stock') + '</div>' +
                             '</div>' +
                             '<div style="font-weight:600;font-size:0.82rem;color:#10b981;">$' + (p.price || 0).toLocaleString('es-CO') + '</div>' +
