@@ -80,9 +80,7 @@ class ForensicLogTest extends LTMS_Unit_Test_Case {
 
         // Stubs adicionales específicos.
         Functions\stubs([
-            'sanitize_text_field' => static fn($s) => trim(strip_tags((string)$s)),
-            'current_time'        => static fn($t) => $t === 'timestamp' ? time() : gmdate('Y-m-d H:i:s'),
-            'wp_json_encode'      => static fn($data, $options = 0, $depth = 512) => json_encode($data, $options, $depth),
+            // sanitize_text_field, current_time, wp_json_encode already stubbed in base class.
         ]);
 
         // Reset $_SERVER

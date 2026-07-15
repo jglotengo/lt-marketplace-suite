@@ -76,15 +76,9 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
         Functions\stubs([
-            'current_time'  => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
-            'sanitize_text_field' => static fn($s) => trim(strip_tags((string)$s)),
-            // sanitize_textarea_field is defined in bootstrap.php — can't re-stub.
-            // get_current_user_id is defined in bootstrap.php — can't re-stub.
-            '__'            => static fn($s) => $s,
-            'wp_json_encode' => static fn($d, $o = 0, $d2 = 512) => json_encode($d, $o, $d2),
+            // current_time, sanitize_text_field, __, wp_json_encode, do_action, apply_filters
+            // already stubbed in base class.
             'wp_mail'       => true,
-            'do_action'     => null,
-            'apply_filters' => static fn($tag, $value) => $value,
             'current_user_can' => static fn($cap) => true,
             'get_userdata'  => static fn($id) => null,
             'is_wp_error'   => static fn($t) => $t instanceof \WP_Error,

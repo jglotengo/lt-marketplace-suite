@@ -78,14 +78,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
         Functions\stubs([
-            'sanitize_text_field'       => static fn($s) => trim(strip_tags((string)$s)),
-            // sanitize_textarea_field is defined in bootstrap.php — can't re-stub.
+            // sanitize_text_field, __ already stubbed in base class.
+            // home_url is defined in bootstrap.php — can't re-stub.
             'esc_url_raw'               => static fn($s) => $s,
             'attachment_url_to_postid'  => static fn($url) => 0,
             'wp_mail'                   => true,
             'admin_url'                 => static fn($p = '') => 'http://example.com/wp-admin/' . $p,
-            'home_url'                  => static fn($p = '') => 'http://example.com/' . $p,
-            '__'                        => static fn($s) => $s,
         ]);
     }
 

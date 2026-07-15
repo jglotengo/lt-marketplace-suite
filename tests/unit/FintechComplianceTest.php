@@ -50,8 +50,8 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
         Functions\stubs([
-            'current_time'   => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
-            'wp_json_encode' => static fn($d, $o = 0, $d2 = 512) => json_encode($d, $o, $d2),
+            // current_time, wp_json_encode, __, _e, esc_html, esc_url, get_option,
+            // do_action, apply_filters already stubbed in base class.
             'wp_remote_get'  => static fn($url, $args = []) => new \WP_Error('http_error', 'mock'),
             'is_wp_error'    => static fn($t) => $t instanceof \WP_Error,
             'wp_remote_retrieve_body' => static fn($r) => '',
@@ -61,13 +61,8 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             'get_userdata'   => static fn($id) => null,
             'get_users'      => static fn($args = []) => [],
             'get_user_meta'  => static fn($uid, $key, $single = false) => '',
-            '__'             => static fn($s) => $s,
-            '_e'             => static fn($s) => null,
-            'esc_html'       => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
             'esc_html_e'     => static fn($s) => null,
-            'esc_url'        => static fn($s) => $s,
             'esc_xml'        => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
-            'get_option'     => static fn($k, $d = false) => $d,
             'update_user_meta' => true,
             'delete_user_meta' => true,
             'wp_upload_dir'  => static fn() => ['basedir' => sys_get_temp_dir(), 'baseurl' => 'http://example.com'],

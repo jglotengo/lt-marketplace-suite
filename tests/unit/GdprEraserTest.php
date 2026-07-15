@@ -78,8 +78,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         });
 
         Functions\stubs([
-            'current_time' => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
-            'esc_html'     => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
+            // current_time, esc_html already stubbed in base class.
         ]);
     }
 

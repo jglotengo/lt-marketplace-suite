@@ -65,20 +65,15 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
         Functions\stubs([
-            'current_time'        => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
-            'sanitize_text_field' => static fn($s) => trim(strip_tags((string)$s)),
+            // current_time, sanitize_text_field, __, esc_html, get_option, do_action, apply_filters
+            // already stubbed in base class.
+            // get_current_user_id is defined in bootstrap.php — can't re-stub.
             'wp_mail'             => true,
             'get_post_meta'       => static fn($id, $key, $single) => false,
-            'get_option'          => static fn($k, $d = false) => $d,
-            // get_current_user_id is defined in bootstrap.php — can't re-stub.
-            '__'                  => static fn($s) => $s,
             'esc_url_raw'         => static fn($s) => $s,
-            'esc_html'            => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
             'wc_get_order'        => static fn($id) => false,
             'wp_next_scheduled'   => static fn($hook) => false,
             'wp_schedule_event'   => true,
-            'do_action'           => null,
-            'apply_filters'       => static fn($tag, $value) => $value,
         ]);
     }
 
