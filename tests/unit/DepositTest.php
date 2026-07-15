@@ -74,6 +74,7 @@ class DepositTest extends LTMS_Unit_Test_Case {
                 $this->test->updates[] = ['table' => $table, 'data' => $data, 'where' => $where];
                 return 1;
             }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -84,6 +85,7 @@ class DepositTest extends LTMS_Unit_Test_Case {
             'attachment_url_to_postid'  => static fn($url) => 0,
             'wp_mail'                   => true,
             'admin_url'                 => static fn($p = '') => 'http://example.com/wp-admin/' . $p,
+            'get_userdata'              => static fn($id) => null,
         ]);
     }
 
@@ -271,11 +273,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return 1; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'approved',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -304,11 +307,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'pending',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -345,11 +349,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return 1; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'approved', // Already approved → reject fails.
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -374,11 +379,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return 1; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'pending',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -405,11 +411,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return 1; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'pending',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -433,11 +440,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return 1; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => 50000.0,
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'processing', // Stuck → admin can reject.
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -472,11 +480,12 @@ class DepositTest extends LTMS_Unit_Test_Case {
             public function __construct($test) { $this->test = $test; }
             public function prepare($sql, ...$args) { return $sql; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'amount' => '50000.00',
                     'currency' => 'COP', 'method' => 'pse', 'reference' => 'X',
                     'status' => 'pending',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }

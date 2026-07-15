@@ -61,6 +61,7 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -139,11 +140,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { $this->test->queries[] = $sql; return true; }
             public function get_var($sql) { return 0; } // spent_amount = 0
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '0.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '0.00', 'spent_pct' => '0.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -167,11 +169,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
             public function get_var($sql) { return '100.00'; } // spent 100
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '1000.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '100.00', 'spent_pct' => '10.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -196,11 +199,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
             public function get_var($sql) { return '850.00'; } // spent 850
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '1000.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '850.00', 'spent_pct' => '85.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -225,11 +229,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
             public function get_var($sql) { return '1000.00'; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '1000.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '1000.00', 'spent_pct' => '100.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -254,11 +259,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
             public function get_var($sql) { return '950.00'; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '1000.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '950.00', 'spent_pct' => '95.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -313,11 +319,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
                 static $call_count = 0;
                 $call_count++;
                 if ($call_count === 1) return null;
-                return (object)[
+                $row = [
                     'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
                     'budget_limit' => '0.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
                     'spent_amount' => '0.00', 'spent_pct' => '0.00',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
@@ -350,11 +357,12 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
             public function get_var($sql) { return null; }
             public function get_row($sql, $o = OBJECT) {
-                return (object)[
+                $row = [
                     'id' => 1, 'order_id' => 100, 'vendor_id' => 1,
                     'carrier' => 'deprisa', 'quote_cost' => '50.00',
                     'real_cost' => '55.00', 'status' => 'invoiced',
                 ];
+                return $o === ARRAY_A ? $row : (object)$row;
             }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }

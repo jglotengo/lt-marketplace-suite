@@ -46,6 +46,7 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -69,11 +70,8 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             // wp_mkdir_p is defined in bootstrap.php — can't re-stub.
             // get_current_user_id is defined in bootstrap.php — can't re-stub.
             // sanitize_textarea_field is defined in bootstrap.php — can't re-stub.
-            'file_exists'    => static fn($p) => false,
-            'file_put_contents' => static fn($p, $c) => strlen($c),
-            'fopen'          => static fn($p, $m) => false,
-            'fclose'         => static fn($fp) => true,
-            'fputcsv'        => static fn($fp, $fields) => count($fields),
+            // file_exists, file_put_contents, fopen, fclose, fputcsv are PHP natives —
+            // Patchwork can't redefine them without "redefinable-internals" config.
             'get_transient'  => static fn($k) => false,
             'set_transient'  => true,
             'admin_url'      => static fn($p = '') => 'http://example.com/wp-admin/' . $p,

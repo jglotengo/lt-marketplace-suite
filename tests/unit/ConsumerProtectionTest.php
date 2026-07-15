@@ -72,6 +72,7 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
                 $this->test->updates[] = ['table' => $t, 'data' => $d, 'where' => $w];
                 return 1;
             }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -172,6 +173,7 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -260,6 +262,7 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
@@ -302,6 +305,7 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 
