@@ -114,17 +114,23 @@ class LTMS_Business_Consumer_Protection {
         // Solución: antes de insertar, verificar si ya existe un hold NO liberado
         // (status='held' o 'frozen') para (vendor_id, order_id). Si existe, skip
         // insert + skip wallet ops + return true (la comisión ya está retenida).
+        // RE-AUDIT P0 FIX (TOCTOU): wrap SELECT+INSERT in a transaction with
+        // SELECT FOR UPDATE to prevent two concurrent hold_commission() calls
+        // from both passing the check and both INSERTing → two hold rows →
+        // release_eligible_holds releases twice (different hold_id = different
+        // idempotency key) → second release fails (balance_pending=0) → stuck hold.
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing_hold_id = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT id FROM `{$table}` WHERE vendor_id = %d AND order_id = %d AND status IN ( 'held', 'frozen' ) LIMIT 1",
+                "SELECT id FROM `{$table}` WHERE vendor_id = %d AND order_id = %d AND status IN ( 'held', 'frozen' ) LIMIT 1 FOR UPDATE",
                 $vendor_id,
                 $order_id
             )
         );
 
         if ( $existing_hold_id > 0 ) {
-            // Hold ya existe para este (vendor, order) — idempotent skip.
+            $wpdb->query( 'ROLLBACK' );
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::info(
                     'COMMISSION_HOLD_ALREADY_EXISTS',
@@ -149,8 +155,10 @@ class LTMS_Business_Consumer_Protection {
         ], [ '%d', '%f', '%d', '%s', '%s', '%s', '%s' ] );
 
         if ( ! $inserted ) {
+            $wpdb->query( 'ROLLBACK' );
             return false;
         }
+        $wpdb->query( 'COMMIT' );
 
         // M-84: Acreditar y retener en wallet para que balance_pending refleje los fondos
         // retenidos y el vendedor NO los vea como disponibles hasta que venza el periodo.
@@ -187,13 +195,19 @@ class LTMS_Business_Consumer_Protection {
                 // Solución: verificar manualmente ambos formatos de key. Si cualquiera
                 // existe, skip ambas operaciones (credit + hold) — ya se aplicaron.
                 $legacy_credit_key = sprintf( 'cp_hold_credit_o%d', $order_id );
-                $legacy_hold_key   = sprintf( 'cp_hold_hold_o%d', $order_id );
+                // RE-AUDIT P0 FIX: legacy key (no vendor_id) belongs to vendor_1.
+                // For vendors 2..N, the legacy key matches vendor_1's tx → skip
+                // → vendor_2 gets hold row but ZERO wallet credit. Now: scope the
+                // legacy key check to ALSO match vendor_id, so vendor_2 doesn't
+                // get a false idempotency hit from vendor_1's legacy tx.
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $prior_credit_tx = (int) $wpdb->get_var(
                     $wpdb->prepare(
-                        "SELECT id FROM `{$wpdb->prefix}lt_wallet_transactions` WHERE `reference` IN ( %s, %s ) LIMIT 1",
+                        "SELECT id FROM `{$wpdb->prefix}lt_wallet_transactions`
+                         WHERE `reference` IN ( %s, %s ) AND `vendor_id` = %d LIMIT 1",
                         $credit_idem_key,
-                        $legacy_credit_key
+                        $legacy_credit_key,
+                        $vendor_id
                     )
                 );
 

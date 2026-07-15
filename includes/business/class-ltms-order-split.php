@@ -1116,24 +1116,54 @@ final class LTMS_Business_Order_Split {
                         $ddp_idempotency
                     );
                 } catch ( \Throwable $e ) {
-                    // Race condition: balance changed between pre-check and debit.
-                    // Fall through to partial-debit handling below.
+                    // RE-AUDIT P0 FIX: race condition — balance changed between
+                    // pre-check and debit. PHP catch blocks do NOT fall through to
+                    // the else branch. Previously, the platform silently absorbed
+                    // the full duties with no vendor debit and no debt record.
+                    // Now: attempt partial debit (debit whatever balance is left).
                     LTMS_Core_Logger::warning(
-                        'DDP_DEBIT_INSUFFICIENT',
+                        'DDP_DEBIT_RACE_FALLBACK',
                         sprintf(
-                            'Vendor #%d insufficient balance for DDP duties $%.2f (race after pre-check): %s',
+                            'Vendor #%d full DDP debit failed (race): %s. Attempting partial debit.',
                             $vendor_id,
-                            $ddp_duties,
                             $e->getMessage()
                         ),
-                        [
-                            'order_id'      => $order->get_id(),
-                            'vendor_id'     => $vendor_id,
-                            'ddp_duties'    => $ddp_duties,
-                            'currency'      => $order_currency,
-                            'platform_covers' => $ddp_duties,
-                        ]
+                        [ 'order_id' => $order->get_id(), 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties ]
                     );
+                    // Re-read balance and attempt partial debit.
+                    try {
+                        $wallet_info   = LTMS_Business_Wallet::get_balance_for_currency( $vendor_id, $order_currency );
+                        $partial_amount = max( 0.0, (float) ( $wallet_info['balance'] ?? 0 ) );
+                        if ( $partial_amount > 0 ) {
+                            LTMS_Business_Wallet::debit(
+                                $vendor_id,
+                                min( $partial_amount, $ddp_duties ),
+                                $ddp_description . ' (partial — race fallback)',
+                                $ddp_metadata,
+                                $order->get_id(),
+                                $order_currency,
+                                $ddp_idempotency . '_partial'
+                            );
+                            $platform_covers = $ddp_duties - min( $partial_amount, $ddp_duties );
+                            LTMS_Core_Logger::warning(
+                                'DDP_PARTIAL_DEBIT',
+                                sprintf( 'Vendor #%d partial DDP debit $%.2f, platform covers $%.2f.', $vendor_id, min( $partial_amount, $ddp_duties ), $platform_covers ),
+                                [ 'vendor_debited' => min( $partial_amount, $ddp_duties ), 'platform_covers' => $platform_covers ]
+                            );
+                        } else {
+                            LTMS_Core_Logger::critical(
+                                'DDP_DEBIT_TOTAL_FAILURE',
+                                sprintf( 'Vendor #%d: zero balance for DDP duties $%.2f. Platform covers full amount.', $vendor_id, $ddp_duties ),
+                                [ 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties, 'platform_covers' => $ddp_duties ]
+                            );
+                        }
+                    } catch ( \Throwable $partial_e ) {
+                        LTMS_Core_Logger::critical(
+                            'DDP_DEBIT_TOTAL_FAILURE',
+                            sprintf( 'Vendor #%d: both full and partial DDP debit failed. Platform covers $%.2f. Error: %s', $vendor_id, $ddp_duties, $partial_e->getMessage() ),
+                            [ 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties, 'platform_covers' => $ddp_duties, 'error' => $partial_e->getMessage() ]
+                        );
+                    }
                 }
             } else {
                 // Insufficient balance — debit what's available (if any) and
