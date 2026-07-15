@@ -554,7 +554,9 @@ $files = [
     // INTEGRATIONS-AUDIT v2.9.141: storefront CSP compliance JS
     'assets/js/ltms-storefront.js',
     'assets/js/ltms-product-video.js',
+    'assets/js/ltms-product-video.min.js',
     'assets/js/ltms-product-tabs.js',
+    'assets/js/ltms-product-tabs.min.js',
     'includes/frontend/class-ltms-products-ajax.php',
     // INTEGRATIONS-AUDIT v2.9.141: storefront public-facing files
     'includes/frontend/class-ltms-vendor-storefront.php',
