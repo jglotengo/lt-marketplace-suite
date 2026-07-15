@@ -472,13 +472,20 @@ class LTMS_Fintech_Compliance {
                 // Intentar descargar.
                 $response = wp_remote_get( $list_cfg['url'], [ 'timeout' => 30 ] );
                 if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+                    // FASE4 P0 FIX (SARLAFT fail-open): previously did `continue`
+                    // which skipped this list and approved the vendor WITHOUT
+                    // screening against it. This violates SARLAFT (CO Ley 526/1999)
+                    // and MX Ley Fintech art. 87. Now: FAIL-CLOSED — block KYC
+                    // until the list can be retrieved.
                     if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                        LTMS_Core_Logger::warning(
-                            'FT_SCREEN_LIST_UNAVAILABLE',
-                            sprintf( 'Lista %s no disponible: %s', $list_key, $list_cfg['url'] )
+                        LTMS_Core_Logger::critical(
+                            'FT_SCREEN_LIST_UNAVAILABLE_FAIL_CLOSED',
+                            sprintf( 'Lista %s no disponible — KYC BLOQUEADO (fail-closed SARLAFT). URL: %s', $list_key, $list_cfg['url'] ),
+                            [ 'vendor_id' => $vendor_id, 'list_key' => $list_key ]
                         );
                     }
-                    continue;
+                    update_user_meta( $vendor_id, '_ltms_sanctions_list_unavailable', $list_key );
+                    return false; // FAIL-CLOSED
                 }
                 $cached_list = wp_remote_retrieve_body( $response );
                 set_transient( "ltms_sanctions_list_{$list_key}", $cached_list, DAY_IN_SECONDS );
@@ -550,14 +557,25 @@ class LTMS_Fintech_Compliance {
      * Cron mensual: re-screen vendors activos (listas actualizan).
      */
     public static function rescreen_active_vendors(): void {
-        $users = get_users( [
-            'meta_key'   => 'ltms_kyc_status',
-            'meta_value' => 'approved',
-            'fields'     => 'ID',
-            'number'     => 500,
-        ] );
-        foreach ( $users as $uid ) {
-            self::screen_against_sanctions_lists( true, $uid );
+        // FASE4 P1 FIX: was limited to number => 500, so vendors beyond 500 were
+        // NEVER re-screened. SARLAFT requires periodic re-screening of ALL customers.
+        // Now: paginate through ALL approved vendors in batches of 200.
+        $offset = 0;
+        $batch  = 200;
+        while ( true ) {
+            $users = get_users( [
+                'meta_key'   => 'ltms_kyc_status',
+                'meta_value' => 'approved',
+                'fields'     => 'ID',
+                'number'     => $batch,
+                'offset'     => $offset,
+            ] );
+            if ( empty( $users ) ) break;
+            foreach ( $users as $uid ) {
+                self::screen_against_sanctions_lists( true, $uid );
+            }
+            $offset += $batch;
+            if ( count( $users ) < $batch ) break; // Last batch.
         }
     }
 

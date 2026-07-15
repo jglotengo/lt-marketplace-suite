@@ -775,9 +775,37 @@ class LTMS_Cross_Border_Compliance {
         $treaty = $order->get_meta( '_ltms_cert_origin_treaty' );
         if ( empty( $treaty ) ) return;
 
-        $format = $order->get_meta( '_ltms_cert_origin_data' )
-            ? json_decode( $order->get_meta( '_ltms_cert_origin_data' ), true )['cert_format'] ?? 'Self-certification'
-            : 'Self-certification';
+        // FASE4 P0 FIX: _ltms_cert_origin_data stores an ARRAY of certificates
+        // (CB-1 at line 285 stores wp_json_encode($certificates) where $certificates
+        // is [ ['cert_format' => 'EUR.1', ...], ['cert_format' => 'ATR.1', ...] ]).
+        // Accessing ['cert_format'] on a sequential array returns null → always
+        // fell through to 'Self-certification' → EUR.1/ATR.1/Form A PDFs never
+        // generated → customs preference lost, vendors pay full tariffs.
+        // Now: find the certificate matching this treaty.
+        $format = 'Self-certification';
+        $cert_data_raw = $order->get_meta( '_ltms_cert_origin_data' );
+        if ( $cert_data_raw ) {
+            $cert_data = json_decode( $cert_data_raw, true );
+            if ( is_array( $cert_data ) ) {
+                // Handle both sequential array of certs AND single cert associative array.
+                if ( isset( $cert_data['cert_format'] ) ) {
+                    // Single certificate (associative array).
+                    $format = $cert_data['cert_format'];
+                } else {
+                    // Array of certificates — find the one matching this treaty.
+                    foreach ( $cert_data as $cert ) {
+                        if ( is_array( $cert ) && isset( $cert['treaty'] ) && $cert['treaty'] === $treaty ) {
+                            $format = $cert['cert_format'] ?? 'Self-certification';
+                            break;
+                        }
+                    }
+                    // If no treaty match, use the first certificate's format.
+                    if ( $format === 'Self-certification' && ! empty( $cert_data ) && isset( $cert_data[0]['cert_format'] ) ) {
+                        $format = $cert_data[0]['cert_format'];
+                    }
+                }
+            }
+        }
 
         // Despachar generación según formato.
         switch ( $format ) {

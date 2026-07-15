@@ -440,8 +440,13 @@ class LTMS_Accounting_Compliance {
         }
 
         if ( $invoice_number && $range_from && $range_to ) {
-            // Extraer parte numérica (sin prefijo).
-            $numeric_part = preg_replace( '/[^0-9]/', '', $invoice_number );
+            // FASE4 P0 FIX: extract only the SEQUENTIAL number (last numeric segment
+            // after the last hyphen), not ALL digits. The previous preg_replace
+            // extracted ALL digits — for "POS-001-00123456" it yielded "00100123456"
+            // = 11 billion → always exceeded range_to → false DIAN range violation.
+            $parts = explode( '-', $invoice_number );
+            $last_part = end( $parts );
+            $numeric_part = preg_replace( '/[^0-9]/', '', $last_part );
             if ( $numeric_part ) {
                 $num  = (int) $numeric_part;
                 $from = (int) $range_from;
@@ -472,7 +477,11 @@ class LTMS_Accounting_Compliance {
         // Detectar agotamiento del rango (>90% usado) y alertar al admin.
         if ( $range_from && $range_to ) {
             $total_range = (int) $range_to - (int) $range_from + 1;
-            $used = $invoice_number ? ( (int) preg_replace( '/[^0-9]/', '', $invoice_number ) - (int) $range_from + 1 ) : 0;
+            // FASE4 P0 FIX: same extraction logic as above — last numeric segment only.
+            $used_parts = $invoice_number ? explode( '-', $invoice_number ) : [];
+            $used_last = $invoice_number ? end( $used_parts ) : '';
+            $used_numeric = $invoice_number ? preg_replace( '/[^0-9]/', '', $used_last ) : '';
+            $used = $used_numeric ? ( (int) $used_numeric - (int) $range_from + 1 ) : 0;
             if ( $total_range > 0 && $used > 0 ) {
                 $usage_pct = ( $used / $total_range ) * 100;
                 if ( $usage_pct >= 90.0 && class_exists( 'LTMS_Core_Logger' ) ) {
