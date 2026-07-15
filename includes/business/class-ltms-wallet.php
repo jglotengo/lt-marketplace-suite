@@ -646,9 +646,11 @@ final class LTMS_Business_Wallet {
             return 0; // Should not happen — try block threw before setting $return_tx_id.
         }
         try {
-            do_action( 'ltms_wallet_tx_committed', $return_tx_id, $vendor_id, $type, $amount, $currency );
+            if ( function_exists( 'do_action' ) ) {
+                do_action( 'ltms_wallet_tx_committed', $return_tx_id, $vendor_id, $type, $amount, $currency );
+            }
 
-            if ( class_exists( 'LTMS_Core_Logger' ) && isset( $wallet['currency'] ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) && class_exists( 'LTMS_Utils' ) && isset( $wallet['currency'] ) ) {
                 LTMS_Core_Logger::info(
                     'WALLET_TRANSACTION',
                     sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
