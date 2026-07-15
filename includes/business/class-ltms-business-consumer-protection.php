@@ -363,9 +363,18 @@ class LTMS_Business_Consumer_Protection {
             // which previously left the remaining 99 holds in 'held' state
             // and silently lost payouts until the next day's cron run.
             try {
-                self::release_single_hold( (int) $hold->id, (int) $hold->vendor_id );
-                $released_count++;
-                $released_amount += (float) $hold->amount;
+                $release_ok = self::release_single_hold( (int) $hold->id, (int) $hold->vendor_id );
+                // RE-AUDIT P1 FIX: release_single_hold returns bool. Previously
+                // counters were incremented unconditionally even when the method
+                // silently exited (hold not found, already released by concurrent
+                // process). Now: only count if release_single_hold returned true.
+                if ( $release_ok ) {
+                    $released_count++;
+                    $released_amount += (float) $hold->amount;
+                } else {
+                    $skipped_count++;
+                    $skipped_orders[] = (int) $hold->order_id;
+                }
             } catch ( \Throwable $e ) {
                 $failed_count++;
                 $failed_orders[] = (int) $hold->order_id;
@@ -534,7 +543,7 @@ class LTMS_Business_Consumer_Protection {
      * @param int $vendor_id ID del vendedor.
      * @return void
      */
-    public static function release_single_hold( int $hold_id, int $vendor_id ): void {
+    public static function release_single_hold( int $hold_id, int $vendor_id ): bool {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_wallet_holds';
 
@@ -546,7 +555,7 @@ class LTMS_Business_Consumer_Protection {
         ) );
 
         if ( ! $hold ) {
-            return;
+            return false; // RE-AUDIT P1 FIX: return false so caller can track skipped holds.
         }
 
         // H-2 FIX: previously this method marked the hold as 'released' FIRST
@@ -636,16 +645,14 @@ class LTMS_Business_Consumer_Protection {
         );
 
         if ( ! $updated ) {
-            // 0 filas afectadas = el hold ya fue liberado por otro proceso.
-            // The wallet call above was a no-op thanks to the idempotency
-            // key, so there is no double-spend — just exit quietly.
-            return;
+            return false; // Already released by concurrent process.
         }
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::log(
             'HOLD_RELEASED',
             sprintf( 'Hold #%d liberado: %.2f para vendedor #%d', $hold_id, $hold->amount, $vendor_id )
         );
+        return true;
     }
 
     /**
@@ -1084,7 +1091,11 @@ class LTMS_Business_Consumer_Protection {
         }
 
         // Reversión de comisión + liberación del hold frozen lo escuchan otros motores.
-        do_action( 'ltms_dispute_approved', $dispute_id, $order_id, $vendor_id );
+        // RE-AUDIT P1 FIX: do_action passed only $vendor_id (first vendor) →
+        // listeners (insurance, notifications, commission reversal) only reacted
+        // for vendor_1. Vendors 2..N were silently skipped. Now: pass the full
+        // $vendors_to_debit array so listeners can react for ALL affected vendors.
+        do_action( 'ltms_dispute_approved', $dispute_id, $order_id, $vendor_id, $vendors_to_debit );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info(

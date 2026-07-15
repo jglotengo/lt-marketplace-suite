@@ -306,17 +306,23 @@ class LTMS_Shipping_Cost_Ledger {
         }
 
         // Idempotencia: buscar entry existente por (order_id, order_item_id).
-        // order_item_id = 0 significa "sin línea específica" (caso A).
+        // RE-AUDIT P1 FIX: wrap SELECT+INSERT in a transaction with FOR UPDATE
+        // to prevent two concurrent record_shipping_entry() calls from both
+        // passing the check and both INSERTing → duplicate ledger entries →
+        // double vendor debit (different ledger_id = different idempotency key).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT id FROM `{$table}` WHERE order_id = %d AND " .
-                ( $order_item_id > 0 ? 'order_item_id = %d' : 'order_item_id IS NULL' ),
+                ( $order_item_id > 0 ? 'order_item_id = %d' : 'order_item_id IS NULL' ) .
+                " FOR UPDATE",
                 $order_item_id > 0 ? [ $order_id, $order_item_id ] : [ $order_id ]
             )
         );
 
         if ( $existing ) {
+            $wpdb->query( 'COMMIT' ); // Release lock — existing entry found.
             // Ya existe — no duplicar. Solo actualizar campos seguros.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->update( $table, [
@@ -343,12 +349,14 @@ class LTMS_Shipping_Cost_Ledger {
         $ok = $wpdb->insert( $table, $insert_data );
 
         if ( false === $ok ) {
+            $wpdb->query( 'ROLLBACK' );
             LTMS_Core_Logger::warning(
                 'SHIPPING_LEDGER_INSERT_FAILED',
                 sprintf( 'Order #%d: %s', $order_id, $wpdb->last_error )
             );
             return null;
         }
+        $wpdb->query( 'COMMIT' );
 
         return (int) $wpdb->insert_id;
     }
