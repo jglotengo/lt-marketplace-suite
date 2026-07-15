@@ -1080,7 +1080,11 @@ class LTMS_Shipping_Cost_Ledger {
         foreach ( $package['contents'] ?? [] as $item ) {
             $product_id = (int) ( $item['product_id'] ?? 0 );
             if ( $product_id ) {
-                $vendor_id = (int) get_post_field( 'post_author', $product_id );
+                // P2 FIX: prefer _ltms_vendor_id meta over post_author — admins
+                // creating products on behalf of vendors set post_author to the
+                // admin ID, but _ltms_vendor_id has the actual vendor.
+                $meta_vendor = (int) get_post_meta( $product_id, '_ltms_vendor_id', true );
+                $vendor_id = $meta_vendor ?: (int) get_post_field( 'post_author', $product_id );
                 if ( $vendor_id ) break;
             }
         }
@@ -1188,6 +1192,20 @@ class LTMS_Shipping_Cost_Ledger {
 
         $sla_days = (int) LTMS_Core_Config::get( 'ltms_shipping_dispute_sla_days', 15 );
 
+        // P2 FIX: idempotency check — don't create duplicate open disputes for
+        // the same ledger entry. Previously, concurrent calls could insert
+        // multiple dispute rows → multiple debits on resolve.
+        $existing_dispute = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM `{$table}` WHERE ledger_id = %d AND status IN ('open','in_review') LIMIT 1",
+            $ledger_id
+        ) );
+        if ( $existing_dispute > 0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info( 'SHIPPING_DISPUTE_ALREADY_OPEN', sprintf( 'Ledger #%d already has open dispute #%d — skipping.', $ledger_id, $existing_dispute ) );
+            }
+            return $existing_dispute;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert( $table, [
             'ledger_id'        => $ledger_id,
@@ -1270,9 +1288,13 @@ class LTMS_Shipping_Cost_Ledger {
             ], [ 'id' => (int) $dispute['ledger_id'] ] );
 
             // Reembolsar al vendor si fue debitado.
+            // P2 FIX: cap credit_amount at vendor_charged to prevent over-refund.
             $entry = self::get_entry( (int) $dispute['ledger_id'] );
             if ( $entry && (float) $entry['vendor_charged'] > 0 && $entry['vendor_id'] > 0 ) {
-                self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $credit_amount, $entry['currency'] ?? '' );
+                $safe_refund = min( $credit_amount, (float) $entry['vendor_charged'] );
+                if ( $safe_refund > 0 ) {
+                    self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $safe_refund, $entry['currency'] ?? '' );
+                }
             }
         } elseif ( $status === 'rejected' || $status === 'expired' ) {
             // Marcar como reconciliado (pérdida asumida o no recuperable).

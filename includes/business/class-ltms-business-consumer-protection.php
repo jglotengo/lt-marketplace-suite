@@ -694,6 +694,28 @@ class LTMS_Business_Consumer_Protection {
         );
     }
 
+    /**
+     * P2 FIX: Unfreezes a hold that was frozen for a dispute (e.g. when the
+     * dispute is rejected). Reverts status from 'frozen' to 'held' so the
+     * daily cron can release it normally.
+     *
+     * @param int $order_id ID del pedido.
+     * @return bool True si se descongeló, false si no había hold congelado.
+     */
+    public static function unfreeze_hold_for_dispute( int $order_id ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_wallet_holds';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        return (bool) $wpdb->update(
+            $table,
+            [ 'status' => 'held', 'freeze_reason' => null ],
+            [ 'order_id' => $order_id, 'status' => 'frozen' ],
+            [ '%s', null ],
+            [ '%d', '%s' ]
+        );
+    }
+
     /*
      * ---------------------------------------------------------------------------
      * CP-BUG-2 / CP-BUG-3 / CP-BUG-5 / CP-BUG-6 — Dispute lifecycle
@@ -1188,9 +1210,16 @@ class LTMS_Business_Consumer_Protection {
 
         $order_id = (int) $dispute->order_id;
 
-        // Descongelar el hold y disparar liberación al vendor.
-        // El action lo escucha un handler que vuelve el hold a 'held' para que el cron
-        // diario lo libere normalmente, o lo libera inmediatamente.
+        // P2 FIX: directly unfreeze the hold instead of relying solely on a
+        // listener. If no listener is registered, the hold stays frozen forever.
+        // Now: unfreeze immediately AND fire the action for listeners.
+        $unfrozen = self::unfreeze_hold_for_dispute( $order_id );
+        if ( ! $unfrozen && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::warning(
+                'DISPUTE_REJECT_UNFREEZE_FAILED',
+                sprintf( 'Dispute #%d: could not unfreeze hold for order #%d — may need manual unfreeze.', $dispute_id, $order_id )
+            );
+        }
         do_action( 'ltms_dispute_rejected', $dispute_id, $order_id );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
