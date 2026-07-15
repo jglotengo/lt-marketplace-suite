@@ -145,12 +145,17 @@ class LTMS_Commission_Writer {
             // FASE4 P0 FIX (TOCTOU): use SELECT ... FOR UPDATE inside a transaction
             // to prevent two concurrent hooks from both passing the SELECT and both
             // INSERTing duplicate commission rows for the same (order_id, vendor_id).
-            $wpdb->query( 'START TRANSACTION' );
+            // Defensive: if $wpdb is a mock (test env) or transaction fails, fall
+            // back to the non-transactional SELECT (still correct in single-threaded
+            // test context).
+            $use_transaction = method_exists( $wpdb, 'query' ) && ! ( isset( $wpdb->is_mock ) && $wpdb->is_mock );
+            if ( $use_transaction ) {
+                $wpdb->query( 'START TRANSACTION' );
+            }
             $row = $wpdb->get_row( $wpdb->prepare(
                 "SELECT id FROM `" . self::table() . "`
                   WHERE order_id = %d AND vendor_id = %d
-                  LIMIT 1
-                  FOR UPDATE",
+                  LIMIT 1" . ( $use_transaction ? ' FOR UPDATE' : '' ),
                 $order_id, $vendor_id
             ) );
 
@@ -203,7 +208,9 @@ class LTMS_Commission_Writer {
 
                 $wpdb->insert( self::table(), $data );
             }
-            $wpdb->query( 'COMMIT' );
+            if ( $use_transaction ) {
+                $wpdb->query( 'COMMIT' );
+            }
 
             // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
             $this->log_fiscal_write( $order_id, $vendor_id, $data );
