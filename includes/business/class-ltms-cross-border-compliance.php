@@ -893,9 +893,17 @@ class LTMS_Cross_Border_Compliance {
      * Devuelve país destino de la orden (ISO 2-letter).
      */
     private static function get_order_destination_country( \WC_Order $order ): string {
-        $state = $order->get_shipping_state();
         $country = $order->get_shipping_country();
-        return $country ?: ( $state ? substr( $state, 0, 2 ) : '' );
+        if ( $country ) return strtoupper( $country );
+
+        // FASE4 P0 FIX: the fallback `substr($state, 0, 2)` was wrong — WC $state
+        // is sub-national (e.g., "BOG" for Bogotá, "JAL" for Jalisco), NOT
+        // country-prefixed. substr("BOG", 0, 2) = "BO" → misidentified as Bolivia.
+        // Now: fall back to billing country, then empty string (don't guess).
+        $billing_country = $order->get_billing_country();
+        if ( $billing_country ) return strtoupper( $billing_country );
+
+        return '';
     }
 
     /**

@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.144] — 2026-07-15
+
+### FASE 4: Business Logic Financial — 5 P0 fixes (4 archivos críticos)
+
+Auditoría de 8 archivos de business logic financiero (5,000+ líneas). Se encontraron 11 P0 + 12 P1. Se aplican los 5 P0 más críticos en esta versión.
+
+**P0 — Fixes aplicados (5)**
+
+- **`class-ltms-fintech-compliance.php:874-880`** — `enforce_2fa_for_payout_vendors()` chequeaba el rol `'vendor'` que NO EXISTE en este plugin (los roles reales son `'ltms_vendor'` y `'ltms_vendor_premium'`). Resultado: 2FA enforcement NUNCA se disparaba para vendors reales, violando Ley Fintech art. 95 / Circular SFC. Ahora: `array_intersect(['ltms_vendor', 'ltms_vendor_premium', 'vendor'], $user->roles)`.
+- **`class-ltms-fintech-compliance.php:683-703`** — `convert_to_usd()` tenía default rate `1.0` — si `ltms_usd_cop_rate` no estaba configurado, COP 5,000,000 era tratado como USD 5,000,000 → ningún payout bloqueado, sin Travel Rule, sin SOS report. Ahora: si rate es 0 o missing, retorna `PHP_FLOAT_MAX` (fail-safe: thresholds siempre disparan hasta que admin configure el FX rate) + log warning.
+- **`class-ltms-deposit.php:373-405`** — `reject()` race condition con `approve()` concurrente. El UPDATE usaba `WHERE id = %d` sin status guard — concurrente approve+reject dejaba vendor credited pero deposit marcado 'rejected' (double-spend / state desync). Ahora: atomic claim `WHERE id = %d AND status = %s` + check affected_rows === 0 para detectar concurrent modification.
+- **`class-ltms-cross-border-compliance.php:895-907`** — `get_order_destination_country()` fallback `substr($state, 0, 2)` era incorrecto — WC `$state` es sub-nacional (BOG, JAL), no country-prefixed. `substr("BOG", 0, 2) = "BO"` → misidentificado como Bolivia. Afectaba customs/IOSS/AES. Ahora: fallback a billing_country, luego empty string.
+- **`class-ltms-commission-writer.php:144-206`** — TOCTOU race condition: `SELECT id` → `UPDATE or INSERT` sin transacción. Dos hooks concurrentes (woocommerce_payment_complete + yith_wcmv_commission_saved) ambos pasaban el SELECT, ambos INSERT → filas duplicadas de commission → double-counting en ledger. Ahora: `START TRANSACTION` + `SELECT ... FOR UPDATE` + `COMMIT`.
+
+**P0 — Identificados pero pendientes para próxima iteración (6)**
+
+- Sanctions screening FAIL-OPEN + naive substring matching (SARLAFT non-functional)
+- SOS/CRS/FX PII in web-accessible uploads
+- Operational limits currency conversion bug (AML structuring)
+- FX gain/loss uses wrong commission row (accounting-compliance)
+- DIAN range numeric extraction bug
+- EEI filing wrong direction + origin cert array-access bug
+
+**Files modified**: 4 (fintech-compliance, deposit, cross-border-compliance, commission-writer) + plugin main + CHANGELOG.
+
 ## [2.9.143] — 2026-07-15
 
 ### FASE 1: Re-auditoría de Regresiones — 8 P0 + 3 P1 fixes (3 archivos críticos)

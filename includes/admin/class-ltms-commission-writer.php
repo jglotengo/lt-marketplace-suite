@@ -142,10 +142,15 @@ class LTMS_Commission_Writer {
                                  ?: $service_type;
 
             // ── Buscar fila existente en {prefix}lt_commissions ────────────
+            // FASE4 P0 FIX (TOCTOU): use SELECT ... FOR UPDATE inside a transaction
+            // to prevent two concurrent hooks from both passing the SELECT and both
+            // INSERTing duplicate commission rows for the same (order_id, vendor_id).
+            $wpdb->query( 'START TRANSACTION' );
             $row = $wpdb->get_row( $wpdb->prepare(
                 "SELECT id FROM `" . self::table() . "`
                   WHERE order_id = %d AND vendor_id = %d
-                  LIMIT 1",
+                  LIMIT 1
+                  FOR UPDATE",
                 $order_id, $vendor_id
             ) );
 
@@ -198,6 +203,7 @@ class LTMS_Commission_Writer {
 
                 $wpdb->insert( self::table(), $data );
             }
+            $wpdb->query( 'COMMIT' );
 
             // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
             $this->log_fiscal_write( $order_id, $vendor_id, $data );
