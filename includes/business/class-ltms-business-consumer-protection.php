@@ -955,13 +955,19 @@ class LTMS_Business_Consumer_Protection {
                     $total_debited += $v_net;
                 } catch ( \Throwable $e ) {
                     if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                        LTMS_Core_Logger::error(
+                        // RE-AUDIT P0 FIX: upgrade from error → critical. Previously the
+                        // exception was swallowed — customer gets refunded, vendor is NOT
+                        // debited, platform absorbs the full vendor_net as a loss with
+                        // only a log entry. Now: log as critical so monitoring alerts fire.
+                        LTMS_Core_Logger::critical(
                             'DISPUTE_DEBIT_FAILED',
-                            sprintf( 'Dispute #%d: vendor #%d wallet debit failed: %s', $dispute_id, $v_id, $e->getMessage() )
+                            sprintf( 'Dispute #%d: vendor #%d wallet debit FAILED: %s. Platform covers $%.2f. Manual reconciliation required.', $dispute_id, $v_id, $e->getMessage(), $v_net ),
+                            [ 'dispute_id' => $dispute_id, 'vendor_id' => $v_id, 'amount' => $v_net, 'error' => $e->getMessage() ]
                         );
                     }
-                    // No retornamos error: el refund al cliente debe proceder de todos modos.
-                    // El debit fallido queda registrado para conciliación manual posterior.
+                    // Continue to refund the customer — they shouldn't suffer for
+                    // a platform-side wallet issue. The debit failure is logged as
+                    // critical for manual reconciliation.
                 }
             }
         }
