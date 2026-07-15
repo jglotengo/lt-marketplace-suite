@@ -853,9 +853,13 @@ final class LTMS_Business_Order_Split {
         try {
             LTMS_Referral_Tree::distribute_commissions( $vendor_id, $platform_fee, $order->get_id() );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Referral uplines
+            // silently lose their commissions with no retry mechanism. Now: log
+            // as critical so monitoring can trigger manual compensation.
+            LTMS_Core_Logger::critical(
                 'REFERRAL_COMMISSION_FAILED',
-                sprintf( 'Error en comisiones referidos pedido #%d: %s', $order->get_id(), $e->getMessage() )
+                sprintf( 'Order #%d vendor #%d: referral commission distribution FAILED: %s. Referral uplines may be missing commissions — manual review required.', $order->get_id(), $vendor_id, $e->getMessage() ),
+                [ 'order_id' => $order->get_id(), 'vendor_id' => $vendor_id, 'platform_fee' => $platform_fee, 'error' => $e->getMessage() ]
             );
         }
     }

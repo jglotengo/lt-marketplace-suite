@@ -278,10 +278,14 @@ class LTMS_Shipping_Cost_Ledger {
             }
 
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Partial state
+            // (some vendors debited, some not) is left with no cleanup.
+            // Now: log as critical with partial entry count so monitoring can
+            // trigger manual reconciliation of the affected vendors.
+            LTMS_Core_Logger::critical(
                 'SHIPPING_LEDGER_RECORD_FAILED',
-                sprintf( 'Order #%d: %s', $order->get_id(), $e->getMessage() ),
-                [ 'order_id' => $order->get_id(), 'trace' => $e->getTraceAsString() ]
+                sprintf( 'Order #%d: shipping ledger recording FAILED after %d entries: %s. Partial state — manual reconciliation required for affected vendors.', $order->get_id(), count( $entries ), $e->getMessage() ),
+                [ 'order_id' => $order->get_id(), 'entries_processed' => count( $entries ), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ]
             );
         }
 
@@ -1935,7 +1939,11 @@ class LTMS_Shipping_Cost_Ledger {
 
         if ( $diff > 0 ) {
             // Vendor debe más: debit adicional.
-            $idempotency_key = sprintf( 'shipping_reconcile_diff_l%d', $ledger_id );
+            // RE-AUDIT P1 FIX: idempotency key now includes the diff amount so
+            // re-running reconciliation with a corrected amount doesn't hit the
+            // old idempotency key (which would be a no-op, leaving vendor stuck
+            // with the first reconciliation result).
+            $idempotency_key = sprintf( 'shipping_reconcile_debit_l%d_%.2f', $ledger_id, $diff );
             try {
                 LTMS_Business_Wallet::debit(
                     $vendor_id,
