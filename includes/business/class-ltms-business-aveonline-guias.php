@@ -359,6 +359,20 @@ class LTMS_Business_Aveonline_Guias {
                     'numguia' => (string) $existing_numguia,
                 ], 409 );
             }
+
+            // FASE5 P0 FIX (TOCTOU race): two concurrent POSTs both pass the SELECT
+            // above and both call Aveonline → two real guides billed to the vendor.
+            // Now: acquire a transient lock keyed by (order_id, vendor_id) before
+            // the API call. The lock expires after 60s (Aveonline calls typically
+            // complete in <10s). If the lock is already held, return 409.
+            $lock_key = 'ltms_guide_creating_' . md5( $order_id . '_' . $vendor_id );
+            if ( get_transient( $lock_key ) ) {
+                wp_send_json_error( [
+                    'code'    => 'guia_in_progress',
+                    'message' => 'Se está generando una guía para esta orden. Espera unos segundos.',
+                ], 409 );
+            }
+            set_transient( $lock_key, 1, 60 );
         }
 
         // Datos del remitente (vendedor)
@@ -433,6 +447,11 @@ class LTMS_Business_Aveonline_Guias {
                 'contraentrega'   => $contraentrega,
             ] );
 
+            // FASE5 P0 FIX: release the TOCTOU lock on success.
+            if ( $order_id ) {
+                delete_transient( $lock_key );
+            }
+
             wp_send_json_success( [
                 'numguia'  => $result['tracking_number'],
                 'rutaguia' => $result['label_url'],
@@ -441,6 +460,10 @@ class LTMS_Business_Aveonline_Guias {
             ] );
 
         } catch ( \Exception $e ) {
+            // FASE5 P0 FIX: release the TOCTOU lock on error too.
+            if ( isset( $lock_key ) ) {
+                delete_transient( $lock_key );
+            }
             wp_send_json_error( [ 'message' => $e->getMessage() ] );
         }
     }

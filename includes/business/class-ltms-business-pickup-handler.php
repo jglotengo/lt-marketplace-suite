@@ -254,15 +254,30 @@ class LTMS_Business_Pickup_Handler {
         }
 
         // Verificar que es pickup.
+        // FASE5 P0 FIX: use explode(':') instead of strpos to avoid matching
+        // substrings like 'ltms_pickup_fee' or 'not_ltms_pickup_express'.
         $is_pickup = false;
         foreach ( $order->get_shipping_methods() as $method ) {
-            if ( strpos( $method->get_method_id(), 'ltms_pickup' ) !== false ) {
+            $parts = explode( ':', $method->get_method_id() );
+            if ( isset( $parts[0] ) && $parts[0] === 'ltms_pickup' ) {
                 $is_pickup = true;
                 break;
             }
         }
         if ( ! $is_pickup ) {
             wp_send_json_error( [ 'message' => __( 'Este pedido no es de recogida en tienda.', 'ltms' ) ] );
+        }
+
+        // FASE5 P0 FIX: status transition validation — only allow completing
+        // orders in 'ready-for-pickup' or 'processing' status. Previously,
+        // a vendor could mark a pending, cancelled, or already-completed order
+        // as completed (re-firing hooks, bypassing idempotency).
+        $current_status = $order->get_status();
+        if ( ! in_array( $current_status, [ 'ready-for-pickup', 'processing', 'pending' ], true ) ) {
+            wp_send_json_error( [ 'message' => sprintf(
+                __( 'No se puede completar un pedido en estado "%s".', 'ltms' ),
+                $current_status
+            ) ] );
         }
 
         // Marcar como completado — esto dispara on_pickup_completed() que

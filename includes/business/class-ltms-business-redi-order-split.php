@@ -44,6 +44,28 @@ class LTMS_Business_Redi_Order_Split {
     }
 
     private static function process_item( \WC_Order $order, array $item_data, string $country ): void {
+        // FASE5 P0 FIX: idempotency check — if this order_item_id is already in
+        // lt_redi_commissions, skip. Without this, a cron retry or double-firing
+        // ltms_order_paid hook would double-credit wallets + duplicate commission rows.
+        global $wpdb;
+        $order_item_id = (int) ( $item_data['item_id'] ?? 0 );
+        if ( $order_item_id > 0 ) {
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$wpdb->prefix}lt_redi_commissions WHERE order_id = %d AND order_item_id = %d LIMIT 1",
+                $order->get_id(),
+                $order_item_id
+            ) );
+            if ( $existing ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::info(
+                        'REDI_SPLIT_SKIP_DUPLICATE',
+                        sprintf( 'Order #%d item %d already processed (commission row #%d) — skipping.', $order->get_id(), $order_item_id, $existing )
+                    );
+                }
+                return;
+            }
+        }
+
         $gross              = (float) ( $item_data['gross'] ?? 0 );
         $reseller_id        = (int) ( $item_data['reseller_id'] ?? 0 );
         $origin_vendor_id   = (int) ( $item_data['origin_vendor_id'] ?? 0 );
