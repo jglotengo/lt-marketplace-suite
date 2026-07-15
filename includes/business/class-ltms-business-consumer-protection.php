@@ -225,29 +225,84 @@ class LTMS_Business_Consumer_Protection {
                         );
                     }
                 } else {
-                    LTMS_Business_Wallet::credit(
-                        $vendor_id,
-                        $amount,
-                        sprintf( 'Comision pedido #%d - en retencion (proteccion al consumidor)', $order_id ),
-                        [ 'type' => 'commission', 'order_id' => $order_id, 'held_until' => $release_at ],
-                        $order_id,
-                        '',
-                        $credit_idem_key
-                    );
-                    LTMS_Business_Wallet::hold(
-                        $vendor_id,
-                        $amount,
-                        sprintf( 'Retencion Ley 1480 - pedido #%d, libera: %s', $order_id, $release_at ),
-                        [ 'type' => 'consumer_protection', 'order_id' => $order_id, 'release_at' => $release_at ],
-                        0,
-                        '',
-                        $hold_idem_key
-                    );
+                    // RE-AUDIT P0 FIX (partial failure): credit and hold are separate
+                    // wallet operations. If credit SUCCEEDS but hold FAILS, the vendor
+                    // has the full amount in AVAILABLE balance (not held) — consumer
+                    // protection is bypassed, vendor can withdraw immediately.
+                    // Now: wrap both in a try, and if hold fails after credit succeeds,
+                    // attempt to reverse the credit (debit it back) so the vendor doesn't
+                    // keep unheld funds. Log critical if reversal also fails.
+                    $credit_succeeded = false;
+                    try {
+                        LTMS_Business_Wallet::credit(
+                            $vendor_id,
+                            $amount,
+                            sprintf( 'Comision pedido #%d - en retencion (proteccion al consumidor)', $order_id ),
+                            [ 'type' => 'commission', 'order_id' => $order_id, 'held_until' => $release_at ],
+                            $order_id,
+                            '',
+                            $credit_idem_key
+                        );
+                        $credit_succeeded = true;
+                    } catch ( \Throwable $credit_e ) {
+                        throw $credit_e; // Re-throw — outer catch handles it.
+                    }
+                    // Credit succeeded — now attempt hold.
+                    try {
+                        LTMS_Business_Wallet::hold(
+                            $vendor_id,
+                            $amount,
+                            sprintf( 'Retencion Ley 1480 - pedido #%d, libera: %s', $order_id, $release_at ),
+                            [ 'type' => 'consumer_protection', 'order_id' => $order_id, 'release_at' => $release_at ],
+                            0,
+                            '',
+                            $hold_idem_key
+                        );
+                    } catch ( \Throwable $hold_e ) {
+                        // Hold failed after credit succeeded — vendor has unheld funds.
+                        // Attempt to reverse the credit (debit it back).
+                        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                            LTMS_Core_Logger::critical(
+                                'COMMISSION_HOLD_FAILED_AFTER_CREDIT',
+                                sprintf( 'Vendor #%d order #%d: credit succeeded but hold FAILED: %s. Attempting reversal.', $vendor_id, $order_id, $hold_e->getMessage() ),
+                                [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount ]
+                            );
+                        }
+                        try {
+                            LTMS_Business_Wallet::debit(
+                                $vendor_id,
+                                $amount,
+                                sprintf( 'Reversion: hold fallo para pedido #%d', $order_id ),
+                                [ 'type' => 'hold_reversal', 'order_id' => $order_id ],
+                                $order_id,
+                                '',
+                                $credit_idem_key . '_reversal'
+                            );
+                            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                LTMS_Core_Logger::info(
+                                    'COMMISSION_HOLD_REVERSAL_OK',
+                                    sprintf( 'Vendor #%d order #%d: credit reversed after hold failure. Manual review required.', $vendor_id, $order_id )
+                                );
+                            }
+                        } catch ( \Throwable $reversal_e ) {
+                            // Reversal also failed — vendor has unheld funds, no hold.
+                            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                LTMS_Core_Logger::critical(
+                                    'COMMISSION_HOLD_REVERSAL_FAILED',
+                                    sprintf( 'Vendor #%d order #%d: hold failed AND reversal failed: %s. Vendor has unheld credit $%.2f — MANUAL INTERVENTION REQUIRED.', $vendor_id, $order_id, $reversal_e->getMessage(), $amount ),
+                                    [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount ]
+                                );
+                            }
+                        }
+                        throw $hold_e; // Re-throw so outer catch returns false.
+                    }
                 }
             } catch ( \Throwable $e ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                    LTMS_Core_Logger::log( 'COMMISSION_HOLD_WALLET_FAILED',
-                        sprintf( 'Error al registrar hold en wallet vendedor #%d: %s', $vendor_id, $e->getMessage() )
+                    LTMS_Core_Logger::critical(
+                        'COMMISSION_HOLD_WALLET_FAILED',
+                        sprintf( 'Error al registrar hold en wallet vendedor #%d: %s', $vendor_id, $e->getMessage() ),
+                        [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount, 'error' => $e->getMessage() ]
                     );
                 }
                 return false; // CP-BUG-4: NO reportar éxito si el crédito/hold falló.
