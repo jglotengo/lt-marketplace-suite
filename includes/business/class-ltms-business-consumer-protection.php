@@ -973,12 +973,27 @@ class LTMS_Business_Consumer_Protection {
         }
 
         // Crear WooCommerce refund (devuelve el dinero al medio de pago del cliente).
+        // RE-AUDIT P0 FIX: check return value of wc_create_refund. Previously the
+        // return was discarded — if the refund failed (gateway error, order already
+        // refunded), the dispute was marked 'approved', vendor was debited, but
+        // the customer received no refund.
         if ( function_exists( 'wc_create_refund' ) ) {
-            wc_create_refund( [
+            $refund = wc_create_refund( [
                 'order_id' => $order_id,
                 'amount'   => $refund_amount,
                 'reason'   => sprintf( 'Dispute #%d approved', $dispute_id ),
             ] );
+            if ( is_wp_error( $refund ) ) {
+                // Refund failed — log critical and return error so admin can retry.
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'DISPUTE_REFUND_FAILED',
+                        sprintf( 'Dispute #%d: wc_create_refund failed for order #%d: %s', $dispute_id, $order_id, $refund->get_error_message() ),
+                        [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'amount' => $refund_amount ]
+                    );
+                }
+                return new \WP_Error( 'refund_failed', sprintf( __( 'El reembolso al cliente falló: %s', 'ltms' ), $refund->get_error_message() ) );
+            }
         }
 
         // Reversión de comisión + liberación del hold frozen lo escuchan otros motores.

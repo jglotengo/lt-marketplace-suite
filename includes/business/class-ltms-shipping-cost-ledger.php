@@ -1195,7 +1195,7 @@ class LTMS_Shipping_Cost_Ledger {
             // Reembolsar al vendor si fue debitado.
             $entry = self::get_entry( (int) $dispute['ledger_id'] );
             if ( $entry && (float) $entry['vendor_charged'] > 0 && $entry['vendor_id'] > 0 ) {
-                self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $credit_amount );
+                self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $credit_amount, $entry['currency'] ?? '' );
             }
         } elseif ( $status === 'rejected' || $status === 'expired' ) {
             // Marcar como reconciliado (pérdida asumida o no recuperable).
@@ -1355,11 +1355,12 @@ class LTMS_Shipping_Cost_Ledger {
         // Últimas 24h: entries nuevos donde shipping > threshold% del order total.
         $since = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 
+        // RE-AUDIT P0 FIX: query had invalid SQL — 'o.get_total as order_total'
+        // referenced a non-existent table alias 'o' and a PHP method as column.
+        // Removed the invalid column; order_total is fetched via wc_get_order below.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $entries = $wpdb->get_results( $wpdb->prepare(
-            "SELECT l.*, o.get_total as order_total
-             FROM `{$table}` l
-             JOIN (SELECT ID FROM {$wpdb->posts} WHERE post_type='shop_order') p ON p.ID = l.order_id
+            "SELECT l.* FROM `{$table}` l
              WHERE l.created_at >= %s AND l.quote_cost > 0
              AND l.carrier NOT IN ('pickup', 'own_delivery')",
             $since
@@ -1802,10 +1803,16 @@ class LTMS_Shipping_Cost_Ledger {
      * @param int   $vendor_id
      * @param float $amount
      */
-    private static function refund_vendor_for_dispute( int $ledger_id, int $vendor_id, float $amount ): void {
+    private static function refund_vendor_for_dispute( int $ledger_id, int $vendor_id, float $amount, string $currency = '' ): void {
         if ( ! class_exists( 'LTMS_Business_Wallet' ) || $amount <= 0 ) {
             return;
         }
+
+        // RE-AUDIT P0 FIX: was using LTMS_Core_Config::get_currency() (platform base
+        // currency) instead of the ledger entry's currency. If order was in USD but
+        // platform is COP, vendor was debited $10 USD but refunded $10 COP (~$0.0025).
+        // Now: use the passed currency, fall back to config only if empty.
+        $refund_currency = $currency ?: LTMS_Core_Config::get_currency();
 
         $idempotency_key = sprintf( 'shipping_refund_dispute_l%d', $ledger_id );
 
@@ -1819,7 +1826,7 @@ class LTMS_Shipping_Cost_Ledger {
                     'ledger_id' => $ledger_id,
                 ],
                 0,
-                LTMS_Core_Config::get_currency(),
+                $refund_currency,
                 $idempotency_key
             );
 
@@ -1879,7 +1886,7 @@ class LTMS_Shipping_Cost_Ledger {
             }
         } else {
             // Reembolso al vendor.
-            self::refund_vendor_for_dispute( $ledger_id, $vendor_id, abs( $diff ) );
+            self::refund_vendor_for_dispute( $ledger_id, $vendor_id, abs( $diff ), $entry['currency'] ?? '' );
         }
 
         // Actualizar vendor_charged en el ledger para reflejar el costo real.
