@@ -96,6 +96,7 @@ $fmt = function( $v ) use ( $currency ) {
         </select>
         <!-- v2.9.88 P2: CSV Export button -->
         <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-shipping-export-csv"
+                data-filename="fletes_<?php echo esc_attr( $year ); ?>_<?php echo esc_attr( $month ); ?>.csv"
                 style="margin-left:auto;">
             📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
         </button>
@@ -228,8 +229,6 @@ $fmt = function( $v ) use ( $currency ) {
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-shipping-statement.js
-// Pass filename via data attribute (no PHP in JS).
-$csv_filename = 'fletes_' . esc_attr( $year ) . '_' . esc_attr( $month ) . '.csv';
+// Filename passed via data-filename attribute on the button (no inline JS needed).
 wp_enqueue_script( 'ltms-shipping-statement', LTMS_ASSETS_URL . 'js/ltms-shipping-statement.js', [], LTMS_VERSION, true );
-wp_add_inline_script( 'ltms-shipping-statement', 'document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("ltms-shipping-export-csv");if(b){b.dataset.filename="' . $csv_filename . '";}});', 'before' );
 ?>
