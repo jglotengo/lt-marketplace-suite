@@ -21,19 +21,9 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use ReflectionClass;
 
-// Define WP_User stub if not already defined (bootstrap doesn't define it).
-// LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors type-hints \WP_User.
-if ( ! class_exists( 'WP_User' ) ) {
-    class WP_User {
-        public $ID = 0;
-        public $roles = [];
-        public $display_name = '';
-        public function __construct( $id = 0, $name = '', $site_id = '' ) {
-            $this->ID = $id;
-            $this->display_name = $name;
-        }
-    }
-}
+// WP_User is defined in tests/unit/RolesTest.php (global namespace) with
+// constructor (int $id, array $roles). We reuse that stub.
+// The class_exists guard there prevents redefinition.
 
 /**
  * @covers LTMS_Fintech_Compliance
@@ -252,10 +242,9 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
     // ── SECCIÓN 5 — enforce_2fa_for_payout_vendors (FASE4 P0 FIX) ─────────
 
     // Helper: create a fake WP_User with a roles property.
-    // WP_User is defined as a stub at the top of this file.
+    // WP_User stub is defined in tests/unit/RolesTest.php with constructor (int $id, array $roles).
     private function make_fake_user(array $roles, int $id = 1): \WP_User {
-        $user = new \WP_User($id, 'Test User');
-        $user->roles = $roles;
+        $user = new \WP_User($id, $roles);
         $user->display_name = 'Test User';
         return $user;
     }
