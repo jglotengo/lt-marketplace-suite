@@ -564,11 +564,23 @@ final class LTMS_Business_Order_Split {
         try {
             return LTMS_Tax_Engine::calculate( $gross_amount, $order_data, $vendor_data, $country );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::error(
-                'TAX_BREAKDOWN_FAILED',
-                sprintf( 'Error calculando impuestos pedido #%d: %s', $order->get_id(), $e->getMessage() )
-            );
-            return [ 'withholding_total' => 0.0 ];
+            // RE-AUDIT P1 FIX: returning withholding_total=0 on failure → vendor
+            // receives full vendor_gross with ZERO tax withholding → platform
+            // undercollects taxes (ReteIVA, ReteICA). Now: log as critical and
+            // return a conservative estimate (default withholding rate) rather
+            // than zero, so taxes are over-collected rather than under-collected.
+            $default_rate = class_exists( 'LTMS_Core_Config' )
+                ? (float) LTMS_Core_Config::get( 'ltms_tax_fallback_withholding_rate', 0.10 )
+                : 0.10;
+            $fallback_withholding = round( $gross_amount * $default_rate, 2 );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'TAX_BREAKDOWN_FAILED',
+                    sprintf( 'Pedido #%d: tax engine failed: %s. Using fallback withholding $%.2f (rate=%.1f%%).', $order->get_id(), $e->getMessage(), $fallback_withholding, $default_rate * 100 ),
+                    [ 'order_id' => $order->get_id(), 'gross' => $gross_amount, 'fallback_withholding' => $fallback_withholding, 'error' => $e->getMessage() ]
+                );
+            }
+            return [ 'withholding_total' => $fallback_withholding ];
         }
     }
 

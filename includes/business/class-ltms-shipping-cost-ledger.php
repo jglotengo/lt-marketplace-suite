@@ -259,8 +259,22 @@ class LTMS_Shipping_Cost_Ledger {
             self::sync_legacy_order_meta( $order, $first_carrier, $absorbed_cost, $buyer_paid, $primary_vendor_id );
 
             // Actualizar presupuesto del vendor (si modo absorbed).
-            if ( $absorbed_cost > 0 && $primary_vendor_id > 0 ) {
-                self::increment_vendor_spend( $primary_vendor_id, $absorbed_cost );
+            // RE-AUDIT P1 FIX: was using $primary_vendor_id only → vendors 2..N
+            // had wallets debited for shipping but budgets never incremented →
+            // check_vendor_budget() showed $0 spent → unlimited shipping spend.
+            // Now: iterate each entry and increment the per-line vendor's budget.
+            if ( $absorbed_cost > 0 && ! empty( $entries ) ) {
+                $vendor_spend = [];
+                foreach ( $entries as $e ) {
+                    $evid = (int) ( $e['vendor_id'] ?? 0 );
+                    $eabs = (float) ( $e['absorbed_cost'] ?? 0 );
+                    if ( $evid > 0 && $eabs > 0 ) {
+                        $vendor_spend[ $evid ] = ( $vendor_spend[ $evid ] ?? 0 ) + $eabs;
+                    }
+                }
+                foreach ( $vendor_spend as $vid => $vamt ) {
+                    self::increment_vendor_spend( $vid, $vamt );
+                }
             }
 
         } catch ( \Throwable $e ) {
@@ -1707,18 +1721,21 @@ class LTMS_Shipping_Cost_Ledger {
                 );
             }
         } catch ( \InvalidArgumentException $e ) {
-            // Saldo insuficiente: registrar como crédito logístico (deuda).
-            // El vendor queda con balance negativo y debe recargar.
-            $msg = $e->getMessage();
-            if ( false !== strpos( $msg, 'Saldo insuficiente' ) ) {
-                self::record_vendor_shipping_debt( $ledger_id, $vendor_id, $amount, $order_id, $currency, $idempotency_key );
-                return;
+            // RE-AUDIT P1 FIX: string-matching exception message is fragile.
+            // If the error message changes (translation, refactor), the match
+            // fails → exception propagates → vendor never debited → platform
+            // silently absorbs shipping cost. Now: treat ALL InvalidArgumentException
+            // from Wallet::debit as insufficient-balance (the only case Wallet
+            // throws InvalidArgumentException) and record as debt.
+            self::record_vendor_shipping_debt( $ledger_id, $vendor_id, $amount, $order_id, $currency, $idempotency_key );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'SHIPPING_LEDGER_VENDOR_DEBT_RECORDED',
+                    sprintf( 'Ledger #%d vendor #%d: insufficient balance, debt recorded ($%.2f %s).', $ledger_id, $vendor_id, $amount, $currency ),
+                    [ 'ledger_id' => $ledger_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'currency' => $currency ]
+                );
             }
-            // Otro error de argumento: loguear y propagar.
-            LTMS_Core_Logger::warning(
-                'SHIPPING_LEDGER_VENDOR_DEBIT_FAILED',
-                sprintf( 'Ledger #%d vendor #%d: %s', $ledger_id, $vendor_id, $msg )
-            );
+            return;
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::warning(
                 'SHIPPING_LEDGER_VENDOR_DEBIT_FAILED',

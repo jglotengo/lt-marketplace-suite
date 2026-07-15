@@ -868,6 +868,11 @@ class LTMS_Business_Consumer_Protection {
      * @return bool|WP_Error
      */
     public static function review_dispute( int $dispute_id, int $admin_id ) {
+        // RE-AUDIT P1 FIX: no capability check — any authenticated user could
+        // transition disputes to 'under_review' if exposed via REST/AJAX.
+        if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'ltms_manage_disputes' ) ) {
+            return new \WP_Error( 'unauthorized', __( 'Permisos insuficientes para revisar disputas.', 'ltms' ) );
+        }
         global $wpdb;
         $table = $wpdb->prefix . 'lt_consumer_disputes';
 
