@@ -27,7 +27,7 @@ final class LTMS_DB_Migrations {
      * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
      * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.9.14';
+    private const CURRENT_VERSION = '2.9.15';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -105,6 +105,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.14', '<' ) ) {
             self::migrate_2_9_14_wallet_reference_unique();
+        }
+
+        if ( version_compare( $installed_version, '2.9.15', '<' ) ) {
+            self::migrate_2_9_15_consumer_disputes_customs_tables();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3247,6 +3251,91 @@ final class LTMS_DB_Migrations {
             LTMS_Core_Logger::info(
                 'DB_MIGRATION',
                 'v2.9.14 FASE1-REAUDIT P0: added UNIQUE index udx_reference on lt_wallet_transactions.reference — enforces idempotency at the storage layer, prevents double-spend on retry.'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.9.15 — Formaliza las tablas lt_consumer_disputes y
+     * lt_customs_declarations que anteriormente se creaban inline (lazy)
+     * dentro de file_dispute() y process_cross_border_for_vendor().
+     *
+     * Antes de esta migration, las tablas se creaban con CREATE TABLE IF NOT
+     * EXISTS en cada llamada al método — funcional pero no canónico. Esta
+     * migration las registra formalmente en el esquema de migraciones para
+     * que se creen en el orden correcto durante la activación del plugin.
+     *
+     * Tablas creadas:
+     * 1. lt_consumer_disputes — disputas de消费者 (Ley 1480 CO / PROFECO MX).
+     * 2. lt_customs_declarations — declaraciones aduaneras cross-border.
+     *
+     * @return void
+     */
+    private static function migrate_2_9_15_consumer_disputes_customs_tables(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $p       = $wpdb->prefix;
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+        // 1. lt_consumer_disputes — disputas de消费者.
+        // Schema debe coincidir con el CREATE TABLE inline en
+        // LTMS_Business_Consumer_Protection::file_dispute() líneas 792-812.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_consumer_disputes` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`        BIGINT UNSIGNED NOT NULL,
+            `customer_id`     BIGINT UNSIGNED NOT NULL,
+            `reason`          VARCHAR(50)  NOT NULL,
+            `description`     TEXT         NULL,
+            `evidence`        TEXT         NULL,
+            `status`          VARCHAR(20)  NOT NULL DEFAULT 'filed',
+            `hold_frozen`     TINYINT(1)   NOT NULL DEFAULT 0,
+            `reviewed_by`     BIGINT UNSIGNED NULL,
+            `reviewed_at`     DATETIME     NULL,
+            `resolved_by`     BIGINT UNSIGNED NULL,
+            `resolved_at`     DATETIME     NULL,
+            `resolution_note` TEXT         NULL,
+            `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_order`   (`order_id`),
+            KEY `idx_status`  (`status`),
+            KEY `idx_customer`(`customer_id`)
+        ) {$charset}" );
+
+        // 2. lt_customs_declarations — declaraciones aduaneras cross-border.
+        // Schema debe coincidir con LTMS_Order_Split::ensure_customs_table()
+        // líneas 904-929.
+        $wpdb->query( "CREATE TABLE IF NOT EXISTS `{$p}lt_customs_declarations` (
+            `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`            BIGINT UNSIGNED NOT NULL,
+            `vendor_id`           BIGINT UNSIGNED NOT NULL,
+            `origin_country`      CHAR(2)         NOT NULL,
+            `destination_country` CHAR(2)         NOT NULL,
+            `incoterm`            VARCHAR(8)      NOT NULL DEFAULT 'DDU',
+            `hs_code`             VARCHAR(20)     DEFAULT NULL,
+            `cif_value`           DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `duty_rate`           DECIMAL(6,3)    NOT NULL DEFAULT 0,
+            `duty_amount`         DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `vat_rate`            DECIMAL(6,3)    NOT NULL DEFAULT 0,
+            `vat_amount`          DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `other_taxes`         DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `customs_fee`         DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `total_duties_taxes`  DECIMAL(15,2)   NOT NULL DEFAULT 0,
+            `paid_by`             VARCHAR(10)     NOT NULL DEFAULT 'buyer',
+            `below_de_minimis`    TINYINT(1)      NOT NULL DEFAULT 0,
+            `currency`            CHAR(3)         NOT NULL,
+            `breakdown`           LONGTEXT        DEFAULT NULL,
+            `created_at`          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_order_id` (`order_id`),
+            KEY `idx_vendor_id` (`vendor_id`),
+            KEY `idx_origin_dest` (`origin_country`, `destination_country`)
+        ) {$charset}" );
+        // phpcs:enable
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.9.15: lt_consumer_disputes + lt_customs_declarations formalizadas en migration canónica (antes se creaban lazy inline).'
             );
         }
     }

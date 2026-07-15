@@ -63,7 +63,10 @@ class LTMS_Product_Tabs {
         $store_url = class_exists( 'LTMS_Vendor_Storefront' )
             ? home_url( '/vendedor/' . $vendor->user_nicename . '/' )
             : '';
-        $rating = 0; // TODO: calcular rating promedio del vendor.
+        // v2.9.179: Calculate vendor's average rating from WooCommerce product reviews.
+        // Queries all approved comments of type 'review' on products owned by this vendor,
+        // averages their comment_meta '_wc_rating' values. Returns 0 if no reviews.
+        $rating = self::calculate_vendor_rating( $vendor_id );
         $description = get_user_meta( $vendor_id, 'description', true ) ?: '';
         $store_logo = get_user_meta( $vendor_id, 'ltms_store_logo', true ) ?: '';
         ?>
@@ -331,5 +334,34 @@ class LTMS_Product_Tabs {
         } else {
             delete_post_meta( $post_id, '_ltms_size_guide' );
         }
+    }
+
+    /**
+     * Calculate the vendor's average rating from WooCommerce product reviews.
+     *
+     * Queries all approved review-type comments on products where the post_author
+     * matches $vendor_id, then averages the '_wc_rating' comment_meta values.
+     *
+     * @param int $vendor_id The vendor's WordPress user ID.
+     * @return float Average rating (0-5), or 0.0 if no reviews exist.
+     */
+    public static function calculate_vendor_rating( int $vendor_id ): float {
+        global $wpdb;
+        if ( $vendor_id <= 0 ) return 0.0;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $avg = $wpdb->get_var( $wpdb->prepare(
+            "SELECT AVG(CAST(cm.meta_value AS DECIMAL(3,2)))
+             FROM {$wpdb->comments} c
+             INNER JOIN {$wpdb->posts} p ON c.comment_post_ID = p.ID
+             INNER JOIN {$wpdb->commentmeta} cm ON c.comment_ID = cm.comment_id
+             WHERE p.post_author = %d
+               AND c.comment_approved = 1
+               AND c.comment_type = 'review'
+               AND cm.meta_key = 'rating'",
+            $vendor_id
+        ) );
+
+        return $avg !== null ? round( (float) $avg, 1 ) : 0.0;
     }
 }

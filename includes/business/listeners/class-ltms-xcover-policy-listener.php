@@ -14,6 +14,82 @@ class LTMS_XCover_Policy_Listener {
         add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'on_order_paid' ], 20 );
         add_action( 'woocommerce_order_status_cancelled', [ __CLASS__, 'on_order_cancelled' ], 10 );
         add_action( 'woocommerce_order_status_refunded', [ __CLASS__, 'on_order_cancelled' ], 10 );
+        // v2.9.179: Register handler for ltms_xcover_file_claim — previously
+        // the do_action was fired by ConsumerProtection::maybe_trigger_insurance_claim
+        // but no listener was registered, so claims were never filed automatically.
+        add_action( 'ltms_xcover_file_claim', [ __CLASS__, 'on_file_claim' ], 10, 3 );
+    }
+
+    /**
+     * Files an XCover insurance claim when a dispute is approved.
+     *
+     * Hooked to: ltms_xcover_file_claim
+     * Fired by: LTMS_Business_Consumer_Protection::maybe_trigger_insurance_claim()
+     *
+     * @param int    $dispute_id The dispute ID.
+     * @param int    $order_id   The WooCommerce order ID.
+     * @param string $reason     The dispute reason (damaged, lost, not_as_described, etc.).
+     * @return void
+     */
+    public static function on_file_claim( int $dispute_id, int $order_id, string $reason ): void {
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) return;
+
+        // Only file claim if an insurance policy exists for this order.
+        $policy_id = $order->get_meta( '_ltms_insurance_policy_id' );
+        if ( ! $policy_id ) return;
+
+        // Idempotency: don't file claim twice for the same dispute.
+        $existing_claim = $order->get_meta( '_ltms_xcover_claim_filed_' . $dispute_id );
+        if ( $existing_claim ) return;
+
+        try {
+            $xcover = LTMS_Api_Factory::get( 'xcover' );
+
+            // Build claim data from order + dispute info.
+            $claim_data = [
+                'policy_id'    => $policy_id,
+                'reason'       => $reason,
+                'description'  => sprintf(
+                    'Dispute #%d filed by customer. Reason: %s. Order #%d.',
+                    $dispute_id,
+                    $reason,
+                    $order_id
+                ),
+                'incident_date' => current_time( 'mysql', true ),
+                'amount'        => (float) $order->get_total(),
+                'currency'      => $order->get_currency(),
+            ];
+
+            // Attempt to file the claim via the XCover API.
+            // If the API client doesn't have a file_claim method, log and skip.
+            if ( method_exists( $xcover, 'file_claim' ) ) {
+                $result = $xcover->file_claim( $claim_data );
+                $claim_id = $result['claim_id'] ?? $result['id'] ?? '';
+
+                $order->update_meta_data( '_ltms_xcover_claim_filed_' . $dispute_id, $claim_id );
+                $order->update_meta_data( '_ltms_xcover_claim_id', $claim_id );
+                $order->save();
+
+                LTMS_Core_Logger::info(
+                    'XCOVER_CLAIM_FILED',
+                    sprintf( 'Claim %s filed for dispute #%d (policy %s, order #%d)', $claim_id, $dispute_id, $policy_id, $order_id ),
+                    [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'policy_id' => $policy_id, 'claim_id' => $claim_id ]
+                );
+            } else {
+                LTMS_Core_Logger::warning(
+                    'XCOVER_CLAIM_METHOD_MISSING',
+                    sprintf( 'XCover API client does not implement file_claim() — claim for dispute #%d not filed. Implement LTMS_Api_XCover::file_claim().', $dispute_id ),
+                    [ 'dispute_id' => $dispute_id, 'order_id' => $order_id ]
+                );
+            }
+        } catch ( \Throwable $e ) {
+            LTMS_Core_Logger::error(
+                'XCOVER_CLAIM_FILE_FAILED',
+                sprintf( 'Dispute #%d, Order #%d: %s', $dispute_id, $order_id, $e->getMessage() ),
+                [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'error' => $e->getMessage() ]
+            );
+        }
     }
 
     public static function on_order_paid( int $order_id ): void {
