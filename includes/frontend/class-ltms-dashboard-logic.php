@@ -2216,6 +2216,10 @@ final class LTMS_Dashboard_Logic {
     public function ajax_backorder_notify(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // FASE2 P0 FIX: missing global $wpdb — every call crashed with
+        // "Call to a member function prefix() on null".
+        global $wpdb;
+
         // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir abuso de wp_options.
         $ip = LTMS_Utils::get_ip();
         $throttle_key = 'ltms_backorder_' . md5( $ip );

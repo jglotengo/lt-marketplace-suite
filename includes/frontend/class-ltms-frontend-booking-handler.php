@@ -64,8 +64,8 @@ final class LTMS_Frontend_Booking_Handler {
     // ── AJAX: lista de reservas ───────────────────────────────────────────
 
     public function ajax_get_vendor_bookings(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! $this->is_ltms_vendor() ) {
@@ -193,8 +193,8 @@ final class LTMS_Frontend_Booking_Handler {
     // ── AJAX: cancelar reserva propia ─────────────────────────────────────
 
     public function ajax_vendor_cancel_booking(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
         if ( ! $this->is_ltms_vendor() ) {
@@ -299,7 +299,16 @@ final class LTMS_Frontend_Booking_Handler {
         $out = fopen( 'php://output', 'w' );
         fputcsv( $out, [ 'ID', 'Orden WC', 'Producto', 'Huésped', 'Check-in', 'Check-out', 'Huéspedes', 'Total', 'Neto', 'Estado', 'Modo Pago', 'Moneda', 'Creada' ] );
         foreach ( $bookings as $row ) {
-            fputcsv( $out, array_values( $row ) );
+            // FASE2 P1 FIX (CSV injection): prefix cells starting with =+-@
+            // with a single quote to prevent formula injection in Excel/LibreOffice.
+            // Customer display_name and product name are user-controlled.
+            $safe_row = array_map( static function( $val ) {
+                if ( is_string( $val ) && preg_match( '/^[=+\-@]/', $val ) ) {
+                    return "'" . $val;
+                }
+                return $val;
+            }, array_values( $row ) );
+            fputcsv( $out, $safe_row );
         }
         fclose( $out );
         exit;
