@@ -295,5 +295,4 @@ $claim_rate = $kpis['total'] > 0 ? round( ( $kpis['claimed'] / $kpis['total'] ) 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-insurance-view.js
 wp_enqueue_script( 'ltms-insurance-view', LTMS_ASSETS_URL . 'js/ltms-insurance-view.js', [], LTMS_VERSION, true );
-wp_add_inline_script( 'ltms-insurance-view', 'document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("ltms-insurance-export-csv");if(b){b.dataset.filename="seguros_' + new Date().toISOString().slice(0,10) + '.csv";}});', 'before' );
 ?>
