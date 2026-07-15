@@ -390,6 +390,7 @@ class SiigoApiTest extends TestCase
         Functions\when('get_transient')->justReturn(false);
         Functions\when('wp_remote_post')->justReturn(['body' => '{}', 'response' => ['code' => 200]]);
         Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
         Functions\when('wp_remote_retrieve_body')->justReturn('{}');
 
         $this->expectException(\RuntimeException::class);
@@ -422,6 +423,7 @@ class SiigoApiTest extends TestCase
         Functions\when('get_transient')->justReturn(false);
         Functions\when('is_wp_error')->justReturn(false);
         Functions\when('wp_remote_post')->justReturn(['response' => ['code' => 200]]);
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
         Functions\when('wp_remote_retrieve_body')->justReturn(
             '{"access_token":"new_jwt_abc","expires_in":3600}'
         );
@@ -576,6 +578,7 @@ class SiigoApiTest extends TestCase
         Functions\when('get_transient')->justReturn(false);
         Functions\when('is_wp_error')->justReturn(false);
         Functions\when('wp_remote_post')->justReturn(['response' => ['code' => 200]]);
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
         Functions\when('wp_remote_retrieve_body')->justReturn(
             '{"access_token":"jwt_abc","expires_in":3600}'
         );
