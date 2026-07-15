@@ -610,27 +610,15 @@ final class LTMS_Business_Wallet {
             // CR-CRASH-1: marcar journal como completado.
             self::journal_post( $journal_id, 'completed', $tx_id );
 
-            // F-06: Hook contable post-COMMIT.
-            // WL-BUG-1 FIX: usar la currency real de la billetera ($wallet['currency']) en vez de
-            // la variable $currency que NUNCA se asignaba en este scope (siempre caía al fallback 'COP').
-            // Esto hacía que el hook siempre reportara 'COP' incluso para wallets MXN, rompiendo
-            // la integración contable en multi-currency.
+            // FASE1-REAUDIT P0 FIX: do_action + logging moved OUTSIDE the try/catch.
+            // Previously, if a listener on 'ltms_wallet_tx_committed' threw, execution
+            // fell into the catch block which called ROLLBACK — but the transaction was
+            // already committed, so ROLLBACK was a no-op. The exception propagated to
+            // the caller, which believed the operation failed and retried → double
+            // credit. Now: post-commit actions are wrapped in their own try/catch
+            // that swallows non-critical errors.
             $currency = $wallet['currency'] ?? LTMS_Core_Config::get_currency();
-            do_action( 'ltms_wallet_tx_committed', $tx_id, $vendor_id, $type, $amount, $currency );
-
-            LTMS_Core_Logger::info(
-                'WALLET_TRANSACTION',
-                sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
-                    strtoupper( $type ),
-                    $vendor_id,
-                    LTMS_Utils::format_money( $amount, $wallet['currency'] ),
-                    $description,
-                    LTMS_Utils::format_money( (float) $new_balance, $wallet['currency'] )
-                ),
-                [ 'tx_id' => $tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
-            );
-
-            return $tx_id;
+            $return_tx_id = $tx_id;
 
         } catch ( \Throwable $e ) {
             if ( ! $managed_externally ) {
@@ -644,11 +632,37 @@ final class LTMS_Business_Wallet {
             LTMS_Core_Logger::error(
                 'WALLET_TRANSACTION_FAILED',
                 sprintf( 'Transacción de billetera fallida para vendedor #%d: %s', $vendor_id, $e->getMessage() ),
-                [ 'vendor_id' => $vendor_id, 'type' => $type, 'amount' => $amount, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
+                [ 'vendor_id' => $vendor_id, 'type' => $type, 'amount' => $amount, 'currency' => $currency ?? '', 'idempotency_key' => $idempotency_key ]
             );
 
             throw $e;
         }
+
+        // Post-commit hooks + logging — OUTSIDE try/catch so listener exceptions
+        // don't cause false-failure retries (which would double-credit the wallet).
+        try {
+            do_action( 'ltms_wallet_tx_committed', $return_tx_id, $vendor_id, $type, $amount, $currency );
+
+            LTMS_Core_Logger::info(
+                'WALLET_TRANSACTION',
+                sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
+                    strtoupper( $type ),
+                    $vendor_id,
+                    LTMS_Utils::format_money( $amount, $wallet['currency'] ),
+                    $description,
+                    LTMS_Utils::format_money( (float) $new_balance, $wallet['currency'] )
+                ),
+                [ 'tx_id' => $return_tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
+            );
+        } catch ( \Throwable $hook_e ) {
+            // Log but don't rethrow — the transaction already committed.
+            LTMS_Core_Logger::error(
+                'WALLET_POST_COMMIT_HOOK_ERROR',
+                sprintf( 'Post-commit hook/logging failed for tx #%d (transaction was committed): %s', $return_tx_id, $hook_e->getMessage() )
+            );
+        }
+
+        return $return_tx_id;
     }
 
     /**

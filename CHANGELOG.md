@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.143] — 2026-07-15
+
+### FASE 1: Re-auditoría de Regresiones — 8 P0 + 3 P1 fixes (3 archivos críticos)
+
+Re-auditoría de los 3 archivos más críticos que recibieron P0 fixes en auditorías previas. Se encontraron **2 regresiones** introducidas por los fixes anteriores + 6 bugs P0 nuevos + 3 P1.
+
+**P0 — Regresiones de fixes anteriores (2 fixes)**
+
+- **`class-ltms-payout-scheduler.php:92-108`** — **REGRESIÓN P0-1 (v2.9.115)**: el fix anterior cambió `available = max(0, balance - held)` pero `hold()` YA resta de `balance` atómicamente y suma a `balance_pending`. Restar `held` de nuevo doble-resta, bloqueando TODOS los payouts legítimos después de cualquier hold. Ejemplo: balance=1000, hold(600) → balance=400, balance_pending=600. El "fix" calculaba available = max(0, 400-600) = 0 → rechazaba payout de 200. Correcto: available = 400. Revertido a `available = balance`. El double-spend que P0-1 intentaba prevenir ya está bloqueado por el balance check dentro de la transacción de `hold()`.
+- **`class-ltms-booking-policy-handler.php:208-238`** — **REGRESIÓN P0-2 (v2.9.117)**: el fix anterior prevenía double-refund buscando el booking_id en el REASON del refund via `stripos()`. Dos fallos fatales: (1) el prefix estaba hardcoded en español ("Cancelación de reserva #%d") pero el reason usa `__()` → en sitio inglés, no hay match → double refund NO se previene. (2) Colisión de substring: "#1" matchea "#11" → el refund del booking #1 se salta si el booking #11 fue reembolsado primero. Ahora: se almacena `booking_id` como post meta del refund (`_ltms_booking_id`) y se verifica via `get_post_meta()` — inmune a traducción y colisión de substring.
+
+**P0 — Bugs nuevos (6 fixes)**
+
+- **`class-ltms-wallet.php:606-666`** — `do_action('ltms_wallet_tx_committed')` y logging estaban DENTRO del try block, DESPUÉS de `$wpdb->query('COMMIT')`. Si un listener lanzaba excepción, caía al catch que llamaba `ROLLBACK` — pero la transacción ya estaba committed, así que ROLLBACK era no-op. La excepción se propagaba al caller, que creía que la operación falló y reintentaba → **double credit**. Ahora: post-commit actions movidos fuera del try/catch, envueltos en su propio try/catch que traga errores no-críticos.
+- **`class-ltms-payout-scheduler.php:527-574`** — Wallet error marcaba payout como `'completed'` y disparaba `ltms_payout_completed` — pero el wallet debit podría NO haberse ejecutado. Resultado: gateway envió dinero al banco del vendor, wallet balance NO fue debitado. Vendor tiene AMBOS el dinero del banco Y el wallet balance. Ahora: marca como `'processing'` (stuck — admin debe reconciliar), dispara `ltms_payout_wallet_error` (NO `ltms_payout_completed`), no dispara hooks downstream.
+- **`class-ltms-payout-scheduler.php:614-669`** — Gateway failure dejaba payout stuck en `'processing'` sin recovery path. El status ya estaba cambiado a `'processing'` por el atomic claim, pero el código solo appendeaba nota de error sin resetear status. `approve()` rechaza non-pending, cron solo selecciona `'pending'` → stuck forever. Ahora: resetea a `'pending'` + release del hold para que los fondos no queden locked.
+- **`class-ltms-booking-policy-handler.php:134-146`** — IDOR en `get_policy_for_booking`: SELECT por `id` solo, sin verificar que la policy pertenezca al vendor del booking. Si un product meta apuntaba a la policy de otro vendor, retornaba policy equivocada → monto de refund incorrecto. Ahora: `WHERE id = %d AND vendor_id = %d`.
+- **DB migration `migrate_2_9_14_wallet_reference_unique()`** — `lt_wallet_transactions.reference` NO tenía UNIQUE index. El mecanismo de idempotencia WL-CRASH-2 hacía SELECT fuera de la transacción, luego INSERT. Sin UNIQUE index, dos calls concurrentes con el mismo idempotency_key ambos pasan el SELECT, ambos INSERT, ambos COMMIT → **double debit/credit/release**. Ahora: UNIQUE index `udx_reference` enforcea idempotency en el storage layer. La migración detecta duplicados existentes y los loguea para cleanup manual antes de agregar el index.
+- **`class-ltms-booking-policy-handler.php:258-274`** — Refund status no validado antes de disparar `ltms_booking_refund_processed`. `wc_create_refund` puede retornar objeto refund con status `'failed'`. Ahora: verifica `$refund->get_status() === 'completed'` antes de disparar el action.
+
+**P1 — Security hardening (3 fixes)**
+
+- **`class-ltms-booking-policy-handler.php:163-181`** — Timezone bug en `calculate_refund_amount`: `strtotime()` parsea en server timezone mientras `time()` es UTC. Si server es UTC pero WP es America/Bogota (UTC-5), la diferencia era de 5 horas → tier de refund equivocado (100% en vez de 50%). Ahora: `mysql2date('U', ..., true)` fuerza interpretación GMT.
+- **`class-ltms-booking-policy-handler.php:389-399`** — `ajax_get_vendor_policies` sin check `is_ltms_vendor()`. Cualquier usuario logueado (incluyendo customers) podía llamar el endpoint. Ahora: verifica vendor capability.
+- **`class-ltms-booking-policy-handler.php:448-460`** — `ajax_delete_vendor_policy` sin check `is_ltms_vendor()`. Mismo issue. Ahora: verifica vendor capability.
+- **`class-ltms-booking-policy-handler.php:149-158`** — Vendor default policy fallback usaba `ORDER BY id ASC` (la más vieja por ID) en vez de `ORDER BY is_default DESC` (la marcada como default). Ahora: prioriza `is_default`.
+
+**Files modified**: 4 (wallet, payout-scheduler, booking-policy-handler, db-migrations) + plugin main + CHANGELOG.
+
+**DB migration**: v2.9.13 → v2.9.14 — adds UNIQUE index `udx_reference` on `lt_wallet_transactions.reference`.
+
 ## [2.9.142] — 2026-07-15
 
 ### Core Security Audit — Firewall + Security + TOTP-2FA + GDPR + Retention (5 files, 8 P0/P1 fixes)
