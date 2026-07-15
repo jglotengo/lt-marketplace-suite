@@ -163,16 +163,7 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
 
 </div>
 
-<script>
-(function($){
-    'use strict';
-
-    $('.ltms-donations-page').on('click', function(){
-        var page = $(this).data('page');
-        var url = new URL(window.location.href);
-        url.searchParams.set('paged', page);
-        window.location.href = url.toString();
-    });
-
-})(jQuery);
-</script>
+<?php
+// FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-donations.js
+wp_enqueue_script( 'ltms-donations', LTMS_ASSETS_URL . 'js/ltms-donations.js', [ 'jquery' ], LTMS_VERSION, true );
+?>

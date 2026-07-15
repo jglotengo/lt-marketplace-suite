@@ -152,64 +152,7 @@ $type_counts = array_column( $type_counts_raw, 'total', 'type' );
 
 </div>
 
-<script>
-(function($){
-    'use strict';
-
-    // Filtros por tipo
-    $('.ltms-mkt-filter').on('click', function(){
-        var type = $(this).data('type');
-        var url = new URL(window.location.href);
-        if (type) {
-            url.searchParams.set('type', type);
-        } else {
-            url.searchParams.delete('type');
-        }
-        url.searchParams.delete('paged');
-        window.location.href = url.toString();
-    });
-
-    // Paginación
-    $('.ltms-mkt-page').on('click', function(){
-        var page = $(this).data('page');
-        var url = new URL(window.location.href);
-        url.searchParams.set('paged', page);
-        window.location.href = url.toString();
-    });
-
-    // Copiar URL al portapapeles
-    $('.ltms-mkt-copy-url').on('click', function(){
-        var url = $(this).data('url');
-        var $btn = $(this);
-        var original = $btn.html();
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(url).then(function(){
-                $btn.html('✓');
-                setTimeout(function(){ $btn.html(original); }, 1500);
-            });
-        } else {
-            // Fallback
-            var $temp = $('<input>');
-            $('body').append($temp);
-            $temp.val(url).select();
-            document.execCommand('copy');
-            $temp.remove();
-            $btn.html('✓');
-            setTimeout(function(){ $btn.html(original); }, 1500);
-        }
-    });
-
-    // Tracking de descargas (sin bloquear la descarga)
-    $('.ltms-mkt-download').on('click', function(e){
-        var bannerId = $(this).data('banner-id');
-        if (!bannerId) return;
-        // Fire-and-forget AJAX to increment download_count
-        $.post(ltmsDashboard.ajax_url, {
-            action: 'ltms_track_banner_download',
-            nonce: ltmsDashboard.nonce,
-            banner_id: bannerId
-        });
-    });
-
-})(jQuery);
-</script>
+<?php
+// FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-marketing.js
+wp_enqueue_script( 'ltms-marketing', LTMS_ASSETS_URL . 'js/ltms-marketing.js', [ 'jquery' ], LTMS_VERSION, true );
+?>

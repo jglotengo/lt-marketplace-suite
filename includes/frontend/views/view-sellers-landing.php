@@ -135,7 +135,7 @@ $vendor_earn  = 100 - $vendor_fee;
             <label for="ltms-calc-price">Precio de tu producto</label>
             <div class="ltms-sl-calc-input-wrap">
                 <span class="ltms-sl-calc-currency">$</span>
-                <input type="number" id="ltms-calc-price" placeholder="50000" min="0" step="1000" value="50000">
+                <input type="number" id="ltms-calc-price" placeholder="50000" min="0" step="1000" value="50000" data-commission="<?php echo esc_attr( (float) $commission ); ?>">
             </div>
             <div class="ltms-sl-calc-result" id="ltms-calc-result">
                 <div class="ltms-sl-calc-row">
@@ -192,22 +192,9 @@ $vendor_earn  = 100 - $vendor_fee;
         </div>
     </section>
 
-    <script>
-    // v2.9.79 P1: Calculadora de ganancias interactiva.
-    (function() {
-        var input = document.getElementById('ltms-calc-price');
-        if (!input) return;
-        var commission = <?php echo (float) $commission; ?>;
-        var fmt = function(v) { return '$' + new Intl.NumberFormat('es-CO').format(Math.round(v)); };
-        input.addEventListener('input', function() {
-            var price = parseFloat(input.value) || 0;
-            var fee = price * commission;
-            var earn = price - fee;
-            document.getElementById('ltms-calc-total').textContent = fmt(price);
-            document.getElementById('ltms-calc-fee').textContent = '-' + fmt(fee);
-            document.getElementById('ltms-calc-earn').textContent = fmt(earn);
-        });
-    })();
-    </script>
+    <?php
+    // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-sellers-landing.js
+    wp_enqueue_script( 'ltms-sellers-landing', LTMS_ASSETS_URL . 'js/ltms-sellers-landing.js', [], LTMS_VERSION, true );
+    ?>
 
 </div><!-- .ltms-sellers-landing -->
