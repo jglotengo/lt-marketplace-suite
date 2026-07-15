@@ -718,26 +718,31 @@ class LTMS_Business_Consumer_Protection {
         }
 
         // Idempotencia: no permitir doble disputa activa para el mismo pedido.
+        // RE-AUDIT P0 FIX (TOCTOU): wrap SELECT+INSERT in a transaction with
+        // SELECT FOR UPDATE to prevent two concurrent file_dispute() calls from
+        // both passing the check and both INSERTing → double dispute → double
+        // vendor debit (approve_dispute uses dispute_id in idempotency key).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $existing = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM `{$table}` WHERE order_id = %d AND status IN ('filed','under_review')",
+            "SELECT id FROM `{$table}` WHERE order_id = %d AND status IN ('filed','under_review') FOR UPDATE",
             $order_id
         ) );
         if ( $existing ) {
+            $wpdb->query( 'ROLLBACK' );
             return new WP_Error( 'dispute_exists', __( 'Dispute already filed for this order', 'ltms' ) );
         }
 
         // Verificar ventana legal de disputa (CP-BUG-3: country-aware).
-        // Meta `_ltms_delivered_at` es la marca canónica escrita por on_shipping_delivered().
         $delivered_date = $order->get_meta( '_ltms_delivered_at' );
         if ( $delivered_date ) {
             $window_days = self::get_dispute_window_days( $order_id );
             $days_since  = ( time() - strtotime( $delivered_date ) ) / DAY_IN_SECONDS;
             if ( $days_since > $window_days ) {
+                $wpdb->query( 'ROLLBACK' );
                 return new WP_Error(
                     'window_expired',
                     sprintf(
-                        /* translators: %d: días de la ventana legal */
                         __( 'Dispute window expired (%d days)', 'ltms' ),
                         $window_days
                     )
@@ -762,8 +767,10 @@ class LTMS_Business_Consumer_Protection {
         ], [ '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s' ] );
 
         if ( ! $inserted ) {
+            $wpdb->query( 'ROLLBACK' );
             return new WP_Error( 'insert_failed', __( 'Could not create dispute record', 'ltms' ) );
         }
+        $wpdb->query( 'COMMIT' );
 
         $dispute_id = (int) $wpdb->insert_id;
 
