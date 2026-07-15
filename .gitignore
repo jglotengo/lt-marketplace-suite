@@ -97,3 +97,4 @@ run-tests.sh
 deploy/ltms-fpm-opcache-reset.php
 ltms-ajax-debug.log
 ltms-fatal-debug.txt
+coverage/
