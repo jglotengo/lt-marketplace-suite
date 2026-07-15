@@ -56,7 +56,10 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
                 $this->test->queries[] = $sql;
                 return null;
             }
-            public function get_row($sql, $o = OBJECT) { return null; }
+            public function get_row($sql, $o = OBJECT) {
+                $this->test->queries[] = $sql;
+                return null;
+            }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
@@ -458,11 +461,19 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             public function prepare($sql, ...$args) { return $sql; }
             public function query($sql) { return true; }
             public function get_var($sql) { return '0.00'; }
-            public function get_row($sql, $o = OBJECT) { return null; }
+            public function get_row($sql, $o = OBJECT) {
+                $row = [
+                    'id' => 1, 'vendor_id' => 1, 'period_year' => 2026, 'period_month' => 7,
+                    'budget_limit' => '0.00', 'soft_threshold' => '80.00', 'hard_threshold' => '100.00',
+                    'spent_amount' => '0.00', 'spent_pct' => '0.00',
+                ];
+                return $o === ARRAY_A ? $row : (object)$row;
+            }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return []; }
             public function insert($t, $d, $f = null) { return 1; }
             public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
 

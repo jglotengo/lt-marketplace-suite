@@ -316,11 +316,48 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
     // ── SECCIÓN 8 — freeze/unfreeze hold ──────────────────────────────────
 
     public function test_freeze_hold_for_dispute_returns_false_when_no_hold(): void {
+        // Mock wpdb update to return 0 (no rows affected = no matching hold).
+        $self = $this;
+        $this->mock_wpdb = new class($self) {
+            public $prefix = 'wp_';
+            public $insert_id = 0;
+            private $test;
+            public function __construct($test) { $this->test = $test; }
+            public function prepare($sql, ...$args) { return $sql; }
+            public function query($sql) { return true; }
+            public function get_var($sql) { return null; }
+            public function get_row($sql, $o = OBJECT) { return null; }
+            public function get_results($sql, $o = OBJECT) { return []; }
+            public function get_col($sql) { return []; }
+            public function insert($t, $d, $f = null) { return 1; }
+            public function update($t, $d, $w, $f = null, $wf = null) { return 0; } // No match
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
+        };
+        $GLOBALS['wpdb'] = $this->mock_wpdb;
+
         $result = \LTMS_Business_Consumer_Protection::freeze_hold_for_dispute(999, 'dispute');
         $this->assertFalse($result);
     }
 
     public function test_unfreeze_hold_for_dispute_returns_false_when_no_hold(): void {
+        $self = $this;
+        $this->mock_wpdb = new class($self) {
+            public $prefix = 'wp_';
+            public $insert_id = 0;
+            private $test;
+            public function __construct($test) { $this->test = $test; }
+            public function prepare($sql, ...$args) { return $sql; }
+            public function query($sql) { return true; }
+            public function get_var($sql) { return null; }
+            public function get_row($sql, $o = OBJECT) { return null; }
+            public function get_results($sql, $o = OBJECT) { return []; }
+            public function get_col($sql) { return []; }
+            public function insert($t, $d, $f = null) { return 1; }
+            public function update($t, $d, $w, $f = null, $wf = null) { return 0; } // No match
+            public function get_charset_collate() { return 'utf8mb4 utf8mb4_unicode_ci'; }
+        };
+        $GLOBALS['wpdb'] = $this->mock_wpdb;
+
         $result = \LTMS_Business_Consumer_Protection::unfreeze_hold_for_dispute(999);
         $this->assertFalse($result);
     }

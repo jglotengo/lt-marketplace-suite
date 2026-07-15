@@ -21,6 +21,20 @@ use Brain\Monkey;
 use Brain\Monkey\Functions;
 use ReflectionClass;
 
+// Define WP_User stub if not already defined (bootstrap doesn't define it).
+// LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors type-hints \WP_User.
+if ( ! class_exists( 'WP_User' ) ) {
+    class WP_User {
+        public $ID = 0;
+        public $roles = [];
+        public $display_name = '';
+        public function __construct( $id = 0, $name = '', $site_id = '' ) {
+            $this->ID = $id;
+            $this->display_name = $name;
+        }
+    }
+}
+
 /**
  * @covers LTMS_Fintech_Compliance
  */
@@ -77,6 +91,7 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             'admin_url'      => static fn($p = '') => 'http://example.com/wp-admin/' . $p,
             'is_user_logged_in' => static fn() => false,
             'wp_get_current_user' => static fn() => new \stdClass(),
+            'remove_accents'  => static fn($s) => $s, // Pass-through for normalize_for_match
             'DAY_IN_SECONDS' => 86400,
         ]);
     }
@@ -236,11 +251,10 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
 
     // ── SECCIÓN 5 — enforce_2fa_for_payout_vendors (FASE4 P0 FIX) ─────────
 
-    // Helper: create a fake WP_User with a roles property (WP_User is not
-    // loaded in UNIT_ONLY mode, so we use a stdClass with public $roles and $ID).
-    private function make_fake_user(array $roles, int $id = 1): object {
-        $user = new \stdClass();
-        $user->ID = $id;
+    // Helper: create a fake WP_User with a roles property.
+    // WP_User is defined as a stub at the top of this file.
+    private function make_fake_user(array $roles, int $id = 1): \WP_User {
+        $user = new \WP_User($id, 'Test User');
         $user->roles = $roles;
         $user->display_name = 'Test User';
         return $user;
@@ -281,8 +295,18 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_normalize_for_match_strips_accents(): void {
+        // remove_accents is stubbed as pass-through in setUp, so we override
+        // it here with a real accent-stripping implementation.
+        Functions\when('remove_accents')->alias(static fn($s) =>
+            str_replace(
+                ['á','é','í','ó','ú','Á','É','Í','Ó','Ú','ñ','Ñ','ü','Ü'],
+                ['a','e','i','o','u','A','E','I','O','U','n','N','u','U'],
+                $s
+            )
+        );
         $result = self::callPrivate('normalize_for_match', 'JUAN PÉREZ');
         // Accents stripped to ASCII.
         $this->assertStringNotContainsString('É', $result);
+        $this->assertSame('juan perez', $result);
     }
 }
