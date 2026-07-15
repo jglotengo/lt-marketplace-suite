@@ -28,10 +28,10 @@ use ReflectionClass;
 class DepositTest extends LTMS_Unit_Test_Case {
 
     private object $mock_wpdb;
-    private array $rows = [];
-    private array $inserts = [];
-    private array $updates = [];
-    private int $last_insert_id = 0;
+    public array $rows = [];
+    public array $inserts = [];
+    public array $updates = [];
+    public int $last_insert_id = 0;
 
     protected function setUp(): void {
         parent::setUp();
@@ -40,6 +40,11 @@ class DepositTest extends LTMS_Unit_Test_Case {
         $this->inserts = [];
         $this->updates = [];
         $this->last_insert_id = 100;
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         $self = $this;
         $this->mock_wpdb = new class($self) {
@@ -82,6 +87,13 @@ class DepositTest extends LTMS_Unit_Test_Case {
             'home_url'                  => static fn($p = '') => 'http://example.com/' . $p,
             '__'                        => static fn($s) => $s,
         ]);
+    }
+
+    protected function tearDown(): void {
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
+        parent::tearDown();
     }
 
     private static function callPrivate(string $method, mixed ...$args): mixed {

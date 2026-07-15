@@ -26,10 +26,15 @@ use ReflectionClass;
  */
 class FintechComplianceTest extends LTMS_Unit_Test_Case {
 
-    private object $mock_wpdb;
+    public object $mock_wpdb;
 
     protected function setUp(): void {
         parent::setUp();
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         $this->mock_wpdb = new class {
             public $prefix = 'wp_';
@@ -69,6 +74,13 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             'set_transient'  => true,
             'DAY_IN_SECONDS' => 86400,
         ]);
+    }
+
+    protected function tearDown(): void {
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
+        parent::tearDown();
     }
 
     private static function callPrivate(string $method, mixed ...$args): mixed {

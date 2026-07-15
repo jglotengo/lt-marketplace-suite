@@ -27,9 +27,9 @@ use Brain\Monkey\Functions;
 class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
 
     private object $mock_wpdb;
-    private array $queries = [];
-    private array $inserts = [];
-    private array $updates = [];
+    public array $queries = [];
+    public array $inserts = [];
+    public array $updates = [];
     private array $existing_holds = []; // vendor_id+order_id → hold_id
 
     protected function setUp(): void {
@@ -39,6 +39,11 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
         $this->inserts = [];
         $this->updates = [];
         $this->existing_holds = [];
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         $self = $this;
         $this->mock_wpdb = new class($self) {
@@ -75,6 +80,13 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
             'sanitize_text_field' => static fn($s) => trim(strip_tags((string)$s)),
             '__'            => static fn($s) => $s,
         ]);
+    }
+
+    protected function tearDown(): void {
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
+        parent::tearDown();
     }
 
     // ── SECCIÓN 1 — Constants ─────────────────────────────────────────────

@@ -339,14 +339,16 @@ class CustomsCalculatorTest extends LTMS_Unit_Test_Case {
     }
 
     public function test_calculate_clamps_negative_shipping_to_zero(): void {
+        // Use a high item_value so CIF is above de minimis ($800 US threshold)
+        // — otherwise the result is zero_result with cif_value=0.
         $result = \LTMS_Customs_Calculator::calculate([
-            'item_value'          => 100.0,
+            'item_value'          => 5000.0,
             'origin_country'      => 'CO',
             'destination_country' => 'US',
             'shipping_cost'       => -50.0,
         ]);
-        // CIF should be 100, not 50.
-        $this->assertEqualsWithDelta(100.0, $result['cif_value'], 0.01);
+        // CIF = 5000 (item) + 0 (clamped shipping) + 0 (no insurance) = 5000.
+        $this->assertEqualsWithDelta(5000.0, $result['cif_value'], 0.01);
     }
 
     public function test_calculate_sanitizes_hs_code_to_digits(): void {

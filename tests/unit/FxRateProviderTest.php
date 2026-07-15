@@ -28,8 +28,8 @@ use ReflectionClass;
  */
 class FxRateProviderTest extends LTMS_Unit_Test_Case {
 
-    private array $transients = [];
-    private array $wp_remote_responses = [];
+    public array $transients = [];
+    public array $wp_remote_responses = [];
     private object $mock_wpdb;
 
     protected function setUp(): void {
@@ -37,6 +37,11 @@ class FxRateProviderTest extends LTMS_Unit_Test_Case {
 
         $this->transients = [];
         $this->wp_remote_responses = [];
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         // Mock get_transient / set_transient.
         $self = $this;
@@ -72,6 +77,13 @@ class FxRateProviderTest extends LTMS_Unit_Test_Case {
             public function query($sql) { return true; }
         };
         $GLOBALS['wpdb'] = $this->mock_wpdb;
+    }
+
+    protected function tearDown(): void {
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
+        parent::tearDown();
     }
 
     private static function callPrivate(string $method, mixed ...$args): mixed {

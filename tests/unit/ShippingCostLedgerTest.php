@@ -28,13 +28,19 @@ use ReflectionClass;
  */
 class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
 
-    private object $mock_wpdb;
-    private array $queries = [];
+    public object $mock_wpdb;
+    public array $queries = [];
 
     protected function setUp(): void {
         parent::setUp();
 
         $this->queries = [];
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking
+        // into subsequent test classes — root cause of 233 CI errors in #1429).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         $self = $this;
         $this->mock_wpdb = new class($self) {
@@ -66,6 +72,14 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             'get_option'          => static fn($k, $d = false) => $d,
             'get_current_user_id' => static fn() => 1,
         ]);
+    }
+
+    protected function tearDown(): void {
+        // Restore original wpdb to prevent mock leaking into other tests.
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
+        parent::tearDown();
     }
 
     private static function callPrivate(string $method, mixed ...$args): mixed {

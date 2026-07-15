@@ -28,9 +28,9 @@ use Brain\Monkey\Functions;
 class GdprEraserTest extends LTMS_Unit_Test_Case {
 
     private object $mock_wpdb;
-    private array $deleted_meta_keys = [];
-    private array $updated_meta = [];
-    private array $b2_deletes = [];
+    public array $deleted_meta_keys = [];
+    public array $updated_meta = [];
+    public array $b2_deletes = [];
     private ?object $mock_b2 = null;
     private array $b2_init_errors = [];
 
@@ -42,6 +42,11 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         $this->b2_deletes = [];
         $this->b2_init_errors = [];
         $this->mock_b2 = null;
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         $self = $this;
         $this->mock_wpdb = new class($self) {
@@ -130,6 +135,39 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         }
     }
 
+    /**
+     * Create a B2 mock that extends LTMS_Abstract_API_Client (required because
+     * LTMS_Api_Factory::get() has return type LTMS_Abstract_API_Client —
+     * PHP 8.1 enforces return types and would TypeError on a plain stdClass).
+     */
+    private function make_b2_mock(bool $fail_on_delete = false, ?string $fail_key = null): object {
+        $self = $this;
+        return new class($self, $fail_on_delete, $fail_key) extends \LTMS_Abstract_API_Client {
+            private $test;
+            private $fail_on_delete;
+            private $fail_key;
+            public function __construct($test, $fail_on_delete, $fail_key) {
+                $this->test = $test;
+                $this->fail_on_delete = $fail_on_delete;
+                $this->fail_key = $fail_key;
+                // Skip parent constructor to avoid config dependency.
+            }
+            public function health_check(): array {
+                return ['status' => 'ok', 'message' => 'mock'];
+            }
+            public function get_provider_slug(): string {
+                return 'backblaze';
+            }
+            public $calls = [];
+            public function delete_file($bucket, $key) {
+                $this->calls[] = ['bucket' => $bucket, 'key' => $key];
+                if ($this->fail_on_delete && ($this->fail_key === null || $this->fail_key === $key)) {
+                    throw new \RuntimeException('B2 delete failed (mock)');
+                }
+            }
+        };
+    }
+
     protected function tearDown(): void {
         // Clear LTMS_Api_Factory instances cache to prevent bleed between tests.
         if (class_exists('LTMS_Api_Factory')) {
@@ -137,6 +175,9 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
             $prop = $ref->getProperty('instances');
             $prop->setAccessible(true);
             $prop->setValue(null, []);
+        }
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
         }
         parent::tearDown();
     }
@@ -298,23 +339,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         ]);
         $this->set_b2_files([]);
 
-        $b2_calls = [];
-        $b2 = new class($b2_calls) {
-            private $calls;
-            public function __construct(&$calls) { $this->calls = &$calls; }
-            public function delete_file($bucket, $key) {
-                $this->calls[] = ['bucket' => $bucket, 'key' => $key];
-            }
-        };
-        $this->set_b2_client($b2);
-        // Need to share the calls array reference — use a property on $this instead.
-        $self = $this;
-        $b2 = new class {
-            public $calls = [];
-            public function delete_file($bucket, $key) {
-                $this->calls[] = ['bucket' => $bucket, 'key' => $key];
-            }
-        };
+        $b2 = $this->make_b2_mock();
         $this->set_b2_client($b2);
 
         $result = \LTMS_GDPR_Eraser::erase_kyc_data('contract@example.com');
@@ -330,12 +355,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         $this->set_user_meta(12, ['ltms_legal_hold' => '']);
         $this->set_b2_files([]);
 
-        $b2 = new class {
-            public $calls = [];
-            public function delete_file($bucket, $key) {
-                $this->calls[] = ['bucket' => $bucket, 'key' => $key];
-            }
-        };
+        $b2 = $this->make_b2_mock();
         $this->set_b2_client($b2);
 
         \LTMS_GDPR_Eraser::erase_kyc_data('nocontract@example.com');
@@ -352,11 +372,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
         ]);
         $this->set_b2_files([]);
 
-        $failing_b2 = new class {
-            public function delete_file($bucket, $key) {
-                throw new \RuntimeException('B2 auth failed');
-            }
-        };
+        $failing_b2 = $this->make_b2_mock(true);
         $this->set_b2_client($failing_b2);
 
         $result = \LTMS_GDPR_Eraser::erase_kyc_data('fail@example.com');
@@ -376,12 +392,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
             (object)['id' => 102, 'file_key' => 'kyc/back.pdf', 'bucket' => 'ltms-kyc'],
         ]);
 
-        $b2 = new class {
-            public $calls = [];
-            public function delete_file($bucket, $key) {
-                $this->calls[] = ['bucket' => $bucket, 'key' => $key];
-            }
-        };
+        $b2 = $this->make_b2_mock();
         $this->set_b2_client($b2);
 
         $result = \LTMS_GDPR_Eraser::erase_kyc_data('files@example.com');
@@ -399,15 +410,7 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
             (object)['id' => 202, 'file_key' => 'kyc/bad.pdf', 'bucket' => 'ltms-kyc'],
         ]);
 
-        $b2 = new class {
-            public $calls = [];
-            public function delete_file($bucket, $key) {
-                $this->calls[] = $key;
-                if ($key === 'kyc/bad.pdf') {
-                    throw new \RuntimeException('Cannot delete');
-                }
-            }
-        };
+        $b2 = $this->make_b2_mock(true, 'kyc/bad.pdf');
         $this->set_b2_client($b2);
 
         $result = \LTMS_GDPR_Eraser::erase_kyc_data('mix@example.com');

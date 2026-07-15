@@ -28,14 +28,19 @@ use ReflectionClass;
 class ForensicLogTest extends LTMS_Unit_Test_Case {
 
     private object $mock_wpdb;
-    private array $inserted_rows = [];
-    private array $queries = [];
+    public array $inserted_rows = [];
+    public array $queries = [];
 
     protected function setUp(): void {
         parent::setUp();
 
         $this->inserted_rows = [];
         $this->queries = [];
+
+        // Save original wpdb to restore in tearDown (prevents mock leaking).
+        if ( ! isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['__ltms_saved_wpdb'] = $GLOBALS['wpdb'] ?? null;
+        }
 
         // Mock wpdb — captura INSERTs para inspección.
         $self = $this;
@@ -89,6 +94,9 @@ class ForensicLogTest extends LTMS_Unit_Test_Case {
 
     protected function tearDown(): void {
         unset($_SERVER['HTTP_X_FORWARDED_FOR']);
+        if ( isset( $GLOBALS['__ltms_saved_wpdb'] ) ) {
+            $GLOBALS['wpdb'] = $GLOBALS['__ltms_saved_wpdb'];
+        }
         parent::tearDown();
     }
 
