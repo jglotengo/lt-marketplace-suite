@@ -27,7 +27,7 @@ final class LTMS_DB_Migrations {
      * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
      * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.9.13';
+    private const CURRENT_VERSION = '2.9.14';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -101,6 +101,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.13', '<' ) ) {
             self::migrate_2_9_13_consent_log_schema_fix();
+        }
+
+        if ( version_compare( $installed_version, '2.9.14', '<' ) ) {
+            self::migrate_2_9_14_wallet_reference_unique();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3172,6 +3176,77 @@ final class LTMS_DB_Migrations {
             LTMS_Core_Logger::info(
                 'DB_MIGRATION',
                 'v2.9.13 PR-1: lt_consent_log schema fix — added consent_type, accepted, version, ip_address columns + idx_user_consent_type (Ley 1581 art. 10 / LFPDPPP art. 11 / GDPR art. 7(1) compliance).'
+            );
+        }
+    }
+
+    /**
+     * v2.9.14 FASE1-REAUDIT P0 FIX: add UNIQUE index on lt_wallet_transactions.reference
+     *
+     * The WL-CRASH-2 idempotency mechanism does a SELECT outside the transaction,
+     * then INSERTs. Without a UNIQUE index on `reference`, two concurrent calls
+     * with the same idempotency_key both pass the SELECT (neither sees the other's
+     * uncommitted insert), both INSERT, both COMMIT → double debit / double credit /
+     * double release. The payout scheduler's PO-BUG-A fix explicitly relies on this
+     * idempotency to prevent double-spend on retry.
+     *
+     * Adding the UNIQUE index makes the DB enforce idempotency at the storage layer
+     * — the second INSERT will fail with a duplicate key error, which the wallet
+     * class catches and treats as "already processed".
+     *
+     * NOTE: existing duplicate rows (if any) must be cleaned up before the UNIQUE
+     * index can be added. We log duplicates but don't auto-delete (admin decision).
+     */
+    private static function migrate_2_9_14_wallet_reference_unique(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_wallet_transactions';
+
+        // Check if the UNIQUE index already exists.
+        $idx_exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM information_schema.STATISTICS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND INDEX_NAME = %s',
+                DB_NAME, $table, 'udx_reference'
+            )
+        );
+
+        if ( $idx_exists > 0 ) {
+            return; // Already added.
+        }
+
+        // Check for existing duplicate reference values — if any exist, the
+        // UNIQUE index creation will fail. Log them for admin cleanup.
+        $duplicates = $wpdb->get_var(
+            "SELECT COUNT(*) FROM (
+                SELECT reference FROM `{$table}`
+                WHERE reference IS NOT NULL AND reference != ''
+                GROUP BY reference HAVING COUNT(*) > 1
+            ) AS dup"
+        );
+
+        if ( $duplicates > 0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'DB_MIGRATION_WALLET_DUPLICATES',
+                    sprintf(
+                        'v2.9.14: found %d duplicate reference values in %s — cannot add UNIQUE index. Manual cleanup required (keep the oldest row per reference, delete the rest).',
+                        $duplicates,
+                        $table
+                    )
+                );
+            }
+            return; // Don't add the index — admin must clean up first.
+        }
+
+        // Add the UNIQUE index.
+        $wpdb->query(
+            "ALTER TABLE `{$table}` ADD UNIQUE KEY `udx_reference` (`reference`)"
+        );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                'v2.9.14 FASE1-REAUDIT P0: added UNIQUE index udx_reference on lt_wallet_transactions.reference — enforces idempotency at the storage layer, prevents double-spend on retry.'
             );
         }
     }

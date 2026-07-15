@@ -682,8 +682,24 @@ class LTMS_Fintech_Compliance {
      */
     private static function convert_to_usd( float $amount, string $currency ): float {
         if ( $currency === 'USD' ) return $amount;
-        $rate = (float) LTMS_Core_Config::get( "ltms_usd_{$currency}_rate", 1.0 );
-        return $rate > 0 ? ( $amount / $rate ) : $amount;
+        // FASE4 P0 FIX: default was 1.0 which made COP 5,000,000 treated as
+        // USD 5,000,000 — no payouts blocked, no Travel Rule, no SOS report.
+        // Now: if rate is not configured, return -1 (sentinel) so callers
+        // can detect the missing config and fail-safe (block high-value ops).
+        $rate = (float) LTMS_Core_Config::get( "ltms_usd_{$currency}_rate", 0 );
+        if ( $rate <= 0 ) {
+            // No rate configured — return a very large number so thresholds
+            // ALWAYS trigger (fail-safe: block high-value operations until
+            // the admin configures the FX rate).
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'FT_FX_RATE_MISSING',
+                    sprintf( 'ltms_usd_%s_rate not configured — convert_to_usd returning PHP_FLOAT_MAX (fail-safe). Configure the FX rate in admin settings.', $currency )
+                );
+            }
+            return PHP_FLOAT_MAX;
+        }
+        return $amount / $rate;
     }
 
     // ================================================================
@@ -872,7 +888,12 @@ class LTMS_Fintech_Compliance {
      * @param \WP_User $user Usuario.
      */
     public static function enforce_2fa_for_payout_vendors( string $user_login, \WP_User $user ): void {
-        if ( ! in_array( 'vendor', (array) $user->roles, true ) ) return;
+        // FASE4 P0 FIX: checked 'vendor' role but the platform's vendor roles are
+        // 'ltms_vendor' and 'ltms_vendor_premium'. The 'vendor' role doesn't exist
+        // in this plugin — 2FA enforcement NEVER fired for actual vendors, violating
+        // Ley Fintech art. 95 / Circular SFC compliance.
+        $vendor_roles = [ 'ltms_vendor', 'ltms_vendor_premium', 'vendor' ];
+        if ( ! array_intersect( $vendor_roles, (array) $user->roles ) ) return;
 
         $required = LTMS_Core_Config::get( 'ltms_2fa_required_vendors', 'yes' );
         if ( $required !== 'yes' ) return;

@@ -379,13 +379,29 @@ final class LTMS_Deposit {
                 'reject_reason' => sanitize_textarea_field( $reason ),
                 'updated_at'   => LTMS_Utils::now_utc(),
             ],
-            [ 'id' => $deposit_id ],
+            // FASE4 P0 FIX: atomic claim — only reject if still in pending/processing.
+            // Without the status guard in WHERE, concurrent approve() + reject() can
+            // race: approve credits wallet, then reject overwrites to 'rejected' →
+            // vendor credited but deposit marked rejected (double-spend / state desync).
+            [
+                'id'     => $deposit_id,
+                'status' => $deposit['status'], // atomic: only if status hasn't changed
+            ],
             [ '%s', '%d', '%s', '%s', '%s' ],
-            [ '%d' ]
+            [ '%d', '%s' ]
         );
 
         if ( $updated === false ) {
             return [ 'success' => false, 'message' => __( 'Error al actualizar el depósito.', 'ltms' ) ];
+        }
+
+        // FASE4 P0 FIX: if 0 rows affected, the status changed between our read
+        // and the UPDATE — concurrent approve() won. Tell the admin.
+        if ( $updated === 0 ) {
+            return [
+                'success' => false,
+                'message' => __( 'El depósito fue procesado concurrentemente por otro admin. Recarga la página.', 'ltms' ),
+            ];
         }
 
         LTMS_Core_Logger::info(
