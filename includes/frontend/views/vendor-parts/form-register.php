@@ -317,21 +317,11 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             <?php endif; ?>
         </div>
 
-    
-<script>
-(function() {
-    var sel    = document.getElementById('ltms-reg-vendor-country');
-    var phone  = document.getElementById('ltms-reg-phone');
-    var docSel = document.getElementById('ltms-reg-document-type');
 
-    var docOpts = {
-        CO: [
-            {v:'', l:'
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-login-register.js
 wp_enqueue_script( 'ltms-login-register', LTMS_ASSETS_URL . 'js/ltms-login-register.js', [], LTMS_VERSION, true );
 ?>
-on(); // phpcs:ignore WordPress.Security.EscapeOutput ?>
     <?php endif; ?>
     <div class="ltms-auth-footer">
         <p>
