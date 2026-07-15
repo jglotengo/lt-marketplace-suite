@@ -562,6 +562,12 @@ $files = [
     'includes/frontend/class-ltms-product-video.php',
     'includes/frontend/class-ltms-public-auth-handler.php',
     'includes/frontend/views/view-sellers-landing.php',
+    // INTEGRATIONS-AUDIT v2.9.142: core security files
+    'includes/core/class-ltms-firewall.php',
+    'includes/core/class-ltms-security.php',
+    'includes/core/class-ltms-totp-2fa.php',
+    'includes/core/class-ltms-gdpr-eraser.php',
+    'includes/core/class-ltms-retention-cron.php',
     'includes/frontend/views/dashboard-wrapper.php',
     'patchwork.json',
     // DIAG temp

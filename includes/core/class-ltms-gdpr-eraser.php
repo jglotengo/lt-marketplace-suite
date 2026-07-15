@@ -41,6 +41,22 @@ class LTMS_GDPR_Eraser {
         }
 
         $user_id        = (int) $user->ID;
+
+        // INTEGRATIONS-AUDIT P0 FIX (legal hold bypass): the retention cron
+        // (class-ltms-retention-cron.php line 107-110) honors `ltms_legal_hold`,
+        // but the GDPR eraser previously ignored it. An admin running "Erase
+        // Personal Data" on a user under active legal hold (lawsuit, regulatory
+        // investigation) would destroy evidence — exposing the operator to
+        // sanctions, spoliation charges, and obstruction of justice.
+        if ( get_user_meta( $user_id, 'ltms_legal_hold', true ) ) {
+            return [
+                'items_removed'  => false,
+                'items_retained' => true,
+                'messages'       => [ __( 'Usuario bajo retención legal (legal hold). Los datos no pueden ser eliminados hasta que se levante la retención.', 'ltms' ) ],
+                'done'           => true,
+            ];
+        }
+
         $items_removed  = false;
         $items_retained = false;
         $messages       = [];
@@ -154,12 +170,22 @@ class LTMS_GDPR_Eraser {
             }
         }
 
-        // 3. Marcar usuario como borrado por GDPR (protege de retention cron)
-        update_user_meta( $user_id, 'ltms_gdpr_erased_at', current_time( 'mysql', true ) );
-        update_user_meta( $user_id, 'ltms_retention_deleted_at', current_time( 'mysql', true ) );
-        $items_removed = true;
-
-        LTMS_Core_Logger::info( 'GDPR_ERASE_COMPLETE', "User #{$user_id} ({$email}) — borrado GDPR completado." );
+        // 3. Marcar usuario como borrado por GDPR (protege de retention cron).
+        // INTEGRATIONS-AUDIT P1 FIX: only mark as erased when $items_retained is
+        // false. Previously, ltms_gdpr_erased_at was written unconditionally —
+        // if B2 deletion partially failed, the user was still marked as erased
+        // and the retention cron would never retry, orphaning B2 objects forever.
+        if ( ! $items_retained ) {
+            update_user_meta( $user_id, 'ltms_gdpr_erased_at', current_time( 'mysql', true ) );
+            update_user_meta( $user_id, 'ltms_retention_deleted_at', current_time( 'mysql', true ) );
+            $items_removed = true;
+            LTMS_Core_Logger::info( 'GDPR_ERASE_COMPLETE', "User #{$user_id} ({$email}) — borrado GDPR completado." );
+        } else {
+            LTMS_Core_Logger::warning(
+                'GDPR_ERASE_PARTIAL',
+                "User #{$user_id} ({$email}) — borrado GDPR parcial. B2 objects retained — not marking as erased so retention cron will retry."
+            );
+        }
 
         return [
             'items_removed'  => $items_removed,

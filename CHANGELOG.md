@@ -4,6 +4,32 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.142] — 2026-07-15
+
+### Core Security Audit — Firewall + Security + TOTP-2FA + GDPR + Retention (5 files, 8 P0/P1 fixes)
+
+Comprehensive audit of the 5 core security files (2,304 lines). These are the security-critical core — any bug here is high-impact. 8 bugs fixed:
+
+**P0 — Security critical (3 fixes)**
+
+- **`class-ltms-firewall.php:605-627`** — IP spoofing → WAF bypass. `get_client_ip()` took the LEFTMOST entry of `X-Forwarded-For` — that's the client-supplied value, trivially spoofable. An attacker sends `X-Forwarded-For: 1.2.3.4` → nginx appends the real IP → WAF reads `1.2.3.4`. Result: full bypass of IP-based auto-block + ability to frame victim IPs for blacklisting. This was the OPPOSITE convention of `LTMS_Core_Security::get_client_ip_safe()` (which correctly takes the rightmost). Now: prefer `HTTP_CF_CONNECTING_IP` (Cloudflare, overwritten not appended), then `HTTP_X_REAL_IP` (nginx, overwritten), then RIGHTMOST entry of `X-Forwarded-For` (proxy-appended = unspoofable).
+- **`class-ltms-totp-2fa.php:218-256`** — Mandatory 2FA policy bypass. `intercept_login_for_2fa()` returned early if the user had 2FA required but NOT configured — letting the user log in without any 2FA challenge. The admin policy `ltms_2fa_required_auditors = 'yes'` was silently ignored for un-enrolled users. Now: redirects to the dashboard security page with a `_ltms_2fa_enrollment_required` flag forcing immediate enrollment. The flag is cleared when 2FA is configured via `ajax_confirm_2fa`.
+- **`class-ltms-gdpr-eraser.php:31-170`** — Legal hold bypass. The retention cron honored `ltms_legal_hold`, but the GDPR eraser ignored it. An admin running "Erase Personal Data" on a user under active legal hold (lawsuit, regulatory investigation) would destroy evidence — exposing the operator to sanctions, spoliation charges, and obstruction of justice. Now: checks `ltms_legal_hold` at the top and returns `items_retained => true` with a message.
+
+**P1 — Security hardening (5 fixes)**
+
+- **`class-ltms-security.php:385-403`** — `verify_webhook_signature()` accepted an empty `$secret`. `hash_hmac('sha256', $payload, '')` returns a valid HMAC computed with an empty key — an attacker who knows the public webhook payload could forge the signature. Now returns `false` if `$secret === ''`.
+- **`class-ltms-security.php:447-475`** — `derive_key()` ran `hash_pbkdf2('sha256', …, 600000, 32, true)` on every `encrypt()`/`decrypt()` call. At ~0.3-0.8s per call, decrypting 10 fields = 3-8s per request — severe perf impact that tempts operators to lower iterations or skip encryption. Now: memoizes the derived key in a `static $derived_key_cache` array for the request lifetime.
+- **`class-ltms-gdpr-eraser.php:155-160`** — `ltms_gdpr_erased_at` was written unconditionally — even when `$items_retained = true` (B2 deletion partially failed). Once set, the retention cron treated the user as erased and skipped them forever — orphaning B2 objects permanently. Now: only writes `ltms_gdpr_erased_at` when `! $items_retained`, logs a `GDPR_ERASE_PARTIAL` warning otherwise so the cron retries.
+- **`class-ltms-retention-cron.php:221-235`** — `get_candidates()` had no `ORDER BY` and a hard `LIMIT 50`. MySQL returned rows in arbitrary order — if the first 50 candidates were all "protect" (recent transactions, legal hold), they occupied the slots forever and users 51+ never got evaluated, leaving their KYC data past the legal retention window (SAGRILAFT/Ley 1581 violation). Now: `ORDER BY MAX(created_at) ASC` (oldest first) + `GROUP BY entity_id`.
+- **`class-ltms-retention-cron.php:148-218`** — `delete_kyc_files()` returned `true` unconditionally — even when individual B2 deletions failed (caught, logged, but loop continued). The cron then wrote `ltms_retention_deleted_at` and the user was marked as fully deleted in `lt_retention_log` even though B2 objects remained. No retry mechanism — failed B2 deletions were orphaned forever. Now: tracks `$had_failure`, returns `false` on partial failure, doesn't write `ltms_retention_deleted_at` so the cron retries.
+
+**Test compatibility**
+
+- No test changes needed. The IP-spoofing fix changes the helper to match `LTMS_Core_Security::get_client_ip_safe()` (already used by other code paths). The 2FA enrollment fix adds new behavior but no existing test covered the previously-broken path. The GDPR/retention fixes change return values only on edge cases (legal hold, partial failure) that existing tests don't exercise.
+
+**Files modified**: 5 core security files + plugin main + CHANGELOG + webhook deploy list (added 5 core files).
+
 ## [2.9.141] — 2026-07-15
 
 ### Storefront Public Audit — Vitrina Pública hardened (12 P0/P1 fixes)

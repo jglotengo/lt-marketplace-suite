@@ -388,6 +388,13 @@ final class LTMS_Core_Security {
         string $secret,
         string $prefix = 'sha256='
     ): bool {
+        // INTEGRATIONS-AUDIT P1 FIX (fail-closed on empty secret): previously,
+        // an empty $secret produced a valid HMAC computed with an empty key.
+        // An attacker who knows the public webhook payload could compute the
+        // same HMAC and forge the signature. Now reject empty secrets.
+        if ( '' === $secret ) {
+            return false;
+        }
         if ( ! empty( $prefix ) ) {
             $signature = str_replace( $prefix, '', $signature );
         }
@@ -439,6 +446,15 @@ final class LTMS_Core_Security {
     }
 
     /**
+     * Cache de claves derivadas por request — PBKDF2 con 600k iteraciones toma
+     * ~0.3-0.8s por llamada; sin cache, decrypting 10 fields = 3-8s por request.
+     * INTEGRATIONS-AUDIT P1 FIX.
+     *
+     * @var array<string, string>
+     */
+    private static array $derived_key_cache = [];
+
+    /**
      * Deriva una clave AES de 256 bits desde la clave maestra usando PBKDF2.
      *
      * @param string $master_key Clave maestra.
@@ -449,6 +465,12 @@ final class LTMS_Core_Security {
         // Use site_url as salt so the derived key is unique per installation.
         // 600,000 iterations aligns with NIST SP 800-132 (2024) recommendation for SHA-256.
         $site_salt = defined( 'AUTH_SALT' ) ? AUTH_SALT : site_url();
-        return hash_pbkdf2( 'sha256', $master_key, $site_salt, 600000, 32, true );
+        $cache_key = hash( 'sha256', $master_key . '|' . $site_salt );
+        if ( isset( self::$derived_key_cache[ $cache_key ] ) ) {
+            return self::$derived_key_cache[ $cache_key ];
+        }
+        $derived = hash_pbkdf2( 'sha256', $master_key, $site_salt, 600000, 32, true );
+        self::$derived_key_cache[ $cache_key ] = $derived;
+        return $derived;
     }
 }
