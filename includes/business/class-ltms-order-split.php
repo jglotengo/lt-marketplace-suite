@@ -954,10 +954,12 @@ final class LTMS_Business_Order_Split {
         $existing_declaration_id = (int) $order->get_meta( '_ltms_customs_declaration_id' );
         if ( $existing_declaration_id < 1 ) {
             // Meta missing — defensive fallback: query the table directly.
+            // RE-AUDIT P1 FIX: added FOR UPDATE to prevent TOCTOU race where two
+            // concurrent calls both see no existing declaration and both INSERT.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $existing_declaration_id = (int) $wpdb->get_var(
                 $wpdb->prepare(
-                    "SELECT id FROM {$wpdb->prefix}lt_customs_declarations WHERE order_id = %d LIMIT 1",
+                    "SELECT id FROM {$wpdb->prefix}lt_customs_declarations WHERE order_id = %d LIMIT 1 FOR UPDATE",
                     $order_id
                 )
             );

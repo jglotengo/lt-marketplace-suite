@@ -463,6 +463,24 @@ class LTMS_Shipping_Cost_Ledger {
             'SHIPPING_LEDGER_FAILED',
             sprintf( 'Order #%d marcada para revisión (carrier=%s failed). Posible disputa.', $order_id, $carrier )
         );
+
+        // RE-AUDIT P1 FIX: if entries were DELIVERED, the consumer protection
+        // hold may have already been released (vendor has the money). Log a
+        // critical alert so the team can attempt manual clawback if needed.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $delivered_count = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$table}` WHERE order_id = %d AND status = %s AND metadata LIKE '%s'",
+            $order_id,
+            self::STATUS_DISPUTED,
+            '%"failure_carrier"%'
+        ) );
+        if ( $delivered_count > 0 && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::critical(
+                'SHIPPING_LEDGER_DELIVERED_NOW_DISPUTED',
+                sprintf( 'Order #%d: %d ledger entries were DELIVERED (hold likely released) but now marked DISPUTED. Vendor funds may need manual clawback.', $order_id, $delivered_count ),
+                [ 'order_id' => $order_id, 'entries_affected' => $delivered_count, 'carrier' => $carrier ]
+            );
+        }
     }
 
     /**
@@ -755,6 +773,10 @@ class LTMS_Shipping_Cost_Ledger {
         $variance = round( $real_cost - $quote_cost, 2 );
         $variance_pct = $quote_cost > 0 ? round( ( $variance / $quote_cost ) * 100, 2 ) : 0.0;
 
+        // RE-AUDIT P1 FIX: wrap the update + reconcile in a transaction so that
+        // if reconcile_vendor_charge fails (Wallet throws), the ledger update is
+        // rolled back too — no inconsistent state (status=invoiced but no debit).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $ok = $wpdb->update( $table, [
             'real_cost'        => $real_cost,
@@ -767,17 +789,35 @@ class LTMS_Shipping_Cost_Ledger {
             'updated_at'       => current_time( 'mysql', true ),
         ], [ 'id' => $ledger_id ] );
 
-        // Si la varianza es >tolerancia (default 5%), abrir disputa automáticamente.
-        $tolerance_pct = (float) LTMS_Core_Config::get( 'ltms_shipping_variance_tolerance_pct', 5.0 );
-        if ( $variance_pct > $tolerance_pct && $variance > 0 ) {
-            self::auto_open_dispute( $ledger_id, $invoice_id, $invoice_line_id, $variance, $variance_pct );
+        if ( false === $ok ) {
+            $wpdb->query( 'ROLLBACK' );
+            return false;
         }
 
-        // Si el costo real > lo debitado al vendor, el vendor debe la diferencia.
-        // Si el costo real < lo debitado, reembolsar al vendor.
-        $vendor_charged = (float) $entry['vendor_charged'];
-        if ( $vendor_charged > 0 && abs( $real_cost - $vendor_charged ) > 0.01 ) {
-            self::reconcile_vendor_charge( $ledger_id, $vendor_charged, $real_cost );
+        try {
+            // Si la varianza es >tolerancia (default 5%), abrir disputa automáticamente.
+            $tolerance_pct = (float) LTMS_Core_Config::get( 'ltms_shipping_variance_tolerance_pct', 5.0 );
+            if ( $variance_pct > $tolerance_pct && $variance > 0 ) {
+                self::auto_open_dispute( $ledger_id, $invoice_id, $invoice_line_id, $variance, $variance_pct );
+            }
+
+            // Si el costo real > lo debitado al vendor, el vendor debe la diferencia.
+            // Si el costo real < lo debitado, reembolsar al vendor.
+            $vendor_charged = (float) $entry['vendor_charged'];
+            if ( $vendor_charged > 0 && abs( $real_cost - $vendor_charged ) > 0.01 ) {
+                self::reconcile_vendor_charge( $ledger_id, $vendor_charged, $real_cost );
+            }
+            $wpdb->query( 'COMMIT' );
+        } catch ( \Throwable $e ) {
+            $wpdb->query( 'ROLLBACK' );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'SHIPPING_LEDGER_RECONCILE_FAILED',
+                    sprintf( 'Ledger #%d: update succeeded but reconcile failed, rolled back: %s', $ledger_id, $e->getMessage() ),
+                    [ 'ledger_id' => $ledger_id, 'error' => $e->getMessage() ]
+                );
+            }
+            return false;
         }
 
         return $ok !== false;
