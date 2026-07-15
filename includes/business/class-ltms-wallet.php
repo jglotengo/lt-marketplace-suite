@@ -610,38 +610,25 @@ final class LTMS_Business_Wallet {
             // CR-CRASH-1: marcar journal como completado.
             self::journal_post( $journal_id, 'completed', $tx_id );
 
-            // FASE1-REAUDIT P0 FIX: do_action + logging wrapped in nested try/catch
-            // INSIDE the main try block. If a listener throws, the nested catch
-            // swallows it — preventing the outer catch from calling ROLLBACK on an
-            // already-committed transaction (which would cause false-failure retries
-            // → double credit). The nested catch logs but does NOT re-throw.
+            // F-06: Hook contable post-COMMIT.
+            // WL-BUG-1 FIX: usar la currency real de la billetera ($wallet['currency']) en vez de
+            // la variable $currency que NUNCA se asignaba en este scope (siempre caía al fallback 'COP').
+            // Esto hacía que el hook siempre reportara 'COP' incluso para wallets MXN, rompiendo
+            // la integración contable en multi-currency.
             $currency = $wallet['currency'] ?? LTMS_Core_Config::get_currency();
-            try {
-                if ( function_exists( 'do_action' ) ) {
-                    do_action( 'ltms_wallet_tx_committed', $tx_id, $vendor_id, $type, $amount, $currency );
-                }
+            do_action( 'ltms_wallet_tx_committed', $tx_id, $vendor_id, $type, $amount, $currency );
 
-                if ( class_exists( 'LTMS_Core_Logger' ) && class_exists( 'LTMS_Utils' ) ) {
-                    LTMS_Core_Logger::info(
-                        'WALLET_TRANSACTION',
-                        sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
-                            strtoupper( $type ),
-                            $vendor_id,
-                            LTMS_Utils::format_money( $amount, $wallet['currency'] ),
-                            $description,
-                            LTMS_Utils::format_money( (float) $new_balance, $wallet['currency'] )
-                        ),
-                        [ 'tx_id' => $tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
-                    );
-                }
-            } catch ( \Throwable $hook_e ) {
-                if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                    LTMS_Core_Logger::error(
-                        'WALLET_POST_COMMIT_HOOK_ERROR',
-                        sprintf( 'Post-commit hook failed for tx #%d (transaction was committed): %s', $tx_id, $hook_e->getMessage() )
-                    );
-                }
-            }
+            LTMS_Core_Logger::info(
+                'WALLET_TRANSACTION',
+                sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
+                    strtoupper( $type ),
+                    $vendor_id,
+                    LTMS_Utils::format_money( $amount, $wallet['currency'] ),
+                    $description,
+                    LTMS_Utils::format_money( (float) $new_balance, $wallet['currency'] )
+                ),
+                [ 'tx_id' => $tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
+            );
 
             return $tx_id;
 
@@ -654,13 +641,11 @@ final class LTMS_Business_Wallet {
             // el caller hará ROLLBACK; el journal update es autónomo).
             self::journal_post( $journal_id, 'failed', 0, $e->getMessage() );
 
-            if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                LTMS_Core_Logger::error(
-                    'WALLET_TRANSACTION_FAILED',
-                    sprintf( 'Transacción de billetera fallida para vendedor #%d: %s', $vendor_id, $e->getMessage() ),
-                    [ 'vendor_id' => $vendor_id, 'type' => $type, 'amount' => $amount, 'currency' => $currency ?? '', 'idempotency_key' => $idempotency_key ]
-                );
-            }
+            LTMS_Core_Logger::error(
+                'WALLET_TRANSACTION_FAILED',
+                sprintf( 'Transacción de billetera fallida para vendedor #%d: %s', $vendor_id, $e->getMessage() ),
+                [ 'vendor_id' => $vendor_id, 'type' => $type, 'amount' => $amount, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
+            );
 
             throw $e;
         }
