@@ -185,7 +185,13 @@ final class LTMS_Business_Order_Split {
                 $order->update_meta_data( '_ltms_vendor_split_breakdown', $per_vendor );
             }
 
-            $order->save();
+            // RE-AUDIT P1 FIX: order meta is saved AFTER the outer transaction
+            // COMMIT, not before. Previously, meta was saved at line 188 BEFORE
+            // START TRANSACTION — if Phase 2 rolled back, the meta persisted,
+            // causing approve_dispute() to later debit a vendor who was never
+            // credited. Now: meta is saved only after successful COMMIT.
+            // (The save is moved to after the COMMIT below.)
+            $pending_meta_save = true;
         }
 
         // Phase 2: ONE outer transaction for ALL credits + record_commissions.
@@ -304,8 +310,11 @@ final class LTMS_Business_Order_Split {
                 // con el ROLLBACK si algo falla después.
                 $existing_commission_id = (int) $wpdb->get_var(
                     $wpdb->prepare(
+                        // RE-AUDIT P1 FIX: added FOR UPDATE to prevent TOCTOU race
+                        // under MySQL REPEATABLE READ where two concurrent process()
+                        // calls both see no existing commission and both INSERT.
                         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                        "SELECT id FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1",
+                        "SELECT id FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1 FOR UPDATE",
                         $order->get_id(),
                         $vendor_id
                     )
@@ -347,6 +356,13 @@ final class LTMS_Business_Order_Split {
             }
 
             $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+            // RE-AUDIT P1 FIX: save order meta AFTER successful COMMIT — if the
+            // transaction had rolled back, the meta would have persisted, causing
+            // approve_dispute() to debit vendors who were never credited.
+            if ( ! empty( $pending_meta_save ) ) {
+                $order->save();
+            }
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 

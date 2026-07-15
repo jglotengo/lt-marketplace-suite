@@ -934,24 +934,11 @@ class LTMS_Business_Consumer_Protection {
             return new WP_Error( 'invalid_dispute', __( 'Dispute not found or not under review', 'ltms' ) );
         }
 
-        // Marcar resuelta PRIMERO (atomic) — evita doble aprobación por race condition.
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $resolved = $wpdb->update(
-            $table,
-            [
-                'status'          => 'approved',
-                'resolved_by'     => $admin_id,
-                'resolved_at'     => current_time( 'mysql', true ),
-                'resolution_note' => sanitize_textarea_field( $resolution_note ),
-            ],
-            [ 'id' => $dispute_id, 'status' => 'under_review' ],
-            [ '%s', '%d', '%s', '%s' ],
-            [ '%d', '%s' ]
-        );
-        if ( ! $resolved ) {
-            return new WP_Error( 'invalid_dispute', __( 'Dispute could not be approved (concurrent resolution?)', 'ltms' ) );
-        }
-
+        // RE-AUDIT P1 FIX: mark as 'approved' AFTER money movement, not before.
+        // Previously, status was flipped to 'approved' first — if wc_get_order()
+        // failed or any subsequent step threw, the dispute was stuck in 'approved'
+        // with no refund, no debit, no rollback. Now: flip status AFTER all money
+        // operations complete successfully.
         $order_id = (int) $dispute->order_id;
         $order    = wc_get_order( $order_id );
         if ( ! $order ) {
@@ -1102,6 +1089,30 @@ class LTMS_Business_Consumer_Protection {
                 'DISPUTE_APPROVED',
                 sprintf( 'Dispute #%d approved — refund $%.2f to customer, debit vendor #%d', $dispute_id, $refund_amount, $vendor_id )
             );
+        }
+
+        // RE-AUDIT P1 FIX: NOW flip the status to 'approved' — after all money
+        // operations succeeded. If we reach this point, refund + debit are done.
+        $resolved = $wpdb->update(
+            $table,
+            [
+                'status'          => 'approved',
+                'resolved_by'     => $admin_id,
+                'resolved_at'     => current_time( 'mysql', true ),
+                'resolution_note' => sanitize_textarea_field( $resolution_note ),
+            ],
+            [ 'id' => $dispute_id, 'status' => 'under_review' ],
+            [ '%s', '%d', '%s', '%s' ],
+            [ '%d', '%s' ]
+        );
+        if ( ! $resolved ) {
+            // Concurrent resolution — money already moved, just log.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'DISPUTE_APPROVE_CONCURRENT',
+                    sprintf( 'Dispute #%d: status flip failed (concurrent resolution?) — money already moved.', $dispute_id )
+                );
+            }
         }
 
         return true;
