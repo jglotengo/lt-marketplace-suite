@@ -640,26 +640,35 @@ final class LTMS_Business_Wallet {
 
         // Post-commit hooks + logging — OUTSIDE try/catch so listener exceptions
         // don't cause false-failure retries (which would double-credit the wallet).
+        // FASE4 FIX: guard with isset() for test environments where $wallet/$new_balance
+        // may not be set if the try block threw before the SELECT.
+        if ( ! isset( $return_tx_id ) ) {
+            return 0; // Should not happen — try block threw before setting $return_tx_id.
+        }
         try {
             do_action( 'ltms_wallet_tx_committed', $return_tx_id, $vendor_id, $type, $amount, $currency );
 
-            LTMS_Core_Logger::info(
-                'WALLET_TRANSACTION',
-                sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
-                    strtoupper( $type ),
-                    $vendor_id,
-                    LTMS_Utils::format_money( $amount, $wallet['currency'] ),
-                    $description,
-                    LTMS_Utils::format_money( (float) $new_balance, $wallet['currency'] )
-                ),
-                [ 'tx_id' => $return_tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
-            );
+            if ( class_exists( 'LTMS_Core_Logger' ) && isset( $wallet['currency'] ) ) {
+                LTMS_Core_Logger::info(
+                    'WALLET_TRANSACTION',
+                    sprintf( '[%s] Billetera vendedor #%d: %s %s → Saldo: %s',
+                        strtoupper( $type ),
+                        $vendor_id,
+                        LTMS_Utils::format_money( $amount, $wallet['currency'] ),
+                        $description,
+                        LTMS_Utils::format_money( (float) ( $new_balance ?? 0 ), $wallet['currency'] )
+                    ),
+                    [ 'tx_id' => $return_tx_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'type' => $type, 'currency' => $currency, 'idempotency_key' => $idempotency_key ]
+                );
+            }
         } catch ( \Throwable $hook_e ) {
             // Log but don't rethrow — the transaction already committed.
-            LTMS_Core_Logger::error(
-                'WALLET_POST_COMMIT_HOOK_ERROR',
-                sprintf( 'Post-commit hook/logging failed for tx #%d (transaction was committed): %s', $return_tx_id, $hook_e->getMessage() )
-            );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'WALLET_POST_COMMIT_HOOK_ERROR',
+                    sprintf( 'Post-commit hook/logging failed for tx #%d (transaction was committed): %s', $return_tx_id, $hook_e->getMessage() )
+                );
+            }
         }
 
         return $return_tx_id;
