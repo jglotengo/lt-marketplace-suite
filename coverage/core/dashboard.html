@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <title>Dashboard for C:\Users\User\LTMS\lt-marketplace-suite\includes\core</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="../_css/bootstrap.min.css?v=10.1.16" rel="stylesheet" type="text/css">
+  <link href="../_css/nv.d3.min.css?v=10.1.16" rel="stylesheet" type="text/css">
+  <link href="../_css/style.css?v=10.1.16" rel="stylesheet" type="text/css">
+  <link href="../_css/custom.css" rel="stylesheet" type="text/css">
+ </head>
+ <body>
+  <header>
+   <div class="container-fluid">
+    <div class="row">
+     <div class="col-md-12">
+      <nav aria-label="breadcrumb">
+       <ol class="breadcrumb">
+         <li class="breadcrumb-item"><a href="../index.html">C:\Users\User\LTMS\lt-marketplace-suite\includes</a></li>
+         <li class="breadcrumb-item"><a href="index.html">core</a></li>
+         <li class="breadcrumb-item active">(Dashboard)</li>
+
+       </ol>
+      </nav>
+     </div>
+    </div>
+   </div>
+  </header>
+  <div class="container-fluid">
+   <div class="row">
+    <div class="col-md-12">
+     <h2>Classes</h2>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Coverage Distribution</h3>
+     <div id="classCoverageDistribution" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Complexity</h3>
+     <div id="classComplexity" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Insufficient Coverage</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Class</th>
+         <th class="text-right">Coverage</th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#19">LTMS_Core_Cron_Manager</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#22">LTMS_Core_Kernel</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#20">LTMS_Core_Activator</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#23">LTMS_Core_Deactivator</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#20">LTMS_Core_Firewall</a></td><td class="text-right">27%</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#19">LTMS_Logger_Aware</a></td><td class="text-right">50%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#20">LTMS_Core_Logger</a></td><td class="text-right">55%</td></tr>
+       <tr><td><a href="traits/trait-ltms-singleton.php.html#19">LTMS_Singleton</a></td><td class="text-right">71%</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#21">LTMS_Data_Masking</a></td><td class="text-right">78%</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#20">LTMS_Core_Security</a></td><td class="text-right">81%</td></tr>
+       <tr><td><a href="class-ltms-config.php.html#20">LTMS_Core_Config</a></td><td class="text-right">87%</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Project Risks</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Class</th>
+         <th class="text-right"><abbr title="Change Risk Anti-Patterns (CRAP) Index">CRAP</abbr></th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="class-ltms-kernel.php.html#22">LTMS_Core_Kernel</a></td><td class="text-right">7656</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#20">LTMS_Core_Firewall</a></td><td class="text-right">1439</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#20">LTMS_Core_Activator</a></td><td class="text-right">1122</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#19">LTMS_Core_Cron_Manager</a></td><td class="text-right">870</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#20">LTMS_Core_Logger</a></td><td class="text-right">253</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#23">LTMS_Core_Deactivator</a></td><td class="text-right">156</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#20">LTMS_Core_Security</a></td><td class="text-right">46</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#21">LTMS_Data_Masking</a></td><td class="text-right">31</td></tr>
+       <tr><td><a href="class-ltms-config.php.html#20">LTMS_Core_Config</a></td><td class="text-right">30</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#19">LTMS_Logger_Aware</a></td><td class="text-right">16</td></tr>
+       <tr><td><a href="traits/trait-ltms-singleton.php.html#19">LTMS_Singleton</a></td><td class="text-right">5</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-12">
+     <h2>Methods</h2>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Coverage Distribution</h3>
+     <div id="methodCoverageDistribution" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Complexity</h3>
+     <div id="methodComplexity" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Insufficient Coverage</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Method</th>
+         <th class="text-right">Coverage</th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="class-ltms-config.php.html#48"><abbr title="LTMS_Core_Config::init">init</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#23"><abbr title="LTMS_Core_Cron_Manager::init">init</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#37"><abbr title="LTMS_Core_Cron_Manager::schedule_jobs">schedule_jobs</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#55"><abbr title="LTMS_Core_Cron_Manager::cleanup_pending_bookings">cleanup_pending_bookings</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#66"><abbr title="LTMS_Core_Cron_Manager::send_checkin_reminders">send_checkin_reminders</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#84"><abbr title="LTMS_Core_Cron_Manager::balance_due_reminders">balance_due_reminders</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#100"><abbr title="LTMS_Core_Cron_Manager::auto_checkout">auto_checkout</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#110"><abbr title="LTMS_Core_Cron_Manager::check_rnt_expiry">check_rnt_expiry</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#121"><abbr title="LTMS_Core_Cron_Manager::release_booking_deposits">release_booking_deposits</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#192"><abbr title="LTMS_Data_Masking::log_auditor_access">log_auditor_access</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#57"><abbr title="LTMS_Core_Firewall::get_block_duration">get_block_duration</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#66"><abbr title="LTMS_Core_Firewall::get_ip_cache_ttl">get_ip_cache_ttl</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#75"><abbr title="LTMS_Core_Firewall::init">init</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#116"><abbr title="LTMS_Core_Firewall::is_authenticated_admin">is_authenticated_admin</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#142"><abbr title="LTMS_Core_Firewall::run">run</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#236"><abbr title="LTMS_Core_Firewall::handle_attack">handle_attack</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#290"><abbr title="LTMS_Core_Firewall::is_ip_blocked">is_ip_blocked</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#323"><abbr title="LTMS_Core_Firewall::block_ip">block_ip</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#361"><abbr title="LTMS_Core_Firewall::block_request">block_request</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#436"><abbr title="LTMS_Core_Firewall::get_client_ip">get_client_ip</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#48"><abbr title="LTMS_Core_Kernel::__construct">__construct</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#55"><abbr title="LTMS_Core_Kernel::get_instance">get_instance</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#68"><abbr title="LTMS_Core_Kernel::boot">boot</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#117"><abbr title="LTMS_Core_Kernel::boot_infrastructure">boot_infrastructure</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#154"><abbr title="LTMS_Core_Kernel::boot_roles">boot_roles</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#168"><abbr title="LTMS_Core_Kernel::boot_business_logic">boot_business_logic</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#251"><abbr title="LTMS_Core_Kernel::boot_api_integrations">boot_api_integrations</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#307"><abbr title="LTMS_Core_Kernel::register_shipping_methods">register_shipping_methods</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#332"><abbr title="LTMS_Core_Kernel::register_payment_gateways">register_payment_gateways</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#351"><abbr title="LTMS_Core_Kernel::boot_frontend">boot_frontend</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#406"><abbr title="LTMS_Core_Kernel::boot_admin">boot_admin</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#458"><abbr title="LTMS_Core_Kernel::boot_cron">boot_cron</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#487"><abbr title="LTMS_Core_Kernel::boot_rest_api">boot_rest_api</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#499"><abbr title="LTMS_Core_Kernel::__clone">__clone</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#506"><abbr title="LTMS_Core_Kernel::__wakeup">__wakeup</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#51"><abbr title="LTMS_Core_Logger::init">init</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#139"><abbr title="LTMS_Core_Logger::critical">critical</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#197"><abbr title="LTMS_Core_Logger::get_recent_logs">get_recent_logs</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#329"><abbr title="LTMS_Core_Logger::ensure_log_directory">ensure_log_directory</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#42"><abbr title="LTMS_Core_Security::init">init</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#58"><abbr title="LTMS_Core_Security::force_https_redirect">force_https_redirect</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#27"><abbr title="LTMS_Core_Activator::activate">activate</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#53"><abbr title="LTMS_Core_Activator::run_migrations">run_migrations</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#64"><abbr title="LTMS_Core_Activator::install_roles">install_roles</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#78"><abbr title="LTMS_Core_Activator::install_pages">install_pages</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#139"><abbr title="LTMS_Core_Activator::set_default_options">set_default_options</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#212"><abbr title="LTMS_Core_Activator::schedule_cron_jobs">schedule_cron_jobs</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#259"><abbr title="LTMS_Core_Activator::register_hooks">register_hooks</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#269"><abbr title="LTMS_Core_Activator::handle_recreate_pages">handle_recreate_pages</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#293"><abbr title="LTMS_Core_Activator::create_required_pages">create_required_pages</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#374"><abbr title="LTMS_Core_Activator::create_secure_directories">create_secure_directories</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#30"><abbr title="LTMS_Core_Deactivator::deactivate">deactivate</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#43"><abbr title="LTMS_Core_Deactivator::clear_cron_jobs">clear_cron_jobs</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#76"><abbr title="LTMS_Core_Deactivator::clear_transients">clear_transients</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#108"><abbr title="LTMS_Core_Deactivator::flush_rewrite_rules">flush_rewrite_rules</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#117"><abbr title="LTMS_Core_Deactivator::log_deactivation">log_deactivation</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#143"><abbr title="LTMS_Core_Deactivator::set_deactivation_notice">set_deactivation_notice</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#46"><abbr title="LTMS_Logger_Aware::log_debug">log_debug</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#73"><abbr title="LTMS_Logger_Aware::log_error">log_error</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#82"><abbr title="LTMS_Logger_Aware::log_critical">log_critical</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-logger-aware.php.html#91"><abbr title="LTMS_Logger_Aware::log_security">log_security</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-singleton.php.html#49"><abbr title="LTMS_Singleton::__clone">__clone</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="traits/trait-ltms-singleton.php.html#56"><abbr title="LTMS_Singleton::__wakeup">__wakeup</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#153"><abbr title="LTMS_Core_Logger::flush_buffer">flush_buffer</abbr></a></td><td class="text-right">20%</td></tr>
+       <tr><td><a href="class-ltms-config.php.html#176"><abbr title="LTMS_Core_Config::get_encryption_key">get_encryption_key</abbr></a></td><td class="text-right">25%</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#466"><abbr title="LTMS_Core_Firewall::is_trusted_proxy">is_trusted_proxy</abbr></a></td><td class="text-right">33%</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#157"><abbr title="LTMS_Core_Security::hash">hash</abbr></a></td><td class="text-right">70%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#261"><abbr title="LTMS_Core_Logger::get_caller_class">get_caller_class</abbr></a></td><td class="text-right">80%</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#158"><abbr title="LTMS_Data_Masking::mask_bank_account">mask_bank_account</abbr></a></td><td class="text-right">83%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#70"><abbr title="LTMS_Core_Logger::log">log</abbr></a></td><td class="text-right">84%</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#301"><abbr title="LTMS_Core_Logger::write_to_file">write_to_file</abbr></a></td><td class="text-right">86%</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#72"><abbr title="LTMS_Core_Security::encrypt">encrypt</abbr></a></td><td class="text-right">88%</td></tr>
+       <tr><td><a href="utils/class-ltms-utils.php.html#181"><abbr title="LTMS_Utils::is_ltms_vendor">is_ltms_vendor</abbr></a></td><td class="text-right">88%</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Project Risks</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Method</th>
+         <th class="text-right"><abbr title="Change Risk Anti-Patterns (CRAP) Index">CRAP</abbr></th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="class-ltms-kernel.php.html#168"><abbr title="LTMS_Core_Kernel::boot_business_logic">boot_business_logic</abbr></a></td><td class="text-right">380</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#351"><abbr title="LTMS_Core_Kernel::boot_frontend">boot_frontend</abbr></a></td><td class="text-right">210</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#406"><abbr title="LTMS_Core_Kernel::boot_admin">boot_admin</abbr></a></td><td class="text-right">210</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#142"><abbr title="LTMS_Core_Firewall::run">run</abbr></a></td><td class="text-right">156</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#251"><abbr title="LTMS_Core_Kernel::boot_api_integrations">boot_api_integrations</abbr></a></td><td class="text-right">72</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#121"><abbr title="LTMS_Core_Cron_Manager::release_booking_deposits">release_booking_deposits</abbr></a></td><td class="text-right">56</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#117"><abbr title="LTMS_Core_Kernel::boot_infrastructure">boot_infrastructure</abbr></a></td><td class="text-right">56</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#436"><abbr title="LTMS_Core_Firewall::get_client_ip">get_client_ip</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#212"><abbr title="LTMS_Core_Activator::schedule_cron_jobs">schedule_cron_jobs</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#293"><abbr title="LTMS_Core_Activator::create_required_pages">create_required_pages</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#197"><abbr title="LTMS_Core_Logger::get_recent_logs">get_recent_logs</abbr></a></td><td class="text-right">30</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#78"><abbr title="LTMS_Core_Activator::install_pages">install_pages</abbr></a></td><td class="text-right">30</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#374"><abbr title="LTMS_Core_Activator::create_secure_directories">create_secure_directories</abbr></a></td><td class="text-right">30</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#466"><abbr title="LTMS_Core_Firewall::is_trusted_proxy">is_trusted_proxy</abbr></a></td><td class="text-right">26</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#37"><abbr title="LTMS_Core_Cron_Manager::schedule_jobs">schedule_jobs</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#66"><abbr title="LTMS_Core_Cron_Manager::send_checkin_reminders">send_checkin_reminders</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#84"><abbr title="LTMS_Core_Cron_Manager::balance_due_reminders">balance_due_reminders</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#192"><abbr title="LTMS_Data_Masking::log_auditor_access">log_auditor_access</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#68"><abbr title="LTMS_Core_Kernel::boot">boot</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#332"><abbr title="LTMS_Core_Kernel::register_payment_gateways">register_payment_gateways</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#458"><abbr title="LTMS_Core_Kernel::boot_cron">boot_cron</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#329"><abbr title="LTMS_Core_Logger::ensure_log_directory">ensure_log_directory</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#43"><abbr title="LTMS_Core_Deactivator::clear_cron_jobs">clear_cron_jobs</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="class-ltms-config.php.html#176"><abbr title="LTMS_Core_Config::get_encryption_key">get_encryption_key</abbr></a></td><td class="text-right">15</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#55"><abbr title="LTMS_Core_Cron_Manager::cleanup_pending_bookings">cleanup_pending_bookings</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#110"><abbr title="LTMS_Core_Cron_Manager::check_rnt_expiry">check_rnt_expiry</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#236"><abbr title="LTMS_Core_Firewall::handle_attack">handle_attack</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#290"><abbr title="LTMS_Core_Firewall::is_ip_blocked">is_ip_blocked</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#154"><abbr title="LTMS_Core_Kernel::boot_roles">boot_roles</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#307"><abbr title="LTMS_Core_Kernel::register_shipping_methods">register_shipping_methods</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#42"><abbr title="LTMS_Core_Security::init">init</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#64"><abbr title="LTMS_Core_Activator::install_roles">install_roles</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#117"><abbr title="LTMS_Core_Deactivator::log_deactivation">log_deactivation</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#153"><abbr title="LTMS_Core_Logger::flush_buffer">flush_buffer</abbr></a></td><td class="text-right">11</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#70"><abbr title="LTMS_Core_Logger::log">log</abbr></a></td><td class="text-right">11</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#157"><abbr title="LTMS_Core_Security::hash">hash</abbr></a></td><td class="text-right">11</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#23"><abbr title="LTMS_Core_Cron_Manager::init">init</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-core-cron-manager.php.html#100"><abbr title="LTMS_Core_Cron_Manager::auto_checkout">auto_checkout</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#75"><abbr title="LTMS_Core_Firewall::init">init</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-firewall.php.html#116"><abbr title="LTMS_Core_Firewall::is_authenticated_admin">is_authenticated_admin</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#55"><abbr title="LTMS_Core_Kernel::get_instance">get_instance</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-kernel.php.html#487"><abbr title="LTMS_Core_Kernel::boot_rest_api">boot_rest_api</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#51"><abbr title="LTMS_Core_Logger::init">init</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#58"><abbr title="LTMS_Core_Security::force_https_redirect">force_https_redirect</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#27"><abbr title="LTMS_Core_Activator::activate">activate</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#53"><abbr title="LTMS_Core_Activator::run_migrations">run_migrations</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="services/class-ltms-activator.php.html#269"><abbr title="LTMS_Core_Activator::handle_recreate_pages">handle_recreate_pages</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="services/class-ltms-deactivator.php.html#76"><abbr title="LTMS_Core_Deactivator::clear_transients">clear_transients</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="utils/class-ltms-utils.php.html#181"><abbr title="LTMS_Utils::is_ltms_vendor">is_ltms_vendor</abbr></a></td><td class="text-right">5</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#261"><abbr title="LTMS_Core_Logger::get_caller_class">get_caller_class</abbr></a></td><td class="text-right">4</td></tr>
+       <tr><td><a href="class-ltms-security.php.html#72"><abbr title="LTMS_Core_Security::encrypt">encrypt</abbr></a></td><td class="text-right">4</td></tr>
+       <tr><td><a href="class-ltms-data-masking.php.html#158"><abbr title="LTMS_Data_Masking::mask_bank_account">mask_bank_account</abbr></a></td><td class="text-right">3</td></tr>
+       <tr><td><a href="class-ltms-logger.php.html#301"><abbr title="LTMS_Core_Logger::write_to_file">write_to_file</abbr></a></td><td class="text-right">2</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+   <footer>
+    <hr/>
+    <p>
+     <small>Generated by <a href="https://github.com/sebastianbergmann/php-code-coverage" target="_top">php-code-coverage 10.1.16</a> using <a href="https://www.php.net/" target="_top">PHP 8.2.12</a> and <a href="https://phpunit.de/">PHPUnit 10.5.63</a> at Fri Apr 10 1:04:25 CEST 2026.</small>
+    </p>
+   </footer>
+  </div>
+  <script src="../_js/jquery.min.js?v=10.1.16" type="text/javascript"></script>
+  <script src="../_js/d3.min.js?v=10.1.16" type="text/javascript"></script>
+  <script src="../_js/nv.d3.min.js?v=10.1.16" type="text/javascript"></script>
+  <script type="text/javascript">
+$(document).ready(function() {
+  nv.addGraph(function() {
+    var chart = nv.models.multiBarChart();
+    chart.tooltips(false)
+      .showControls(false)
+      .showLegend(false)
+      .reduceXTicks(false)
+      .staggerLabels(true)
+      .yAxis.tickFormat(d3.format('d'));
+
+    d3.select('#classCoverageDistribution svg')
+      .datum(getCoverageDistributionData([4,0,0,1,0,0,2,0,2,2,1,0], "Class Coverage"))
+      .transition().duration(500).call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  nv.addGraph(function() {
+    var chart = nv.models.multiBarChart();
+    chart.tooltips(false)
+      .showControls(false)
+      .showLegend(false)
+      .reduceXTicks(false)
+      .staggerLabels(true)
+      .yAxis.tickFormat(d3.format('d'));
+
+    d3.select('#methodCoverageDistribution svg')
+      .datum(getCoverageDistributionData([63,0,0,2,1,0,0,0,1,6,2,54], "Method Coverage"))
+      .transition().duration(500).call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  function getCoverageDistributionData(data, label) {
+    var labels = [
+      '0%',
+      '0-10%',
+      '10-20%',
+      '20-30%',
+      '30-40%',
+      '40-50%',
+      '50-60%',
+      '60-70%',
+      '70-80%',
+      '80-90%',
+      '90-100%',
+      '100%'
+    ];
+    var values = [];
+    $.each(labels, function(key) {
+      values.push({x: labels[key], y: data[key]});
+    });
+
+    return [
+      {
+        key: label,
+        values: values,
+        color: "#4572A7"
+      }
+    ];
+  }
+  nv.addGraph(function() {
+    var chart = nv.models.scatterChart()
+      .showDistX(true)
+      .showDistY(true)
+      .showLegend(false)
+      .forceX([0, 100]);
+    chart.tooltipContent(function(graph) {
+      return '<p>' + graph.point.class + '</p>';
+    });
+
+    chart.xAxis.axisLabel('Code Coverage (in percent)');
+    chart.yAxis.axisLabel('Cyclomatic Complexity');
+
+    d3.select('#classComplexity svg')
+      .datum(getComplexityData([[87.93103448275862,29,"<a href=\"class-ltms-config.php.html#20\">LTMS_Core_Config<\/a>"],[0,29,"<a href=\"class-ltms-core-cron-manager.php.html#19\">LTMS_Core_Cron_Manager<\/a>"],[78.66666666666666,25,"<a href=\"class-ltms-data-masking.php.html#21\">LTMS_Data_Masking<\/a>"],[27.37430167597765,60,"<a href=\"class-ltms-firewall.php.html#20\">LTMS_Core_Firewall<\/a>"],[0,87,"<a href=\"class-ltms-kernel.php.html#22\">LTMS_Core_Kernel<\/a>"],[55.3030303030303,48,"<a href=\"class-ltms-logger.php.html#20\">LTMS_Core_Logger<\/a>"],[81.81818181818183,38,"<a href=\"class-ltms-security.php.html#20\">LTMS_Core_Security<\/a>"],[0,33,"<a href=\"services\/class-ltms-activator.php.html#20\">LTMS_Core_Activator<\/a>"],[0,12,"<a href=\"services\/class-ltms-deactivator.php.html#23\">LTMS_Core_Deactivator<\/a>"],[97.36842105263158,31,"<a href=\"utils\/class-ltms-utils.php.html#20\">LTMS_Utils<\/a>"],[50,8,"<a href=\"traits\/trait-ltms-logger-aware.php.html#19\">LTMS_Logger_Aware<\/a>"],[71.42857142857143,5,"<a href=\"traits\/trait-ltms-singleton.php.html#19\">LTMS_Singleton<\/a>"]], 'Class Complexity'))
+      .transition()
+      .duration(500)
+      .call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  nv.addGraph(function() {
+    var chart = nv.models.scatterChart()
+      .showDistX(true)
+      .showDistY(true)
+      .showLegend(false)
+      .forceX([0, 100]);
+    chart.tooltipContent(function(graph) {
+      return '<p>' + graph.point.class + '</p>';
+    });
+
+    chart.xAxis.axisLabel('Code Coverage (in percent)');
+    chart.yAxis.axisLabel('Method Complexity');
+
+    d3.select('#methodComplexity svg')
+      .datum(getComplexityData([[0,1,"<a href=\"class-ltms-config.php.html#48\">LTMS_Core_Config::init<\/a>"],[100,3,"<a href=\"class-ltms-config.php.html#57\">LTMS_Core_Config::load_settings<\/a>"],[100,5,"<a href=\"class-ltms-config.php.html#74\">LTMS_Core_Config::get<\/a>"],[100,1,"<a href=\"class-ltms-config.php.html#113\">LTMS_Core_Config::set<\/a>"],[100,3,"<a href=\"class-ltms-config.php.html#125\">LTMS_Core_Config::get_country<\/a>"],[100,1,"<a href=\"class-ltms-config.php.html#137\">LTMS_Core_Config::get_context_country<\/a>"],[100,1,"<a href=\"class-ltms-config.php.html#146\">LTMS_Core_Config::is_production<\/a>"],[100,1,"<a href=\"class-ltms-config.php.html#156\">LTMS_Core_Config::is_development<\/a>"],[100,2,"<a href=\"class-ltms-config.php.html#165\">LTMS_Core_Config::get_currency<\/a>"],[25,5,"<a href=\"class-ltms-config.php.html#176\">LTMS_Core_Config::get_encryption_key<\/a>"],[100,1,"<a href=\"class-ltms-config.php.html#195\">LTMS_Core_Config::flush_cache<\/a>"],[100,5,"<a href=\"class-ltms-config.php.html#206\">LTMS_Core_Config::get_all_safe<\/a>"],[0,2,"<a href=\"class-ltms-core-cron-manager.php.html#23\">LTMS_Core_Cron_Manager::init<\/a>"],[0,4,"<a href=\"class-ltms-core-cron-manager.php.html#37\">LTMS_Core_Cron_Manager::schedule_jobs<\/a>"],[0,3,"<a href=\"class-ltms-core-cron-manager.php.html#55\">LTMS_Core_Cron_Manager::cleanup_pending_bookings<\/a>"],[0,4,"<a href=\"class-ltms-core-cron-manager.php.html#66\">LTMS_Core_Cron_Manager::send_checkin_reminders<\/a>"],[0,4,"<a href=\"class-ltms-core-cron-manager.php.html#84\">LTMS_Core_Cron_Manager::balance_due_reminders<\/a>"],[0,2,"<a href=\"class-ltms-core-cron-manager.php.html#100\">LTMS_Core_Cron_Manager::auto_checkout<\/a>"],[0,3,"<a href=\"class-ltms-core-cron-manager.php.html#110\">LTMS_Core_Cron_Manager::check_rnt_expiry<\/a>"],[0,7,"<a href=\"class-ltms-core-cron-manager.php.html#121\">LTMS_Core_Cron_Manager::release_booking_deposits<\/a>"],[100,1,"<a href=\"class-ltms-data-masking.php.html#28\">LTMS_Data_Masking::is_external_auditor<\/a>"],[100,5,"<a href=\"class-ltms-data-masking.php.html#39\">LTMS_Data_Masking::prepare_for_auditor<\/a>"],[100,3,"<a href=\"class-ltms-data-masking.php.html#84\">LTMS_Data_Masking::mask_email<\/a>"],[100,2,"<a href=\"class-ltms-data-masking.php.html#109\">LTMS_Data_Masking::mask_phone<\/a>"],[100,3,"<a href=\"class-ltms-data-masking.php.html#124\">LTMS_Data_Masking::mask_name<\/a>"],[100,2,"<a href=\"class-ltms-data-masking.php.html#143\">LTMS_Data_Masking::mask_address<\/a>"],[83.33333333333334,3,"<a href=\"class-ltms-data-masking.php.html#158\">LTMS_Data_Masking::mask_bank_account<\/a>"],[100,2,"<a href=\"class-ltms-data-masking.php.html#177\">LTMS_Data_Masking::mask_document<\/a>"],[0,4,"<a href=\"class-ltms-data-masking.php.html#192\">LTMS_Data_Masking::log_auditor_access<\/a>"],[0,1,"<a href=\"class-ltms-firewall.php.html#57\">LTMS_Core_Firewall::get_block_duration<\/a>"],[0,1,"<a href=\"class-ltms-firewall.php.html#66\">LTMS_Core_Firewall::get_ip_cache_ttl<\/a>"],[0,2,"<a href=\"class-ltms-firewall.php.html#75\">LTMS_Core_Firewall::init<\/a>"],[0,2,"<a href=\"class-ltms-firewall.php.html#116\">LTMS_Core_Firewall::is_authenticated_admin<\/a>"],[100,3,"<a href=\"class-ltms-firewall.php.html#127\">LTMS_Core_Firewall::is_whitelisted_admin_path<\/a>"],[0,12,"<a href=\"class-ltms-firewall.php.html#142\">LTMS_Core_Firewall::run<\/a>"],[100,3,"<a href=\"class-ltms-firewall.php.html#214\">LTMS_Core_Firewall::check_patterns<\/a>"],[0,3,"<a href=\"class-ltms-firewall.php.html#236\">LTMS_Core_Firewall::handle_attack<\/a>"],[0,3,"<a href=\"class-ltms-firewall.php.html#290\">LTMS_Core_Firewall::is_ip_blocked<\/a>"],[0,1,"<a href=\"class-ltms-firewall.php.html#323\">LTMS_Core_Firewall::block_ip<\/a>"],[0,1,"<a href=\"class-ltms-firewall.php.html#361\">LTMS_Core_Firewall::block_request<\/a>"],[100,3,"<a href=\"class-ltms-firewall.php.html#380\">LTMS_Core_Firewall::is_bad_bot<\/a>"],[100,4,"<a href=\"class-ltms-firewall.php.html#408\">LTMS_Core_Firewall::get_severity<\/a>"],[0,6,"<a href=\"class-ltms-firewall.php.html#436\">LTMS_Core_Firewall::get_client_ip<\/a>"],[33.33333333333333,8,"<a href=\"class-ltms-firewall.php.html#466\">LTMS_Core_Firewall::is_trusted_proxy<\/a>"],[100,7,"<a href=\"class-ltms-firewall.php.html#498\">LTMS_Core_Firewall::ip_in_cidr<\/a>"],[0,1,"<a href=\"class-ltms-kernel.php.html#48\">LTMS_Core_Kernel::__construct<\/a>"],[0,2,"<a href=\"class-ltms-kernel.php.html#55\">LTMS_Core_Kernel::get_instance<\/a>"],[0,4,"<a href=\"class-ltms-kernel.php.html#68\">LTMS_Core_Kernel::boot<\/a>"],[0,7,"<a href=\"class-ltms-kernel.php.html#117\">LTMS_Core_Kernel::boot_infrastructure<\/a>"],[0,3,"<a href=\"class-ltms-kernel.php.html#154\">LTMS_Core_Kernel::boot_roles<\/a>"],[0,19,"<a href=\"class-ltms-kernel.php.html#168\">LTMS_Core_Kernel::boot_business_logic<\/a>"],[0,8,"<a href=\"class-ltms-kernel.php.html#251\">LTMS_Core_Kernel::boot_api_integrations<\/a>"],[0,3,"<a href=\"class-ltms-kernel.php.html#307\">LTMS_Core_Kernel::register_shipping_methods<\/a>"],[0,4,"<a href=\"class-ltms-kernel.php.html#332\">LTMS_Core_Kernel::register_payment_gateways<\/a>"],[0,14,"<a href=\"class-ltms-kernel.php.html#351\">LTMS_Core_Kernel::boot_frontend<\/a>"],[0,14,"<a href=\"class-ltms-kernel.php.html#406\">LTMS_Core_Kernel::boot_admin<\/a>"],[0,4,"<a href=\"class-ltms-kernel.php.html#458\">LTMS_Core_Kernel::boot_cron<\/a>"],[0,2,"<a href=\"class-ltms-kernel.php.html#487\">LTMS_Core_Kernel::boot_rest_api<\/a>"],[0,1,"<a href=\"class-ltms-kernel.php.html#499\">LTMS_Core_Kernel::__clone<\/a>"],[0,1,"<a href=\"class-ltms-kernel.php.html#506\">LTMS_Core_Kernel::__wakeup<\/a>"],[0,2,"<a href=\"class-ltms-logger.php.html#51\">LTMS_Core_Logger::init<\/a>"],[84.61538461538461,11,"<a href=\"class-ltms-logger.php.html#70\">LTMS_Core_Logger::log<\/a>"],[100,1,"<a href=\"class-ltms-logger.php.html#123\">LTMS_Core_Logger::debug<\/a>"],[100,1,"<a href=\"class-ltms-logger.php.html#127\">LTMS_Core_Logger::info<\/a>"],[100,1,"<a href=\"class-ltms-logger.php.html#131\">LTMS_Core_Logger::warning<\/a>"],[100,1,"<a href=\"class-ltms-logger.php.html#135\">LTMS_Core_Logger::error<\/a>"],[0,1,"<a href=\"class-ltms-logger.php.html#139\">LTMS_Core_Logger::critical<\/a>"],[100,1,"<a href=\"class-ltms-logger.php.html#143\">LTMS_Core_Logger::security<\/a>"],[20.833333333333336,4,"<a href=\"class-ltms-logger.php.html#153\">LTMS_Core_Logger::flush_buffer<\/a>"],[0,5,"<a href=\"class-ltms-logger.php.html#197\">LTMS_Core_Logger::get_recent_logs<\/a>"],[100,5,"<a href=\"class-ltms-logger.php.html#232\">LTMS_Core_Logger::get_ip<\/a>"],[80,4,"<a href=\"class-ltms-logger.php.html#261\">LTMS_Core_Logger::get_caller_class<\/a>"],[100,5,"<a href=\"class-ltms-logger.php.html#277\">LTMS_Core_Logger::sanitize_context<\/a>"],[86.66666666666667,2,"<a href=\"class-ltms-logger.php.html#301\">LTMS_Core_Logger::write_to_file<\/a>"],[0,4,"<a href=\"class-ltms-logger.php.html#329\">LTMS_Core_Logger::ensure_log_directory<\/a>"],[0,3,"<a href=\"class-ltms-security.php.html#42\">LTMS_Core_Security::init<\/a>"],[0,2,"<a href=\"class-ltms-security.php.html#58\">LTMS_Core_Security::force_https_redirect<\/a>"],[88.88888888888889,4,"<a href=\"class-ltms-security.php.html#72\">LTMS_Core_Security::encrypt<\/a>"],[91.30434782608695,7,"<a href=\"class-ltms-security.php.html#110\">LTMS_Core_Security::decrypt<\/a>"],[70,9,"<a href=\"class-ltms-security.php.html#157\">LTMS_Core_Security::hash<\/a>"],[100,1,"<a href=\"class-ltms-security.php.html#185\">LTMS_Core_Security::verify_hash<\/a>"],[100,1,"<a href=\"class-ltms-security.php.html#195\">LTMS_Core_Security::generate_token<\/a>"],[100,2,"<a href=\"class-ltms-security.php.html#204\">LTMS_Core_Security::generate_referral_code<\/a>"],[100,2,"<a href=\"class-ltms-security.php.html#225\">LTMS_Core_Security::verify_webhook_signature<\/a>"],[100,2,"<a href=\"class-ltms-security.php.html#245\">LTMS_Core_Security::sanitize_email<\/a>"],[100,1,"<a href=\"class-ltms-security.php.html#257\">LTMS_Core_Security::sanitize_document_number<\/a>"],[100,1,"<a href=\"class-ltms-security.php.html#267\">LTMS_Core_Security::sanitize_phone<\/a>"],[100,1,"<a href=\"class-ltms-security.php.html#277\">LTMS_Core_Security::current_user_can<\/a>"],[100,2,"<a href=\"class-ltms-security.php.html#287\">LTMS_Core_Security::derive_key<\/a>"],[0,2,"<a href=\"services\/class-ltms-activator.php.html#27\">LTMS_Core_Activator::activate<\/a>"],[0,2,"<a href=\"services\/class-ltms-activator.php.html#53\">LTMS_Core_Activator::run_migrations<\/a>"],[0,3,"<a href=\"services\/class-ltms-activator.php.html#64\">LTMS_Core_Activator::install_roles<\/a>"],[0,5,"<a href=\"services\/class-ltms-activator.php.html#78\">LTMS_Core_Activator::install_pages<\/a>"],[0,1,"<a href=\"services\/class-ltms-activator.php.html#139\">LTMS_Core_Activator::set_default_options<\/a>"],[0,6,"<a href=\"services\/class-ltms-activator.php.html#212\">LTMS_Core_Activator::schedule_cron_jobs<\/a>"],[0,1,"<a href=\"services\/class-ltms-activator.php.html#259\">LTMS_Core_Activator::register_hooks<\/a>"],[0,2,"<a href=\"services\/class-ltms-activator.php.html#269\">LTMS_Core_Activator::handle_recreate_pages<\/a>"],[0,6,"<a href=\"services\/class-ltms-activator.php.html#293\">LTMS_Core_Activator::create_required_pages<\/a>"],[0,5,"<a href=\"services\/class-ltms-activator.php.html#374\">LTMS_Core_Activator::create_secure_directories<\/a>"],[0,1,"<a href=\"services\/class-ltms-deactivator.php.html#30\">LTMS_Core_Deactivator::deactivate<\/a>"],[0,4,"<a href=\"services\/class-ltms-deactivator.php.html#43\">LTMS_Core_Deactivator::clear_cron_jobs<\/a>"],[0,2,"<a href=\"services\/class-ltms-deactivator.php.html#76\">LTMS_Core_Deactivator::clear_transients<\/a>"],[0,1,"<a href=\"services\/class-ltms-deactivator.php.html#108\">LTMS_Core_Deactivator::flush_rewrite_rules<\/a>"],[0,3,"<a href=\"services\/class-ltms-deactivator.php.html#117\">LTMS_Core_Deactivator::log_deactivation<\/a>"],[0,1,"<a href=\"services\/class-ltms-deactivator.php.html#143\">LTMS_Core_Deactivator::set_deactivation_notice<\/a>"],[90.9090909090909,3,"<a href=\"utils\/class-ltms-utils.php.html#30\">LTMS_Utils::format_money<\/a>"],[100,5,"<a href=\"utils\/class-ltms-utils.php.html#53\">LTMS_Utils::get_ip<\/a>"],[100,4,"<a href=\"utils\/class-ltms-utils.php.html#83\">LTMS_Utils::format_phone_e164<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#108\">LTMS_Utils::generate_reference<\/a>"],[100,2,"<a href=\"utils\/class-ltms-utils.php.html#122\">LTMS_Utils::truncate<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#135\">LTMS_Utils::sanitize_filename<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#150\">LTMS_Utils::is_json<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#161\">LTMS_Utils::cents_to_decimal<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#171\">LTMS_Utils::decimal_to_cents<\/a>"],[88.88888888888889,5,"<a href=\"utils\/class-ltms-utils.php.html#181\">LTMS_Utils::is_ltms_vendor<\/a>"],[100,1,"<a href=\"utils\/class-ltms-utils.php.html#201\">LTMS_Utils::now_utc<\/a>"],[100,2,"<a href=\"utils\/class-ltms-utils.php.html#212\">LTMS_Utils::days_between<\/a>"],[100,4,"<a href=\"utils\/class-ltms-utils.php.html#229\">LTMS_Utils::array_to_html_table<\/a>"],[100,2,"<a href=\"traits\/trait-ltms-logger-aware.php.html#30\">LTMS_Logger_Aware::log<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#46\">LTMS_Logger_Aware::log_debug<\/a>"],[100,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#55\">LTMS_Logger_Aware::log_info<\/a>"],[100,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#64\">LTMS_Logger_Aware::log_warning<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#73\">LTMS_Logger_Aware::log_error<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#82\">LTMS_Logger_Aware::log_critical<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-logger-aware.php.html#91\">LTMS_Logger_Aware::log_security<\/a>"],[100,2,"<a href=\"traits\/trait-ltms-singleton.php.html#33\">LTMS_Singleton::get_instance<\/a>"],[100,1,"<a href=\"traits\/trait-ltms-singleton.php.html#44\">LTMS_Singleton::__construct<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-singleton.php.html#49\">LTMS_Singleton::__clone<\/a>"],[0,1,"<a href=\"traits\/trait-ltms-singleton.php.html#56\">LTMS_Singleton::__wakeup<\/a>"]], 'Method Complexity'))
+      .transition()
+      .duration(500)
+      .call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  function getComplexityData(data, label) {
+    var values = [];
+    $.each(data, function(key) {
+      var value = Math.round(data[key][0]*100) / 100;
+      values.push({
+        x: value,
+        y: data[key][1],
+        class: data[key][2],
+        size: 0.05,
+        shape: 'diamond'
+      });
+    });
+
+    return [
+      {
+        key: label,
+        values: values,
+        color: "#4572A7"
+      }
+    ];
+  }
+});
+  </script>
+ </body>
+</html>
