@@ -230,17 +230,23 @@ class LTMS_Business_Redi_Manager {
         }
 
         // Guard (c): prevent duplicate active agreements for the same origin product
+        // FASE5 P0 FIX (TOCTOU): wrap the check+insert in a transaction with
+        // SELECT FOR UPDATE to prevent two concurrent adopt requests from both
+        // passing the check and both inserting duplicate active agreements.
         global $wpdb;
+        $wpdb->query( 'START TRANSACTION' );
         $existing_agreement = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->prepare(
                 "SELECT id FROM `{$wpdb->prefix}lt_redi_agreements`
                  WHERE reseller_vendor_id = %d AND origin_product_id = %d AND status = 'active'
-                 LIMIT 1",
+                 LIMIT 1
+                 FOR UPDATE",
                 $reseller_id,
                 $origin_product_id
             )
         );
         if ( $existing_agreement ) {
+            $wpdb->query( 'ROLLBACK' );
             LTMS_Core_Logger::error(
                 'REDI_ADOPT_DUPLICATE',
                 sprintf(
@@ -302,6 +308,9 @@ class LTMS_Business_Redi_Manager {
                 $reseller_id, $origin_product_id, $new_product_id, $redi_rate
             )
         );
+
+        // FASE5 P0 FIX: commit the transaction that holds the FOR UPDATE lock.
+        $wpdb->query( 'COMMIT' );
 
         return $new_product_id;
     }

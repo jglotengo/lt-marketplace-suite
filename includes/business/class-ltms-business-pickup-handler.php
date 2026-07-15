@@ -196,9 +196,11 @@ class LTMS_Business_Pickup_Handler {
         if ( ! $order ) return;
 
         // Solo si es pickup.
+        // FASE5 P0 FIX: use explode(':') instead of strpos for method_id matching.
         $is_pickup = false;
         foreach ( $order->get_shipping_methods() as $method ) {
-            if ( strpos( $method->get_method_id(), 'ltms_pickup' ) !== false ) {
+            $parts = explode( ':', $method->get_method_id() );
+            if ( isset( $parts[0] ) && $parts[0] === 'ltms_pickup' ) {
                 $is_pickup = true;
                 break;
             }
@@ -208,18 +210,32 @@ class LTMS_Business_Pickup_Handler {
         // Idempotency guard.
         if ( $order->get_meta( '_ltms_shipping_delivered_fired' ) ) return;
 
-        $order->update_meta_data( '_ltms_shipping_delivered_fired', 1 );
-        $order->update_meta_data( '_ltms_delivered_at', gmdate( 'Y-m-d H:i:s' ) );
-        $order->update_meta_data( '_ltms_pickup_completed_at', current_time( 'mysql', true ) );
-        $order->save();
+        // FASE5 P0 FIX: fire the action FIRST, then set the idempotency meta.
+        // Previously, meta was set BEFORE the action — if a listener threw,
+        // the meta was already committed and the action NEVER retried.
+        try {
+            do_action( 'ltms_shipping_delivered', $order_id );
 
-        do_action( 'ltms_shipping_delivered', $order_id );
+            // Only set idempotency meta AFTER successful action execution.
+            $order->update_meta_data( '_ltms_shipping_delivered_fired', 1 );
+            $order->update_meta_data( '_ltms_delivered_at', gmdate( 'Y-m-d H:i:s' ) );
+            $order->update_meta_data( '_ltms_pickup_completed_at', current_time( 'mysql', true ) );
+            $order->save_meta_data(); // save_meta_data() avoids full order save hook cascade.
 
-        if ( class_exists( 'LTMS_Core_Logger' ) ) {
-            LTMS_Core_Logger::info( 'PICKUP_DELIVERED',
-                sprintf( 'Pickup order #%d marked as completed — ltms_shipping_delivered fired.', $order_id ),
-                [ 'order_id' => $order_id ]
-            );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info( 'PICKUP_DELIVERED',
+                    sprintf( 'Pickup order #%d marked as completed — ltms_shipping_delivered fired.', $order_id ),
+                    [ 'order_id' => $order_id ]
+                );
+            }
+        } catch ( \Throwable $e ) {
+            // Action listener threw — don't set idempotency meta so it can retry.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'PICKUP_DELIVERED_LISTENER_ERROR',
+                    sprintf( 'Pickup order #%d: ltms_shipping_delivered listener threw: %s — idempotency meta NOT set, will retry.', $order_id, $e->getMessage() )
+                );
+            }
         }
     }
 
