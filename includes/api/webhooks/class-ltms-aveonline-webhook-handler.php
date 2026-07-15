@@ -328,7 +328,7 @@ class LTMS_Aveonline_Webhook_Handler {
             }
 
             // HPOS (WooCommerce High-Performance Order Storage)
-            if ( $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}wc_orders'" ) ) {
+            if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $wpdb->prefix . 'wc_orders' ) ) ) {
                 $found = (int) $wpdb->get_var( $wpdb->prepare(
                     "SELECT order_id FROM {$wpdb->prefix}wc_orders_meta
                      WHERE meta_key = '_ltms_aveonline_tracking'

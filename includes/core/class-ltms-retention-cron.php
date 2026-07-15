@@ -249,8 +249,9 @@ class LTMS_Retention_Cron {
     private static function get_last_transaction_date( int $user_id ): ?int {
         global $wpdb;
         $hpos = $wpdb->prefix . 'wc_orders';
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$hpos}'" ) === $hpos ) {
+        // FASE6 P1 FIX: use $wpdb->prepare for SHOW TABLES to prevent SQL injection
+        // via $wpdb->prefix manipulation (defense-in-depth).
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $hpos ) ) === $hpos ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $d = $wpdb->get_var( $wpdb->prepare(
                 "SELECT MAX(date_created_gmt) FROM `{$hpos}` WHERE customer_id = %d AND status NOT IN ('cancelled','failed','trash')",

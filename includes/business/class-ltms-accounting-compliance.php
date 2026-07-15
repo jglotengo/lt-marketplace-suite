@@ -564,7 +564,7 @@ class LTMS_Accounting_Compliance {
         // 3. Gastos: costos de carrier (real_cost en shipping cost ledger).
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $carrier_costs = 0.0;
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$sc_table}'" ) === $sc_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $sc_table ) ) === $sc_table ) {
             $carrier_costs = (float) $wpdb->get_var( $wpdb->prepare(
                 "SELECT COALESCE(SUM(real_cost), 0) FROM `{$sc_table}`
                  WHERE invoiced_at BETWEEN %s AND %s",

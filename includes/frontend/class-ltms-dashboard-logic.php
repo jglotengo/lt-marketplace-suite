@@ -2242,7 +2242,7 @@ final class LTMS_Dashboard_Logic {
         $user_id = get_current_user_id();
 
         // Verificar si la tabla existe (puede no estar migrada aún).
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table ) {
             // Usar custom table.
             $exists = $wpdb->get_var( $wpdb->prepare(
                 "SELECT id FROM `{$table}` WHERE product_id = %d AND email = %s LIMIT 1",
@@ -2339,7 +2339,7 @@ final class LTMS_Dashboard_Logic {
         // v2.9.69 DEEP-AUDIT-002 P2-25: Usar custom table para dedup atómica.
         $votes_table = $wpdb->prefix . 'lt_review_votes';
 
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$votes_table}'" ) === $votes_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $votes_table ) ) === $votes_table ) {
             // Usar custom table con UNIQUE KEY (comment_id, ip_address).
             // INSERT ignorará si ya existe (dedup atómica a nivel de DB).
             $inserted = $wpdb->query( $wpdb->prepare(

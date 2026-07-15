@@ -121,7 +121,7 @@ final class LTMS_PosGold_Sync {
         // Notificación in-dashboard.
         global $wpdb;
         $notifications_table = $wpdb->prefix . 'lt_notifications';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$notifications_table}'" ) === $notifications_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $notifications_table ) ) === $notifications_table ) {
             $wpdb->insert(
                 $notifications_table,
                 [
