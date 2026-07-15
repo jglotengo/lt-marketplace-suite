@@ -333,6 +333,7 @@ class LTMS_Fintech_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'sos_uiaf_%s_%s.csv', gmdate( 'Ymd' ), wp_generate_password( 6, false ) );
         $path     = $dir . '/' . $filename;
         $fp       = fopen( $path, 'w' );
@@ -374,6 +375,7 @@ class LTMS_Fintech_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'sos_shcp_%s_%s.xml', gmdate( 'Ymd' ), wp_generate_password( 6, false ) );
         $path     = $dir . '/' . $filename;
 
@@ -1023,6 +1025,7 @@ class LTMS_Fintech_Compliance {
         $upload_dir = wp_upload_dir();
         $dir        = $upload_dir['basedir'] . '/ltms-crs';
         if ( ! file_exists( $dir ) ) wp_mkdir_p( $dir );
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'crs_fatca_%s_%s.csv', $country, gmdate( 'Y' ) );
         $path     = $dir . '/' . $filename;
         $fp       = fopen( $path, 'w' );
@@ -1167,5 +1170,21 @@ class LTMS_Fintech_Compliance {
                 'OECD CRS / MCAA'                => 'Intercambio automático de información fiscal.',
             ],
         ];
+    }
+
+    /**
+     * FASE4 P0 FIX: protect PII directories from web access.
+     * Writes .htaccess (Deny from all) + index.php (silence) to prevent
+     * direct download of SOS/CRS reports containing vendor DNI/TIN/bank data.
+     */
+    private static function protect_pii_dir( string $dir ): void {
+        $htaccess = $dir . '/.htaccess';
+        if ( ! file_exists( $htaccess ) ) {
+            @file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" );
+        }
+        $index_php = $dir . '/index.php';
+        if ( ! file_exists( $index_php ) ) {
+            @file_put_contents( $index_php, "<?php // Silence is golden.\n" );
+        }
     }
 }

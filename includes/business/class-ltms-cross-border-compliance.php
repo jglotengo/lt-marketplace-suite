@@ -955,7 +955,26 @@ class LTMS_Cross_Border_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        // FASE4 P0 FIX: protect PII-containing directories from web access.
+        // SOS/CRS/FX reports contain vendor DNI/NIT/TIN, bank data, transaction
+        // totals — all SARLAFT/FATCA/CRS protected data. Without .htaccess, these
+        // CSVs are publicly downloadable via /wp-content/uploads/ltms-*/.
+        self::protect_dir( $dir );
         return $dir;
+    }
+
+    /**
+     * Writes .htaccess + index.php to prevent direct web access to a directory.
+     */
+    private static function protect_dir( string $dir ): void {
+        $htaccess = $dir . '/.htaccess';
+        if ( ! file_exists( $htaccess ) ) {
+            @file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" );
+        }
+        $index_php = $dir . '/index.php';
+        if ( ! file_exists( $index_php ) ) {
+            @file_put_contents( $index_php, "<?php // Silence is golden.\n" );
+        }
     }
 
     /**

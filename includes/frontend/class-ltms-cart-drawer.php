@@ -283,7 +283,7 @@ JS;
         // v2.9.123 CHECKOUT-AUDIT P1-1 FIX: rate limit drawer refresh.
         // Before, bots could spam this endpoint → high CPU from get_drawer_data.
         // Now capped at 30 per IP per minute.
-        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
         $rl_key = 'ltms_drawer_rl_' . md5( $ip );
         $rl_count = (int) get_transient( $rl_key );
         if ( $rl_count > 30 ) {

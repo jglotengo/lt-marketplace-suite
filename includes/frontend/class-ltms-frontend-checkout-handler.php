@@ -1837,7 +1837,7 @@ final class LTMS_Frontend_Checkout_Handler {
         // v2.9.123 CHECKOUT-AUDIT P1-2 FIX: rate limit coupon validation.
         // Before, bots could brute-force coupon codes at high speed.
         // Now capped at 10 per IP per 5 minutes.
-        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
         $rl_key = 'ltms_coupon_rl_' . md5( $ip );
         $rl_count = (int) get_transient( $rl_key );
         if ( $rl_count > 10 ) {
