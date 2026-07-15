@@ -787,6 +787,12 @@ class LTMS_Shipping_Cost_Ledger {
         $sla_days = (int) LTMS_Core_Config::get( 'ltms_shipping_dispute_sla_days', 15 );
         $sla_due = gmdate( 'Y-m-d H:i:s', time() + ( $sla_days * DAY_IN_SECONDS ) );
 
+        // P2 FIX: fetch real_cost and quote_cost from the ledger entry so the
+        // dispute reason and expected_amount have actual values instead of zeros.
+        $entry = self::get_entry( $ledger_id );
+        $real_cost = (float) ( $entry['real_cost'] ?? 0 );
+        $quote_cost = (float) ( $entry['quote_cost'] ?? 0 );
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert( $table, [
             'ledger_id'        => $ledger_id,
@@ -795,9 +801,9 @@ class LTMS_Shipping_Cost_Ledger {
             'dispute_type'     => 'overcharge',
             'dispute_reason'   => sprintf(
                 'Varianza automática: %.2f%% sobre la cotización (real=%.2f, quote=%.2f, diff=%.2f).',
-                $variance_pct, 0, 0, $variance
+                $variance_pct, $real_cost, $quote_cost, $variance
             ),
-            'expected_amount'  => 0, // Se rellenará desde el ledger
+            'expected_amount'  => $quote_cost, // P2 FIX: was 0, now uses actual quote_cost.
             'disputed_amount'  => $variance,
             'status'           => 'open',
             'opened_by'        => 0, // System
@@ -1827,6 +1833,22 @@ class LTMS_Shipping_Cost_Ledger {
                 'SHIPPING_DISPUTE_REFUND',
                 sprintf( 'Vendor #%d reembolsado $%.2f por disputa (ledger #%d, tx #%d).', $vendor_id, $amount, $ledger_id, $tx_id )
             );
+
+            // P2 FIX: store the refund tx_id in the ledger entry's metadata
+            // so the refund is traceable from the ledger without querying
+            // lt_wallet_transactions by idempotency key.
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE `{$wpdb->prefix}lt_shipping_cost_ledger`
+                 SET `metadata` = JSON_SET(COALESCE(metadata, '{}'), '$.refund_tx_id', %d, '$.refund_amount', %.2f, '$.refunded_at', %s),
+                     `updated_at` = %s
+                 WHERE `id` = %d",
+                (int) $tx_id,
+                $amount,
+                current_time( 'mysql', true ),
+                current_time( 'mysql', true ),
+                $ledger_id
+            ) );
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::warning(
                 'SHIPPING_DISPUTE_REFUND_FAILED',

@@ -800,7 +800,9 @@ final class LTMS_Business_Order_Split {
         foreach ( $order->get_items() as $item ) {
             $items[] = [
                 'product_id'   => $item->get_product_id(),
-                'product_name' => $item->get_name(),
+                // P2 FIX: sanitize product name — vendors can set product names
+                // containing customer info. sanitize_text_field strips HTML/tags.
+                'product_name' => sanitize_text_field( $item->get_name() ),
                 'subtotal'     => (float) $item->get_subtotal(),
                 'total'        => (float) $item->get_total(),
                 'quantity'     => $item->get_quantity(),
