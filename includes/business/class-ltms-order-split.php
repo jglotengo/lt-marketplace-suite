@@ -110,6 +110,16 @@ final class LTMS_Business_Order_Split {
                 ? LTMS_Commission_Strategy::get_rate( $vendor_id, $order )
                 : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 );
 
+            // P2 FIX: validate platform_rate — if >1.0 or <0.0, platform_fee
+            // could exceed gross_amount → negative vendor_gross → max(0.0,...)
+            // clamps to zero but platform over-collects.
+            if ( ! is_finite( $platform_rate ) || $platform_rate < 0.0 || $platform_rate > 1.0 ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning( 'ORDER_SPLIT_INVALID_RATE', sprintf( 'Vendor #%d: invalid platform_rate %s, falling back to 0.15.', $vendor_id, var_export( $platform_rate, true ) ) );
+                }
+                $platform_rate = 0.15;
+            }
+
             $tax_breakdown = self::calculate_tax_breakdown( $gross_amount, $order, $vendor_id, $country );
 
             $platform_fee = round( $gross_amount * $platform_rate, 2 );

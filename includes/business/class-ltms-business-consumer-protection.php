@@ -79,7 +79,23 @@ class LTMS_Business_Consumer_Protection {
      * @return bool
      */
     public static function hold_commission( int $vendor_id, float $amount, int $order_id ): bool {
-        $hold_days   = (int) LTMS_Core_Config::get( 'ltms_consumer_protection_days', self::DEFAULT_HOLD_DAYS );
+        // P2 FIX: validate amount — NaN passes <= 0.0 check, negative credits
+        // negative balances. is_finite() rejects NaN and INF.
+        if ( ! is_finite( $amount ) || $amount <= 0.0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'COMMISSION_HOLD_INVALID_AMOUNT', sprintf( 'hold_commission rejected invalid amount: %s (order #%d, vendor #%d)', var_export( $amount, true ), $order_id, $vendor_id ) );
+            }
+            return false;
+        }
+
+        // P2 FIX: validate hold_days — negative or zero bypasses consumer protection.
+        $hold_days = (int) LTMS_Core_Config::get( 'ltms_consumer_protection_days', self::DEFAULT_HOLD_DAYS );
+        if ( $hold_days < 1 ) {
+            $hold_days = self::DEFAULT_HOLD_DAYS; // Fallback to safe default.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'COMMISSION_HOLD_INVALID_DAYS', sprintf( 'ltms_consumer_protection_days config invalid, using default %d days.', self::DEFAULT_HOLD_DAYS ) );
+            }
+        }
         $release_at  = gmdate( 'Y-m-d H:i:s', strtotime( "+{$hold_days} weekdays" ) );
 
         // AUDIT-BOOKING-ENGINE #9 FIX: para reservas de turismo/hospedaje,
@@ -601,9 +617,11 @@ class LTMS_Business_Consumer_Protection {
                 $wpdb->update(
                     $table,
                     [ 'status' => 'held' ],
-                    [ 'id' => $hold_id ],
+                    // P2 FIX: add WHERE status guard to prevent overwriting a
+                    // concurrent successful 'released' status.
+                    [ 'id' => $hold_id, 'status' => 'held' ],
                     [ '%s' ],
-                    [ '%d' ]
+                    [ '%d', '%s' ]
                 );
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::critical(

@@ -116,8 +116,16 @@ class LTMS_Shipping_Cost_Ledger {
         try {
             $order_id          = (int) $order->get_id();
             $absorbed_cost     = (float) $order->get_meta( '_ltms_absorbed_shipping_cost' );
+            // P2 FIX: validate absorbed_cost — negative or NaN/INF values would
+            // cause negative vendor debits (effectively crediting the vendor).
+            if ( ! is_finite( $absorbed_cost ) || $absorbed_cost < 0 ) {
+                $absorbed_cost = 0.0;
+            }
             $absorbed_provider = (string) $order->get_meta( '_ltms_absorbed_shipping_provider' );
             $buyer_paid        = (float) $order->get_shipping_total() + (float) $order->get_shipping_tax();
+            if ( ! is_finite( $buyer_paid ) || $buyer_paid < 0 ) {
+                $buyer_paid = 0.0;
+            }
             $currency          = $order->get_currency() ?: LTMS_Core_Config::get_currency();
             $country           = LTMS_Core_Config::get_country();
 
@@ -1243,7 +1251,10 @@ class LTMS_Shipping_Cost_Ledger {
             'resolution_notes' => $notes,
             'resolved_at'      => current_time( 'mysql', true ),
             'resolved_by'      => $resolved_by ?: get_current_user_id(),
-        ], [ 'id' => $dispute_id ] );
+        ],
+        // P2 FIX: add WHERE-status guard — can only resolve disputes in active states.
+        [ 'id' => $dispute_id, 'status' => [ 'open', 'in_review' ] ]
+        );
 
         if ( false === $ok ) {
             return false;
