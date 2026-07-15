@@ -132,26 +132,17 @@ class LTMS_Booking_Policy_Handler {
             $policy_id = (int) $booking['policy_id'];
         }
         if ( $policy_id ) {
-            // FASE1-REAUDIT P0 FIX (IDOR): verify the policy belongs to the booking's
-            // vendor. Without this, a misconfigured product meta pointing to another
-            // vendor's policy would return the wrong policy → wrong refund amount.
             $policy = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT * FROM {$wpdb->prefix}lt_booking_policies WHERE id = %d AND vendor_id = %d",
-                    $policy_id,
-                    (int) $booking['vendor_id']
-                ),
+                $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}lt_booking_policies WHERE id = %d", $policy_id ),
                 ARRAY_A
             );
             if ( $policy ) return $policy;
         }
 
         // Vendor default policy.
-        // FASE1-REAUDIT P1 FIX: ORDER BY is_default DESC so the vendor's marked
-        // default is returned first, not just the oldest by ID.
         return $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT * FROM {$wpdb->prefix}lt_booking_policies WHERE vendor_id = %d ORDER BY is_default DESC, id ASC LIMIT 1",
+                "SELECT * FROM {$wpdb->prefix}lt_booking_policies WHERE vendor_id = %d ORDER BY id ASC LIMIT 1",
                 (int) $booking['vendor_id']
             ),
             ARRAY_A
@@ -169,16 +160,7 @@ class LTMS_Booking_Policy_Handler {
         $policy = self::get_policy_for_booking( $booking_id );
         if ( ! $policy ) return 0.0;
 
-        // FASE1-REAUDIT P1 FIX (timezone bug): strtotime() parses in the server
-        // timezone (PHP date.timezone) while time() is UTC. If the server is UTC
-        // but WP is configured for America/Bogota (UTC-5), and checkin_date is
-        // stored in WP local time, the calculation was off by 5 hours → wrong
-        // refund tier (100% instead of 50%, or vice versa).
-        // Now: use mysql2date with $gmt=true to force GMT interpretation.
-        $checkin_ts = function_exists( 'mysql2date' )
-            ? (int) mysql2date( 'U', $booking['checkin_date'], true )
-            : (int) strtotime( $booking['checkin_date'] . ' UTC' );
-        $hours_until_checkin = ( $checkin_ts - time() ) / HOUR_IN_SECONDS;
+        $hours_until_checkin = ( strtotime( $booking['checkin_date'] ) - time() ) / HOUR_IN_SECONDS;
         $total               = (float) $booking['total_price'];
         $deposit             = (float) ( $booking['deposit_amount'] ?? 0 );
         $paid                = 'deposit' === $booking['payment_mode'] ? $deposit : $total;
@@ -224,31 +206,25 @@ class LTMS_Booking_Policy_Handler {
     public static function process_cancellation_refund( int $booking_id, array $booking, string $cancelled_by ): void {
         try {
             // v2.9.117 BOOKING-AUDIT P0-2 FIX: prevent double refund.
-            // FASE1-REAUDIT P0 REGRESSION FIX: the original fix checked for a refund
-            // by substring-matching the refund REASON. Two fatal flaws:
-            //   1. Translation mismatch: prefix hardcoded Spanish ("Cancelación de
-            //      reserva #%d") but reason uses __() → on English site, no match.
-            //   2. Substring collision: "#1" matches "#11" → booking #1's refund
-            //      is skipped if booking #11 was refunded first.
-            // Now we store booking_id as refund POST META and check that — immune
-            // to translation and substring issues.
+            // Before, if cancel_booking was called twice (race condition or retry),
+            // process_cancellation_refund would run twice and wc_create_refund
+            // would create TWO refund objects for the same booking → double money back.
+            // Now we check if a refund already exists for this booking's WC order.
             $wc_order_id = (int) $booking['wc_order_id'];
             if ( ! $wc_order_id ) return;
 
             $order = wc_get_order( $wc_order_id );
             if ( ! $order ) return;
 
-            // Check if a refund with this booking_id already exists via post meta.
+            // Check if a refund with the booking_id in the reason already exists.
+            $refund_reason_prefix = sprintf( 'Cancelación de reserva #%d', $booking_id );
             $existing_refunds = $order->get_refunds();
             foreach ( $existing_refunds as $existing_refund ) {
-                $refund_id          = $existing_refund->get_id();
-                $existing_booking_id = (int) get_post_meta( $refund_id, '_ltms_booking_id', true );
-                if ( $existing_booking_id === $booking_id ) {
+                if ( stripos( $existing_refund->get_reason(), $refund_reason_prefix ) !== false ) {
                     // Already refunded for this booking — skip.
                     self::log_info_static( 'booking', sprintf(
-                        'Booking #%d: refund already exists (refund_id=%d, amount=%s), skipping double refund.',
+                        'Booking #%d: refund already exists (amount=%s), skipping double refund.',
                         $booking_id,
-                        $refund_id,
                         $existing_refund->get_amount()
                     ) );
                     return;
@@ -276,19 +252,7 @@ class LTMS_Booking_Policy_Handler {
             if ( is_wp_error( $refund ) ) {
                 self::log_warning_static( 'booking', 'refund error booking #' . $booking_id . ': ' . $refund->get_error_message() );
             } else {
-                // FASE1-REAUDIT P0 FIX: store booking_id on the refund post meta so
-                // future double-refund checks are O(1) and translation-independent.
-                update_post_meta( $refund->get_id(), '_ltms_booking_id', $booking_id );
-                // FASE1-REAUDIT P1 FIX: verify refund status before firing action.
-                if ( $refund->get_status() === 'completed' ) {
-                    do_action( 'ltms_booking_refund_processed', $booking_id, $refund_amount, $refund );
-                } else {
-                    self::log_warning_static( 'booking', sprintf(
-                        'Booking #%d: refund created but status is "%s" (not completed) — not firing ltms_booking_refund_processed.',
-                        $booking_id,
-                        $refund->get_status()
-                    ) );
-                }
+                do_action( 'ltms_booking_refund_processed', $booking_id, $refund_amount, $refund );
             }
         } catch ( \Throwable $e ) {
             self::log_warning_static( 'booking', 'process_cancellation_refund exception: ' . $e->getMessage() );
@@ -390,11 +354,6 @@ class LTMS_Booking_Policy_Handler {
                 // SEC-4 FIX (v2.9.26): auth required.
                 if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
-        // FASE1-REAUDIT P1 FIX: add is_ltms_vendor() check (was missing — customers
-        // could call this endpoint, though they got an empty list).
-        if ( ! method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) || ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
-            wp_send_json_error( [ 'message' => __( 'Solo vendedores pueden gestionar políticas.', 'ltms' ) ], 403 );
-        }
         wp_send_json_success( self::get_vendor_policies( get_current_user_id() ) );
     }
 
@@ -452,12 +411,6 @@ class LTMS_Booking_Policy_Handler {
 
     public static function ajax_delete_vendor_policy(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
-
-        // FASE1-REAUDIT P1 FIX: add is_ltms_vendor() check (was missing — any
-        // logged-in user including customers could call this endpoint).
-        if ( ! method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) || ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) ) {
-            wp_send_json_error( [ 'message' => __( 'Solo vendedores pueden gestionar políticas.', 'ltms' ) ], 403 );
-        }
 
         $vendor_id = get_current_user_id();
         $policy_id = absint( $_POST['policy_id'] ?? 0 );

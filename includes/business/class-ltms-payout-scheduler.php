@@ -88,22 +88,14 @@ final class LTMS_Payout_Scheduler {
             ];
         }
 
-        // Verificar balance disponible.
-        // FASE1-REAUDIT P0 REGRESSION FIX: the v2.9.115 P0-1 "fix" changed this to
-        // `$available = max(0, $balance - $held)` — but `hold()` ALREADY subtracts
-        // from `balance` and adds to `balance_pending` atomically. So `balance` IS
-        // the free balance. Subtracting `held` again double-subtracts, blocking ALL
-        // legitimate payouts after any hold. Example:
-        //   balance=1000, hold(600) → balance=400, balance_pending=600.
-        //   Old "fix": available = max(0, 400-600) = 0 → rejects payout of 200. WRONG.
-        //   Correct: available = 400 → payout of 200 succeeds.
-        // The double-spend that P0-1 tried to prevent is already blocked by the
-        // balance check inside `hold()`'s transaction (wallet.php:494,503) which
-        // catches insufficient balance atomically.
+        // Verificar balance disponible
+        // v2.9.115 PAYOUT-AUDIT P0-1 FIX: use AVAILABLE balance (balance - held), not raw balance.
+        // Before, vendor could request payout of HELD funds (already earmarked for another
+        // pending payout) → double-spend of held funds when both payouts are approved.
         $wallet    = LTMS_Business_Wallet::get_or_create( $vendor_id );
         $balance   = (float) $wallet['balance'];
-        $held      = (float) ( $wallet['balance_pending'] ?? 0 );
-        $available = $balance; // balance is already the free balance after hold().
+        $held      = (float) ( $wallet['balance_pending'] ?? $wallet['balance_reserved'] ?? 0 );
+        $available = max( 0.0, $balance - $held );
 
         if ( $amount > $available ) {
             return [
@@ -534,19 +526,11 @@ final class LTMS_Payout_Scheduler {
                 );
             } catch ( \Throwable $wallet_err ) {
                 // El gateway ya procesó el pago pero la billetera falló.
-                // FASE1-REAUDIT P0 FIX: previously marked status='completed' and
-                // fired ltms_payout_completed — but the wallet debit may NOT have
-                // executed. Result: gateway sent money to vendor's bank, wallet
-                // balance was NOT debited. Vendor has BOTH the bank money AND the
-                // wallet balance. Downstream hooks (affiliate commission, accounting)
-                // would also fire assuming the wallet was debited.
-                // Now: mark status='processing' with a 'wallet_error' flag, fire
-                // ltms_payout_wallet_error (NOT ltms_payout_completed), and trigger
-                // a CRITICAL alert for manual reconciliation.
+                // Marcar como completed con nota para revisión manual.
                 LTMS_Core_Logger::error(
                     'PAYOUT_WALLET_ERROR',
                     sprintf(
-                        'Retiro #%d: gateway OK pero wallet falló — %s. Requiere reconciliación manual URGENTE.',
+                        'Retiro #%d: gateway OK pero wallet falló — %s. Requiere ajuste manual.',
                         $payout_id,
                         $wallet_err->getMessage()
                     )
@@ -555,20 +539,17 @@ final class LTMS_Payout_Scheduler {
                 $wpdb->update(
                     $table,
                     [
-                        'status'      => 'processing', // Stuck in processing — admin must reconcile manually.
+                        'status'      => 'completed',
                         'gateway_ref' => $payment_result['reference'] ?? '',
-                        'notes'       => 'AVISO: gateway OK, wallet error: ' . $wallet_err->getMessage() . ' — REQUIERE RECONCILIACIÓN MANUAL.',
+                        'notes'       => 'AVISO: gateway OK, wallet error: ' . $wallet_err->getMessage(),
                     ],
                     [ 'id' => $payout_id ],
                     [ '%s', '%s', '%s' ],
                     [ '%d' ]
                 );
-                // FASE1-REAUDIT P0 FIX: do NOT fire ltms_payout_completed — that
-                // triggers downstream hooks (affiliate, accounting) that assume the
-                // wallet was debited. Fire a dedicated error action instead.
-                do_action( 'ltms_payout_wallet_error', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id, $wallet_err->getMessage() );
+                do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id );
                 return [
-                    'success' => false,
+                    'success' => true,
                     'message' => __( 'Retiro procesado. Advertencia: billetera requiere revisión.', 'ltms' ),
                 ];
             }
@@ -629,14 +610,10 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
             return [ 'success' => true, 'message' => __( 'Retiro aprobado y procesado exitosamente.', 'ltms' ) ];
         }
 
-        // Fallo en el gateway — resetear a 'pending' con nota de error.
-        // FASE1-REAUDIT P0 FIX: the previous code only appended an error note but
-        // did NOT reset the status. The status was already changed to 'processing'
-        // by the atomic claim (line ~394). With status stuck in 'processing',
-        // approve() rejects non-pending payouts AND process_pending_payouts cron
-        // only selects 'pending' — so the payout was stuck forever with NO recovery
-        // path. Now: reset to 'pending' so the cron or admin can retry.
+        // Fallo en el gateway — mantener en pending con nota
         // v2.9.115 PAYOUT-AUDIT P1-5 FIX: append error to existing notes, don't overwrite.
+        // Before, this update overwrote any existing notes (e.g., name mismatch flag
+        // from KYC submit) with just the gateway error message.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
         $new_notes = sprintf( 'Error gateway: %s', $payment_result['message'] );
@@ -645,37 +622,11 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         }
         $wpdb->update(
             $table,
-            [
-                'status' => 'pending',
-                'notes'  => $new_notes,
-            ],
+            [ 'notes' => $new_notes ],
             [ 'id' => $payout_id ],
-            [ '%s', '%s' ],
+            [ '%s' ],
             [ '%d' ]
         );
-
-        // FASE1-REAUDIT P0 FIX: release the held funds back to the vendor's
-        // available balance so they're not locked. The hold() at create_request
-        // moved balance→balance_pending; if the gateway failed, we must reverse it.
-        try {
-            $release_result = LTMS_Business_Wallet::release(
-                $payout['vendor_id'],
-                (float) $payout['amount'],
-                sprintf( 'Liberación: payout #%d fallido en gateway', $payout_id ),
-                'payout_release_fail_' . $payout_id
-            );
-            if ( ! $release_result ) {
-                LTMS_Core_Logger::warning(
-                    'PAYOUT_GATEWAY_FAIL_RELEASE',
-                    sprintf( 'Payout #%d: gateway failed AND wallet release returned false — funds may be stuck in balance_pending.', $payout_id )
-                );
-            }
-        } catch ( \Throwable $rel_e ) {
-            LTMS_Core_Logger::error(
-                'PAYOUT_GATEWAY_FAIL_RELEASE_ERROR',
-                sprintf( 'Payout #%d: gateway failed AND wallet release threw: %s', $payout_id, $rel_e->getMessage() )
-            );
-        }
 
         return [ 'success' => false, 'message' => $payment_result['message'] ];
     }
