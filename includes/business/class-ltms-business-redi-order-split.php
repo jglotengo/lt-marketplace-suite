@@ -128,12 +128,15 @@ class LTMS_Business_Redi_Order_Split {
 
         // Retener comisión del vendedor origen durante el período de protección al consumidor
         $origin_held = false;
+        $origin_tx_id = 0;
         if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
             $origin_held = LTMS_Business_Consumer_Protection::hold_commission( $origin_vendor_id, $origin_vendor_net, $order->get_id() );
         }
         if ( ! $origin_held ) {
-            // M-108: firma correcta = credit(vendor, amount, description:string, metadata:array, order_id:int)
-            LTMS_Business_Wallet::credit(
+            // FASE5 P0 FIX: capture the actual wallet tx_id returned by credit().
+            // Previously the return value was discarded and origin_tx_id was set
+            // to boolean true → ledger unreconcilable, audit trail broken.
+            $origin_tx_id = (int) LTMS_Business_Wallet::credit(
                 $origin_vendor_id,
                 $origin_vendor_net,
                 sprintf(
@@ -145,22 +148,16 @@ class LTMS_Business_Redi_Order_Split {
                 $order->get_id()
             );
         }
-        $origin_tx_id = $origin_held ? null : true; // compat for record_redi_commission
 
         // Retener comisión del revendedor durante el período de protección al consumidor
-        // AUDIT-RD-BK RD-3 FIX: omitir todo el bloque de crédito/hold cuando
-        // $reseller_commission es 0 (caso self-purchase o rate=0). Antes se
-        // llamaba a Wallet::credit(0) y Consumer_Protection::hold_commission(0),
-        // generando transacciones de monto 0 en lt_wallet_transactions y
-        // filas fantasma en la tabla de holds — contaminación de ledger.
         $reseller_held = false;
+        $reseller_tx_id = 0;
         if ( $reseller_commission > 0 ) {
             if ( class_exists( 'LTMS_Business_Consumer_Protection' ) ) {
                 $reseller_held = LTMS_Business_Consumer_Protection::hold_commission( $reseller_id, $reseller_commission, $order->get_id() );
             }
             if ( ! $reseller_held ) {
-                // M-108: firma correcta
-                LTMS_Business_Wallet::credit(
+                $reseller_tx_id = (int) LTMS_Business_Wallet::credit(
                     $reseller_id,
                     $reseller_commission,
                     sprintf(
@@ -173,7 +170,6 @@ class LTMS_Business_Redi_Order_Split {
                 );
             }
         }
-        $reseller_tx_id = ( $reseller_commission > 0 && ! $reseller_held ) ? true : null; // compat for record_redi_commission
 
         self::record_redi_commission(
             $order, $origin_vendor_id, $reseller_id,

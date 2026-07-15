@@ -137,16 +137,31 @@ class LTMS_Business_Pickup_Handler {
      * @return array
      */
     public static function adjust_ica_for_pickup( array $result, $order, array $vendor_data, string $country ): array {
-        if ( $country !== 'CO' || ! ( $order instanceof \WC_Order ) ) {
+        // FASE5 P0 FIX: the ltms_after_tax_calculate filter passes $order_data as
+        // an ARRAY (not WC_Order). The previous instanceof check always failed →
+        // ICA tax for pickup orders was NEVER adjusted to vendor's municipality.
+        // Now: handle both array (from tax engine) and WC_Order (legacy callers).
+        if ( $country !== 'CO' ) {
             return $result;
         }
 
-        $shipping_methods = $order->get_shipping_methods();
-        $is_pickup        = false;
-        foreach ( $shipping_methods as $method ) {
-            if ( strpos( $method->get_method_id(), 'ltms_pickup' ) !== false ) {
+        $is_pickup = false;
+        if ( $order instanceof \WC_Order ) {
+            $shipping_methods = $order->get_shipping_methods();
+            foreach ( $shipping_methods as $method ) {
+                $method_id = $method->get_method_id();
+                $parts = explode( ':', $method_id );
+                if ( isset( $parts[0] ) && $parts[0] === 'ltms_pickup' ) {
+                    $is_pickup = true;
+                    break;
+                }
+            }
+        } elseif ( is_array( $order ) ) {
+            // Tax engine passes order_data array — check shipping_method field.
+            $shipping_method = $order['shipping_method'] ?? '';
+            $parts = explode( ':', (string) $shipping_method );
+            if ( isset( $parts[0] ) && $parts[0] === 'ltms_pickup' ) {
                 $is_pickup = true;
-                break;
             }
         }
 
