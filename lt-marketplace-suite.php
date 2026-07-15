@@ -4,7 +4,7 @@
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
  * Version:           2.9.176
->>>>>>> 40389df30a0e9e3ef58700e6aa22ab51b72a763b
+ * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
  * Author URI:        https://ltmarketplace.co
@@ -36,7 +36,6 @@ define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
 define( 'LTMS_VERSION', '2.9.176' );
->>>>>>> 40389df30a0e9e3ef58700e6aa22ab51b72a763b
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
