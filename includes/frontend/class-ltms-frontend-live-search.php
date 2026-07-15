@@ -97,6 +97,7 @@ class LTMS_Frontend_Live_Search {
             'role__in'   => [ 'ltms_vendor', 'ltms_vendor_premium' ],
             'search'     => '*' . esc_attr( $q ) . '*',
             'search_columns' => [ 'display_name', 'user_email' ],
+            'number'     => 20,  // FASE8: limit search results
             'number'     => $limit,
         ] );
 

@@ -471,6 +471,7 @@ final class LTMS_Public_Auth_Handler {
                 'meta_value' => $data['referral_code'],
                 'number'     => 1,
                 'fields'     => 'ID',
+                'number'     => 1,
             ] );
             if ( empty( $referrer ) ) {
                 // Invalid code — don't fail registration, just clear it.

@@ -143,6 +143,7 @@ class LTMS_Vendor_Storefront {
             'meta_value' => $slug,
             'number'     => 1,
             'role'       => 'ltms_vendor',
+            'number'     => 1,  // FASE8: slug lookup returns max 1
         ] );
 
         // Nivel 2 — compatibilidad histórica: login exacto (solo funciona
