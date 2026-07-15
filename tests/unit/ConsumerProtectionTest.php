@@ -78,7 +78,17 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
         Functions\stubs([
             'current_time'  => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
             'sanitize_text_field' => static fn($s) => trim(strip_tags((string)$s)),
+            'sanitize_textarea_field' => static fn($s) => trim(strip_tags((string)$s)),
             '__'            => static fn($s) => $s,
+            'wp_json_encode' => static fn($d, $o = 0, $d2 = 512) => json_encode($d, $o, $d2),
+            'wp_mail'       => true,
+            'do_action'     => null,
+            'apply_filters' => static fn($tag, $value) => $value,
+            'current_user_can' => static fn($cap) => true,
+            'get_userdata'  => static fn($id) => null,
+            'is_wp_error'   => static fn($t) => $t instanceof \WP_Error,
+            'wc_create_refund' => static fn($args = []) => false,
+            'get_current_user_id' => static fn() => 1,
         ]);
     }
 

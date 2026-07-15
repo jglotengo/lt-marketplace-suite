@@ -71,6 +71,14 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             'get_post_meta'       => static fn($id, $key, $single) => false,
             'get_option'          => static fn($k, $d = false) => $d,
             'get_current_user_id' => static fn() => 1,
+            '__'                  => static fn($s) => $s,
+            'esc_url_raw'         => static fn($s) => $s,
+            'esc_html'            => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
+            'wc_get_order'        => static fn($id) => false,
+            'wp_next_scheduled'   => static fn($hook) => false,
+            'wp_schedule_event'   => true,
+            'do_action'           => null,
+            'apply_filters'       => static fn($tag, $value) => $value,
         ]);
     }
 
