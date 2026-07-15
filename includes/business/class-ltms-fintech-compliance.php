@@ -945,7 +945,12 @@ class LTMS_Fintech_Compliance {
     public static function render_2fa_required_notice(): void {
         if ( ! is_user_logged_in() ) return;
         $user_id = get_current_user_id();
-        if ( ! user_can( $user_id, 'vendor' ) ) return;
+        // RE-AUDIT P1 FIX: user_can($user_id, 'vendor') checks a CAPABILITY named
+        // 'vendor' which doesn't exist. Changed to role check matching the enforcement
+        // side (enforce_2fa_for_payout_vendors at line 915).
+        $user = wp_get_current_user();
+        $vendor_roles = [ 'ltms_vendor', 'ltms_vendor_premium', 'vendor' ];
+        if ( ! array_intersect( $vendor_roles, (array) $user->roles ) ) return;
         if ( get_user_meta( $user_id, '_ltms_2fa_required_notice', true ) !== 'yes' ) return;
         $has_2fa = get_user_meta( $user_id, '_ltms_2fa_verified', true ) === 'yes';
         if ( $has_2fa ) {

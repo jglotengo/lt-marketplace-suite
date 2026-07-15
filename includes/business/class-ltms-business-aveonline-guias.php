@@ -291,6 +291,28 @@ class LTMS_Business_Aveonline_Guias {
         $contraentrega   = (int)   ( $_POST['contraentrega']   ?? 0 );     // phpcs:ignore
         $idasumecosto    = (int)   ( $_POST['idasumecosto']    ?? 0 );     // phpcs:ignore
 
+        // RE-AUDIT P1 FIX: replicate package validation from ajax_cotizar().
+        // Without this, a vendor could generate guides with NaN/INF/negative/zero
+        // dimensions → invalid guides billed to the vendor.
+        if ( ! is_finite( $peso ) || $peso <= 0 || $peso > 1000 ) {
+            wp_send_json_error( [ 'message' => __( 'Peso inválido (debe ser 0.1-1000 kg).', 'ltms' ) ] );
+        }
+        foreach ( [ 'alto' => $alto, 'largo' => $largo, 'ancho' => $ancho ] as $dim_name => $dim_val ) {
+            if ( ! is_finite( $dim_val ) || $dim_val <= 0 || $dim_val > 500 ) {
+                wp_send_json_error( [ 'message' => sprintf( __( '%s inválido (debe ser 1-500 cm).', 'ltms' ), $dim_name ) ] );
+            }
+        }
+        if ( ! is_finite( $valor_declarado ) || $valor_declarado < 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Valor declarado inválido.', 'ltms' ) ] );
+        }
+        // RE-AUDIT P1 FIX: valorrecaudo ↔ contraentrega consistency (same as ajax_cotizar).
+        if ( $contraentrega > 0 && $valorrecaudo <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Contraentrega activa requiere valor de recaudo > 0.', 'ltms' ) ] );
+        }
+        if ( $contraentrega === 0 && $valorrecaudo > 0 ) {
+            $valorrecaudo = 0; // Clear COD amount if carrier won't collect.
+        }
+
         if ( ! $idtransportador || ! $origen || ! $destino || ! $destinatario || ! $dir_dest || ! $tel_dest ) {
             wp_send_json_error( [ 'message' => 'Faltan campos requeridos.' ] );
         }

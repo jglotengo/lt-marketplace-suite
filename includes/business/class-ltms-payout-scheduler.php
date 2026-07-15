@@ -657,11 +657,16 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         // FASE1-REAUDIT P0 FIX: release the held funds back to the vendor's
         // available balance so they're not locked. The hold() at create_request
         // moved balance→balance_pending; if the gateway failed, we must reverse it.
+        // RE-AUDIT P0 FIX: previous call passed idempotency_key (string) as 4th arg
+        // (metadata array) → TypeError → release NEVER executed → funds locked forever.
         try {
             $release_result = LTMS_Business_Wallet::release(
-                $payout['vendor_id'],
+                (int) $payout['vendor_id'],
                 (float) $payout['amount'],
                 sprintf( 'Liberación: payout #%d fallido en gateway', $payout_id ),
+                [ 'payout_id' => $payout_id, 'type' => 'gateway_fail_release' ],
+                0,
+                '',
                 'payout_release_fail_' . $payout_id
             );
             if ( ! $release_result ) {
