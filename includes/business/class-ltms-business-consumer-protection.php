@@ -966,8 +966,19 @@ class LTMS_Business_Consumer_Protection {
         // dejando a los demás vendors con saldo indebido.
         $vendor_net = (float) $order->get_meta( '_ltms_vendor_net' );
         if ( $vendor_net <= 0 ) {
-            // Fallback: si no hay meta (pedido legacy), usar order_total como antes.
-            $vendor_net = $refund_amount;
+            // RE-AUDIT P1 FIX: legacy fallback used full order_total → vendor
+            // debited order_total but only received vendor_net (< order_total).
+            // Vendor loses platform_fee + withholding more than they earned.
+            // Now: cap at 80% of order_total as conservative estimate (typical
+            // platform_fee is 10-20%), log critical for manual review.
+            $vendor_net = $refund_amount * 0.80;
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'DISPUTE_LEGACY_NO_VENDOR_NET',
+                    sprintf( 'Dispute #%d order #%d: no _ltms_vendor_net meta. Using 80%% fallback ($%.2f of $%.2f). Manual review required.', $dispute_id, $order_id, $vendor_net, $refund_amount ),
+                    [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'fallback_net' => $vendor_net, 'order_total' => $refund_amount ]
+                );
+            }
         }
 
         // FU4: construir lista de vendors a debitar con sus montos individuales.

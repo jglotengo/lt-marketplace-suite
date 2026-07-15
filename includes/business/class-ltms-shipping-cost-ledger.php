@@ -1949,18 +1949,27 @@ class LTMS_Shipping_Cost_Ledger {
                 $idempotency_key
             );
 
-            // Guardar el tx_id en el primer ledger entry del pedido.
+            // RE-AUDIT P1 FIX: was updating ALL ledger entries for the order
+            // (no LIMIT) → each entry appeared backed by the full platform tx.
+            // Now: only update entries that don't already have a platform_wallet_tx_id.
             global $wpdb;
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update(
-                $wpdb->prefix . 'lt_shipping_cost_ledger',
-                [ 'platform_wallet_tx_id' => (int) $tx_id, 'updated_at' => current_time( 'mysql', true ) ],
-                [ 'order_id' => $order->get_id() ]
-            );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE `{$wpdb->prefix}lt_shipping_cost_ledger`
+                 SET `platform_wallet_tx_id` = %d, `updated_at` = %s
+                 WHERE `order_id` = %d AND `platform_wallet_tx_id` IS NULL",
+                (int) $tx_id,
+                current_time( 'mysql', true ),
+                $order->get_id()
+            ) );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Platform shipping
+            // cost is never recorded in wallet ledger → silent accounting gap.
+            // Now: critical so monitoring alerts fire for manual reconciliation.
+            LTMS_Core_Logger::critical(
                 'PLATFORM_LEDGER_ENTRY_FAILED',
-                sprintf( 'Order #%d: %s', $order->get_id(), $e->getMessage() )
+                sprintf( 'Order #%d: platform wallet entry FAILED: %s. Platform cost $%.2f %s unrecorded — manual reconciliation required.', $order->get_id(), $e->getMessage(), $amount, $currency ),
+                [ 'order_id' => $order->get_id(), 'amount' => $amount, 'currency' => $currency, 'error' => $e->getMessage() ]
             );
         }
     }
