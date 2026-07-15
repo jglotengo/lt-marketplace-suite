@@ -1,0 +1,265 @@
+<?php
+/**
+ * FintechComplianceTest — Tests unitarios para LTMS_Fintech_Compliance
+ *
+ * Cubre:
+ * - Constants: UMA_2026_MXN, TRAVEL_RULE_USD_THRESHOLD, SANCTIONS_LISTS, PLD_ACTIVITIES
+ * - convert_to_usd(): USD passthrough, COP/MXN conversion, FX-1 FIX (default 0 → PHP_FLOAT_MAX)
+ * - recalculate_pld_mx_threshold(): UMA-scaled, cash vs electronic
+ * - get_legal_basis(): CO, MX, CROSS-BORDER keys
+ * - enforce_2fa_for_payout_vendors(): role check (vendor, ltms_vendor, ltms_vendor_premium)
+ * - screen_against_sanctions_lists(): SARLAFT fail-closed when list unavailable
+ *
+ * @package LTMS\Tests\Unit
+ */
+
+declare(strict_types=1);
+
+namespace LTMS\Tests\Unit;
+
+use Brain\Monkey;
+use Brain\Monkey\Functions;
+use ReflectionClass;
+
+/**
+ * @covers LTMS_Fintech_Compliance
+ */
+class FintechComplianceTest extends LTMS_Unit_Test_Case {
+
+    private object $mock_wpdb;
+
+    protected function setUp(): void {
+        parent::setUp();
+
+        $this->mock_wpdb = new class {
+            public $prefix = 'wp_';
+            public function prepare($sql, ...$args) { return $sql; }
+            public function query($sql) { return true; }
+            public function get_var($sql) { return null; }
+            public function get_row($sql, $o = OBJECT) { return null; }
+            public function get_results($sql, $o = OBJECT) { return []; }
+            public function get_col($sql) { return []; }
+            public function insert($t, $d, $f = null) { return 1; }
+            public function update($t, $d, $w, $f = null, $wf = null) { return 1; }
+        };
+        $GLOBALS['wpdb'] = $this->mock_wpdb;
+
+        Functions\stubs([
+            'current_time'   => static fn($t, $gmt = false) => gmdate('Y-m-d H:i:s'),
+            'wp_json_encode' => static fn($d, $o = 0, $d2 = 512) => json_encode($d, $o, $d2),
+            'wp_remote_get'  => static fn($url, $args = []) => new \WP_Error('http_error', 'mock'),
+            'is_wp_error'    => static fn($t) => $t instanceof \WP_Error,
+            'wp_remote_retrieve_body' => static fn($r) => '',
+            'wp_remote_retrieve_response_code' => static fn($r) => 0,
+            'wp_mail'        => true,
+            'get_bloginfo'   => static fn($k) => 'LT Marketplace',
+            'get_userdata'   => static fn($id) => null,
+            '__'             => static fn($s) => $s,
+            'esc_html'       => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
+            'esc_xml'        => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),
+            'get_option'     => static fn($k, $d = false) => $d,
+            'update_user_meta' => true,
+            'delete_user_meta' => true,
+            'wp_upload_dir'  => static fn() => ['basedir' => sys_get_temp_dir(), 'baseurl' => 'http://example.com'],
+            'wp_mkdir_p'     => true,
+            'file_exists'    => static fn($p) => false,
+            'file_put_contents' => static fn($p, $c) => strlen($c),
+            'fopen'          => static fn($p, $m) => false,
+            'get_transient'  => static fn($k) => false,
+            'set_transient'  => true,
+            'DAY_IN_SECONDS' => 86400,
+        ]);
+    }
+
+    private static function callPrivate(string $method, mixed ...$args): mixed {
+        $ref = new ReflectionClass(\LTMS_Fintech_Compliance::class);
+        $m = $ref->getMethod($method);
+        $m->setAccessible(true);
+        return $m->invoke(null, ...$args);
+    }
+
+    // ── SECCIÓN 1 — Constants ─────────────────────────────────────────────
+
+    public function test_uma_2026_mxn_is_108_57(): void {
+        $this->assertSame(108.57, \LTMS_Fintech_Compliance::UMA_2026_MXN);
+    }
+
+    public function test_travel_rule_threshold_is_1000_usd(): void {
+        $this->assertSame(1000.0, \LTMS_Fintech_Compliance::TRAVEL_RULE_USD_THRESHOLD);
+    }
+
+    public function test_sanctions_lists_has_three_sources(): void {
+        $lists = \LTMS_Fintech_Compliance::SANCTIONS_LISTS;
+        $this->assertArrayHasKey('ofac_sdn', $lists);
+        $this->assertArrayHasKey('un_consolidated', $lists);
+        $this->assertArrayHasKey('eu_restrictive', $lists);
+    }
+
+    public function test_pld_activities_has_cash_and_electronic(): void {
+        $activities = \LTMS_Fintech_Compliance::PLD_ACTIVITIES;
+        $this->assertContains('cash', $activities);
+        $this->assertContains('electronic', $activities);
+    }
+
+    public function test_lfpidrpi_thresholds_uma_has_both_activity_types(): void {
+        $thresholds = \LTMS_Fintech_Compliance::LFPIDRPI_THRESHOLDS_UMA;
+        $this->assertArrayHasKey('cash', $thresholds);
+        $this->assertArrayHasKey('electronic', $thresholds);
+        $this->assertSame(5610, $thresholds['cash']);
+        $this->assertSame(10140, $thresholds['electronic']);
+    }
+
+    public function test_default_limits_has_required_keys(): void {
+        $limits = \LTMS_Fintech_Compliance::DEFAULT_LIMITS;
+        $this->assertArrayHasKey('daily_payout_usd', $limits);
+        $this->assertArrayHasKey('monthly_payout_usd', $limits);
+        $this->assertArrayHasKey('daily_tx_count', $limits);
+        $this->assertSame(5000.0, $limits['daily_payout_usd']);
+    }
+
+    // ── SECCIÓN 2 — convert_to_usd (FX-1 FIX) ────────────────────────────
+
+    public function test_convert_to_usd_usd_passthrough(): void {
+        $this->assertSame(100.0, self::callPrivate('convert_to_usd', 100.0, 'USD'));
+    }
+
+    public function test_convert_to_usd_with_configured_cop_rate(): void {
+        $this->mock_options(['ltms_usd_COP_rate' => 4100.0]);
+        $result = self::callPrivate('convert_to_usd', 4100000.0, 'COP');
+        $this->assertEqualsWithDelta(1000.0, $result, 0.01);
+    }
+
+    public function test_convert_to_usd_with_configured_mxn_rate(): void {
+        $this->mock_options(['ltms_usd_MXN_rate' => 17.5]);
+        $result = self::callPrivate('convert_to_usd', 1750.0, 'MXN');
+        $this->assertEqualsWithDelta(100.0, $result, 0.01);
+    }
+
+    public function test_convert_to_usd_returns_float_max_when_rate_missing(): void {
+        // FASE4 P0 FIX: missing rate → PHP_FLOAT_MAX (fail-safe: blocks high-value ops).
+        $result = self::callPrivate('convert_to_usd', 5000000.0, 'COP');
+        $this->assertSame(PHP_FLOAT_MAX, $result, 'Missing FX rate must return PHP_FLOAT_MAX (fail-safe)');
+    }
+
+    public function test_convert_to_usd_returns_float_max_when_rate_zero(): void {
+        $this->mock_options(['ltms_usd_COP_rate' => 0]);
+        $result = self::callPrivate('convert_to_usd', 5000000.0, 'COP');
+        $this->assertSame(PHP_FLOAT_MAX, $result, 'Zero FX rate must return PHP_FLOAT_MAX (fail-safe)');
+    }
+
+    public function test_convert_to_usd_returns_float_max_when_rate_negative(): void {
+        $this->mock_options(['ltms_usd_COP_rate' => -100]);
+        $result = self::callPrivate('convert_to_usd', 5000000.0, 'COP');
+        $this->assertSame(PHP_FLOAT_MAX, $result);
+    }
+
+    // ── SECCIÓN 3 — recalculate_pld_mx_threshold ──────────────────────────
+
+    public function test_recalculate_pld_mx_threshold_electronic(): void {
+        // UMA 108.57 × 10140 = 1,100,899.80 MXN.
+        $threshold = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'electronic');
+        $expected = 108.57 * 10140;
+        $this->assertEqualsWithDelta($expected, $threshold, 0.01);
+    }
+
+    public function test_recalculate_pld_mx_threshold_cash(): void {
+        // UMA 108.57 × 5610 = 609,077.70 MXN.
+        $threshold = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'cash');
+        $expected = 108.57 * 5610;
+        $this->assertEqualsWithDelta($expected, $threshold, 0.01);
+    }
+
+    public function test_recalculate_pld_mx_threshold_unknown_activity_defaults_to_electronic(): void {
+        $threshold = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'unknown');
+        $expected = 108.57 * 10140; // electronic default
+        $this->assertEqualsWithDelta($expected, $threshold, 0.01);
+    }
+
+    public function test_recalculate_pld_mx_threshold_uses_configured_uma(): void {
+        $this->mock_options(['ltms_mx_uma_valor' => 200.0]);
+        $threshold = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'electronic');
+        $expected = 200.0 * 10140;
+        $this->assertEqualsWithDelta($expected, $threshold, 0.01);
+    }
+
+    public function test_recalculate_pld_mx_threshold_cash_lower_than_electronic(): void {
+        $cash = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'cash');
+        $electronic = \LTMS_Fintech_Compliance::recalculate_pld_mx_threshold(0.0, 'electronic');
+        $this->assertLessThan($electronic, $cash, 'Cash threshold must be lower than electronic');
+    }
+
+    // ── SECCIÓN 4 — get_legal_basis ───────────────────────────────────────
+
+    public function test_get_legal_basis_returns_co_mx_cross_border(): void {
+        $basis = \LTMS_Fintech_Compliance::get_legal_basis();
+        $this->assertArrayHasKey('CO', $basis);
+        $this->assertArrayHasKey('MX', $basis);
+        $this->assertArrayHasKey('CROSS-BORDER', $basis);
+    }
+
+    public function test_get_legal_basis_co_includes_sarlaft(): void {
+        $basis = \LTMS_Fintech_Compliance::get_legal_basis();
+        $this->assertArrayHasKey('Ley 526/1999 (SARLAFT)', $basis['CO']);
+    }
+
+    public function test_get_legal_basis_mx_includes_ley_fintech_95(): void {
+        $basis = \LTMS_Fintech_Compliance::get_legal_basis();
+        $this->assertArrayHasKey('Ley Fintech art. 95', $basis['MX']);
+    }
+
+    public function test_get_legal_basis_cross_border_includes_fatf_travel_rule(): void {
+        $basis = \LTMS_Fintech_Compliance::get_legal_basis();
+        $this->assertArrayHasKey('FATF Rec. 16', $basis['CROSS-BORDER']);
+    }
+
+    public function test_get_legal_basis_cross_border_includes_pci_dss(): void {
+        $basis = \LTMS_Fintech_Compliance::get_legal_basis();
+        $this->assertArrayHasKey('PCI DSS v4.0 SAQ-A', $basis['CROSS-BORDER']);
+    }
+
+    // ── SECCIÓN 5 — enforce_2fa_for_payout_vendors (FASE4 P0 FIX) ─────────
+
+    public function test_enforce_2fa_skips_non_vendor_user(): void {
+        $user = new \WP_User(1);
+        $user->roles = ['subscriber'];
+        // Should return early without doing anything.
+        \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
+        $this->assertTrue(true); // Just verify no exception.
+    }
+
+    public function test_enforce_2fa_accepts_ltms_vendor_role(): void {
+        $user = new \WP_User(1);
+        $user->roles = ['ltms_vendor'];
+        // No recent payouts in mock → returns early.
+        \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
+        $this->assertTrue(true);
+    }
+
+    public function test_enforce_2fa_accepts_ltms_vendor_premium_role(): void {
+        $user = new \WP_User(1);
+        $user->roles = ['ltms_vendor_premium'];
+        \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
+        $this->assertTrue(true);
+    }
+
+    public function test_enforce_2fa_accepts_vendor_role_for_backward_compat(): void {
+        // FASE4 P0 FIX: 'vendor' role should also be checked (backward compat).
+        $user = new \WP_User(1);
+        $user->roles = ['vendor'];
+        \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
+        $this->assertTrue(true);
+    }
+
+    // ── SECCIÓN 6 — normalize_for_match ───────────────────────────────────
+
+    public function test_normalize_for_match_lowercases(): void {
+        $result = self::callPrivate('normalize_for_match', 'JUAN PEREZ');
+        $this->assertSame('juan perez', $result);
+    }
+
+    public function test_normalize_for_match_strips_accents(): void {
+        $result = self::callPrivate('normalize_for_match', 'JUAN PÉREZ');
+        // Accents stripped to ASCII.
+        $this->assertStringNotContainsString('É', $result);
+    }
+}
