@@ -227,13 +227,31 @@ class LTMS_Admin_Bookings {
         if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Unauthorized', 403 );
         check_admin_referer( 'ltms_export_bookings_csv' );
         global $wpdb;
-        $bookings = $wpdb->get_results( "SELECT id, wc_order_id, product_id, vendor_id, customer_id, checkin_date, checkout_date, guests, total_price, status, payment_mode, currency, created_at FROM {$wpdb->prefix}lt_bookings ORDER BY created_at DESC", ARRAY_A ) ?: [];
+        // FASE3 P1 FIX: add LIMIT 5000 to prevent memory exhaustion on large marketplaces.
+        $bookings = $wpdb->get_results( "SELECT id, wc_order_id, product_id, vendor_id, customer_id, checkin_date, checkout_date, guests, total_price, status, payment_mode, currency, created_at FROM {$wpdb->prefix}lt_bookings ORDER BY created_at DESC LIMIT 5000", ARRAY_A ) ?: [];
         header( 'Content-Type: text/csv; charset=UTF-8' );
         header( 'Content-Disposition: attachment; filename="ltms-bookings-' . gmdate( 'Y-m-d' ) . '.csv"' );
         $out = fopen( 'php://output', 'w' );
         fputcsv( $out, [ 'ID', 'Orden WC', 'Producto', 'Vendedor', 'Cliente', 'Check-in', 'Check-out', 'Huéspedes', 'Total', 'Estado', 'Modo Pago', 'Moneda', 'Creada' ] );
-        foreach ( $bookings as $row ) fputcsv( $out, array_values( $row ) );
+        foreach ( $bookings as $row ) {
+            // FASE3 P1 FIX: CSV formula-injection protection (same pattern as admin-payouts).
+            $safe_row = array_map( static function( $val ) {
+                if ( is_string( $val ) && preg_match( '/^[=+\-@]/', $val ) ) {
+                    return "'" . $val;
+                }
+                return $val;
+            }, array_values( $row ) );
+            fputcsv( $out, $safe_row );
+        }
         fclose( $out );
+        // FASE3 P1 FIX: audit log for Ley 1581 art. 15 compliance.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'BOOKINGS_CSV_EXPORT',
+                sprintf( 'Admin #%d exported %d bookings to CSV.', get_current_user_id(), count( $bookings ) ),
+                [ 'admin_id' => get_current_user_id(), 'count' => count( $bookings ) ]
+            );
+        }
         exit;
     }
 }

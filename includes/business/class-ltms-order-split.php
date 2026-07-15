@@ -110,6 +110,16 @@ final class LTMS_Business_Order_Split {
                 ? LTMS_Commission_Strategy::get_rate( $vendor_id, $order )
                 : (float) LTMS_Core_Config::get( 'ltms_platform_commission_rate', 0.15 );
 
+            // P2 FIX: validate platform_rate — if >1.0 or <0.0, platform_fee
+            // could exceed gross_amount → negative vendor_gross → max(0.0,...)
+            // clamps to zero but platform over-collects.
+            if ( ! is_finite( $platform_rate ) || $platform_rate < 0.0 || $platform_rate > 1.0 ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning( 'ORDER_SPLIT_INVALID_RATE', sprintf( 'Vendor #%d: invalid platform_rate %s, falling back to 0.15.', $vendor_id, var_export( $platform_rate, true ) ) );
+                }
+                $platform_rate = 0.15;
+            }
+
             $tax_breakdown = self::calculate_tax_breakdown( $gross_amount, $order, $vendor_id, $country );
 
             $platform_fee = round( $gross_amount * $platform_rate, 2 );
@@ -185,7 +195,13 @@ final class LTMS_Business_Order_Split {
                 $order->update_meta_data( '_ltms_vendor_split_breakdown', $per_vendor );
             }
 
-            $order->save();
+            // RE-AUDIT P1 FIX: order meta is saved AFTER the outer transaction
+            // COMMIT, not before. Previously, meta was saved at line 188 BEFORE
+            // START TRANSACTION — if Phase 2 rolled back, the meta persisted,
+            // causing approve_dispute() to later debit a vendor who was never
+            // credited. Now: meta is saved only after successful COMMIT.
+            // (The save is moved to after the COMMIT below.)
+            $pending_meta_save = true;
         }
 
         // Phase 2: ONE outer transaction for ALL credits + record_commissions.
@@ -304,8 +320,11 @@ final class LTMS_Business_Order_Split {
                 // con el ROLLBACK si algo falla después.
                 $existing_commission_id = (int) $wpdb->get_var(
                     $wpdb->prepare(
+                        // RE-AUDIT P1 FIX: added FOR UPDATE to prevent TOCTOU race
+                        // under MySQL REPEATABLE READ where two concurrent process()
+                        // calls both see no existing commission and both INSERT.
                         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                        "SELECT id FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1",
+                        "SELECT id FROM `{$wpdb->prefix}lt_commissions` WHERE order_id = %d AND vendor_id = %d LIMIT 1 FOR UPDATE",
                         $order->get_id(),
                         $vendor_id
                     )
@@ -347,6 +366,13 @@ final class LTMS_Business_Order_Split {
             }
 
             $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+            // RE-AUDIT P1 FIX: save order meta AFTER successful COMMIT — if the
+            // transaction had rolled back, the meta would have persisted, causing
+            // approve_dispute() to debit vendors who were never credited.
+            if ( ! empty( $pending_meta_save ) ) {
+                $order->save();
+            }
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
@@ -564,11 +590,23 @@ final class LTMS_Business_Order_Split {
         try {
             return LTMS_Tax_Engine::calculate( $gross_amount, $order_data, $vendor_data, $country );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::error(
-                'TAX_BREAKDOWN_FAILED',
-                sprintf( 'Error calculando impuestos pedido #%d: %s', $order->get_id(), $e->getMessage() )
-            );
-            return [ 'withholding_total' => 0.0 ];
+            // RE-AUDIT P1 FIX: returning withholding_total=0 on failure → vendor
+            // receives full vendor_gross with ZERO tax withholding → platform
+            // undercollects taxes (ReteIVA, ReteICA). Now: log as critical and
+            // return a conservative estimate (default withholding rate) rather
+            // than zero, so taxes are over-collected rather than under-collected.
+            $default_rate = class_exists( 'LTMS_Core_Config' )
+                ? (float) LTMS_Core_Config::get( 'ltms_tax_fallback_withholding_rate', 0.10 )
+                : 0.10;
+            $fallback_withholding = round( $gross_amount * $default_rate, 2 );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'TAX_BREAKDOWN_FAILED',
+                    sprintf( 'Pedido #%d: tax engine failed: %s. Using fallback withholding $%.2f (rate=%.1f%%).', $order->get_id(), $e->getMessage(), $fallback_withholding, $default_rate * 100 ),
+                    [ 'order_id' => $order->get_id(), 'gross' => $gross_amount, 'fallback_withholding' => $fallback_withholding, 'error' => $e->getMessage() ]
+                );
+            }
+            return [ 'withholding_total' => $fallback_withholding ];
         }
     }
 
@@ -827,9 +865,13 @@ final class LTMS_Business_Order_Split {
         try {
             LTMS_Referral_Tree::distribute_commissions( $vendor_id, $platform_fee, $order->get_id() );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Referral uplines
+            // silently lose their commissions with no retry mechanism. Now: log
+            // as critical so monitoring can trigger manual compensation.
+            LTMS_Core_Logger::critical(
                 'REFERRAL_COMMISSION_FAILED',
-                sprintf( 'Error en comisiones referidos pedido #%d: %s', $order->get_id(), $e->getMessage() )
+                sprintf( 'Order #%d vendor #%d: referral commission distribution FAILED: %s. Referral uplines may be missing commissions — manual review required.', $order->get_id(), $vendor_id, $e->getMessage() ),
+                [ 'order_id' => $order->get_id(), 'vendor_id' => $vendor_id, 'platform_fee' => $platform_fee, 'error' => $e->getMessage() ]
             );
         }
     }
@@ -928,10 +970,12 @@ final class LTMS_Business_Order_Split {
         $existing_declaration_id = (int) $order->get_meta( '_ltms_customs_declaration_id' );
         if ( $existing_declaration_id < 1 ) {
             // Meta missing — defensive fallback: query the table directly.
+            // RE-AUDIT P1 FIX: added FOR UPDATE to prevent TOCTOU race where two
+            // concurrent calls both see no existing declaration and both INSERT.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $existing_declaration_id = (int) $wpdb->get_var(
                 $wpdb->prepare(
-                    "SELECT id FROM {$wpdb->prefix}lt_customs_declarations WHERE order_id = %d LIMIT 1",
+                    "SELECT id FROM {$wpdb->prefix}lt_customs_declarations WHERE order_id = %d LIMIT 1 FOR UPDATE",
                     $order_id
                 )
             );
@@ -1118,24 +1162,54 @@ final class LTMS_Business_Order_Split {
                         $ddp_idempotency
                     );
                 } catch ( \Throwable $e ) {
-                    // Race condition: balance changed between pre-check and debit.
-                    // Fall through to partial-debit handling below.
+                    // RE-AUDIT P0 FIX: race condition — balance changed between
+                    // pre-check and debit. PHP catch blocks do NOT fall through to
+                    // the else branch. Previously, the platform silently absorbed
+                    // the full duties with no vendor debit and no debt record.
+                    // Now: attempt partial debit (debit whatever balance is left).
                     LTMS_Core_Logger::warning(
-                        'DDP_DEBIT_INSUFFICIENT',
+                        'DDP_DEBIT_RACE_FALLBACK',
                         sprintf(
-                            'Vendor #%d insufficient balance for DDP duties $%.2f (race after pre-check): %s',
+                            'Vendor #%d full DDP debit failed (race): %s. Attempting partial debit.',
                             $vendor_id,
-                            $ddp_duties,
                             $e->getMessage()
                         ),
-                        [
-                            'order_id'      => $order->get_id(),
-                            'vendor_id'     => $vendor_id,
-                            'ddp_duties'    => $ddp_duties,
-                            'currency'      => $order_currency,
-                            'platform_covers' => $ddp_duties,
-                        ]
+                        [ 'order_id' => $order->get_id(), 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties ]
                     );
+                    // Re-read balance and attempt partial debit.
+                    try {
+                        $wallet_info   = LTMS_Business_Wallet::get_balance_for_currency( $vendor_id, $order_currency );
+                        $partial_amount = max( 0.0, (float) ( $wallet_info['balance'] ?? 0 ) );
+                        if ( $partial_amount > 0 ) {
+                            LTMS_Business_Wallet::debit(
+                                $vendor_id,
+                                min( $partial_amount, $ddp_duties ),
+                                $ddp_description . ' (partial — race fallback)',
+                                $ddp_metadata,
+                                $order->get_id(),
+                                $order_currency,
+                                $ddp_idempotency . '_partial'
+                            );
+                            $platform_covers = $ddp_duties - min( $partial_amount, $ddp_duties );
+                            LTMS_Core_Logger::warning(
+                                'DDP_PARTIAL_DEBIT',
+                                sprintf( 'Vendor #%d partial DDP debit $%.2f, platform covers $%.2f.', $vendor_id, min( $partial_amount, $ddp_duties ), $platform_covers ),
+                                [ 'vendor_debited' => min( $partial_amount, $ddp_duties ), 'platform_covers' => $platform_covers ]
+                            );
+                        } else {
+                            LTMS_Core_Logger::critical(
+                                'DDP_DEBIT_TOTAL_FAILURE',
+                                sprintf( 'Vendor #%d: zero balance for DDP duties $%.2f. Platform covers full amount.', $vendor_id, $ddp_duties ),
+                                [ 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties, 'platform_covers' => $ddp_duties ]
+                            );
+                        }
+                    } catch ( \Throwable $partial_e ) {
+                        LTMS_Core_Logger::critical(
+                            'DDP_DEBIT_TOTAL_FAILURE',
+                            sprintf( 'Vendor #%d: both full and partial DDP debit failed. Platform covers $%.2f. Error: %s', $vendor_id, $ddp_duties, $partial_e->getMessage() ),
+                            [ 'vendor_id' => $vendor_id, 'ddp_duties' => $ddp_duties, 'platform_covers' => $ddp_duties, 'error' => $partial_e->getMessage() ]
+                        );
+                    }
                 }
             } else {
                 // Insufficient balance — debit what's available (if any) and

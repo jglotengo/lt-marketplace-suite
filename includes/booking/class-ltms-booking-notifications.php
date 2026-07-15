@@ -174,9 +174,23 @@ final class LTMS_Booking_Notifications {
             $mailer->send( $to, $subject, $html_body, "Content-Type: text/html\r\n" );
             return;
         }
-        add_filter( 'wp_mail_content_type', fn() => 'text/html' );
+        // v2.9.119 NOTIFICATIONS-AUDIT P1-1 FIX: use named function for filter removal.
+        // Before, arrow functions (fn() => 'text/html') created a NEW closure on each
+        // call, so remove_filter() with another arrow function would NOT remove the
+        // original filter (different closure instance). This left the content_type
+        // filter permanently changed to text/html, affecting all subsequent wp_mail
+        // calls in the same request. Now we use a static method reference which is
+        // stable and can be properly removed.
+        add_filter( 'wp_mail_content_type', [ __CLASS__, 'set_html_content_type' ] );
         wp_mail( $to, $subject, $html_body );
-        remove_filter( 'wp_mail_content_type', fn() => 'text/html' );
+        remove_filter( 'wp_mail_content_type', [ __CLASS__, 'set_html_content_type' ] );
+    }
+
+    /**
+     * v2.9.119 P1-1: Static method for wp_mail_content_type filter (stable reference).
+     */
+    public static function set_html_content_type(): string {
+        return 'text/html';
     }
 
     private static function get_booking( int $booking_id ): ?array {

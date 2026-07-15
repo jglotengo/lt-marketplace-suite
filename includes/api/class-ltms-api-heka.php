@@ -49,6 +49,11 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
         $api_key            = LTMS_Core_Security::decrypt( $encrypted_key );
         $this->account_id   = LTMS_Core_Config::get( 'ltms_heka_account_id', '' );
 
+        // INTEGRATIONS-AUDIT P1 FIX: call parent::__construct() so configurable
+        // timeout / retries apply.
+        parent::__construct();
+        $this->timeout = 30;
+
         // La API Key se incluye en todos los requests mediante este header.
         $this->default_headers['X-API-Key'] = $api_key;
     }
@@ -167,8 +172,14 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
     public function cancel_shipment( string $tracking_number ): array {
         $tracking_number = sanitize_text_field( $tracking_number );
 
-        return $this->perform_request( 'POST', '/shipments/cancel', [
+        // INTEGRATIONS-AUDIT P1 FIX: endpoint was '/shipments/cancel' (missing
+        // /v1/ prefix) — every other Heka endpoint uses /v1/. The cancel call
+        // was hitting a 404 on every attempt.
+        return $this->perform_request( 'POST', '/v1/shipments/cancel', [
             'tracking_number' => $tracking_number,
+        ], [
+            // Idempotency — repeated cancel requests must be deduped.
+            'Idempotency-Key' => 'ltms_heka_cancel_' . substr( md5( $tracking_number ), 0, 32 ),
         ] );
     }
 

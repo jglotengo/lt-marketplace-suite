@@ -272,6 +272,23 @@ final class LTMS_Google_OAuth {
     private function login_or_register( array $profile ): int|\WP_Error {
         $email = $profile['email'];
 
+        // FASE2 P0 FIX: verify email_verified flag from Google. Previously
+        // captured but never checked — if Google returned email_verified=false
+        // (unverified secondary email), the user was still registered as vendor
+        // and auto-logged-in.
+        if ( empty( $profile['verified'] ) ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'GOOGLE_OAUTH_EMAIL_NOT_VERIFIED',
+                    sprintf( 'Google OAuth: email %s not verified by Google — registration blocked.', substr( $email, 0, 3 ) . '***' . strrchr( $email, '@' ) )
+                );
+            }
+            return new \WP_Error(
+                'email_not_verified',
+                __( 'Tu email de Google no está verificado. Verifícalo en tu cuenta de Google e intenta de nuevo.', 'ltms' )
+            );
+        }
+
         // ¿Ya existe un user con este email?
         $existing = get_user_by( 'email', $email );
 
@@ -294,6 +311,11 @@ final class LTMS_Google_OAuth {
                 $existing->add_role( 'ltms_vendor' );
                 update_user_meta( $existing->ID, 'ltms_kyc_status', 'pending' );
                 update_user_meta( $existing->ID, 'ltms_email_verified', 1 );
+                // FASE2 P1 FIX: set profile_incomplete flag so promoted users
+                // must complete the wizard (phone, document, business_type,
+                // SAGRILAFT consent) before publishing products. Previously
+                // they could publish immediately after Google OAuth.
+                update_user_meta( $existing->ID, 'ltms_profile_incomplete', 1 );
                 return $existing->ID;
             }
 

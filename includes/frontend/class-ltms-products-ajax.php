@@ -145,8 +145,19 @@ class LTMS_Products_Ajax {
                 if ( isset( $_POST['settings'][ $field ] ) ) { // phpcs:ignore
                     $raw = wp_unslash( $_POST['settings'][ $field ] ); // phpcs:ignore
                     // v2.9.99: sanitization per-field type.
+                    // INTEGRATIONS-AUDIT P0 FIX: removed dead-code first branch
+                    // that bypassed IDOR protection on ltms_store_logo_id. The
+                    // ownership check (post_author === $user_id) now applies.
                     if ( $field === 'ltms_store_logo_id' ) {
-                        $settings_map[ $field ] = absint( $raw );
+                        // v2.9.99 REG-2 FIX: IDOR protection — verify attachment ownership.
+                        $logo_id = absint( $raw );
+                        $attach  = get_post( $logo_id );
+                        if ( $attach && $attach->post_type === 'attachment' && (int) $attach->post_author === $user_id ) {
+                            $settings_map[ $field ] = $logo_id;
+                        } else {
+                            // Vendor tried to set someone else's attachment — silently ignore.
+                            continue;
+                        }
                     } elseif ( $field === 'ltms_store_schedule' ) {
                         // JSON array of per-day open/close — sanitize as wp_json_encode after decoding.
                         $decoded = json_decode( $raw, true );
@@ -155,16 +166,6 @@ class LTMS_Products_Ajax {
                         $settings_map[ $field ] = sanitize_textarea_field( $raw );
                     } elseif ( in_array( $field, [ 'ltms_store_instagram', 'ltms_store_facebook', 'ltms_store_whatsapp' ], true ) ) {
                         $settings_map[ $field ] = esc_url_raw( $raw );
-                    } elseif ( $field === 'ltms_store_logo_id' ) {
-                        // v2.9.99 REG-2 FIX: IDOR protection — verify attachment ownership.
-                        $logo_id = absint( $raw );
-                        $attach = get_post( $logo_id );
-                        if ( $attach && $attach->post_type === 'attachment' && (int) $attach->post_author === $user_id ) {
-                            $settings_map[ $field ] = $logo_id;
-                        } else {
-                            // Vendor tried to set someone else's attachment — silently ignore.
-                            continue;
-                        }
                     } else {
                         $settings_map[ $field ] = sanitize_text_field( $raw );
                     }

@@ -42,6 +42,9 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
         $this->api_url     = LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX;
         $this->partner_code = LTMS_Core_Config::get( 'ltms_xcover_partner_code', '' );
         $this->api_key      = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_xcover_api_key', '' ) );
+        // INTEGRATIONS-AUDIT P1 FIX: set provider_slug so log_api_call() writes
+        // provider='xcover' in lt_api_logs (previously '' empty).
+        $this->provider_slug = 'xcover';
         parent::__construct();
     }
 
@@ -59,6 +62,11 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array Lista de opciones de cobertura con precios.
      */
     public function get_quotes( array $product_data ): array {
+        // INTEGRATIONS-AUDIT P1 FIX: validate partner_code format to prevent
+        // path traversal via /partners/{code}/quotes/.
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $this->partner_code ) ) {
+            return [];
+        }
         $payload = [
             'partner_code' => $this->partner_code,
             'request'      => [[
@@ -74,7 +82,15 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
             ]],
         ];
 
-        $response = $this->perform_request( 'POST', '/partners/' . $this->partner_code . '/quotes/', $payload );
+        // INTEGRATIONS-AUDIT P1 FIX: idempotency key on get_quotes to prevent
+        // duplicate quote creation on 5xx retry.
+        $idem_key = 'ltms_quote_' . substr( md5( wp_json_encode( $payload ) ), 0, 32 );
+        $response = $this->perform_request(
+            'POST',
+            '/partners/' . rawurlencode( $this->partner_code ) . '/quotes/',
+            $payload,
+            [ 'Idempotency-Key' => $idem_key ]
+        );
 
         return $response['quotes'] ?? [];
     }
@@ -109,7 +125,7 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
 
         $response = $this->perform_request(
             'POST',
-            '/partners/' . $this->partner_code . '/policies/',
+            '/partners/' . rawurlencode( $this->partner_code ) . '/policies/',
             $payload,
             [ 'Idempotency-Key' => $idempotency_key ]
         );
@@ -129,6 +145,10 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array
      */
     public function get_policy( string $policy_id ): array {
+        // v2.9.121 INSURANCE-AUDIT P1-1 FIX: validate policy_id format.
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $policy_id ) ) {
+            return [];
+        }
         return $this->perform_request( 'GET', '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/' );
     }
 
@@ -140,11 +160,24 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      * @return array{success: bool, refund_amount: float}
      */
     public function cancel_policy( string $policy_id, string $reason ): array {
+        // v2.9.121 INSURANCE-AUDIT P1-2 FIX: validate policy_id format.
+        // Before, $policy_id was used directly in the URL path without validation
+        // — path traversal characters could access unintended API endpoints.
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $policy_id ) ) {
+            return [
+                'success'       => false,
+                'refund_amount' => 0.0,
+            ];
+        }
+
         $payload  = [ 'reason' => sanitize_text_field( $reason ) ];
         $response = $this->perform_request(
             'DELETE',
-            '/partners/' . $this->partner_code . '/policies/' . $policy_id . '/',
-            $payload
+            '/partners/' . rawurlencode( $this->partner_code ) . '/policies/' . $policy_id . '/',
+            $payload,
+            // INTEGRATIONS-AUDIT P1 FIX: idempotency on cancel — repeated
+            // cancellation requests must be deduped by XCover.
+            [ 'Idempotency-Key' => 'ltms_cancel_policy_' . $policy_id ]
         );
 
         return [
@@ -158,7 +191,14 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
      */
     public function health_check(): array {
         try {
-            $response = $this->perform_request( 'GET', '/partners/' . $this->partner_code . '/' );
+            // INTEGRATIONS-AUDIT P1 FIX: validate partner_code before URL build.
+            if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $this->partner_code ) ) {
+                return [
+                    'status'  => 'error',
+                    'message' => '[xcover] partner_code inválido.',
+                ];
+            }
+            $response = $this->perform_request( 'GET', '/partners/' . rawurlencode( $this->partner_code ) . '/' );
             return [
                 'status'  => isset( $response['partnerCode'] ) ? 'ok' : 'error',
                 'message' => 'XCover API conectado',

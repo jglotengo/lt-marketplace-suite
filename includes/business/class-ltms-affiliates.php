@@ -303,6 +303,9 @@ class LTMS_Affiliates {
 
         // M-105: las comisiones de referido se almacenan en lt_wallet_transactions
         // (acreditadas por Wallet::credit() con type=referral en metadata), NO en lt_commissions
+        // v2.9.122 AFFILIATE-AUDIT P1-3 FIX: use exact JSON match, not LIKE substring.
+        // Before, LIKE '%"type":"referral"%' also matched '%"type":"referral_commission"%'
+        // → mixed commission types returned. Now uses JSON_EXTRACT for exact match.
         return $wpdb->get_results( $wpdb->prepare(
             "SELECT
                 wt.id,
@@ -317,11 +320,10 @@ class LTMS_Affiliates {
              )
              WHERE wt.vendor_id = %d
                AND wt.type = 'credit'
-               AND wt.metadata LIKE %s
+               AND JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.type')) = 'referral'
              ORDER BY wt.created_at DESC
              LIMIT %d",
             $vendor_id,
-            '%"type":"referral"%',
             $limit
         ), ARRAY_A );
     }
@@ -370,10 +372,13 @@ class LTMS_Affiliates {
             'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
         ] );
 
+        // v2.9.122 AFFILIATE-AUDIT P1-2 FIX: restrict leaderboard to admins only.
+        // Before, any vendor could see the leaderboard exposing all vendors'
+        // referral income — PII/financial leak. Now requires manage_options.
         register_rest_route( 'ltms/v1', '/affiliates/leaderboard', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'rest_get_leaderboard' ],
-            'permission_callback' => fn() => is_user_logged_in() && ltms_is_vendor(),
+            'permission_callback' => fn() => current_user_can( 'manage_options' ),
         ] );
     }
 

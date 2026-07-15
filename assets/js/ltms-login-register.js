@@ -1,370 +1,63 @@
 /**
- * LT Marketplace Suite - Login / Register JavaScript
- * Manejo de formularios de autenticación del frontend
- * Version: 1.5.0
+ * LTMS Vendor Registration Form — Cloudflare Turnstile + country/document dynamic fields.
+ * FASE2B P0 FIX (CSP): extracted from inline <script> in vendor-parts/form-register.php.
  */
-
-/* global ltmsAuth, jQuery */
-
-(function ($) {
+(function () {
     'use strict';
 
-    window.LTMS = window.LTMS || {};
-
-    /**
-     * LTMS.Auth - Módulo de autenticación del frontend
-     */
-    LTMS.Auth = {
-
-        init() {
-            this.bindLoginForm();
-            this.bindRegisterForm();
-            this.bindBusinessTypeCards();
-            this.bindVendorCountryToggle();
-            this.initPasswordStrength();
-            this.initTogglePassword();
-        },
-
-        // M-57: helper para mostrar/ocultar estado "procesando" sin destruir
-        // los <span> internos del botón (.ltms-btn-text / .ltms-btn-spinner).
-        setBtnProcessing($btn, isProcessing) {
-            if (isProcessing) {
-                if (!$btn.data('ltms-original-html')) {
-                    $btn.data('ltms-original-html', $btn.html());
+    // Cloudflare Turnstile callback (global, required by Turnstile API).
+    window.onloadTurnstileCallback = function () {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render('.cf-turnstile', {
+                callback: function (token) {
+                    var el = document.getElementById('ltms-turnstile-token');
+                    if (el) el.value = token;
                 }
-                $btn.prop('disabled', true).text(ltmsAuth.i18n.processing);
-            } else {
-                const original = $btn.data('ltms-original-html');
-                if (original) {
-                    $btn.html(original);
-                }
-                $btn.prop('disabled', false);
-            }
-        },
-
-        bindLoginForm() {
-            $(document).on('submit', '#ltms-login-form', function (e) {
-                e.preventDefault();
-                const $form = $(this);
-                const $btn  = $form.find('[type="submit"]');
-
-                LTMS.Auth.setBtnProcessing($btn, true);
-
-                $.ajax({
-                    url: ltmsAuth.ajax_url,
-                    method: 'POST',
-                    data: {
-                        action:   'ltms_vendor_login',
-                        nonce:    ltmsAuth.nonce,
-                        username: $form.find('[name="username"]').val(),
-                        password: $form.find('[name="password"]').val(),
-                        remember: $form.find('[name="rememberme"]').is(':checked'),
-                    },
-                    success(response) {
-                        LTMS.Auth.setBtnProcessing($btn, false);
-                        if (response.success) {
-                            window.location.href = response.data.redirect;
-                        } else {
-                            const msg = (typeof response.data === 'string')
-                                ? response.data
-                                : (response.data && response.data.message) || 'Error en el inicio de sesión.';
-                            LTMS.Auth.showFormError('#ltms-login-form', msg);
-                        }
-                    },
-                    error(xhr) {
-                        LTMS.Auth.setBtnProcessing($btn, false);
-                        let msg = 'Error de conexión. Intenta de nuevo.';
-                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Espera 15 minutos.';
-                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
-                        LTMS.Auth.showFormError('#ltms-login-form', msg);
-                    },
-                });
             });
-        },
-
-        bindRegisterForm() {
-            // ── Wizard: Siguiente ──────────────────────────────────────────────
-            $(document).on('click', '.ltms-wizard-next', function () {
-                const $btn      = $(this);
-                const nextPage  = parseInt($btn.data('next'), 10);
-                const $form     = $btn.closest('form');
-                const $curPage  = $btn.closest('.ltms-wizard-page');
-
-                // M-AUDIT-REG-02: Validate required fields in current page before advancing.
-                // Radio groups need special handling — jQuery's .val() on a single radio
-                // element always returns its literal value="" attribute regardless of
-                // whether it's checked, so the old check never caught an unselected group.
-                // We also skip fields that are currently hidden (e.g. country-conditional
-                // blocks toggled via JS) so a required-but-invisible field never blocks
-                // the wizard.
-                let valid = true;
-                const seenRadioGroups = {};
-
-                $curPage.find('[required]:visible').each(function () {
-                    const $field = $(this);
-
-                    if ($field.is(':radio')) {
-                        const groupName = $field.attr('name');
-                        if (seenRadioGroups[groupName]) return; // ya validado este grupo
-                        seenRadioGroups[groupName] = true;
-
-                        const $group  = $curPage.find('input[name="' + groupName + '"]');
-                        const checked = $group.filter(':checked').length > 0;
-                        const $wrap   = $field.closest('.ltms-form-group');
-                        if (!checked) { valid = false; $wrap.addClass('ltms-field-error'); }
-                        else { $wrap.removeClass('ltms-field-error'); }
-                    } else if ($field.is(':checkbox')) {
-                        if (!$field.is(':checked')) { valid = false; $field.closest('.ltms-form-group').addClass('ltms-field-error'); }
-                        else { $field.closest('.ltms-form-group').removeClass('ltms-field-error'); }
-                    } else {
-                        if (!$field.val().trim()) { valid = false; $field.addClass('ltms-input-error'); }
-                        else { $field.removeClass('ltms-input-error'); }
-                    }
-                });
-
-                if (!valid) {
-                    LTMS.Auth.showFormError('#ltms-register-form', ltmsAuth.i18n.required_fields || 'Por favor completa todos los campos requeridos.');
-                    return;
-                }
-
-                // Hide all pages, show target page
-                $form.find('.ltms-wizard-page').hide();
-                $form.find('.ltms-wizard-page[data-page="' + nextPage + '"]').show();
-
-                // Update step indicators
-                $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
-                    const step = parseInt($(this).data('step'), 10);
-                    $(this).toggleClass('active', step === nextPage);
-                    $(this).toggleClass('completed', step < nextPage);
-                });
-            });
-
-            // ── Wizard: Atrás ──────────────────────────────────────────────────
-            $(document).on('click', '.ltms-wizard-back', function () {
-                const $btn     = $(this);
-                const prevPage = parseInt($btn.data('back'), 10);
-                const $form    = $btn.closest('form');
-
-                $form.find('.ltms-wizard-page').hide();
-                $form.find('.ltms-wizard-page[data-page="' + prevPage + '"]').show();
-
-                $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
-                    const step = parseInt($(this).data('step'), 10);
-                    $(this).toggleClass('active', step === prevPage);
-                    $(this).removeClass('completed');
-                });
-            });
-
-            // ── Submit ─────────────────────────────────────────────────────────
-            $(document).on('submit', '#ltms-register-form', function (e) {
-                e.preventDefault();
-                const $form = $(this);
-
-                // M-7: normalizar referral code a uppercase antes de enviar.
-                const $ref = $form.find('[name="referral_code"]');
-                if ($ref.length) $ref.val(($ref.val() || '').toUpperCase().trim());
-
-                // Limpiar errores previos por campo.
-                $form.find('.ltms-input-error').removeClass('ltms-input-error');
-                $form.find('.ltms-field-error').removeClass('ltms-field-error');
-
-                // Validar contraseñas
-                const pass1 = $form.find('[name="password"]').val();
-                const pass2 = $form.find('[name="password_confirm"]').val();
-
-                if (pass1 !== pass2) {
-                    LTMS.Auth.showFormError('#ltms-register-form', ltmsAuth.i18n.password_mismatch);
-                    return;
-                }
-
-                const $btn = $form.find('[type="submit"]');
-                LTMS.Auth.setBtnProcessing($btn, true);
-
-                $.ajax({
-                    url: ltmsAuth.ajax_url,
-                    method: 'POST',
-                    data: $form.serialize() + '&action=ltms_vendor_register&nonce=' + ltmsAuth.nonce,
-                    success(response) {
-                        LTMS.Auth.setBtnProcessing($btn, false);
-                        if (response.success) {
-                            window.location.href = response.data.redirect;
-                        } else {
-                            // M-10: el handler puede devolver un objeto con {message, errors:[{field,message}]}
-                            // o un string plano. Soportar ambos formatos.
-                            const payload = response.data || {};
-                            let msg = '';
-                            let fieldErrors = [];
-
-                            if (typeof payload === 'string') {
-                                msg = payload;
-                            } else {
-                                msg = payload.message || 'Error en el registro.';
-                                fieldErrors = Array.isArray(payload.errors) ? payload.errors : [];
-                            }
-
-                            LTMS.Auth.showFormError('#ltms-register-form', msg);
-
-                            // Resaltar campos específicos y enfocar el primero.
-                            if (fieldErrors.length) {
-                                let firstField = null;
-                                fieldErrors.forEach(function (err) {
-                                    const $field = $form.find('[name="' + err.field + '"]');
-                                    if (!$field.length) return;
-                                    // M-AUDIT-REG-02: los radios (p. ej. business_type) no son
-                                    // :checkbox para jQuery — sin esta rama, addClass() caía en
-                                    // los inputs ocultos (opacity:0) sin ningún efecto visible.
-                                    if ($field.is(':checkbox') || $field.is(':radio')) {
-                                        $field.closest('.ltms-form-group').addClass('ltms-field-error');
-                                    } else {
-                                        $field.addClass('ltms-input-error');
-                                    }
-                                    // No enfocar un radio invisible (opacity:0) — preferir el
-                                    // primer elemento visible/enfocable real del campo en error.
-                                    if (!firstField) {
-                                        firstField = $field.is(':radio') ? $field.eq(0) : $field;
-                                    }
-                                });
-
-                                if (firstField) {
-                                    // Saltar al wizard step que contiene el primer campo en error.
-                                    const $page = firstField.closest('.ltms-wizard-page');
-                                    if ($page.length) {
-                                        const stepNum = parseInt($page.data('page'), 10);
-                                        $form.find('.ltms-wizard-page').hide();
-                                        $page.show();
-                                        $form.closest('.ltms-auth-card').find('.ltms-step').each(function () {
-                                            const step = parseInt($(this).data('step'), 10);
-                                            $(this).toggleClass('active', step === stepNum);
-                                            $(this).toggleClass('completed', step < stepNum);
-                                        });
-                                    }
-                                    firstField.focus();
-                                }
-                            }
-                        }
-                    },
-                    error(xhr) {
-                        LTMS.Auth.setBtnProcessing($btn, false);
-                        let msg = 'Error de conexión.';
-                        if (xhr && xhr.status === 429) msg = 'Demasiados intentos. Intenta más tarde.';
-                        if (xhr && xhr.status === 0)   msg = 'No se pudo contactar el servidor. Verifica tu conexión.';
-                        if (xhr && xhr.status === 403) msg = 'Sesión expirada. Recarga la página.';
-                        LTMS.Auth.showFormError('#ltms-register-form', msg);
-                    },
-                });
-            });
-        },
-
-        bindBusinessTypeCards() {
-            // M-AUDIT-REG-04: Las tarjetas de tipo de negocio (📦💻🛠️🏨) no tenían
-            // ningún manejador JS. El radio se marcaba por comportamiento nativo del
-            // <label>, pero sin cambio visual el vendedor no veía confirmación de
-            // su elección y asumía que la plataforma no respondía.
-            $(document).on('change', 'input[name="business_type"]', function () {
-                const $allLabels = $(this).closest('.ltms-form-group').find('.ltms-btype-lbl');
-                $allLabels.css({ 'border-color': '#d1d5db', background: '#fafafa', 'box-shadow': 'none' });
-                $(this).closest('.ltms-btype-lbl').css({
-                    'border-color': '#2563eb',
-                    background: '#eff6ff',
-                    'box-shadow': '0 0 0 3px rgba(37,99,235,.15)',
-                });
-            });
-            // Inicializar el estado visual si ya hay un radio prechecked (p.ej. recarga)
-            $('input[name="business_type"]:checked').trigger('change');
-        },
-
-        bindVendorCountryToggle() {
-            // M-AUDIT-REG-03: El bloque SAGRILAFT se renderizaba en PHP según el
-            // país GLOBAL del servidor, no según la elección del vendedor en el
-            // select de país. En esta plataforma el default es 'CO', por lo que el
-            // checkbox siempre aparecía aunque el vendedor eligiera México.
-            // Ahora se muestra/oculta dinámicamente y el atributo required se ajusta
-            // en consecuencia para que el formulario nunca bloquee por un campo invisible.
-            function toggleSagrilaft() {
-                const $sel = $('#ltms-reg-vendor-country');
-                if (!$sel.length) return;
-                const isCO = $sel.val() === 'CO';
-                const $wrap = $('input[name="accept_sagrilaft"]').closest('.ltms-form-group');
-                $wrap.toggle(isCO);
-                $wrap.find('input[name="accept_sagrilaft"]').prop('required', isCO);
-            }
-            $(document).on('change', '#ltms-reg-vendor-country', toggleSagrilaft);
-            // Ejecutar al cargar por si el select ya tiene un valor (p.ej. MX preseleccionado)
-            toggleSagrilaft();
-        },
-
-        initPasswordStrength() {
-            // Only the register form has a strength meter (#ltms-reg-password).
-            // The .ltms-password-strength div is a sibling of .ltms-input-group, not of the input.
-            // Use closest('.ltms-form-group').find() to locate it correctly.
-            $(document).on('input', '#ltms-reg-password', function () {
-                const val    = $(this).val();
-                const $group = $(this).closest('.ltms-form-group');
-                const $meter = $group.find('.ltms-password-strength');
-                if ($meter.length === 0) return;
-
-                let strength = 0;
-                if (val.length >= 8)            strength++;
-                if (/[A-Z]/.test(val))          strength++;
-                if (/[0-9]/.test(val))          strength++;
-                if (/[^A-Za-z0-9]/.test(val))  strength++;
-
-                const classes = ['', 'weak', 'fair', 'good', 'strong'];
-                const labels  = ['', 'Débil', 'Regular', 'Buena', 'Fuerte'];
-
-                // Update the bar width and label text separately — don't overwrite the inner HTML
-                $meter
-                    .removeClass('weak fair good strong')
-                    .addClass(classes[strength]);
-                $meter.find('.ltms-strength-label').text(labels[strength]);
-                $meter.find('.ltms-strength-bar').css('width', (strength * 25) + '%');
-            });
-        },
-
-        initTogglePassword() {
-            $(document).on('click', '.ltms-toggle-password', function () {
-                const $input = $(this).siblings('input');
-                const type   = $input.attr('type') === 'password' ? 'text' : 'password';
-                $input.attr('type', type);
-                $(this).text(type === 'password' ? '👁' : '🙈');
-            });
-        },
-
-        showFormError(formSelector, message) {
-            // Notice divs use IDs: #ltms-login-notice / #ltms-register-notice
-            // They live outside the <form> tag, so search in the parent card wrapper
-            const $form   = $(formSelector);
-            const $card   = $form.closest('.ltms-auth-card');
-            const $notice = $card.length
-                ? $card.find('.ltms-notice')
-                : $form.find('.ltms-notice');
-
-            // M-58: defensa contra objetos — evita "[object Object]" si el caller
-            // pasa accidentalmente un payload de respuesta sin extraer .message.
-            let text;
-            if (typeof message === 'string') {
-                text = message;
-            } else if (message && typeof message === 'object') {
-                text = message.message
-                    || (Array.isArray(message.errors) && message.errors[0] && message.errors[0].message)
-                    || JSON.stringify(message);
-            } else {
-                text = String(message);
-            }
-
-            if ($notice.length) {
-                $notice.removeClass('ltms-notice-success')
-                       .addClass('ltms-notice-error')
-                       .text(text)
-                       .show();
-            }
-        },
+        }
     };
 
-    $(document).ready(function () {
-        if (typeof ltmsAuth !== 'undefined') {
-            LTMS.Auth.init();
-        }
-    });
+    // Country → document type + phone placeholder + municipality toggle.
+    var sel = document.getElementById('ltms-reg-vendor-country');
+    var phone = document.getElementById('ltms-reg-phone');
+    var docSel = document.getElementById('ltms-reg-document-type');
 
-})(jQuery);
+    var docOpts = {
+        CO: [
+            { v: '', l: 'Seleccionar...' },
+            { v: 'CC', l: 'Cédula de Ciudadanía' },
+            { v: 'CE', l: 'Cédula de Extranjería' },
+            { v: 'NIT', l: 'NIT' },
+            { v: 'PAS', l: 'Pasaporte' }
+        ],
+        MX: [
+            { v: '', l: 'Seleccionar...' },
+            { v: 'RFC', l: 'RFC' },
+            { v: 'CURP', l: 'CURP' },
+            { v: 'PAS', l: 'Pasaporte' }
+        ]
+    };
+
+    var municipioWrap = document.getElementById('ltms-municipality-wrap');
+    var municipioSel = document.getElementById('ltms-reg-municipality');
+
+    function updateCountry(country) {
+        if (phone) phone.placeholder = country === 'MX' ? '+52 55 0000 0000' : '+57 300 000 0000';
+        if (docSel) {
+            var opts = docOpts[country] || docOpts.CO;
+            docSel.innerHTML = opts.map(function (o) {
+                return '<option value="' + o.v + '">' + o.l + '</option>';
+            }).join('');
+        }
+        if (municipioWrap) {
+            var isCO = country === 'CO';
+            municipioWrap.style.display = isCO ? '' : 'none';
+            if (municipioSel) municipioSel.required = isCO;
+        }
+    }
+
+    if (sel) {
+        sel.addEventListener('change', function () { updateCountry(this.value); });
+        updateCountry(sel.value);
+    }
+})();

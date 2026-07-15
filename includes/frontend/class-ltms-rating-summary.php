@@ -80,8 +80,7 @@ class LTMS_Rating_Summary {
             <div style="flex:1;min-width:250px;">
                 <?php foreach ( $distribution as $d ) : ?>
                     <div class="ltms-rating-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;"
-                         data-rating="<?php echo esc_attr( $d['stars'] ); ?>"
-                         onclick="ltmsFilterReviews(<?php echo esc_attr( $d['stars'] ); ?>)">
+                         data-rating="<?php echo esc_attr( $d['stars'] ); ?>">
                         <span style="font-size:12px;min-width:30px;color:#6b7280;">
                             <?php echo esc_html( $d['stars'] ); ?>★
                         </span>
@@ -97,7 +96,7 @@ class LTMS_Rating_Summary {
 
                 <!-- Botón "Ver todas" -->
                 <div style="margin-top:8px;">
-                    <button type="button" onclick="ltmsFilterReviews(0)"
+                    <button type="button"
                             style="font-size:11px;color:#2563eb;background:none;border:none;cursor:pointer;text-decoration:underline;">
                         <?php esc_html_e( 'Ver todas las reseñas', 'ltms' ); ?>
                     </button>
@@ -106,19 +105,36 @@ class LTMS_Rating_Summary {
         </div>
 
         <script>
-        function ltmsFilterReviews(rating) {
-            // AJAX para filtrar reviews por rating.
-            jQuery.post(ltmsDrawerData.ajaxUrl, {
-                action: 'ltms_filter_reviews',
-                nonce: '<?php echo esc_attr( wp_create_nonce( 'ltms_filter_reviews' ) ); ?>',
-                product_id: <?php echo esc_attr( $product_id ); ?>,
-                rating: rating
-            }, function(response) {
-                if (response.success) {
-                    jQuery('#comments .commentlist').html(response.data.html);
+        // v2.9.120 REVIEWS-AUDIT P0-4 FIX: removed inline onclick handlers (CSP violation).
+        // Now uses event delegation via jQuery on document ready.
+        (function($) {
+            'use strict';
+            $(function() {
+                var nonce = '<?php echo esc_js( wp_create_nonce( 'ltms_filter_reviews' ) ); ?>';
+                var productId = <?php echo esc_js( $product_id ); ?>;
+                var ajaxUrl = (typeof ltmsDrawerData !== 'undefined') ? ltmsDrawerData.ajaxUrl : '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+
+                function filterReviews(rating) {
+                    $.post(ajaxUrl, {
+                        action: 'ltms_filter_reviews',
+                        nonce: nonce,
+                        product_id: productId,
+                        rating: rating
+                    }, function(response) {
+                        if (response.success) {
+                            $('#comments .commentlist').html(response.data.html);
+                        }
+                    });
                 }
+
+                $('.ltms-rating-bar').on('click', function() {
+                    filterReviews($(this).data('rating'));
+                });
+                $('.ltms-show-all-reviews').on('click', function() {
+                    filterReviews(0);
+                });
             });
-        }
+        })(jQuery);
         </script>
         <?php
     }
@@ -154,6 +170,11 @@ class LTMS_Rating_Summary {
         check_ajax_referer( 'ltms_filter_reviews', 'nonce' );
         $product_id = (int) ( $_POST['product_id'] ?? 0 );
         $rating = (int) ( $_POST['rating'] ?? 0 );
+
+        // v2.9.120 REVIEWS-AUDIT P1-3 FIX: validate rating against allowlist [0-5].
+        if ( $rating < 0 || $rating > 5 ) {
+            $rating = 0;
+        }
 
         if ( ! $product_id ) wp_send_json_error();
 

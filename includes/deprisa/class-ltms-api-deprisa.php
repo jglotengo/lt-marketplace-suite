@@ -127,7 +127,7 @@ class LTMS_Deprisa_API {
             return false;
         }
         libxml_use_internal_errors( true );
-        $xml = simplexml_load_string( $xml_string, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOENT );
+        $xml = simplexml_load_string( $xml_string, 'SimpleXMLElement', LIBXML_NONET );
         if ( $xml === false ) {
             $this->log( 'Error parseando XML: ' . implode( ', ', array_map( function( $e ) {
                 return $e->message;

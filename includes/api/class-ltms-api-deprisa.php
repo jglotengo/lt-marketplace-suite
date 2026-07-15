@@ -494,7 +494,16 @@ class LTMS_Api_Deprisa {
          */
         private function parse_xml( string $body ): \SimpleXMLElement {
                 libxml_use_internal_errors( true );
-                $xml = simplexml_load_string( $body, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOENT );
+                // INTEGRATIONS-AUDIT P1 FIX: defense-in-depth against XXE. LIBXML_NONET
+                // blocks http/ftp entity loading but does NOT block file:// entity
+                // attacks on PHP < 8.0 with libxml < 2.9.0. We explicitly disable
+                // entity loader substitution. On PHP 8.0+ this is a no-op (the
+                // function is deprecated and libxml >=2.9 defaults are safe) but
+                // we call it guarded for older PHP versions.
+                if ( PHP_VERSION_ID < 80000 && function_exists( 'libxml_disable_entity_loader' ) ) {
+                        libxml_disable_entity_loader( true );
+                }
+                $xml = simplexml_load_string( $body, 'SimpleXMLElement', LIBXML_NONET );
                 if ( false === $xml ) {
                         $errors = libxml_get_errors();
                         libxml_clear_errors();
@@ -708,13 +717,18 @@ class LTMS_Api_Deprisa {
          */
         private function post( string $path, string $xml_body ): \SimpleXMLElement {
                 $url      = $this->base_url . $path;
+                // INTEGRATIONS-AUDIT P1 FIX: Idempotency-Key on POST — Deprisa
+                // admit/envio/recogida are financial operations; duplicate POSTs
+                // on caller retry create duplicate paid shipments.
+                $idem_key = 'ltms_deprisa_' . substr( md5( $path . $xml_body ), 0, 32 );
                 try {
                         $response = wp_remote_post( $url, [
                                 'timeout'    => 30,
                                 'headers'    => [
-                                        'Authorization' => $this->auth_header(),
-                                        'Content-Type'  => 'application/xml; charset=UTF-8',
-                                        'Accept'        => 'application/xml',
+                                        'Authorization'  => $this->auth_header(),
+                                        'Content-Type'   => 'application/xml; charset=UTF-8',
+                                        'Accept'         => 'application/xml',
+                                        'Idempotency-Key'=> $idem_key,
                                 ],
                                 'body'       => $xml_body,
                                 // API-BUG-5 FIX: SSL verification must ALWAYS be true. The

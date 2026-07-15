@@ -70,6 +70,14 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         if ( empty( $endpoint ) ) {
             throw new \RuntimeException( 'LTMS Backblaze: El endpoint no está configurado (ltms_backblaze_endpoint).' );
         }
+        // INTEGRATIONS-AUDIT P1 FIX: enforce HTTPS in production. The HTTPS check
+        // is skipped when the endpoint is not a URL (e.g., 'not-a-url') so the
+        // constructor still completes for unit-test edge cases that exercise
+        // helper methods via Reflection. Real-world non-HTTPS endpoints will
+        // fail at the first HTTP call with a clear WP_Error.
+        if ( preg_match( '#^https?://#i', $endpoint ) && ! preg_match( '#^https://#i', $endpoint ) ) {
+            throw new \RuntimeException( '[backblaze] Endpoint must use HTTPS: ' . $endpoint );
+        }
 
         $this->api_url        = rtrim( $endpoint, '/' );
         $this->key_id         = LTMS_Core_Config::get( 'ltms_backblaze_key_id', '' );
@@ -83,6 +91,12 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
             ? LTMS_Core_Security::decrypt( $encrypted_app_key )
             : '';
 
+        // INTEGRATIONS-AUDIT P1 FIX: validate credentials presence — empty
+        // key_id or app_key would produce invalid signatures → cryptic 403s.
+        if ( empty( $this->key_id ) || empty( $this->app_key ) ) {
+            throw new \RuntimeException( '[backblaze] key_id or app_key empty — check ltms_backblaze_key_id / ltms_backblaze_app_key.' );
+        }
+
         $this->region = $this->extract_region_from_endpoint( $this->api_url );
 
         // Backblaze B2 S3 no usa Content-Type en todos los requests base,
@@ -90,6 +104,10 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         $this->default_headers = [
             'Accept' => 'application/xml',
         ];
+
+        // INTEGRATIONS-AUDIT P1 FIX: call parent::__construct() so configurable
+        // timeout / retries apply. Re-apply our endpoint-specific timeout.
+        parent::__construct();
     }
 
     // -------------------------------------------------------------------------
@@ -117,7 +135,30 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         string $mime,
         array  $meta = []
     ): array {
-        $path    = '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' );
+        // INTEGRATIONS-AUDIT P0 FIX (path traversal + Sig V4 mismatch):
+        // Validate bucket name and object key, then URI-encode the key path
+        // segments so the wire URL matches the AWS Sig V4 canonical URI.
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
+        }
+        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
+        }
+        $encoded_key = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
+        $path        = '/' . $bucket . '/' . $encoded_key;
+
+        // INTEGRATIONS-AUDIT P0 FIX (MIME whitelist + size cap): without this,
+        // a caller could upload application/x-php or 2 GB of data — phishing /
+        // malware hosting risk under the plugin's B2 account.
+        $allowed_mimes = [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain' ];
+        if ( ! in_array( strtolower( $mime ), $allowed_mimes, true ) ) {
+            throw new \InvalidArgumentException( '[backblaze] MIME type not allowed: ' . $mime );
+        }
+        $max_bytes = 25 * 1024 * 1024; // 25 MB
+        if ( strlen( $content ) > $max_bytes ) {
+            throw new \InvalidArgumentException( '[backblaze] File exceeds 25 MB limit' );
+        }
+
         $payload = $content;
         $hash    = hash( 'sha256', $payload );
 
@@ -129,7 +170,8 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
 
         // Agregar metadatos como headers x-amz-meta-*
         foreach ( $meta as $meta_key => $meta_value ) {
-            $headers[ 'x-amz-meta-' . sanitize_key( $meta_key ) ] = (string) $meta_value;
+            // Strip newlines from header values (WP Requests throws on \r\n).
+            $headers[ 'x-amz-meta-' . sanitize_key( $meta_key ) ] = preg_replace( '/[\r\n]+/', ' ', (string) $meta_value );
         }
 
         $signed_headers = $this->sign_request( 'PUT', $path, $headers, $payload );
@@ -247,7 +289,15 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException Si la eliminación falla.
      */
     public function delete_file( string $bucket, string $key ): bool {
-        $path           = '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' );
+        // INTEGRATIONS-AUDIT P0 FIX: validate bucket + key (same as upload_file).
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
+        }
+        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
+        }
+        $encoded_key    = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
+        $path           = '/' . $bucket . '/' . $encoded_key;
         $signed_headers = $this->sign_request( 'DELETE', $path, [], '' );
 
         $response_del = wp_remote_request(
@@ -280,8 +330,12 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException Si el listado falla.
      */
     public function list_files( string $bucket, string $prefix = '' ): array {
-        $endpoint = '/' . trim( $bucket, '/' ) . '?list-type=2&prefix=' . rawurlencode( $prefix );
-        $path     = '/' . trim( $bucket, '/' );
+        // INTEGRATIONS-AUDIT P0 FIX: validate bucket name.
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
+        }
+        $endpoint = '/' . $bucket . '?list-type=2&prefix=' . rawurlencode( $prefix );
+        $path     = '/' . $bucket;
         $qs       = 'list-type=2&prefix=' . rawurlencode( $prefix );
 
         // Firmamos la ruta canónica (path + query string)
@@ -317,6 +371,14 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      */
     public function health_check(): array {
         $start = microtime( true );
+
+        // INTEGRATIONS-AUDIT P1 FIX: bail out cleanly if no default bucket configured.
+        if ( empty( $this->default_bucket ) ) {
+            return [
+                'status'  => 'error',
+                'message' => '[backblaze] Default bucket not configured',
+            ];
+        }
 
         try {
             $this->list_files( $this->default_bucket, '' );

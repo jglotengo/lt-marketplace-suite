@@ -126,8 +126,9 @@ final class LTMS_Admin_Donations {
      * @return void
      */
     public function ajax_get_donations(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // v2.9.125 DONATIONS-AUDIT P0-1 FIX: removed duplicate check_ajax_referer('ltms_admin_nonce')
+                // that always failed (the JS sends nonce from wp_create_nonce('ltms_admin_donations')).
+                // The $this->verify() call below uses the correct NONCE_ACTION ('ltms_admin_donations').
         $this->verify();
         if ( ! current_user_can( self::REQUIRED_CAP ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
@@ -257,8 +258,7 @@ final class LTMS_Admin_Donations {
      * @return void
      */
     public function ajax_get_payout_batches(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // v2.9.125 P0-1 FIX: removed duplicate nonce check (see ajax_get_donations).
         $this->verify();
         if ( ! current_user_can( self::REQUIRED_CAP ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
@@ -415,8 +415,7 @@ final class LTMS_Admin_Donations {
      * @return void
      */
     public function ajax_generate_certificate(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // v2.9.125 P0-1 FIX: removed duplicate nonce check (see ajax_get_donations).
         $this->verify();
         if ( ! current_user_can( self::REQUIRED_CAP ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );
@@ -546,8 +545,7 @@ final class LTMS_Admin_Donations {
      * @return void
      */
     public function ajax_get_statistics(): void {
-		// SEC-3 FIX (v2.9.26): CSRF protection.
-		check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
+                // v2.9.125 P0-1 FIX: removed duplicate nonce check (see ajax_get_donations).
         $this->verify();
         if ( ! current_user_can( self::REQUIRED_CAP ) ) {
             wp_send_json_error( __( 'Permisos insuficientes.', 'ltms' ), 403 );

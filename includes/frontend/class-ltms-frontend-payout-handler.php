@@ -136,7 +136,10 @@ final class LTMS_Frontend_Payout_Handler {
         // phpcs:enable
 
         // Validación básica de campos
-        if ( $amount <= 0 ) {
+        // FASE2 P1 FIX: reject NaN/INF — (float)"NaN" → NAN, NAN <= 0 is false
+        // in PHP so the old check passed. NAN forwarded to scheduler could
+        // bypass balance checks (NAN > finite is false).
+        if ( $amount <= 0 || ! is_finite( $amount ) ) {
             wp_send_json_error( __( 'El monto debe ser mayor a cero.', 'ltms' ) );
         }
 

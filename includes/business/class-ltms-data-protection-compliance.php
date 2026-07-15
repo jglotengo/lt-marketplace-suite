@@ -815,10 +815,15 @@ class LTMS_Data_Protection_Compliance {
 
         $deadline = gmdate( 'Y-m-d H:i:s', time() + ( self::BREACH_NOTIFICATION_HOURS * HOUR_IN_SECONDS ) );
 
+        $severity_raw = sanitize_key( $_POST['severity'] ?? 'medium' );
+        // v2.9.124 COMPLIANCE-AUDIT P1-1 FIX: validate severity against ENUM allowlist.
+        $valid_severities = [ 'low', 'medium', 'high', 'critical' ];
+        $severity = in_array( $severity_raw, $valid_severities, true ) ? $severity_raw : 'medium';
+
         $wpdb->insert( $table, [
             'description'           => sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) ),
-            'severity'              => sanitize_key( $_POST['severity'] ?? 'medium' ),
-            'affected_count'        => (int) ( $_POST['affected_count'] ?? 0 ),
+            'severity'              => $severity,
+            'affected_count'        => absint( $_POST['affected_count'] ?? 0 ),
             'data_types'            => sanitize_text_field( wp_unslash( $_POST['data_types'] ?? '' ) ),
             'detected_at'           => current_time( 'mysql', true ),
             'detected_by'           => get_current_user_id(),
@@ -938,13 +943,22 @@ class LTMS_Data_Protection_Compliance {
         }
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
 
+        // v2.9.124 COMPLIANCE-AUDIT P0-1 FIX: verify user is vendor or admin.
+        // Before, any logged-in user could mark data protection training as
+        // complete — even customers who never took the training. Now requires
+        // vendor role or manage_options.
+        if ( ! LTMS_Utils::is_ltms_vendor( get_current_user_id() ) && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_data_protection_training';
+        $score = isset( $_POST['score'] ) ? absint( $_POST['score'] ) : null; // v2.9.124 P0-2: sanitize score
         $wpdb->insert( $table, [
             'user_id'     => get_current_user_id(),
             'module'      => 'data_protection',
             'completed_at'=> current_time( 'mysql', true ),
-            'score'       => (int) ( $_POST['score'] ?? null ),
+            'score'       => $score,
         ] );
 
         wp_send_json_success( [ 'message' => __( 'Capacitación registrada.', 'ltms' ) ] );

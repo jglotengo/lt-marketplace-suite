@@ -95,6 +95,17 @@ class LTMS_Product_Video {
         if ( ! current_user_can( 'edit_product', $post_id ) ) return;
         $video_id = (int) ( $_POST['_ltms_product_video_id'] ?? 0 );
         if ( $video_id > 0 ) {
+            // INTEGRATIONS-AUDIT P1 FIX (IDOR): verify attachment ownership.
+            // Previously, a vendor could set ANY attachment ID as their product
+            // video — exposing other vendors' private attachments via
+            // wp_get_attachment_url() on the public product page.
+            $attach = get_post( $video_id );
+            if ( ! $attach
+                || $attach->post_type !== 'attachment'
+                || (int) $attach->post_author !== get_current_user_id()
+            ) {
+                return; // Silently reject — don't expose that the ID was invalid.
+            }
             update_post_meta( $post_id, '_ltms_product_video_id', $video_id );
         } else {
             delete_post_meta( $post_id, '_ltms_product_video_id' );
@@ -111,8 +122,12 @@ class LTMS_Product_Video {
         if ( ! $video_id ) return;
         $video_url = wp_get_attachment_url( $video_id );
         if ( ! $video_url ) return;
+        // INTEGRATIONS-AUDIT P0 FIX (CSP): replaced inline onclick + inline
+        // <script> with data-* attributes. The handler is registered via
+        // addEventListener in assets/js/ltms-product-video.js (enqueued below).
+        wp_enqueue_script( 'ltms-product-video', LTMS_PLUGIN_URL . 'assets/js/ltms-product-video.js', [ 'jquery' ], LTMS_VERSION, true );
         ?>
-        <div class="ltms-product-video-wrap" onclick="ltmsPlayMainVideo('<?php echo esc_url( $video_url ); ?>')"
+        <div class="ltms-product-video-wrap" data-ltms-video-url="<?php echo esc_attr( $video_url ); ?>"
              style="cursor:pointer;position:relative;width:100%;margin-bottom:10px;border-radius:8px;overflow:hidden;">
             <video muted loop playsinline preload="metadata"
                    style="width:100%;display:block;border-radius:8px;">
@@ -124,19 +139,6 @@ class LTMS_Product_Video {
                 </div>
             </div>
         </div>
-        <script>
-        function ltmsPlayMainVideo(url) {
-            var overlay = event.currentTarget.querySelector('.ltms-product-video-overlay');
-            var video = event.currentTarget.querySelector('video');
-            if (video.paused) {
-                video.play();
-                overlay.style.opacity = '0';
-            } else {
-                video.pause();
-                overlay.style.opacity = '1';
-            }
-        }
-        </script>
         <?php
     }
 

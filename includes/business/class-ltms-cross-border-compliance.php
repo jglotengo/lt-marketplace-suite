@@ -775,9 +775,37 @@ class LTMS_Cross_Border_Compliance {
         $treaty = $order->get_meta( '_ltms_cert_origin_treaty' );
         if ( empty( $treaty ) ) return;
 
-        $format = $order->get_meta( '_ltms_cert_origin_data' )
-            ? json_decode( $order->get_meta( '_ltms_cert_origin_data' ), true )['cert_format'] ?? 'Self-certification'
-            : 'Self-certification';
+        // FASE4 P0 FIX: _ltms_cert_origin_data stores an ARRAY of certificates
+        // (CB-1 at line 285 stores wp_json_encode($certificates) where $certificates
+        // is [ ['cert_format' => 'EUR.1', ...], ['cert_format' => 'ATR.1', ...] ]).
+        // Accessing ['cert_format'] on a sequential array returns null → always
+        // fell through to 'Self-certification' → EUR.1/ATR.1/Form A PDFs never
+        // generated → customs preference lost, vendors pay full tariffs.
+        // Now: find the certificate matching this treaty.
+        $format = 'Self-certification';
+        $cert_data_raw = $order->get_meta( '_ltms_cert_origin_data' );
+        if ( $cert_data_raw ) {
+            $cert_data = json_decode( $cert_data_raw, true );
+            if ( is_array( $cert_data ) ) {
+                // Handle both sequential array of certs AND single cert associative array.
+                if ( isset( $cert_data['cert_format'] ) ) {
+                    // Single certificate (associative array).
+                    $format = $cert_data['cert_format'];
+                } else {
+                    // Array of certificates — find the one matching this treaty.
+                    foreach ( $cert_data as $cert ) {
+                        if ( is_array( $cert ) && isset( $cert['treaty'] ) && $cert['treaty'] === $treaty ) {
+                            $format = $cert['cert_format'] ?? 'Self-certification';
+                            break;
+                        }
+                    }
+                    // If no treaty match, use the first certificate's format.
+                    if ( $format === 'Self-certification' && ! empty( $cert_data ) && isset( $cert_data[0]['cert_format'] ) ) {
+                        $format = $cert_data[0]['cert_format'];
+                    }
+                }
+            }
+        }
 
         // Despachar generación según formato.
         switch ( $format ) {
@@ -893,9 +921,17 @@ class LTMS_Cross_Border_Compliance {
      * Devuelve país destino de la orden (ISO 2-letter).
      */
     private static function get_order_destination_country( \WC_Order $order ): string {
-        $state = $order->get_shipping_state();
         $country = $order->get_shipping_country();
-        return $country ?: ( $state ? substr( $state, 0, 2 ) : '' );
+        if ( $country ) return strtoupper( $country );
+
+        // FASE4 P0 FIX: the fallback `substr($state, 0, 2)` was wrong — WC $state
+        // is sub-national (e.g., "BOG" for Bogotá, "JAL" for Jalisco), NOT
+        // country-prefixed. substr("BOG", 0, 2) = "BO" → misidentified as Bolivia.
+        // Now: fall back to billing country, then empty string (don't guess).
+        $billing_country = $order->get_billing_country();
+        if ( $billing_country ) return strtoupper( $billing_country );
+
+        return '';
     }
 
     /**
@@ -919,7 +955,26 @@ class LTMS_Cross_Border_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        // FASE4 P0 FIX: protect PII-containing directories from web access.
+        // SOS/CRS/FX reports contain vendor DNI/NIT/TIN, bank data, transaction
+        // totals — all SARLAFT/FATCA/CRS protected data. Without .htaccess, these
+        // CSVs are publicly downloadable via /wp-content/uploads/ltms-*/.
+        self::protect_dir( $dir );
         return $dir;
+    }
+
+    /**
+     * Writes .htaccess + index.php to prevent direct web access to a directory.
+     */
+    private static function protect_dir( string $dir ): void {
+        $htaccess = $dir . '/.htaccess';
+        if ( ! file_exists( $htaccess ) ) {
+            @file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" );
+        }
+        $index_php = $dir . '/index.php';
+        if ( ! file_exists( $index_php ) ) {
+            @file_put_contents( $index_php, "<?php // Silence is golden.\n" );
+        }
     }
 
     /**

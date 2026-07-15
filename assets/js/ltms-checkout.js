@@ -423,8 +423,11 @@
          */
         showError(message) {
             const $notice = $('#ltms-checkout-notice');
-            $notice.removeClass('ltms-notice-success').addClass('ltms-notice-error')
-                   .html('<p>' + message + '</p>').show();
+            $notice.removeClass('ltms-notice-success').addClass('ltms-notice-error');
+            // FASE2B P1 FIX (XSS): use .text() instead of .html() for user-facing
+            // messages from AJAX responses. The message could contain HTML from
+            // a compromised server response.
+            $notice.empty().append($('<p>').text(message)).show();
             $('html, body').animate({ scrollTop: $notice.offset().top - 80 }, 300);
         },
 
@@ -435,8 +438,9 @@
          */
         showSuccess(message) {
             const $notice = $('#ltms-checkout-notice');
-            $notice.removeClass('ltms-notice-error').addClass('ltms-notice-success')
-                   .html('<p>' + message + '</p>').show();
+            $notice.removeClass('ltms-notice-error').addClass('ltms-notice-success');
+            // FASE2B P1 FIX (XSS): same as showError — use .text() for safety.
+            $notice.empty().append($('<p>').text(message)).show();
         },
     };
 

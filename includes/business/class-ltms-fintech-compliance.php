@@ -333,6 +333,7 @@ class LTMS_Fintech_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'sos_uiaf_%s_%s.csv', gmdate( 'Ymd' ), wp_generate_password( 6, false ) );
         $path     = $dir . '/' . $filename;
         $fp       = fopen( $path, 'w' );
@@ -374,6 +375,7 @@ class LTMS_Fintech_Compliance {
         if ( ! file_exists( $dir ) ) {
             wp_mkdir_p( $dir );
         }
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'sos_shcp_%s_%s.xml', gmdate( 'Ymd' ), wp_generate_password( 6, false ) );
         $path     = $dir . '/' . $filename;
 
@@ -472,20 +474,43 @@ class LTMS_Fintech_Compliance {
                 // Intentar descargar.
                 $response = wp_remote_get( $list_cfg['url'], [ 'timeout' => 30 ] );
                 if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+                    // FASE4 P0 FIX (SARLAFT fail-open): previously did `continue`
+                    // which skipped this list and approved the vendor WITHOUT
+                    // screening against it. This violates SARLAFT (CO Ley 526/1999)
+                    // and MX Ley Fintech art. 87. Now: FAIL-CLOSED — block KYC
+                    // until the list can be retrieved.
                     if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                        LTMS_Core_Logger::warning(
-                            'FT_SCREEN_LIST_UNAVAILABLE',
-                            sprintf( 'Lista %s no disponible: %s', $list_key, $list_cfg['url'] )
+                        LTMS_Core_Logger::critical(
+                            'FT_SCREEN_LIST_UNAVAILABLE_FAIL_CLOSED',
+                            sprintf( 'Lista %s no disponible — KYC BLOQUEADO (fail-closed SARLAFT). URL: %s', $list_key, $list_cfg['url'] ),
+                            [ 'vendor_id' => $vendor_id, 'list_key' => $list_key ]
                         );
                     }
-                    continue;
+                    update_user_meta( $vendor_id, '_ltms_sanctions_list_unavailable', $list_key );
+                    return false; // FAIL-CLOSED
                 }
                 $cached_list = wp_remote_retrieve_body( $response );
                 set_transient( "ltms_sanctions_list_{$list_key}", $cached_list, DAY_IN_SECONDS );
             }
 
             // Match simple por nombre (case-insensitive, sin acentos).
+            // v2.9.124 COMPLIANCE-AUDIT P0-3 FIX: require minimum name length for matching.
+            // Before, a 2-character name (e.g., "Li") would match thousands of entries
+            // in the OFAC list (Lisa, Liu, Lin, etc.) → false positives blocking
+            // legitimate vendors. Now requires minimum 4 characters for matching.
             $normalized_name = self::normalize_for_match( $name );
+            if ( strlen( $normalized_name ) < 4 ) {
+                // Name too short for reliable substring matching — skip this list
+                // and log for manual review by compliance officer.
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'FT_SANCTIONS_NAME_TOO_SHORT',
+                        sprintf( 'Vendor #%d (%s) — name too short for automated sanctions match, requires manual review.', $vendor_id, $name ),
+                        [ 'vendor_id' => $vendor_id, 'name' => $name, 'list_key' => $list_key ]
+                    );
+                }
+                continue;
+            }
             $pattern         = preg_quote( $normalized_name, '/' );
             if ( preg_match( "/{$pattern}/i", $cached_list ) ) {
                 // Match encontrado — bloquear.
@@ -501,7 +526,8 @@ class LTMS_Fintech_Compliance {
                 // Notificar al oficial de cumplimiento.
                 $email = LTMS_Core_Config::get( 'ltms_compliance_officer_email', get_option( 'admin_email' ) );
                 if ( $email ) {
-                    wp_mail(
+                    // v2.9.134 ERROR-AUDIT P1-1: log if compliance-critical email fails.
+                    $sent = wp_mail(
                         $email,
                         __( '[LTMS ALERTA] Coincidencia en lista restrictiva', 'ltms' ),
                         sprintf(
@@ -510,6 +536,13 @@ class LTMS_Fintech_Compliance {
                             $vendor_id, $name, $list_key
                         )
                     );
+                    if ( ! $sent && class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::critical(
+                            'FT_SANCTIONS_EMAIL_FAILED',
+                            sprintf( 'Failed to send sanctions match notification email for vendor #%d to %s', $vendor_id, $email ),
+                            [ 'vendor_id' => $vendor_id, 'email' => $email ]
+                        );
+                    }
                 }
                 return false;
             }
@@ -526,14 +559,25 @@ class LTMS_Fintech_Compliance {
      * Cron mensual: re-screen vendors activos (listas actualizan).
      */
     public static function rescreen_active_vendors(): void {
-        $users = get_users( [
-            'meta_key'   => 'ltms_kyc_status',
-            'meta_value' => 'approved',
-            'fields'     => 'ID',
-            'number'     => 500,
-        ] );
-        foreach ( $users as $uid ) {
-            self::screen_against_sanctions_lists( true, $uid );
+        // FASE4 P1 FIX: was limited to number => 500, so vendors beyond 500 were
+        // NEVER re-screened. SARLAFT requires periodic re-screening of ALL customers.
+        // Now: paginate through ALL approved vendors in batches of 200.
+        $offset = 0;
+        $batch  = 200;
+        while ( true ) {
+            $users = get_users( [
+                'meta_key'   => 'ltms_kyc_status',
+                'meta_value' => 'approved',
+                'fields'     => 'ID',
+                'number'     => $batch,
+                'offset'     => $offset,
+            ] );
+            if ( empty( $users ) ) break;
+            foreach ( $users as $uid ) {
+                self::screen_against_sanctions_lists( true, $uid );
+            }
+            $offset += $batch;
+            if ( count( $users ) < $batch ) break; // Last batch.
         }
     }
 
@@ -658,8 +702,24 @@ class LTMS_Fintech_Compliance {
      */
     private static function convert_to_usd( float $amount, string $currency ): float {
         if ( $currency === 'USD' ) return $amount;
-        $rate = (float) LTMS_Core_Config::get( "ltms_usd_{$currency}_rate", 1.0 );
-        return $rate > 0 ? ( $amount / $rate ) : $amount;
+        // FASE4 P0 FIX: default was 1.0 which made COP 5,000,000 treated as
+        // USD 5,000,000 — no payouts blocked, no Travel Rule, no SOS report.
+        // Now: if rate is not configured, return -1 (sentinel) so callers
+        // can detect the missing config and fail-safe (block high-value ops).
+        $rate = (float) LTMS_Core_Config::get( "ltms_usd_{$currency}_rate", 0 );
+        if ( $rate <= 0 ) {
+            // No rate configured — return a very large number so thresholds
+            // ALWAYS trigger (fail-safe: block high-value operations until
+            // the admin configures the FX rate).
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'FT_FX_RATE_MISSING',
+                    sprintf( 'ltms_usd_%s_rate not configured — convert_to_usd returning PHP_FLOAT_MAX (fail-safe). Configure the FX rate in admin settings.', $currency )
+                );
+            }
+            return PHP_FLOAT_MAX;
+        }
+        return $amount / $rate;
     }
 
     // ================================================================
@@ -848,7 +908,12 @@ class LTMS_Fintech_Compliance {
      * @param \WP_User $user Usuario.
      */
     public static function enforce_2fa_for_payout_vendors( string $user_login, \WP_User $user ): void {
-        if ( ! in_array( 'vendor', (array) $user->roles, true ) ) return;
+        // FASE4 P0 FIX: checked 'vendor' role but the platform's vendor roles are
+        // 'ltms_vendor' and 'ltms_vendor_premium'. The 'vendor' role doesn't exist
+        // in this plugin — 2FA enforcement NEVER fired for actual vendors, violating
+        // Ley Fintech art. 95 / Circular SFC compliance.
+        $vendor_roles = [ 'ltms_vendor', 'ltms_vendor_premium', 'vendor' ];
+        if ( ! array_intersect( $vendor_roles, (array) $user->roles ) ) return;
 
         $required = LTMS_Core_Config::get( 'ltms_2fa_required_vendors', 'yes' );
         if ( $required !== 'yes' ) return;
@@ -880,7 +945,12 @@ class LTMS_Fintech_Compliance {
     public static function render_2fa_required_notice(): void {
         if ( ! is_user_logged_in() ) return;
         $user_id = get_current_user_id();
-        if ( ! user_can( $user_id, 'vendor' ) ) return;
+        // RE-AUDIT P1 FIX: user_can($user_id, 'vendor') checks a CAPABILITY named
+        // 'vendor' which doesn't exist. Changed to role check matching the enforcement
+        // side (enforce_2fa_for_payout_vendors at line 915).
+        $user = wp_get_current_user();
+        $vendor_roles = [ 'ltms_vendor', 'ltms_vendor_premium', 'vendor' ];
+        if ( ! array_intersect( $vendor_roles, (array) $user->roles ) ) return;
         if ( get_user_meta( $user_id, '_ltms_2fa_required_notice', true ) !== 'yes' ) return;
         $has_2fa = get_user_meta( $user_id, '_ltms_2fa_verified', true ) === 'yes';
         if ( $has_2fa ) {
@@ -960,6 +1030,7 @@ class LTMS_Fintech_Compliance {
         $upload_dir = wp_upload_dir();
         $dir        = $upload_dir['basedir'] . '/ltms-crs';
         if ( ! file_exists( $dir ) ) wp_mkdir_p( $dir );
+        self::protect_pii_dir( $dir );
         $filename = sprintf( 'crs_fatca_%s_%s.csv', $country, gmdate( 'Y' ) );
         $path     = $dir . '/' . $filename;
         $fp       = fopen( $path, 'w' );
@@ -1104,5 +1175,21 @@ class LTMS_Fintech_Compliance {
                 'OECD CRS / MCAA'                => 'Intercambio automático de información fiscal.',
             ],
         ];
+    }
+
+    /**
+     * FASE4 P0 FIX: protect PII directories from web access.
+     * Writes .htaccess (Deny from all) + index.php (silence) to prevent
+     * direct download of SOS/CRS reports containing vendor DNI/TIN/bank data.
+     */
+    private static function protect_pii_dir( string $dir ): void {
+        $htaccess = $dir . '/.htaccess';
+        if ( ! file_exists( $htaccess ) ) {
+            @file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" );
+        }
+        $index_php = $dir . '/index.php';
+        if ( ! file_exists( $index_php ) ) {
+            @file_put_contents( $index_php, "<?php // Silence is golden.\n" );
+        }
     }
 }

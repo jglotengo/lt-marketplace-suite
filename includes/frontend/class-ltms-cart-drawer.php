@@ -280,6 +280,17 @@ JS;
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
             wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
         }
+        // v2.9.123 CHECKOUT-AUDIT P1-1 FIX: rate limit drawer refresh.
+        // Before, bots could spam this endpoint → high CPU from get_drawer_data.
+        // Now capped at 30 per IP per minute.
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+        $rl_key = 'ltms_drawer_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count > 30 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas solicitudes.', 'ltms' ) ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, MINUTE_IN_SECONDS );
+
         $full = isset( $_POST['full'] ) && $_POST['full'] === '1';
         wp_send_json_success( self::get_drawer_data( ! $full ) );
     }
@@ -311,8 +322,12 @@ JS;
         }
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         $qty = (int) ( $_POST['qty'] ?? 1 );
+        // v2.9.123 CHECKOUT-AUDIT P0-2 FIX: bound qty to reasonable max.
+        // Before, a customer could set qty=999999999 → WC()->cart->set_quantity
+        // would try to recalculate totals for that quantity → DoS via CPU.
+        $qty = max( 1, min( $qty, 999 ) );
         if ( $cart_item_key && WC()->cart ) {
-            WC()->cart->set_quantity( $cart_item_key, max( 1, $qty ), true );
+            WC()->cart->set_quantity( $cart_item_key, $qty, true );
         }
         wp_send_json_success( self::get_drawer_data( true ) );
     }

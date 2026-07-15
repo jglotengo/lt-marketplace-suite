@@ -113,6 +113,17 @@ class LTMS_Core_REST_Controller {
      * @return WP_REST_Response
      */
     public function get_products( WP_REST_Request $request ): WP_REST_Response {
+        // v2.9.129 GAP-AUDIT P1-1 FIX: rate limit public products endpoint.
+        // Before, bots could enumerate all products at high speed.
+        // Now capped at 60 per IP per minute.
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $rl_key = 'ltms_rest_products_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count > 60 ) {
+            return new WP_REST_Response( [ 'error' => 'Rate limit exceeded' ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, MINUTE_IN_SECONDS );
+
         $args = [
             'status'         => 'publish',
             'limit'          => min( 50, absint( $request->get_param( 'per_page' ) ?: 20 ) ),
@@ -146,6 +157,17 @@ class LTMS_Core_REST_Controller {
      * @return WP_REST_Response
      */
     public function get_shipping_quote( WP_REST_Request $request ): WP_REST_Response {
+        // v2.9.129 GAP-AUDIT P1-2 FIX: rate limit shipping quote endpoint.
+        // Before, bots could spam quotes → high load on shipping APIs (Aveonline).
+        // Now capped at 20 per IP per minute (shipping quotes are expensive).
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $rl_key = 'ltms_rest_quote_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count > 20 ) {
+            return new WP_REST_Response( [ 'error' => 'Rate limit exceeded' ], 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, MINUTE_IN_SECONDS );
+
         $body      = $request->get_json_params();
         $postal    = sanitize_text_field( $body['postal_code'] ?? '' );
         $vendor_id = absint( $body['vendor_id'] ?? 0 );

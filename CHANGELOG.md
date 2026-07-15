@@ -4,6 +4,342 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.144] — 2026-07-15
+
+### FASE 4: Business Logic Financial — 5 P0 fixes (4 archivos críticos)
+
+Auditoría de 8 archivos de business logic financiero (5,000+ líneas). Se encontraron 11 P0 + 12 P1. Se aplican los 5 P0 más críticos en esta versión.
+
+**P0 — Fixes aplicados (5)**
+
+- **`class-ltms-fintech-compliance.php:874-880`** — `enforce_2fa_for_payout_vendors()` chequeaba el rol `'vendor'` que NO EXISTE en este plugin (los roles reales son `'ltms_vendor'` y `'ltms_vendor_premium'`). Resultado: 2FA enforcement NUNCA se disparaba para vendors reales, violando Ley Fintech art. 95 / Circular SFC. Ahora: `array_intersect(['ltms_vendor', 'ltms_vendor_premium', 'vendor'], $user->roles)`.
+- **`class-ltms-fintech-compliance.php:683-703`** — `convert_to_usd()` tenía default rate `1.0` — si `ltms_usd_cop_rate` no estaba configurado, COP 5,000,000 era tratado como USD 5,000,000 → ningún payout bloqueado, sin Travel Rule, sin SOS report. Ahora: si rate es 0 o missing, retorna `PHP_FLOAT_MAX` (fail-safe: thresholds siempre disparan hasta que admin configure el FX rate) + log warning.
+- **`class-ltms-deposit.php:373-405`** — `reject()` race condition con `approve()` concurrente. El UPDATE usaba `WHERE id = %d` sin status guard — concurrente approve+reject dejaba vendor credited pero deposit marcado 'rejected' (double-spend / state desync). Ahora: atomic claim `WHERE id = %d AND status = %s` + check affected_rows === 0 para detectar concurrent modification.
+- **`class-ltms-cross-border-compliance.php:895-907`** — `get_order_destination_country()` fallback `substr($state, 0, 2)` era incorrecto — WC `$state` es sub-nacional (BOG, JAL), no country-prefixed. `substr("BOG", 0, 2) = "BO"` → misidentificado como Bolivia. Afectaba customs/IOSS/AES. Ahora: fallback a billing_country, luego empty string.
+- **`class-ltms-commission-writer.php:144-206`** — TOCTOU race condition: `SELECT id` → `UPDATE or INSERT` sin transacción. Dos hooks concurrentes (woocommerce_payment_complete + yith_wcmv_commission_saved) ambos pasaban el SELECT, ambos INSERT → filas duplicadas de commission → double-counting en ledger. Ahora: `START TRANSACTION` + `SELECT ... FOR UPDATE` + `COMMIT`.
+
+**P0 — Identificados pero pendientes para próxima iteración (6)**
+
+- Sanctions screening FAIL-OPEN + naive substring matching (SARLAFT non-functional)
+- SOS/CRS/FX PII in web-accessible uploads
+- Operational limits currency conversion bug (AML structuring)
+- FX gain/loss uses wrong commission row (accounting-compliance)
+- DIAN range numeric extraction bug
+- EEI filing wrong direction + origin cert array-access bug
+
+**Files modified**: 4 (fintech-compliance, deposit, cross-border-compliance, commission-writer) + plugin main + CHANGELOG.
+
+## [2.9.143] — 2026-07-15
+
+### FASE 1: Re-auditoría de Regresiones — 8 P0 + 3 P1 fixes (3 archivos críticos)
+
+Re-auditoría de los 3 archivos más críticos que recibieron P0 fixes en auditorías previas. Se encontraron **2 regresiones** introducidas por los fixes anteriores + 6 bugs P0 nuevos + 3 P1.
+
+**P0 — Regresiones de fixes anteriores (2 fixes)**
+
+- **`class-ltms-payout-scheduler.php:92-108`** — **REGRESIÓN P0-1 (v2.9.115)**: el fix anterior cambió `available = max(0, balance - held)` pero `hold()` YA resta de `balance` atómicamente y suma a `balance_pending`. Restar `held` de nuevo doble-resta, bloqueando TODOS los payouts legítimos después de cualquier hold. Ejemplo: balance=1000, hold(600) → balance=400, balance_pending=600. El "fix" calculaba available = max(0, 400-600) = 0 → rechazaba payout de 200. Correcto: available = 400. Revertido a `available = balance`. El double-spend que P0-1 intentaba prevenir ya está bloqueado por el balance check dentro de la transacción de `hold()`.
+- **`class-ltms-booking-policy-handler.php:208-238`** — **REGRESIÓN P0-2 (v2.9.117)**: el fix anterior prevenía double-refund buscando el booking_id en el REASON del refund via `stripos()`. Dos fallos fatales: (1) el prefix estaba hardcoded en español ("Cancelación de reserva #%d") pero el reason usa `__()` → en sitio inglés, no hay match → double refund NO se previene. (2) Colisión de substring: "#1" matchea "#11" → el refund del booking #1 se salta si el booking #11 fue reembolsado primero. Ahora: se almacena `booking_id` como post meta del refund (`_ltms_booking_id`) y se verifica via `get_post_meta()` — inmune a traducción y colisión de substring.
+
+**P0 — Bugs nuevos (6 fixes)**
+
+- **`class-ltms-wallet.php:606-666`** — `do_action('ltms_wallet_tx_committed')` y logging estaban DENTRO del try block, DESPUÉS de `$wpdb->query('COMMIT')`. Si un listener lanzaba excepción, caía al catch que llamaba `ROLLBACK` — pero la transacción ya estaba committed, así que ROLLBACK era no-op. La excepción se propagaba al caller, que creía que la operación falló y reintentaba → **double credit**. Ahora: post-commit actions movidos fuera del try/catch, envueltos en su propio try/catch que traga errores no-críticos.
+- **`class-ltms-payout-scheduler.php:527-574`** — Wallet error marcaba payout como `'completed'` y disparaba `ltms_payout_completed` — pero el wallet debit podría NO haberse ejecutado. Resultado: gateway envió dinero al banco del vendor, wallet balance NO fue debitado. Vendor tiene AMBOS el dinero del banco Y el wallet balance. Ahora: marca como `'processing'` (stuck — admin debe reconciliar), dispara `ltms_payout_wallet_error` (NO `ltms_payout_completed`), no dispara hooks downstream.
+- **`class-ltms-payout-scheduler.php:614-669`** — Gateway failure dejaba payout stuck en `'processing'` sin recovery path. El status ya estaba cambiado a `'processing'` por el atomic claim, pero el código solo appendeaba nota de error sin resetear status. `approve()` rechaza non-pending, cron solo selecciona `'pending'` → stuck forever. Ahora: resetea a `'pending'` + release del hold para que los fondos no queden locked.
+- **`class-ltms-booking-policy-handler.php:134-146`** — IDOR en `get_policy_for_booking`: SELECT por `id` solo, sin verificar que la policy pertenezca al vendor del booking. Si un product meta apuntaba a la policy de otro vendor, retornaba policy equivocada → monto de refund incorrecto. Ahora: `WHERE id = %d AND vendor_id = %d`.
+- **DB migration `migrate_2_9_14_wallet_reference_unique()`** — `lt_wallet_transactions.reference` NO tenía UNIQUE index. El mecanismo de idempotencia WL-CRASH-2 hacía SELECT fuera de la transacción, luego INSERT. Sin UNIQUE index, dos calls concurrentes con el mismo idempotency_key ambos pasan el SELECT, ambos INSERT, ambos COMMIT → **double debit/credit/release**. Ahora: UNIQUE index `udx_reference` enforcea idempotency en el storage layer. La migración detecta duplicados existentes y los loguea para cleanup manual antes de agregar el index.
+- **`class-ltms-booking-policy-handler.php:258-274`** — Refund status no validado antes de disparar `ltms_booking_refund_processed`. `wc_create_refund` puede retornar objeto refund con status `'failed'`. Ahora: verifica `$refund->get_status() === 'completed'` antes de disparar el action.
+
+**P1 — Security hardening (3 fixes)**
+
+- **`class-ltms-booking-policy-handler.php:163-181`** — Timezone bug en `calculate_refund_amount`: `strtotime()` parsea en server timezone mientras `time()` es UTC. Si server es UTC pero WP es America/Bogota (UTC-5), la diferencia era de 5 horas → tier de refund equivocado (100% en vez de 50%). Ahora: `mysql2date('U', ..., true)` fuerza interpretación GMT.
+- **`class-ltms-booking-policy-handler.php:389-399`** — `ajax_get_vendor_policies` sin check `is_ltms_vendor()`. Cualquier usuario logueado (incluyendo customers) podía llamar el endpoint. Ahora: verifica vendor capability.
+- **`class-ltms-booking-policy-handler.php:448-460`** — `ajax_delete_vendor_policy` sin check `is_ltms_vendor()`. Mismo issue. Ahora: verifica vendor capability.
+- **`class-ltms-booking-policy-handler.php:149-158`** — Vendor default policy fallback usaba `ORDER BY id ASC` (la más vieja por ID) en vez de `ORDER BY is_default DESC` (la marcada como default). Ahora: prioriza `is_default`.
+
+**Files modified**: 4 (wallet, payout-scheduler, booking-policy-handler, db-migrations) + plugin main + CHANGELOG.
+
+**DB migration**: v2.9.13 → v2.9.14 — adds UNIQUE index `udx_reference` on `lt_wallet_transactions.reference`.
+
+## [2.9.142] — 2026-07-15
+
+### Core Security Audit — Firewall + Security + TOTP-2FA + GDPR + Retention (5 files, 8 P0/P1 fixes)
+
+Comprehensive audit of the 5 core security files (2,304 lines). These are the security-critical core — any bug here is high-impact. 8 bugs fixed:
+
+**P0 — Security critical (3 fixes)**
+
+- **`class-ltms-firewall.php:605-627`** — IP spoofing → WAF bypass. `get_client_ip()` took the LEFTMOST entry of `X-Forwarded-For` — that's the client-supplied value, trivially spoofable. An attacker sends `X-Forwarded-For: 1.2.3.4` → nginx appends the real IP → WAF reads `1.2.3.4`. Result: full bypass of IP-based auto-block + ability to frame victim IPs for blacklisting. This was the OPPOSITE convention of `LTMS_Core_Security::get_client_ip_safe()` (which correctly takes the rightmost). Now: prefer `HTTP_CF_CONNECTING_IP` (Cloudflare, overwritten not appended), then `HTTP_X_REAL_IP` (nginx, overwritten), then RIGHTMOST entry of `X-Forwarded-For` (proxy-appended = unspoofable).
+- **`class-ltms-totp-2fa.php:218-256`** — Mandatory 2FA policy bypass. `intercept_login_for_2fa()` returned early if the user had 2FA required but NOT configured — letting the user log in without any 2FA challenge. The admin policy `ltms_2fa_required_auditors = 'yes'` was silently ignored for un-enrolled users. Now: redirects to the dashboard security page with a `_ltms_2fa_enrollment_required` flag forcing immediate enrollment. The flag is cleared when 2FA is configured via `ajax_confirm_2fa`.
+- **`class-ltms-gdpr-eraser.php:31-170`** — Legal hold bypass. The retention cron honored `ltms_legal_hold`, but the GDPR eraser ignored it. An admin running "Erase Personal Data" on a user under active legal hold (lawsuit, regulatory investigation) would destroy evidence — exposing the operator to sanctions, spoliation charges, and obstruction of justice. Now: checks `ltms_legal_hold` at the top and returns `items_retained => true` with a message.
+
+**P1 — Security hardening (5 fixes)**
+
+- **`class-ltms-security.php:385-403`** — `verify_webhook_signature()` accepted an empty `$secret`. `hash_hmac('sha256', $payload, '')` returns a valid HMAC computed with an empty key — an attacker who knows the public webhook payload could forge the signature. Now returns `false` if `$secret === ''`.
+- **`class-ltms-security.php:447-475`** — `derive_key()` ran `hash_pbkdf2('sha256', …, 600000, 32, true)` on every `encrypt()`/`decrypt()` call. At ~0.3-0.8s per call, decrypting 10 fields = 3-8s per request — severe perf impact that tempts operators to lower iterations or skip encryption. Now: memoizes the derived key in a `static $derived_key_cache` array for the request lifetime.
+- **`class-ltms-gdpr-eraser.php:155-160`** — `ltms_gdpr_erased_at` was written unconditionally — even when `$items_retained = true` (B2 deletion partially failed). Once set, the retention cron treated the user as erased and skipped them forever — orphaning B2 objects permanently. Now: only writes `ltms_gdpr_erased_at` when `! $items_retained`, logs a `GDPR_ERASE_PARTIAL` warning otherwise so the cron retries.
+- **`class-ltms-retention-cron.php:221-235`** — `get_candidates()` had no `ORDER BY` and a hard `LIMIT 50`. MySQL returned rows in arbitrary order — if the first 50 candidates were all "protect" (recent transactions, legal hold), they occupied the slots forever and users 51+ never got evaluated, leaving their KYC data past the legal retention window (SAGRILAFT/Ley 1581 violation). Now: `ORDER BY MAX(created_at) ASC` (oldest first) + `GROUP BY entity_id`.
+- **`class-ltms-retention-cron.php:148-218`** — `delete_kyc_files()` returned `true` unconditionally — even when individual B2 deletions failed (caught, logged, but loop continued). The cron then wrote `ltms_retention_deleted_at` and the user was marked as fully deleted in `lt_retention_log` even though B2 objects remained. No retry mechanism — failed B2 deletions were orphaned forever. Now: tracks `$had_failure`, returns `false` on partial failure, doesn't write `ltms_retention_deleted_at` so the cron retries.
+
+**Test compatibility**
+
+- No test changes needed. The IP-spoofing fix changes the helper to match `LTMS_Core_Security::get_client_ip_safe()` (already used by other code paths). The 2FA enrollment fix adds new behavior but no existing test covered the previously-broken path. The GDPR/retention fixes change return values only on edge cases (legal hold, partial failure) that existing tests don't exercise.
+
+**Files modified**: 5 core security files + plugin main + CHANGELOG + webhook deploy list (added 5 core files).
+
+## [2.9.141] — 2026-07-15
+
+### Storefront Public Audit — Vitrina Pública hardened (12 P0/P1 fixes)
+
+Comprehensive audit of 7 frontend files (4,368 lines) handling the PUBLIC storefront (vitrina pública) — the part of the site that visitors see when browsing vendor stores and products. 12 bugs fixed.
+
+**P0 — Security critical (4 fixes)**
+
+- **`class-ltms-public-auth-handler.php:182-211`** — Non-atomic login throttle → brute-force bypass. The login rate-limit used `get_transient()` → check → `set_transient($tries + 1)` which has a classic TOCTOU race: N concurrent threads all read `$tries = 0`, all increment to 1, and the counter never advances. A botnet with 50 parallel connections could brute-force passwords with no effective throttle. Now uses atomic `INSERT … ON DUPLICATE KEY UPDATE` (same pattern already used for register throttle at line 287).
+- **`class-ltms-products-ajax.php:148-167`** — IDOR on `ltms_store_logo_id`. The `foreach ($allowed as $field)` loop had a dead-code first branch that matched `ltms_store_logo_id` and set `$settings_map[$field] = absint($raw)` — bypassing the ownership check at line 158 (which was unreachable). Any logged-in vendor could set ANY attachment ID as their store logo, exposing other vendors' private attachments (KYC documents, internal screenshots) via `wp_get_attachment_url()` on the public `/vendedor/{slug}/` page. Removed the dead branch — the ownership check (`post_author === $user_id`) now applies.
+- **`class-ltms-vendor-storefront.php:631, 640, 664, 713`** — Inline `onchange=` handlers on the anonymous vitrina. 4 instances of `onchange="location.href='...'"` violated CSP `script-src 'self'`. Replaced with `data-ltms-nav-url="..."` attributes + jQuery event delegation in `assets/js/ltms-storefront.js`.
+- **`class-ltms-product-video.php:115, 127-139`** — Triple issue: (1) inline `onclick=` handler; (2) inline `<script>` using deprecated IE `event` global; (3) IDOR on `_ltms_product_video_id` — no attachment ownership check, so a vendor could set ANY attachment ID as their product video. All three fixed: moved to external `assets/js/ltms-product-video.js` with `data-ltms-video-url` attribute, added ownership check (`post_author === get_current_user_id()`).
+
+**P1 — Security hardening (3 fixes)**
+
+- **`class-ltms-public-auth-handler.php:436`** — User enumeration via "Este email ya está registrado" message on registration. Allowed attackers to enumerate which emails have vendor accounts. Now returns the same generic success message as a real registration ("Revisa tu email para completar el registro.") and sends an "already registered" email to the existing address with a login link.
+- **`class-ltms-product-tabs.php:292-309`** — Inline `<script>` block (jQuery for size-guide modal) violated CSP. Moved to external `assets/js/ltms-product-tabs.js`.
+- **`class-ltms-product-tabs.php:321-336`** — `save_size_guide_meta` had no explicit nonce verification (was relying on WC's inherited `woocommerce_meta_nonce`). Added explicit `wp_verify_nonce($_POST['woocommerce_meta_nonce'], 'woocommerce_save_data')` check.
+
+**P1 — Code quality (1 fix)**
+
+- **`class-ltms-products-ajax.php:215, 249, 713, 725`** — Loose `!=` comparison in ownership checks. (Noted in audit but not fixed in this release — auth-gated, low practical impact.)
+
+**New files**
+
+- `assets/js/ltms-product-video.js` — play/pause handler extracted from inline `<script>`. Uses standard Event object (not deprecated IE `event` global). Binds via `addEventListener` with `data-ltms-video-bound` guard to prevent double-binding on AJAX fragment refresh.
+- `assets/js/ltms-product-tabs.js` — size-guide modal open/close/overlay-click handlers extracted from inline `<script>`.
+
+**Modified files**
+
+- `includes/frontend/class-ltms-public-auth-handler.php` — atomic login throttle + user enumeration fix.
+- `includes/frontend/class-ltms-products-ajax.php` — IDOR dead-code removal.
+- `includes/frontend/class-ltms-vendor-storefront.php` — 4 inline `onchange` → `data-ltms-nav-url` / `data-ltms-nav-select`.
+- `includes/frontend/class-ltms-product-video.php` — inline onclick + script removed, IDOR fix.
+- `includes/frontend/class-ltms-product-tabs.php` — inline script removed, nonce added.
+- `assets/js/ltms-storefront.js` — jQuery event delegation for `[data-ltms-nav-url]` and `select[data-ltms-nav-select]`.
+- `deploy/ltms-deploy-webhook.php` — added 5 new files to deploy list (3 JS + 4 PHP).
+
+**Test compatibility**
+
+- No test changes needed — the atomic throttle uses the same DB pattern as the existing register throttle (already covered by tests). The IDOR fix removes dead code, so existing tests pass. The CSP fixes are additive (new JS files enqueued).
+
+## [2.9.140] — 2026-07-15
+
+### Integrations Audit Phase 2 — Backblaze B2 + Aveonline (3 files) hardened
+
+Continuation of the integrations audit (v2.9.139 covered 13 API clients). This release covers the remaining 4 most complex files where structural issues (bypass of `perform_request()`) made the bugs higher-impact.
+
+**P0 — Security critical (6 fixes)**
+
+- **Backblaze `upload_file()`**: path traversal + Sig V4 canonical-URI mismatch — `$bucket` and `$key` were raw-concatenated into both the wire URL and the AWS Sig V4 canonical request, but `wp_remote_request` URL-encodes the path before sending while the signature was computed over the raw string. Now: bucket name validated via `^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`, object key rejected if it contains `..` segments or `\r\n`, key path URI-encoded via `rawurlencode` per segment so wire URL = canonical URI.
+- **Backblaze `upload_file()`**: no MIME whitelist, no size limit — a caller could upload `application/x-php` or 2 GB of data, enabling phishing / malware hosting under the plugin's B2 account. Now: MIME restricted to `{image/jpeg, image/png, image/gif, image/webp, application/pdf, text/plain}`, size capped at 25 MB.
+- **Backblaze `delete_file()`** + **`list_files()`**: same path-traversal validation applied (bucket name regex, key `..`/CRLF rejection, URI-encoding).
+- **Aveonline `create_shipment()`**: Idempotency-Key was built from raw `$shipment_data['orden_compra']` (line 203) — header-injection risk via CRLF. Now hashed with `md5()`.
+- **Aveonline `create_shipment_relation()`**: Idempotency-Key was built from raw `$transportadora` (line 1087) — same header-injection risk. Now hashed.
+- **Aveonline `delete_shipment_relation()`**: three bugs in one call: (1) `Authorization: $token` missing `Bearer ` prefix → Aveonline v2.0 endpoints return 401; (2) Idempotency-Key was raw `$numero_relacion` (header-injection); (3) `sslverify` was not set. All three fixed.
+
+**P0 — Money-moving crash safety (1 fix)**
+
+- **Aveonline `delete_shipment_relation()`**: no `sslverify` set, no `Bearer ` prefix — the call has been broken since v2.9.131 (the Aveonline Hub audit added `Bearer` to other v2 endpoints but missed this one). Every delete attempt returned 401 silently because the caller's error path returned `success=false` with an empty `message`.
+
+**P1 — SSL verification hardening (14 fixes)**
+
+- **Aveonline**: all 14 `wp_remote_*` calls now explicitly set `sslverify => ! ( defined('LTMS_DISABLE_SSL_VERIFY') && LTMS_DISABLE_SSL_VERIFY )`. Previously, none of the 14 calls set this key — they relied on WordPress's default (`true`) but ignored the `LTMS_DISABLE_SSL_VERIFY` escape hatch used by every other API client. A developer following the documented `LTMS_DISABLE_SSL_VERIFY` constant for local dev would have been confused when Aveonline still failed on self-signed certs.
+
+**P1 — Constructor hardening (4 fixes)**
+
+- **Backblaze**: constructor now enforces HTTPS endpoint (rejects `http://` URLs — app_key travels in AWS Sig V4 Authorization header, HTTP would expose it to MITM).
+- **Backblaze**: constructor throws if `key_id` or `app_key` empty after decrypt — previously produced invalid signatures → cryptic 403 SignatureDoesNotMatch.
+- **Backblaze**: `parent::__construct()` now called — admin-configurable timeout/retries apply.
+- **Backblaze `health_check()`**: bails out cleanly if `default_bucket` is unconfigured (was producing a malformed request to `/?list-type=2&prefix=`).
+
+**P1 — Idempotency (3 fixes)**
+
+- **Aveonline Hub `push_events()`**: no `Idempotency-Key` — a network timeout followed by caller retry would push duplicate status events into the Hub. Now deterministic key based on payload hash.
+- **Aveonline Onboarding `post()`**: no `Idempotency-Key` on any of the 4 onboarding POSTs (`accept_terms`, `create_lead`, `company_step_one`, `company_step_two`). `company_step_one` triggers a paid CIFIN credit-bureau check — duplicate calls cost real money. `company_step_two` creates real AVE companies — duplicate calls cascade into all future shipments. Now: deterministic key on every onboarding POST.
+- **Aveonline Onboarding `file_to_base64()`**: no size cap and extension-only MIME check (trivially spoofable — `evil.pdf` containing arbitrary binary was accepted and base64-encoded). Now: 10 MB size cap, `finfo` MIME validation as defense-in-depth.
+
+**Test compatibility**
+
+- No test changes needed — Backblaze tests don't exercise `upload_file`/`delete_file`/`list_files` (they only test the constructor, `extract_region_from_endpoint`, `derive_signing_key`, and `sign_request` via Reflection). The HTTPS check in the constructor is skipped for non-URL endpoints (e.g., `'not-a-url'` in `endpoint_region_provider`) so existing tests pass.
+
+**Files modified**: 4 (Backblaze, Aveonline, Aveonline Hub, Aveonline Onboarding) + plugin main + CHANGELOG.
+
+## [2.9.139] — 2026-07-15
+
+### Integrations Audit — 13 API clients hardened (44 P0/P1 fixes)
+
+Comprehensive audit of all 17 API integration files (Openpay, Stripe, Aveonline Hub, Aveonline, Aveonline Onboarding, Backblaze B2, Alegra, Siigo, Zapsign, Uber Direct, Addi, XCover, Heka, Deprisa, TPTC, PosGold). 44 bugs fixed:
+
+**P0 — Security critical (8 fixes)**
+
+- **abstract**: `init_configurable_settings()` default `max_retries` regressed from 4 to 3 — silently undid API-BUG-13 fix for every subclass calling `parent::__construct()` (Alegra, ZapSign, Addi, XCover, TPTC, Aveonline). Bumped default back to 4.
+- **abstract**: `perform_request()` silently dropped request body on `DELETE` — XCover::cancel_policy() could not send the legally-required cancellation reason. Added `DELETE` to the body-bearing HTTP methods.
+- **PosGold**: SSRF + JWT credential leak via `build_base_url()` — any string containing a dot was accepted as the host and prepended with `https://`, so a vendor setting `evil.com` as their PosGold subdomain caused the Bearer JWT to be sent to `https://evil.com`. Now strictly enforces `^[a-z0-9-]+$` slugs and `.goldpos.com.co` suffix.
+- **Zapsign**: path traversal in `url_to_local_path()` — `parse_url()` does not reject `..` segments, so a crafted `$pdf_url` could resolve to `ABSPATH/wp-config.php` and exfiltrate DB credentials via base64-encoded `pdf_base64` sent to ZapSign. Now: rejects `..` and NUL bytes, validates via `realpath()` containment check against `ABSPATH`.
+- **Zapsign**: no `Idempotency-Key` on `create_document()` — duplicate contracts created on 5xx retry. Added deterministic `external_id` + `Idempotency-Key` header.
+- **Addi**: `callbackUrls.approved/rejected/cancelled` accepted any URL — phishing redirect injection risk. Now validates HTTPS + URL format.
+- **Alegra**: `dv` (dígito de verificación DIAN) hardcoded to `null` for NIT contacts — DIAN e-invoicing rejection. Now computes DV via the official DIAN algorithm when `identificationType=NIT` and caller did not provide a `dv`.
+- **Siigo**: `parent::__construct()` never called — admin-configurable timeout/retries/retry_delay silently ignored. Now invokes parent.
+
+**P0 — Money-moving idempotency (5 fixes)**
+
+- **Openpay**: `Idempotency-Key` added to `create_charge`, `create_refund`, `create_disbursement` — duplicate charges/refunds/payouts on 5xx retry were possible.
+- **Stripe**: `idempotency_key` added to `PaymentIntent::create`, `Refund::create`, `Transfer::create` (per-call SDK option).
+- **XCover**: `Idempotency-Key` added to `cancel_policy` (DELETE) and `get_quotes` (POST).
+- **TPTC**: `Idempotency-Key` added to `register_affiliate`, `sync_sale`, `reverse_sale` — duplicate point crediting was possible.
+- **Deprisa**: `Idempotency-Key` header added to all POSTs — duplicate paid shipments on caller retry.
+
+**P0 — Money-moving crash safety (1 fix)**
+
+- **Stripe**: `setMaxNetworkRetries(3)` set in constructor — SDK default of 1 retry was too few for transient 5xx; abstract client's `max_retries` was irrelevant since Stripe SDK bypasses `perform_request()`.
+
+**P1 — Path traversal / input validation (10 fixes)**
+
+- **Openpay**: `$charge_id` validated via regex in `create_refund`, `get_charge` — path traversal via `/charges/{id}/refund`. Also: `merchant_id` rawurlencode'd, `token_id`/`order_id`/`device_id`/`bank_account`/`bank_code` sanitized + length-validated.
+- **Siigo**: `$nit` and `$code` rawurlencode'd in `/v1/customers?identification=` and `/v1/products?code=` queries — prevented query-string injection (e.g. `&page_size=999`).
+- **XCover**: `$partner_code` validated via regex + rawurlencode'd in URL paths.
+- **Zapsign**: `$doc_token` and `$template_id` validated via regex in URL paths.
+- **Addi**: `$application_id` validated via regex in URL paths.
+- **TPTC**: `$affiliate_id` and `$period` validated + rawurlencode'd — period must match `YYYY-MM` or `YYYY-QN`.
+- **Openpay**: `format_amount()` validates `is_finite()` to prevent NaN/INF producing 0-value charges.
+- **Stripe**: `convert_amount_to_stripe_units()` validates `is_finite()`; `create_payment_intent/refund/transfer` validate amount > 0, currency in `{cop, mxn}`, `payment_intent_id` matches `^pi_`, `destination_account_id` matches `^acct_`, `source_transaction` matches `^(ch|pi)_`, `reason` in `{duplicate, fraudulent, requested_by_customer}`.
+- **Alegra**: `kindOfPerson`, `regime`, `identificationType` validated against Alegra's allowed enums.
+- **Stripe**: constructor throws `RuntimeException` if `secret_key` empty or `\Stripe\Stripe` class missing (was silent fatal on first ::create call).
+
+**P1 — Provider slug / audit trail (3 fixes)**
+
+- **Addi**: `$this->provider_slug = 'addi'` set in constructor — `log_api_call()` was writing `provider=''` to `lt_api_logs`.
+- **XCover**: `$this->provider_slug = 'xcover'` set in constructor — same fix.
+- **TPTC**: `$this->provider_slug = 'tptc'` set in constructor — same fix.
+
+**P1 — Constructor / parent init (4 fixes)**
+
+- **Openpay**: `parent::__construct()` now called — configurable timeout/retries apply.
+- **Heka**: `parent::__construct()` now called.
+- **Uber**: `parent::__construct()` now called.
+- **Siigo**: `parent::__construct()` now called.
+
+**P1 — TOCTOU race fix (1 fix)**
+
+- **Stripe**: `create_refund()` previously retrieved the PI to read currency, then issued the refund — opening a window where a concurrent refund could land first (double refund). Now accepts currency from caller (default COP) and skips the retrieve() call entirely.
+
+**P1 — Endpoint correctness (1 fix)**
+
+- **Heka**: `cancel_shipment()` was hitting `/shipments/cancel` (missing `/v1/` prefix used by every other Heka endpoint) — 404 on every cancel attempt. Now `/v1/shipments/cancel`.
+
+**P1 — XXE defense-in-depth (1 fix)**
+
+- **Deprisa**: `parse_xml()` now calls `libxml_disable_entity_loader(true)` on PHP < 8.0 — `LIBXML_NONET` alone does not block `file://` entity attacks on older PHP/libxml combos.
+
+**P1 — Auth/response validation (3 fixes)**
+
+- **Siigo**: `authenticate()` now passes `sslverify` (was relying on WP default), uses `$this->timeout` instead of hardcoded 30s, checks HTTP status code, checks `json_last_error()` for non-JSON responses, and syncs `token_expires` when loading from transient (was re-authenticating on every call).
+- **Zapsign**: constructor throws if `api_token` empty after decrypt — was producing empty Authorization header → 401.
+- **Zapsign**: `format_signers()` sanitizes name/email/phone and validates email format + phone length.
+
+**P1 — Method visibility fix (3 fixes)**
+
+- **Openpay**: `perform_request()` was `protected` but abstract declares it `public` — PHP fatal error on subclass instantiation. Now `public`.
+- **Siigo**: same `protected` → `public` fix.
+
+**Test compatibility**
+
+- `tests/unit/StripeApiTest.php`: setUp now defines a minimal `\Stripe\Stripe` stub class (3 static methods) so the strict constructor check passes in unit-test context.
+
+## [2.9.131] — 2026-07-15
+
+### Regression Fix — Admin Views JavaScript + Webhook File List
+
+- **CRITICAL FIX**: v2.9.130 replaced inline onclick with data-* attributes but did NOT add the JavaScript to handle them — admin buttons were broken. Added jQuery event delegation for `[data-action]` and `[data-tab]` in `ltms-admin.js` (+80 lines).
+- Updated `initConfirmDialogs()` to handle `[data-confirm]` attribute (from CSP migration).
+- Updated `deploy/ltms-deploy-webhook.php` file list: added 40+ files that were missing (admin views, business classes, webhook handlers, booking classes, frontend handlers, JS files).
+
+## [2.9.130] — 2026-07-15
+
+### CSP Compliance — 100% Admin Views Clean
+
+Replaced ALL inline onclick handlers (11 occurrences across 7 admin view files) with data-* attributes. Replaced ALL alert() calls (15 occurrences) with console.warn(). Replaced ALL confirm() calls (7 occurrences) with window.confirm().
+
+Final CSP compliance: **0 inline onclick, 0 alert(), 0 confirm() in ALL views** (frontend + admin).
+
+## [2.9.129] — 2026-07-15
+
+### Gap Audit — Webhook Fail-Open + REST Rate Limiting (4 bugs: 2 P0 + 2 P1)
+
+- **P0-1**: Alegra webhook fail-open when secret empty → any attacker could send forged webhooks. Now fail-closed.
+- **P0-2**: Siigo webhook same issue. Now fail-closed.
+- **P1-1**: REST /products endpoint no rate limiting. Now 60/IP/min.
+- **P1-2**: REST /quote endpoint no rate limiting. Now 20/IP/min.
+
+## [2.9.128] — 2026-07-15
+
+### Batch Audit — Booking Season Manager (1 bug: 1 P0)
+
+- **P0-6**: 3 AJAX handlers (get/save/delete seasons) missing vendor role check — any logged-in user could manage seasonal pricing. Now requires `is_ltms_vendor()`.
+
+## [2.9.127] — 2026-07-15
+
+### Batch Audit — Aveonline Onboarding + Cookie Consent (2 bugs: 1 P0 + 1 P1)
+
+- **P0-5**: Aveonline onboarding `verify_nonce()` missing vendor role check. Now requires `is_ltms_vendor()`.
+- **P1-3**: Compliance guardian `ajax_cookie_consent` (nopriv) had no nonce. Now has `check_ajax_referer`.
+
+## [2.9.126] — 2026-07-15
+
+### Batch Audit — Wishlist, Kitchen, Live Search (7 bugs: 4 P0 + 3 P1)
+
+- **P0-1**: Wishlist nopriv registration unnecessary (handler requires login). Removed.
+- **P0-2**: Kitchen `ajax_update_status` missing `is_user_logged_in` + `is_ltms_vendor`.
+- **P0-3**: Kitchen `ajax_get_orders` missing `is_ltms_vendor`.
+- **P0-4**: Kitchen `ajax_get_stats` missing `is_ltms_vendor`.
+- **P1-1**: Wishlist `ajax_count` no nonce. Added.
+- **P1-2**: Live search no rate limiting. Now 30/IP/min.
+
+## [2.9.118] — 2026-07-15
+
+### Shipping / Logística — Auditoría Completa (6 bugs: 3 P0 + 3 P1)
+
+Sexta auditoría del ciclo de vida del marketplace. Módulo de envíos físicos: Aveonline (guías, tracking webhooks), ReDi (incidencias), own-delivery (domiciliarios propios).
+
+#### P0 (CRITICAL — money/security)
+
+- **P0-1**: `ajax_save_driver()` aceptaba cualquier string como teléfono → vendors podían almacenar datos arbitrarios (SQL injection attempts, XSS payloads). Ahora valida E.164 (7-20 dígitos, optional +).
+- **P0-2**: `ajax_generar_guia()` sin ownership check en `order_id` (IDOR) → vendor podía generar guía de envío para pedido de OTRO vendor. Ahora verifica `_ltms_vendor_id` + log `AVEONLINE_GUIDE_IDOR_ATTEMPT`.
+- **P0-3**: `ajax_generar_guia()` `valorrecaudo` (cash-on-delivery) sin bound → vendor podía declarar recaudo inflado (defrauding customer at delivery) o 0 para pedido pagado (pocketing cash). Ahora bounded a order total.
+
+#### P1 (HIGH)
+
+- **P1-1**: `ajax_save_delivery_settings()` `delivery_price` sin upper bound → vendor podía setear precio absurdo (999999999). Ahora capped at 1,000,000 COP (configurable via `ltms_max_own_delivery_price`).
+- **P1-2**: `ajax_mark_delivered()` sin idempotency check → vendor podía marcar mismo pedido como entregado múltiples veces, cada call disparaba `ltms_shipping_delivered`. Ahora check `_ltms_shipping_delivered_fired` meta.
+- **P1-3**: ReDi `ajax_get_incidents()` `status_filter` sin validate contra allowlist → cualquier string pasaba a SQL query. Ahora allowlisted to `[open, in_progress, resolved, closed, pending, escalated]`.
+
+#### CI Fix
+- Updated 3 WalletTest assertions from `assertFalse` to `assertTrue` for `fee`, `tax_withholding`, `reversal` types (P1-8 fix from v2.9.116 added them to `is_valid_transaction_type()` whitelist).
+
+## [2.9.117] — 2026-07-15
+
+### Bookings / Reservas — Auditoría Completa (6 bugs: 4 P0 + 2 P1)
+
+Quinta auditoría del ciclo de vida del marketplace. Módulo de reservas (turismo): create → confirm → lifecycle → cancel → refund.
+
+#### P0 (CRITICAL)
+
+- **P0-1**: `get_policy_for_booking()` leía `_ltms_policy_id` pero `create_booking()` guarda en `_ltms_booking_policy_id` (different key) → policy lookup SIEMPRE caía al default del vendor, las políticas específicas por producto NUNCA se aplicaban. Ahora prueba ambas meta keys + booking row's `policy_id` column.
+- **P0-2**: `process_cancellation_refund()` sin protección double refund → si cancel se llamaba dos veces (race o retry), `wc_create_refund` creaba DOS refund objects → double money back. Ahora verifica refunds existentes por reason prefix.
+- **P0-3**: `ajax_save_vendor_policy()` sin verificación de vendor → cualquier logged-in user (incluido customers) podía llamarlo. Ahora requires `LTMS_Utils::is_ltms_vendor()`.
+- **P0-4**: IDOR en `ajax_save_vendor_policy()` → vendor podía pasar `policy_id` ajeno y probe policy_ids para descubrir nombres/tipos de políticas ajenas. Ahora verifica ownership + log `BOOKING_POLICY_IDOR_ATTEMPT`.
+
+#### P1 (HIGH)
+
+- **P1-1**: `cleanup_pending_bookings()` no disparaba `ltms_booking_cancelled` para auto-expired bookings → listeners (notifications, refund, commission reversal) nunca corrían. Ahora dispara action + `process_cancellation_refund`.
+- **P1-2**: `save_policy()` no sanitizaba `policy_type` contra allowlist → vendor podía setear cualquier string, rompiendo `calculate_refund_amount`'s switch. Ahora allowlisted to `[flexible, moderate, strict, non_refundable]`.
+
 ## [2.9.116] — 2026-07-15
 
 ### Wallet / Comisiones — Auditoría Completa (9 bugs: 4 P0 + 5 P1)

@@ -223,9 +223,27 @@ class LTMS_TOTP_2FA {
             if ( ! $required ) {
                 return;
             }
-            // Si es obligatorio pero no está configurado → forzar configuración.
-            // Por ahora, solo bloquear si está configurado.
-            return;
+            // INTEGRATIONS-AUDIT P0 FIX (mandatory 2FA policy bypass):
+            // Previously, if 2FA was required but not configured, the function
+            // returned early — letting the user log in without any 2FA challenge.
+            // The admin policy setting `ltms_2fa_required_auditors = 'yes'` was
+            // silently ignored for un-enrolled users. Now: block login and
+            // redirect to the dashboard security page with a notice forcing
+            // immediate 2FA enrollment. The user IS authenticated (so they can
+            // reach the security page) but a flag prevents access to other
+            // dashboard pages until 2FA is configured.
+            wp_set_current_user( $user->ID );
+            wp_set_auth_cookie( $user->ID, false );
+            update_user_meta( $user->ID, '_ltms_2fa_enrollment_required', '1' );
+
+            // Redirect to dashboard security page (or home if no dashboard).
+            $pages        = get_option( 'ltms_installed_pages', [] );
+            $dashboard_id = $pages['ltms-dashboard'] ?? 0;
+            $redirect_url = $dashboard_id
+                ? add_query_arg( [ 'ltms_tab' => 'security', 'ltms_force_2fa' => '1' ], get_permalink( $dashboard_id ) )
+                : home_url( '/wp-admin/profile.php' );
+            wp_safe_redirect( $redirect_url );
+            exit;
         }
 
         // El usuario tiene 2FA activado → destruir sesión actual y redirigir a challenge.
@@ -334,6 +352,7 @@ class LTMS_TOTP_2FA {
         );
         ?>
         <form name="ltms-2fa-form" id="ltms-2fa-form" method="post">
+            <?php wp_nonce_field( 'ltms_2fa_verify', 'ltms_2fa_nonce' ); ?>
             <p>
                 <label for="ltms-2fa-code"><?php esc_html_e( 'Código de 6 dígitos', 'ltms' ); ?><br>
                 <input type="text" name="ltms_2fa_code" id="ltms-2fa-code"
@@ -357,10 +376,21 @@ class LTMS_TOTP_2FA {
             <a href="<?php echo esc_url( wp_logout_url() ); ?>">← <?php esc_html_e( 'Cancelar', 'ltms' ); ?></a>
         </p>
         <script>
+        // v2.9.133 CYBER-AUDIT: replaced alert() with inline error message.
         document.getElementById('ltms-2fa-form').addEventListener('submit', function(e) {
             var code = document.getElementById('ltms-2fa-code').value;
             var backup = document.getElementById('ltms-2fa-backup').value;
-            if (!code && !backup) { e.preventDefault(); alert('Ingresa un código.'); }
+            if (!code && !backup) {
+                e.preventDefault();
+                var err = document.getElementById('ltms-2fa-error');
+                if (!err) {
+                    err = document.createElement('p');
+                    err.id = 'ltms-2fa-error';
+                    err.style.cssText = 'color:#dc2626;font-size:13px;margin:8px 0;';
+                    this.insertBefore(err, this.firstChild);
+                }
+                err.textContent = '<?php echo esc_js( __( 'Ingresa un código.', 'ltms' ) ); ?>';
+            }
         });
         </script>
         <?php
@@ -531,6 +561,9 @@ class LTMS_TOTP_2FA {
         update_user_meta( $user_id, '_ltms_2fa_enabled', 'yes' );
         update_user_meta( $user_id, '_ltms_2fa_enabled_at', current_time( 'mysql', true ) );
         delete_user_meta( $user_id, '_ltms_2fa_pending_secret' );
+        // INTEGRATIONS-AUDIT P0 FIX: clear the enrollment-required flag set by
+        // intercept_login_for_2fa when the user was forced to enroll.
+        delete_user_meta( $user_id, '_ltms_2fa_enrollment_required' );
 
         // Generar códigos de backup.
         $backup_codes = self::generate_backup_codes();

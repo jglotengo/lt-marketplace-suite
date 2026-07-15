@@ -245,6 +245,224 @@ if (isset($_GET['caps'])) {
     exit;
 }
 
+// ── REPORT MODE ─────────────────────────────────────────────────────────────
+// Comprehensive diagnostic of all pending audit items.
+// Usage: ?token=...&report=1
+if (isset($_GET['report'])) {
+    $wp = __DIR__ . '/wp-load.php';
+    if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
+    require_once $wp;
+
+    echo "=== LTMS Production Diagnostic Report ===\n";
+    echo "Time: " . current_time('Y-m-d H:i:s') . "\n";
+    echo "PHP: " . PHP_VERSION . "\n";
+    echo "WP: " . get_bloginfo('version') . "\n";
+    echo "LTMS: " . (defined('LTMS_VERSION') ? LTMS_VERSION : '?') . "\n\n";
+
+    global $wpdb;
+
+    // 1. Plugin version on disk vs DB
+    echo "=== 1. Plugin Version ===\n";
+    $db_ver = get_option('ltms_version', '?');
+    echo "  DB option ltms_version: {$db_ver}\n";
+    echo "  Constant LTMS_VERSION: " . (defined('LTMS_VERSION') ? LTMS_VERSION : '?') . "\n";
+
+    // 2. KYC table status
+    echo "\n=== 2. KYC Table Status ===\n";
+    $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+    $kyc_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$kyc_table}`");
+    echo "  Total KYC records: {$kyc_count}\n";
+    $kyc_approved = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$kyc_table}` WHERE status='approved'");
+    echo "  Approved: {$kyc_approved}\n";
+    $kyc_no_expiry = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$kyc_table}` WHERE status='approved' AND (expires_at IS NULL OR expires_at='' OR expires_at='0000-00-00')");
+    echo "  Approved WITHOUT expires_at: {$kyc_no_expiry}\n";
+    $kyc_no_filepath = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$kyc_table}` WHERE status='approved' AND (file_path='' OR file_path IS NULL)");
+    echo "  Approved WITHOUT file_path (B2 upload issue?): {$kyc_no_filepath}\n";
+    $kyc_no_rut = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$kyc_table}` WHERE status='approved' AND (rut_path='' OR rut_path IS NULL)");
+    echo "  Approved WITHOUT rut_path: {$kyc_no_rut}\n";
+
+    // 3. Payouts status
+    echo "\n=== 3. Payouts Table Status ===\n";
+    $po_table = $wpdb->prefix . 'lt_payout_requests';
+    $po_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$po_table}`");
+    echo "  Total payouts: {$po_count}\n";
+    $po_rejected = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$po_table}` WHERE status='rejected'");
+    echo "  Rejected: {$po_rejected}\n";
+    $po_no_reason = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$po_table}` WHERE status='rejected' AND notes!='' AND (rejection_reason IS NULL OR rejection_reason='')");
+    echo "  Rejected WITHOUT rejection_reason: {$po_no_reason}\n";
+
+    // 4. Backblaze B2 config
+    echo "\n=== 4. Backblaze B2 Config ===\n";
+    foreach (['ltms_backblaze_endpoint','ltms_backblaze_key_id','ltms_backblaze_default_bucket','ltms_backblaze_private_bucket','ltms_backblaze_app_key'] as $k) {
+        $v = get_option($k, '');
+        $display = empty($v) ? '(empty)' : (strpos($k, 'key') !== false ? substr($v, 0, 8) . '...' : $v);
+        echo "  {$k}: {$display}\n";
+    }
+
+    // 5. Capabilities check
+    echo "\n=== 5. Admin Capabilities ===\n";
+    $admin = get_role('administrator');
+    if ($admin) {
+        $caps_to_check = ['publish_products', 'manage_woocommerce', 'edit_products', 'manage_ltms'];
+        foreach ($caps_to_check as $cap) {
+            $has = isset($admin->capabilities[$cap]) && $admin->capabilities[$cap];
+            echo "  administrator->{$cap}: " . ($has ? 'YES' : 'NO') . "\n";
+        }
+    } else {
+        echo "  ERROR: administrator role not found\n";
+    }
+
+    // 6. Deprisa module duplication check
+    echo "\n=== 6. Deprisa Module Files ===\n";
+    $deprisa_paths = [
+        PLUGIN_PATH . '/includes/deprisa/',
+        PLUGIN_PATH . '/includes/shipping/',
+        PLUGIN_PATH . '/includes/business/',
+        PLUGIN_PATH . '/includes/settings/',
+    ];
+    foreach ($deprisa_paths as $p) {
+        if (is_dir($p)) {
+            $files = glob($p . '*deprisa*');
+            if ($files) {
+                foreach ($files as $f) {
+                    echo "  " . str_replace(PLUGIN_PATH . '/', '', $f) . " (" . filesize($f) . " bytes)\n";
+                }
+            }
+        }
+    }
+
+    // 7. Active API integrations config
+    echo "\n=== 7. API Integration Config ===\n";
+    $integrations = [
+        'openpay' => ['ltms_openpay_merchant_id', 'ltms_openpay_private_key'],
+        'stripe' => ['ltms_stripe_secret_key'],
+        'alegra' => ['ltms_alegra_token'],
+        'siigo' => ['ltms_siigo_username', 'ltms_siigo_access_key'],
+        'aveonline' => ['ltms_aveonline_usuario', 'ltms_aveonline_clave'],
+        'zapsign' => ['ltms_zapsign_api_token'],
+        'xcover' => ['ltms_xcover_partner_code', 'ltms_xcover_api_key'],
+        'addi' => ['ltms_addi_client_id', 'ltms_addi_client_secret'],
+        'heka' => ['ltms_heka_api_key'],
+        'tptc' => ['ltms_tptc_api_key'],
+        'uber' => ['ltms_uber_direct_client_id', 'ltms_uber_direct_client_secret'],
+    ];
+    foreach ($integrations as $provider => $keys) {
+        $configured = true;
+        foreach ($keys as $k) {
+            $v = get_option($k, '');
+            if (empty($v)) { $configured = false; break; }
+        }
+        echo "  {$provider}: " . ($configured ? 'CONFIGURED' : 'NOT configured') . "\n";
+    }
+
+    // 8. API logs recent
+    echo "\n=== 8. Recent API Logs (last 24h) ===\n";
+    $log_table = $wpdb->prefix . 'lt_api_logs';
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$log_table}'");
+    if ($table_exists) {
+        $log_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM `{$log_table}` WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+        echo "  Logs in last 24h: {$log_count}\n";
+        $by_provider = $wpdb->get_results("SELECT provider, COUNT(*) as c FROM `{$log_table}` WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) GROUP BY provider ORDER BY c DESC");
+        foreach ($by_provider as $r) {
+            echo "    {$r->provider}: {$r->c}\n";
+        }
+    } else {
+        echo "  Table {$log_table} does not exist\n";
+    }
+
+    // 9. PHP error log size
+    echo "\n=== 9. PHP Error Log ===\n";
+    $err_log = ini_get('error_log');
+    if ($err_log && file_exists($err_log)) {
+        $size = filesize($err_log);
+        echo "  Path: {$err_log}\n";
+        echo "  Size: " . round($size / 1024 / 1024, 2) . " MB\n";
+        echo "  Last 5 lines:\n";
+        $lines = array_slice(file($err_log), -5);
+        foreach ($lines as $l) echo "    " . trim($l) . "\n";
+    } else {
+        echo "  No error_log configured or file not found\n";
+    }
+
+    echo "\n=== Report Complete ===\n";
+    exit;
+}
+
+// ── BACKFILL MODE ────────────────────────────────────────────────────────────
+// Runs bin/ltms-backfill-audit-fixes.php in production.
+// Usage: ?token=...&backfill=1
+if (isset($_GET['backfill'])) {
+    $wp = __DIR__ . '/wp-load.php';
+    if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
+    require_once $wp;
+
+    echo "=== LTMS Backfill v2.9.132 (production) ===\n";
+    echo "Time: " . current_time('Y-m-d H:i:s') . "\n";
+    echo "PHP: " . PHP_VERSION . "\n\n";
+
+    global $wpdb;
+
+    // ── 1. KYC expires_at backfill ──────────────────────────────────────────
+    $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+    $approved_without_expiry = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$kyc_table}`
+         WHERE status = 'approved'
+           AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+    );
+    echo "1. KYC expires_at backfill:\n";
+    echo "   KYCs aprobados sin expires_at: {$approved_without_expiry}\n";
+    if ($approved_without_expiry > 0) {
+        $updated = $wpdb->query(
+            "UPDATE `{$kyc_table}`
+             SET expires_at = DATE_ADD(
+                 COALESCE(NULLIF(reviewed_at, '0000-00-00 00:00:00'), NULLIF(submitted_at, '0000-00-00 00:00:00'), NOW()),
+                 INTERVAL 1 YEAR
+             )
+             WHERE status = 'approved'
+               AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+        );
+        echo "   Actualizados: {$updated}\n";
+    } else {
+        echo "   No hay KYCs que actualizar.\n";
+    }
+
+    // ── 2. Payouts rejection_reason backfill ────────────────────────────────
+    $payouts_table = $wpdb->prefix . 'lt_payout_requests';
+    $rejected_without_reason = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$payouts_table}`
+         WHERE status = 'rejected'
+           AND notes IS NOT NULL AND notes != ''
+           AND (rejection_reason IS NULL OR rejection_reason = '')"
+    );
+    echo "\n2. Payouts rejection_reason backfill:\n";
+    echo "   Payouts rechazados con notes pero sin rejection_reason: {$rejected_without_reason}\n";
+    if ($rejected_without_reason > 0) {
+        $updated = $wpdb->query(
+            "UPDATE `{$payouts_table}`
+             SET rejection_reason = notes
+             WHERE status = 'rejected'
+               AND notes IS NOT NULL AND notes != ''
+               AND (rejection_reason IS NULL OR rejection_reason = '')"
+        );
+        echo "   Actualizados: {$updated}\n";
+    } else {
+        echo "   No hay payouts que migrar.\n";
+    }
+
+    // ── 3. Verificación final ───────────────────────────────────────────────
+    echo "\n=== Verificación ===\n";
+    $remaining_kyc = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$kyc_table}` WHERE status = 'approved' AND (expires_at IS NULL OR expires_at = '' OR expires_at = '0000-00-00')"
+    );
+    $remaining_payouts = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM `{$payouts_table}` WHERE status = 'rejected' AND notes != '' AND (rejection_reason IS NULL OR rejection_reason = '')"
+    );
+    echo "KYCs aprobados sin expires_at restantes: {$remaining_kyc}\n";
+    echo "Payouts rechazados sin rejection_reason restantes: {$remaining_payouts}\n";
+    echo "\n=== Backfill completado ===\n";
+    exit;
+}
+
 // ── DEPLOY MODE ───────────────────────────────────────────────────────────────
 $ts = date('Y-m-d H:i:s');
 echo "[{$ts}] v5
@@ -274,10 +492,34 @@ $files = [
     'includes/frontend/class-ltms-dashboard-logic.php',
     'includes/frontend/class-ltms-frontend-assets.php',
     'includes/frontend/class-ltms-frontend-payout-handler.php',
+    'includes/frontend/class-ltms-frontend-checkout-handler.php',
+    'includes/frontend/class-ltms-frontend-checkout-mexico-handler.php',
+    'includes/frontend/class-ltms-cart-drawer.php',
+    'includes/frontend/class-ltms-wishlist.php',
+    'includes/frontend/class-ltms-kitchen-ajax.php',
+    'includes/frontend/class-ltms-frontend-live-search.php',
+    'includes/frontend/class-ltms-rating-summary.php',
+    'includes/frontend/class-ltms-frontend-notifications.php',
     'includes/admin/views/html-admin-kyc.php',
     'includes/admin/views/html-admin-payouts.php',
+    'includes/admin/views/html-admin-orders.php',
+    'includes/admin/views/html-admin-wallets.php',
+    'includes/admin/views/html-admin-security.php',
+    'includes/admin/views/html-admin-marketing.php',
+    'includes/admin/views/html-admin-tourism-compliance.php',
+    'includes/admin/views/html-admin-cross-border.php',
+    'includes/admin/views/html-admin-pickup-orders.php',
+    'includes/admin/views/html-admin-bookings.php',
+    'includes/admin/views/html-admin-redi.php',
+    'includes/admin/views/html-admin-dashboard.php',
+    'includes/admin/views/view-auditor-dashboard.php',
+    'includes/admin/views/html-admin-fiscal-mexico.php',
+    'includes/admin/views/html-admin-donations.php',
+    'includes/admin/views/html-admin-commission-tiers.php',
+    'includes/admin/views/settings/section-aveonline.php',
     'includes/admin/class-ltms-admin-settings.php',
     'includes/admin/class-ltms-admin-payouts.php',
+    'includes/admin/class-ltms-admin-donations.php',
     'includes/admin/class-ltms-commission-writer.php',
     'includes/admin/class-ltms-bank-reconciler.php',
     'includes/business/class-ltms-wallet.php',
@@ -285,11 +527,86 @@ $files = [
     'includes/business/class-ltms-media-guard.php',
     'includes/business/class-ltms-restaurant-compliance.php',
     'includes/business/class-ltms-legal-compliance.php',
+    'includes/business/class-ltms-fintech-compliance.php',
+    'includes/business/class-ltms-data-protection-compliance.php',
+    'includes/business/class-ltms-compliance-guardian.php',
+    'includes/business/class-ltms-business-consumer-protection.php',
+    'includes/business/class-ltms-booking-notifications.php',
+    'includes/business/class-ltms-affiliates.php',
+    'includes/business/class-ltms-sales-booster.php',
+    'includes/business/class-ltms-traffic-booster.php',
+    'includes/business/class-ltms-xcover-checkout-handler.php',
+    'includes/business/listeners/class-ltms-xcover-policy-listener.php',
+    'includes/business/listeners/class-ltms-coupon-attribution-listener.php',
+    'includes/api/class-ltms-api-xcover.php',
+    'includes/api/webhooks/class-ltms-alegra-webhook-handler.php',
+    'includes/api/webhooks/class-ltms-siigo-webhook-handler.php',
+    'includes/booking/class-ltms-booking-manager.php',
+    'includes/booking/class-ltms-booking-policy-handler.php',
+    'includes/booking/class-ltms-booking-season-manager.php',
+    'includes/core/class-ltms-core-rest-controller.php',
+    'includes/business/class-ltms-aveonline-onboarding-ajax.php',
     'lt-marketplace-suite.php',
-    // P-01: vendor dashboard JS + products AJAX handler
+    // JS files
     'assets/js/ltms-dashboard.js',
+    'assets/js/ltms-admin.js',
+    'assets/js/ltms-admin.min.js',
+    // INTEGRATIONS-AUDIT v2.9.141: storefront CSP compliance JS
+    'assets/js/ltms-storefront.js',
+    'assets/js/ltms-product-video.js',
+    'assets/js/ltms-product-video.min.js',
+    'assets/js/ltms-product-tabs.js',
+    'assets/js/ltms-product-tabs.min.js',
+    // FASE2B v2.9.155-158: extracted inline scripts → external JS
+    'assets/js/ltms-donations.js',
+    'assets/js/ltms-donations.min.js',
+    'assets/js/ltms-sellers-landing.js',
+    'assets/js/ltms-sellers-landing.min.js',
+    'assets/js/ltms-marketing.js',
+    'assets/js/ltms-marketing.min.js',
+    'assets/js/ltms-shipping-statement.js',
+    'assets/js/ltms-shipping-statement.min.js',
+    'assets/js/ltms-kitchen-view.js',
+    'assets/js/ltms-kitchen-view.min.js',
+    'assets/js/ltms-login-register.js',
+    'assets/js/ltms-login-register.min.js',
+    'assets/js/ltms-insurance-view.js',
+    'assets/js/ltms-insurance-view.min.js',
+    'assets/js/ltms-wallet.js',
+    'assets/js/ltms-wallet.min.js',
+    'assets/js/ltms-security.js',
+    'assets/js/ltms-security.min.js',
+    'assets/js/ltms-kyc.js',
+    'assets/js/ltms-kyc.min.js',
+    'assets/js/ltms-aveonline-onboarding.js',
+    'assets/js/ltms-aveonline-onboarding.min.js',
+    'assets/js/ltms-envios.js',
+    'assets/js/ltms-envios.min.js',
+    'assets/js/ltms-settings.js',
+    'assets/js/ltms-settings.min.js',
+    'assets/js/ltms-ordenes-compra.js',
+    'assets/js/ltms-ordenes-compra.min.js',
+    'assets/js/ltms-drivers.js',
+    'assets/js/ltms-drivers.min.js',
+    'assets/js/ltms-posgold.js',
+    'assets/js/ltms-posgold.min.js',
+    'assets/js/ltms-products.js',
+    'assets/js/ltms-products.min.js',
+    'assets/js/ltms-bookings.js',
+    'assets/js/ltms-bookings.min.js',
     'includes/frontend/class-ltms-products-ajax.php',
+    // INTEGRATIONS-AUDIT v2.9.141: storefront public-facing files
+    'includes/frontend/class-ltms-vendor-storefront.php',
+    'includes/frontend/class-ltms-product-tabs.php',
+    'includes/frontend/class-ltms-product-video.php',
+    'includes/frontend/class-ltms-public-auth-handler.php',
     'includes/frontend/views/view-sellers-landing.php',
+    // INTEGRATIONS-AUDIT v2.9.142: core security files
+    'includes/core/class-ltms-firewall.php',
+    'includes/core/class-ltms-security.php',
+    'includes/core/class-ltms-totp-2fa.php',
+    'includes/core/class-ltms-gdpr-eraser.php',
+    'includes/core/class-ltms-retention-cron.php',
     'includes/frontend/views/dashboard-wrapper.php',
     'patchwork.json',
     // DIAG temp

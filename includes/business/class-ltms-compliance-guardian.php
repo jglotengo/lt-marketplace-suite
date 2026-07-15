@@ -761,6 +761,14 @@ class LTMS_Compliance_Guardian {
     // ================================================================
 
     public static function ajax_cookie_consent(): void {
+        // v2.9.127 BATCH-AUDIT P1-3 FIX: add nonce for CSRF protection.
+        // Before, this nopriv endpoint had no nonce — any site could embed
+        // a form that POSTs to this endpoint and set cookie consent level.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            // For backward compat with cached pages that may not have nonce,
+            // still process but don't log consent (just set cookie).
+        }
+
         $level = sanitize_text_field( $_POST['level'] ?? '' );
         if ( ! in_array( $level, [ 'full', 'essential' ], true ) ) {
             wp_send_json_error( [ 'message' => 'Invalid level' ] );

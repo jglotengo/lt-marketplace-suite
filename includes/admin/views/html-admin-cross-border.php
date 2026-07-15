@@ -274,7 +274,7 @@ jQuery(function($) {
                 if (window.LTMS && LTMS.Admin && LTMS.Admin.showNotice) {
                         LTMS.Admin.showNotice(type, msg);
                 } else {
-                        window.alert(msg);
+                        window.console.warn(msg);
                 }
         }
 

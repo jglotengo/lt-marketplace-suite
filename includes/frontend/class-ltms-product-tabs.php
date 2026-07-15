@@ -289,25 +289,16 @@ class LTMS_Product_Tabs {
             </div>
         </div>
 
-        <script>
-        jQuery(document).ready(function($) {
-            $('#ltms-size-guide-open').on('click', function() {
-                $('#ltms-size-guide-modal').css('display', 'flex');
-                $('body').css('overflow', 'hidden');
-            });
-            $('#ltms-size-guide-close').on('click', function() {
-                $('#ltms-size-guide-modal').css('display', 'none');
-                $('body').css('overflow', '');
-            });
-            $('#ltms-size-guide-modal').on('click', function(e) {
-                if (e.target === this) {
-                    $(this).css('display', 'none');
-                    $('body').css('overflow', '');
-                }
-            });
-        });
-        </script>
         <?php
+        // INTEGRATIONS-AUDIT P0 FIX (CSP): moved inline <script> to external
+        // assets/js/ltms-product-tabs.js (enqueued below).
+        wp_enqueue_script(
+            'ltms-product-tabs',
+            LTMS_ASSETS_URL . 'js/ltms-product-tabs.js',
+            [ 'jquery' ],
+            LTMS_VERSION,
+            true
+        );
     }
 
     public static function render_size_guide_meta(): void {
@@ -326,6 +317,13 @@ class LTMS_Product_Tabs {
     }
 
     public static function save_size_guide_meta( int $post_id ): void {
+        // INTEGRATIONS-AUDIT P1 FIX: add explicit nonce verification (was
+        // relying on WC's inherited nonce — best practice is explicit).
+        if ( ! isset( $_POST['woocommerce_meta_nonce'] )
+            || ! wp_verify_nonce( $_POST['woocommerce_meta_nonce'], 'woocommerce_save_data' )
+        ) {
+            return;
+        }
         if ( ! current_user_can( 'edit_product', $post_id ) ) return;
         $guide = wp_kses_post( wp_unslash( $_POST['_ltms_size_guide'] ?? '' ) );
         if ( $guide ) {

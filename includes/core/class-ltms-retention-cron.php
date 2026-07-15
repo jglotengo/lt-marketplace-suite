@@ -149,6 +149,12 @@ class LTMS_Retention_Cron {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_media_files';
 
+        // INTEGRATIONS-AUDIT P1 FIX: track failures so we don't mark the user
+        // as fully deleted when B2 objects remain. Previously, the function
+        // returned true unconditionally — orphaning B2 objects forever because
+        // the cron wrote ltms_retention_deleted_at and never retried.
+        $had_failure = false;
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rows = $wpdb->get_results( $wpdb->prepare(
             "SELECT id, file_key, bucket FROM `{$table}` WHERE entity_id = %d AND entity_type IN ('kyc','contract') AND is_private = 1",
@@ -170,18 +176,13 @@ class LTMS_Retention_Cron {
                     $wpdb->delete( $table, [ 'id' => (int) $row->id ], [ '%d' ] );
                     LTMS_Core_Logger::info( 'RETENTION_FILE_DELETED', "User #{$user_id} — {$row->file_key}" );
                 } catch ( \Throwable $e ) {
+                    $had_failure = true;
                     LTMS_Core_Logger::error( 'RETENTION_FILE_DELETE_FAILED', "User #{$user_id} — {$row->file_key}: " . $e->getMessage() );
                 }
             }
         }
 
         // RC-3 FIX: also delete the signed contract backup from B2.
-        // backup_signed_contract() uploads the signed PDF to B2 but does NOT
-        // register it in lt_media_files (the ENUM lacks 'contract'). The only
-        // references are the ltms_contract_b2_bucket / ltms_contract_b2_key
-        // user_meta keys. Without this block, signed contracts would persist
-        // in B2 forever — defeating the retention policy and leaking PII
-        // (vendor name, email, masked document, signature) past the legal window.
         $contract_bucket = get_user_meta( $user_id, 'ltms_contract_b2_bucket', true );
         $contract_key    = get_user_meta( $user_id, 'ltms_contract_b2_key', true );
         if ( $contract_bucket && $contract_key ) {
@@ -190,6 +191,7 @@ class LTMS_Retention_Cron {
                 $b2_contract->delete_file( $contract_bucket, $contract_key );
                 LTMS_Core_Logger::info( 'RETENTION_CONTRACT_DELETED', "User #{$user_id} — signed contract: {$contract_bucket}/{$contract_key}" );
             } catch ( \Throwable $e ) {
+                $had_failure = true;
                 LTMS_Core_Logger::error( 'RETENTION_CONTRACT_DELETE_FAILED', "User #{$user_id} — {$contract_bucket}/{$contract_key}: " . $e->getMessage() );
             }
         }
@@ -200,6 +202,15 @@ class LTMS_Retention_Cron {
                     'ltms_contract_sign_url', 'ltms_contract_b2_bucket', 'ltms_contract_b2_key', 'ltms_contract_pdf_hash',
                     'ltms_contract_backed_up_at', 'ltms_document_number', 'ltms_phone' ] as $key ) {
             delete_user_meta( $user_id, $key );
+        }
+
+        if ( $had_failure ) {
+            // Don't mark as deleted — cron will retry on next run.
+            LTMS_Core_Logger::warning(
+                'RETENTION_PARTIAL',
+                "User #{$user_id} — partial deletion (some B2 objects failed). Will retry on next sweep."
+            );
+            return false;
         }
 
         update_user_meta( $user_id, 'ltms_retention_deleted_at', current_time( 'mysql', true ) );
@@ -221,9 +232,15 @@ class LTMS_Retention_Cron {
     private static function get_candidates( int $limit ): array {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_media_files';
+        // INTEGRATIONS-AUDIT P1 FIX: add ORDER BY MAX(created_at) ASC so the
+        // oldest KYC data is processed first. Without this, MySQL returned rows
+        // in arbitrary order (typically primary key) — if the first 50 candidates
+        // were all "protect" (recent transactions, legal hold), they occupied
+        // the slots forever and users 51+ never got evaluated, leaving their
+        // KYC data past the legal retention window (SAGRILAFT/Ley 1581 violation).
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $rows = $wpdb->get_col( $wpdb->prepare(
-            "SELECT DISTINCT entity_id FROM `{$table}` WHERE entity_type = 'kyc' AND is_private = 1 AND entity_id NOT IN ( SELECT user_id FROM `{$wpdb->usermeta}` WHERE meta_key = 'ltms_gdpr_erased_at' ) LIMIT %d",
+            "SELECT entity_id FROM `{$table}` WHERE entity_type = 'kyc' AND is_private = 1 AND entity_id NOT IN ( SELECT user_id FROM `{$wpdb->usermeta}` WHERE meta_key = 'ltms_gdpr_erased_at' ) GROUP BY entity_id ORDER BY MAX(created_at) ASC LIMIT %d",
             $limit
         ) );
         return array_map( 'intval', $rows ?: [] );
@@ -232,8 +249,9 @@ class LTMS_Retention_Cron {
     private static function get_last_transaction_date( int $user_id ): ?int {
         global $wpdb;
         $hpos = $wpdb->prefix . 'wc_orders';
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$hpos}'" ) === $hpos ) {
+        // FASE6 P1 FIX: use $wpdb->prepare for SHOW TABLES to prevent SQL injection
+        // via $wpdb->prefix manipulation (defense-in-depth).
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $hpos ) ) === $hpos ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $d = $wpdb->get_var( $wpdb->prepare(
                 "SELECT MAX(date_created_gmt) FROM `{$hpos}` WHERE customer_id = %d AND status NOT IN ('cancelled','failed','trash')",

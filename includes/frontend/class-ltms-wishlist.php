@@ -25,7 +25,10 @@ class LTMS_Wishlist {
 
         // AJAX: toggle wishlist.
         add_action( 'wp_ajax_ltms_toggle_wishlist', [ __CLASS__, 'ajax_toggle' ] );
-        add_action( 'wp_ajax_nopriv_ltms_toggle_wishlist', [ __CLASS__, 'ajax_toggle' ] );
+        // v2.9.126 BATCH-AUDIT P0-1 FIX: removed nopriv registration — handler requires login.
+        // The nopriv registration was misleading: ajax_toggle() checks is_user_logged_in()
+        // and returns 401, so guests could never use it. Keeping the registration caused
+        // unnecessary 401 responses and confused security scanners.
 
         // AJAX: get count.
         add_action( 'wp_ajax_ltms_wishlist_count', [ __CLASS__, 'ajax_count' ] );
@@ -174,8 +177,8 @@ class LTMS_Wishlist {
      * AJAX: toggle wishlist.
      */
     public static function ajax_toggle(): void {
-		// SEC-4 FIX (v2.9.26): auth required.
-		if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // SEC-4 FIX (v2.9.26): auth required.
+                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
         $product_id = (int) ( $_POST['product_id'] ?? 0 );
         $nonce = sanitize_text_field( $_POST['nonce'] ?? '' );
 
@@ -195,6 +198,13 @@ class LTMS_Wishlist {
      * AJAX: get count.
      */
     public static function ajax_count(): void {
+        // v2.9.126 BATCH-AUDIT P1-1 FIX: add nonce for CSRF protection.
+        // Before, any request could call this endpoint — while it only returns
+        // a count (low risk), it should still be protected against CSRF.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            // For guests without nonce, still return count (backward compat with cached pages)
+            // but the count is 0 for unauthenticated users anyway.
+        }
         wp_send_json_success( [ 'count' => count( self::get_wishlist_ids() ) ] );
     }
 

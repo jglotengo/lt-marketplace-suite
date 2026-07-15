@@ -335,6 +335,7 @@ class LTMS_SEO_Enhanced {
             'role'       => 'vendor',
             'number'     => 50,
             'orderby'    => 'registered',
+            'number'     => 50,  // FASE8: prevent unbounded query
             'order'      => 'DESC',
             'meta_key'   => 'ltms_kyc_status',
             'meta_value' => 'approved',

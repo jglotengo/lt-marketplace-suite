@@ -48,8 +48,13 @@ class StripeApiTest extends LTMS_Unit_Test_Case {
 
         // LTMS_Api_Stripe es final — no se puede subclasear.
         // Accedemos a los métodos private directamente via ReflectionMethod.
-        // El constructor solo llama \Stripe\Stripe::setApiKey() si la clase
-        // existe — en el entorno de test unitario no existe, así que es seguro.
+        // INTEGRATIONS-AUDIT FIX: constructor now throws if Stripe SDK is
+        // missing. We define a minimal stub \Stripe\Stripe class so the
+        // constructor's strict check passes in unit-test context.
+        if ( ! class_exists( '\Stripe\Stripe' ) ) {
+            eval( 'namespace Stripe { class Stripe { public static function setApiKey($k){} public static function setAppInfo($n,$v,$u=""){} public static function setMaxNetworkRetries($n){} } }' );
+        }
+
         $this->stripe = new LTMS_Api_Stripe( 'sk_test_dummy_key_for_unit_tests', false );
 
         $this->refConvert = new \ReflectionMethod( LTMS_Api_Stripe::class, 'convert_amount_to_stripe_units' );

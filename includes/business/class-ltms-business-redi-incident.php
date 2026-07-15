@@ -1099,6 +1099,14 @@ final class LTMS_Business_Redi_Incident {
         $per_page      = isset( $_POST['per_page'] ) ? max( 1, min( 100, (int) sanitize_text_field( wp_unslash( $_POST['per_page'] ) ) ) ) : 20;
         $offset        = ( $page - 1 ) * $per_page;
 
+        // v2.9.118 SHIPPING-AUDIT P1-3 FIX: validate status_filter against allowlist.
+        // Before, any string was passed to get_vendor_incidents which builds a SQL
+        // query — though prepared, an unknown status could cause unexpected results.
+        $valid_statuses = [ '', 'open', 'in_progress', 'resolved', 'closed', 'pending', 'escalated' ];
+        if ( ! in_array( $status_filter, $valid_statuses, true ) ) {
+            $status_filter = '';
+        }
+
         $incidents = self::get_vendor_incidents( $user_id, $status_filter, $per_page, $offset );
 
         wp_send_json_success( [

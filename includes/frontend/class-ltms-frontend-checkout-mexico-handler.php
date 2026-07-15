@@ -151,6 +151,13 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
             wp_send_json_error( [ 'message' => __( 'Datos inválidos.', 'ltms' ) ] );
         }
 
+        // v2.9.123 CHECKOUT-AUDIT P0-1 FIX: verify order ownership (IDOR).
+        // SEC-2-3-5-1 CRITICAL: this endpoint was missing ownership verification —
+        // any user could download the OXXO voucher for ANY order by passing
+        // an arbitrary order_id. Now calls verify_order_ownership() (same as
+        // ajax_create_oxxo_reference and ajax_create_spei_reference already do).
+        $this->verify_order_ownership( $order, $order_id );
+
         $barcode_url = $order->get_meta( '_ltms_oxxo_barcode_url' );
 
         if ( $barcode_url ) {

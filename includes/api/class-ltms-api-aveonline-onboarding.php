@@ -315,12 +315,20 @@ class LTMS_Api_Aveonline_Onboarding {
         }
 
         $url      = self::API_BASE . $endpoint;
+        // INTEGRATIONS-AUDIT P1 FIX: deterministic Idempotency-Key based on
+        // endpoint + body hash. Prevents duplicate leads / companies / CIFIN
+        // checks on caller retry (especially important for company_step_two
+        // which creates real AVE companies and company_step_one which triggers
+        // paid CIFIN credit-bureau checks).
+        $idem_key = 'ltms_ave_onb_' . substr( md5( $endpoint . wp_json_encode( $body ) ), 0, 32 );
         $response = wp_remote_post( $url, [
             'timeout'     => $timeout,
+            'sslverify'   => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             'headers'     => [
-                'Content-Type'  => 'application/json',
-                'Accept'        => 'application/json',
-                'Authorization' => 'Bearer ' . $this->jwt,
+                'Content-Type'   => 'application/json',
+                'Accept'         => 'application/json',
+                'Authorization'  => 'Bearer ' . $this->jwt,
+                'Idempotency-Key'=> $idem_key,
             ],
             'body'        => wp_json_encode( $body ),
             'data_format' => 'body',
@@ -404,6 +412,14 @@ class LTMS_Api_Aveonline_Onboarding {
             return null;
         }
 
+        // INTEGRATIONS-AUDIT P1 FIX: cap file size before reading — a 100 MB
+        // upload would exhaust PHP memory and crash the onboarding mid-call.
+        $max_bytes = 10 * 1024 * 1024; // 10 MB
+        $size      = @filesize( $file_path );
+        if ( false === $size || $size > $max_bytes ) {
+            return null;
+        }
+
         $mime_map = [
             'jpg'  => 'image/jpeg',
             'jpeg' => 'image/jpeg',
@@ -416,6 +432,22 @@ class LTMS_Api_Aveonline_Onboarding {
 
         if ( ! $mime ) {
             return null;
+        }
+
+        // INTEGRATIONS-AUDIT P1 FIX: validate actual MIME via finfo (extension
+        // is trivially spoofable — a file named evil.pdf containing arbitrary
+        // binary would pass the extension check).
+        if ( function_exists( 'finfo_open' ) ) {
+            $finfo = finfo_open( FILEINFO_MIME_TYPE );
+            if ( $finfo ) {
+                $real_mime = finfo_file( $finfo, $file_path );
+                finfo_close( $finfo );
+                // Allow aliases — finfo may report 'image/x-png' for legacy PNGs.
+                $allowed_real = [ 'image/jpeg', 'image/png', 'image/x-png', 'application/pdf' ];
+                if ( ! in_array( $real_mime, $allowed_real, true ) ) {
+                    return null;
+                }
+            }
         }
 
         $content = file_get_contents( $file_path );

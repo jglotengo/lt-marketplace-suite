@@ -79,7 +79,23 @@ class LTMS_Business_Consumer_Protection {
      * @return bool
      */
     public static function hold_commission( int $vendor_id, float $amount, int $order_id ): bool {
-        $hold_days   = (int) LTMS_Core_Config::get( 'ltms_consumer_protection_days', self::DEFAULT_HOLD_DAYS );
+        // P2 FIX: validate amount — NaN passes <= 0.0 check, negative credits
+        // negative balances. is_finite() rejects NaN and INF.
+        if ( ! is_finite( $amount ) || $amount <= 0.0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'COMMISSION_HOLD_INVALID_AMOUNT', sprintf( 'hold_commission rejected invalid amount: %s (order #%d, vendor #%d)', var_export( $amount, true ), $order_id, $vendor_id ) );
+            }
+            return false;
+        }
+
+        // P2 FIX: validate hold_days — negative or zero bypasses consumer protection.
+        $hold_days = (int) LTMS_Core_Config::get( 'ltms_consumer_protection_days', self::DEFAULT_HOLD_DAYS );
+        if ( $hold_days < 1 ) {
+            $hold_days = self::DEFAULT_HOLD_DAYS; // Fallback to safe default.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning( 'COMMISSION_HOLD_INVALID_DAYS', sprintf( 'ltms_consumer_protection_days config invalid, using default %d days.', self::DEFAULT_HOLD_DAYS ) );
+            }
+        }
         $release_at  = gmdate( 'Y-m-d H:i:s', strtotime( "+{$hold_days} weekdays" ) );
 
         // AUDIT-BOOKING-ENGINE #9 FIX: para reservas de turismo/hospedaje,
@@ -114,17 +130,23 @@ class LTMS_Business_Consumer_Protection {
         // Solución: antes de insertar, verificar si ya existe un hold NO liberado
         // (status='held' o 'frozen') para (vendor_id, order_id). Si existe, skip
         // insert + skip wallet ops + return true (la comisión ya está retenida).
+        // RE-AUDIT P0 FIX (TOCTOU): wrap SELECT+INSERT in a transaction with
+        // SELECT FOR UPDATE to prevent two concurrent hold_commission() calls
+        // from both passing the check and both INSERTing → two hold rows →
+        // release_eligible_holds releases twice (different hold_id = different
+        // idempotency key) → second release fails (balance_pending=0) → stuck hold.
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing_hold_id = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT id FROM `{$table}` WHERE vendor_id = %d AND order_id = %d AND status IN ( 'held', 'frozen' ) LIMIT 1",
+                "SELECT id FROM `{$table}` WHERE vendor_id = %d AND order_id = %d AND status IN ( 'held', 'frozen' ) LIMIT 1 FOR UPDATE",
                 $vendor_id,
                 $order_id
             )
         );
 
         if ( $existing_hold_id > 0 ) {
-            // Hold ya existe para este (vendor, order) — idempotent skip.
+            $wpdb->query( 'ROLLBACK' );
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::info(
                     'COMMISSION_HOLD_ALREADY_EXISTS',
@@ -149,8 +171,10 @@ class LTMS_Business_Consumer_Protection {
         ], [ '%d', '%f', '%d', '%s', '%s', '%s', '%s' ] );
 
         if ( ! $inserted ) {
+            $wpdb->query( 'ROLLBACK' );
             return false;
         }
+        $wpdb->query( 'COMMIT' );
 
         // M-84: Acreditar y retener en wallet para que balance_pending refleje los fondos
         // retenidos y el vendedor NO los vea como disponibles hasta que venza el periodo.
@@ -187,13 +211,19 @@ class LTMS_Business_Consumer_Protection {
                 // Solución: verificar manualmente ambos formatos de key. Si cualquiera
                 // existe, skip ambas operaciones (credit + hold) — ya se aplicaron.
                 $legacy_credit_key = sprintf( 'cp_hold_credit_o%d', $order_id );
-                $legacy_hold_key   = sprintf( 'cp_hold_hold_o%d', $order_id );
+                // RE-AUDIT P0 FIX: legacy key (no vendor_id) belongs to vendor_1.
+                // For vendors 2..N, the legacy key matches vendor_1's tx → skip
+                // → vendor_2 gets hold row but ZERO wallet credit. Now: scope the
+                // legacy key check to ALSO match vendor_id, so vendor_2 doesn't
+                // get a false idempotency hit from vendor_1's legacy tx.
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $prior_credit_tx = (int) $wpdb->get_var(
                     $wpdb->prepare(
-                        "SELECT id FROM `{$wpdb->prefix}lt_wallet_transactions` WHERE `reference` IN ( %s, %s ) LIMIT 1",
+                        "SELECT id FROM `{$wpdb->prefix}lt_wallet_transactions`
+                         WHERE `reference` IN ( %s, %s ) AND `vendor_id` = %d LIMIT 1",
                         $credit_idem_key,
-                        $legacy_credit_key
+                        $legacy_credit_key,
+                        $vendor_id
                     )
                 );
 
@@ -211,29 +241,84 @@ class LTMS_Business_Consumer_Protection {
                         );
                     }
                 } else {
-                    LTMS_Business_Wallet::credit(
-                        $vendor_id,
-                        $amount,
-                        sprintf( 'Comision pedido #%d - en retencion (proteccion al consumidor)', $order_id ),
-                        [ 'type' => 'commission', 'order_id' => $order_id, 'held_until' => $release_at ],
-                        $order_id,
-                        '',
-                        $credit_idem_key
-                    );
-                    LTMS_Business_Wallet::hold(
-                        $vendor_id,
-                        $amount,
-                        sprintf( 'Retencion Ley 1480 - pedido #%d, libera: %s', $order_id, $release_at ),
-                        [ 'type' => 'consumer_protection', 'order_id' => $order_id, 'release_at' => $release_at ],
-                        0,
-                        '',
-                        $hold_idem_key
-                    );
+                    // RE-AUDIT P0 FIX (partial failure): credit and hold are separate
+                    // wallet operations. If credit SUCCEEDS but hold FAILS, the vendor
+                    // has the full amount in AVAILABLE balance (not held) — consumer
+                    // protection is bypassed, vendor can withdraw immediately.
+                    // Now: wrap both in a try, and if hold fails after credit succeeds,
+                    // attempt to reverse the credit (debit it back) so the vendor doesn't
+                    // keep unheld funds. Log critical if reversal also fails.
+                    $credit_succeeded = false;
+                    try {
+                        LTMS_Business_Wallet::credit(
+                            $vendor_id,
+                            $amount,
+                            sprintf( 'Comision pedido #%d - en retencion (proteccion al consumidor)', $order_id ),
+                            [ 'type' => 'commission', 'order_id' => $order_id, 'held_until' => $release_at ],
+                            $order_id,
+                            '',
+                            $credit_idem_key
+                        );
+                        $credit_succeeded = true;
+                    } catch ( \Throwable $credit_e ) {
+                        throw $credit_e; // Re-throw — outer catch handles it.
+                    }
+                    // Credit succeeded — now attempt hold.
+                    try {
+                        LTMS_Business_Wallet::hold(
+                            $vendor_id,
+                            $amount,
+                            sprintf( 'Retencion Ley 1480 - pedido #%d, libera: %s', $order_id, $release_at ),
+                            [ 'type' => 'consumer_protection', 'order_id' => $order_id, 'release_at' => $release_at ],
+                            0,
+                            '',
+                            $hold_idem_key
+                        );
+                    } catch ( \Throwable $hold_e ) {
+                        // Hold failed after credit succeeded — vendor has unheld funds.
+                        // Attempt to reverse the credit (debit it back).
+                        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                            LTMS_Core_Logger::critical(
+                                'COMMISSION_HOLD_FAILED_AFTER_CREDIT',
+                                sprintf( 'Vendor #%d order #%d: credit succeeded but hold FAILED: %s. Attempting reversal.', $vendor_id, $order_id, $hold_e->getMessage() ),
+                                [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount ]
+                            );
+                        }
+                        try {
+                            LTMS_Business_Wallet::debit(
+                                $vendor_id,
+                                $amount,
+                                sprintf( 'Reversion: hold fallo para pedido #%d', $order_id ),
+                                [ 'type' => 'hold_reversal', 'order_id' => $order_id ],
+                                $order_id,
+                                '',
+                                $credit_idem_key . '_reversal'
+                            );
+                            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                LTMS_Core_Logger::info(
+                                    'COMMISSION_HOLD_REVERSAL_OK',
+                                    sprintf( 'Vendor #%d order #%d: credit reversed after hold failure. Manual review required.', $vendor_id, $order_id )
+                                );
+                            }
+                        } catch ( \Throwable $reversal_e ) {
+                            // Reversal also failed — vendor has unheld funds, no hold.
+                            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                LTMS_Core_Logger::critical(
+                                    'COMMISSION_HOLD_REVERSAL_FAILED',
+                                    sprintf( 'Vendor #%d order #%d: hold failed AND reversal failed: %s. Vendor has unheld credit $%.2f — MANUAL INTERVENTION REQUIRED.', $vendor_id, $order_id, $reversal_e->getMessage(), $amount ),
+                                    [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount ]
+                                );
+                            }
+                        }
+                        throw $hold_e; // Re-throw so outer catch returns false.
+                    }
                 }
             } catch ( \Throwable $e ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                    LTMS_Core_Logger::log( 'COMMISSION_HOLD_WALLET_FAILED',
-                        sprintf( 'Error al registrar hold en wallet vendedor #%d: %s', $vendor_id, $e->getMessage() )
+                    LTMS_Core_Logger::critical(
+                        'COMMISSION_HOLD_WALLET_FAILED',
+                        sprintf( 'Error al registrar hold en wallet vendedor #%d: %s', $vendor_id, $e->getMessage() ),
+                        [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'amount' => $amount, 'error' => $e->getMessage() ]
                     );
                 }
                 return false; // CP-BUG-4: NO reportar éxito si el crédito/hold falló.
@@ -294,9 +379,18 @@ class LTMS_Business_Consumer_Protection {
             // which previously left the remaining 99 holds in 'held' state
             // and silently lost payouts until the next day's cron run.
             try {
-                self::release_single_hold( (int) $hold->id, (int) $hold->vendor_id );
-                $released_count++;
-                $released_amount += (float) $hold->amount;
+                $release_ok = self::release_single_hold( (int) $hold->id, (int) $hold->vendor_id );
+                // RE-AUDIT P1 FIX: release_single_hold returns bool. Previously
+                // counters were incremented unconditionally even when the method
+                // silently exited (hold not found, already released by concurrent
+                // process). Now: only count if release_single_hold returned true.
+                if ( $release_ok ) {
+                    $released_count++;
+                    $released_amount += (float) $hold->amount;
+                } else {
+                    $skipped_count++;
+                    $skipped_orders[] = (int) $hold->order_id;
+                }
             } catch ( \Throwable $e ) {
                 $failed_count++;
                 $failed_orders[] = (int) $hold->order_id;
@@ -465,7 +559,7 @@ class LTMS_Business_Consumer_Protection {
      * @param int $vendor_id ID del vendedor.
      * @return void
      */
-    public static function release_single_hold( int $hold_id, int $vendor_id ): void {
+    public static function release_single_hold( int $hold_id, int $vendor_id ): bool {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_wallet_holds';
 
@@ -477,7 +571,7 @@ class LTMS_Business_Consumer_Protection {
         ) );
 
         if ( ! $hold ) {
-            return;
+            return false; // RE-AUDIT P1 FIX: return false so caller can track skipped holds.
         }
 
         // H-2 FIX: previously this method marked the hold as 'released' FIRST
@@ -523,9 +617,11 @@ class LTMS_Business_Consumer_Protection {
                 $wpdb->update(
                     $table,
                     [ 'status' => 'held' ],
-                    [ 'id' => $hold_id ],
+                    // P2 FIX: add WHERE status guard to prevent overwriting a
+                    // concurrent successful 'released' status.
+                    [ 'id' => $hold_id, 'status' => 'held' ],
                     [ '%s' ],
-                    [ '%d' ]
+                    [ '%d', '%s' ]
                 );
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::critical(
@@ -567,16 +663,14 @@ class LTMS_Business_Consumer_Protection {
         );
 
         if ( ! $updated ) {
-            // 0 filas afectadas = el hold ya fue liberado por otro proceso.
-            // The wallet call above was a no-op thanks to the idempotency
-            // key, so there is no double-spend — just exit quietly.
-            return;
+            return false; // Already released by concurrent process.
         }
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) LTMS_Core_Logger::log(
             'HOLD_RELEASED',
             sprintf( 'Hold #%d liberado: %.2f para vendedor #%d', $hold_id, $hold->amount, $vendor_id )
         );
+        return true;
     }
 
     /**
@@ -596,6 +690,28 @@ class LTMS_Business_Consumer_Protection {
             [ 'status' => 'frozen', 'freeze_reason' => sanitize_text_field( $reason ) ],
             [ 'order_id' => $order_id, 'status' => 'held' ],
             [ '%s', '%s' ],
+            [ '%d', '%s' ]
+        );
+    }
+
+    /**
+     * P2 FIX: Unfreezes a hold that was frozen for a dispute (e.g. when the
+     * dispute is rejected). Reverts status from 'frozen' to 'held' so the
+     * daily cron can release it normally.
+     *
+     * @param int $order_id ID del pedido.
+     * @return bool True si se descongeló, false si no había hold congelado.
+     */
+    public static function unfreeze_hold_for_dispute( int $order_id ): bool {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_wallet_holds';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        return (bool) $wpdb->update(
+            $table,
+            [ 'status' => 'held', 'freeze_reason' => null ],
+            [ 'order_id' => $order_id, 'status' => 'frozen' ],
+            [ '%s', null ],
             [ '%d', '%s' ]
         );
     }
@@ -718,26 +834,31 @@ class LTMS_Business_Consumer_Protection {
         }
 
         // Idempotencia: no permitir doble disputa activa para el mismo pedido.
+        // RE-AUDIT P0 FIX (TOCTOU): wrap SELECT+INSERT in a transaction with
+        // SELECT FOR UPDATE to prevent two concurrent file_dispute() calls from
+        // both passing the check and both INSERTing → double dispute → double
+        // vendor debit (approve_dispute uses dispute_id in idempotency key).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $existing = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM `{$table}` WHERE order_id = %d AND status IN ('filed','under_review')",
+            "SELECT id FROM `{$table}` WHERE order_id = %d AND status IN ('filed','under_review') FOR UPDATE",
             $order_id
         ) );
         if ( $existing ) {
+            $wpdb->query( 'ROLLBACK' );
             return new WP_Error( 'dispute_exists', __( 'Dispute already filed for this order', 'ltms' ) );
         }
 
         // Verificar ventana legal de disputa (CP-BUG-3: country-aware).
-        // Meta `_ltms_delivered_at` es la marca canónica escrita por on_shipping_delivered().
         $delivered_date = $order->get_meta( '_ltms_delivered_at' );
         if ( $delivered_date ) {
             $window_days = self::get_dispute_window_days( $order_id );
             $days_since  = ( time() - strtotime( $delivered_date ) ) / DAY_IN_SECONDS;
             if ( $days_since > $window_days ) {
+                $wpdb->query( 'ROLLBACK' );
                 return new WP_Error(
                     'window_expired',
                     sprintf(
-                        /* translators: %d: días de la ventana legal */
                         __( 'Dispute window expired (%d days)', 'ltms' ),
                         $window_days
                     )
@@ -762,8 +883,10 @@ class LTMS_Business_Consumer_Protection {
         ], [ '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s' ] );
 
         if ( ! $inserted ) {
+            $wpdb->query( 'ROLLBACK' );
             return new WP_Error( 'insert_failed', __( 'Could not create dispute record', 'ltms' ) );
         }
+        $wpdb->query( 'COMMIT' );
 
         $dispute_id = (int) $wpdb->insert_id;
 
@@ -792,6 +915,11 @@ class LTMS_Business_Consumer_Protection {
      * @return bool|WP_Error
      */
     public static function review_dispute( int $dispute_id, int $admin_id ) {
+        // RE-AUDIT P1 FIX: no capability check — any authenticated user could
+        // transition disputes to 'under_review' if exposed via REST/AJAX.
+        if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'ltms_manage_disputes' ) ) {
+            return new \WP_Error( 'unauthorized', __( 'Permisos insuficientes para revisar disputas.', 'ltms' ) );
+        }
         global $wpdb;
         $table = $wpdb->prefix . 'lt_consumer_disputes';
 
@@ -846,24 +974,11 @@ class LTMS_Business_Consumer_Protection {
             return new WP_Error( 'invalid_dispute', __( 'Dispute not found or not under review', 'ltms' ) );
         }
 
-        // Marcar resuelta PRIMERO (atomic) — evita doble aprobación por race condition.
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $resolved = $wpdb->update(
-            $table,
-            [
-                'status'          => 'approved',
-                'resolved_by'     => $admin_id,
-                'resolved_at'     => current_time( 'mysql', true ),
-                'resolution_note' => sanitize_textarea_field( $resolution_note ),
-            ],
-            [ 'id' => $dispute_id, 'status' => 'under_review' ],
-            [ '%s', '%d', '%s', '%s' ],
-            [ '%d', '%s' ]
-        );
-        if ( ! $resolved ) {
-            return new WP_Error( 'invalid_dispute', __( 'Dispute could not be approved (concurrent resolution?)', 'ltms' ) );
-        }
-
+        // RE-AUDIT P1 FIX: mark as 'approved' AFTER money movement, not before.
+        // Previously, status was flipped to 'approved' first — if wc_get_order()
+        // failed or any subsequent step threw, the dispute was stuck in 'approved'
+        // with no refund, no debit, no rollback. Now: flip status AFTER all money
+        // operations complete successfully.
         $order_id = (int) $dispute->order_id;
         $order    = wc_get_order( $order_id );
         if ( ! $order ) {
@@ -891,8 +1006,19 @@ class LTMS_Business_Consumer_Protection {
         // dejando a los demás vendors con saldo indebido.
         $vendor_net = (float) $order->get_meta( '_ltms_vendor_net' );
         if ( $vendor_net <= 0 ) {
-            // Fallback: si no hay meta (pedido legacy), usar order_total como antes.
-            $vendor_net = $refund_amount;
+            // RE-AUDIT P1 FIX: legacy fallback used full order_total → vendor
+            // debited order_total but only received vendor_net (< order_total).
+            // Vendor loses platform_fee + withholding more than they earned.
+            // Now: cap at 80% of order_total as conservative estimate (typical
+            // platform_fee is 10-20%), log critical for manual review.
+            $vendor_net = $refund_amount * 0.80;
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'DISPUTE_LEGACY_NO_VENDOR_NET',
+                    sprintf( 'Dispute #%d order #%d: no _ltms_vendor_net meta. Using 80%% fallback ($%.2f of $%.2f). Manual review required.', $dispute_id, $order_id, $vendor_net, $refund_amount ),
+                    [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'fallback_net' => $vendor_net, 'order_total' => $refund_amount ]
+                );
+            }
         }
 
         // FU4: construir lista de vendors a debitar con sus montos individuales.
@@ -948,13 +1074,19 @@ class LTMS_Business_Consumer_Protection {
                     $total_debited += $v_net;
                 } catch ( \Throwable $e ) {
                     if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                        LTMS_Core_Logger::error(
+                        // RE-AUDIT P0 FIX: upgrade from error → critical. Previously the
+                        // exception was swallowed — customer gets refunded, vendor is NOT
+                        // debited, platform absorbs the full vendor_net as a loss with
+                        // only a log entry. Now: log as critical so monitoring alerts fire.
+                        LTMS_Core_Logger::critical(
                             'DISPUTE_DEBIT_FAILED',
-                            sprintf( 'Dispute #%d: vendor #%d wallet debit failed: %s', $dispute_id, $v_id, $e->getMessage() )
+                            sprintf( 'Dispute #%d: vendor #%d wallet debit FAILED: %s. Platform covers $%.2f. Manual reconciliation required.', $dispute_id, $v_id, $e->getMessage(), $v_net ),
+                            [ 'dispute_id' => $dispute_id, 'vendor_id' => $v_id, 'amount' => $v_net, 'error' => $e->getMessage() ]
                         );
                     }
-                    // No retornamos error: el refund al cliente debe proceder de todos modos.
-                    // El debit fallido queda registrado para conciliación manual posterior.
+                    // Continue to refund the customer — they shouldn't suffer for
+                    // a platform-side wallet issue. The debit failure is logged as
+                    // critical for manual reconciliation.
                 }
             }
         }
@@ -973,22 +1105,65 @@ class LTMS_Business_Consumer_Protection {
         }
 
         // Crear WooCommerce refund (devuelve el dinero al medio de pago del cliente).
+        // RE-AUDIT P0 FIX: check return value of wc_create_refund. Previously the
+        // return was discarded — if the refund failed (gateway error, order already
+        // refunded), the dispute was marked 'approved', vendor was debited, but
+        // the customer received no refund.
         if ( function_exists( 'wc_create_refund' ) ) {
-            wc_create_refund( [
+            $refund = wc_create_refund( [
                 'order_id' => $order_id,
                 'amount'   => $refund_amount,
                 'reason'   => sprintf( 'Dispute #%d approved', $dispute_id ),
             ] );
+            if ( is_wp_error( $refund ) ) {
+                // Refund failed — log critical and return error so admin can retry.
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'DISPUTE_REFUND_FAILED',
+                        sprintf( 'Dispute #%d: wc_create_refund failed for order #%d: %s', $dispute_id, $order_id, $refund->get_error_message() ),
+                        [ 'dispute_id' => $dispute_id, 'order_id' => $order_id, 'amount' => $refund_amount ]
+                    );
+                }
+                return new \WP_Error( 'refund_failed', sprintf( __( 'El reembolso al cliente falló: %s', 'ltms' ), $refund->get_error_message() ) );
+            }
         }
 
         // Reversión de comisión + liberación del hold frozen lo escuchan otros motores.
-        do_action( 'ltms_dispute_approved', $dispute_id, $order_id, $vendor_id );
+        // RE-AUDIT P1 FIX: do_action passed only $vendor_id (first vendor) →
+        // listeners (insurance, notifications, commission reversal) only reacted
+        // for vendor_1. Vendors 2..N were silently skipped. Now: pass the full
+        // $vendors_to_debit array so listeners can react for ALL affected vendors.
+        do_action( 'ltms_dispute_approved', $dispute_id, $order_id, $vendor_id, $vendors_to_debit );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info(
                 'DISPUTE_APPROVED',
                 sprintf( 'Dispute #%d approved — refund $%.2f to customer, debit vendor #%d', $dispute_id, $refund_amount, $vendor_id )
             );
+        }
+
+        // RE-AUDIT P1 FIX: NOW flip the status to 'approved' — after all money
+        // operations succeeded. If we reach this point, refund + debit are done.
+        $resolved = $wpdb->update(
+            $table,
+            [
+                'status'          => 'approved',
+                'resolved_by'     => $admin_id,
+                'resolved_at'     => current_time( 'mysql', true ),
+                'resolution_note' => sanitize_textarea_field( $resolution_note ),
+            ],
+            [ 'id' => $dispute_id, 'status' => 'under_review' ],
+            [ '%s', '%d', '%s', '%s' ],
+            [ '%d', '%s' ]
+        );
+        if ( ! $resolved ) {
+            // Concurrent resolution — money already moved, just log.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'DISPUTE_APPROVE_CONCURRENT',
+                    sprintf( 'Dispute #%d: status flip failed (concurrent resolution?) — money already moved.', $dispute_id )
+                );
+            }
         }
 
         return true;
@@ -1035,9 +1210,16 @@ class LTMS_Business_Consumer_Protection {
 
         $order_id = (int) $dispute->order_id;
 
-        // Descongelar el hold y disparar liberación al vendor.
-        // El action lo escucha un handler que vuelve el hold a 'held' para que el cron
-        // diario lo libere normalmente, o lo libera inmediatamente.
+        // P2 FIX: directly unfreeze the hold instead of relying solely on a
+        // listener. If no listener is registered, the hold stays frozen forever.
+        // Now: unfreeze immediately AND fire the action for listeners.
+        $unfrozen = self::unfreeze_hold_for_dispute( $order_id );
+        if ( ! $unfrozen && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::warning(
+                'DISPUTE_REJECT_UNFREEZE_FAILED',
+                sprintf( 'Dispute #%d: could not unfreeze hold for order #%d — may need manual unfreeze.', $dispute_id, $order_id )
+            );
+        }
         do_action( 'ltms_dispute_rejected', $dispute_id, $order_id );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {

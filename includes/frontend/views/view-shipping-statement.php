@@ -96,6 +96,7 @@ $fmt = function( $v ) use ( $currency ) {
         </select>
         <!-- v2.9.88 P2: CSV Export button -->
         <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-shipping-export-csv"
+                data-filename="fletes_<?php echo esc_attr( $year ); ?>_<?php echo esc_attr( $month ); ?>.csv"
                 style="margin-left:auto;">
             📥 <?php esc_html_e( 'Exportar CSV', 'ltms' ); ?>
         </button>
@@ -226,32 +227,8 @@ $fmt = function( $v ) use ( $currency ) {
 
 </div>
 
-<script>
-// v2.9.88 P2: CSV Export para shipping-statement
-(function() {
-    var btn = document.getElementById('ltms-shipping-export-csv');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-        var rows = document.querySelectorAll('.ltms-table tbody tr');
-        var csv = 'Fecha,Pedido,Transportadora,Costo Absorbido,Costo Real\n';
-        rows.forEach(function(row) {
-            var cells = row.querySelectorAll('td');
-            if (cells.length >= 5) {
-                var line = Array.from(cells).slice(0, 5).map(function(c) {
-                    return '"' + (c.textContent || '').trim().replace(/"/g, '""') + '"';
-                }).join(',');
-                csv += line + '\n';
-            }
-        });
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        var link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'fletes_<?php echo esc_js( $year ); ?>_<?php echo esc_js( $month ); ?>.csv';
-        link.click();
-    });
-})();
-// v2.9.96 P3: CSP-compliant form submit (replaces inline onchange)
-document.querySelectorAll('[data-action="submit-form"]').forEach(function(el) {
-    el.addEventListener('change', function() { this.form.submit(); });
-});
-</script>
+<?php
+// FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-shipping-statement.js
+// Filename passed via data-filename attribute on the button (no inline JS needed).
+wp_enqueue_script( 'ltms-shipping-statement', LTMS_ASSETS_URL . 'js/ltms-shipping-statement.js', [], LTMS_VERSION, true );
+?>

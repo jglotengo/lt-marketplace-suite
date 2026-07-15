@@ -182,10 +182,10 @@ class LTMS_Business_Aveonline_Guias {
      *              valorrecaudo, contraentrega, idasumecosto
      */
     public static function ajax_cotizar(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code (check_ajax_referer('ltms_admin_nonce')
+        // + current_user_can('edit_posts')) which blocked all vendors — vendors don't
+        // have edit_posts cap and don't have admin nonces. check_vendor_nonce() already
+        // verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         $origen  = sanitize_text_field( $_POST['origen']  ?? '' );  // phpcs:ignore
@@ -203,6 +203,26 @@ class LTMS_Business_Aveonline_Guias {
         $valorrecaudo    = (int)   ( $_POST['valorrecaudo']    ?? 0 );     // phpcs:ignore
         $contraentrega   = (int)   ( $_POST['contraentrega']   ?? 0 );     // phpcs:ignore
         $idasumecosto    = (int)   ( $_POST['idasumecosto']    ?? 0 );     // phpcs:ignore
+
+        // FASE5 P0 FIX: validate numeric inputs — reject NaN/INF/negative/zero dimensions.
+        if ( ! is_finite( $peso ) || $peso <= 0 || $peso > 1000 ) {
+            wp_send_json_error( [ 'message' => __( 'Peso inválido (debe ser 0.1-1000 kg).', 'ltms' ) ] );
+        }
+        foreach ( [ 'alto' => $alto, 'largo' => $largo, 'ancho' => $ancho ] as $dim_name => $dim_val ) {
+            if ( ! is_finite( $dim_val ) || $dim_val <= 0 || $dim_val > 500 ) {
+                wp_send_json_error( [ 'message' => sprintf( __( '%s inválido (debe ser 1-500 cm).', 'ltms' ), $dim_name ) ] );
+            }
+        }
+        if ( ! is_finite( $valor_declarado ) || $valor_declarado < 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Valor declarado inválido.', 'ltms' ) ] );
+        }
+        // FASE5 P0 FIX: valorrecaudo ↔ contraentrega consistency.
+        if ( $contraentrega > 0 && $valorrecaudo <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Contraentrega activa requiere valor de recaudo > 0.', 'ltms' ) ] );
+        }
+        if ( $contraentrega === 0 && $valorrecaudo > 0 ) {
+            $valorrecaudo = 0; // Clear COD amount if carrier won't collect.
+        }
 
         try {
             $api          = self::get_api();
@@ -271,8 +291,74 @@ class LTMS_Business_Aveonline_Guias {
         $contraentrega   = (int)   ( $_POST['contraentrega']   ?? 0 );     // phpcs:ignore
         $idasumecosto    = (int)   ( $_POST['idasumecosto']    ?? 0 );     // phpcs:ignore
 
+        // RE-AUDIT P1 FIX: replicate package validation from ajax_cotizar().
+        // Without this, a vendor could generate guides with NaN/INF/negative/zero
+        // dimensions → invalid guides billed to the vendor.
+        if ( ! is_finite( $peso ) || $peso <= 0 || $peso > 1000 ) {
+            wp_send_json_error( [ 'message' => __( 'Peso inválido (debe ser 0.1-1000 kg).', 'ltms' ) ] );
+        }
+        foreach ( [ 'alto' => $alto, 'largo' => $largo, 'ancho' => $ancho ] as $dim_name => $dim_val ) {
+            if ( ! is_finite( $dim_val ) || $dim_val <= 0 || $dim_val > 500 ) {
+                wp_send_json_error( [ 'message' => sprintf( __( '%s inválido (debe ser 1-500 cm).', 'ltms' ), $dim_name ) ] );
+            }
+        }
+        if ( ! is_finite( $valor_declarado ) || $valor_declarado < 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Valor declarado inválido.', 'ltms' ) ] );
+        }
+        // RE-AUDIT P1 FIX: valorrecaudo ↔ contraentrega consistency (same as ajax_cotizar).
+        if ( $contraentrega > 0 && $valorrecaudo <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Contraentrega activa requiere valor de recaudo > 0.', 'ltms' ) ] );
+        }
+        if ( $contraentrega === 0 && $valorrecaudo > 0 ) {
+            $valorrecaudo = 0; // Clear COD amount if carrier won't collect.
+        }
+
         if ( ! $idtransportador || ! $origen || ! $destino || ! $destinatario || ! $dir_dest || ! $tel_dest ) {
             wp_send_json_error( [ 'message' => 'Faltan campos requeridos.' ] );
+        }
+
+        // v2.9.118 SHIPPING-AUDIT P0-2 FIX: verify order ownership (IDOR).
+        // Before, a vendor could pass order_id of ANOTHER vendor's order and
+        // generate a shipping guide for it — the guide would be created with
+        // the caller's vendor_id, but the order belongs to someone else.
+        // Now we verify that the order's _ltms_vendor_id matches the caller.
+        if ( $order_id ) {
+            $order = wc_get_order( $order_id );
+            if ( ! $order ) {
+                wp_send_json_error( [ 'message' => 'Pedido no encontrado.' ] );
+            }
+            $order_vendor = (int) $order->get_meta( '_ltms_vendor_id' );
+            if ( $order_vendor && $order_vendor !== $vendor_id && ! current_user_can( 'manage_options' ) ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::security(
+                        'AVEONLINE_GUIDE_IDOR_ATTEMPT',
+                        sprintf( 'Vendor #%d intentó generar guía para order #%d del vendor #%d', $vendor_id, $order_id, $order_vendor ),
+                        [ 'vendor_id' => $vendor_id, 'order_id' => $order_id, 'order_vendor_id' => $order_vendor ]
+                    );
+                }
+                wp_send_json_error( [ 'message' => 'No tienes permiso para generar guía de este pedido.' ], 403 );
+            }
+        }
+
+        // v2.9.118 SHIPPING-AUDIT P0-3 FIX: bound valorrecaudo to order total.
+        // Before, vendor could set valorrecaudo (cash-on-delivery amount) to any
+        // value — they could declare 0 recaudo for a paid order (pocketing the
+        // cash) or declare an inflated recaudo (defrauding the customer at delivery).
+        // Now we verify it doesn't exceed the order total if the order exists.
+        if ( $order_id && $valorrecaudo > 0 ) {
+            $order = wc_get_order( $order_id );
+            if ( $order ) {
+                $order_total = (float) $order->get_total();
+                if ( $valorrecaudo > $order_total ) {
+                    wp_send_json_error( [
+                        'message' => sprintf(
+                            'El valor de recaudo (%s) no puede superar el total del pedido (%s).',
+                            number_format( $valorrecaudo, 0, ',', '.' ),
+                            number_format( $order_total, 0, ',', '.' )
+                        ),
+                    ] );
+                }
+            }
         }
 
         // AO-BUG-11 FIX: dedup por order_id. Un doble-clic en "Generar guía"
@@ -295,6 +381,20 @@ class LTMS_Business_Aveonline_Guias {
                     'numguia' => (string) $existing_numguia,
                 ], 409 );
             }
+
+            // FASE5 P0 FIX (TOCTOU race): two concurrent POSTs both pass the SELECT
+            // above and both call Aveonline → two real guides billed to the vendor.
+            // Now: acquire a transient lock keyed by (order_id, vendor_id) before
+            // the API call. The lock expires after 60s (Aveonline calls typically
+            // complete in <10s). If the lock is already held, return 409.
+            $lock_key = 'ltms_guide_creating_' . md5( $order_id . '_' . $vendor_id );
+            if ( get_transient( $lock_key ) ) {
+                wp_send_json_error( [
+                    'code'    => 'guia_in_progress',
+                    'message' => 'Se está generando una guía para esta orden. Espera unos segundos.',
+                ], 409 );
+            }
+            set_transient( $lock_key, 1, 60 );
         }
 
         // Datos del remitente (vendedor)
@@ -369,6 +469,11 @@ class LTMS_Business_Aveonline_Guias {
                 'contraentrega'   => $contraentrega,
             ] );
 
+            // FASE5 P0 FIX: release the TOCTOU lock on success.
+            if ( $order_id ) {
+                delete_transient( $lock_key );
+            }
+
             wp_send_json_success( [
                 'numguia'  => $result['tracking_number'],
                 'rutaguia' => $result['label_url'],
@@ -377,6 +482,10 @@ class LTMS_Business_Aveonline_Guias {
             ] );
 
         } catch ( \Exception $e ) {
+            // FASE5 P0 FIX: release the TOCTOU lock on error too.
+            if ( isset( $lock_key ) ) {
+                delete_transient( $lock_key );
+            }
             wp_send_json_error( [ 'message' => $e->getMessage() ] );
         }
     }
@@ -387,10 +496,7 @@ class LTMS_Business_Aveonline_Guias {
      * Devuelve las guías del vendedor logueado desde la tabla local.
      */
     public static function ajax_mis_guias(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code — check_vendor_nonce() already verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         global $wpdb;
@@ -463,10 +569,7 @@ class LTMS_Business_Aveonline_Guias {
      * POST params: idoperador (int), guias (string separado por comas)
      */
     public static function ajax_reimprimir_guia(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code — check_vendor_nonce() already verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         $idoperador = (int) ( $_POST['idoperador'] ?? 0 ); // phpcs:ignore

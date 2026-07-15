@@ -611,14 +611,38 @@ final class LTMS_Core_Firewall {
 
         // Only honour forwarded-for headers when the direct connection comes from a trusted proxy.
         if ( self::is_trusted_proxy( $remote_addr ) ) {
-            $proxy_headers = [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP' ];
-            foreach ( $proxy_headers as $h ) {
-                if ( ! empty( $_SERVER[ $h ] ) ) {
-                    // X-Forwarded-For may be a comma-separated list; take the leftmost (client) IP.
-                    $ip = trim( explode( ',', $_SERVER[ $h ] )[0] );
-                    if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-                        return $ip;
-                    }
+            // INTEGRATIONS-AUDIT P0 FIX (IP spoofing → WAF bypass):
+            // Previously took the LEFTMOST entry of X-Forwarded-For — that's the
+            // client-supplied value and is trivially spoofable. An attacker sends
+            // `X-Forwarded-For: 1.2.3.4` → nginx appends the real IP → WAF reads
+            // `1.2.3.4`. Result: full bypass of IP-based auto-block + ability to
+            // frame victim IPs. Now: prefer HTTP_CF_CONNECTING_IP (set by Cloudflare
+            // and overwritten — not appended — so unspoofable), then HTTP_X_REAL_IP
+            // (similarly overwritten by nginx), then RIGHTMOST entry of
+            // X-Forwarded-For (the proxy-appended hop = unspoofable).
+            $cf_ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '';
+            if ( ! empty( $cf_ip ) ) {
+                $ip = trim( $cf_ip );
+                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                    return $ip;
+                }
+            }
+            $real_ip = $_SERVER['HTTP_X_REAL_IP'] ?? '';
+            if ( ! empty( $real_ip ) ) {
+                $ip = trim( $real_ip );
+                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                    return $ip;
+                }
+            }
+            $xff = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+            if ( ! empty( $xff ) ) {
+                // Take the RIGHTMOST entry — that's the IP appended by the last
+                // trusted proxy in the chain. Client-supplied leftmost entries
+                // are ignored.
+                $parts = array_map( 'trim', explode( ',', $xff ) );
+                $ip    = end( $parts );
+                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                    return $ip;
                 }
             }
         }

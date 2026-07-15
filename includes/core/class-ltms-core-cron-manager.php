@@ -305,6 +305,8 @@ class LTMS_Core_Cron_Manager {
     public static function auto_checkout(): void {
         global $wpdb;
         try {
+            // v2.9.133 CYBER-AUDIT: this query has NO user input — all values are
+            // hardcoded SQL constants (status strings, CURDATE(), NOW()). Safe.
             $wpdb->query( "UPDATE {$wpdb->prefix}lt_bookings SET status = 'checked_out', updated_at = NOW() WHERE checkout_date < CURDATE() AND status = 'checked_in'" );
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Cron: auto_checkout — ' . $e->getMessage() );

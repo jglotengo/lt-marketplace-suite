@@ -98,6 +98,7 @@ class LTMS_Api_Aveonline_Hub {
                 ],
             ] ),
             'timeout' => 20,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -156,9 +157,13 @@ class LTMS_Api_Aveonline_Hub {
                 'Content-Type'       => 'application/json',
                 'Accept'             => 'application/json',
                 'Ave-Hub-signature'  => $token,
+                // INTEGRATIONS-AUDIT P1 FIX: idempotency-key prevents duplicate
+                // event pushes on caller retry.
+                'Idempotency-Key'    => 'ltms_ave_hub_' . substr( md5( wp_json_encode( $payload ) ), 0, 32 ),
             ],
             'body'    => wp_json_encode( $payload ),
-            'timeout' => 30,
+            'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -179,9 +184,11 @@ class LTMS_Api_Aveonline_Hub {
                     'Content-Type'       => 'application/json',
                     'Accept'             => 'application/json',
                     'Ave-Hub-signature'  => $token,
+                    'Idempotency-Key'    => 'ltms_ave_hub_' . substr( md5( wp_json_encode( $payload ) ), 0, 32 ),
                 ],
                 'body'    => wp_json_encode( $payload ),
-                'timeout' => 30,
+                'timeout' => 30, // v2.9.134 ERROR-AUDIT P0-1: add timeout
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ] );
 
             $http_code = wp_remote_retrieve_response_code( $response );
@@ -239,7 +246,8 @@ class LTMS_Api_Aveonline_Hub {
                 'Accept'            => 'application/json',
                 'Ave-Hub-signature' => $token,
             ],
-            'timeout' => 20,
+            'timeout' => 20, // v2.9.134 P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -260,7 +268,8 @@ class LTMS_Api_Aveonline_Hub {
                     'Accept'            => 'application/json',
                     'Ave-Hub-signature' => $token,
                 ],
-                'timeout' => 20,
+                'timeout' => 20, // v2.9.134 P0-1: add timeout
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ] );
             $http_code = wp_remote_retrieve_response_code( $response );
         }

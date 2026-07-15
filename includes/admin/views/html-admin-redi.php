@@ -325,20 +325,20 @@ function ltms_redi_page_url( string $tab, int $p, string $s, string $st ): strin
         }
         $.post( ajaxurl, data, function( res ) {
             if ( res.success ) { window.location.reload(); }
-            else { alert( res.data || '<?php echo esc_js( __( "Error al procesar la solicitud.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
+            else { console.warn( res.data || '<?php echo esc_js( __( "Error al procesar la solicitud.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
         } ).fail( function() {
-            alert( '<?php echo esc_js( __( "Error de conexion.", "ltms" ) ); ?>' );
+            console.warn( '<?php echo esc_js( __( "Error de conexion.", "ltms" ) ); ?>' );
             $btn.prop( 'disabled', false );
         } );
     }
     $( document ).on( 'click', '.ltms-redi-revoke', function( e ) {
         e.preventDefault();
-        if ( ! confirm( '<?php echo esc_js( __( "Revocar este acuerdo?", "ltms" ) ); ?>' ) ) return;
+        if ( ! window.confirm( '<?php echo esc_js( __( "Revocar este acuerdo?", "ltms" ) ); ?>' ) ) return;
         ltmsRediAction( 'ltms_revoke_redi_agreement', $( this ).data( 'id' ), $( this ).data( 'nonce' ), $( this ) );
     } );
     $( document ).on( 'click', '.ltms-redi-activate', function( e ) {
         e.preventDefault();
-        if ( ! confirm( '<?php echo esc_js( __( "Activar este acuerdo?", "ltms" ) ); ?>' ) ) return;
+        if ( ! window.confirm( '<?php echo esc_js( __( "Activar este acuerdo?", "ltms" ) ); ?>' ) ) return;
         ltmsRediAction( 'ltms_approve_redi_agreement', $( this ).data( 'id' ), $( this ).data( 'nonce' ), $( this ) );
     } );
 }( jQuery ) );

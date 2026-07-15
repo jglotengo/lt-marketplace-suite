@@ -24,6 +24,12 @@ final class LTMS_Public_Auth_Handler {
     /** Vigencia del token de verificación de email en segundos (48h). */
     private const EMAIL_VERIFY_TTL = 48 * HOUR_IN_SECONDS;
 
+    /** Máximo de intentos de login fallidos por IP en la ventana. */
+    private const LOGIN_MAX_ATTEMPTS = 5;
+
+    /** Ventana del rate limit de login (15 minutos). */
+    private const LOGIN_WINDOW = 15 * MINUTE_IN_SECONDS;
+
     public static function init(): void {
         $instance = new self();
 
@@ -177,15 +183,60 @@ final class LTMS_Public_Auth_Handler {
     public function ajax_vendor_login(): void {
         check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
 
-        // Throttle: máximo 5 intentos por IP en 15 minutos
-        $ip     = LTMS_Utils::get_ip();
-        $key    = 'ltms_login_attempts_' . md5( $ip );
-        $tries  = (int) get_transient( $key );
+        // Throttle: máximo 5 intentos por IP en 15 minutos.
+        // INTEGRATIONS-AUDIT P0 FIX: migrated from non-atomic get_transient/set_transient
+        // to atomic INSERT...ON DUPLICATE KEY UPDATE (same pattern as register throttle
+        // at line 287). The previous implementation had a TOCTOU race: N concurrent
+        // requests all read $tries=0, all increment to 1, the counter never advanced.
+        // A botnet with 50 parallel connections could brute-force passwords with no
+        // effective throttle.
+        $ip           = LTMS_Utils::get_ip();
+        $throttle_key = 'ltms_login_attempts_' . md5( $ip );
+        global $wpdb;
+        $option_name  = '_transient_' . $throttle_key;
+        $timeout_name = '_transient_timeout_' . $throttle_key;
+        $now          = time();
+        $expires      = $now + self::LOGIN_WINDOW;
 
-        if ( $tries >= 5 ) {
+        // Check if the transient already expired → reset to 0.
+        $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $timeout_name
+        ) );
+
+        if ( $timeout_val && $timeout_val < $now ) {
+            // Expired — reset counter to 0 before incrementing.
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                $option_name
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $expires, $timeout_name
+            ) );
+        }
+
+        // Atomic increment — race-safe under concurrent requests.
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+            $option_name
+        ) );
+        // Ensure timeout is set (only on first attempt; don't extend on subsequent).
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+            $timeout_name, $expires, $now, $expires
+        ) );
+        $tries = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $option_name
+        ) );
+
+        if ( $tries > self::LOGIN_MAX_ATTEMPTS ) {
             LTMS_Core_Logger::security(
                 'LOGIN_THROTTLE',
-                sprintf( 'IP %s bloqueada por demasiados intentos de login', $ip )
+                sprintf( 'IP %s bloqueada por demasiados intentos de login (%d intentos)', $ip, $tries )
             );
             wp_send_json_error( __( 'Demasiados intentos. Espera 15 minutos.', 'ltms' ), 429 );
         }
@@ -204,11 +255,12 @@ final class LTMS_Public_Auth_Handler {
         ]);
 
         if ( is_wp_error( $user ) ) {
-            set_transient( $key, $tries + 1, 900 );
+            // Counter was already incremented at the top — no need to increment again.
             wp_send_json_error( __( 'Usuario o contraseña incorrectos.', 'ltms' ) );
         }
 
-        delete_transient( $key );
+        // Successful login — clear the throttle counter.
+        delete_transient( $throttle_key );
 
         $pages        = get_option( 'ltms_installed_pages', [] );
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
@@ -383,9 +435,32 @@ final class LTMS_Public_Auth_Handler {
 
         if ( email_exists( $data['email'] ) ) {
             // v2.9.60 REG-02: El contador ya se incrementó atómicamente arriba.
-            wp_send_json_error([
-                'message' => __( 'Este email ya está registrado.', 'ltms' ),
-                'errors'  => [ [ 'field' => 'email', 'message' => __( 'Este email ya está registrado.', 'ltms' ) ] ],
+            // INTEGRATIONS-AUDIT P1 FIX (user enumeration): previously returned
+            // "Este email ya está registrado" — allowed attackers to enumerate
+            // which emails have vendor accounts. Now returns the same generic
+            // success message as a new registration, and sends an "already
+            // registered" email to the existing address with a login link.
+            $existing_user = get_user_by( 'email', $data['email'] );
+            if ( $existing_user ) {
+                $login_url = wp_login_url();
+                $subject   = sprintf( __( '[%s] Ya tienes una cuenta', 'ltms' ), get_bloginfo( 'name' ) );
+                $message   = sprintf(
+                    __( "Hola,\n\nAlguien intentó registrar una nueva cuenta con tu email en %s.\n\nSi fuiste tú, ya tienes una cuenta. Puedes iniciar sesión aquí: %s\n\nSi no fuiste tú, ignora este correo — tu cuenta está segura.\n\nSaludos,\nEquipo %s", 'ltms' ),
+                    get_bloginfo( 'name' ),
+                    $login_url,
+                    get_bloginfo( 'name' )
+                );
+                wp_mail( $data['email'], $subject, $message );
+                LTMS_Core_Logger::info(
+                    'REGISTER_DUPLICATE_EMAIL',
+                    sprintf( 'Existing email used on registration form — sent login link to user #%d', $existing_user->ID )
+                );
+            }
+            // Return the same success shape as a real registration so the
+            // attacker can't distinguish "created" from "already existed".
+            wp_send_json_success([
+                'message'  => __( 'Revisa tu email para completar el registro.', 'ltms' ),
+                'redirect' => '',
             ]);
         }
 
@@ -396,6 +471,7 @@ final class LTMS_Public_Auth_Handler {
                 'meta_value' => $data['referral_code'],
                 'number'     => 1,
                 'fields'     => 'ID',
+                'number'     => 1,
             ] );
             if ( empty( $referrer ) ) {
                 // Invalid code — don't fail registration, just clear it.

@@ -136,14 +136,38 @@ class LTMS_XCover_Policy_Listener {
 
     public static function record_policy( int $order_id, int $vendor_id, array $result, float $premium ): void {
         global $wpdb;
+        $table = $wpdb->prefix . 'lt_insurance_policies';
+
+        // v2.9.121 INSURANCE-AUDIT P0-2 FIX: check for duplicate before INSERT.
+        // Before, if on_order_paid was called twice (race between
+        // woocommerce_payment_complete and woocommerce_order_status_completed),
+        // the idempotency guard (_ltms_insurance_policy_created) might not be
+        // set yet → double INSERT in lt_insurance_policies.
+        $policy_id = $result['policy_id'] ?? $result['id'] ?? '';
+        if ( $policy_id ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $existing = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM `{$table}` WHERE policy_id = %s",
+                $policy_id
+            ) );
+            if ( $existing > 0 ) {
+                LTMS_Core_Logger::warning(
+                    'XCOVER_POLICY_DUPLICATE_SKIP',
+                    sprintf( 'Policy %s already recorded for order #%d — skipping duplicate INSERT', $policy_id, $order_id ),
+                    [ 'order_id' => $order_id, 'policy_id' => $policy_id ]
+                );
+                return;
+            }
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert(
-            $wpdb->prefix . 'lt_insurance_policies',
+            $table,
             [
                 'order_id'        => $order_id,
                 'vendor_id'       => $vendor_id,
                 'quote_id'        => $result['quote_id'] ?? '',
-                'policy_id'       => $result['policy_id'] ?? $result['id'] ?? '',
+                'policy_id'       => $policy_id,
                 'policy_number'   => $result['policy_number'] ?? '',
                 'certificate_url' => $result['certificate_url'] ?? '',
                 'insurance_type'  => $result['insurance_type'] ?? 'parcel_protection',

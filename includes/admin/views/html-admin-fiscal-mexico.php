@@ -283,7 +283,7 @@ $hist_url     = admin_url( 'admin.php?page=ltms-fiscal-history&country=MX' );
                                 <input type="hidden" name="ltms_isr_tramo_action" value="delete">
                                 <input type="hidden" name="tramo_id" value="<?php echo esc_attr( $tramo['id'] ); ?>">
                                 <button type="submit" class="ltms-btn ltms-btn-danger ltms-btn-sm"
-                                        onclick="return confirm('<?php esc_attr_e( 'Eliminar tramo?', 'ltms' ); ?>')">
+                                        data-confirm="<?php esc_attr_e( 'Eliminar tramo?', 'ltms' ); ?>">
                                     &#x1F5D1;
                                 </button>
                             </form>
@@ -381,7 +381,7 @@ $hist_url     = admin_url( 'admin.php?page=ltms-fiscal-history&country=MX' );
                                 <input type="hidden" name="ltms_ieps_action" value="delete">
                                 <input type="hidden" name="ieps_id" value="<?php echo esc_attr( $ieps['id'] ); ?>">
                                 <button type="submit" class="ltms-btn ltms-btn-danger ltms-btn-sm"
-                                        onclick="return confirm('<?php esc_attr_e( 'Eliminar IEPS?', 'ltms' ); ?>')">
+                                        data-confirm="<?php esc_attr_e( 'Eliminar IEPS?', 'ltms' ); ?>">
                                     &#x1F5D1;
                                 </button>
                             </form>

@@ -116,8 +116,16 @@ class LTMS_Shipping_Cost_Ledger {
         try {
             $order_id          = (int) $order->get_id();
             $absorbed_cost     = (float) $order->get_meta( '_ltms_absorbed_shipping_cost' );
+            // P2 FIX: validate absorbed_cost — negative or NaN/INF values would
+            // cause negative vendor debits (effectively crediting the vendor).
+            if ( ! is_finite( $absorbed_cost ) || $absorbed_cost < 0 ) {
+                $absorbed_cost = 0.0;
+            }
             $absorbed_provider = (string) $order->get_meta( '_ltms_absorbed_shipping_provider' );
             $buyer_paid        = (float) $order->get_shipping_total() + (float) $order->get_shipping_tax();
+            if ( ! is_finite( $buyer_paid ) || $buyer_paid < 0 ) {
+                $buyer_paid = 0.0;
+            }
             $currency          = $order->get_currency() ?: LTMS_Core_Config::get_currency();
             $country           = LTMS_Core_Config::get_country();
 
@@ -259,15 +267,33 @@ class LTMS_Shipping_Cost_Ledger {
             self::sync_legacy_order_meta( $order, $first_carrier, $absorbed_cost, $buyer_paid, $primary_vendor_id );
 
             // Actualizar presupuesto del vendor (si modo absorbed).
-            if ( $absorbed_cost > 0 && $primary_vendor_id > 0 ) {
-                self::increment_vendor_spend( $primary_vendor_id, $absorbed_cost );
+            // RE-AUDIT P1 FIX: was using $primary_vendor_id only → vendors 2..N
+            // had wallets debited for shipping but budgets never incremented →
+            // check_vendor_budget() showed $0 spent → unlimited shipping spend.
+            // Now: iterate each entry and increment the per-line vendor's budget.
+            if ( $absorbed_cost > 0 && ! empty( $entries ) ) {
+                $vendor_spend = [];
+                foreach ( $entries as $e ) {
+                    $evid = (int) ( $e['vendor_id'] ?? 0 );
+                    $eabs = (float) ( $e['absorbed_cost'] ?? 0 );
+                    if ( $evid > 0 && $eabs > 0 ) {
+                        $vendor_spend[ $evid ] = ( $vendor_spend[ $evid ] ?? 0 ) + $eabs;
+                    }
+                }
+                foreach ( $vendor_spend as $vid => $vamt ) {
+                    self::increment_vendor_spend( $vid, $vamt );
+                }
             }
 
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Partial state
+            // (some vendors debited, some not) is left with no cleanup.
+            // Now: log as critical with partial entry count so monitoring can
+            // trigger manual reconciliation of the affected vendors.
+            LTMS_Core_Logger::critical(
                 'SHIPPING_LEDGER_RECORD_FAILED',
-                sprintf( 'Order #%d: %s', $order->get_id(), $e->getMessage() ),
-                [ 'order_id' => $order->get_id(), 'trace' => $e->getTraceAsString() ]
+                sprintf( 'Order #%d: shipping ledger recording FAILED after %d entries: %s. Partial state — manual reconciliation required for affected vendors.', $order->get_id(), count( $entries ), $e->getMessage() ),
+                [ 'order_id' => $order->get_id(), 'entries_processed' => count( $entries ), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ]
             );
         }
 
@@ -292,17 +318,23 @@ class LTMS_Shipping_Cost_Ledger {
         }
 
         // Idempotencia: buscar entry existente por (order_id, order_item_id).
-        // order_item_id = 0 significa "sin línea específica" (caso A).
+        // RE-AUDIT P1 FIX: wrap SELECT+INSERT in a transaction with FOR UPDATE
+        // to prevent two concurrent record_shipping_entry() calls from both
+        // passing the check and both INSERTing → duplicate ledger entries →
+        // double vendor debit (different ledger_id = different idempotency key).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT id FROM `{$table}` WHERE order_id = %d AND " .
-                ( $order_item_id > 0 ? 'order_item_id = %d' : 'order_item_id IS NULL' ),
+                ( $order_item_id > 0 ? 'order_item_id = %d' : 'order_item_id IS NULL' ) .
+                " FOR UPDATE",
                 $order_item_id > 0 ? [ $order_id, $order_item_id ] : [ $order_id ]
             )
         );
 
         if ( $existing ) {
+            $wpdb->query( 'COMMIT' ); // Release lock — existing entry found.
             // Ya existe — no duplicar. Solo actualizar campos seguros.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->update( $table, [
@@ -329,12 +361,14 @@ class LTMS_Shipping_Cost_Ledger {
         $ok = $wpdb->insert( $table, $insert_data );
 
         if ( false === $ok ) {
+            $wpdb->query( 'ROLLBACK' );
             LTMS_Core_Logger::warning(
                 'SHIPPING_LEDGER_INSERT_FAILED',
                 sprintf( 'Order #%d: %s', $order_id, $wpdb->last_error )
             );
             return null;
         }
+        $wpdb->query( 'COMMIT' );
 
         return (int) $wpdb->insert_id;
     }
@@ -441,6 +475,24 @@ class LTMS_Shipping_Cost_Ledger {
             'SHIPPING_LEDGER_FAILED',
             sprintf( 'Order #%d marcada para revisión (carrier=%s failed). Posible disputa.', $order_id, $carrier )
         );
+
+        // RE-AUDIT P1 FIX: if entries were DELIVERED, the consumer protection
+        // hold may have already been released (vendor has the money). Log a
+        // critical alert so the team can attempt manual clawback if needed.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $delivered_count = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$table}` WHERE order_id = %d AND status = %s AND metadata LIKE '%s'",
+            $order_id,
+            self::STATUS_DISPUTED,
+            '%"failure_carrier"%'
+        ) );
+        if ( $delivered_count > 0 && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::critical(
+                'SHIPPING_LEDGER_DELIVERED_NOW_DISPUTED',
+                sprintf( 'Order #%d: %d ledger entries were DELIVERED (hold likely released) but now marked DISPUTED. Vendor funds may need manual clawback.', $order_id, $delivered_count ),
+                [ 'order_id' => $order_id, 'entries_affected' => $delivered_count, 'carrier' => $carrier ]
+            );
+        }
     }
 
     /**
@@ -733,6 +785,10 @@ class LTMS_Shipping_Cost_Ledger {
         $variance = round( $real_cost - $quote_cost, 2 );
         $variance_pct = $quote_cost > 0 ? round( ( $variance / $quote_cost ) * 100, 2 ) : 0.0;
 
+        // RE-AUDIT P1 FIX: wrap the update + reconcile in a transaction so that
+        // if reconcile_vendor_charge fails (Wallet throws), the ledger update is
+        // rolled back too — no inconsistent state (status=invoiced but no debit).
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $ok = $wpdb->update( $table, [
             'real_cost'        => $real_cost,
@@ -745,17 +801,35 @@ class LTMS_Shipping_Cost_Ledger {
             'updated_at'       => current_time( 'mysql', true ),
         ], [ 'id' => $ledger_id ] );
 
-        // Si la varianza es >tolerancia (default 5%), abrir disputa automáticamente.
-        $tolerance_pct = (float) LTMS_Core_Config::get( 'ltms_shipping_variance_tolerance_pct', 5.0 );
-        if ( $variance_pct > $tolerance_pct && $variance > 0 ) {
-            self::auto_open_dispute( $ledger_id, $invoice_id, $invoice_line_id, $variance, $variance_pct );
+        if ( false === $ok ) {
+            $wpdb->query( 'ROLLBACK' );
+            return false;
         }
 
-        // Si el costo real > lo debitado al vendor, el vendor debe la diferencia.
-        // Si el costo real < lo debitado, reembolsar al vendor.
-        $vendor_charged = (float) $entry['vendor_charged'];
-        if ( $vendor_charged > 0 && abs( $real_cost - $vendor_charged ) > 0.01 ) {
-            self::reconcile_vendor_charge( $ledger_id, $vendor_charged, $real_cost );
+        try {
+            // Si la varianza es >tolerancia (default 5%), abrir disputa automáticamente.
+            $tolerance_pct = (float) LTMS_Core_Config::get( 'ltms_shipping_variance_tolerance_pct', 5.0 );
+            if ( $variance_pct > $tolerance_pct && $variance > 0 ) {
+                self::auto_open_dispute( $ledger_id, $invoice_id, $invoice_line_id, $variance, $variance_pct );
+            }
+
+            // Si el costo real > lo debitado al vendor, el vendor debe la diferencia.
+            // Si el costo real < lo debitado, reembolsar al vendor.
+            $vendor_charged = (float) $entry['vendor_charged'];
+            if ( $vendor_charged > 0 && abs( $real_cost - $vendor_charged ) > 0.01 ) {
+                self::reconcile_vendor_charge( $ledger_id, $vendor_charged, $real_cost );
+            }
+            $wpdb->query( 'COMMIT' );
+        } catch ( \Throwable $e ) {
+            $wpdb->query( 'ROLLBACK' );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'SHIPPING_LEDGER_RECONCILE_FAILED',
+                    sprintf( 'Ledger #%d: update succeeded but reconcile failed, rolled back: %s', $ledger_id, $e->getMessage() ),
+                    [ 'ledger_id' => $ledger_id, 'error' => $e->getMessage() ]
+                );
+            }
+            return false;
         }
 
         return $ok !== false;
@@ -1012,7 +1086,11 @@ class LTMS_Shipping_Cost_Ledger {
         foreach ( $package['contents'] ?? [] as $item ) {
             $product_id = (int) ( $item['product_id'] ?? 0 );
             if ( $product_id ) {
-                $vendor_id = (int) get_post_field( 'post_author', $product_id );
+                // P2 FIX: prefer _ltms_vendor_id meta over post_author — admins
+                // creating products on behalf of vendors set post_author to the
+                // admin ID, but _ltms_vendor_id has the actual vendor.
+                $meta_vendor = (int) get_post_meta( $product_id, '_ltms_vendor_id', true );
+                $vendor_id = $meta_vendor ?: (int) get_post_field( 'post_author', $product_id );
                 if ( $vendor_id ) break;
             }
         }
@@ -1120,6 +1198,20 @@ class LTMS_Shipping_Cost_Ledger {
 
         $sla_days = (int) LTMS_Core_Config::get( 'ltms_shipping_dispute_sla_days', 15 );
 
+        // P2 FIX: idempotency check — don't create duplicate open disputes for
+        // the same ledger entry. Previously, concurrent calls could insert
+        // multiple dispute rows → multiple debits on resolve.
+        $existing_dispute = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM `{$table}` WHERE ledger_id = %d AND status IN ('open','in_review') LIMIT 1",
+            $ledger_id
+        ) );
+        if ( $existing_dispute > 0 ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info( 'SHIPPING_DISPUTE_ALREADY_OPEN', sprintf( 'Ledger #%d already has open dispute #%d — skipping.', $ledger_id, $existing_dispute ) );
+            }
+            return $existing_dispute;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert( $table, [
             'ledger_id'        => $ledger_id,
@@ -1183,7 +1275,10 @@ class LTMS_Shipping_Cost_Ledger {
             'resolution_notes' => $notes,
             'resolved_at'      => current_time( 'mysql', true ),
             'resolved_by'      => $resolved_by ?: get_current_user_id(),
-        ], [ 'id' => $dispute_id ] );
+        ],
+        // P2 FIX: add WHERE-status guard — can only resolve disputes in active states.
+        [ 'id' => $dispute_id, 'status' => [ 'open', 'in_review' ] ]
+        );
 
         if ( false === $ok ) {
             return false;
@@ -1199,9 +1294,13 @@ class LTMS_Shipping_Cost_Ledger {
             ], [ 'id' => (int) $dispute['ledger_id'] ] );
 
             // Reembolsar al vendor si fue debitado.
+            // P2 FIX: cap credit_amount at vendor_charged to prevent over-refund.
             $entry = self::get_entry( (int) $dispute['ledger_id'] );
             if ( $entry && (float) $entry['vendor_charged'] > 0 && $entry['vendor_id'] > 0 ) {
-                self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $credit_amount );
+                $safe_refund = min( $credit_amount, (float) $entry['vendor_charged'] );
+                if ( $safe_refund > 0 ) {
+                    self::refund_vendor_for_dispute( (int) $dispute['ledger_id'], $entry['vendor_id'], $safe_refund, $entry['currency'] ?? '' );
+                }
             }
         } elseif ( $status === 'rejected' || $status === 'expired' ) {
             // Marcar como reconciliado (pérdida asumida o no recuperable).
@@ -1361,11 +1460,12 @@ class LTMS_Shipping_Cost_Ledger {
         // Últimas 24h: entries nuevos donde shipping > threshold% del order total.
         $since = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 
+        // RE-AUDIT P0 FIX: query had invalid SQL — 'o.get_total as order_total'
+        // referenced a non-existent table alias 'o' and a PHP method as column.
+        // Removed the invalid column; order_total is fetched via wc_get_order below.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $entries = $wpdb->get_results( $wpdb->prepare(
-            "SELECT l.*, o.get_total as order_total
-             FROM `{$table}` l
-             JOIN (SELECT ID FROM {$wpdb->posts} WHERE post_type='shop_order') p ON p.ID = l.order_id
+            "SELECT l.* FROM `{$table}` l
              WHERE l.created_at >= %s AND l.quote_cost > 0
              AND l.carrier NOT IN ('pickup', 'own_delivery')",
             $since
@@ -1712,18 +1812,21 @@ class LTMS_Shipping_Cost_Ledger {
                 );
             }
         } catch ( \InvalidArgumentException $e ) {
-            // Saldo insuficiente: registrar como crédito logístico (deuda).
-            // El vendor queda con balance negativo y debe recargar.
-            $msg = $e->getMessage();
-            if ( false !== strpos( $msg, 'Saldo insuficiente' ) ) {
-                self::record_vendor_shipping_debt( $ledger_id, $vendor_id, $amount, $order_id, $currency, $idempotency_key );
-                return;
+            // RE-AUDIT P1 FIX: string-matching exception message is fragile.
+            // If the error message changes (translation, refactor), the match
+            // fails → exception propagates → vendor never debited → platform
+            // silently absorbs shipping cost. Now: treat ALL InvalidArgumentException
+            // from Wallet::debit as insufficient-balance (the only case Wallet
+            // throws InvalidArgumentException) and record as debt.
+            self::record_vendor_shipping_debt( $ledger_id, $vendor_id, $amount, $order_id, $currency, $idempotency_key );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'SHIPPING_LEDGER_VENDOR_DEBT_RECORDED',
+                    sprintf( 'Ledger #%d vendor #%d: insufficient balance, debt recorded ($%.2f %s).', $ledger_id, $vendor_id, $amount, $currency ),
+                    [ 'ledger_id' => $ledger_id, 'vendor_id' => $vendor_id, 'amount' => $amount, 'currency' => $currency ]
+                );
             }
-            // Otro error de argumento: loguear y propagar.
-            LTMS_Core_Logger::warning(
-                'SHIPPING_LEDGER_VENDOR_DEBIT_FAILED',
-                sprintf( 'Ledger #%d vendor #%d: %s', $ledger_id, $vendor_id, $msg )
-            );
+            return;
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::warning(
                 'SHIPPING_LEDGER_VENDOR_DEBIT_FAILED',
@@ -1808,10 +1911,16 @@ class LTMS_Shipping_Cost_Ledger {
      * @param int   $vendor_id
      * @param float $amount
      */
-    private static function refund_vendor_for_dispute( int $ledger_id, int $vendor_id, float $amount ): void {
+    private static function refund_vendor_for_dispute( int $ledger_id, int $vendor_id, float $amount, string $currency = '' ): void {
         if ( ! class_exists( 'LTMS_Business_Wallet' ) || $amount <= 0 ) {
             return;
         }
+
+        // RE-AUDIT P0 FIX: was using LTMS_Core_Config::get_currency() (platform base
+        // currency) instead of the ledger entry's currency. If order was in USD but
+        // platform is COP, vendor was debited $10 USD but refunded $10 COP (~$0.0025).
+        // Now: use the passed currency, fall back to config only if empty.
+        $refund_currency = $currency ?: LTMS_Core_Config::get_currency();
 
         $idempotency_key = sprintf( 'shipping_refund_dispute_l%d', $ledger_id );
 
@@ -1825,7 +1934,7 @@ class LTMS_Shipping_Cost_Ledger {
                     'ledger_id' => $ledger_id,
                 ],
                 0,
-                LTMS_Core_Config::get_currency(),
+                $refund_currency,
                 $idempotency_key
             );
 
@@ -1885,7 +1994,11 @@ class LTMS_Shipping_Cost_Ledger {
 
         if ( $diff > 0 ) {
             // Vendor debe más: debit adicional.
-            $idempotency_key = sprintf( 'shipping_reconcile_diff_l%d', $ledger_id );
+            // RE-AUDIT P1 FIX: idempotency key now includes the diff amount so
+            // re-running reconciliation with a corrected amount doesn't hit the
+            // old idempotency key (which would be a no-op, leaving vendor stuck
+            // with the first reconciliation result).
+            $idempotency_key = sprintf( 'shipping_reconcile_debit_l%d_%.2f', $ledger_id, $diff );
             try {
                 LTMS_Business_Wallet::debit(
                     $vendor_id,
@@ -1901,7 +2014,7 @@ class LTMS_Shipping_Cost_Ledger {
             }
         } else {
             // Reembolso al vendor.
-            self::refund_vendor_for_dispute( $ledger_id, $vendor_id, abs( $diff ) );
+            self::refund_vendor_for_dispute( $ledger_id, $vendor_id, abs( $diff ), $entry['currency'] ?? '' );
         }
 
         // Actualizar vendor_charged en el ledger para reflejar el costo real.
@@ -1939,18 +2052,27 @@ class LTMS_Shipping_Cost_Ledger {
                 $idempotency_key
             );
 
-            // Guardar el tx_id en el primer ledger entry del pedido.
+            // RE-AUDIT P1 FIX: was updating ALL ledger entries for the order
+            // (no LIMIT) → each entry appeared backed by the full platform tx.
+            // Now: only update entries that don't already have a platform_wallet_tx_id.
             global $wpdb;
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update(
-                $wpdb->prefix . 'lt_shipping_cost_ledger',
-                [ 'platform_wallet_tx_id' => (int) $tx_id, 'updated_at' => current_time( 'mysql', true ) ],
-                [ 'order_id' => $order->get_id() ]
-            );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE `{$wpdb->prefix}lt_shipping_cost_ledger`
+                 SET `platform_wallet_tx_id` = %d, `updated_at` = %s
+                 WHERE `order_id` = %d AND `platform_wallet_tx_id` IS NULL",
+                (int) $tx_id,
+                current_time( 'mysql', true ),
+                $order->get_id()
+            ) );
         } catch ( \Throwable $e ) {
-            LTMS_Core_Logger::warning(
+            // RE-AUDIT P1 FIX: upgrade from warning → critical. Platform shipping
+            // cost is never recorded in wallet ledger → silent accounting gap.
+            // Now: critical so monitoring alerts fire for manual reconciliation.
+            LTMS_Core_Logger::critical(
                 'PLATFORM_LEDGER_ENTRY_FAILED',
-                sprintf( 'Order #%d: %s', $order->get_id(), $e->getMessage() )
+                sprintf( 'Order #%d: platform wallet entry FAILED: %s. Platform cost $%.2f %s unrecorded — manual reconciliation required.', $order->get_id(), $e->getMessage(), $amount, $currency ),
+                [ 'order_id' => $order->get_id(), 'amount' => $amount, 'currency' => $currency, 'error' => $e->getMessage() ]
             );
         }
     }

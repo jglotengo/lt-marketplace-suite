@@ -324,8 +324,41 @@ class LTMS_Bank_Reconciler {
 
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
+
+        // FASE3 P1 FIX: verify payout status is completed/paid before allowing
+        // reconciliation. Previously, a pending or rejected payout could be
+        // marked reconciled — corrupting the reconciliation ledger.
+        $status = $wpdb->get_var( $wpdb->prepare(
+            "SELECT status FROM `{$table}` WHERE id = %d",
+            $payout_id
+        ) );
+        if ( ! $status ) {
+            wp_send_json_error( __( 'Pago no encontrado.', 'ltms' ) );
+        }
+        if ( ! in_array( $status, [ 'completed', 'paid' ], true ) ) {
+            wp_send_json_error( sprintf(
+                __( 'Solo se pueden conciliar pagos completados. Estado actual: %s.', 'ltms' ),
+                $status
+            ) );
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update( $table, [ 'reconciled' => 1, 'reconciled_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $payout_id ], [ '%d', '%s' ], [ '%d' ] );
+        $updated = $wpdb->update( $table, [ 'reconciled' => 1, 'reconciled_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $payout_id ], [ '%d', '%s' ], [ '%d' ] );
+
+        // FASE3 P1 FIX: check return value — previously returned success
+        // unconditionally even if the UPDATE failed.
+        if ( $updated === false ) {
+            wp_send_json_error( __( 'Error al actualizar el pago en la base de datos.', 'ltms' ) );
+        }
+
+        // FASE3 P1 FIX: add audit log for reconciliation actions.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'BANK_RECONCILE_MARKED',
+                sprintf( 'Admin #%d marcó payout #%d como conciliado.', get_current_user_id(), $payout_id ),
+                [ 'admin_id' => get_current_user_id(), 'payout_id' => $payout_id ]
+            );
+        }
 
         wp_send_json_success( [ 'message' => __( 'Pago marcado como conciliado.', 'ltms' ) ] );
     }

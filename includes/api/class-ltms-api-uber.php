@@ -73,6 +73,11 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
         if ( empty( $this->customer_id ) ) {
             throw new \RuntimeException( 'LTMS Uber Direct: Customer ID no configurado (ltms_uber_direct_customer_id).' );
         }
+
+        // INTEGRATIONS-AUDIT P1 FIX: call parent::__construct() so the admin-
+        // configurable timeout / retries / retry_delay apply.
+        parent::__construct();
+        $this->timeout = 30;
     }
 
     // -------------------------------------------------------------------------

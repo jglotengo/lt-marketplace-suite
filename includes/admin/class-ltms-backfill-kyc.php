@@ -240,7 +240,7 @@ class LTMS_KYC_Guard {
         global $wpdb;
         $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
 
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$kyc_table}'" ) !== $kyc_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $kyc_table ) ) !== $kyc_table ) {
             return;
         }
 
@@ -333,7 +333,7 @@ class LTMS_KYC_Guard {
         // Si el KYC fue aprobado en la tabla ltms_kyc, permitir publicar
         global $wpdb;
         $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$kyc_table}'" ) === $kyc_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $kyc_table ) ) === $kyc_table ) {
             $kyc_status = $wpdb->get_var( $wpdb->prepare(
                 "SELECT status FROM {$kyc_table} WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
                 $vendor_id
@@ -380,7 +380,7 @@ class LTMS_KYC_Guard {
         // por qué su producto quedó en 'pending'.
         global $wpdb;
         $notifications_table = $wpdb->prefix . 'lt_notifications';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$notifications_table}'" ) === $notifications_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $notifications_table ) ) === $notifications_table ) {
             $wpdb->insert(
                 $notifications_table,
                 [

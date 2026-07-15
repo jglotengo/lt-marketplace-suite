@@ -18,6 +18,17 @@ class LTMS_Frontend_Live_Search {
      * @return void
      */
     public function handle_search(): void {
+        // v2.9.126 BATCH-AUDIT P1-2 FIX: rate limit public live search.
+        // Before, bots could spam this endpoint → high DB load from wc_get_products.
+        // Now capped at 30 per IP per minute.
+        $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : '0.0.0.0';
+        $rl_key = 'ltms_search_rl_' . md5( $ip );
+        $rl_count = (int) get_transient( $rl_key );
+        if ( $rl_count > 30 ) {
+            wp_send_json_error( 'Rate limit exceeded', 429 );
+        }
+        set_transient( $rl_key, $rl_count + 1, MINUTE_IN_SECONDS );
+
         // La búsqueda en vivo es pública (productos/vendedores) y también interna (pedidos del vendedor).
         // Para usuarios no autenticados usamos un nonce público; para autenticados el nonce del dashboard.
         if ( is_user_logged_in() ) {
@@ -86,6 +97,7 @@ class LTMS_Frontend_Live_Search {
             'role__in'   => [ 'ltms_vendor', 'ltms_vendor_premium' ],
             'search'     => '*' . esc_attr( $q ) . '*',
             'search_columns' => [ 'display_name', 'user_email' ],
+            'number'     => 20,  // FASE8: limit search results
             'number'     => $limit,
         ] );
 

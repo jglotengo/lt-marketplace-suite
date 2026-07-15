@@ -400,17 +400,33 @@ final class LTMS_Dashboard_Logic {
         $user_id         = get_current_user_id();
         $notification_id = (int) ( $_POST['notification_id'] ?? 0 ); // phpcs:ignore
 
+        if ( ! $notification_id ) {
+            wp_send_json_error( [ 'message' => __( 'ID de notificación inválido.', 'ltms' ) ] );
+        }
+
         global $wpdb;
         $table = $wpdb->prefix . 'lt_notifications';
 
+        // v2.9.119 NOTIFICATIONS-AUDIT P1-2 FIX: verify the notification belongs to the user.
+        // Before, the WHERE clause included user_id (so 0 rows affected if mismatch), but
+        // the handler returned success regardless — the frontend would think it was marked
+        // read when it wasn't. Now we check affected rows and return error if 0.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
+        $updated = $wpdb->update(
             $table,
             [ 'is_read' => 1, 'read_at' => LTMS_Utils::now_utc() ],
-            [ 'id' => $notification_id, 'user_id' => $user_id ],
+            [ 'id' => $notification_id, 'user_id' => $user_id, 'is_read' => 0 ],
             [ '%d', '%s' ],
-            [ '%d', '%d' ]
+            [ '%d', '%d', '%d' ]
         );
+
+        if ( false === $updated ) {
+            wp_send_json_error( [ 'message' => __( 'Error al marcar la notificación.', 'ltms' ) ] );
+        }
+        if ( 0 === $updated ) {
+            // Either the notification doesn't exist, belongs to another user, or was already read.
+            wp_send_json_error( [ 'message' => __( 'Notificación no encontrada o ya leída.', 'ltms' ) ] );
+        }
 
         wp_send_json_success();
     }
@@ -2200,6 +2216,10 @@ final class LTMS_Dashboard_Logic {
     public function ajax_backorder_notify(): void {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
+        // FASE2 P0 FIX: missing global $wpdb — every call crashed with
+        // "Call to a member function prefix() on null".
+        global $wpdb;
+
         // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir abuso de wp_options.
         $ip = LTMS_Utils::get_ip();
         $throttle_key = 'ltms_backorder_' . md5( $ip );
@@ -2222,7 +2242,7 @@ final class LTMS_Dashboard_Logic {
         $user_id = get_current_user_id();
 
         // Verificar si la tabla existe (puede no estar migrada aún).
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table ) {
             // Usar custom table.
             $exists = $wpdb->get_var( $wpdb->prepare(
                 "SELECT id FROM `{$table}` WHERE product_id = %d AND email = %s LIMIT 1",
@@ -2305,13 +2325,21 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Reseña inválida.', 'ltms' ) ], 400 );
         }
 
-        $ip = LTMS_Utils::get_ip();
+        // v2.9.120 REVIEWS-AUDIT P1-4 FIX: use LTMS_Core_Security::get_client_ip_safe() for IP.
+        // Before, LTMS_Utils::get_ip() was used which may trust X-Forwarded-For headers
+        // that can be spoofed by the client. Now uses the safe method that validates
+        // against trusted proxy headers only.
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ) {
+            $ip = LTMS_Core_Security::get_client_ip_safe();
+        } else {
+            $ip = LTMS_Utils::get_ip();
+        }
         $user_id = get_current_user_id();
 
         // v2.9.69 DEEP-AUDIT-002 P2-25: Usar custom table para dedup atómica.
         $votes_table = $wpdb->prefix . 'lt_review_votes';
 
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$votes_table}'" ) === $votes_table ) {
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $votes_table ) ) === $votes_table ) {
             // Usar custom table con UNIQUE KEY (comment_id, ip_address).
             // INSERT ignorará si ya existe (dedup atómica a nivel de DB).
             $inserted = $wpdb->query( $wpdb->prepare(

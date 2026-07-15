@@ -3,8 +3,8 @@
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
 > **Última actualización:** 2026-07-15
-> **Versión del plugin:** 2.9.116
-> **Total de lecciones:** 80 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 10 nuevas de auditorías v2.9.113-116)
+> **Versión del plugin:** 2.9.132
+> **Total de lecciones:** 90 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132)
 
 ---
 
@@ -1063,3 +1063,157 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Fix:** Hacer un empty commit para forzar un nuevo ref en GitHub (invalida el cache). Re-trigger el webhook múltiples veces hasta que el fetch traiga el último commit.
 
 **Regla preventiva:** Si el deploy webhook muestra `HEAD is now at <commit-viejo>` cuando GitHub ya tiene un commit más reciente, hacer un empty commit (`git commit --allow-empty -m "force refresh"`) y re-push. Esto invalida el cache HTTP de GitHub en SiteGround. Considerar agregar `git fetch --no-cache` o `git remote set-url` con un timestamp en el webhook futuro.
+
+### LECCIÓN #81: Meta key mismatch — verificar consistencia entre writer y reader
+
+**Error:** `get_policy_for_booking()` leía `_ltms_policy_id` pero `create_booking()` guarda en `_ltms_booking_policy_id` (different key). La política de cancelación SIEMPRE caía al default del vendor, las políticas específicas por producto NUNCA se aplicaban.
+
+**Causa raíz:** Dos métodos independientes (writer y reader) usaban meta keys ligeramente diferentes sin coordinación. No hay warning de PHP ni de WordPress cuando esto pasa.
+
+**Fix:** Probar ambas meta keys + booking row's `policy_id` column.
+
+**Regla preventiva:** Toda meta key que se escribe en un lugar debe leerse con el MISMO nombre en otro. Grep por el meta key completo (`_ltms_policy_id` vs `_ltms_booking_policy_id`) para verificar consistencia entre writer y reader. Considerar centralizar meta keys en constantes de clase.
+
+### LECCIÓN #82: Double refund sin idempotencia en cancelaciones
+
+**Error:** `process_cancellation_refund()` no tenía protección contra double refund. Si `cancel_booking` se llamaba dos veces (race condition o retry), `wc_create_refund` creaba DOS refund objects → double money back al cliente.
+
+**Causa raíz:** El método no verificaba si ya existía un refund para ese booking antes de crear uno nuevo. WooCommerce's `wc_create_refund` no es idempotente por defecto.
+
+**Fix:** Verificar refunds existentes por reason prefix (que incluye el booking_id) antes de crear uno nuevo.
+
+**Regla preventiva:** Toda función que cree refunds, payouts, o transacciones financieras debe ser idempotente. Verificar si ya existe una transacción con el mismo identificador (booking_id, order_id, idempotency_key) antes de crear una nueva. Para refunds de WC, buscar en `$order->get_refunds()` por reason prefix.
+
+### LECCIÓN #83: AJAX handler sin verificación de rol específico
+
+**Error:** `ajax_save_vendor_policy()` no verificaba que el usuario fuera vendor. Cualquier logged-in user (incluido customers con rol `subscriber` o `customer`) podía llamarlo y crear/editar políticas de cancelación.
+
+**Causa raíz:** El handler solo tenía `check_ajax_referer` (que verifica sesión) pero no verificaba el rol. `is_user_logged_in()` no es suficiente — cualquier cuenta registrada pasa el check.
+
+**Fix:** Agregar `LTMS_Utils::is_ltms_vendor()` check al inicio del handler.
+
+**Regla preventiva:** TODO AJAX handler que modifique datos de vendor debe verificar `LTMS_Utils::is_ltms_vendor()` además de `check_ajax_referer`. `is_user_logged_in()` solo verifica sesión, no rol. Los customers tienen cuentas válidas pero no deben acceder a endpoints de vendor.
+
+### LECCIÓN #84: IDOR en endpoints de save/update con ID numérico
+
+**Error:** `ajax_save_vendor_policy()` IDOR — un vendor podía pasar `policy_id` de OTRA vendor's policy y el método `save_policy` intentaría UPDATE (con vendor_id en WHERE, 0 rows affected) luego INSERT. El risk real: probe policy_ids para descubrir nombres/tipos de políticas ajenas.
+
+**Causa raíz:** El handler recibía `policy_id` del cliente pero no verificaba ownership antes de pasarlo a `save_policy`. Aunque `save_policy` tiene `vendor_id` en el WHERE del UPDATE, el INSERT fallback permite crear políticas duplicadas.
+
+**Fix:** Verificar ownership del policy_id antes de update + log `BOOKING_POLICY_IDOR_ATTEMPT`.
+
+**Regla preventiva:** TODO endpoint AJAX que acepte un ID numérico (policy_id, booking_id, order_id, driver_id) debe verificar ownership antes de procesar. El patrón: `SELECT vendor_id FROM table WHERE id = %d` → comparar con `get_current_user_id()`. Log security event si mismatch.
+
+### LECCIÓN #85: valorrecaudo (cash-on-delivery) sin bound = fraude
+
+**Error:** `ajax_generar_guia()` `valorrecaudo` (cash-on-delivery amount) no tenía bound. Vendor podía declarar recaudo inflado (customer paga más en delivery) o 0 recaudo para pedido pagado (vendor pocketing cash).
+
+**Causa raíz:** El handler aceptaba cualquier valor entero de `$_POST['valorrecaudo']` sin verificar contra el total del pedido. Aveonline procesa el recaudo literalmente — si el vendor dice 500000, el transportador cobra 500000 al cliente.
+
+**Fix:** Verificar `valorrecaudo <= order total` cuando el order existe.
+
+**Regla preventiva:** TODO campo financiero que represente un monto a cobrar/pagar (valorrecaudo, delivery_price, payout_amount) debe tener bounds razonables. Para cash-on-delivery, el monto nunca debe superar el total del pedido. Para delivery_price, cap a un máximo configurable. Validar contra el order total cuando aplique.
+
+### LECCIÓN #86: Webhook fail-open cuando secret/token no configurado
+
+**Error:** Los webhook handlers de Alegra y Siigo eran fail-open: si el secret/token estaba vacío, el check de auth se skipeaba completamente. Cualquier atacante podía enviar webhooks forjados.
+
+**Causa raíz:** El patrón `if ($expected) { ... check ... }` skipea el check cuando el secret está vacío. Otros handlers (Stripe, Openpay, Zapsign, Addi, Uber) ya eran fail-closed, pero Alegra y Siigo se quedaron con el patrón viejo.
+
+**Fix:** Cambiar a fail-closed: `if (empty($expected)) { return 403; }` antes del check.
+
+**Regla preventiva:** TODO webhook handler debe ser fail-closed: si el secret/token no está configurado, RECHAZAR el webhook con 403. Nunca usar `if ($expected) { check }` — usar `if (empty($expected)) { reject; } check;`.
+
+### LECCIÓN #87: Inline onclick reemplazado por data-* SIN agregar JS = botones rotos
+
+**Error:** Al reemplazar inline `onclick` con `data-action`/`data-confirm` attributes para cumplimiento CSP, NO se agregó el JavaScript que escucha esos attributes. Los botones de admin dejaron de funcionar.
+
+**Causa raíz:** El fix CSP fue incompleto — se hizo el cambio de HTML pero no el cambio de JS correspondiente.
+
+**Fix:** Agregar jQuery event delegation: `$(document).on('click', '[data-action]', function() { ... })` que dispatcha según el valor de `data-action`.
+
+**Regla preventiva:** Al migrar de inline onclick a data-* attributes, SIEMPRE agregar el JS de event delegation en el MISMO commit. Un cambio CSP sin el JS correspondiente es una regresión.
+
+### LECCIÓN #88: .min.js desactualizado después de modificar .js
+
+**Error:** Se modificó `ltms-admin.js` pero no se regeneró `ltms-admin.min.js`. En producción, el plugin carga `.min.js` (via `get_suffix()`), así que los cambios no se reflejaban.
+
+**Causa raíz:** Olvido de ejecutar `npm run build` después de modificar JS.
+
+**Fix:** Ejecutar `npm run build` para regenerar todos los `.min.js` y `.min.css`.
+
+**Regla preventiva:** DESPUÉS de modificar cualquier archivo `.js` o `.css`, ejecutar `npm run build` ANTES de commit. El CI verifica que `.min` files estén sincronizados, pero solo en GitHub Actions — localmente no hay check.
+
+### LECCIÓN #89: Webhook file list hardcoded — archivos no se sincronizan
+
+**Error:** El deploy webhook tiene una lista hardcoded de archivos a sincronizar desde GitHub. Si se modifica un archivo que NO está en la lista, ese archivo no se actualiza en producción via webhook.
+
+**Causa raíz:** El webhook fue diseñado con una lista mínima de archivos críticos. A medida que se modificaron más archivos, la lista se quedó corta.
+
+**Fix:** Actualizar la lista del webhook con TODOS los archivos modificados (de 16 a 56 archivos).
+
+**Regla preventiva:** Al agregar archivos modificados al repo, verificar que estén en la lista del webhook `deploy/ltms-deploy-webhook.php`. Idealmente, el webhook debería hacer `git reset --hard origin/main` (que sí sincroniza todo) en lugar de descargar archivos individuales.
+
+### LECCIÓN #90: Nonce action mismatch entre PHP y JS = endpoint roto
+
+**Error:** 4 admin AJAX handlers en Donations tenían `check_ajax_referer('ltms_admin_nonce', 'nonce')` seguido de `$this->verify()` que usa `NONCE_ACTION='ltms_admin_donations'`. El JS enviaba nonce de `wp_create_nonce('ltms_admin_donations')`, así que el primer check SIEMPRE fallaba y `wp_die()`'d.
+
+**Causa raíz:** Doble check de nonce con actions diferentes. El primer check (legacy SEC-3 FIX) usaba el nonce estándar del plugin, pero el JS usaba un nonce específico del módulo.
+
+**Fix:** Remover el check duplicado, manteniendo solo `$this->verify()` con el nonce correcto.
+
+**Regla preventiva:** NUNCA tener dos `check_ajax_referer` con actions diferentes en el mismo handler. Verificar qué nonce envía el JS (`wp_create_nonce`) y usar exactamente ese action en el `check_ajax_referer` del PHP.
+
+---
+
+## Lecciones v2.9.143 → v2.9.160 (Full-Stack Audit, 81 bugs fixeados)
+
+### Lección #91: Regresiones por fixes incompletos
+**Error:** El fix P0-1 de v2.9.115 (payout-scheduler) cambió `available = max(0, balance - held)` pero `hold()` ya resta de `balance` atómicamente — doble-resta bloqueaba todos los payouts después de cualquier hold.
+**Fix:** Revertido a `available = balance`. El double-spend que P0-1 intentaba prevenir ya está bloqueado por el balance check dentro de la transacción de `hold()`.
+**Regla preventiva:** Antes de cambiar cálculos de balance, trazar el flujo completo: `hold()` → `balance -= amount; balance_pending += amount`. El `balance` resultante YA es el free balance.
+
+### Lección #92: Double-refund check por string matching
+**Error:** El fix P0-2 de v2.9.117 (booking) prevenía double-refund buscando el booking_id en el REASON del refund via `stripos()`. Roto por (1) traducción (prefix español vs reason `__()`) y (2) colisión de substring (#1 matchea #11).
+**Fix:** Almacenar `booking_id` como post meta del refund (`_ltms_booking_id`) y verificar via `get_post_meta()`.
+**Regla preventiva:** NUNCA usar string matching para deduplicación. Usar metadatos estructurados (post meta, user meta, o columnas dedicadas).
+
+### Lección #93: do_action dentro de try después de COMMIT
+**Error:** En `wallet.php`, `do_action('ltms_wallet_tx_committed')` estaba dentro del try block DESPUÉS de `$wpdb->query('COMMIT')`. Si un listener lanzaba excepción, el catch llamaba ROLLBACK — pero la transacción ya estaba committed. La excepción se propagaba al caller, que creía que la operación falló y reintentaba → double credit.
+**Fix:** Envolver el do_action + logging en un try/catch anidado que traga errores no-críticos.
+**Regla preventiva:** NUNCA ejecutar hooks (`do_action`) dentro de un try block que tiene ROLLBACK en el catch, si la transacción ya está committed. Los hooks son side-effects que no deben afectar el resultado de la transacción.
+
+### Lección #94: Role check incorrecto en 2FA enforcement
+**Error:** `enforce_2fa_for_payout_vendors()` chequeaba el rol `'vendor'` que NO EXISTE en este plugin (los roles reales son `'ltms_vendor'` y `'ltms_vendor_premium'`). 2FA enforcement NUNCA se disparaba para vendors reales.
+**Fix:** `array_intersect(['ltms_vendor', 'ltms_vendor_premium', 'vendor'], $user->roles)`.
+**Regla preventiva:** Verificar los roles registrados en `class-ltms-roles.php` antes de escribir checks de `in_array('role_name', $user->roles)`.
+
+### Lección #95: Fail-open en screening de sanciones
+**Error:** Cuando la descarga de una lista de sanciones (OFAC/UN/EU) fallaba, el código hacía `continue` (saltaba la lista y aprobaba el vendor sin screening). Violación directa de SARLAFT.
+**Fix:** FAIL-CLOSED — bloquear KYC hasta que la lista pueda ser obtenida.
+**Regla preventiva:** En compliance, SIEMPRE fail-closed. Si un recurso externo no está disponible, bloquear la operación, no continuar.
+
+### Lección #96: Arbitrary option overwrite via settings save
+**Error:** El loop de guardado de settings llamaba `update_option($key, $value)` para CUALQUIER key en `$sanitized`, incluyendo opciones core de WordPress (admin_email, siteurl, default_role). Un CSRF podía comprometer el sitio completamente.
+**Fix:** Solo keys con prefijo `ltms_` son guardadas.
+**Regla preventiva:** NUNCA hacer `update_option` con keys arbitrarias del input del usuario. Usar whitelist o prefix check.
+
+### Lección #97: TOCTOU en creación de guías
+**Error:** El check de deduplicación de guías (`SELECT numguia WHERE order_id`) no era atómico con `create_shipment()` + `db_insert()`. Dos POSTs concurrentes ambos pasaban el check y ambos llamaban Aveonline → dos guías reales facturadas.
+**Fix:** Transient lock antes del API call, liberado en success/error.
+**Regla preventiva:** Para operaciones que llaman APIs pagas externas, SIEMPRE usar un lock (transient o DB) antes del API call, no solo un SELECT de deduplicación.
+
+### Lección #98: Inline scripts y CSP compliance
+**Error:** 22+ bloques `<script>` inline en views PHP violaban CSP `script-src 'self'`. Cada uno era una superficie de XSS potencial.
+**Fix:** Extracción a 17 archivos JS externos + `wp_enqueue_script`. Variables PHP pasadas via `data-*` attributes o `ltmsDashboard` localized.
+**Regla preventiva:** NUNCA escribir `<script>` inline en views PHP. Toda lógica JS debe estar en archivos externos en `assets/js/`.
+
+### Lección #99: Ledger integrity — tx_id como boolean
+**Error:** En `redi-order-split.php`, `origin_tx_id` y `reseller_tx_id` se almacenaban como `true`/`null` en vez del ID real de transacción del wallet. Ledger unreconcilable, audit trail roto, refund rollbacks imposibles.
+**Fix:** Capturar `(int) Wallet::credit()` return value.
+**Regla preventiva:** NUNCA descartar el return value de funciones que crean registros financieros. El ID de la transacción es crítico para auditoría y reconciliación.
+
+### Lección #100: Dead code por type mismatch en filter callback
+**Error:** `adjust_ica_for_pickup()` chequeaba `$order instanceof WC_Order` pero el filter `ltms_after_tax_calculate` pasa `$order_data` como ARRAY. El instanceof siempre fallaba → ICA tax para pickup orders NUNCA se ajustaba.
+**Fix:** Manejar tanto array (tax engine) como WC_Order (legacy callers).
+**Regla preventiva:** Al registrar un callback para un filter de WP, verificar el tipo del parámetro que el filter pasa — no asumir que es el tipo esperado.
