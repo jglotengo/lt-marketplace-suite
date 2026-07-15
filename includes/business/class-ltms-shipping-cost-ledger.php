@@ -849,9 +849,17 @@ class LTMS_Shipping_Cost_Ledger {
         $table = $wpdb->prefix . 'lt_shipping_disputes';
 
         // No abrir si ya existe una disputa para este ledger_id.
+        // P2-3 FIX (REAUDIT): SELECT ... FOR UPDATE to prevent TOCTOU race where two
+        // concurrent apply_real_cost_to_invoice() calls both see no existing dispute
+        // and both INSERT. The caller (apply_real_cost_to_invoice) opens a transaction,
+        // and under InnoDB + REPEATABLE READ (WP default), SELECT ... FOR UPDATE on a
+        // non-matching predicate acquires a next-key gap lock that blocks the other
+        // transaction's SELECT ... FOR UPDATE for the same predicate — so only one
+        // transaction reaches the INSERT. The INSERT-failure handler below is a
+        // defensive backstop for hosts running READ COMMITTED (no gap locks).
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $existing = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM `{$table}` WHERE ledger_id = %d AND status IN ('open', 'in_review') LIMIT 1",
+            "SELECT id FROM `{$table}` WHERE ledger_id = %d AND status IN ('open', 'in_review') LIMIT 1 FOR UPDATE",
             $ledger_id
         ) );
         if ( $existing ) {
@@ -868,7 +876,7 @@ class LTMS_Shipping_Cost_Ledger {
         $quote_cost = (float) ( $entry['quote_cost'] ?? 0 );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert( $table, [
+        $inserted = $wpdb->insert( $table, [
             'ledger_id'        => $ledger_id,
             'invoice_id'       => $invoice_id,
             'invoice_line_id'  => $invoice_line_id,
@@ -884,6 +892,21 @@ class LTMS_Shipping_Cost_Ledger {
             'opened_at'        => current_time( 'mysql', true ),
             'sla_due_at'       => $sla_due,
         ] );
+
+        // P2-3 FIX (REAUDIT): If a concurrent call inserted the same dispute
+        // first (race loser under READ COMMITTED isolation level where gap
+        // locks don't apply), the INSERT will fail. Treat that as success
+        // (the dispute exists) instead of crashing the reconcile flow.
+        if ( false === $inserted ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'SHIPPING_DISPUTE_RACE_LOST',
+                    sprintf( 'Disputa para ledger #%d ya fue creada por un proceso concurrente — skip.', $ledger_id ),
+                    [ 'ledger_id' => $ledger_id ]
+                );
+            }
+            return; // Race loser — dispute already exists.
+        }
 
         $dispute_id = (int) $wpdb->insert_id;
 
@@ -920,9 +943,17 @@ class LTMS_Shipping_Cost_Ledger {
         if ( ! $year )  $year  = (int) current_time( 'Y' );
         if ( ! $month ) $month = (int) current_time( 'n' );
 
+        // P2-4 FIX (REAUDIT): wrap the SELECT + INSERT in a transaction with
+        // FOR UPDATE to prevent TOCTOU race where two concurrent
+        // get_vendor_budget() calls both see no row and both INSERT. The
+        // UNIQUE INDEX udx_vendor_period (vendor_id, period_year, period_month)
+        // backstops this: if both INSERTs slip through (e.g. under READ COMMITTED
+        // isolation), the second fails with duplicate-key and we re-SELECT to
+        // retrieve the winner's row.
+        $wpdb->query( 'START TRANSACTION' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $row = $wpdb->get_row( $wpdb->prepare(
-            "SELECT * FROM `{$table}` WHERE vendor_id = %d AND period_year = %d AND period_month = %d",
+            "SELECT * FROM `{$table}` WHERE vendor_id = %d AND period_year = %d AND period_month = %d LIMIT 1 FOR UPDATE",
             $vendor_id, $year, $month
         ), ARRAY_A );
 
@@ -930,7 +961,7 @@ class LTMS_Shipping_Cost_Ledger {
             // Crear con defaults globales.
             $default_budget = (float) LTMS_Core_Config::get( 'ltms_shipping_vendor_default_budget', 0 );
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert( $table, [
+            $inserted = $wpdb->insert( $table, [
                 'vendor_id'        => $vendor_id,
                 'period_year'      => $year,
                 'period_month'     => $month,
@@ -940,11 +971,25 @@ class LTMS_Shipping_Cost_Ledger {
                 'spent_amount'     => 0.00,
                 'spent_pct'        => 0.00,
             ] );
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $row = $wpdb->get_row( $wpdb->prepare(
-                "SELECT * FROM `{$table}` WHERE vendor_id = %d AND period_year = %d AND period_month = %d",
-                $vendor_id, $year, $month
-            ), ARRAY_A );
+
+            if ( false === $inserted ) {
+                // Race loser — concurrent call already inserted. Roll back and re-SELECT.
+                $wpdb->query( 'ROLLBACK' );
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $row = $wpdb->get_row( $wpdb->prepare(
+                    "SELECT * FROM `{$table}` WHERE vendor_id = %d AND period_year = %d AND period_month = %d",
+                    $vendor_id, $year, $month
+                ), ARRAY_A );
+            } else {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $row = $wpdb->get_row( $wpdb->prepare(
+                    "SELECT * FROM `{$table}` WHERE vendor_id = %d AND period_year = %d AND period_month = %d",
+                    $vendor_id, $year, $month
+                ), ARRAY_A );
+                $wpdb->query( 'COMMIT' );
+            }
+        } else {
+            $wpdb->query( 'COMMIT' );
         }
 
         // Recalcular spent_amount desde el ledger (source of truth).

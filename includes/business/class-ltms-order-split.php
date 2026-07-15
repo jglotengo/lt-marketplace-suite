@@ -957,6 +957,18 @@ final class LTMS_Business_Order_Split {
         global $wpdb;
         $order_id = (int) $order->get_id();
 
+        // OS P2-1 FIX (REAUDIT): ensure the lt_customs_declarations table exists
+        // before any SELECT/INSERT against it. Previously, the SELECT ... FOR UPDATE
+        // below could run against a missing table on the very first cross-border
+        // order (because ensure_customs_table() was only called inside
+        // create_customs_declaration, which runs AFTER the idempotency check).
+        // On a fresh install with no prior customs declarations, this would
+        // throw a WPDB error like "Table 'wp_lt_customs_declarations' doesn't
+        // exist" — and because the call happens inside an outer try/catch that
+        // silently logs and continues, the first cross-border order's idempotency
+        // check would silently fail, allowing duplicate declarations later.
+        self::ensure_customs_table();
+
         // OS-BUG-1 FIX (Task 65-C): Idempotency — if a customs declaration
         // already exists for this order, skip re-processing. The wallet
         // operations (credit/debit/FX-convert) are already idempotent via
