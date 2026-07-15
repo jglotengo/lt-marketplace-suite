@@ -145,10 +145,11 @@ class LTMS_Commission_Writer {
             // FASE4 P0 FIX (TOCTOU): use SELECT ... FOR UPDATE inside a transaction
             // to prevent two concurrent hooks from both passing the SELECT and both
             // INSERTing duplicate commission rows for the same (order_id, vendor_id).
-            // Defensive: if $wpdb is a mock (test env) or transaction fails, fall
-            // back to the non-transactional SELECT (still correct in single-threaded
-            // test context).
-            $use_transaction = method_exists( $wpdb, 'query' ) && ! ( isset( $wpdb->is_mock ) && $wpdb->is_mock );
+            // Defensive: skip transaction in test environments where $wpdb is mocked
+            // (anonymous class without real DB connection). The SELECT without FOR UPDATE
+            // is still correct in single-threaded test context.
+            $use_transaction = ! ( $wpdb instanceof \stdClass )
+                && ! str_starts_with( get_class( $wpdb ), 'class@anonymous' );
             if ( $use_transaction ) {
                 $wpdb->query( 'START TRANSACTION' );
             }
