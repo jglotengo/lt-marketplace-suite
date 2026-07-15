@@ -219,33 +219,39 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
 
     // ── SECCIÓN 5 — enforce_2fa_for_payout_vendors (FASE4 P0 FIX) ─────────
 
+    // Helper: create a fake WP_User with a roles property (WP_User is not
+    // loaded in UNIT_ONLY mode, so we use a stdClass with public $roles and $ID).
+    private function make_fake_user(array $roles, int $id = 1): object {
+        $user = new \stdClass();
+        $user->ID = $id;
+        $user->roles = $roles;
+        $user->display_name = 'Test User';
+        return $user;
+    }
+
     public function test_enforce_2fa_skips_non_vendor_user(): void {
-        $user = new \WP_User(1);
-        $user->roles = ['subscriber'];
+        $user = $this->make_fake_user(['subscriber']);
         // Should return early without doing anything.
         \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
         $this->assertTrue(true); // Just verify no exception.
     }
 
     public function test_enforce_2fa_accepts_ltms_vendor_role(): void {
-        $user = new \WP_User(1);
-        $user->roles = ['ltms_vendor'];
+        $user = $this->make_fake_user(['ltms_vendor']);
         // No recent payouts in mock → returns early.
         \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
         $this->assertTrue(true);
     }
 
     public function test_enforce_2fa_accepts_ltms_vendor_premium_role(): void {
-        $user = new \WP_User(1);
-        $user->roles = ['ltms_vendor_premium'];
+        $user = $this->make_fake_user(['ltms_vendor_premium']);
         \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
         $this->assertTrue(true);
     }
 
     public function test_enforce_2fa_accepts_vendor_role_for_backward_compat(): void {
         // FASE4 P0 FIX: 'vendor' role should also be checked (backward compat).
-        $user = new \WP_User(1);
-        $user->roles = ['vendor'];
+        $user = $this->make_fake_user(['vendor']);
         \LTMS_Fintech_Compliance::enforce_2fa_for_payout_vendors('test', $user);
         $this->assertTrue(true);
     }

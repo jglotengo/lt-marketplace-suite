@@ -114,12 +114,31 @@ class GdprEraserTest extends LTMS_Unit_Test_Case {
 
     private function set_b2_client(?object $b2): void {
         $this->mock_b2 = $b2;
-
-        // Mock LTMS_Api_Factory::get to return our B2 mock.
-        if (!class_exists('LTMS_Api_Factory')) {
-            eval('class LTMS_Api_Factory { public static function get($name) { return $GLOBALS["__mock_b2"] ?? null; } }');
+        // Inject mock into LTMS_Api_Factory's static $instances cache via reflection.
+        // This way, LTMS_Api_Factory::get('backblaze') returns our mock instead of
+        // trying to instantiate a real LTMS_Api_Backblaze client (which requires
+        // API keys and would throw).
+        if (class_exists('LTMS_Api_Factory')) {
+            $ref = new \ReflectionClass('LTMS_Api_Factory');
+            $prop = $ref->getProperty('instances');
+            $prop->setAccessible(true);
+            if ($b2 === null) {
+                $prop->setValue(null, []);
+            } else {
+                $prop->setValue(null, ['backblaze' => $b2]);
+            }
         }
-        $GLOBALS['__mock_b2'] = $b2;
+    }
+
+    protected function tearDown(): void {
+        // Clear LTMS_Api_Factory instances cache to prevent bleed between tests.
+        if (class_exists('LTMS_Api_Factory')) {
+            $ref = new \ReflectionClass('LTMS_Api_Factory');
+            $prop = $ref->getProperty('instances');
+            $prop->setAccessible(true);
+            $prop->setValue(null, []);
+        }
+        parent::tearDown();
     }
 
     // ── SECCIÓN 1 — register_eraser ───────────────────────────────────────

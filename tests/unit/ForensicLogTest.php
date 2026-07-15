@@ -137,8 +137,9 @@ class ForensicLogTest extends LTMS_Unit_Test_Case {
         $ctx_a = ['z' => 1, 'a' => 2, 'm' => 3];
         $ctx_b = ['a' => 2, 'm' => 3, 'z' => 1];
         $args = ['prev', 'ACT', 1, '127.0.0.1', '2026', 'UA', '/'];
-        $h_a = self::callPrivate('compute_entry_hash', ...$args, $ctx_a);
-        $h_b = self::callPrivate('compute_entry_hash', ...$args, $ctx_b);
+        // PHP 8.0+: spread must be the last argument, so merge context into args.
+        $h_a = self::callPrivate('compute_entry_hash', ...array_merge($args, [$ctx_a]));
+        $h_b = self::callPrivate('compute_entry_hash', ...array_merge($args, [$ctx_b]));
         $this->assertSame($h_a, $h_b, 'ksort must make context key order irrelevant');
     }
 

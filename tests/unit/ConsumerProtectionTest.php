@@ -43,6 +43,7 @@ class ConsumerProtectionTest extends LTMS_Unit_Test_Case {
         $self = $this;
         $this->mock_wpdb = new class($self) {
             public $prefix = 'wp_';
+            public $insert_id = 1;
             private $test;
             public function __construct($test) { $this->test = $test; }
             public function prepare($sql, ...$args) { return $sql; }
