@@ -280,11 +280,18 @@ final class LTMS_Customs_Calculator {
         ];
 
         if ( ! isset( $vat_rates[ $destination ] ) ) {
-            LTMS_Core_Logger::warning(
-                'CUSTOMS_UNKNOWN_COUNTRY',
-                sprintf( 'No VAT rate for %s, using 0', $destination )
-            );
-            return 0.0;
+            // FASE5 P0 FIX: unknown country returned 0.0 VAT → customs underpayment
+            // + revenue leak. Now: use configurable fallback (default 20%) so the
+            // shipment is not under-taxed. Admin can set ltms_customs_vat_fallback
+            // to 0 if they want the old behavior.
+            $fallback = (float) ( class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get( 'ltms_customs_vat_fallback', 20.0 ) : 20.0 );
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'CUSTOMS_UNKNOWN_COUNTRY',
+                    sprintf( 'No VAT rate for %s, using fallback %.1f%%', $destination, $fallback )
+                );
+            }
+            return $fallback;
         }
 
         return (float) $vat_rates[ $destination ];
@@ -344,7 +351,12 @@ final class LTMS_Customs_Calculator {
      */
     private static function maybe_cap_mpf( string $destination, float $fee ): float {
         if ( 'US' === $destination ) {
-            return max( 25.00, min( 614.25, $fee ) );
+            // FASE5 P0 FIX: use configurable MPF caps instead of hard-coded 2024 figures.
+            // CBP updates these annually (2024: min $31.67, max $614.25; 2025: similar).
+            // Admin can override via ltms_customs_us_mpf_min / ltms_customs_us_mpf_max.
+            $min = (float) ( class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get( 'ltms_customs_us_mpf_min', 31.67 ) : 31.67 );
+            $max = (float) ( class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get( 'ltms_customs_us_mpf_max', 614.25 ) : 614.25 );
+            return max( $min, min( $max, $fee ) );
         }
         return $fee;
     }

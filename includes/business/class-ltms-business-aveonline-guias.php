@@ -182,10 +182,10 @@ class LTMS_Business_Aveonline_Guias {
      *              valorrecaudo, contraentrega, idasumecosto
      */
     public static function ajax_cotizar(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code (check_ajax_referer('ltms_admin_nonce')
+        // + current_user_can('edit_posts')) which blocked all vendors — vendors don't
+        // have edit_posts cap and don't have admin nonces. check_vendor_nonce() already
+        // verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         $origen  = sanitize_text_field( $_POST['origen']  ?? '' );  // phpcs:ignore
@@ -203,6 +203,26 @@ class LTMS_Business_Aveonline_Guias {
         $valorrecaudo    = (int)   ( $_POST['valorrecaudo']    ?? 0 );     // phpcs:ignore
         $contraentrega   = (int)   ( $_POST['contraentrega']   ?? 0 );     // phpcs:ignore
         $idasumecosto    = (int)   ( $_POST['idasumecosto']    ?? 0 );     // phpcs:ignore
+
+        // FASE5 P0 FIX: validate numeric inputs — reject NaN/INF/negative/zero dimensions.
+        if ( ! is_finite( $peso ) || $peso <= 0 || $peso > 1000 ) {
+            wp_send_json_error( [ 'message' => __( 'Peso inválido (debe ser 0.1-1000 kg).', 'ltms' ) ] );
+        }
+        foreach ( [ 'alto' => $alto, 'largo' => $largo, 'ancho' => $ancho ] as $dim_name => $dim_val ) {
+            if ( ! is_finite( $dim_val ) || $dim_val <= 0 || $dim_val > 500 ) {
+                wp_send_json_error( [ 'message' => sprintf( __( '%s inválido (debe ser 1-500 cm).', 'ltms' ), $dim_name ) ] );
+            }
+        }
+        if ( ! is_finite( $valor_declarado ) || $valor_declarado < 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Valor declarado inválido.', 'ltms' ) ] );
+        }
+        // FASE5 P0 FIX: valorrecaudo ↔ contraentrega consistency.
+        if ( $contraentrega > 0 && $valorrecaudo <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Contraentrega activa requiere valor de recaudo > 0.', 'ltms' ) ] );
+        }
+        if ( $contraentrega === 0 && $valorrecaudo > 0 ) {
+            $valorrecaudo = 0; // Clear COD amount if carrier won't collect.
+        }
 
         try {
             $api          = self::get_api();
@@ -431,10 +451,7 @@ class LTMS_Business_Aveonline_Guias {
      * Devuelve las guías del vendedor logueado desde la tabla local.
      */
     public static function ajax_mis_guias(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code — check_vendor_nonce() already verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         global $wpdb;
@@ -507,10 +524,7 @@ class LTMS_Business_Aveonline_Guias {
      * POST params: idoperador (int), guias (string separado por comas)
      */
     public static function ajax_reimprimir_guia(): void {
-                // SEC-3 FIX (v2.9.26): CSRF protection.
-                check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
-                // SEC-4 FIX (v2.9.26): capability check.
-                if ( ! current_user_can( 'edit_posts' ) ) { wp_send_json_error( [ 'message' => __( 'Permisos insuficientes.', 'ltms' ) ], 403 ); }
+        // FASE5 P0 FIX: removed dual-nonce dead code — check_vendor_nonce() already verifies ltms_vendor_nonce + is_ltms_vendor().
         self::check_vendor_nonce();
 
         $idoperador = (int) ( $_POST['idoperador'] ?? 0 ); // phpcs:ignore
