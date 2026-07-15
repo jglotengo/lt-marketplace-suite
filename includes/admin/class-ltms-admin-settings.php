@@ -28,6 +28,18 @@ final class LTMS_Admin_Settings {
     use LTMS_Logger_Aware;
 
     /**
+     * FASE3 P0 FIX: Whitelist of LTMS-prefixed option keys that can be saved.
+     * Without this, the settings save loop at L401 calls update_option() for
+     * ANY key in $sanitized — including WordPress core options like admin_email,
+     * siteurl, default_role, active_plugins. A CSRF or compromised admin could
+     * overwrite these and fully compromise the site.
+     */
+    private const ALLOWED_OPTION_PREFIX = 'ltms_';
+    private const ALLOWED_WC_OPTION_KEYS = [
+        'woocommerce_ltms_openpay_settings',
+    ];
+
+    /**
      * Registra los hooks para la gestión de configuración.
      *
      * @return void
@@ -398,6 +410,19 @@ final class LTMS_Admin_Settings {
             $ltms_settings = [];
         }
         foreach ( $sanitized as $key => $value ) {
+            // FASE3 P0 FIX: only save LTMS-prefixed options. Reject any key
+            // that doesn't start with 'ltms_' to prevent overwriting WordPress
+            // core options (admin_email, siteurl, default_role, active_plugins).
+            if ( ! str_starts_with( $key, self::ALLOWED_OPTION_PREFIX ) ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::security(
+                        'SETTINGS_OPTION_KEY_REJECTED',
+                        sprintf( 'Rejected attempt to save non-LTMS option key: %s', $key ),
+                        [ 'key' => $key ]
+                    );
+                }
+                continue;
+            }
             update_option( $key, $value );
             $ltms_settings[ $key ] = $value; // espejo en ltms_settings
         }

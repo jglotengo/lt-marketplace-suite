@@ -126,6 +126,17 @@ final class LTMS_Admin_Payouts {
             wp_send_json_error( __( 'Este KYC ya está aprobado.', 'ltms' ) );
         }
 
+        // FASE3 P0 FIX: block invalid state transitions. Previously, a rejected
+        // or expired KYC could be flipped back to approved without re-submission
+        // of documents — bypassing the entire compliance review. Now: only
+        // 'pending' KYCs can be approved.
+        if ( ! in_array( $kyc['status'] ?? '', [ 'pending', 'submitted' ], true ) ) {
+            wp_send_json_error( sprintf(
+                __( 'No se puede aprobar un KYC en estado "%s". El vendedor debe reenviar documentos.', 'ltms' ),
+                $kyc['status'] ?? 'desconocido'
+            ) );
+        }
+
         // RB-9 FIX (v2.9.19): Disparar filter ltms_kyc_pre_approve para que
         // los listeners (FT-2 screen_against_sanctions_lists, RT-2 validate_sanitary_registration)
         // puedan BLOQUEAR la aprobación si el vendor está en listas restrictivas o
