@@ -44,6 +44,10 @@ class CurrencyManagerTest extends LTMS_Unit_Test_Case {
             return $self->user_meta[$uid][$key] ?? false;
         });
 
+        // Mock WC() to return an object with null session — so get_display_currency()
+        // skips the session check and falls through to geo/base.
+        Functions\when('WC')->justReturn((object)['session' => null]);
+
         // Mock LTMS_FX_Rate_Provider statics.
         // The class is real in UNIT_ONLY mode; we can't override its methods.
         // Tests that depend on FX will use convert_to_settlement with $rate parameter.

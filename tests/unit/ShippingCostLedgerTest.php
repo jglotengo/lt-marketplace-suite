@@ -70,7 +70,7 @@ class ShippingCostLedgerTest extends LTMS_Unit_Test_Case {
             'wp_mail'             => true,
             'get_post_meta'       => static fn($id, $key, $single) => false,
             'get_option'          => static fn($k, $d = false) => $d,
-            'get_current_user_id' => static fn() => 1,
+            // get_current_user_id is defined in bootstrap.php — can't re-stub.
             '__'                  => static fn($s) => $s,
             'esc_url_raw'         => static fn($s) => $s,
             'esc_html'            => static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'),

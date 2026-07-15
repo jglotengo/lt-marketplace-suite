@@ -79,7 +79,7 @@ class DepositTest extends LTMS_Unit_Test_Case {
 
         Functions\stubs([
             'sanitize_text_field'       => static fn($s) => trim(strip_tags((string)$s)),
-            'sanitize_textarea_field'   => static fn($s) => trim(strip_tags((string)$s)),
+            // sanitize_textarea_field is defined in bootstrap.php — can't re-stub.
             'esc_url_raw'               => static fn($s) => $s,
             'attachment_url_to_postid'  => static fn($url) => 0,
             'wp_mail'                   => true,

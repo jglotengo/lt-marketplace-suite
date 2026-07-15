@@ -71,7 +71,9 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
             'update_user_meta' => true,
             'delete_user_meta' => true,
             'wp_upload_dir'  => static fn() => ['basedir' => sys_get_temp_dir(), 'baseurl' => 'http://example.com'],
-            'wp_mkdir_p'     => true,
+            // wp_mkdir_p is defined in bootstrap.php — can't re-stub.
+            // get_current_user_id is defined in bootstrap.php — can't re-stub.
+            // sanitize_textarea_field is defined in bootstrap.php — can't re-stub.
             'file_exists'    => static fn($p) => false,
             'file_put_contents' => static fn($p, $c) => strlen($c),
             'fopen'          => static fn($p, $m) => false,

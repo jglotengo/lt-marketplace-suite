@@ -246,8 +246,10 @@ class ForensicLogTest extends LTMS_Unit_Test_Case {
         $self = $this;
         $this->mock_wpdb = new class($self) {
             public $prefix = 'wp_';
-            public function query($sql) { $self->queries[] = $sql; return true; }
-            public function get_var($sql) { $self->queries[] = $sql; return null; }
+            private $test;
+            public function __construct($test) { $this->test = $test; }
+            public function query($sql) { $this->test->queries[] = $sql; return true; }
+            public function get_var($sql) { $this->test->queries[] = $sql; return null; }
             public function get_results($sql, $o = OBJECT) { return []; }
             public function get_col($sql) { return ['id','action','user_id','ip','created_at','user_agent','request_uri','context','entry_hash']; }
             public function insert($t, $d, $f = null) { return false; }
