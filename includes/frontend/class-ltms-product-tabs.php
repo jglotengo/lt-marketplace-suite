@@ -70,51 +70,65 @@ class LTMS_Product_Tabs {
         $description = get_user_meta( $vendor_id, 'description', true ) ?: '';
         $store_logo = get_user_meta( $vendor_id, 'ltms_store_logo', true ) ?: '';
         ?>
-        <div class="ltms-vendor-tab" style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div class="ltms-vendor-tab">
             <!-- Columna izquierda: info del vendor -->
-            <div style="flex:1;min-width:200px;">
+            <div>
                 <?php if ( $store_logo ) : ?>
                     <img src="<?php echo esc_url( $store_logo ); ?>" alt="<?php echo esc_attr( $vendor->display_name ); ?>"
-                         style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:12px;border:2px solid #e5e7eb;">
+                         class="ltms-vendor-avatar"
+                         style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
                 <?php else : ?>
-                    <div style="width:80px;height:80px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:12px;">
+                    <div class="ltms-vendor-avatar">
                         &#x1F3EA;
                     </div>
                 <?php endif; ?>
 
-                <h3 style="margin:0 0 4px;font-size:18px;">
+                <h3>
                     <?php echo esc_html( $vendor->display_name ); ?>
                     <?php if ( $kyc_approved ) : ?>
                         <span style="color:#16a34a;font-size:14px;" title="<?php esc_attr_e( 'Vendedor verificado', 'ltms' ); ?>">&#x2705;</span>
                     <?php endif; ?>
                 </h3>
 
-                <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
+                <div class="ltms-vendor-meta">
                     <?php echo esc_html( sprintf( __( 'Vendedor desde %s', 'ltms' ), $vendor_since ) ); ?>
                 </div>
 
-                <div style="display:flex;gap:12px;margin-bottom:12px;font-size:13px;">
+                <div class="ltms-vendor-stats">
                     <div>
                         <strong><?php echo esc_html( number_format( $sales_count ) ); ?></strong>
-                        <span style="color:#6b7280;"><?php esc_html_e( 'ventas', 'ltms' ); ?></span>
+                        <span><?php esc_html_e( 'ventas', 'ltms' ); ?></span>
                     </div>
                     <div>
-                        <strong>&#x2B50; <?php echo esc_html( number_format( $rating, 1 ) ); ?></strong>
-                        <span style="color:#6b7280;"><?php esc_html_e( 'rating', 'ltms' ); ?></span>
+                        <strong><?php echo esc_html( number_format( $rating, 1 ) ); ?></strong>
+                        <span><?php esc_html_e( 'rating', 'ltms' ); ?></span>
                     </div>
                 </div>
 
+                <?php if ( $rating > 0 ) : ?>
+                    <div class="ltms-vendor-rating-stars" aria-label="<?php echo esc_attr( sprintf( __( 'Calificación: %s de 5', 'ltms' ), number_format( $rating, 1 ) ) ); ?>">
+                        <?php
+                        $full_stars  = (int) floor( $rating );
+                        $has_half    = ( $rating - $full_stars ) >= 0.25 && ( $rating - $full_stars ) < 0.75;
+                        $empty_stars = 5 - $full_stars - ( $has_half ? 1 : 0 );
+                        for ( $i = 0; $i < $full_stars; $i++ ) echo '★';
+                        if ( $has_half ) echo '⯨';
+                        for ( $i = 0; $i < $empty_stars; $i++ ) echo '☆';
+                        ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ( $store_url ) : ?>
-                    <a href="<?php echo esc_url( $store_url ); ?>" class="button" style="font-size:12px;">
+                    <a href="<?php echo esc_url( $store_url ); ?>" class="button">
                         <?php esc_html_e( 'Ver tienda del vendedor →', 'ltms' ); ?>
                     </a>
                 <?php endif; ?>
             </div>
 
             <!-- Columna derecha: descripción -->
-            <div style="flex:2;min-width:250px;">
+            <div>
                 <?php if ( $description ) : ?>
-                    <p style="font-size:13px;color:#4b5563;line-height:1.6;"><?php echo esc_html( $description ); ?></p>
+                    <p class="ltms-vendor-description"><?php echo esc_html( $description ); ?></p>
                 <?php else : ?>
                     <p style="font-size:13px;color:#9ca3af;font-style:italic;">
                         <?php esc_html_e( 'El vendedor aún no ha agregado una descripción.', 'ltms' ); ?>
