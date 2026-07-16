@@ -444,6 +444,143 @@ final class LTMS_Core_Kernel {
             ] );
         } );
 
+        // v2.9.182 — Inline critical CSS for add-to-cart button.
+        // Injected via wp_head with priority 999 (after Elementor's styles)
+        // to guarantee our button styling wins the cascade war against
+        // Elementor's aggressive .button !important rules.
+        add_action( 'wp_head', function() {
+            if ( ! is_product() ) return;
+            ?>
+            <style id="ltms-critical-product-css">
+            /* Force button dimensions — override Elementor theme */
+            .single_add_to_cart_button,
+            .single_add_to_cart_button.button,
+            .single_add_to_cart_button.button.alt,
+            .elementor-add-to-cart .single_add_to_cart_button,
+            .elementor-widget-woocommerce-product-add-to-cart .single_add_to_cart_button,
+            .elementor-product-simple .single_add_to_cart_button,
+            form.cart .single_add_to_cart_button,
+            .cart .single_add_to_cart_button {
+                background-color: #E80001 !important;
+                color: #fff !important;
+                border: none !important;
+                border-radius: 10px !important;
+                font-weight: 700 !important;
+                font-size: 15px !important;
+                padding: 0 32px !important;
+                height: 48px !important;
+                min-height: 48px !important;
+                max-height: 48px !important;
+                line-height: 48px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                vertical-align: middle !important;
+                float: none !important;
+                margin: 0 !important;
+                text-transform: none !important;
+                text-shadow: none !important;
+                background-image: none !important;
+                box-shadow: 0 2px 6px rgba(232,0,1,0.25) !important;
+                transition: all 0.25s ease !important;
+                cursor: pointer !important;
+                -webkit-appearance: none !important;
+                box-sizing: border-box !important;
+            }
+            .single_add_to_cart_button:hover,
+            .single_add_to_cart_button.button:hover,
+            .single_add_to_cart_button.button.alt:hover {
+                background-color: #B80001 !important;
+                color: #fff !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 4px 14px rgba(232,0,1,0.35) !important;
+            }
+            /* Quantity input — same height as button */
+            .quantity,
+            .elementor-add-to-cart .quantity,
+            form.cart .quantity {
+                display: inline-flex !important;
+                align-items: center !important;
+                border: 2px solid #e5e7eb !important;
+                border-radius: 10px !important;
+                overflow: hidden !important;
+                height: 48px !important;
+                min-height: 48px !important;
+                max-height: 48px !important;
+                margin: 0 !important;
+                flex-shrink: 0 !important;
+                background: #fff !important;
+                box-sizing: border-box !important;
+            }
+            .quantity:hover,
+            .elementor-add-to-cart .quantity:hover {
+                border-color: #E80001 !important;
+            }
+            .quantity input[type="number"],
+            .quantity .input-text,
+            .elementor-add-to-cart .quantity input[type="number"],
+            form.cart .quantity input[type="number"] {
+                border: none !important;
+                text-align: center !important;
+                width: 56px !important;
+                height: 44px !important;
+                padding: 0 4px !important;
+                font-size: 16px !important;
+                font-weight: 600 !important;
+                background: transparent !important;
+                -moz-appearance: textfield !important;
+                -webkit-appearance: none !important;
+                box-shadow: none !important;
+                outline: none !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+            }
+            .quantity input[type="number"]::-webkit-outer-spin-button,
+            .quantity input[type="number"]::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+            /* Cart form layout */
+            form.cart,
+            .elementor-add-to-cart .cart,
+            .elementor-widget-woocommerce-product-add-to-cart .cart,
+            .elementor-product-simple .cart {
+                display: flex !important;
+                align-items: center !important;
+                gap: 12px !important;
+                flex-wrap: wrap !important;
+                margin-top: 16px !important;
+            }
+            /* Mobile: button full width, quantity beside it */
+            @media (max-width: 768px) {
+                .single_add_to_cart_button,
+                .single_add_to_cart_button.button,
+                .single_add_to_cart_button.button.alt {
+                    flex: 1 1 auto !important;
+                    padding: 0 20px !important;
+                    height: 52px !important;
+                    min-height: 52px !important;
+                    max-height: 52px !important;
+                    line-height: 52px !important;
+                    font-size: 16px !important;
+                }
+                .quantity,
+                .elementor-add-to-cart .quantity {
+                    height: 52px !important;
+                    min-height: 52px !important;
+                    max-height: 52px !important;
+                    flex: 0 0 80px !important;
+                }
+                .quantity input[type="number"],
+                .quantity .input-text {
+                    height: 48px !important;
+                    font-size: 18px !important;
+                }
+            }
+            </style>
+            <?php
+        }, 999 );
+
         // v1.6.0 — Módulos Enterprise
         if ( class_exists( 'LTMS_Media_Guard' ) ) {
             LTMS_Media_Guard::init();
