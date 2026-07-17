@@ -540,23 +540,36 @@ final class LTMS_Core_Kernel {
                 -webkit-appearance: none !important;
                 margin: 0 !important;
             }
-            /* Cart form layout */
+            /* Cart form layout — CRITICAL FIX: use display:block NOT flex.
+               form.cart contains gift-options, mini-badges, addon-items
+               that should NOT be in a flex row with the button.
+               The 938px button bug was caused by flex stretch. */
             form.cart,
             .elementor-add-to-cart .cart,
             .elementor-widget-woocommerce-product-add-to-cart .cart,
             .elementor-product-simple .cart {
-                display: flex !important;
-                align-items: center !important;
-                gap: 12px !important;
-                flex-wrap: wrap !important;
+                display: block !important;
                 margin-top: 16px !important;
+            }
+            /* Button + quantity: inline row */
+            form.cart .quantity,
+            .elementor-add-to-cart .quantity {
+                display: inline-flex !important;
+                align-items: center !important;
+                vertical-align: middle !important;
+                margin-right: 12px !important;
+            }
+            form.cart .single_add_to_cart_button,
+            .elementor-add-to-cart .single_add_to_cart_button {
+                display: inline-flex !important;
+                vertical-align: middle !important;
             }
             /* Mobile: button full width, quantity beside it */
             @media (max-width: 768px) {
                 .single_add_to_cart_button,
                 .single_add_to_cart_button.button,
                 .single_add_to_cart_button.button.alt {
-                    flex: 1 1 auto !important;
+                    width: calc(100% - 92px) !important;
                     padding: 0 20px !important;
                     height: 52px !important;
                     min-height: 52px !important;
@@ -569,7 +582,7 @@ final class LTMS_Core_Kernel {
                     height: 52px !important;
                     min-height: 52px !important;
                     max-height: 52px !important;
-                    flex: 0 0 80px !important;
+                    width: 80px !important;
                 }
                 .quantity input[type="number"],
                 .quantity .input-text {
