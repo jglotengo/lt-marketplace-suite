@@ -266,6 +266,13 @@ class LTMS_Native_Templates {
     }
 
     /**
+     * Devuelve el directorio de templates (para debug).
+     */
+    public static function get_template_dir(): string {
+        return self::$template_dir;
+    }
+
+    /**
      * Detecta si es la página de tracking de orden.
      */
     private static function is_order_tracking_page(): bool {
