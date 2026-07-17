@@ -611,6 +611,24 @@ $files = [
     'patchwork.json',
     // DIAG temp
     'deploy/ltms-panel-diag.php',
+    // v2.9.183 — Plaza Viva design system + native templates
+    'assets/css/ltms-plaza-viva.css',
+    'assets/css/ltms-plaza-viva.min.css',
+    'assets/js/ltms-plaza-viva.js',
+    'assets/js/ltms-plaza-viva.min.js',
+    'includes/frontend/class-ltms-native-templates.php',
+    'includes/frontend/templates/single-product.php',
+    'includes/frontend/templates/home.php',
+    'includes/frontend/templates/archive-product.php',
+    'includes/frontend/templates/cart.php',
+    'includes/frontend/templates/checkout.php',
+    'includes/frontend/templates/order-tracking.php',
+    'includes/frontend/templates/vendor-store.php',
+    'includes/frontend/templates/help-center.php',
+    'includes/frontend/templates/wc-parts/content-product.php',
+    // v2.9.184 — CSS fix for button height
+    'assets/css/ltms-product-enhancements.css',
+    'assets/css/ltms-product-enhancements.min.css',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
