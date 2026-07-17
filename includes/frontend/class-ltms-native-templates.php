@@ -40,13 +40,9 @@ class LTMS_Native_Templates {
      * Inicializa el sistema de templates nativos.
      */
     public static function init(): void {
-        // Guard: LTMS_PATH puede no estar definida en contextos de testing
-        // o si el plugin se carga parcialmente.
-        if ( ! defined( 'LTMS_PATH' ) ) {
-            return;
-        }
-
-        self::$template_dir = LTMS_PATH . 'includes/frontend/templates/';
+        // Resolver la ruta del plugin de forma compatible (LTMS_PATH o LTMS_PLUGIN_DIR).
+        $plugin_dir = defined( 'LTMS_PATH' ) ? LTMS_PATH : ( defined( 'LTMS_PLUGIN_DIR' ) ? LTMS_PLUGIN_DIR : dirname( __DIR__, 3 ) . '/' );
+        self::$template_dir = $plugin_dir . 'includes/frontend/templates/';
 
         // Solo activar en frontend.
         if ( is_admin() ) {

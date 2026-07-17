@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.185
+ * Version:           2.9.186
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -35,7 +35,7 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.185' );
+define( 'LTMS_VERSION', '2.9.186' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -623,7 +623,7 @@ function ltms_load_autoloader(): void {
                 'ltms-api-posgold'                       => 'api/class-ltms-api-posgold.php',
                 'ltms-posgold-sync'                      => 'business/class-ltms-posgold-sync.php',
                 'ltms-posgold-price-calculator'          => 'business/class-ltms-posgold-price-calculator.php',
-                // v2.9.185 — Native Templates (Plaza Viva design system).
+                // v2.9.186 — Native Templates (Plaza Viva design system).
                 'ltms-native-templates'                  => 'frontend/class-ltms-native-templates.php',
             ];
 
@@ -857,7 +857,7 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
         }
     }
 
-    // v2.9.185 — Inicializar Native Templates (Plaza Viva design system).
+    // v2.9.186 — Inicializar Native Templates (Plaza Viva design system).
     // Debe ir después del Kernel boot para que WC esté cargado.
     // Fallback: require_once directo si el autoloader no encuentra la clase.
     if ( ! class_exists( 'LTMS_Native_Templates' ) ) {
