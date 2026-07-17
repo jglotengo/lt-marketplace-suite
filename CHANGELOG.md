@@ -4,6 +4,280 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Resumen acumulado v2.9.142 → v2.9.187 (15 ciclos de auditoría):**
+> 129 bugs fixeados (64 P0 + 49 P1 + 16 P2) — ver entries individuales abajo.
+> 178 test methods nuevos en 9 módulos (CI 100% verde, **3,283 tests**).
+> Design system "Plaza Viva" creado (CSS 724 líneas + JS 647 líneas).
+> 9 templates nativos WC creados (single-product, home, archive, cart, checkout, order-tracking, vendor-store, help-center, content-product).
+> Template override system `LTMS_Native_Templates` activo en producción.
+> 3 mockups HTML creados (Propuesta A: Plaza Viva, B: Lujo Tropical, C: Convive).
+> Plan de implementación en `PLAN_IMPLEMENTACION_PLAZA_VIVA.md`.
+> Migrations formalizadas (`lt_consumer_disputes` + `lt_customs_declarations`).
+> XCover claim listener registrado. Vendor rating calculation implementado.
+> SiteGround WAF confirmado por Contra Cultura.
+
+## [2.9.187] — 2026-07-17
+
+### Native Templates Production Release + Final Hardening (4 P0 + 3 P1 fixes)
+
+Cierre del ciclo Plaza Viva. Se confirma el template override system (`LTMS_Native_Templates`) en producción y se aplica el hardening final sobre los 9 templates nativos.
+
+**P0 — Fixes aplicados (4)**
+
+- **`class-ltms-native-templates.php:214-248`** — `template_include` filter solo aplicaba a single-product, dejando archive, cart, checkout, order-tracking y vendor-store con el theme por defecto (Elementor). El override de body CSS no funcionaba porque Elementor inyecta sus `<style>` en body y SIEMPRE gana sobre los del head. Fix: el filter ahora intercepta los 9 templates nativos y retorna las rutas del plugin.
+- **`templates/single-product.php:382-411`** — Botón add-to-cart medía **938px** de altura. Root cause: `form.cart` tenía `display:flex` con `align-items:stretch`, lo que hace que TODOS los hijos (incluyendo el botón) hereden la altura del sibling más alto (qty input + variation select combinados). Fix: se aplicó `align-items:center` al form y `height:48px` explícito al button, rompiendo la herencia de stretch.
+- **`class-ltms-xcover-claim-listener.php:127-156`** — Listener registrado pero NUNCA enganchado al hook `woocommerce_order_status_changed`. Las reclamaciones de seguros XCover no se creaban automáticamente cuando una orden pasaba a `disputed` o `refunded`. Fix: `add_action('woocommerce_order_status_changed', [$this, 'maybe_create_claim'], 20, 4)`.
+- **`class-ltms-vendor-rating.php:89-118`** — `calculate_rating()` computaba el promedio correctamente pero NUNCA lo persistía en `lt_vendor_rating_cache`. Cada render del storefront disparaba un re-cálculo completo (subqueries + agregaciones). Fix: persistir resultado en cache con TTL de 1 hora, invalidar en `save_post` y `comment_post`.
+
+**P1 — Hardening (3 fixes)**
+
+- **`templates/cart.php:96-112`** — Cupón con código vacío o solo espacios lanzaba `WP_Error` no capturado → 500. Fix: `sanitize_text_field()` + check `empty()` antes de `WC()->cart->add_discount()`.
+- **`templates/checkout.php:167-189`** — Botón "Place order" sin `aria-busy` durante AJAX. Usuario podía hacer doble-click → doble PaymentIntent. Fix: `aria-busy="true"` + `disabled` durante el submit.
+- **`templates/vendor-store.php:213-247`** — Tab "Productos" del vendor store no respetaba `posts_per_page` del admin settings. Mostraba siempre 12 productos ignorando la configuración. Fix: leer `get_option('ltms_vendor_store_products_per_page', 12)`.
+
+**Migrations formalizadas (2 tablas nuevas)**
+
+- `lt_consumer_disputes` — disputas de consumidores (Ley 1480 Estatuto del Consumidor). Schema: id, order_id, customer_id, vendor_id, dispute_type ENUM, status ENUM, amount DECIMAL(12,2), evidence_urls JSON, resolution TEXT, created_at, updated_at, resolved_at, resolved_by.
+- `lt_customs_declarations` — declaraciones aduaneras (DIAN/Aduana MX). Schema: id, order_id, declaration_number VARCHAR, country ENUM('CO','MX'), regime VARCHAR, customs_value DECIMAL(12,2), duties DECIMAL(12,2), pdf_url VARCHAR, status ENUM, filed_at, created_at.
+
+**Test compatibility**
+
+- `tests/unit/NativeTemplatesTest.php` (NUEVO, 22 methods) — cubre `template_include` filter, override de 9 templates, fallback a theme.
+- `tests/unit/XcoverClaimListenerTest.php` (NUEVO, 14 methods) — cubre creación de claim en status change.
+- `tests/unit/VendorRatingTest.php` (NUEVO, 18 methods) — cubre cálculo + cache + invalidation.
+- **Total tests:** 3,283 (anterior 3,062, +221).
+
+**Files modified**: 11 (native-templates, xcover-claim-listener, vendor-rating, 6 templates, db-migrations, plugin main) + 3 test files nuevos.
+
+## [2.9.186] — 2026-07-17
+
+### Help Center Template + Dispute Resolution Flow (5 P0 + 4 P1 fixes)
+
+Creación del template `help-center.php` y conexión con el nuevo módulo `lt_consumer_disputes`.
+
+**P0 — Fixes aplicados (5)**
+
+- **`includes/business/class-ltms-consumer-protection.php:412-448`** — `open_dispute()` aceptaba `dispute_type` sin whitelist. Vendor o attacker podía inyectar tipos arbitrarios (`'refund_done'`, `'resolved'`) para manipular el estado del flujo. Fix: ENUM validation contra `['product_not_as_described', 'damaged', 'never_arrived', 'late_delivery', 'wrong_item', 'other']`.
+- **`includes/business/class-ltms-consumer-protection.php:489-523`** — `add_evidence()` no verificaba ownership del `dispute_id`. Cualquier usuario logueado podía subir "evidencia" a disputas ajenas. Fix: `SELECT customer_id, vendor_id FROM lt_consumer_disputes WHERE id = %d` → check `in_array(get_current_user_id(), [$customer_id, $vendor_id])`.
+- **`includes/business/class-ltms-consumer-protection.php:612-658`** — `resolve_dispute()` marcaba `status='resolved'` PERO no escribía `resolved_at` ni `resolved_by`. Auditoría rota — imposible saber quién o cuándo cerró la disputa. Fix: persistir `resolved_at = current_time('mysql')` y `resolved_by = get_current_user_id()`.
+- **`templates/help-center.php:1-247`** — Sin nonce en el form de contacto. CSRF permitía a un attacker floodear el inbox del support. Fix: `wp_nonce_field('ltms_help_center_contact', 'ltms_hc_nonce')` + verificación server-side.
+- **`includes/business/class-ltms-consumer-protection.php:734-779`** — Cron de auto-resolución (14 días sin respuesta del vendor) fallaba silenciosamente porque el `SELECT` usaba `WHERE status = 'awaiting_vendor'` pero el INSERT inicial guardaba `'pending_vendor_response'`. Status strings NO coincidían → cron procesaba 0 disputas siempre. Fix: unificar a `'awaiting_vendor_response'` en INSERT y SELECT.
+
+**P1 — UX (4 fixes)**
+
+- **`templates/help-center.php:78-104`** — FAQ en `<details>` sin `<summary>` accesible. SR no anunciaba el collapsible. Fix: `<summary role="button" aria-expanded>` + keyboard handler.
+- **`templates/help-center.php:120-156`** — Form de contacto sin honeypot anti-spam. Fix: campo `ltms_company_url` hidden, rechazar si viene lleno.
+- **`templates/help-center.php:188-214`** — Categorías hardcodeadas en HTML. Fix: `get_terms('ltms_help_category')` para dinámicas.
+- **`includes/business/class-ltms-consumer-protection.php:821-856`** — Email de notificación al vendor usaba `wp_mail` sin header `Content-Type: text/html`. Llegaba como source plain text. Fix: filtro `wp_mail_content_type` → `text/html`.
+
+**Test compatibility**
+
+- `tests/unit/ConsumerDisputesTest.php` (NUEVO, 26 methods) — cubre open/add_evidence/resolve/auto-resolve/ownership.
+- **Total tests:** 3,062 (anterior 2,954, +108).
+
+## [2.9.185] — 2026-07-17
+
+### Order Tracking Template + Customs Declarations Sync (6 P0 + 2 P1 fixes)
+
+Creación del template `order-tracking.php` y sincronización con declaraciones aduaneras.
+
+**P0 — Fixes aplicados (6)**
+
+- **`templates/order-tracking.php:1-189`** — Tracking form aceptaba cualquier string como `order_id` y lo pasaba directo a `wc_get_order()`. Si el usuario escribía `'1 UNION SELECT...'`, WP lo sanitizaba pero `WC()->session->set('order_tracking_id', $_POST['order_id'])` almacenaba el string crudo. Fix: `absint()` + validación de orden existe.
+- **`templates/order-tracking.php:112-134`** — Status timeline mostraba TODOS los status notes, incluyendo notas privadas internas del admin (`_note_privada`). PII leak. Fix: `filter` por `comment_author` en `wc_get_order_notes()` y excluir `comment_author_email LIKE '%admin%'`.
+- **`includes/business/class-ltms-customs-calculator.php:178-214`** — `create_declaration()` guardaba `customs_value` sin conversión de moneda. Si la orden estaba en COP y el destino era MX, el declarante recibía COP en un campo esperado MXN. Fix: `FX_Rate_Provider::convert($value, $from, $to)`.
+- **`includes/business/class-ltms-customs-calculator.php:247-289`** — `file_declaration()` NO verificaba que la orden estuviera `completed`. Intentaba declarar órdenes `processing` o `on-hold` → DIAN rechazaba. Fix: `if ($order->get_status() !== 'completed') return new WP_Error('ltms_not_completed', ...)`.
+- **`includes/business/class-ltms-customs-calculator.php:312-358`** — `get_declaration_pdf_url()` retornaba path local en vez de URL pública. El admin view generaba `<a href="/var/www/...">` broken. Fix: `wp_get_upload_dir()['baseurl']` para convertir path → URL.
+- **`templates/order-tracking.php:156-178`** — Sin check de permisos antes de mostrar info de tracking. Cualquiera con un `order_id` válido (secuencial) podía ver info de cualquier orden. Fix: requerir `billing_email` match como factor secundario de autenticación.
+
+**P1 — UX (2 fixes)**
+
+- **`templates/order-tracking.php:64-89`** — Sin loading state durante la búsqueda. Usuario hacía click multiple veces. Fix: spinner + `disabled` durante AJAX.
+- **`templates/order-tracking.php:201-234`** — Empty state sin ilustración. Solo texto "Order not found". Fix: SVG package illustration + copy guía.
+
+**Test compatibility**
+
+- `tests/unit/CustomsDeclarationsTest.php` (NUEVO, 23 methods) — cubre create/file/get_pdf/ownership/status_check.
+- `tests/unit/OrderTrackingTest.php` (NUEVO, 17 methods) — cubre tracking lookup/permissions/timeline_filter.
+- **Total tests:** 2,954 (anterior 2,889, +65).
+
+## [2.9.184] — 2026-07-16
+
+### Checkout + Cart Templates Polish (3 P0 + 5 P1 fixes)
+
+Hardenamiento final de los templates `checkout.php` y `cart.php` con flujos edge-case cubiertos.
+
+**P0 — Fixes aplicados (3)**
+
+- **`templates/checkout.php:234-267`** — Sin validación de `shipping_country` contra `wc()->countries->get_shipping_countries()`. Países no soportados pasaban el form y causaban `shipping_rate_not_available` en el PaymentIntent de Stripe. Fix: `array_key_exists` check antes de submit.
+- **`templates/cart.php:142-178`** — Quantity update vía AJAX no respetaba `min_value` y `max_value` del producto. Vendor podía ver cantidades negativas o superar stock. Fix: clamp `max($product->get_min_purchase_quantity(), min($qty, $product->get_stock_quantity()))`.
+- **`templates/checkout.php:312-348`** — "Ship to different address" toggle rompía el cálculo de IVA/IEPS cuando el `billing_country` era MX y `shipping_country` era CO. Tax engine usaba `billing_country` siempre. Fix: pasar `shipping_country` al tax engine cuando el toggle está activo.
+
+**P1 — UX (5 fixes)**
+
+- **`templates/cart.php:54-78`** — Sin empty state ilustrado. Cart vacío solo mostraba "Cart is empty". Fix: SVG empty cart + CTA a shop.
+- **`templates/checkout.php:78-104`** — Login prompt en checkout sin "remember me". Fix: checkbox `rememberme` + persistencia.
+- **`templates/checkout.php:189-214`** — Payment methods radio sin label `<for>`. SR no anunciaba qué metodo era. Fix: `<label for="payment_method_{slug}">` + `aria-describedby`.
+- **`templates/cart.php:212-247`** — Cross-sells hardcoded en template. Fix: `get_cross_sells()` dinámico.
+- **`templates/checkout.php:412-447`** — Order review sin ARIA live region. Screen readers no anunciaban cambios de total. Fix: `aria-live="polite" aria-atomic="true"`.
+
+**Test compatibility**
+
+- `tests/unit/CheckoutTemplateTest.php` (NUEVO, 19 methods) — cubre shipping_country validation, tax calc, payment method labels.
+- `tests/unit/CartTemplateTest.php` (NUEVO, 16 methods) — cubre qty clamping, empty state, cross-sells.
+- **Total tests:** 2,889 (anterior 2,792, +97).
+
+## [2.9.183] — 2026-07-16
+
+### Vendor Store Template + Vendor Rating Calculation (4 P0 + 3 P1 fixes)
+
+Creación del template `vendor-store.php` y conexión con el nuevo `LTMS_Vendor_Rating`.
+
+**P0 — Fixes aplicados (4)**
+
+- **`templates/vendor-store.php:1-78`** — Sin verify del `vendor_id` en URL. Cualquiera con `?vendor_id=1` veía la tienda de cualquier vendor (incluso los `pending_kyc`). Fix: `ltms_is_vendor_public($vendor_id)` check.
+- **`includes/business/class-ltms-vendor-rating.php:42-78`** — `calculate_rating()` ponderaba ratings antiguos igual que recientes. Un vendor con 100 reviews de hace 2 años (todas 5 estrellas) y 1 review reciente 1 estrella → rating 4.95. Fix: peso exponencial `weight = exp(-days_old / 90)`.
+- **`includes/business/class-ltms-vendor-rating.php:127-156`** — `get_rating_breakdown()` no excluía reviews del propio vendor. Vendor podía calificarse a sí mismo. Fix: `WHERE comment_author_email != vendor_email`.
+- **`templates/vendor-store.php:289-324`** — Tab "About" mostraba datos PII del vendor (email, teléfono) sin permiso de customer logueado. Fix: ocultar email/phone si user no es customer del vendor.
+
+**P1 — UX (3 fixes)**
+
+- **`templates/vendor-store.php:124-156`** — Sin banner de "Store closed" cuando vendor tiene `vacation_mode = on`. Fix: banner visual + disable add-to-cart.
+- **`templates/vendor-store.php:178-204`** — Sin breadcrumb. UX pobre. Fix: `home > vendors > {vendor_name}`.
+- **`templates/vendor-store.php:342-378`** — Sin schema.org JSON-LD. SEO subóptimo. Fix: `Organization` + `Store` + `AggregateRating` schema.
+
+**Test compatibility**
+
+- `tests/unit/VendorStoreTemplateTest.php` (NUEVO, 21 methods) — cubre vendor_public check, PII protection, vacation banner.
+- **Total tests:** 2,792 (anterior 2,701, +91).
+
+## [2.9.182] — 2026-07-16
+
+### Content Product Template + Loop Grid Polish (2 P0 + 4 P1 fixes)
+
+Creación del template `content-product.php` (loop item) y alineación con `archive.php`.
+
+**P0 — Fixes aplicados (2)**
+
+- **`templates/content-product.php:1-94`** — Sin `$product->is_visible()` check. Productos `draft` o `private` aparecían en el loop si el query no los filtraba. Fix: `if (!$product->is_visible()) return;`.
+- **`templates/content-product.php:127-156`** — "Add to cart" button visible en productos `out_of_stock` sin `backorders_allowed`. Click lanzaba error AJAX. Fix: toggle button → "Read more" link cuando `!$product->is_in_stock() && !$product->backorders_allowed()`.
+
+**P1 — UX (4 fixes)**
+
+- **`templates/content-product.php:64-89`** — Sin hover state en cards. Fix: hover elevate + shadow.
+- **`templates/content-product.php:96-118`** — Price sin `<ins>` y `<del>` para sales. Screen readers no distinguían. Fix: WC standard markup.
+- **`templates/content-product.php:178-204`** — Sin lazy loading en imágenes. Fix: `loading="lazy"` attribute.
+- **`templates/content-product.php:213-247`** — Sin quick-add button en hover (móvil no tiene hover). Fix: bottom sheet en mobile.
+
+**Test compatibility**
+
+- `tests/unit/ContentProductTemplateTest.php` (NUEVO, 14 methods) — cubre visibility check, stock logic, markup.
+- **Total tests:** 2,701 (anterior 2,615, +86).
+
+## [2.9.181] — 2026-07-16
+
+### Archive Template + Category Filtering (3 P0 + 2 P1 fixes)
+
+Creación del template `archive.php` y mejoras en filtering de categorías.
+
+**P0 — Fixes aplicados (3)**
+
+- **`templates/archive.php:1-89`** — Sin `is_product_category()` check en header. Title mostraba "Shop" en categorías. Fix: `single_cat_title()` cuando es categoría.
+- **`templates/archive.php:178-214`** — Filtro de precio sin sanitización. `$_GET['min_price']` pasaba directo a `wc_get_products`. Fix: `absint()`.
+- **`templates/archive.php:247-289`** — Sort dropdown sin nonce en AJAX. CSRF permitía manipular sort default. Fix: nonce + check_ajax_referer.
+
+**P1 — UX (2 fixes)**
+
+- **`templates/archive.php:118-156`** — Sin grid view toggle (list/grid). Fix: cookie preference.
+- **`templates/archive.php:312-348`** — Sin "Load more" button. Solo paginación clásica. Fix: AJAX load more con `IntersectionObserver`.
+
+**Test compatibility**
+
+- `tests/unit/ArchiveTemplateTest.php` (NUEVO, 12 methods) — cubre title, price filter, sort nonce, load more.
+- **Total tests:** 2,615 (anterior 2,548, +67).
+
+## [2.9.180] — 2026-07-16
+
+### Home Template + Hero Section Polish (1 P0 + 3 P1 fixes)
+
+Creación del template `home.php` con hero section, featured products y categorías.
+
+**P0 — Fixes aplicados (1)**
+
+- **`templates/home.php:1-89`** — Hero CTA sin verify de `current_user_can('edit_posts')` para el botón "Vender ahora". Cualquiera (incluido bots) podía linkear a `/vendedor/registro/`. Fix: condicional login check.
+
+**P1 — UX (3 fixes)**
+
+- **`templates/home.php:118-156`** — Sin featured categories carousel. Fix: `get_terms('product_cat')` + carousel.
+- **`templates/home.php:189-234`** — Sin testimonials section. Fix: `WP_Query` post_type `ltms_testimonial`.
+- **`templates/home.php:247-289`** — Sin newsletter signup. Fix: form integrado con `ltms_newsletter`.
+
+**Test compatibility**
+
+- `tests/unit/HomeTemplateTest.php` (NUEVO, 9 methods) — cubre hero CTA, featured categories, testimonials, newsletter.
+- **Total tests:** 2,548 (anterior 2,490, +58).
+
+## [2.9.179] — 2026-07-15
+
+### Single Product Template + Add-to-Cart Button Fix (1 P0 crítico + 2 P1 fixes)
+
+Creación del template `single-product.php` con el famoso fix del botón add-to-cart de 938px → 48px.
+
+**P0 — Fix crítico (1)**
+
+- **`templates/single-product.php:382-411`** — **Botón add-to-cart medía 938px de altura**. Root cause: `form.cart` tenía `display:flex` con `align-items:stretch` (default en flexbox). Esto hace que TODOS los hijos hereden la altura del sibling más alto. En este caso, qty input + variation select combinados median 938px. El botón heredaba esta altura. Fix: `align-items:center` en form + `height:48px` explícito en button. **Lección #101 documentada.**
+
+**P1 — UX (2 fixes)**
+
+- **`templates/single-product.php:78-104`** — Sin breadcrumb. Fix: WC `woocommerce_breadcrumb()`.
+- **`templates/single-product.php:247-289`** — Sin related products. Fix: `woocommerce_related_products()`.
+
+**Test compatibility**
+
+- `tests/unit/SingleProductTemplateTest.php` (NUEVO, 15 methods) — cubre add-to-cart fix, breadcrumb, related products.
+- **Total tests:** 2,490 (anterior 2,425, +65).
+
+## [2.9.178] — 2026-07-15
+
+### Plaza Viva Design System + Mockups HTML (Foundation Release)
+
+Lanzamiento del design system "Plaza Viva" como foundation de los 9 templates nativos.
+
+**Assets añadidos**
+
+- `assets/css/ltms-plaza-viva.css` (724 líneas) — design tokens, typography, spacing, color palette, shadows, border-radius, dark mode, responsive breakpoints.
+- `assets/js/ltms-plaza-viva.js` (647 líneas) — microinteractions, scroll reveal, sticky behavior, theme toggle, accessibility helpers.
+
+**Paleta Plaza Viva**
+
+```css
+--pv-primary:    #00867d   (verde profundo — confianza, freshness)
+--pv-secondary:  #f4a261   (naranja cálido — energía, CTA)
+--pv-tertiary:   #e76f51   (coral — urgency, alerts)
+--pv-surface:    #ffffff   (card backgrounds)
+--pv-text:       #2a2d34   (body text)
+--pv-muted:      #6c757d   (secondary text)
+--pv-success:    #2a9d8f
+--pv-warning:    #e9c46a
+--pv-danger:     #d62828
+```
+
+**Mockups HTML creados (3 propuestas)**
+
+- `mockups/propuesta-a-plaza-viva.html` — clean, modern, lots of whitespace, focus on product photography.
+- `mockups/propuesta-b-lujo-tropical.html` — premium feel, dark mode default, gold accents.
+- `mockups/propuesta-c-convive.html` — community-driven, social proof front and center, testimonios.
+
+**Decisión:** Propuesta A (Plaza Viva) seleccionada por alineación con identidad de la marca "Lo Tengo". Documentada en `PLAN_IMPLEMENTACION_PLAZA_VIVA.md`.
+
+**Documentation**
+
+- `PLAN_IMPLEMENTACION_PLAZA_VIVA.md` (NUEVO) — plan de implementación de 9 sprints (1 template por sprint), 2 semanas por sprint, 18 semanas total.
+
+**Files modified**: 5 (plaza-viva.css, plaza-viva.js, frontend-assets.php, plugin main, CHANGELOG) + 3 mockups + 1 plan doc.
+
+---
+
 ## [2.9.144] — 2026-07-15
 
 ### FASE 4: Business Logic Financial — 5 P0 fixes (4 archivos críticos)

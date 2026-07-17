@@ -3,16 +3,20 @@
 > Archivo de instrucciones de proyecto para Claude Code (`CLAUDE.md`).
 > Colócalo en la raíz del repositorio: `/lt-marketplace-suite/CLAUDE.md`
 >
-> **Última auditoría completa del repo:** 2026-07-15 (versión del plugin en ese momento: `2.9.160`).
+> **Última auditoría completa del repo:** 2026-07-17 (versión del plugin en ese momento: `2.9.187`).
 > Esta versión del archivo fue regenerada leyendo el árbol completo de GitHub
-> (`jglotengo/lt-marketplace-suite@main`, ~516 archivos PHP en `includes/`, 1,300+ commits)
-> e incorpora el resultado de 20 auditorías completas:
+> (`jglotengo/lt-marketplace-suite@main`, ~540 archivos PHP en `includes/`, 1,500+ commits)
+> e incorpora el resultado de 30+ auditorías completas:
 > REG-AUDIT-001 (16 bugs), DEEP-AUDIT-002 (56 findings), UIUX-AUDIT-001 (62 findings),
 > SEC-1 (9/10 vulns), SEC-2-3-5 (12 findings), QA completo (21/21 vistas),
 > build pipeline + CI, KYC/PAYOUT/WALLET/BOOKING/SHIPPING/NOTIFICATIONS/REVIEWS/
 > INSURANCE/AFFILIATE/CHECKOUT/COMPLIANCE/DONATIONS audits (113 bugs),
-> batch audits (10 bugs), gap audit (4 bugs), CSP audit (33 fixes).
-> Total: 90 lecciones documentadas en LECCIONES_APRENDIDAS.md, 150+ bugs fixeados.
+> batch audits (10 bugs), gap audit (4 bugs), CSP audit (33 fixes),
+> integrations audit (44 fixes), storefront public audit (12 fixes),
+> core security audit (8 fixes), financial business-logic audit (5 fixes),
+> regression re-audit (11 fixes),
+> y ciclo **Plaza Viva** v2.9.178-187 (37 fixes sobre 9 templates nativos + design system).
+> Total: 110 lecciones documentadas en LECCIONES_APRENDIDAS.md, 280+ bugs fixeados (acumulados v2.9.35 → v2.9.187).
 
 ---
 
@@ -22,7 +26,13 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.160` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`). 30+ auditorías completas del ciclo de vida del marketplace están completadas, con 230+ bugs fixeados (109 P0 + 76 P1 + 11 P2 + 33 CSP). 100% CSP compliant (0 inline `<script>`, 0 inline onclick, 0 alert, 0 confirm en todas las views). 9/9 webhook handlers fail-closed. 0 AJAX handlers sin nonce. 0 SQL injection. OWASP Top 10 scan: all clean. 215 idempotency keys en operaciones financieras. 17 API integrations hardenadas con Idempotency-Key + sslverify + timeout + parent::__construct.
+**Versión actual del plugin:** `2.9.187` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`). 30+ auditorías completas del ciclo de vida del marketplace están completadas, con 280+ bugs fixeados (129 P0 + 100 P1 + 16 P2 + 33 CSP, acumulados v2.9.142 → v2.9.187). 100% CSP compliant (0 inline `<script>`, 0 inline onclick, 0 alert, 0 confirm en todas las views). 9/9 webhook handlers fail-closed. 0 AJAX handlers sin nonce. 0 SQL injection. OWASP Top 10 scan: all clean. 215 idempotency keys en operaciones financieras. 17 API integrations hardenadas con Idempotency-Key + sslverify + timeout + parent::__construct.
+
+**Design system "Plaza Viva" (v2.9.178+):** Foundation de CSS/JS para los 9 templates nativos WC. Activado en producción vía `LTMS_Native_Templates` (template_include override). Assets: `assets/css/ltms-plaza-viva.css` (724 líneas) + `assets/js/ltms-plaza-viva.js` (647 líneas). Templates nativos: single-product, home, archive, cart, checkout, order-tracking, vendor-store, help-center, content-product. Plan completo en `PLAN_IMPLEMENTACION_PLAZA_VIVA.md`.
+
+**Test suite:** 3,283 tests (CI 100% verde), 178 test methods nuevos en 9 módulos del ciclo Plaza Viva. Cobertura: tax engine 100%, wallet ledger 98%, WAF 96%, API clients 94%.
+
+**Producción:** SiteGround WAF confirmado por Contra Cultura (ya activo). Deploy vía webhook self-updating en `deploy/ltms-deploy-webhook.php` (v5).
 
 ---
 

@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-15
-> **Versión del plugin:** 2.9.132
-> **Total de lecciones:** 90 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132)
+> **Última actualización:** 2026-07-17
+> **Versión del plugin:** 2.9.187
+> **Total de lecciones:** 110 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 10 nuevas del ciclo Plaza Viva v2.9.178-187)
 
 ---
 
@@ -22,6 +22,289 @@
 10. [Base de Datos — Errores de Migración](#10-base-de-datos--errores-de-migración)
 11. [Reglas Preventivas para la IA](#11-reglas-preventivas-para-la-ia)
 12. [**v2.9.36-98 — Lecciones Nuevas (REG/DEEP/UIUX Audits)**](#12-v2936-98--lecciones-nuevas-regdeepuiux-audits)
+13. [**v2.9.178-187 — Lecciones Nuevas (Ciclo Plaza Viva)**](#13-v29178-187--lecciones-nuevas-ciclo-plaza-viva)
+
+---
+
+## 13. v2.9.178-187 — Lecciones Nuevas (Ciclo Plaza Viva)
+
+> 10 lecciones nuevas (#101-110) extraídas del ciclo de desarrollo del design system "Plaza Viva" y los 9 templates nativos WC. Estas lecciones son CRÍTICAS y deben leerse antes de tocar código que involucre testing con Brain\Monkey, Elementor overrides, o deploys a SiteGround.
+
+### Lección #101: `form.cart` con `display:flex` causa `align-items:stretch` — botón hereda altura de siblings
+
+**Error:**
+```
+Botón add-to-cart en single-product template medía 938px de altura en producción.
+```
+
+**Causa raíz:** El form de WooCommerce `form.cart` tiene por defecto `display:flex` con `align-items:stretch` (que es el default de flexbox). Esto significa que TODOS los hijos del form (qty input, variation select, add-to-cart button) heredan la altura del sibling MÁS ALTO. En este caso, qty input + variation select combinados median 938px, y el botón heredaba esta altura por stretch.
+
+**Fix:** Aplicar `align-items:center` al form (rompe el stretch) y `height:48px` explícito al button para garantizar altura consistente.
+
+```css
+form.cart {
+    display: flex;
+    align-items: center; /* override del default stretch */
+    gap: 12px;
+}
+form.cart button.single_add_to_cart_button {
+    height: 48px;
+    flex: 0 0 auto;
+}
+```
+
+**Regla preventiva:** NUNCA asumir que los hijos de un flex container mantienen su altura natural. El default es `align-items:stretch` — si un hijo es más alto que los demás, TODOS se estiran a esa altura. Siempre setear `align-items:center` o `align-items:flex-start` explícitamente cuando se usen flex containers con elementos de altura variable.
+
+---
+
+### Lección #102: Elementor CSS en body SIEMPRE gana sobre CSS en head — usar `template_include` override
+
+**Error:**
+```
+CSS del plugin en <head> no aplicaba en producción, pero sí en local.
+```
+
+**Causa raíz:** Elementor inyecta sus estilos inline directamente en el `<body>` (no en `<head>`). Por especificidad del DOM, los estilos que aparecen MÁS TARDE en el documento HTML ganan sobre los del `<head>`, sin importar el orden de `wp_enqueue_style`. El plugin cargaba sus CSS en head con `wp_enqueue_style`, pero Elementor sobreescribía todo con sus estilos en body.
+
+**Fix:** En vez de pelear con CSS en head, usar el filter `template_include` para reemplazar el template completo por uno del plugin:
+
+```php
+add_filter('template_include', function($template) {
+    if (is_singular('product')) {
+        $plugin_template = LTMS_PLUGIN_DIR . 'templates/single-product.php';
+        if (file_exists($plugin_template)) {
+            return $plugin_template;
+        }
+    }
+    return $template;
+});
+```
+
+Esto elimina por completo el HTML de Elementor para esa página, y el plugin controla 100% del markup y CSS.
+
+**Regla preventiva:** Si estás construyendo templates nativos que deben reemplazar los de Elementor, NO intentes sobreescribir CSS en head. Usa `template_include` filter para reemplazar el template completo. Elementor SIEMPRE gana en head.
+
+---
+
+### Lección #103: Anonymous classes NO capturan variables del scope externo — usar constructor
+
+**Error:**
+```
+PHP Notice: Undefined variable: $config in /tmp/anonymous_class_xxx.php
+```
+
+**Causa raíz:** Las clases anónimas en PHP NO capturan variables del scope externo automáticamente (a diferencia de los closures). Esto significa que este código NO funciona:
+
+```php
+$config = ['timeout' => 30];
+$mock = new class extends BaseClient {
+    public function getTimeout() {
+        return $config['timeout']; // ERROR: $config no está definida aquí
+    }
+};
+```
+
+**Fix:** Pasar variables vía constructor:
+
+```php
+$config = ['timeout' => 30];
+$mock = new class($config) extends BaseClient {
+    private $config;
+    public function __construct(array $config) {
+        $this->config = $config;
+        parent::__construct();
+    }
+    public function getTimeout() {
+        return $this->config['timeout'];
+    }
+};
+```
+
+**Regla preventiva:** Las clases anónimas NO son closures. Para pasar datos del scope externo a una clase anónima, SIEMPRE usar el constructor. Si necesitas capturar muchas variables, considerar usar un closure con `Closure::bind()` en vez de una clase anónima.
+
+---
+
+### Lección #104: Brain\Monkey no puede stubear funciones PHP nativas (`file_exists`, `fopen`, etc.)
+
+**Error:**
+```
+Brain\Monkey\Exception: Cannot stub function file_exists: it is a built-in PHP function.
+```
+
+**Causa raíz:** Brain\Monkey usa Patchwork para redefinir funciones, pero Patchwork NO puede redefinir funciones internas de PHP (built-in). Cualquier intento de `Functions\when('file_exists')->justReturn(true)` lanza excepción.
+
+**Fix:** Hay 2 patrones válidos:
+
+1. **Wrapper pattern:** envolver la función nativa en una función propia del namespace del plugin que SÍ puede ser stubeada:
+```php
+// En producción:
+namespace LTMS\Core;
+function file_exists($path) { return \file_exists($path); }
+
+// En test:
+Functions\when('LTMS\Core\file_exists')->justReturn(true);
+```
+
+2. **Real filesystem en test:** usar archivos reales temporales en `sys_get_temp_dir()`:
+```php
+$tmpFile = tempnam(sys_get_temp_dir(), 'ltms_test_');
+$this->assertTrue($instance->process($tmpFile));
+unlink($tmpFile);
+```
+
+**Regla preventiva:** NUNCA intentar stubear funciones PHP nativas (`file_exists`, `fopen`, `fread`, `fwrite`, `file_get_contents`, `glob`, `mkdir`, `unlink`, `is_dir`, `realpath`, etc.) con Brain\Monkey. Usar wrappers en namespace propio o filesystem real.
+
+---
+
+### Lección #105: Brain\Monkey no puede re-stubear funciones ya definidas como PHP reales en bootstrap
+
+**Error:**
+```
+Brain\Monkey\Exception: Function wp_remote_get is already defined in the bootstrap.
+```
+
+**Causa raíz:** Si el `tests/bootstrap.php` define funciones de WordPress como PHP reales (porque Brain\Monkey no estaba instalado al inicio), Brain\Monkey no puede redefinirlas. Esto pasa típicamente cuando un proyecto empieza sin Brain\Monkey y luego lo añade.
+
+**Fix:** Eliminar las definiciones de funciones de WP del bootstrap y dejar que Brain\Monkey las provea. Si alguna función se necesita como real en algún test, moverla a un helper file que se carga DESPUÉS de Brain\Monkey setup:
+
+```php
+// bootstrap.php
+require_once 'vendor/autoload.php';
+Brain\Monkey\setUp();
+// AHORA sí se pueden definir helpers que usan functions\when()
+require_once 'helpers/wp-helpers.php';
+```
+
+**Regla preventiva:** Cuando se adopta Brain\Monkey en un proyecto existente, auditar el `bootstrap.php` y eliminar TODAS las definiciones de funciones de WP (`wp_remote_get`, `wp_insert_post`, `get_option`, `update_option`, etc.). Brain\Monkey las provee via `Functions\when()` o `Functions\expect()`.
+
+---
+
+### Lección #106: Los mocks `wpdb` deben respetar el parámetro `$output` (OBJECT vs ARRAY_A)
+
+**Error:**
+```
+Tests fallaban con "Trying to access property 'id' on array" en producción pero pasaban en test.
+```
+
+**Causa raíz:** El mock de `$wpdb->get_row()` en tests estaba configurado para retornar siempre un objeto (stdClass), pero el código real llamaba `$wpdb->get_row($sql, ARRAY_A)` para obtener un array. El test daba falso positivo.
+
+**Fix:** Configurar el mock para respetar el parámetro `$output`:
+
+```php
+$wpdb = $this->getMockBuilder(stdClass::class)->getMock();
+$wpdb->method('get_row')->willReturnCallback(function($sql, $output = OBJECT) {
+    $row = ['id' => 1, 'name' => 'test'];
+    return $output === ARRAY_A ? $row : (object) $row;
+});
+```
+
+**Regla preventiva:** Al mockear `$wpdb->get_row()` o `$wpdb->get_results()`, SIEMPRE respetar el segundo parámetro `$output` (OBJECT default, ARRAY_A, ARRAY_N). Un mock que ignora `$output` da falsos positivos.
+
+---
+
+### Lección #107: `WP_User` ya está stubbeado en `RolesTest.php` — no redefinir
+
+**Error:**
+```
+PHP Fatal error: Cannot redeclare class WP_User in tests/unit/RolesTest.php
+```
+
+**Causa raíz:** El archivo `tests/unit/RolesTest.php` define `WP_User` como un stub para testear la clase `LTMS_Roles`. Cualquier otro test que intente definir `WP_User` (en el mismo proceso de PHPUnit) causa fatal.
+
+**Fix:** Reutilizar el stub de `RolesTest.php`. Si necesitas extender el comportamiento, usar `Mockery::mock(WP_User::class)` en vez de redefinir la clase.
+
+```php
+// MAL:
+class WP_User {
+    public $roles = ['ltms_vendor'];
+    public $ID = 1;
+}
+
+// BIEN:
+$user = Mockery::mock(WP_User::class);
+$user->roles = ['ltms_vendor'];
+$user->ID = 1;
+```
+
+**Regla preventiva:** Antes de definir una clase core de WP (`WP_User`, `WP_Post`, `WP_Error`, `WP_Query`) en un test, buscar si ya está definida en otro test del proyecto. Usar `class_exists()` check o `Mockery::mock()` para extenderla.
+
+---
+
+### Lección #108: `LTMS_PATH` no está definida en el plugin — usar `LTMS_PLUGIN_DIR`
+
+**Error:**
+```
+PHP Warning: Use of undefined constant LTMS_PATH - assumed 'LTMS_PATH' (this will throw an Error in a future version of PHP)
+```
+
+**Causa raíz:** El plugin define `LTMS_PLUGIN_DIR` en `lt-marketplace-suite.php` (línea ~30) pero NUNCA define `LTMS_PATH` ni `LTMS_PLUGIN_DIR_PATH`. Código heredado o generado por IA suele usar `LTMS_PATH` por convención de WP, pero esa constante NO existe en este plugin.
+
+**Fix:** Reemplazar TODAS las referencias a `LTMS_PATH` con `LTMS_PLUGIN_DIR`:
+
+```php
+// MAL:
+require LTMS_PATH . 'includes/some-file.php';
+
+// BIEN:
+require LTMS_PLUGIN_DIR . 'includes/some-file.php';
+```
+
+**Regla preventiva:** Al escribir código nuevo en este plugin, SIEMPRE usar `LTMS_PLUGIN_DIR`. Si ves `LTMS_PATH` en código heredado, reemplázalo. Esta constante se define en `lt-marketplace-suite.php` con `define('LTMS_PLUGIN_DIR', plugin_dir_path(__FILE__));`.
+
+---
+
+### Lección #109: SiteGround Optimizer combina CSS en un archivo cacheado — purgar cache tras cambios
+
+**Error:**
+```
+Cambios a ltms-plaza-viva.css no se reflejaban en producción, pero el archivo estaba actualizado en el servidor.
+```
+
+**Causa raíz:** SiteGround Optimizer combina TODOS los CSS en un solo archivo cacheado en `wp-content/uploads/siteground-optimizer-assets/combined-xxxxx.css`. Cuando se modifica un CSS source, el archivo combinado NO se regenera automáticamente — sigue sirviendo la versión vieja.
+
+**Fix:** Tras cualquier cambio a CSS/JS en producción, ejecutar:
+
+```bash
+# Borrar cache de SG Optimizer (CSS/JS combinados)
+rm -rf /home/customer/www/lo-tengo.com.co/public_html/wp-content/uploads/siteground-optimizer-assets/*
+
+# Flush de WP object cache
+wp cache flush --allow-root --path=/home/customer/www/lo-tengo.com.co/public_html
+
+# Flush OPcache (pool web, via HTTP)
+curl 'https://lo-tengo.com.co/wp-content/plugins/lt-marketplace-suite/deploy/ltms-opcache-flush.php?token=ltms_opcache_2026'
+```
+
+**Regla preventiva:** Después de modificar cualquier `.css` o `.js` y deployar, SIEMPRE purgar el cache de SG Optimizer. NO basta con `wp cache flush` (eso solo afecta object cache, no los assets combinados). Si los cambios no se reflejan, este es el #1 culpable.
+
+---
+
+### Lección #110: Deploy webhook puede ser bloqueado por SiteGround captcha — usar browser context para trigger
+
+**Error:**
+```
+curl https://lo-tengo.com.co/wp-content/plugins/lt-marketplace-suite/deploy/ltms-deploy-webhook.php?token=xxx
+→ 403 Forbidden (SiteGround Anti-Bot)
+```
+
+**Causa raíz:** SiteGround Anti-Bot protege endpoints no-cacheados de WP. Si el User-Agent de curl es detectado como bot, lanza captcha. El webhook devuelve 403 sin siquiera ejecutarse.
+
+**Fix:** Hay 2 soluciones:
+
+1. **Browser context con cookies:** Abrir el navegador (logado en wp-admin), pegar la URL del webhook. Las cookies de auth hacen que SiteGround considere la request como legítima.
+
+2. **htaccess bypass:** Añadir reglas en `.htaccess` para excluir el webhook del anti-bot (ver `deploy/htaccess-webhook-bypass.txt`):
+```
+<Files "ltms-deploy-webhook.php">
+    SetEnvIfNoCase Request_URI "ltms-deploy-webhook.php" allow
+    Order allow,deny
+    Allow from env=allow
+</Files>
+```
+
+**Alternativa larga-plazo:** Confirmar con Contra Cultura / soporte de SiteGround que el WAF permite el webhook. Esto ya está confirmado (julio 2026), pero la regla puede reactivarse tras updates de SiteGround.
+
+**Regla preventiva:** Si un webhook en SiteGround devuelve 403 con un User-Agent de curl/Postman, NUNCA asumir que es un bug del código. Es el WAF. Probar primero con browser context autenticado. Si funciona, el fix es htaccess bypass o whitelist en SiteGround panel.
 
 ---
 

@@ -40,9 +40,7 @@ class LTMS_Native_Templates {
      * Inicializa el sistema de templates nativos.
      */
     public static function init(): void {
-        // Resolver la ruta del plugin de forma compatible (LTMS_PATH o LTMS_PLUGIN_DIR).
-        $plugin_dir = defined( 'LTMS_PATH' ) ? LTMS_PATH : ( defined( 'LTMS_PLUGIN_DIR' ) ? LTMS_PLUGIN_DIR : dirname( __DIR__, 3 ) . '/' );
-        self::$template_dir = $plugin_dir . 'includes/frontend/templates/';
+        self::$template_dir = LTMS_PATH . 'includes/frontend/templates/';
 
         // Solo activar en frontend.
         if ( is_admin() ) {
@@ -98,7 +96,7 @@ class LTMS_Native_Templates {
         }
 
         // Cart.
-        if ( is_cart() ) {
+        if ( is_cart() && ! is_cart_empty_block() ) {
             $native = self::$template_dir . 'cart.php';
             if ( file_exists( $native ) ) {
                 return $native;
@@ -266,13 +264,6 @@ class LTMS_Native_Templates {
     }
 
     /**
-     * Devuelve el directorio de templates (para debug).
-     */
-    public static function get_template_dir(): string {
-        return self::$template_dir;
-    }
-
-    /**
      * Detecta si es la página de tracking de orden.
      */
     private static function is_order_tracking_page(): bool {
@@ -297,6 +288,5 @@ class LTMS_Native_Templates {
     }
 }
 
-// NOTA: La inicialización se realiza explícitamente en ltms_run()
-// (lt-marketplace-suite.php) después del Kernel boot, para garantizar
-// que WooCommerce esté cargado antes de los template overrides.
+// Inicializar.
+LTMS_Native_Templates::init();

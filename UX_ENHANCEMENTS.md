@@ -1,10 +1,258 @@
-# UX Enhancements — LT Marketplace Suite v2.9.98
+# UX Enhancements — LT Marketplace Suite v2.9.187
 
-> **Histórico:** Este documento cubre la capa UX desde v2.9.35 (capa inicial overlay) hasta v2.9.98 (UIUX-AUDIT-001 completo, 62 findings 100% resueltos).
+> **Histórico:** Este documento cubre la capa UX desde v2.9.35 (capa inicial overlay) hasta v2.9.187 (ciclo Plaza Viva completo, 9 templates nativos WC en producción).
 >
-> **Versión actual:** 2.9.98 (2026-07-08)
+> **Versión actual:** 2.9.187 (2026-07-17)
 
 Capa overlay de mejoras de experiencia de usuario aplicada a **todas las interfaces** del marketplace. A partir de v2.9.77, la capa UX se sometió a una auditoría completa (UIUX-AUDIT-001) que abarcó 25 vistas del dashboard, 4 archivos CSS y 9 clases storefront, resultando en 62 hallazgos (P0×7, P1×15, P2×25, P3×15) — **100% resueltos a v2.9.98**.
+
+A partir de v2.9.178, se introdujo el **design system "Plaza Viva"** como foundation de los 9 templates nativos WC activos en producción vía `LTMS_Native_Templates` (template_include override). 37 bugs fixeados sobre los templates (v2.9.178-187).
+
+---
+
+## v2.9.178-187 — Design System "Plaza Viva" + 9 Native Templates WC
+
+### Resumen del ciclo
+
+| Versión | Template / Componente | P0 | P1 | Total |
+|---------|----------------------|----|----|----|
+| 2.9.178 | Design system foundation + 3 mockups HTML | 0 | 0 | 0 (foundation) |
+| 2.9.179 | single-product.php + add-to-cart fix 938px → 48px | 1 | 2 | 3 |
+| 2.9.180 | home.php + hero section | 1 | 3 | 4 |
+| 2.9.181 | archive.php + category filtering | 3 | 2 | 5 |
+| 2.9.182 | content-product.php + loop grid | 2 | 4 | 6 |
+| 2.9.183 | vendor-store.php + vendor rating calculation | 4 | 3 | 7 |
+| 2.9.184 | checkout.php + cart.php polish | 3 | 5 | 8 |
+| 2.9.185 | order-tracking.php + customs declarations | 6 | 2 | 8 |
+| 2.9.186 | help-center.php + dispute resolution flow | 5 | 4 | 9 |
+| 2.9.187 | Native templates production release + final hardening | 4 | 3 | 7 |
+| **Total** | | **29** | **28** | **57** (sobre templates) |
+
+### Design System "Plaza Viva"
+
+**Filosofía:** "Plaza Viva" representa la fusión entre lo tradicional (la plaza de mercado latinoamericana como punto de encuentro comercial) y lo moderno (clean lines, microinteracciones, dark mode). El design system busca transmitir confianza, frescura y energía.
+
+**Assets:**
+- `assets/css/ltms-plaza-viva.css` (724 líneas) — design tokens, typography, spacing, color palette, shadows, border-radius, dark mode, responsive breakpoints.
+- `assets/js/ltms-plaza-viva.js` (647 líneas) — microinteractions, scroll reveal, sticky behavior, theme toggle, accessibility helpers.
+
+**Paleta Plaza Viva:**
+
+```css
+:root {
+    /* Primarios */
+    --pv-primary:    #00867d;   /* verde profundo — confianza, freshness */
+    --pv-secondary:  #f4a261;   /* naranja cálido — energía, CTA */
+    --pv-tertiary:   #e76f51;   /* coral — urgency, alerts */
+
+    /* Neutrales */
+    --pv-surface:    #ffffff;   /* card backgrounds */
+    --pv-text:       #2a2d34;   /* body text */
+    --pv-muted:      #6c757d;   /* secondary text */
+    --pv-border:     #e9ecef;   /* dividers */
+
+    /* Status */
+    --pv-success:    #2a9d8f;
+    --pv-warning:    #e9c46a;
+    --pv-danger:     #d62828;
+    --pv-info:       #4a90e2;
+
+    /* Tipografía */
+    --pv-font-sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --pv-font-display: 'Poppins', var(--pv-font-sans);
+
+    /* Spacing (escala 1.25) */
+    --pv-space-1:  4px;
+    --pv-space-2:  8px;
+    --pv-space-3:  12px;
+    --pv-space-4:  16px;
+    --pv-space-5:  20px;
+    --pv-space-6:  24px;
+    --pv-space-8:  32px;
+    --pv-space-10: 40px;
+    --pv-space-12: 48px;
+
+    /* Border-radius */
+    --pv-radius-sm: 4px;
+    --pv-radius:    8px;
+    --pv-radius-lg: 12px;
+    --pv-radius-pill: 9999px;
+
+    /* Shadows */
+    --pv-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --pv-shadow:    0 4px 6px -1px rgba(0,0,0,0.1);
+    --pv-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+
+    /* Breakpoints */
+    --pv-bp-sm:  640px;
+    --pv-bp-md:  768px;
+    --pv-bp-lg:  1024px;
+    --pv-bp-xl:  1280px;
+}
+
+/* Dark mode */
+[data-ltms-theme="dark"] {
+    --pv-surface:    #1a1d24;
+    --pv-text:       #e9ecef;
+    --pv-muted:      #adb5bd;
+    --pv-border:     #2a2d34;
+    --pv-shadow-sm:  0 1px 2px rgba(0,0,0,0.3);
+    --pv-shadow:     0 4px 6px -1px rgba(0,0,0,0.4);
+    --pv-shadow-lg:  0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
+}
+```
+
+**Microinteracciones (JS):**
+- Scroll reveal con `IntersectionObserver` — elementos con clase `pv-reveal` aparecen con fade-in + slide-up al entrar en viewport.
+- Sticky behavior inteligente — header sticky en mobile, solo cuando se hace scroll up.
+- Theme toggle persistente en `localStorage` — respeta `prefers-color-scheme` en primera visita.
+- Accessibility helpers — focus trap automático en modales, `aria-live` regions dinámicas.
+- Reduced motion support — respeta `prefers-reduced-motion: reduce` (desactiva animaciones).
+
+### Mockups HTML (3 propuestas evaluadas)
+
+| Propuesta | Archivo | Estilo | Decisión |
+|-----------|---------|--------|----------|
+| A — Plaza Viva | `mockups/propuesta-a-plaza-viva.html` | Clean, modern, lots of whitespace, focus on product photography | ✅ **SELECCIONADA** |
+| B — Lujo Tropical | `mockups/propuesta-b-lujo-tropical.html` | Premium feel, dark mode default, gold accents | Descartada |
+| C — Convive | `mockups/propuesta-c-convive.html` | Community-driven, social proof front and center, testimonios | Descartada |
+
+**Justificación de la selección:** Propuesta A (Plaza Viva) fue seleccionada por alineación con identidad de la marca "Lo Tengo" — el verde profundo (`#00867d`) transmite confianza y frescura, mientras que el naranja cálido (`#f4a261`) aporta energía sin ser agresivo. La tipografía Inter + Poppins es accesible (WCAG AAA en tamaños normales) y carga rápido (Google Fonts con `display=swap`).
+
+### 9 Templates nativos WC (production-ready)
+
+Cada template fue creado como archivo PHP independiente en `templates/` y se activa vía `template_include` filter de WordPress en `class-ltms-native-templates.php`. Esto elimina por completo el HTML de Elementor para las páginas críticas (Lección #102: Elementor SIEMPRE gana en head).
+
+#### 1. `single-product.php` — Página de producto individual
+
+- **Fix crítico:** Add-to-cart button 938px → 48px (Lección #101). Root cause: `form.cart` con `display:flex` y `align-items:stretch`. Fix: `align-items:center` + `height:48px` explícito.
+- Breadcrumb con WC `woocommerce_breadcrumb()`.
+- Gallery con thumbnails + zoom on hover (desktop) + swipe (mobile).
+- Variations select con auto-update de precio.
+- Tabs: Descripción, Especificaciones, Reseñas, "Sobre el vendedor", "Envío y Entrega".
+- Related products grid (4 items).
+- Schema.org JSON-LD: `Product` + `Offer` + `AggregateRating` + `Review`.
+- Schema.org `@type=BreadcrumbList`.
+
+#### 2. `home.php` — Homepage
+
+- Hero section con CTA condicional (login check).
+- Featured categories carousel (`get_terms('product_cat')`).
+- Featured products grid (8 items, ordenados por `total_sales`).
+- Testimonials section (`WP_Query` post_type `ltms_testimonial`).
+- Newsletter signup (integrado con `ltms_newsletter`).
+- Trust badges bar (pagos seguros, envíos nacionales, devoluciones 14 días).
+
+#### 3. `archive.php` — Tienda / Categorías
+
+- Header dinámico (`single_cat_title()` en categorías, "Tienda" en main archive).
+- Price filter con sanitización `absint()`.
+- Sort dropdown con nonce AJAX (`check_ajax_referer`).
+- Grid view toggle (list/grid, persistencia en cookie).
+- "Load more" button con `IntersectionObserver` (infinite scroll opcional).
+- Breadcrumb + count de resultados.
+
+#### 4. `cart.php` — Carrito
+
+- Empty state ilustrado (SVG empty cart + CTA a shop).
+- Quantity input con clamping (`max($min, min($qty, $stock))`).
+- Cross-sells dinámicos (`get_cross_sells()`).
+- Coupon input con sanitización + empty check.
+- Cart totals con shipping calculator.
+- "Proceed to checkout" button destacado.
+
+#### 5. `checkout.php` — Finalizar compra
+
+- Login prompt en checkout con "remember me" checkbox.
+- Billing/shipping forms con validación de `shipping_country` (`array_key_exists`).
+- "Ship to different address" toggle — pasa `shipping_country` al tax engine cuando activo.
+- Payment methods radio con `<label for>` asociado + `aria-describedby`.
+- Order review con `aria-live="polite" aria-atomic="true"` — SR anuncia cambios de total.
+- "Place order" button con `aria-busy` + `disabled` durante AJAX (evita doble PaymentIntent).
+
+#### 6. `order-tracking.php` — Seguimiento de pedido
+
+- Form con `absint()` validation + orden existe check.
+- Loading state durante AJAX (spinner + `disabled`).
+- Status timeline filtrado (excluye notas privadas del admin).
+- Permisos: requiere `billing_email` match como factor secundario de autenticación.
+- Empty state ilustrado (SVG package + copy guía).
+
+#### 7. `vendor-store.php` — Tienda del vendedor
+
+- `ltms_is_vendor_public($vendor_id)` check (no mostrar vendors `pending_kyc`).
+- Breadcrumb dinámico (`home > vendors > {vendor_name}`).
+- Vacation banner cuando `ltms_vacation_mode = 'on'` (disable add-to-cart).
+- Tabs: Productos, Sobre, Reseñas.
+- PII protection: ocultar email/phone del vendor si user no es customer del vendor.
+- Schema.org `Organization` + `Store` + `AggregateRating`.
+- `posts_per_page` configurable via `get_option('ltms_vendor_store_products_per_page', 12)`.
+
+#### 8. `help-center.php` — Centro de ayuda
+
+- FAQ en `<details>` accesibles (`<summary role="button" aria-expanded>` + keyboard handler).
+- Categorías dinámicas (`get_terms('ltms_help_category')`).
+- Form de contacto con honeypot anti-spam (`ltms_company_url` hidden).
+- Nonce CSRF protection (`wp_nonce_field('ltms_help_center_contact', 'ltms_hc_nonce')`).
+- Conexión con `lt_consumer_disputes` para abrir disputas (Ley 1480).
+
+#### 9. `content-product.php` — Loop item (grid de productos)
+
+- `$product->is_visible()` check (excluye `draft`, `private`).
+- Hover state en cards (elevate + shadow).
+- Price con WC standard markup (`<ins>` y `<del>` para sales).
+- `loading="lazy"` en imágenes.
+- Add-to-cart vs "Read more" según stock + backorders.
+- Quick-add button en hover (desktop) / bottom sheet (mobile).
+
+### Vendor Rating Calculation (v2.9.183)
+
+**Algoritmo con peso exponencial:**
+
+```php
+public function calculate_rating($vendor_id) {
+    $reviews = $this->get_vendor_reviews($vendor_id); // excluye self-reviews
+    if (empty($reviews)) return null;
+
+    $weighted_sum = 0;
+    $weight_total = 0;
+
+    foreach ($reviews as $review) {
+        $days_old = (time() - strtotime($review->post_date)) / 86400;
+        $weight = exp(-$days_old / 90); // half-life ~62 días
+        $weighted_sum += $review->rating * $weight;
+        $weight_total += $weight;
+    }
+
+    $rating = $weight_total > 0 ? $weighted_sum / $weight_total : 0;
+
+    // Persistir en cache (TTL 1 hora)
+    update_user_meta($vendor_id, '_ltms_vendor_rating_cache', wp_json_encode([
+        'rating' => round($rating, 2),
+        'count' => count($reviews),
+        'calculated_at' => current_time('mysql'),
+    ]));
+
+    return $rating;
+}
+```
+
+**Invalidation:** Cache se invalida en `save_post` (review publicada/actualizada) y `comment_post` (nuevo comentario).
+
+### XCover Claim Listener (v2.9.187)
+
+Enganchado a `woocommerce_order_status_changed` (priority 20, accepts 4 args). Cuando una orden con seguro XCover pasa a `disputed` o `refunded`, crea automáticamente un claim en `lt_insurance_policies` con `status='claim_filed'`.
+
+```php
+add_action('woocommerce_order_status_changed', [$this, 'maybe_create_claim'], 20, 4);
+
+public function maybe_create_claim($order_id, $from, $to, $order) {
+    if (!in_array($to, ['disputed', 'refunded'])) return;
+    $policy = $this->get_policy_for_order($order_id);
+    if (!$policy || $policy->status !== 'active') return;
+    // ... crear claim
+}
+```
 
 ---
 

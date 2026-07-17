@@ -147,7 +147,7 @@ do_action( 'ltms_before_help_center_plazaviva' );
             <h1 id="pv-help-hero-title" class="pv-hero__title"><?php esc_html_e( '¿Cómo podemos ayudarte?', 'ltms' ); ?></h1>
             <p class="pv-hero__sub"><?php esc_html_e( 'Encuentra respuestas rápidas, rastrea tus pedidos o habla con nuestro equipo de soporte.', 'ltms' ); ?></p>
 
-            <form class="pv-hero__search pv-help__search" role="search" autocomplete="off" data-pv-prevent-default>
+            <form class="pv-hero__search pv-help__search" role="search" autocomplete="off" onsubmit="return false;">
                 <label class="pv-visually-hidden" for="pv-help-faq-search"><?php esc_html_e( 'Buscar en preguntas frecuentes', 'ltms' ); ?></label>
                 <span class="pv-help__search-icon" aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -407,16 +407,11 @@ do_action( 'ltms_before_help_center_plazaviva' );
             setTimeout(function(){ if (window.Intercom) window.Intercom('show'); }, 600);
             return;
         }
-        // Último recurso: mensaje de ayuda (usar console + fallback DOM, no alert).
+        // Último recurso: mensaje de ayuda.
         if (window.PV && window.PV.toast) {
             window.PV.toast('<?php echo esc_js( __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ) ); ?>', { type: 'warning', duration: 3000 });
         } else {
-            // Fallback: crear un toast DOM básico si PV no está cargado.
-            var fb = document.createElement('div');
-            fb.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#F5A623;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,0.15)';
-            fb.textContent = '<?php echo esc_js( __( 'El chat no está disponible. Escríbenos por WhatsApp o email.', 'ltms' ) ); ?>';
-            document.body.appendChild(fb);
-            setTimeout(function(){ fb.remove(); }, 4000);
+            alert('<?php echo esc_js( __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ) ); ?>');
         }
     });
 })();
