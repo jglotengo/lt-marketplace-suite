@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-17
-> **Versión del plugin:** 2.9.187
-> **Total de lecciones:** 110 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 10 nuevas del ciclo Plaza Viva v2.9.178-187)
+> **Última actualización:** 2026-07-18
+> **Versión del plugin:** 2.9.188
+> **Total de lecciones:** 112 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 12 del ciclo Plaza Viva v2.9.178-188)
 
 ---
 
@@ -1500,3 +1500,59 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Error:** `adjust_ica_for_pickup()` chequeaba `$order instanceof WC_Order` pero el filter `ltms_after_tax_calculate` pasa `$order_data` como ARRAY. El instanceof siempre fallaba → ICA tax para pickup orders NUNCA se ajustaba.
 **Fix:** Manejar tanto array (tax engine) como WC_Order (legacy callers).
 **Regla preventiva:** Al registrar un callback para un filter de WP, verificar el tipo del parámetro que el filter pasa — no asumir que es el tipo esperado.
+
+### Lección #101: Flexbox stretch causa botón de 938px
+**Error:** `form.cart { display: flex; flex-wrap: wrap; }` causaba `align-items: stretch` (default de flex), lo que estiraba TODOS los hijos del form a la altura del más alto (~938px, el grid de addon-items). El botón "Añadir al carrito" heredaba 938px de altura.
+**Fix:** Cambiar `form.cart` a `display: block`. Solo el botón y el quantity usan `inline-flex` con `vertical-align: middle`.
+**Regla preventiva:** NUNCA usar `display: flex` en un contenedor que tiene hijos de alturas muy diferentes (como un form con gift options, badges, grids de productos). Usar `display: block` y `inline-flex` solo en los elementos que necesitan alineación horizontal.
+
+### Lección #102: Elementor CSS en body siempre gana sobre CSS en head
+**Error:** Elementor inyecta estilos CSS directamente en el `<body>` (no en `<head>`). CSS en body SIEMPRE tiene prioridad sobre CSS en head, sin importar la especificidad o `!important`. Nuestro CSS crítico inline en `wp_head` era inútil contra Elementor.
+**Fix:** Usar `template_include` filter para reemplazar completamente las plantillas de Elementor con templates nativos del plugin, eliminando el CSS de Elementor del body.
+**Regla preventiva:** Cuando un theme builder (Elementor, Divi, WPBakery) inyecta CSS en body, NO intentar override desde head. Reemplazar el template completo via `template_include`.
+
+### Lección #103: Anonymous classes NO capturan variables del scope externo
+**Error:** En tests unitarios, anonymous classes definidas dentro de `setUp()` intentaban acceder a `$this->test->queries[]` pero `$test` no estaba capturado (las anonymous classes en PHP NO auto-capturan variables del scope externo como sí lo hacen las closures con `use`).
+**Fix:** Pasar la referencia via constructor: `new class($self) { public function __construct($test) { $this->test = $test; } }`.
+**Regla preventiva:** Las anonymous classes en PHP NO capturan variables del scope externo automáticamente. SIEMPRE pasar variables via constructor.
+
+### Lección #104: Brain\Monkey no puede stubbear funciones PHP nativas
+**Error:** Intentar stubbear `file_exists`, `fopen`, `fclose`, `fputcsv` con `Functions\stubs()` causaba `Patchwork\Exceptions\NotUserDefined` porque estas son funciones internas de PHP que Patchwork no puede redefinir sin configuración especial (`redefinable-internals`).
+**Fix:** Remover las funciones PHP nativas de los stubs. La clase bajo test solo las llama en rutas no ejercidas por los tests.
+**Regla preventiva:** NUNCA intentar stubbear funciones PHP nativas con Brain\Monkey. Solo se pueden stubbear funciones definidas por el usuario (WP functions).
+
+### Lección #105: Mocks wpdb deben respetar el parámetro $output
+**Error:** Los mocks de `$wpdb->get_row()` siempre retornaban `(object)[...]` sin importar el parámetro `$output`. Pero métodos como `LTMS_Deposit::get()` llaman `get_row($sql, ARRAY_A)` y tienen return type `?array`. Retornar un `stdClass` causaba `TypeError: Return value must be of type ?array, stdClass returned`.
+**Fix:** Hacer que el mock sea condicional: `return $o === ARRAY_A ? $row : (object)$row;`.
+**Regla preventiva:** Los mocks de `$wpdb->get_row()` y `get_results()` SIEMPRE deben respetar el parámetro `$output` (OBJECT, ARRAY_A, ARRAY_N).
+
+### Lección #106: WP_User ya está stubbeado en RolesTest.php
+**Error:** Se definió un stub `WP_User` en `FintechComplianceTest.php` con constructor `(int $id, string $name)`, pero `RolesTest.php` ya definía `WP_User` con constructor `(int $id, array $roles)`. Como ambos usaban `if (!class_exists())`, solo el primero cargado ganaba.
+**Fix:** Remover el stub duplicado y reutilizar el de `RolesTest.php` con su firma de constructor.
+**Regla preventiva:** ANTES de definir un stub de clase global, buscar si ya existe en otro archivo de test. Reutilizar, no redefinir.
+
+### Lección #107: LTMS_PATH no existe — usar LTMS_PLUGIN_DIR
+**Error:** `LTMS_Native_Templates::init()` usaba `LTMS_PATH` para resolver el directorio de templates, pero esa constante NUNCA se define en el plugin. El plugin define `LTMS_PLUGIN_DIR` (línea 63) pero no `LTMS_PATH`. El guard `if (!defined('LTMS_PATH')) return;` causaba que `init()` abortara silenciosamente en cada page load.
+**Fix:** Usar `defined('LTMS_PATH') ? LTMS_PATH : (defined('LTMS_PLUGIN_DIR') ? LTMS_PLUGIN_DIR : dirname(__DIR__, 3) . '/')`.
+**Regla preventiva:** ANTES de usar una constante del plugin, verificar que esté definida en el archivo principal con `grep -n "define.*CONSTANT_NAME"`.
+
+### Lección #108: SiteGround Optimizer combina CSS en archivo cacheado
+**Error:** SiteGround Optimizer combina todos los CSS en un solo archivo (`siteground-optimizer-combined-css-*.css`). Cuando se cambia un CSS source, el combined CSS NO se regenera automáticamente. El navegador recibe el CSS viejo combinado.
+**Fix:** Purgar manualmente el cache de SiteGround (Site Tools → Speed → Caching → Clear Cache) después de cada cambio CSS.
+**Regla preventiva:** En sitios con SiteGround Optimizer, los cambios CSS requieren purga manual del cache. El versionado de `wp_enqueue_style` NO es suficiente porque SG combina los archivos.
+
+### Lección #109: Deploy webhook puede ser bloqueado por SiteGround captcha
+**Error:** El deploy webhook (`/ltms-deploy-webhook.php`) puede ser bloqueado por el captcha de SiteGuard (SiteGround's bot protection). El webhook devuelve 202 (redirect a captcha) en vez de 200, y el deploy no se ejecuta.
+**Fix:** Ejecutar el webhook desde el contexto de un navegador (que ya pasó el captcha) usando `fetch()` desde `agent-browser`.
+**Regla preventiva:** Cuando un endpoint del servidor esté detrás de SiteGround captcha, ejecutarlo desde un contexto de navegador, no via curl directo.
+
+### Lección #111: Deploy webhook descarga archivos individualmente — no hace git pull completo
+**Error:** El deploy webhook NO hace `git pull`. Descarga archivos individuales desde la API de GitHub usando una lista hardcoded `$files`. Los nuevos archivos (Plaza Viva templates, CSS, JS) NO estaban en esa lista, por lo que nunca se desplegaron al servidor.
+**Causa de la caída del sitio:** El `lt-marketplace-suite.php` (que SÍ estaba en la lista) se actualizó con `require_once class-ltms-native-templates.php`, pero el archivo `class-ltms-native-templates.php` NO estaba en la lista del webhook → el servidor tenía la versión vieja con `LTMS_PATH` hardcoded → PHP Fatal: Undefined constant "LTMS_PATH" → sitio caído.
+**Fix:** Añadir todos los archivos Plaza Viva a la lista `$files` del webhook + envolver `require_once + init()` en try-catch para que un error en la clase no tumbe el sitio.
+**Regla preventiva:** Cuando se añadan nuevos archivos PHP al plugin, SIEMPRE añadirlos a la lista `$files` en `deploy/ltms-deploy-webhook.php`. Además, envolver cualquier `require_once` de clases nuevas en `try-catch` para evitar que un error de carga tumbe el sitio completo.
+
+### Lección #112: Git fetch en servidor puede quedarse atascado en un commit
+**Error:** El `git fetch origin` en el servidor SiteGround no traía los commits más recientes. Se quedaba atascado en `621d338` aunque GitHub ya tenía commits `172a8ed`, `3d4d73c`, `19cea6b`, `057f784`. El `git reset --hard origin/main` reseteaba al commit obsoleto.
+**Fix:** Ejecutar manualmente via SSH: `git fetch origin && git reset --hard origin/main`.
+**Regla preventiva:** Cuando el deploy webhook muestre un commit obsoleto en "HEAD is now at...", conectar via SSH y ejecutar `git fetch origin && git reset --hard origin/main` manualmente.
