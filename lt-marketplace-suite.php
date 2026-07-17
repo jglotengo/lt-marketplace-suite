@@ -858,16 +858,19 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
     }
 
     // v2.9.188 — Inicializar Native Templates (Plaza Viva design system).
-    // Debe ir después del Kernel boot para que WC esté cargado.
-    // Fallback: require_once directo si el autoloader no encuentra la clase.
-    if ( ! class_exists( 'LTMS_Native_Templates' ) ) {
-        $pv_file = LTMS_PLUGIN_DIR . 'includes/frontend/class-ltms-native-templates.php';
-        if ( file_exists( $pv_file ) ) {
-            require_once $pv_file;
+    // try-catch para evitar que un error en la clase tumbe el sitio.
+    try {
+        if ( ! class_exists( 'LTMS_Native_Templates' ) ) {
+            $pv_file = LTMS_PLUGIN_DIR . 'includes/frontend/class-ltms-native-templates.php';
+            if ( file_exists( $pv_file ) ) {
+                require_once $pv_file;
+            }
         }
-    }
-    if ( class_exists( 'LTMS_Native_Templates' ) ) {
-        LTMS_Native_Templates::init();
+        if ( class_exists( 'LTMS_Native_Templates' ) ) {
+            LTMS_Native_Templates::init();
+        }
+    } catch ( \Throwable $e ) {
+        error_log( 'LTMS Native Templates init failed: ' . $e->getMessage() );
     }
 
     // Aliases de compatibilidad — usados en smoke-tests, docs y código de terceros.
