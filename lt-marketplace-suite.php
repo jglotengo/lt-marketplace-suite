@@ -857,6 +857,12 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
         }
     }
 
+    // v2.9.183 — Inicializar Native Templates (Plaza Viva design system).
+    // Debe ir después del Kernel boot para que WC esté cargado.
+    if ( class_exists( 'LTMS_Native_Templates' ) ) {
+        LTMS_Native_Templates::init();
+    }
+
     // Aliases de compatibilidad — usados en smoke-tests, docs y código de terceros.
     // LTMS_Encryption apunta a LTMS_Core_Security (la clase real de cifrado).
     // LTMS_Firewall apunta a LTMS_Core_Firewall (la clase real del WAF — NO a Security).

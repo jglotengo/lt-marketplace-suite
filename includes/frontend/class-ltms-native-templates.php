@@ -288,5 +288,6 @@ class LTMS_Native_Templates {
     }
 }
 
-// Inicializar.
-LTMS_Native_Templates::init();
+// NOTA: La inicialización se realiza explícitamente en ltms_run()
+// (lt-marketplace-suite.php) después del Kernel boot, para garantizar
+// que WooCommerce esté cargado antes de los template overrides.
