@@ -96,7 +96,7 @@ class LTMS_Native_Templates {
         }
 
         // Cart.
-        if ( is_cart() && ! is_cart_empty_block() ) {
+        if ( is_cart() ) {
             $native = self::$template_dir . 'cart.php';
             if ( file_exists( $native ) ) {
                 return $native;
