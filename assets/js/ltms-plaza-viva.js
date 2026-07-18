@@ -661,9 +661,13 @@
     // Don't double-inject
     if (qs('.ltms-hero-headline')) return;
 
-    // Find hero section (Elementor hero or first section)
-    var hero = qs('.elementor-section, .hero, .banner, [class*=hero], [class*=banner]');
-    if (!hero) return;
+    // Find hero section — try multiple selectors for Elementor
+    var hero = qs('.elementor-section') || qs('.e-con') || qs('.e-flex') || qs('[data-elementor-type]') || qs('main .elementor') || qs('.elementor-element');
+    if (!hero) {
+      // Fallback: inject at top of main content
+      hero = qs('main') || qs('.site-main') || qs('#content') || qs('.page-content');
+      if (!hero) return;
+    }
 
     // Create headline
     var headline = document.createElement('div');
