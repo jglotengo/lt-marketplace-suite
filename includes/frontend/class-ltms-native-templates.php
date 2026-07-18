@@ -111,14 +111,12 @@ class LTMS_Native_Templates {
         }
 
         // Shop / archive / category / tag.
-        // DISABLED: archive-product.php template causes critical error on /tienda/.
-        // Falling through to Elementor/WC default template until debugged.
-        // if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
-        //     $native = self::$template_dir . 'archive-product.php';
-        //     if ( file_exists( $native ) ) {
-        //         return $native;
-        //     }
-        // }
+        if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
+            $native = self::$template_dir . 'archive-product.php';
+            if ( file_exists( $native ) ) {
+                return $native;
+            }
+        }
 
         // Cart.
         if ( is_cart() ) {
