@@ -90,15 +90,18 @@ class LTMS_Native_Templates {
         }
 
         // Shop / archive / category / tag.
-        if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
-            $native = self::$template_dir . 'archive-product.php';
-            if ( file_exists( $native ) ) {
-                return $native;
-            }
-        }
+        // TEMPORARY: disabled until archive-product.php template is fixed.
+        // The template causes a critical error on /tienda/ — needs debugging.
+        // Fall through to Elementor/WC default template.
+        // if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
+        //     $native = self::$template_dir . 'archive-product.php';
+        //     if ( file_exists( $native ) ) {
+        //         return $native;
+        //     }
+        // }
 
         // Cart.
-        if ( is_cart() && ! is_cart_empty_block() ) {
+        if ( is_cart() ) {
             $native = self::$template_dir . 'cart.php';
             if ( file_exists( $native ) ) {
                 return $native;
