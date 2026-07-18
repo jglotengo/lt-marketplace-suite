@@ -246,10 +246,11 @@ class LTMS_Native_Templates {
         );
 
         // Design system CSS.
-        wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver );
+        wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver . '-b' . time() );
 
         // Design system JS (vanilla, no jQuery).
-        wp_enqueue_script( 'ltms-plaza-viva', $url . 'js/ltms-plaza-viva.js', [], $ver, true );
+        // Cache-buster: time() appended to force browser reload on every deploy.
+        wp_enqueue_script( 'ltms-plaza-viva', $url . 'js/ltms-plaza-viva.js', [], $ver . '-b' . time(), true );
 
         // Localize para AJAX.
         wp_localize_script( 'ltms-plaza-viva', 'ltms_data', [
