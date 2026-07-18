@@ -750,14 +750,15 @@
     var stickySentinel = qs('[data-pv-sticky-sentinel]');
     if (stickyBar && stickySentinel) PV.stickyATC({ bar: stickyBar, sentinel: stickySentinel });
 
-    // v2.9.199 — Inject "Buy Now" button next to Add to Cart on product pages.
+    // v2.9.200 — Inject "Buy Now" button next to Add to Cart on product pages.
     PV.injectBuyNow();
 
     // v2.9.200 — Homepage hero headline injection.
-    PV.injectHeroHeadline();
+    // Delay 500ms to allow Elementor to render its containers.
+    setTimeout(function() { PV.injectHeroHeadline(); }, 500);
 
     // v2.9.200 — Shop duplicate search removal.
-    PV.cleanShopPage();
+    setTimeout(function() { PV.cleanShopPage(); }, 500);
 
     // v2.9.200 — Price prominence enhancement.
     PV.enhancePriceDisplay();
