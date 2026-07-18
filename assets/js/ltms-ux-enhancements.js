@@ -5490,27 +5490,66 @@
     }
 
     function updateCartQty(key, change) {
-        // v2.9.56: NO-OP — El manejo del carrito ahora lo hace el script inline
-        // en class-ltms-cart-drawer.php (render_cart_buttons_script).
-        // Esta función existe solo para compatibilidad con versiones cacheadas
-        // del JS que la llaman. Si se ejecuta, no hace nada (evita el error 400
-        // del woocommerce_set_cart_quantity que no existe).
-        // El script inline usa capture=true + stopImmediatePropagation para
-        // interceptar el click ANTES que este handler.
-        return;
-
-        // Código legacy (NO se ejecuta, pero se mantiene para referencia):
-        // const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)...
-        // fetch(ajaxUrl, {...})...
+        // v2.9.207: Defense-in-depth fallback. If the inline LTMS_CART script
+        // (injected via output buffering) is present, it handles clicks via
+        // capture-phase listener and this function is never called. But if SG
+        // cache serves a stale HTML page without the inline script, this code
+        // path becomes the active handler — so it must actually work.
+        if (typeof window.LTMS_CART !== 'undefined' && window.LTMS_CART.updateQty) {
+            window.LTMS_CART.updateQty(key, change);
+            return;
+        }
+        // Legacy fallback (pre-v2.9.59): direct fetch via ltmsUX.
+        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url) || '/wp-admin/admin-ajax.php';
+        const nonce = (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '';
+        const body = new URLSearchParams();
+        body.append('action', 'ltms_drawer_update_qty');
+        body.append('nonce', nonce);
+        body.append('cart_item_key', key);
+        // Need to fetch current qty from the DOM.
+        const itemEl = document.querySelector('[data-cart-item-key="' + key + '"]');
+        const qtySpan = itemEl ? itemEl.querySelector('.ltms-cart-qty-value') : null;
+        const currentQty = qtySpan ? parseInt(qtySpan.textContent, 10) || 1 : 1;
+        const newQty = Math.max(1, currentQty + change);
+        body.append('qty', String(newQty));
+        if (qtySpan) qtySpan.textContent = newQty;
+        fetch(ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+        }).then(r => r.json()).then(() => {
+            if (typeof loadCartContents === 'function') loadCartContents();
+        }).catch(() => {});
     }
 
     function removeCartItem(key) {
-        // v2.9.56: NO-OP — El manejo del carrito ahora lo hace el script inline.
-        return;
-
-        // Código legacy (NO se ejecuta):
-        // const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url)...
-        // fetch(ajaxUrl, {...})...
+        // v2.9.207: Defense-in-depth fallback. Same logic as updateCartQty.
+        if (typeof window.LTMS_CART !== 'undefined' && window.LTMS_CART.removeItem) {
+            window.LTMS_CART.removeItem(key);
+            return;
+        }
+        const ajaxUrl = (typeof ltmsUX !== 'undefined' && ltmsUX.ajax_url) || '/wp-admin/admin-ajax.php';
+        const nonce = (typeof ltmsUX !== 'undefined' && ltmsUX.nonce) || '';
+        const body = new URLSearchParams();
+        body.append('action', 'ltms_drawer_remove_item');
+        body.append('nonce', nonce);
+        body.append('cart_item_key', key);
+        const itemEl = document.querySelector('[data-cart-item-key="' + key + '"]');
+        if (itemEl) {
+            itemEl.style.transition = 'opacity 0.2s, transform 0.2s';
+            itemEl.style.opacity = '0';
+            itemEl.style.transform = 'translateX(20px)';
+            setTimeout(() => { if (itemEl.parentNode) itemEl.parentNode.removeChild(itemEl); }, 200);
+        }
+        fetch(ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+        }).then(r => r.json()).then(() => {
+            if (typeof loadCartContents === 'function') loadCartContents();
+        }).catch(() => {});
     }
 
     /**

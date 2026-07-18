@@ -113,7 +113,10 @@ class LTMS_Cart_Drawer {
 window.LTMS_CART = {
     ajaxUrl: '{$ajax_url_js}',
     nonce: '{$nonce_js}',
-    busy: false
+    busy: false,
+    debug: window.location.search.indexOf('ltmsCartDebug=1') !== -1,
+    log: function(msg) { if (window.LTMS_CART.debug) console.log('[LTMS_CART]', msg); },
+    err: function(msg, e) { console.error('[LTMS_CART]', msg, e || ''); }
 };
 // v2.9.206: Capture-phase click listener. Matches BOTH the new dynamic drawer
 // button classes (.ltms-cart-qty-inc/dec, .ltms-cart-item-remove) AND the legacy
@@ -129,16 +132,72 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    if (window.LTMS_CART.busy) return;
+    if (window.LTMS_CART.busy) {
+        window.LTMS_CART.log('busy, ignoring click');
+        return;
+    }
     window.LTMS_CART.busy = true;
-    setTimeout(function() { window.LTMS_CART.busy = false; }, 400);
+    setTimeout(function() { window.LTMS_CART.busy = false; }, 300);
     var key = (incBtn || decBtn || removeBtn).dataset.key;
+    if (!key) {
+        window.LTMS_CART.err('No data-key on button', (incBtn || decBtn || removeBtn));
+        return;
+    }
+    window.LTMS_CART.log('click: key=' + key + ' inc=' + !!incBtn + ' dec=' + !!decBtn + ' rm=' + !!removeBtn);
     if (incBtn || decBtn) {
         LTMS_CART.updateQty(key, incBtn ? 1 : -1);
     } else if (removeBtn) {
         LTMS_CART.removeItem(key);
     }
 }, true);
+// v2.9.207: Use XMLHttpRequest instead of fetch. SiteGround's security layer
+// (mod_security rules + Cloudflare-style proxy) has been known to silently
+// drop fetch() POST requests with application/x-www-form-urlencoded bodies
+// while allowing jQuery's $.post (which uses XHR). Using XHR directly matches
+// jQuery's behavior and is more resilient to intermediary interference.
+window.LTMS_CART.ajax = function(body, onSuccess, onError) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', LTMS_CART.ajaxUrl, true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+    xhr.withCredentials = true;
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                var json = JSON.parse(xhr.responseText);
+                if (json && json.success) {
+                    window.LTMS_CART.log('AJAX success');
+                    onSuccess(json.data, json);
+                } else {
+                    window.LTMS_CART.err('AJAX returned error', json);
+                    if (onError) onError(json, xhr.status);
+                    else LTMS_CART.notify('Error: ' + (json && json.data && json.data.message || 'desconocido'));
+                }
+            } catch (parseErr) {
+                window.LTMS_CART.err('AJAX response not JSON', xhr.responseText.substring(0, 200));
+                if (onError) onError(null, xhr.status);
+                else LTMS_CART.notify('Error de red — ver consola');
+            }
+        } else {
+            window.LTMS_CART.err('AJAX HTTP ' + xhr.status, xhr.responseText.substring(0, 200));
+            if (onError) onError(null, xhr.status);
+            else LTMS_CART.notify('HTTP ' + xhr.status + ' — ver consola');
+        }
+    };
+    xhr.onerror = function() {
+        window.LTMS_CART.err('XHR network error');
+        if (onError) onError(null, 0);
+        else LTMS_CART.notify('Error de red');
+    };
+    xhr.send(body);
+};
+window.LTMS_CART.notify = function(msg) {
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#DC2626;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.2);font-family:sans-serif';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 3500);
+};
 window.LTMS_CART.updateQty = function(key, change) {
     // v2.9.206: Update qty display in BOTH drawer types simultaneously.
     // New dynamic drawer: <span class="ltms-cart-qty-value"> inside [data-cart-item-key]
@@ -171,34 +230,36 @@ window.LTMS_CART.updateQty = function(key, change) {
         }
     }
     if (newQty < 1) newQty = 1;
+    window.LTMS_CART.log('updateQty: ' + key + ' ' + currentQty + ' -> ' + newQty);
     var body = 'action=ltms_drawer_update_qty&nonce=' + encodeURIComponent(LTMS_CART.nonce) + '&cart_item_key=' + encodeURIComponent(key) + '&qty=' + newQty;
-    fetch(LTMS_CART.ajaxUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:body})
-    .then(function(r){return r.json();}).then(function(){LTMS_CART.reload();}).catch(function(){LTMS_CART.reload();});
+    LTMS_CART.ajax(body, function(data) {
+        LTMS_CART.reload();
+    }, function(err, status) {
+        LTMS_CART.reload();
+    });
 };
 window.LTMS_CART.removeItem = function(key) {
-    // v2.9.206: Visually remove the item from BOTH drawers immediately (don't
-    // just dim it). The server will confirm via reload().
     var itemEls = document.querySelectorAll('[data-cart-item-key="' + key + '"]');
+    window.LTMS_CART.log('removeItem: ' + key + ' (found ' + itemEls.length + ' element[s])');
     for (var i = 0; i < itemEls.length; i++) {
         var el = itemEls[i];
         el.style.transition = 'opacity 0.2s, transform 0.2s';
         el.style.opacity = '0';
         el.style.transform = 'translateX(20px)';
-        // Defer actual DOM removal so the transition can play
         (function(node) {
-            setTimeout(function() { if (node && node.parentNode) node.parentNode.removeChild(node); }, 250);
+            setTimeout(function() { if (node && node.parentNode) node.parentNode.removeChild(node); }, 200);
         })(el);
     }
     var body = 'action=ltms_drawer_remove_item&nonce=' + encodeURIComponent(LTMS_CART.nonce) + '&cart_item_key=' + encodeURIComponent(key);
-    fetch(LTMS_CART.ajaxUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:body})
-    .then(function(r){return r.json();}).then(function(){LTMS_CART.reload();}).catch(function(){LTMS_CART.reload();});
+    LTMS_CART.ajax(body, function(data) {
+        LTMS_CART.reload();
+    }, function(err, status) {
+        LTMS_CART.reload();
+    });
 };
 window.LTMS_CART.reload = function() {
     var body = 'action=ltms_get_cart&nonce=' + encodeURIComponent(LTMS_CART.nonce);
-    fetch(LTMS_CART.ajaxUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:body})
-    .then(function(r){return r.json();}).then(function(response){
-        if (!response || !response.success || !response.data) return;
-        var data = response.data;
+    LTMS_CART.ajax(body, function(data) {
         if (data.count !== undefined) {
             document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count').forEach(function(el){el.textContent=data.count;});
         }
@@ -227,7 +288,11 @@ window.LTMS_CART.reload = function() {
         if (c1) containers.push(c1);
         var c2 = document.querySelector('#ltms-drawer-items');
         if (c2 && containers.indexOf(c2) === -1) containers.push(c2);
-        if (!containers.length) return;
+        if (!containers.length) {
+            window.LTMS_CART.log('reload: no containers found');
+            return;
+        }
+        window.LTMS_CART.log('reload: ' + containers.length + ' container[s], ' + (data.items ? data.items.length : 0) + ' item[s]');
         var html;
         if (!data.items || !data.items.length) {
             html = '<div style="text-align:center;padding:40px 20px;"><p>Tu carrito esta vacio</p></div>';
@@ -250,7 +315,9 @@ window.LTMS_CART.reload = function() {
                 '</div>';
         }).join('');
         for (var j = 0; j < containers.length; j++) containers[j].innerHTML = html;
-    }).catch(function(){});
+    }, function(err, status) {
+        window.LTMS_CART.err('reload failed', err);
+    });
 };
 window.LTMS_CART.esc = function(str){
     if(!str) return '';
@@ -359,9 +426,19 @@ JS;
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
             wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
         }
+        // v2.9.207: Ensure WC()->cart is initialized for guests in AJAX context.
+        if ( function_exists( 'WC' ) && WC()->cart && method_exists( WC()->cart, 'get_cart' ) && empty( WC()->cart->get_cart() ) && WC()->session ) {
+            WC()->cart->get_cart_from_session();
+        }
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         if ( $cart_item_key && WC()->cart ) {
             WC()->cart->remove_cart_item( $cart_item_key );
+            // v2.9.207: Force session + totals save so the change persists
+            // across the immediately-following ltms_get_cart AJAX call.
+            if ( WC()->session ) {
+                WC()->cart->set_session();
+                WC()->cart->calculate_totals();
+            }
         }
         wp_send_json_success( self::get_drawer_data( true ) );
     }
@@ -375,14 +452,24 @@ JS;
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
             wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
         }
+        // v2.9.207: Ensure WC()->cart is initialized for guests in AJAX context.
+        if ( function_exists( 'WC' ) && WC()->cart && method_exists( WC()->cart, 'get_cart' ) && empty( WC()->cart->get_cart() ) && WC()->session ) {
+            WC()->cart->get_cart_from_session();
+        }
         $cart_item_key = sanitize_text_field( $_POST['cart_item_key'] ?? '' );
         $qty = (int) ( $_POST['qty'] ?? 1 );
         // v2.9.123 CHECKOUT-AUDIT P0-2 FIX: bound qty to reasonable max.
-        // Before, a customer could set qty=999999999 → WC()->cart->set_quantity
-        // would try to recalculate totals for that quantity → DoS via CPU.
         $qty = max( 1, min( $qty, 999 ) );
         if ( $cart_item_key && WC()->cart ) {
-            WC()->cart->set_quantity( $cart_item_key, $qty, true );
+            $result = WC()->cart->set_quantity( $cart_item_key, $qty, true );
+            // v2.9.207: Force session + totals save so the change persists
+            // across the immediately-following ltms_get_cart AJAX call.
+            // set_quantity with $refresh_totals=true SHOULD do this, but some
+            // WC versions don't save to session immediately for guests.
+            if ( WC()->session ) {
+                WC()->cart->set_session();
+                WC()->cart->calculate_totals();
+            }
         }
         wp_send_json_success( self::get_drawer_data( true ) );
     }
