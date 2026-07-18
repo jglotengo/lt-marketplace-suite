@@ -72,6 +72,26 @@ class LTMS_Native_Templates {
 
         // Body class para scope CSS.
         add_filter( 'body_class', [ __CLASS__, 'body_class' ] );
+
+        // v2.9.191 — Rewrite rules for custom pages (tracking, help).
+        add_action( 'init', [ __CLASS__, 'register_rewrites' ] );
+        add_filter( 'query_vars', [ __CLASS__, 'register_query_vars' ] );
+    }
+
+    /**
+     * Registra rewrite rules para páginas custom del plugin.
+     */
+    public static function register_rewrites(): void {
+        add_rewrite_rule( '^seguimiento/?$', 'index.php?ltms_page=tracking', 'top' );
+        add_rewrite_rule( '^ayuda/?$', 'index.php?ltms_page=help', 'top' );
+    }
+
+    /**
+     * Registra query vars custom.
+     */
+    public static function register_query_vars( array $vars ): array {
+        $vars[] = 'ltms_page';
+        return $vars;
     }
 
     /**

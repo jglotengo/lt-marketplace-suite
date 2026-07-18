@@ -721,4 +721,162 @@
   .pv-product-card:hover{transform:none !important;}
 }
 
+/* ── v2.9.191 — SHOP PAGE IMPROVEMENTS ──────────────────────────────────── */
+
+/* Sidebar filters — more prominent and visible */
+.pv-shop .pv-shop-sidebar,
+.pv-shop .pv-shop__sidebar {
+    background: var(--surface) !important;
+    border-radius: var(--r-card) !important;
+    padding: 20px !important;
+    box-shadow: var(--sh-2) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Filter sections — better spacing and hierarchy */
+.pv-shop-filter,
+.pv-shop__filter {
+    padding: 16px 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.pv-shop-filter:last-child,
+.pv-shop__filter:last-child {
+    border-bottom: none !important;
+}
+.pv-shop-filter h4,
+.pv-shop__filter h4,
+.pv-shop-filter__title,
+.pv-shop__filter-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    margin-bottom: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+/* Filter checkboxes — bigger touch targets */
+.pv-shop-filter label,
+.pv-shop__filter label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 0 !important;
+    font-size: 14px !important;
+    color: var(--text-2) !important;
+    cursor: pointer !important;
+    transition: color 0.15s !important;
+    min-height: 36px !important;
+}
+.pv-shop-filter label:hover,
+.pv-shop__filter label:hover {
+    color: var(--primary) !important;
+}
+.pv-shop-filter input[type="checkbox"],
+.pv-shop__filter input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    accent-color: var(--primary) !important;
+    cursor: pointer !important;
+}
+
+/* Price filter inputs — wider and styled */
+.pv-shop-filter__price-field input,
+.pv-shop__filter-price input {
+    width: 100% !important;
+    height: 40px !important;
+    padding: 0 12px !important;
+    border: 2px solid var(--border) !important;
+    border-radius: var(--r-sm) !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    background: var(--surface) !important;
+    transition: border-color 0.15s !important;
+}
+.pv-shop-filter__price-field input:focus,
+.pv-shop__filter-price input:focus {
+    border-color: var(--primary) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1) !important;
+}
+
+/* Shop toolbar — cleaner and more prominent */
+.pv-shop__toolbar,
+.pv-shop-toolbar {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--r-md) !important;
+    padding: 12px 16px !important;
+    box-shadow: var(--sh-1) !important;
+    margin-bottom: 20px !important;
+}
+
+/* Active filter chips — more visible */
+.pv-shop__active-filter,
+.pv-shop-active-filter {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    background: var(--primary-50) !important;
+    color: var(--primary-700) !important;
+    border: 1px solid var(--primary-100) !important;
+    border-radius: var(--r-pill) !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+}
+.pv-shop__active-filter:hover,
+.pv-shop-active-filter:hover {
+    background: var(--primary) !important;
+    color: #fff !important;
+}
+
+/* Product grid — better card spacing */
+.pv-shop .pv-product-card,
+.pv-shop .product {
+    margin-bottom: 20px !important;
+}
+
+/* Complementary products — less dominant */
+.pv-product-page .ltms-addon-items {
+    margin-top: 32px !important;
+    padding: 16px !important;
+    background: var(--bg) !important;
+    border-radius: var(--r-card) !important;
+    border: 1px solid var(--border) !important;
+}
+.pv-product-page .ltms-addon-items h4 {
+    font-size: 15px !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+}
+
+/* Trust badges — more prominent with icon sizing */
+.pv-product-page .ltms-mini-badges {
+    padding: 14px 18px !important;
+    background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%) !important;
+    border-radius: var(--r-md) !important;
+    border: 1px solid #bbf7d0 !important;
+    margin-top: 20px !important;
+}
+.pv-product-page .ltms-mini-badge {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+.pv-product-page .ltms-mini-badge span:first-child {
+    font-size: 18px !important;
+}
+
+/* ── RESPONSIVE: Shop sidebar mobile ─────────────────────────────────────── */
+@media (max-width: 768px) {
+    .pv-shop .pv-shop-sidebar,
+    .pv-shop .pv-shop__sidebar {
+        position: static !important;
+        width: 100% !important;
+        margin-bottom: 16px !important;
+    }
+}
+
 /* end of file · ltms-plaza-viva.css */
