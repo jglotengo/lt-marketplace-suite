@@ -617,6 +617,42 @@
   });
 
   /* =========================================================================
+   * v2.9.199 — Buy Now button injection
+   * ========================================================================= */
+  PV.injectBuyNow = function () {
+    // Only on product pages
+    var atcBtn = qs('form.cart .single_add_to_cart_button, .elementor-add-to-cart .single_add_to_cart_button');
+    if (!atcBtn) return;
+    // Don't double-inject
+    if (qs('.ltms-buy-now-btn')) return;
+
+    // Get product ID from the add-to-cart button or form
+    var form = atcBtn.closest('form.cart');
+    var pid = '';
+    if (form) {
+      var hidden = form.querySelector('input[name="add-to-cart"]');
+      if (hidden) pid = hidden.value;
+    }
+    if (!pid && atcBtn.name === 'add-to-cart') pid = atcBtn.value;
+    if (!pid) return;
+
+    // Get checkout URL
+    var checkoutUrl = (window.ltms_data && window.ltms_data.checkout_url) || '/checkout/';
+
+    // Create Buy Now button
+    var buyNow = document.createElement('a');
+    buyNow.href = checkoutUrl + '?buy_now=' + encodeURIComponent(pid);
+    buyNow.className = 'ltms-buy-now-btn';
+    buyNow.setAttribute('aria-label', 'Comprar ahora');
+    buyNow.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>Comprar ahora';
+
+    // Insert after the add-to-cart button
+    if (atcBtn.parentNode) {
+      atcBtn.parentNode.insertBefore(buyNow, atcBtn.nextSibling);
+    }
+  };
+
+  /* =========================================================================
    * Auto-init on DOM ready
    * ========================================================================= */
   function autoInit() {
@@ -635,6 +671,10 @@
     var stickyBar = qs('.pv-sticky-atc');
     var stickySentinel = qs('[data-pv-sticky-sentinel]');
     if (stickyBar && stickySentinel) PV.stickyATC({ bar: stickyBar, sentinel: stickySentinel });
+
+    // v2.9.199 — Inject "Buy Now" button next to Add to Cart on product pages.
+    PV.injectBuyNow();
+
     dispatch('ready', { version: PV.version });
   }
 
