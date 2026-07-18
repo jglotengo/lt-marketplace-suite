@@ -557,13 +557,23 @@ final class LTMS_Core_Kernel {
                 display: inline-flex !important;
                 align-items: center !important;
                 vertical-align: middle !important;
-                margin-right: 12px !important;
+                margin-right: 16px !important;
             }
             form.cart .single_add_to_cart_button,
             .elementor-add-to-cart .single_add_to_cart_button {
                 display: inline-flex !important;
                 vertical-align: middle !important;
+                margin-right: 12px !important;
             }
+            /* VLM FIX: Trust signals more prominent */
+            .ltms-mini-badges {
+                padding: 12px 16px !important;
+                background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%) !important;
+                border-radius: 10px !important;
+                border: 1px solid #bbf7d0 !important;
+            }
+            .ltms-mini-badge { font-size: 13px !important; font-weight: 600 !important; }
+            .ltms-mini-badge span:first-child { font-size: 16px !important; }
             /* Mobile: button full width, quantity beside it */
             @media (max-width: 768px) {
                 .single_add_to_cart_button,

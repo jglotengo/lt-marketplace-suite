@@ -1456,12 +1456,51 @@ form.cart .quantity,
     display: inline-flex !important;
     align-items: center !important;
     vertical-align: middle !important;
-    margin-right: 12px !important;
+    margin-right: 16px !important;
 }
 form.cart .single_add_to_cart_button,
 .elementor-add-to-cart .single_add_to_cart_button {
     display: inline-flex !important;
     vertical-align: middle !important;
+    margin-right: 12px !important;
+}
+
+/* VLM FIX: Make "Ver tienda" button more visible */
+.ltms-vendor-tab .button,
+a.button[href*="vendedor"],
+a.button[href*="vendor"] {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 8px 20px !important;
+    background: #2563EB !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    transition: all 0.18s cubic-bezier(0.4,0,0.2,1) !important;
+}
+.ltms-vendor-tab .button:hover,
+a.button[href*="vendedor"]:hover,
+a.button[href*="vendor"]:hover {
+    background: #1d4ed8 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3) !important;
+}
+
+/* VLM FIX: Trust signals more prominent */
+.ltms-mini-badges {
+    padding: 12px 16px !important;
+    background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%) !important;
+    border-radius: 10px !important;
+    border: 1px solid #bbf7d0 !important;
+    margin-top: 16px !important;
+}
+.ltms-mini-badge {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+.ltms-mini-badge span:first-child {
+    font-size: 16px !important;
 }
 
 /* ── Responsive: mobile adjustments ─────────────────────────── */
