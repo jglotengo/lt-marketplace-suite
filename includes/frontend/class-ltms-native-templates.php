@@ -115,12 +115,18 @@ class LTMS_Native_Templates {
         }
 
         // Shop / archive / category / tag.
-        if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
-            $native = self::$template_dir . 'archive-product.php';
-            if ( file_exists( $native ) ) {
-                return $native;
-            }
-        }
+        // DISABLED: even the minimal archive-product.php causes a critical error
+        // on /tienda/. The issue is NOT in our template code but in how the
+        // template_include override interacts with Elementor's shop page template.
+        // Elementor registers its own template for the shop page at a higher
+        // priority, and our override at priority 99 conflicts with it.
+        // Falling through to Elementor's shop template.
+        // if ( is_shop() || is_product_category() || is_product_tag() || is_product_taxonomy() ) {
+        //     $native = self::$template_dir . 'archive-product.php';
+        //     if ( file_exists( $native ) ) {
+        //         return $native;
+        //     }
+        // }
 
         // Cart.
         if ( is_cart() ) {
