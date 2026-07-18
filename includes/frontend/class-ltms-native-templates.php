@@ -401,12 +401,167 @@ class LTMS_Native_Templates {
                 if (atc.parentNode) atc.parentNode.insertBefore(bn, atc.nextSibling);
             };
 
+            // v2.9.204 — Inject +/− buttons around quantity inputs on product page
+            PV.injectQtySteppers = function() {
+                if (!document.body.classList.contains('single-product')) return;
+                var qtyInputs = document.querySelectorAll('form.cart .quantity input[type="number"], form.cart .qty, .quantity input.qty');
+                for (var i = 0; i < qtyInputs.length; i++) {
+                    var input = qtyInputs[i];
+                    if (input.dataset.ltmsStepper) continue;
+                    input.dataset.ltmsStepper = '1';
+
+                    var wrapper = input.closest('.quantity');
+                    if (!wrapper) {
+                        wrapper = document.createElement('div');
+                        wrapper.className = 'quantity ltms-qty-wrapper';
+                        input.parentNode.insertBefore(wrapper, input);
+                        wrapper.appendChild(input);
+                    }
+
+                    // Add wrapper class
+                    wrapper.classList.add('ltms-qty-wrapper');
+                    wrapper.style.cssText = 'display:inline-flex !important;align-items:center !important;border:2px solid #E5E7EB !important;border-radius:10px !important;overflow:hidden !important;height:48px !important';
+
+                    // Minus button
+                    var minus = document.createElement('button');
+                    minus.type = 'button';
+                    minus.className = 'ltms-qty-btn ltms-qty-minus';
+                    minus.setAttribute('aria-label', 'Disminuir cantidad');
+                    minus.style.cssText = 'width:44px;height:48px;border:none;background:#F6F5F8 !important;font-size:20px;font-weight:700;color:#565C66;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s';
+                    minus.innerHTML = '\u2212';
+                    minus.onmouseover = function() { this.style.background = '#E5E7EB'; };
+                    minus.onmouseout = function() { this.style.background = '#F6F5F8'; };
+
+                    // Plus button
+                    var plus = document.createElement('button');
+                    plus.type = 'button';
+                    plus.className = 'ltms-qty-btn ltms-qty-plus';
+                    plus.setAttribute('aria-label', 'Aumentar cantidad');
+                    plus.style.cssText = 'width:44px;height:48px;border:none;background:#F6F5F8 !important;font-size:20px;font-weight:700;color:#565C66;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s';
+                    plus.innerHTML = '+';
+                    plus.onmouseover = function() { this.style.background = '#E5E7EB'; };
+                    plus.onmouseout = function() { this.style.background = '#F6F5F8'; };
+
+                    // Style input
+                    input.style.cssText = 'border:none !important;text-align:center !important;width:56px !important;height:48px !important;font-size:16px !important;font-weight:600 !important;background:transparent !important;-moz-appearance:textfield !important;-webkit-appearance:none !important;box-shadow:none !important;outline:none !important;padding:0 4px !important';
+                    input.setAttribute('readonly', 'readonly');
+
+                    // Insert buttons
+                    wrapper.insertBefore(minus, input);
+                    if (input.nextSibling) {
+                        wrapper.insertBefore(plus, input.nextSibling);
+                    } else {
+                        wrapper.appendChild(plus);
+                    }
+
+                    // Event handlers
+                    var min = parseFloat(input.getAttribute('min')) || 1;
+                    var max = parseFloat(input.getAttribute('max')) || 9999;
+                    var step = parseFloat(input.getAttribute('step')) || 1;
+
+                    function setVal(v) {
+                        v = Math.max(min, Math.min(max, parseFloat(v) || min));
+                        input.value = v;
+                        minus.disabled = (v <= min);
+                        plus.disabled = (v >= max);
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    minus.onclick = function(e) { e.preventDefault(); setVal(parseFloat(input.value) - step); };
+                    plus.onclick = function(e) { e.preventDefault(); setVal(parseFloat(input.value) + step); };
+                    setVal(input.value);
+                }
+            };
+
+            // v2.9.204 — Enhance cart page: add +/− buttons and remove buttons
+            PV.enhanceCartPage = function() {
+                var cartPage = document.body.classList.contains('woocommerce-cart') || document.body.classList.contains('woocommerce-checkout');
+                if (!cartPage && !document.querySelector('table.cart, .cart-collaterals, .woocommerce-cart-form')) return;
+
+                // Add +/− steppers to cart quantity inputs
+                var cartQtys = document.querySelectorAll('input.qty, .product-quantity input[type="number"]');
+                for (var i = 0; i < cartQtys.length; i++) {
+                    var input = cartQtys[i];
+                    if (input.dataset.ltmsStepper) continue;
+                    input.dataset.ltmsStepper = '1';
+
+                    var td = input.closest('td');
+                    if (!td) continue;
+
+                    var wrapper = document.createElement('div');
+                    wrapper.className = 'ltms-qty-wrapper';
+                    wrapper.style.cssText = 'display:inline-flex !important;align-items:center !important;border:2px solid #E5E7EB !important;border-radius:8px !important;overflow:hidden !important;height:40px !important';
+
+                    var minus = document.createElement('button');
+                    minus.type = 'button';
+                    minus.style.cssText = 'width:36px;height:40px;border:none;background:#F6F5F8;font-size:18px;font-weight:700;color:#565C66;cursor:pointer';
+                    minus.innerHTML = '\u2212';
+
+                    var plus = document.createElement('button');
+                    plus.type = 'button';
+                    plus.style.cssText = 'width:36px;height:40px;border:none;background:#F6F5F8;font-size:18px;font-weight:700;color:#565C66;cursor:pointer';
+                    plus.innerHTML = '+';
+
+                    input.style.cssText = 'border:none !important;text-align:center !important;width:48px !important;height:40px !important;font-size:14px !important;font-weight:600 !important;background:transparent !important;-moz-appearance:textfield !important;-webkit-appearance:none !important;outline:none !important;padding:0 !important';
+
+                    input.parentNode.insertBefore(wrapper, input);
+                    wrapper.appendChild(minus);
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(plus);
+
+                    var min = parseFloat(input.getAttribute('min')) || 0;
+                    var step = parseFloat(input.getAttribute('step')) || 1;
+
+                    minus.onclick = function(e) {
+                        e.preventDefault();
+                        var v = Math.max(min, parseFloat(input.value) - step);
+                        input.value = v;
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        // Trigger update cart button if exists
+                        var updateBtn = document.querySelector('[name="update_cart"]');
+                        if (updateBtn) { updateBtn.disabled = false; updateBtn.click(); }
+                    };
+                    plus.onclick = function(e) {
+                        e.preventDefault();
+                        var v = parseFloat(input.value) + step;
+                        input.value = v;
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        var updateBtn = document.querySelector('[name="update_cart"]');
+                        if (updateBtn) { updateBtn.disabled = false; updateBtn.click(); }
+                    };
+                }
+
+                // Enhance remove buttons — make them more visible
+                var removeBtns = document.querySelectorAll('.product-remove a.remove, td.product-remove a');
+                for (var j = 0; j < removeBtns.length; j++) {
+                    var rm = removeBtns[j];
+                    rm.style.cssText = 'display:inline-flex !important;align-items:center !important;justify-content:center !important;width:32px !important;height:32px !important;border-radius:50% !important;background:#FEE2E2 !important;color:#DC2626 !important;font-size:16px !important;font-weight:700 !important;text-decoration:none !important;transition:all 0.15s !important';
+                    rm.innerHTML = '\u00d7';
+                    rm.title = 'Eliminar producto';
+                    rm.onmouseover = function() { this.style.background = '#DC2626'; this.style.color = '#fff'; };
+                    rm.onmouseout = function() { this.style.background = '#FEE2E2'; this.style.color = '#DC2626'; };
+                }
+
+                // Enhance add-to-cart buttons on homepage/shop (fly to cart)
+                var shopAtcBtns = document.querySelectorAll('.product a.button, .product button.button, .product-type-simple a.ajax_add_to_cart');
+                for (var k = 0; k < shopAtcBtns.length; k++) {
+                    var btn = shopAtcBtns[k];
+                    if (btn.dataset.ltmsEnhanced) continue;
+                    btn.dataset.ltmsEnhanced = '1';
+                    btn.style.cssText = 'display:block !important;width:100% !important;text-align:center !important;border-radius:8px !important;font-weight:600 !important;font-size:13px !important;padding:10px !important;margin-top:8px !important;background:#E80001 !important;color:#fff !important;border:none !important;transition:all 0.18s !important';
+                    btn.onmouseover = function() { this.style.transform = 'translateY(-1px)'; this.style.boxShadow = '0 4px 12px rgba(232,0,1,0.25)'; };
+                    btn.onmouseout = function() { this.style.transform = ''; this.style.boxShadow = ''; };
+                }
+            };
+
             // Execute all functions with delay for Elementor rendering
             setTimeout(function() {
                 if (PV.injectHeroHeadline) PV.injectHeroHeadline();
                 if (PV.cleanShopPage) PV.cleanShopPage();
                 if (PV.enhancePriceDisplay) PV.enhancePriceDisplay();
                 if (PV.injectBuyNow) PV.injectBuyNow();
+                if (PV.injectQtySteppers) PV.injectQtySteppers();
+                if (PV.enhanceCartPage) PV.enhanceCartPage();
             }, 500);
         })();
         </script>
