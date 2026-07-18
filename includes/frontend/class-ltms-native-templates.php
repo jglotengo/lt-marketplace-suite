@@ -346,79 +346,62 @@ class LTMS_Native_Templates {
         ?>
         <script id="ltms-pv-patch">
         (function(){
-            if (!window.PV) return;
-            // injectHeroHeadline — add if missing
-            if (!PV.injectHeroHeadline) {
-                PV.injectHeroHeadline = function() {
-                    if (!document.body.classList.contains('home')) return;
-                    if (document.querySelector('.ltms-hero-headline')) return;
-                    var hero = document.querySelector('.e-con') || document.querySelector('.e-flex') || document.querySelector('.elementor-section') || document.querySelector('main') || document.querySelector('.site-main');
-                    if (!hero) return;
-                    var h = document.createElement('div');
-                    h.className = 'ltms-hero-headline';
-                    h.innerHTML = '<h2 style="font-family:Albert Sans,sans-serif;font-size:clamp(24px,4vw,36px);font-weight:800;color:#fff;text-align:center;padding:12px 20px;background:linear-gradient(135deg,#E80001 0%,#B80001 100%);border-radius:14px;margin:0 auto;max-width:600px;box-shadow:0 4px 14px rgba(232,0,1,0.3);line-height:1.3;letter-spacing:-0.02em">Tu Marketplace de Confianza en Colombia</h2><p style="text-align:center;color:#565C66;font-size:14px;margin-top:8px;font-weight:500">Miles de productos de vendedores verificados · PSE · Nequi · Envío a todo el país</p>';
-                    hero.insertBefore(h, hero.firstChild);
-                };
-            }
-            // cleanShopPage — add if missing
-            if (!PV.cleanShopPage) {
-                PV.cleanShopPage = function() {
-                    if (!document.body.classList.contains('archive') && !document.body.classList.contains('post-type-archive-product') && !document.body.classList.contains('tax-product_cat')) return;
-                    var searches = document.querySelectorAll('.widget-area .woocommerce-product-search, .sidebar .woocommerce-product-search, .widget_product_search');
-                    searches.forEach(function(s) {
-                        var w = s.closest('.widget');
-                        if (w) w.style.display = 'none';
-                        else s.style.display = 'none';
-                    });
-                    var pf = document.querySelector('.widget_price_filter, .price_filter');
-                    if (pf) {
-                        var w = pf.closest('.widget');
-                        if (w) {
-                            w.style.background = '#fff';
-                            w.style.padding = '16px';
-                            w.style.borderRadius = '14px';
-                            w.style.border = '1px solid #E7E5EC';
-                            w.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
-                            w.style.marginBottom = '16px';
-                        }
-                    }
-                };
-            }
-            // enhancePriceDisplay — add if missing
-            if (!PV.enhancePriceDisplay) {
-                PV.enhancePriceDisplay = function() {
-                    if (!document.body.classList.contains('single-product')) return;
-                    var price = document.querySelector('.single-product .price, .product .price, .pv-product-page .price');
-                    if (!price) return;
-                    if (document.querySelector('.ltms-price-shipping-info')) return;
-                    var info = document.createElement('div');
-                    info.className = 'ltms-price-shipping-info';
-                    info.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
-                    info.innerHTML = '<span>🚚</span> <span>Envío gratis incluido</span>';
-                    if (price.parentNode) price.parentNode.insertBefore(info, price.nextSibling);
-                };
-            }
-            // injectBuyNow — add if missing
-            if (!PV.injectBuyNow) {
-                PV.injectBuyNow = function() {
-                    var atc = document.querySelector('form.cart .single_add_to_cart_button, .elementor-add-to-cart .single_add_to_cart_button');
-                    if (!atc) return;
-                    if (document.querySelector('.ltms-buy-now-btn')) return;
-                    var form = atc.closest('form.cart');
-                    var pid = '';
-                    if (form) { var hidden = form.querySelector('input[name="add-to-cart"]'); if (hidden) pid = hidden.value; }
-                    if (!pid && atc.name === 'add-to-cart') pid = atc.value;
-                    if (!pid) return;
-                    var checkoutUrl = (window.ltms_data && window.ltms_data.checkout_url) || '/checkout/';
-                    var bn = document.createElement('a');
-                    bn.href = checkoutUrl + '?buy_now=' + encodeURIComponent(pid);
-                    bn.className = 'ltms-buy-now-btn';
-                    bn.setAttribute('aria-label', 'Comprar ahora');
-                    bn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>Comprar ahora';
-                    if (atc.parentNode) atc.parentNode.insertBefore(bn, atc.nextSibling);
-                };
-            }
-            // Execute all functions with delay for Elementor
+            if (!window.PV) window.PV = { version: '3.0.2' };
+
+            // ALWAYS override functions (don't check if exists — the cached
+            // external JS may have an OLD version with wrong selectors).
+            PV.injectHeroHeadline = function() {
+                if (!document.body.classList.contains('home')) return;
+                if (document.querySelector('.ltms-hero-headline')) return;
+                var hero = document.querySelector('.e-con') || document.querySelector('.e-flex') || document.querySelector('.elementor-section') || document.querySelector('[data-elementor-type]') || document.querySelector('main') || document.querySelector('.site-main');
+                if (!hero) return;
+                var h = document.createElement('div');
+                h.className = 'ltms-hero-headline';
+                h.innerHTML = '<h2 style="font-family:Albert Sans,sans-serif;font-size:clamp(24px,4vw,36px);font-weight:800;color:#fff;text-align:center;padding:12px 20px;background:linear-gradient(135deg,#E80001 0%,#B80001 100%);border-radius:14px;margin:0 auto;max-width:600px;box-shadow:0 4px 14px rgba(232,0,1,0.3);line-height:1.3;letter-spacing:-0.02em">Tu Marketplace de Confianza en Colombia</h2><p style="text-align:center;color:#565C66;font-size:14px;margin-top:8px;font-weight:500">Miles de productos de vendedores verificados · PSE · Nequi · Envío a todo el país</p>';
+                hero.insertBefore(h, hero.firstChild);
+            };
+
+            PV.cleanShopPage = function() {
+                if (!document.body.classList.contains('archive') && !document.body.classList.contains('post-type-archive-product') && !document.body.classList.contains('tax-product_cat')) return;
+                var searches = document.querySelectorAll('.widget-area .woocommerce-product-search, .sidebar .woocommerce-product-search, .widget_product_search');
+                for (var i = 0; i < searches.length; i++) {
+                    var w = searches[i].closest('.widget');
+                    if (w) w.style.display = 'none';
+                    else searches[i].style.display = 'none';
+                }
+            };
+
+            PV.enhancePriceDisplay = function() {
+                if (!document.body.classList.contains('single-product')) return;
+                var price = document.querySelector('.single-product .price, .product .price, .price:not(.ltms-price-shipping-info)');
+                if (!price) return;
+                if (document.querySelector('.ltms-price-shipping-info')) return;
+                var info = document.createElement('div');
+                info.className = 'ltms-price-shipping-info';
+                info.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
+                info.innerHTML = '<span>\uD83D\uDE9A</span> <span>Envío gratis incluido</span>';
+                if (price.parentNode) price.parentNode.insertBefore(info, price.nextSibling);
+            };
+
+            PV.injectBuyNow = function() {
+                var atc = document.querySelector('form.cart .single_add_to_cart_button, .elementor-add-to-cart .single_add_to_cart_button, button[name="add-to-cart"]');
+                if (!atc) return;
+                if (document.querySelector('.ltms-buy-now-btn')) return;
+                var form = atc.closest('form.cart');
+                var pid = '';
+                if (form) { var hidden = form.querySelector('input[name="add-to-cart"]'); if (hidden) pid = hidden.value; }
+                if (!pid && atc.name === 'add-to-cart') pid = atc.value;
+                if (!pid) return;
+                var checkoutUrl = (window.ltms_data && window.ltms_data.checkout_url) || '/checkout/';
+                var bn = document.createElement('a');
+                bn.href = checkoutUrl + '?buy_now=' + encodeURIComponent(pid);
+                bn.className = 'ltms-buy-now-btn';
+                bn.setAttribute('aria-label', 'Comprar ahora');
+                bn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>Comprar ahora';
+                if (atc.parentNode) atc.parentNode.insertBefore(bn, atc.nextSibling);
+            };
+
+            // Execute all functions with delay for Elementor rendering
             setTimeout(function() {
                 if (PV.injectHeroHeadline) PV.injectHeroHeadline();
                 if (PV.cleanShopPage) PV.cleanShopPage();
