@@ -444,12 +444,12 @@ final class LTMS_Core_Kernel {
             ] );
         } );
 
-        // v2.9.182 — Inline critical CSS for add-to-cart button.
+        // v2.9.198 — Inline critical CSS for product page + homepage enhancements.
         // Injected via wp_head with priority 999 (after Elementor's styles)
-        // to guarantee our button styling wins the cascade war against
-        // Elementor's aggressive .button !important rules.
+        // to guarantee our styling wins the cascade war.
         add_action( 'wp_head', function() {
-            if ( ! is_product() ) return;
+            // Product page critical CSS.
+            if ( is_product() ) :
             ?>
             <style id="ltms-critical-product-css">
             /* Force button dimensions — override Elementor theme */
@@ -599,6 +599,147 @@ final class LTMS_Core_Kernel {
                     height: 48px !important;
                     font-size: 18px !important;
                 }
+            }
+            </style>
+            <?php
+            endif; // is_product()
+
+            // v2.9.198 — VLM-driven enhancements for ALL pages.
+            ?>
+            <style id="ltms-vlm-enhancements">
+            /* VLM: Trust badges — more prominent with icons and background */
+            .ltms-mini-badges {
+                padding: 14px 18px !important;
+                background: linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%) !important;
+                border-radius: 12px !important;
+                border: 1px solid #bbf7d0 !important;
+                margin-top: 20px !important;
+                display: flex !important;
+                gap: 24px !important;
+                flex-wrap: wrap !important;
+                align-items: center !important;
+            }
+            .ltms-mini-badge {
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+                color: #374151 !important;
+            }
+            .ltms-mini-badge span:first-child {
+                font-size: 20px !important;
+                line-height: 1 !important;
+            }
+
+            /* VLM: Buy Now button — secondary CTA alongside Add to Cart */
+            .ltms-buy-now-btn {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 48px !important;
+                padding: 0 28px !important;
+                background: #0BA37F !important;
+                color: #fff !important;
+                border: none !important;
+                border-radius: 10px !important;
+                font-weight: 700 !important;
+                font-size: 15px !important;
+                text-decoration: none !important;
+                vertical-align: middle !important;
+                margin-left: 12px !important;
+                transition: all 0.25s ease !important;
+                cursor: pointer !important;
+            }
+            .ltms-buy-now-btn:hover {
+                background: #08805F !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 4px 14px rgba(11,163,127,0.35) !important;
+            }
+
+            /* VLM: Vendor info — enhanced card */
+            .ltms-vendor-tab .ltms-vendor-avatar,
+            .ltms-pdp-vendor-avatar {
+                width: 48px !important;
+                height: 48px !important;
+                border-radius: 50% !important;
+                background: linear-gradient(135deg, #2563EB, #1E40AF) !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                color: #fff !important;
+                font-weight: 700 !important;
+                font-size: 18px !important;
+                border: 3px solid #fff !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+            }
+
+            /* VLM: Shop — remove duplicate search bar */
+            .woocommerce-products-header .woocommerce-product-search,
+            .pv-shop .woocommerce-product-search {
+                display: none !important;
+            }
+
+            /* VLM: Shop — product cards equal height */
+            .pv-shop ul.products li.product,
+            .pv-shop .product {
+                margin-bottom: 24px !important;
+            }
+            .pv-shop ul.products li.product .woocommerce-loop-product__title,
+            .pv-shop .product .woocommerce-loop-product__title {
+                min-height: 40px !important;
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2 !important;
+                -webkit-box-orient: vertical !important;
+                overflow: hidden !important;
+            }
+            .pv-shop ul.products li.product img,
+            .pv-shop .product img {
+                aspect-ratio: 1 !important;
+                object-fit: cover !important;
+                border-radius: 12px 12px 0 0 !important;
+            }
+            .pv-shop ul.products li.product .button,
+            .pv-shop .product .button {
+                width: 100% !important;
+                text-align: center !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                font-size: 13px !important;
+                padding: 10px !important;
+                margin-top: 8px !important;
+            }
+
+            /* VLM: Homepage trust bar — bigger icons */
+            .ltms-trust-bar .ltms-trust-icon,
+            .ltms-trust-item .ltms-trust-icon {
+                width: 48px !important;
+                height: 48px !important;
+                font-size: 24px !important;
+            }
+            .ltms-trust-bar .ltms-trust-text strong,
+            .ltms-trust-item .ltms-trust-text strong {
+                font-size: 14px !important;
+            }
+
+            /* VLM: Price — more prominent */
+            .pv-product-page .price,
+            .single-product .price {
+                font-size: 28px !important;
+            }
+            .pv-product-page .price ins,
+            .single-product .price ins {
+                text-decoration: none !important;
+            }
+
+            /* VLM: PQR banner — less intrusive, more professional */
+            .ltms-vendor-pqr {
+                margin: 12px 0 !important;
+                padding: 10px 16px !important;
+                background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+                border-radius: 10px !important;
+                border-left: 4px solid #2563EB !important;
+                font-size: 12px !important;
             }
             </style>
             <?php
