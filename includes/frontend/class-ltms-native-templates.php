@@ -65,7 +65,7 @@ class LTMS_Native_Templates {
         // The single-product.php template works fine because it doesn't use
         // wc_get_template_part in a loop.
         // add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_wc_template' ], 10, 3 );
-        add_filter( 'woocommerce_template_loader_files', [ __CLASS__, 'template_loader_files' ], 10, 2 );
+        // add_filter( 'woocommerce_template_loader_files', [ __CLASS__, 'template_loader_files' ], 10, 2 );
 
         // Enqueue design system assets.
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ], 20 );
