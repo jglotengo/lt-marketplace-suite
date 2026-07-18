@@ -106,7 +106,39 @@ class LTMS_Native_Templates {
      * @return string Template override o el original.
      */
     public static function maybe_override( string $template ): string {
-        // Single product.
+        // CRITICAL: If Elementor Pro Theme Builder is handling this page,
+        // do NOT override. Elementor registers its own template_include
+        // callback. Our priority 99 runs AFTER Elementor, but calling
+        // is_product() / is_shop() etc. triggers WC query setup that
+        // conflicts with Elementor's template loading, causing a fatal.
+        // Only override on specific pages where we know it's safe.
+        if ( did_action( 'elementor_pro/init' ) || did_action( 'elementor/loaded' ) ) {
+            // Elementor is active — only override single product and cart/checkout.
+            // Skip ALL archive/shop/category/tag overrides.
+            if ( is_product() ) {
+                $native = self::$template_dir . 'single-product.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+            if ( is_cart() ) {
+                $native = self::$template_dir . 'cart.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+            if ( is_checkout() ) {
+                $native = self::$template_dir . 'checkout.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+            // For ALL other pages (shop, category, tag, account, etc.),
+            // return the original template — let Elementor handle it.
+            return $template;
+        }
+
+        // Non-Elementor: full override (all pages).
         if ( is_product() ) {
             $native = self::$template_dir . 'single-product.php';
             if ( file_exists( $native ) ) {
