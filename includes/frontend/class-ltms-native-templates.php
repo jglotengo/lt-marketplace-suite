@@ -60,7 +60,11 @@ class LTMS_Native_Templates {
         add_filter( 'template_include', [ __CLASS__, 'maybe_override' ], 99 );
 
         // Override de plantillas de WC content (parts).
-        add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_wc_template' ], 10, 3 );
+        // DISABLED: causing shop page crash. The content-product.php override
+        // is triggering a fatal error when WC loads it in the loop context.
+        // The single-product.php template works fine because it doesn't use
+        // wc_get_template_part in a loop.
+        // add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_wc_template' ], 10, 3 );
         add_filter( 'woocommerce_template_loader_files', [ __CLASS__, 'template_loader_files' ], 10, 2 );
 
         // Enqueue design system assets.
