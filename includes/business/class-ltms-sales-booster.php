@@ -631,7 +631,8 @@ class LTMS_Sales_Booster {
 
         echo '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;margin:8px 0;">';
         echo '<p style="font-size:13px;margin:0 0 8px;color:#92400e;">';
-        echo esc_html( sprintf(
+        echo wp_kses_post( sprintf(
+            /* translators: %s: monto restante formateado como HTML de precio de WooCommerce. */
             __( 'Te faltan %s para envío gratis 🚚', 'ltms' ),
             wc_price( $remaining, [ 'currency' => $currency ] )
         ) );

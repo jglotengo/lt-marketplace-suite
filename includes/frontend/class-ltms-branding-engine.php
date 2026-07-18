@@ -566,8 +566,9 @@ class LTMS_Branding_Engine {
         $currency = LTMS_Core_Config::get_currency();
 
         echo '<div class="ltms-loss-aversion" style="margin-top:12px;text-align:center;">';
-        echo esc_html( sprintf(
-            __( 'Estás perdiendo %s en envío. Agrega %s más para envío gratis.', 'ltms' ),
+        echo wp_kses_post( sprintf(
+            /* translators: 1: costo de envío formateado como HTML de precio de WooCommerce, 2: monto restante para envío gratis. */
+            __( 'Estás perdiendo %1$s en envío. Agrega %2$s más para envío gratis.', 'ltms' ),
             wc_price( $shipping_cost, [ 'currency' => $currency ] ),
             wc_price( $remaining, [ 'currency' => $currency ] )
         ) );

@@ -115,40 +115,83 @@ window.LTMS_CART = {
     nonce: '{$nonce_js}',
     busy: false
 };
+// v2.9.206: Capture-phase click listener. Matches BOTH the new dynamic drawer
+// button classes (.ltms-cart-qty-inc/dec, .ltms-cart-item-remove) AND the legacy
+// jQuery drawer button classes (.ltms-drawer-qty-plus/minus, .ltms-drawer-item__remove).
+// Using capture=true + stopImmediatePropagation so we beat any bubble-phase
+// jQuery handler that may be attached to the legacy drawer.
 document.addEventListener('click', function(e) {
     if (!e.target || typeof e.target.closest !== 'function') return;
-    var incBtn = e.target.closest('.ltms-cart-qty-inc');
-    var decBtn = e.target.closest('.ltms-cart-qty-dec');
-    var removeBtn = e.target.closest('.ltms-cart-item-remove');
+    var incBtn = e.target.closest('.ltms-cart-qty-inc, .ltms-drawer-qty-plus');
+    var decBtn = e.target.closest('.ltms-cart-qty-dec, .ltms-drawer-qty-minus');
+    var removeBtn = e.target.closest('.ltms-cart-item-remove, .ltms-drawer-item__remove');
     if (!incBtn && !decBtn && !removeBtn) return;
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
     if (window.LTMS_CART.busy) return;
     window.LTMS_CART.busy = true;
-    setTimeout(function() { window.LTMS_CART.busy = false; }, 800);
+    setTimeout(function() { window.LTMS_CART.busy = false; }, 400);
+    var key = (incBtn || decBtn || removeBtn).dataset.key;
     if (incBtn || decBtn) {
-        var btn = incBtn || decBtn;
-        LTMS_CART.updateQty(btn.dataset.key, incBtn ? 1 : -1);
+        LTMS_CART.updateQty(key, incBtn ? 1 : -1);
     } else if (removeBtn) {
-        LTMS_CART.removeItem(removeBtn.dataset.key);
+        LTMS_CART.removeItem(key);
     }
 }, true);
 window.LTMS_CART.updateQty = function(key, change) {
-    var qtyEl = document.querySelector('[data-cart-item-key="' + key + '"] .ltms-cart-qty-value');
-    var currentQty = qtyEl ? parseInt(qtyEl.textContent, 10) : 1;
-    var newQty = Math.max(1, currentQty + change);
-    if (qtyEl) qtyEl.textContent = newQty;
+    // v2.9.206: Update qty display in BOTH drawer types simultaneously.
+    // New dynamic drawer: <span class="ltms-cart-qty-value"> inside [data-cart-item-key]
+    // Legacy jQuery drawer: sibling <span> between +/- buttons (no .ltms-cart-qty-value class)
+    var itemEls = document.querySelectorAll('[data-cart-item-key="' + key + '"]');
+    var currentQty = 1;
+    var newQty = 1;
+    for (var i = 0; i < itemEls.length; i++) {
+        var el = itemEls[i];
+        // New drawer: <span class="ltms-cart-qty-value">
+        var qtySpan = el.querySelector('.ltms-cart-qty-value');
+        // Legacy drawer: any <span> inside .ltms-drawer-item__qty (between +/- buttons)
+        if (!qtySpan) {
+            var legacyQtyWrap = el.querySelector('.ltms-drawer-item__qty');
+            if (legacyQtyWrap) {
+                var spans = legacyQtyWrap.querySelectorAll('span');
+                // First span that contains just a number is the qty
+                for (var j = 0; j < spans.length; j++) {
+                    if (!spans[j].className || spans[j].className.indexOf('remove') === -1) {
+                        var t = parseInt(spans[j].textContent, 10);
+                        if (!isNaN(t)) { qtySpan = spans[j]; break; }
+                    }
+                }
+            }
+        }
+        if (qtySpan) {
+            currentQty = parseInt(qtySpan.textContent, 10) || 1;
+            newQty = Math.max(1, currentQty + change);
+            qtySpan.textContent = newQty;
+        }
+    }
+    if (newQty < 1) newQty = 1;
     var body = 'action=ltms_drawer_update_qty&nonce=' + encodeURIComponent(LTMS_CART.nonce) + '&cart_item_key=' + encodeURIComponent(key) + '&qty=' + newQty;
     fetch(LTMS_CART.ajaxUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:body})
     .then(function(r){return r.json();}).then(function(){LTMS_CART.reload();}).catch(function(){LTMS_CART.reload();});
 };
 window.LTMS_CART.removeItem = function(key) {
-    var itemEl = document.querySelector('[data-cart-item-key="' + key + '"]');
-    if (itemEl) itemEl.style.opacity = '0.5';
+    // v2.9.206: Visually remove the item from BOTH drawers immediately (don't
+    // just dim it). The server will confirm via reload().
+    var itemEls = document.querySelectorAll('[data-cart-item-key="' + key + '"]');
+    for (var i = 0; i < itemEls.length; i++) {
+        var el = itemEls[i];
+        el.style.transition = 'opacity 0.2s, transform 0.2s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        // Defer actual DOM removal so the transition can play
+        (function(node) {
+            setTimeout(function() { if (node && node.parentNode) node.parentNode.removeChild(node); }, 250);
+        })(el);
+    }
     var body = 'action=ltms_drawer_remove_item&nonce=' + encodeURIComponent(LTMS_CART.nonce) + '&cart_item_key=' + encodeURIComponent(key);
     fetch(LTMS_CART.ajaxUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:body})
-    .then(function(r){return r.json();}).then(function(){LTMS_CART.reload();}).catch(function(){if(itemEl)itemEl.style.opacity='';LTMS_CART.reload();});
+    .then(function(r){return r.json();}).then(function(){LTMS_CART.reload();}).catch(function(){LTMS_CART.reload();});
 };
 window.LTMS_CART.reload = function() {
     var body = 'action=ltms_get_cart&nonce=' + encodeURIComponent(LTMS_CART.nonce);
@@ -174,13 +217,24 @@ window.LTMS_CART.reload = function() {
             }
             if (subtotalEl) subtotalEl.innerHTML = data.total_formatted;
         }
-        var container = document.querySelector('#ltms-drawer-items') || document.querySelector('#ltms-cart-drawer-items');
-        if (!container) return;
+        // v2.9.206: Update BOTH drawer containers if they exist in the DOM.
+        // Before, this used a short-circuit || which always picked the hidden
+        // static #ltms-drawer-items container (always present via wp_footer)
+        // and NEVER updated the visible dynamic #ltms-cart-drawer-items one.
+        // Result: user saw optimistic qty update but no item list refresh.
+        var containers = [];
+        var c1 = document.querySelector('#ltms-cart-drawer-items');
+        if (c1) containers.push(c1);
+        var c2 = document.querySelector('#ltms-drawer-items');
+        if (c2 && containers.indexOf(c2) === -1) containers.push(c2);
+        if (!containers.length) return;
+        var html;
         if (!data.items || !data.items.length) {
-            container.innerHTML = '<div style="text-align:center;padding:40px 20px;"><p>Tu carrito esta vacio</p></div>';
+            html = '<div style="text-align:center;padding:40px 20px;"><p>Tu carrito esta vacio</p></div>';
+            for (var i = 0; i < containers.length; i++) containers[i].innerHTML = html;
             return;
         }
-        container.innerHTML = data.items.map(function(item){
+        html = data.items.map(function(item){
             var k = LTMS_CART.esc(item.key);
             return '<div class="ltms-cart-item" data-cart-item-key="'+k+'">' +
                 '<div class="ltms-cart-item-img">'+(item.image?'<img src="'+LTMS_CART.esc(item.image)+'" alt="'+LTMS_CART.esc(item.name)+'" loading="lazy">':'<div>&#128230;</div>')+'</div>' +
@@ -195,6 +249,7 @@ window.LTMS_CART.reload = function() {
                 '<button type="button" class="ltms-cart-item-remove" data-key="'+k+'" aria-label="Eliminar">&#10005;</button>' +
                 '</div>';
         }).join('');
+        for (var j = 0; j < containers.length; j++) containers[j].innerHTML = html;
     }).catch(function(){});
 };
 window.LTMS_CART.esc = function(str){

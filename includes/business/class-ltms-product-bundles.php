@@ -113,7 +113,7 @@ class LTMS_Product_Bundles {
                             <?php echo wc_price( $bundle_price ); // phpcs:ignore ?>
                         </div>
                         <div style="font-size:12px;color:#16a34a;font-weight:600;">
-                            <?php echo esc_html( sprintf( __( 'Ahorras %s (%.0f%%)', 'ltms' ), wc_price( $discount_amount ), $discount_pct ) ); // phpcs:ignore ?>
+                            <?php echo wp_kses_post( sprintf( /* translators: 1: monto ahorrado (HTML precio WC), 2: porcentaje de descuento. */ __( 'Ahorras %1$s (%2$.0f%%)', 'ltms' ), wc_price( $discount_amount ), $discount_pct ) ); // phpcs:ignore ?>
                         </div>
                     </div>
                     <button type="button"

@@ -422,7 +422,7 @@ final class LTMS_Core_Kernel {
             wp_localize_script( 'ltms-product-enhancements', 'ltmsDrawerData', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'ajaxurl' => admin_url( 'admin-ajax.php' ), // v2.9.40: some JS code uses ajaxurl directly
-                'nonce'   => wp_create_nonce( 'ltms_drawer_nonce' ),
+                'nonce'   => wp_create_nonce( 'ltms_ux_nonce' ), // v2.9.206: was 'ltms_drawer_nonce' — mismatch with AJAX endpoint check_ajax_referer('ltms_ux_nonce') → 403 on all drawer operations. Aligned to ltms_ux_nonce.
                 'i18n'    => [
                     'remove'           => __( 'Quitar', 'ltms' ),
                     'empty'            => __( 'Tu carrito está vacío', 'ltms' ),

@@ -723,10 +723,10 @@ class LTMS_Logistics_Compliance {
         if ( $carrier_gps_enabled !== 'yes' ) {
             wc_add_notice(
                 sprintf(
-                    /* translators: 1: cart total, 2: threshold */
+                    /* translators: 1: total del carrito (HTML precio WC), 2: umbral de carga de valor alto (HTML precio WC). */
                     __( 'El envío supera el umbral de carga de valor alto (%1$s ≥ %2$s). El carrier debe tener GPS satelital habilitado (MX Ley de Caminos art. 47-A / CO Res. 4146/2016).', 'ltms' ),
-                    esc_html( wc_price( $cart_total ) ),
-                    esc_html( wc_price( $threshold ) )
+                    wp_kses_post( wc_price( $cart_total ) ),
+                    wp_kses_post( wc_price( $threshold ) )
                 ),
                 'error'
             );
