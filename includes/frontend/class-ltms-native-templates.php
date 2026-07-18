@@ -74,8 +74,9 @@ class LTMS_Native_Templates {
         add_filter( 'body_class', [ __CLASS__, 'body_class' ] );
 
         // v2.9.191 — Rewrite rules for custom pages (tracking, help).
-        add_action( 'init', [ __CLASS__, 'register_rewrites' ] );
-        add_filter( 'query_vars', [ __CLASS__, 'register_query_vars' ] );
+        // Disabled temporarily — causing shop page crash. Needs flush_rewrite_rules.
+        // add_action( 'init', [ __CLASS__, 'register_rewrites' ] );
+        // add_filter( 'query_vars', [ __CLASS__, 'register_query_vars' ] );
     }
 
     /**
