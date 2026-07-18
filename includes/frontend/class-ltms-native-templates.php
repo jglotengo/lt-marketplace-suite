@@ -249,11 +249,12 @@ class LTMS_Native_Templates {
         wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver . '-b' . time() );
 
         // Design system JS (vanilla, no jQuery).
-        // Cache-buster: time() appended to force browser reload on every deploy.
-        wp_enqueue_script( 'ltms-plaza-viva', $url . 'js/ltms-plaza-viva.js', [], $ver . '-b' . time(), true );
+        // Use unique handle per version to bypass SiteGround Optimizer JS cache.
+        $pv_js_handle = 'ltms-plaza-viva-' . substr( md5( $ver ), 0, 8 );
+        wp_enqueue_script( $pv_js_handle, $url . 'js/ltms-plaza-viva.js?cb=' . time(), [], null, true );
 
         // Localize para AJAX.
-        wp_localize_script( 'ltms-plaza-viva', 'ltms_data', [
+        wp_localize_script( $pv_js_handle, 'ltms_data', [
             'ajax_url'  => admin_url( 'admin-ajax.php' ),
             'nonce'     => wp_create_nonce( 'ltms_plaza_viva' ),
             'cart_url'  => wc_get_cart_url(),
