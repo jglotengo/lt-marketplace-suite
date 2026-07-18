@@ -1556,3 +1556,9 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Error:** El `git fetch origin` en el servidor SiteGround no traía los commits más recientes. Se quedaba atascado en `621d338` aunque GitHub ya tenía commits `172a8ed`, `3d4d73c`, `19cea6b`, `057f784`. El `git reset --hard origin/main` reseteaba al commit obsoleto.
 **Fix:** Ejecutar manualmente via SSH: `git fetch origin && git reset --hard origin/main`.
 **Regla preventiva:** Cuando el deploy webhook muestre un commit obsoleto en "HEAD is now at...", conectar via SSH y ejecutar `git fetch origin && git reset --hard origin/main` manualmente.
+
+### Lección #113: Elementor Pro + template_include + WC conditional functions = fatal
+**Error:** El filter `template_include` a prioridad 99 llamaba `is_shop()`, `is_product_category()`, etc. Estas funciones de WC disparan WC query setup. Cuando Elementor Pro Theme Builder está activo, este query setup conflictúa con la carga de templates de Elementor, causando un PHP fatal en `/tienda/` y `/categoria-producto/*`.
+**Causa raíz:** NO era nuestro template `archive-product.php`. Incluso la versión minimal (90 líneas, solo WC hooks) causaba el mismo error. El problema era que `is_shop()` dentro de `maybe_override()` disparaba el query setup de WC que chocaba con Elementor.
+**Fix:** Detectar Elementor al inicio de `maybe_override()` con `did_action('elementor/loaded')`. Si Elementor está activo, SOLO override single-product, cart y checkout (páginas donde Elementor no tiene Theme Builder template). Para shop/category/tag/account, retornar el template original inmediatamente sin llamar ninguna función WC condicional.
+**Regla preventiva:** Cuando uses `template_include` con Elementor Pro activo, SIEMPRE verificar `did_action('elementor/loaded')` antes de llamar `is_shop()`, `is_product_category()`, etc. Elementor tiene su propio handler de template_include que conflictúa con el query setup de WC.
