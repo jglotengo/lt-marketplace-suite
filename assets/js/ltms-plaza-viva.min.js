@@ -653,6 +653,80 @@
   };
 
   /* =========================================================================
+   * v2.9.200 — Homepage hero headline injection
+   * ========================================================================= */
+  PV.injectHeroHeadline = function () {
+    // Only on homepage
+    if (!document.body.classList.contains('home')) return;
+    // Don't double-inject
+    if (qs('.ltms-hero-headline')) return;
+
+    // Find hero section (Elementor hero or first section)
+    var hero = qs('.elementor-section, .hero, .banner, [class*=hero], [class*=banner]');
+    if (!hero) return;
+
+    // Create headline
+    var headline = document.createElement('div');
+    headline.className = 'ltms-hero-headline';
+    headline.innerHTML = '<h2 style="font-family:Albert Sans,sans-serif;font-size:clamp(24px,4vw,36px);font-weight:800;color:#fff;text-align:center;padding:12px 20px;background:linear-gradient(135deg,#E80001 0%,#B80001 100%);border-radius:14px;margin:0 auto;max-width:600px;box-shadow:0 4px 14px rgba(232,0,1,0.3);line-height:1.3;letter-spacing:-0.02em">Tu Marketplace de Confianza en Colombia 🇨🇴</h2><p style="text-align:center;color:#565C66;font-size:14px;margin-top:8px;font-weight:500">Miles de productos de vendedores verificados · PSE · Nequi · Envío a todo el país</p>';
+
+    // Insert at the beginning of the hero section
+    hero.insertBefore(headline, hero.firstChild);
+  };
+
+  /* =========================================================================
+   * v2.9.200 — Shop page cleanup (remove duplicate search)
+   * ========================================================================= */
+  PV.cleanShopPage = function () {
+    // Only on shop/archive pages
+    if (!document.body.classList.contains('archive') && !document.body.classList.contains('post-type-archive-product') && !document.body.classList.contains('tax-product_cat')) return;
+
+    // Remove duplicate search bars in the sidebar/widget area
+    var sidebarSearches = qsa('.widget-area .woocommerce-product-search, .sidebar .woocommerce-product-search, .widget_product_search');
+    sidebarSearches.forEach(function (s) {
+      var widget = s.closest('.widget');
+      if (widget) widget.style.display = 'none';
+      else s.style.display = 'none';
+    });
+
+    // Enhance price filter visibility
+    var priceFilter = qs('.widget_price_filter, .price_filter, [class*=price-filter]');
+    if (priceFilter) {
+      var widget = priceFilter.closest('.widget');
+      if (widget) {
+        widget.style.background = '#fff';
+        widget.style.padding = '16px';
+        widget.style.borderRadius = '14px';
+        widget.style.border = '1px solid #E7E5EC';
+        widget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+        widget.style.marginBottom = '16px';
+      }
+    }
+  };
+
+  /* =========================================================================
+   * v2.9.200 — Price display enhancement
+   * ========================================================================= */
+  PV.enhancePriceDisplay = function () {
+    // Only on product pages
+    if (!document.body.classList.contains('single-product')) return;
+
+    var price = qs('.single-product .price, .pv-product-page .price, .product .price');
+    if (!price) return;
+
+    // Add shipping info below price
+    var shippingInfo = document.createElement('div');
+    shippingInfo.className = 'ltms-price-shipping-info';
+    shippingInfo.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
+    shippingInfo.innerHTML = '<span>🚚</span> <span>Envío gratis incluido</span>';
+
+    // Insert after price
+    if (price.parentNode) {
+      price.parentNode.insertBefore(shippingInfo, price.nextSibling);
+    }
+  };
+
+  /* =========================================================================
    * Auto-init on DOM ready
    * ========================================================================= */
   function autoInit() {
@@ -674,6 +748,15 @@
 
     // v2.9.199 — Inject "Buy Now" button next to Add to Cart on product pages.
     PV.injectBuyNow();
+
+    // v2.9.200 — Homepage hero headline injection.
+    PV.injectHeroHeadline();
+
+    // v2.9.200 — Shop duplicate search removal.
+    PV.cleanShopPage();
+
+    // v2.9.200 — Price prominence enhancement.
+    PV.enhancePriceDisplay();
 
     dispatch('ready', { version: PV.version });
   }
