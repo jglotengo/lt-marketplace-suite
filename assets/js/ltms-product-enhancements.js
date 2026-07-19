@@ -16,29 +16,32 @@
         init: function() {
             this.nonce = typeof ltmsDrawerData !== 'undefined' ? ltmsDrawerData.nonce : '';
 
-            // v2.9.45: NO abrir drawer viejo en added_to_cart.
-            // El cart drawer de ltms-ux-enhancements.js maneja esto ahora.
-            // El drawer viejo abría un overlay (#ltms-cart-drawer-overlay) que
-            // se quedaba pegado y bloqueaba la página.
-            // $(document.body).on('added_to_cart', this.openAfterAdd.bind(this));
-            $(document.body).on('wc_cart_fragment_refreshed', this.refresh.bind(this));
+            // v2.9.208 — DECISIÓN ARQUITECTÓNICA: Cart drawer ELIMINADO.
+            // Después de 4 versiones fallidas (v2.9.204 → v2.9.207) intentando
+            // estabilizar el drawer en el entorno hostil de SiteGround, se elimina.
+            // El icono del carrito ahora usa su href nativo (wc_get_cart_url())
+            // y redirige a /cart donde WC maneja todo con AJAX nativo confiable.
 
-            // Close drawer.
+            // v2.9.45: NO abrir drawer viejo en added_to_cart.
+            // $(document.body).on('added_to_cart', this.openAfterAdd.bind(this));
+
+            // v2.9.208: NO interceptar clicks del cart icon — dejar que el
+            // navegador siga el href natural hacia /cart.
+            // Antes: $(document).on('click', '.cart-contents, .ltms-open-cart-drawer', function(e) {
+            //     e.preventDefault();
+            //     LTMS_Drawer.open();
+            // });
+
+            // v2.9.208: Mantener handlers de +/- y remove por si SG cache sirve
+            // HTML stale con el drawer todavía presente. No abren el drawer,
+            // pero si el drawer está visible (por HTML cacheado), los botones
+            // siguen funcionando via AJAX.
+            $(document.body).on('wc_cart_fragment_refreshed', this.refresh.bind(this));
             $('#ltms-drawer-close').on('click', this.close.bind(this));
             $('#ltms-cart-drawer-overlay').on('click', this.close.bind(this));
-
-            // Remove item.
             $(document).on('click', '.ltms-drawer-item__remove', this.removeItem.bind(this));
-
-            // Update quantity.
             $(document).on('click', '.ltms-drawer-qty-minus', this.decreaseQty.bind(this));
             $(document).on('click', '.ltms-drawer-qty-plus', this.increaseQty.bind(this));
-
-            // Open drawer on cart icon click.
-            $(document).on('click', '.cart-contents, .ltms-open-cart-drawer', function(e) {
-                e.preventDefault();
-                LTMS_Drawer.open();
-            });
         },
 
         openAfterAdd: function() {

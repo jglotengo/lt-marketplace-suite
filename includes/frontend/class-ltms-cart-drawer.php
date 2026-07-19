@@ -18,31 +18,39 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class LTMS_Cart_Drawer {
 
     public static function init(): void {
-        // Render drawer HTML en el footer de todas las páginas.
-        add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ] );
+        // v2.9.208 — DECISIÓN ARQUITECTÓNICA: Eliminar el cart drawer.
+        // Después de 4 versiones fallidas (v2.9.204 → v2.9.207) intentando
+        // estabilizar el drawer en el entorno hostil de SiteGround (HTML cache
+        // strips inline scripts, mod_security bloquea AJAX, múltiples capas
+        // de cache causan stale JS), el costo de mantenimiento supera el
+        // beneficio. La página /cart nativa de WC funciona confiablemente y ya
+        // tiene steppers +/- vía PV.enhanceCartPage() desde v2.9.204.
+        //
+        // Lo que se mantiene activo:
+        //  - AJAX endpoints (backward compat para JS cacheado)
+        //  - add_drawer_fragment (WC fragments, no rompe nada)
+        //
+        // Lo que se desactiva:
+        //  - render_drawer_html (no dibuja el drawer estático)
+        //  - start_output_buffer (no inyecta inline JS)
+        //  - disable_cart_redirect (WC usa su setting nativo → redirect a /cart)
 
-        // v2.9.59: Output buffering — inyectar el script inline directamente
-        // en el HTML final. SiteGround Optimizer remueve scripts inline de
-        // wp_head/wp_footer, pero NO puede tocar el HTML modificado vía ob.
-        add_action( 'template_redirect', [ __CLASS__, 'start_output_buffer' ] );
-
-        // AJAX: obtener contenido del drawer (refresh).
+        // AJAX: mantener endpoints por compatibilidad con JS cacheado.
         add_action( 'wp_ajax_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
         add_action( 'wp_ajax_nopriv_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
-
-        // AJAX: remove item from cart via drawer.
         add_action( 'wp_ajax_ltms_drawer_remove_item', [ __CLASS__, 'ajax_remove_item' ] );
         add_action( 'wp_ajax_nopriv_ltms_drawer_remove_item', [ __CLASS__, 'ajax_remove_item' ] );
-
-        // AJAX: update quantity via drawer.
         add_action( 'wp_ajax_ltms_drawer_update_qty', [ __CLASS__, 'ajax_update_qty' ] );
         add_action( 'wp_ajax_nopriv_ltms_drawer_update_qty', [ __CLASS__, 'ajax_update_qty' ] );
 
-        // Hook into WC add_to_cart to trigger drawer open (via JS).
+        // Hook into WC add_to_cart fragments (inofensivo, mantiene contador).
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'add_drawer_fragment' ] );
 
-        // Disable WC redirect to cart after add (we use drawer instead).
-        add_filter( 'woocommerce_cart_redirect_after_add', [ __CLASS__, 'disable_cart_redirect' ] );
+        // v2.9.208: NO desactivar el redirect de WC — usar setting nativo
+        // (WooCommerce > Settings > Products > Add to cart > "Redirect to the
+        // cart page after successful addition"). Si está activado en WP admin,
+        // WC redirige a /cart después de add-to-cart. Es lo más confiable.
+        // add_filter( 'woocommerce_cart_redirect_after_add', [ __CLASS__, 'disable_cart_redirect' ] );
     }
 
     /**
@@ -327,7 +335,17 @@ JS;
     }
 
     /**
-     * Desactiva el redirect a /cart después de add-to-cart (usamos drawer).
+     * v2.9.208: Desactiva el redirect a /cart después de add-to-cart.
+     *
+     * Este método existía para que el cart drawer maneje el add-to-cart en
+     * vez de redirigir. Como el drawer se eliminó en v2.9.208, este filtro
+     * ya NO se registra en init(). WC usa su setting nativo:
+     * WooCommerce > Settings > Products > Add to cart >
+     *   ☑ Redirect to the cart page after successful addition
+     *
+     * Si quieres forzar el redirect por código (ignorando el setting),
+     * descomenta la línea en init() que devuelve true:
+     *   add_filter( 'woocommerce_cart_redirect_after_add', '__return_true' );
      */
     public static function disable_cart_redirect(): bool {
         return false;

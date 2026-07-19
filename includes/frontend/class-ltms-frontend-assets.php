@@ -374,6 +374,10 @@ final class LTMS_Frontend_Assets {
             'nonce'    => wp_create_nonce( 'ltms_ux_nonce' ),
             'is_admin' => false,
             'currency' => LTMS_Core_Config::get_currency(),
+            // v2.9.208: Expose cart_url so JS can redirect to /cart reliably
+            // (some sites use /carrito/ or other slugs — wc_get_cart_url()
+            // returns the correct one for this site).
+            'cart_url' => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '/cart/',
             'i18n'     => [
                 'loading' => __( 'Cargando...', 'ltms' ),
                 'error'   => __( 'Ocurrió un error', 'ltms' ),

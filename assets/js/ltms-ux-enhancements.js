@@ -5562,29 +5562,23 @@
     }
 
     function initCartDrawer() {
-        // v2.9.42: Interceptamos el click del botón de carrito de Elementor
-        // porque su JS está roto (elementorModules is not defined en v4.1.x).
-        // En lugar de dejar que Elementor maneje el carrito (que no funciona),
-        // abrimos el cart drawer de LTMS que SÍ funciona.
-        document.addEventListener('click', (e) => {
-            const cartTrigger = e.target.closest(
-                '.elementor-menu-cart__toggle_button, .elementor-menu-cart__wrapper, ' +
-                '#elementor-menu-cart__toggle_button, ' +
-                '.ltms-sf-topbar-cart, .ltms-cart-trigger, [data-cart-drawer], ' +
-                '.ltms-header-cart, .ltms-cart-icon, .ltms-cart-link'
-            );
-            if (!cartTrigger) return;
+        // v2.9.208 — DECISIÓN ARQUITECTÓNICA: Cart drawer ELIMINADO.
+        // Después de 4 versiones fallidas (v2.9.204 → v2.9.207) intentando
+        // estabilizar el drawer en el entorno hostil de SiteGround, se elimina.
+        // El icono del carrito ahora usa su href nativo (wc_get_cart_url())
+        // y redirige a /cart donde WC maneja todo con AJAX nativo confiable.
+        //
+        // NO interceptar clicks del cart trigger — dejar que el navegador
+        // siga el href natural hacia /cart.
+        //
+        // Mantenemos:
+        //   - updateCartBadge() para refrescar el contador tras add-to-cart
+        //   - El handler de +/- en el drawer (por si SG cache sirve HTML stale
+        //     con drawer todavía presente, los botones deben seguir funcionando
+        //     via LTMS_CART si está inyectado, o via fallback fetch).
 
-            e.preventDefault();
-            e.stopPropagation();
-            openCartDrawer();
-        });
-
-        // v2.9.53: EVENT DELEGATION para botones del carrito.
-        // Esto funciona incluso si el JS está cacheado (SiteGround Optimizer
-        // remueve el ?ver= del JS, causando que el navegador use versión vieja).
-        // Con event delegation en document, no importan los event listeners
-        // individuales — el click siempre se captura.
+        // v2.9.53: EVENT DELEGATION para botones del carrito (por si el drawer
+        // sigue presente en HTML cacheado por SG).
         document.addEventListener('click', (e) => {
             const incBtn = e.target.closest('.ltms-cart-qty-inc');
             const decBtn = e.target.closest('.ltms-cart-qty-dec');
@@ -5615,14 +5609,7 @@
             jQuery(document.body).on('updated_cart_totals', () => {
                 if (cartDrawerState.drawer) loadCartContents();
             });
-            // v2.9.49: NO disparar loadCartContents() en cada 'added_to_cart'.
-            // Antes esto hacía una 2a petición AJAX extra (ltms_get_cart) después
-            // de cada add-to-cart, duplicando el round-trip y haciendo que el
-            // drawer tardara ~2x más en mostrar el producto nuevo.
-            // Ahora el drawer se abre directamente con openCartDrawer() que ya
-            // llama a loadCartContents() una sola vez.
             jQuery(document.body).on('added_to_cart', () => {
-                // Solo actualizar el badge de contador, no recargar todo el drawer.
                 updateCartBadge();
             });
         }
@@ -6290,7 +6277,8 @@
                         });
                     }
                     toast('success', 'Añadido al carrito', data.name);
-                    openCartDrawer();
+                    // v2.9.208: redirect to /cart instead of opening drawer.
+                    setTimeout(() => { window.location.href = (typeof ltmsUX !== 'undefined' && ltmsUX.cart_url) || '/cart/'; }, 800);
                     close();
                 });
             } else {
@@ -9341,7 +9329,8 @@
 
         overlay.querySelector('#ltms-cr-continue').addEventListener('click', () => {
             close();
-            openCartDrawer();
+            // v2.9.208: redirect to /cart instead of opening drawer.
+            window.location.href = (typeof ltmsUX !== 'undefined' && ltmsUX.cart_url) || '/cart/';
         });
 
         announce('Tienes productos en tu carrito. ¿Deseas completar tu compra?');
@@ -11915,8 +11904,8 @@
                                 el.style.display = response.data.cart_count > 0 ? '' : 'none';
                             });
                         }
-                        // Open cart drawer
-                        setTimeout(() => openCartDrawer(), 500);
+                        // v2.9.208: redirect to /cart instead of opening drawer.
+                        setTimeout(() => { window.location.href = (typeof ltmsUX !== 'undefined' && ltmsUX.cart_url) || '/cart/'; }, 500);
                     } else {
                         toast('error', 'Error', response.data?.message || response.data || 'No se pudo reordenar.');
                     }
