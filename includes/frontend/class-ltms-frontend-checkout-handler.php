@@ -108,6 +108,17 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_before_cart', [ __CLASS__, 'show_multi_vendor_cart_notice' ], 20 );
         add_action( 'woocommerce_before_checkout_form', [ __CLASS__, 'show_multi_vendor_cart_notice' ], 20 );
 
+        // v2.9.210: Limpiar mensajes confusos de WC en el carrito.
+        // - "Zona de coincidencia con el cliente «Ubicaciones no cubiertas...»"
+        //   Aparece porque WC muestra el nombre de la zona de envío zone 0
+        //   ("Rest of the World") cuando el cliente aún no ha seteado su
+        //   dirección. Es info técnica de admin, no para el cliente final.
+        add_filter( 'woocommerce_cart_shipping_method_full_label', [ __CLASS__, 'clean_shipping_method_label' ], 20, 2 );
+        add_filter( 'woocommerce_shipping_rate_label', [ __CLASS__, 'clean_shipping_rate_label' ], 20, 2 );
+        // Filtrar notices de WC para eliminar el mensaje confuso de zona.
+        add_action( 'woocommerce_before_cart', [ __CLASS__, 'strip_shipping_zone_notices' ], 1 );
+        add_action( 'woocommerce_before_checkout_form', [ __CLASS__, 'strip_shipping_zone_notices' ], 1 );
+
         // Proceso de pago — solo usuarios logueados
         add_action( 'wp_ajax_ltms_process_checkout',        [ $instance, 'ajax_process_checkout' ] );
 
@@ -1037,6 +1048,112 @@ final class LTMS_Frontend_Checkout_Handler {
             $names_str
         ) );
         echo '</div></div>';
+    }
+
+    /**
+     * v2.9.210: Limpia el label del método de envío mostrado en el carrito.
+     *
+     * WC por defecto muestra "Zona de coincidencia con el cliente «Ubicaciones
+     * no cubiertas por tus otras zonas»: [método] [precio]" — información
+     * técnica de admin que confunde al cliente final. Esta función elimina
+     * el prefijo de zona y deja solo el nombre del método + precio.
+     *
+     * @param string           $full_label Etiqueta completa HTML.
+     * @param WC_Shipping_Rate $rate       Objeto de tarifa de envío.
+     * @return string Etiqueta limpia.
+     */
+    public static function clean_shipping_method_label( string $full_label, $rate ): string {
+        // Si el label contiene el patrón "Zona de coincidencia con el cliente «...»"
+        // lo eliminamos y dejamos solo el método + precio.
+        // El patrón puede estar en español o inglés (depende del locale).
+        $patterns = [
+            // ES: "Zona de coincidencia con el cliente «...»: Método - $precio"
+            '/Zona de coincidencia con el cliente\s*[«<][^>»]+[»>]\s*:\s*/u',
+            // ES sin comillas: "Zona de coincidencia con el cliente: Método - $precio"
+            '/Zona de coincidencia con el cliente\s*:\s*/u',
+            // EN: "Matching customer location «...»: Method - $price"
+            '/Matching customer location\s*[«<][^>»]+[»>]\s*:\s*/u',
+            '/Matching customer location\s*:\s*/u',
+            // También limpiar el nombre feo de zone 0 si aparece solo.
+            '/Ubicaciones no cubiertas por tus otras zonas\s*:\s*/u',
+            '/Locations not covered by your other zones\s*:\s*/u',
+        ];
+        $cleaned = preg_replace( $patterns, '', $full_label );
+        return $cleaned !== null ? $cleaned : $full_label;
+    }
+
+    /**
+     * v2.9.210: Limpia el label de la tarifa de envío (versión simple).
+     *
+     * @param string           $label Label de la tarifa.
+     * @param WC_Shipping_Rate $rate  Objeto de tarifa.
+     * @return string Label limpio.
+     */
+    public static function clean_shipping_rate_label( string $label, $rate ): string {
+        $patterns = [
+            '/Zona de coincidencia con el cliente\s*[«<][^>»]+[»>]\s*:\s*/u',
+            '/Zona de coincidencia con el cliente\s*:\s*/u',
+            '/Matching customer location\s*[«<][^>»]+[»>]\s*:\s*/u',
+            '/Matching customer location\s*:\s*/u',
+            '/Ubicaciones no cubiertas por tus otras zonas\s*:\s*/u',
+            '/Locations not covered by your other zones\s*:\s*/u',
+        ];
+        $cleaned = preg_replace( $patterns, '', $label );
+        return $cleaned !== null ? $cleaned : $label;
+    }
+
+    /**
+     * v2.9.210: Filtra los notices de WC para eliminar mensajes confusos de
+     * zona de envío antes de que se impriman en /cart y /checkout.
+     *
+     * WC a veces agrega notices informativos sobre la zona de envío matcheada
+     * cuando el cliente aún no ha seteado su dirección. Estos notices son
+     * ruido visual para el cliente final.
+     */
+    public static function strip_shipping_zone_notices(): void {
+        if ( ! function_exists( 'WC' ) || ! WC()->session ) {
+            return;
+        }
+
+        $notices = WC()->session->get( 'wc_notices', [] );
+        if ( empty( $notices ) ) {
+            return;
+        }
+
+        $patterns = [
+            '/Zona de coincidencia con el cliente/u',
+            '/Ubicaciones no cubiertas por tus otras zonas/u',
+            '/Matching customer location/u',
+            '/Locations not covered by your other zones/u',
+        ];
+
+        $changed = false;
+        foreach ( [ 'success', 'notice', 'error' ] as $type ) {
+            if ( empty( $notices[ $type ] ) ) {
+                continue;
+            }
+            $filtered = [];
+            foreach ( $notices[ $type ] as $notice ) {
+                $text = is_array( $notice ) ? ( $notice['notice'] ?? '' ) : (string) $notice;
+                $should_strip = false;
+                foreach ( $patterns as $pattern ) {
+                    if ( preg_match( $pattern, $text ) ) {
+                        $should_strip = true;
+                        break;
+                    }
+                }
+                if ( ! $should_strip ) {
+                    $filtered[] = $notice;
+                } else {
+                    $changed = true;
+                }
+            }
+            $notices[ $type ] = $filtered;
+        }
+
+        if ( $changed ) {
+            WC()->session->set( 'wc_notices', $notices );
+        }
     }
 
     /**
