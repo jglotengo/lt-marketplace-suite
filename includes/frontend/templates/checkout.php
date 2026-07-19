@@ -1058,6 +1058,128 @@ do_action( 'woocommerce_after_main_content' );
             submitBtn.setAttribute('disabled', 'disabled');
         });
     }
+
+    /* --- 6. v2.9.216: Fix field labels (bypass WOOCCM) ----------------- */
+    /* WOOCCM (WooCommerce Checkout Manager) reconstruye los labels desde
+     * su propia BD DESPUÉS de los filtros woocommerce_billing_fields y
+     * woocommerce_form_field. La única forma de override confiable es
+     * modificar el DOM via JS después de que WOOCCM termina.
+     *
+     * Labels corregidos:
+     *   CO: billing_state → 'Departamento', billing_city → 'Municipio'
+     *   MX: billing_state → 'Estado', billing_city → 'Municipio / Alcaldía'
+     *   Ambos: 'País / Región' → 'País', 'Dirección de la calle' → 'Dirección',
+     *          'Código postal / ZIP' → 'Código postal'
+     */
+    var ltmsCountry = '<?php echo esc_js( LTMS_Core_Config::get_country() ); ?>';
+    var labelMap = {};
+    if (ltmsCountry === 'CO') {
+        labelMap = {
+            'billing_state': 'Departamento',
+            'shipping_state': 'Departamento',
+            'billing_city': 'Municipio',
+            'shipping_city': 'Municipio',
+            'billing_country': 'País',
+            'shipping_country': 'País',
+            'billing_postcode': 'Código postal',
+            'shipping_postcode': 'Código postal',
+            'billing_address_1': 'Dirección',
+            'shipping_address_1': 'Dirección',
+            'billing_address_2': 'Apartamento, suite, etc. (opcional)',
+            'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
+        };
+    } else if (ltmsCountry === 'MX') {
+        labelMap = {
+            'billing_state': 'Estado',
+            'shipping_state': 'Estado',
+            'billing_city': 'Municipio / Alcaldía',
+            'shipping_city': 'Municipio / Alcaldía',
+            'billing_country': 'País',
+            'shipping_country': 'País',
+            'billing_postcode': 'Código postal',
+            'shipping_postcode': 'Código postal',
+            'billing_address_1': 'Dirección',
+            'shipping_address_1': 'Dirección',
+            'billing_address_2': 'Apartamento, suite, etc. (opcional)',
+            'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
+        };
+    }
+
+    function fixFieldLabels() {
+        Object.keys(labelMap).forEach(function(fieldKey) {
+            var newLabel = labelMap[fieldKey];
+            // Buscar el label por 'for' attribute.
+            var labelEl = scope.querySelector('label[for="' + fieldKey + '"]');
+            if (!labelEl) return;
+            // Preservar el <abbr class="required"> o <span class="optional"> si existe.
+            var abbr = labelEl.querySelector('abbr.required, abbr');
+            var optionalSpan = labelEl.querySelector('span.optional, .optional');
+            // Reconstruir el label.
+            labelEl.innerHTML = '';
+            labelEl.appendChild(document.createTextNode(newLabel));
+            if (abbr) {
+                labelEl.appendChild(document.createTextNode(' '));
+                labelEl.appendChild(abbr);
+            }
+            if (optionalSpan) {
+                labelEl.appendChild(document.createTextNode(' '));
+                labelEl.appendChild(optionalSpan);
+            }
+        });
+
+        // Ocultar campos duplicados:
+        // - billing_phone en step 2 (ya está en step 1 como 'Teléfono / WhatsApp')
+        // - billing_email en step 2 (ya está en step 1)
+        // Heuristic: si el label NO contiene 'WhatsApp' o 'Correo', es el duplicado.
+        var phoneLabels = scope.querySelectorAll('label[for="billing_phone"], label[for="shipping_phone"]');
+        phoneLabels.forEach(function(lbl) {
+            var text = (lbl.textContent || '').toLowerCase();
+            if (text.indexOf('whatsapp') === -1) {
+                var field = document.getElementById('billing_phone_field') || document.getElementById('shipping_phone_field');
+                if (field) field.style.display = 'none';
+            }
+        });
+        var emailLabels = scope.querySelectorAll('label[for="billing_email"], label[for="shipping_email"]');
+        emailLabels.forEach(function(lbl) {
+            var text = (lbl.textContent || '').toLowerCase();
+            // Si el label dice 'Correo electrónico' ES el de step 1 (mantener).
+            // Si solo dice 'Email' o 'Dirección de correo electrónico', es duplicado.
+            if (text.indexOf('correo electrónico') === -1) {
+                var field = document.getElementById('billing_email_field') || document.getElementById('shipping_email_field');
+                if (field) field.style.display = 'none';
+            }
+        });
+
+        // Auto-seleccionar país: CO o MX según configuración.
+        var countrySelect = scope.querySelector('#billing_country, #shipping_country');
+        if (countrySelect && countrySelect.value !== ltmsCountry) {
+            countrySelect.value = ltmsCountry;
+            // Disparar change event para que WC actualice los estados.
+            countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    // Ejecutar inmediatamente y después de un delay (para WOOCCM JS que corre tarde).
+    fixFieldLabels();
+    setTimeout(fixFieldLabels, 500);
+    setTimeout(fixFieldLabels, 1500);
+    // También observar mutaciones del DOM (WOOCCM puede modificar dinámicamente).
+    if ('MutationObserver' in window) {
+        var observer = new MutationObserver(function(mutations) {
+            var shouldFix = false;
+            mutations.forEach(function(m) {
+                if (m.type === 'childList' || m.type === 'characterData') {
+                    shouldFix = true;
+                }
+            });
+            if (shouldFix) {
+                fixFieldLabels();
+            }
+        });
+        observer.observe(scope, { childList: true, subtree: true, characterData: true });
+        // Dejar de observar después de 5 segundos (para no matar el performance).
+        setTimeout(function() { observer.disconnect(); }, 5000);
+    }
 })();
 </script>
 
