@@ -67,7 +67,7 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
         if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
             return;
         }
-        wp_register_script( 'ltms-invoice-toggle', '', [ 'jquery' ], LTMS_VERSION, true );
+        wp_register_script( 'ltms-invoice-toggle', LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js', [ 'jquery' ], LTMS_VERSION, true );
         wp_enqueue_script( 'ltms-invoice-toggle' );
         wp_add_inline_script( 'ltms-invoice-toggle', self::get_toggle_script_js(), 'after' );
     }

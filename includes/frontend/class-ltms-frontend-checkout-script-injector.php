@@ -43,10 +43,11 @@ class LTMS_Frontend_Checkout_Script_Injector {
 
         $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
 
-        // Register a tiny inline-only script (no external file needed).
+        // Register a real JS file (stub) so wp_add_inline_script works.
+        // WordPress does NOT print inline scripts for handles with empty src.
         wp_register_script(
             'ltms-checkout-fixes',
-            '', // No src — purely inline
+            LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js',
             [ 'jquery' ],
             LTMS_VERSION,
             true
