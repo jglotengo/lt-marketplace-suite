@@ -1045,6 +1045,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Script_Injector' ) ) {
             LTMS_Frontend_Checkout_Script_Injector::init();
         }
+        // v2.9.221: Patrón "Factura opcional" — checkbox + campos condicionales
+        // CO/MX. Cumple minimización de datos (Ley 1581/LFPDPPP).
+        if ( class_exists( 'LTMS_Frontend_Checkout_Optional_Invoice_Fields' ) ) {
+            LTMS_Frontend_Checkout_Optional_Invoice_Fields::init();
+        }
         // v2.1.0: selección de oficina / punto de entrega Aveonline en checkout.
         if ( class_exists( 'LTMS_Frontend_Checkout_Aveonline_Office' ) ) {
             LTMS_Frontend_Checkout_Aveonline_Office::init();

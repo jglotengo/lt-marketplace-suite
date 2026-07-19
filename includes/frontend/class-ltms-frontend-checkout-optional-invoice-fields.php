@@ -1,0 +1,411 @@
+<?php
+/**
+ * LTMS Frontend Checkout — Optional Invoice Fields
+ *
+ * v2.9.221: Implementa el patrón "Factura opcional" en el checkout.
+ *
+ * Modelo legal M-201: el marketplace NO factura al comprador. Cada vendedor
+ * factura por separado al comprador final. Por lo tanto:
+ *   - Los datos fiscales del comprador (NIT/RFC, razón social) NO son
+ *     obligatorios por defecto (cumple Ley 1581/2012 art. 4 literal f:
+ *     "recolección limitada" — principio de minimización).
+ *   - Si el comprador marca "Necesito factura electrónica", se revelan
+ *     campos condicionales específicos por país:
+ *     - CO: NIT/Cédula + Razón social + checkboxes (Gran contribuyente,
+ *       Autorretenedor) — afecta retenciones del vendedor.
+ *     - MX: RFC + Razón social + Uso CFDI + Régimen fiscal + CP fiscal
+ *       (obligatorio solo si monto > $2,000 MXN).
+ *
+ * Los datos se guardan en order meta para que el vendedor pueda emitir
+ * su factura electrónica correctamente cuando el comprador la solicite.
+ *
+ * @package    LTMS
+ * @subpackage LTMS/includes/frontend
+ * @version    2.9.221
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
+
+    public static function init(): void {
+        if ( ! class_exists( 'LTMS_Core_Config' ) ) {
+            return;
+        }
+        $country = LTMS_Core_Config::get_country();
+        if ( $country !== 'CO' && $country !== 'MX' ) {
+            return;
+        }
+
+        // 1. Marcar billing_company como NO requerido (era required en WC default).
+        add_filter( 'woocommerce_billing_fields', [ __CLASS__, 'make_company_optional' ], 100, 1 );
+
+        // 2. Añadir el checkbox "Necesito factura" + campos condicionales.
+        add_filter( 'woocommerce_checkout_fields', [ __CLASS__, 'add_invoice_fields' ], 100, 1 );
+
+        // 3. Validar formato de NIT/RFC si el checkbox está marcado.
+        add_action( 'woocommerce_checkout_process', [ __CLASS__, 'validate_invoice_fields' ] );
+
+        // 4. Guardar en order meta.
+        add_action( 'woocommerce_checkout_update_order_meta', [ __CLASS__, 'save_invoice_meta' ], 10, 1 );
+
+        // 5. Inyectar JS para toggle de campos condicionales (output buffering).
+        add_action( 'template_redirect', [ __CLASS__, 'start_output_buffer' ] );
+    }
+
+    /**
+     * Marca billing_company como NO requerido (cumple minimización de datos).
+     */
+    public static function make_company_optional( array $fields ): array {
+        if ( isset( $fields['billing_company'] ) ) {
+            $fields['billing_company']['required'] = false;
+        }
+        return $fields;
+    }
+
+    /**
+     * Añade el checkbox "Necesito factura" + campos condicionales al checkout.
+     */
+    public static function add_invoice_fields( array $fields ): array {
+        $country = LTMS_Core_Config::get_country();
+
+        // Checkbox principal.
+        $fields['billing']['ltms_needs_invoice'] = [
+            'type'     => 'checkbox',
+            'label'    => __( 'Necesito factura electrónica', 'ltms' ),
+            'required' => false,
+            'class'    => [ 'form-row-wide', 'ltms-invoice-toggle-row' ],
+            'priority' => 90,
+        ];
+
+        if ( $country === 'CO' ) {
+            // Colombia: NIT/Cédula + Razón social + checkboxes de régimen.
+            $fields['billing']['ltms_buyer_tax_id'] = [
+                'type'        => 'text',
+                'label'       => __( 'NIT o Cédula', 'ltms' ),
+                'placeholder' => __( 'Ej: 900.123.456-7', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-first', 'ltms-invoice-field' ],
+                'priority'    => 91,
+            ];
+            $fields['billing']['ltms_buyer_company_name'] = [
+                'type'        => 'text',
+                'label'       => __( 'Razón social o nombre completo', 'ltms' ),
+                'placeholder' => __( 'Ej: Mi Empresa S.A.S.', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-last', 'ltms-invoice-field' ],
+                'priority'    => 92,
+            ];
+            $fields['billing']['ltms_buyer_is_gran_contribuyente'] = [
+                'type'     => 'checkbox',
+                'label'    => __( 'Gran contribuyente', 'ltms' ),
+                'required' => false,
+                'class'    => [ 'form-row-wide', 'ltms-invoice-field' ],
+                'priority' => 93,
+            ];
+            $fields['billing']['ltms_buyer_is_autorretenedor'] = [
+                'type'     => 'checkbox',
+                'label'    => __( 'Autorretenedor', 'ltms' ),
+                'required' => false,
+                'class'    => [ 'form-row-wide', 'ltms-invoice-field' ],
+                'priority' => 94,
+            ];
+        } elseif ( $country === 'MX' ) {
+            // México: RFC + Razón social + Uso CFDI + Régimen + CP.
+            $fields['billing']['ltms_buyer_tax_id'] = [
+                'type'        => 'text',
+                'label'       => __( 'RFC', 'ltms' ),
+                'placeholder' => __( 'Ej: ABC123456789 o ABC123456ABC12', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-first', 'ltms-invoice-field' ],
+                'priority'    => 91,
+            ];
+            $fields['billing']['ltms_buyer_company_name'] = [
+                'type'        => 'text',
+                'label'       => __( 'Razón social o nombre', 'ltms' ),
+                'placeholder' => __( 'Ej: Mi Empresa S.A. de C.V.', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-last', 'ltms-invoice-field' ],
+                'priority'    => 92,
+            ];
+            $fields['billing']['ltms_buyer_cfdi_usage'] = [
+                'type'        => 'select',
+                'label'       => __( 'Uso del CFDI', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-first', 'ltms-invoice-field' ],
+                'priority'    => 93,
+                'options'     => [
+                    ''    => __( 'Selecciona uso del CFDI', 'ltms' ),
+                    'G01' => __( 'G01 — Adquisición de mercancías', 'ltms' ),
+                    'G02' => __( 'G02 — Devoluciones, descuentos o bonificaciones', 'ltms' ),
+                    'G03' => __( 'G03 — Gastos en general', 'ltms' ),
+                    'I01' => __( 'I01 — Construcciones', 'ltms' ),
+                    'I02' => __( 'I02 — Mobiliario y equipo de oficina', 'ltms' ),
+                    'I03' => __( 'I03 — Equipo de transporte', 'ltms' ),
+                    'I04' => __( 'I04 — Equipo de cómputo y accesorios', 'ltms' ),
+                    'I05' => __( 'I05 — Dados, troqueles, moldes, matrices y herramental', 'ltms' ),
+                    'I06' => __( 'I06 — Comunicaciones telefónicas', 'ltms' ),
+                    'I07' => __( 'I07 — Comunicaciones satelitales', 'ltms' ),
+                    'I08' => __( 'I08 — Otra maquinaria y equipo', 'ltms' ),
+                    'D01' => __( 'D01 — Honorarios médicos, dentales y gastos hospitalarios', 'ltms' ),
+                    'D02' => __( 'D02 — Gastos médicos por incapacidad o discapacidad', 'ltms' ),
+                    'D03' => __( 'D03 — Gastos funerales', 'ltms' ),
+                    'D04' => __( 'D04 — Donativos', 'ltms' ),
+                    'D05' => __( 'D05 — Intereses reales efectivamente pagados por créditos hipotecarios', 'ltms' ),
+                    'D06' => __( 'D06 — Aportaciones voluntarias al SAR', 'ltms' ),
+                    'D07' => __( 'D07 — Primas por seguros de gastos médicos', 'ltms' ),
+                    'D08' => __( 'D08 — Gastos de transportación escolar obligatoria', 'ltms' ),
+                    'D09' => __( 'D09 — Depósitos en cuentas para el ahorro, primas que tengan como base planes de pensiones', 'ltms' ),
+                    'D10' => __( 'D10 — Pagos por servicios educativos', 'ltms' ),
+                    'P01' => __( 'P01 — Por definir', 'ltms' ),
+                ],
+            ];
+            $fields['billing']['ltms_buyer_tax_regime'] = [
+                'type'        => 'select',
+                'label'       => __( 'Régimen fiscal', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-last', 'ltms-invoice-field' ],
+                'priority'    => 94,
+                'options'     => [
+                    ''            => __( 'Selecciona régimen', 'ltms' ),
+                    '601'         => __( '601 — General de Ley Personas Morales', 'ltms' ),
+                    '603'         => __( '603 — Personas Morales con Fines no Lucrativos', 'ltms' ),
+                    '605'         => __( '605 — Sueldos y Salarios e Ingresos Asimilados a Salarios', 'ltms' ),
+                    '606'         => __( '606 — Arrendamiento', 'ltms' ),
+                    '607'         => __( '607 — Régimen de Enajenación o Adquisición de Bienes', 'ltms' ),
+                    '608'         => __( '608 — Demás Ingresos', 'ltms' ),
+                    '609'         => __( '609 — Consolidación', 'ltms' ),
+                    '610'         => __( '610 — Residentes en el Extranjero sin Establecimiento Permanente en México', 'ltms' ),
+                    '611'         => __( '611 — Ingresos por Dividendos (socios y accionistas)', 'ltms' ),
+                    '612'         => __( '612 — Personas Físicas con Actividades Empresariales y Profesionales', 'ltms' ),
+                    '614'         => __( '614 — Ingresos por Intereses', 'ltms' ),
+                    '615'         => __( '615 — Régimen de los Ingresos por Obtención de Premios', 'ltms' ),
+                    '616'         => __( '616 — Sin obligaciones fiscales', 'ltms' ),
+                    '620'         => __( '620 — Sociedades Cooperativas de Producción que optan por diferir sus ingresos', 'ltms' ),
+                    '621'         => __( '621 — Incorporación Fiscal', 'ltms' ),
+                    '622'         => __( '622 — Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras', 'ltms' ),
+                    '623'         => __( '623 — Opcional para Grupos de Sociedades', 'ltms' ),
+                    '624'         => __( '624 — Coordinados', 'ltms' ),
+                    '625'         => __( '625 — Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas', 'ltms' ),
+                    '626'         => __( '626 — Régimen Simplificado de Confianza', 'ltms' ),
+                ],
+            ];
+            $fields['billing']['ltms_buyer_fiscal_cp'] = [
+                'type'        => 'text',
+                'label'       => __( 'Código postal fiscal', 'ltms' ),
+                'placeholder' => __( 'Ej: 01000', 'ltms' ),
+                'required'    => false,
+                'class'       => [ 'form-row-wide', 'ltms-invoice-field' ],
+                'priority'    => 95,
+            ];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Valida el formato del NIT (CO) o RFC (MX) si el checkbox está marcado.
+     */
+    public static function validate_invoice_fields(): void {
+        if ( empty( $_POST['ltms_needs_invoice'] ) ) {
+            return;
+        }
+
+        $country = LTMS_Core_Config::get_country();
+        $tax_id  = sanitize_text_field( $_POST['ltms_buyer_tax_id'] ?? '' );
+        $company = sanitize_text_field( $_POST['ltms_buyer_company_name'] ?? '' );
+
+        if ( empty( $tax_id ) ) {
+            wc_add_notice( __( 'Indica tu NIT/RFC para emitir la factura.', 'ltms' ), 'error' );
+            return;
+        }
+        if ( empty( $company ) ) {
+            wc_add_notice( __( 'Indica la razón social o nombre completo para la factura.', 'ltms' ), 'error' );
+            return;
+        }
+
+        if ( $country === 'CO' ) {
+            // NIT: formato 999999999-X (con o sin puntos, con DV).
+            // Cédula: 6-10 dígitos.
+            $clean = preg_replace( '/[.\s-]/', '', $tax_id );
+            if ( ! preg_match( '/^\d{6,10}[0-9]$/', $clean ) && ! preg_match( '/^\d{8,9}\d$/', $clean ) ) {
+                wc_add_notice( __( 'NIT o Cédula inválido. Formato esperado: 900.123.456-7 o cédula de 6-10 dígitos.', 'ltms' ), 'error' );
+            }
+        } elseif ( $country === 'MX' ) {
+            // RFC: persona moral (12 chars: 3 letras + 6 dígitos + 3 alfanum)
+            //      persona física (13 chars: 4 letras + 6 dígitos + 3 alfanum)
+            $clean = strtoupper( preg_replace( '/\s/', '', $tax_id ) );
+            if ( ! preg_match( '/^([A-Z&Ñ]{3,4})(\d{6})([A-Z0-9]{3})$/', $clean ) ) {
+                wc_add_notice( __( 'RFC inválido. Verifica el formato (12-13 caracteres alfanuméricos).', 'ltms' ), 'error' );
+            }
+            // Uso CFDI y Régimen fiscal obligatorios si marca factura.
+            if ( empty( $_POST['ltms_buyer_cfdi_usage'] ) ) {
+                wc_add_notice( __( 'Selecciona el uso del CFDI.', 'ltms' ), 'error' );
+            }
+            if ( empty( $_POST['ltms_buyer_tax_regime'] ) ) {
+                wc_add_notice( __( 'Selecciona el régimen fiscal.', 'ltms' ), 'error' );
+            }
+            if ( empty( $_POST['ltms_buyer_fiscal_cp'] ) || ! preg_match( '/^\d{5}$/', $_POST['ltms_buyer_fiscal_cp'] ) ) {
+                wc_add_notice( __( 'Código postal fiscal inválido (5 dígitos).', 'ltms' ), 'error' );
+            }
+        }
+    }
+
+    /**
+     * Guarda los datos fiscales del comprador en order meta.
+     */
+    public static function save_invoice_meta( int $order_id ): void {
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            return;
+        }
+
+        $needs_invoice = ! empty( $_POST['ltms_needs_invoice'] );
+        $order->update_meta_data( '_ltms_buyer_needs_invoice', $needs_invoice ? '1' : '0' );
+
+        if ( ! $needs_invoice ) {
+            return;
+        }
+
+        $order->update_meta_data( '_ltms_buyer_tax_id',       sanitize_text_field( $_POST['ltms_buyer_tax_id'] ?? '' ) );
+        $order->update_meta_data( '_ltms_buyer_company_name', sanitize_text_field( $_POST['ltms_buyer_company_name'] ?? '' ) );
+
+        $country = LTMS_Core_Config::get_country();
+        if ( $country === 'CO' ) {
+            $order->update_meta_data( '_ltms_buyer_is_gran_contribuyente', ! empty( $_POST['ltms_buyer_is_gran_contribuyente'] ) ? '1' : '0' );
+            $order->update_meta_data( '_ltms_buyer_is_autorretenedor',     ! empty( $_POST['ltms_buyer_is_autorretenedor'] )     ? '1' : '0' );
+        } elseif ( $country === 'MX' ) {
+            $order->update_meta_data( '_ltms_buyer_cfdi_usage',  sanitize_text_field( $_POST['ltms_buyer_cfdi_usage']  ?? '' ) );
+            $order->update_meta_data( '_ltms_buyer_tax_regime',  sanitize_text_field( $_POST['ltms_buyer_tax_regime']  ?? '' ) );
+            $order->update_meta_data( '_ltms_buyer_fiscal_cp',   sanitize_text_field( $_POST['ltms_buyer_fiscal_cp']   ?? '' ) );
+        }
+
+        // Nota interna para que el vendedor sepa que el comprador solicita factura.
+        $order->add_order_note(
+            sprintf(
+                /* translators: %s: razón social del comprador */
+                __( '📋 Comprador solicita factura electrónica: %s', 'ltms' ),
+                sanitize_text_field( $_POST['ltms_buyer_company_name'] ?? '' )
+            )
+        );
+        $order->save();
+    }
+
+    /**
+     * v2.9.221: Output buffering para inyectar JS que toggle los campos
+     * condicionales. SG Optimizer strippa inline scripts de template files.
+     */
+    public static function start_output_buffer(): void {
+        if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
+            return;
+        }
+        if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+            return;
+        }
+        ob_start( [ __CLASS__, 'inject_script_into_html' ] );
+    }
+
+    public static function inject_script_into_html( string $html ): string {
+        if ( stripos( $html, '<html' ) === false ) {
+            return $html;
+        }
+        $script = self::get_toggle_script_html();
+        $pos = strripos( $html, '</body>' );
+        if ( $pos !== false ) {
+            return substr( $html, 0, $pos ) . $script . substr( $html, $pos );
+        }
+        $pos = strripos( $html, '</html>' );
+        if ( $pos !== false ) {
+            return substr( $html, 0, $pos ) . $script . substr( $html, $pos );
+        }
+        return $html;
+    }
+
+    public static function get_toggle_script_html(): string {
+        return '<!-- LTMS-INVOICE-TOGGLE-v2.9.221-START -->' . "\n" .
+            '<script>' . "\n" .
+            self::get_toggle_script_js() . "\n" .
+            '</script>' . "\n" .
+            '<!-- LTMS-INVOICE-TOGGLE-v2.9.221-END -->' . "\n";
+    }
+
+    /**
+     * JS para mostrar/ocultar los campos condicionales según el checkbox.
+     * También aplica estilos al checkbox principal.
+     */
+    private static function get_toggle_script_js(): string {
+        return <<<JS
+(function(){
+    'use strict';
+
+    // v2.9.221: Inyectar CSS una sola vez para estilizar los campos.
+    if (!document.getElementById('ltms-invoice-fields-css')) {
+        var style = document.createElement('style');
+        style.id = 'ltms-invoice-fields-css';
+        style.textContent = [
+            '.ltms-invoice-toggle-row{padding:14px 16px !important;margin:12px 0 !important;background:#FFF9F9 !important;border:1px solid #FFD6D6 !important;border-left:4px solid #E80001 !important;border-radius:10px !important;}',
+            '.ltms-invoice-toggle-row:hover{background:#FFF1F1 !important;border-color:#E80001 !important;}',
+            '.ltms-invoice-toggle-row .woocommerce-input-wrapper,',
+            '.ltms-invoice-toggle-row label{display:flex !important;align-items:flex-start !important;gap:8px !important;width:100% !important;font-size:14px !important;font-weight:600 !important;color:#1A1F2E !important;line-height:1.5 !important;cursor:pointer !important;}',
+            '.ltms-invoice-toggle-row input[type=checkbox]{width:20px !important;height:20px !important;margin-top:2px !important;accent-color:#E80001 !important;cursor:pointer !important;}',
+            '.ltms-invoice-toggle-row label::after{content:attr(data-desc);display:block;font-size:12px;font-weight:400;color:#565C66;margin-top:4px;}',
+            '.ltms-invoice-field{display:none;animation:pv-fade .25s ease;}',
+            '.ltms-invoice-field.is-visible{display:block;}',
+            '.ltms-invoice-field label{font-size:13.5px !important;font-weight:600 !important;color:#1A1F2E !important;}',
+            '.ltms-invoice-field input, .ltms-invoice-field select{border:1px solid #E7E5EC !important;border-radius:6px !important;padding:10px !important;font-size:14px !important;}',
+            '.ltms-invoice-field input:focus, .ltms-invoice-field select:focus{border-color:#E80001 !important;outline:none !important;box-shadow:0 0 0 3px rgba(232,0,1,0.12) !important;}'
+        ].join('\\n');
+        document.head.appendChild(style);
+    }
+
+    function initInvoiceToggle() {
+        var toggle = document.querySelector('#ltms_needs_invoice');
+        if (!toggle) return;
+        if (toggle.getAttribute('data-ltms-invoice-init') === '1') return;
+        toggle.setAttribute('data-ltms-invoice-init', '1');
+
+        var invoiceFields = document.querySelectorAll('.ltms-invoice-field');
+        var toggleLabel = document.querySelector('label[for="ltms_needs_invoice"]');
+
+        // Añadir descripción al label.
+        if (toggleLabel && !toggleLabel.getAttribute('data-ltms-desc-added')) {
+            toggleLabel.setAttribute('data-ltms-desc-added', '1');
+            var desc = document.createElement('span');
+            desc.style.cssText = 'display:block;font-size:12px;font-weight:400;color:#565C66;margin-top:4px;line-height:1.45';
+            desc.textContent = 'La factura electrónica la emite cada vendedor. Marca si compras para empresa o necesitas soporte contable.';
+            toggleLabel.appendChild(desc);
+        }
+
+        function updateVisibility() {
+            var show = toggle.checked;
+            invoiceFields.forEach(function(field) {
+                field.style.display = show ? '' : 'none';
+                var input = field.querySelector('input, select');
+                if (input && !show) {
+                    input.removeAttribute('required');
+                }
+            });
+        }
+
+        toggle.addEventListener('change', updateVisibility);
+        updateVisibility();
+    }
+
+    // Multi-retry para WOOCCM y AJAX re-renders.
+    initInvoiceToggle();
+    setTimeout(initInvoiceToggle, 500);
+    setTimeout(initInvoiceToggle, 1500);
+    setTimeout(initInvoiceToggle, 3000);
+    if ('MutationObserver' in window) {
+        var obs = new MutationObserver(function() {
+            initInvoiceToggle();
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+        setTimeout(function() { obs.disconnect(); }, 8000);
+    }
+})();
+JS;
+    }
+}
