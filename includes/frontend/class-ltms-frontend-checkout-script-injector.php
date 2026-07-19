@@ -21,25 +21,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LTMS_Frontend_Checkout_Script_Injector {
 
     public static function init(): void {
-        // v2.9.225: Switched from output buffering to wp_footer.
-        // SG Optimizer was stripping inline <script> tags injected via
-        // ob_start callback. wp_footer with PHP_INT_MAX priority runs
-        // AFTER SG Optimizer's HTML processing, so the script survives.
-        add_action( 'wp_footer', [ __CLASS__, 'print_checkout_script' ], PHP_INT_MAX );
+        // v2.9.226: Use wp_enqueue_script + wp_add_inline_script.
+        // SG Optimizer strips ALL inline <script> tags except those
+        // added via wp_localize_script / wp_add_inline_script (WP API).
+        // We register a tiny stub JS file and attach our inline code to it.
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_fixes' ], 100 );
     }
 
     /**
-     * v2.9.225: Prints the checkout script directly via wp_footer.
-     * This runs after all SG Optimizer HTML processing.
+     * v2.9.226: Enqueues a stub JS handle and attaches our inline checkout
+     * fixes via wp_add_inline_script. SG Optimizer respects this because
+     * it's part of the WordPress script API.
      */
-    public static function print_checkout_script(): void {
-        if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
+    public static function enqueue_checkout_fixes(): void {
+        if ( is_admin() || wp_doing_ajax() ) {
             return;
         }
         if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
             return;
         }
-        echo self::get_checkout_script_html();
+
+        $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+
+        // Register a tiny inline-only script (no external file needed).
+        wp_register_script(
+            'ltms-checkout-fixes',
+            '', // No src — purely inline
+            [ 'jquery' ],
+            LTMS_VERSION,
+            true
+        );
+        wp_enqueue_script( 'ltms-checkout-fixes' );
+
+        // Attach our inline JS via wp_add_inline_script — SG Optimizer
+        // respects this because it's the WordPress-standard way.
+        $js = self::get_checkout_script_js( $country );
+        wp_add_inline_script( 'ltms-checkout-fixes', $js, 'after' );
     }
 
     /**

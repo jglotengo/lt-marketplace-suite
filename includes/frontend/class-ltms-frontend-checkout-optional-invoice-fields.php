@@ -51,23 +51,25 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
         // 4. Guardar en order meta.
         add_action( 'woocommerce_checkout_update_order_meta', [ __CLASS__, 'save_invoice_meta' ], 10, 1 );
 
-        // 5. Inyectar JS para toggle de campos condicionales via wp_footer.
-        // v2.9.225: Changed from output buffering to wp_footer (PHP_INT_MAX)
-        // because SG Optimizer strips inline scripts from ob_start callbacks.
-        add_action( 'wp_footer', [ __CLASS__, 'print_invoice_toggle_script' ], PHP_INT_MAX );
+        // 5. Inyectar JS para toggle de campos condicionales via wp_add_inline_script.
+        // v2.9.226: SG Optimizer strips inline <script> from wp_footer/ob_start.
+        // wp_add_inline_script is the only method SG Optimizer respects.
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_invoice_toggle_script' ], 101 );
     }
 
     /**
-     * v2.9.225: Prints the invoice toggle script via wp_footer.
+     * v2.9.226: Enqueues the invoice toggle JS via wp_add_inline_script.
      */
-    public static function print_invoice_toggle_script(): void {
-        if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
+    public static function enqueue_invoice_toggle_script(): void {
+        if ( is_admin() || wp_doing_ajax() ) {
             return;
         }
         if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
             return;
         }
-        echo self::get_toggle_script_html();
+        wp_register_script( 'ltms-invoice-toggle', '', [ 'jquery' ], LTMS_VERSION, true );
+        wp_enqueue_script( 'ltms-invoice-toggle' );
+        wp_add_inline_script( 'ltms-invoice-toggle', self::get_toggle_script_js(), 'after' );
     }
 
     /**
