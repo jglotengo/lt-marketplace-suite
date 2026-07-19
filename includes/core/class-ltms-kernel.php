@@ -1035,6 +1035,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Municipality_Field' ) ) {
             LTMS_Frontend_Checkout_Municipality_Field::init();
         }
+        // v2.9.216: Override de labels de campos del checkout (bypass WOOCCM).
+        // Localiza 'Departamento' / 'Estado', 'Municipio', 'Código postal', etc.
+        if ( class_exists( 'LTMS_Frontend_Checkout_Field_Labels' ) ) {
+            LTMS_Frontend_Checkout_Field_Labels::init();
+        }
         // v2.1.0: selección de oficina / punto de entrega Aveonline en checkout.
         if ( class_exists( 'LTMS_Frontend_Checkout_Aveonline_Office' ) ) {
             LTMS_Frontend_Checkout_Aveonline_Office::init();
