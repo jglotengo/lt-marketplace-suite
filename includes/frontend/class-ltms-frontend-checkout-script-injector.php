@@ -46,20 +46,21 @@ class LTMS_Frontend_Checkout_Script_Injector {
             LTMS_VERSION
         );
 
-        $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
-
-        // Generate the JS file dynamically with country-specific labels.
-        $js_content = self::get_checkout_script_js( $country );
-        $file_path = LTMS_PLUGIN_DIR . 'assets/js/ltms-checkout-fixes.js';
-        file_put_contents( $file_path, $js_content );
-
+        // v2.9.230: Static JS file + wp_localize_script for country config.
+        // No more file_put_contents — static file is committed to git.
         wp_enqueue_script(
             'ltms-checkout-fixes',
-            LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js?v=' . LTMS_VERSION,
+            LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js',
             [ 'jquery' ],
             LTMS_VERSION,
             true
         );
+
+        // Pass country to JS via wp_localize_script (survives SG Optimizer).
+        $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+        wp_localize_script( 'ltms-checkout-fixes', 'ltmsCheckoutFixes', [
+            'country' => $country,
+        ] );
     }
 
     /**
