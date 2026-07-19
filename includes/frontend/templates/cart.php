@@ -565,21 +565,30 @@ get_header( 'shop' );
 
                     <!-- =======================================================
                          CTA: PROCEDER A CHECKOUT
+                         Jerarquía v2.9.212:
+                           1° Finalizar compra (primary, brand red)
+                           2° Seguir comprando (ghost, header)
+                         Botón WC .checkout-button oculto (lo reemplazamos).
                          ======================================================= -->
                     <div class="pv-cart__cta">
                         <?php
                         /**
                          * woocommerce_proceed_to_checkout() — imprime el botón
-                         * estándar de WC para avanzar al checkout. Hook estándar
-                         * invocado dentro de woocommerce_cart_collaterals.
+                         * estándar de WC para avanzar al checkout. Lo ocultamos
+                         * via CSS (.checkout-button { display:none }) y usamos
+                         * nuestro botón con el design system PV + brand color.
                          */
                         if ( function_exists( 'woocommerce_proceed_to_checkout' ) ) {
                             woocommerce_proceed_to_checkout();
                         }
                         ?>
-                        <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="pv-btn pv-btn--accent pv-btn--lg pv-btn--block pv-cart__checkout-cta">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="pv-btn pv-btn--brand pv-btn--lg pv-btn--block pv-cart__checkout-cta">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <?php esc_html_e( 'Finalizar compra', 'ltms' ); ?>
+                        </a>
+                        <a href="<?php echo esc_url( get_permalink( wc_get_page_id( 'shop' ) ) ); ?>" class="pv-btn pv-btn--ghost pv-btn--block pv-cart__continue-cta">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <?php esc_html_e( 'Seguir comprando', 'ltms' ); ?>
                         </a>
                     </div>
 
@@ -804,23 +813,58 @@ do_action( 'woocommerce_after_main_content' );
 }
 .pv-scope.pv-cart .pv-cart__coupon-chip-remove:hover{background:rgba(11,163,127,.32);}
 
-/* Totals */
-.pv-scope.pv-cart .pv-cart__totals{display:flex;flex-direction:column;gap:8px;}
+/* Totals — v2.9.212 improved hierarchy and aesthetics */
+.pv-scope.pv-cart .pv-cart__totals{
+    display:flex;flex-direction:column;gap:0;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:var(--r-md);
+    padding:14px 16px;
+}
 .pv-scope.pv-cart .pv-cart__totals-row{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
     font-size:14px;color:var(--text-2);
+    padding:9px 0;
+    border-bottom:1px solid rgba(0,0,0,0.04);
 }
-.pv-scope.pv-cart .pv-cart__totals-label{font-weight:500;}
-.pv-scope.pv-cart .pv-cart__totals-value{font-weight:600;color:var(--text);text-align:right;}
+.pv-scope.pv-cart .pv-cart__totals-row:last-of-type{border-bottom:0;}
+.pv-scope.pv-cart .pv-cart__totals-label{
+    font-weight:500;color:var(--text-2);
+    display:flex;align-items:center;gap:6px;
+}
+.pv-scope.pv-cart .pv-cart__totals-value{
+    font-weight:600;color:var(--text);text-align:right;
+    font-variant-numeric:tabular-nums;
+}
 .pv-scope.pv-cart .pv-cart__totals-value .woocommerce-Price-amount{font-weight:700;}
 .pv-scope.pv-cart .pv-cart__totals-row--discount .pv-cart__totals-value,
-.pv-scope.pv-cart .pv-cart__totals-row--discount .pv-cart__totals-value .woocommerce-Price-amount{color:var(--accent);}
+.pv-scope.pv-cart .pv-cart__totals-row--discount .pv-cart__totals-value .woocommerce-Price-amount{
+    color:var(--accent);font-weight:700;
+}
 .pv-scope.pv-cart .pv-cart__totals-row--ok .pv-cart__totals-value{color:var(--accent);font-weight:700;}
-.pv-scope.pv-cart .pv-cart__totals-row--muted .pv-cart__totals-value{color:var(--text-3);font-size:12.5px;font-weight:500;}
-.pv-scope.pv-cart .pv-cart__totals-divider{height:1px;background:var(--border);margin:6px 0;}
-.pv-scope.pv-cart .pv-cart__totals-row--total{align-items:baseline;padding-top:6px;}
-.pv-scope.pv-cart .pv-cart__totals-row--total .pv-cart__totals-label{font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);}
-.pv-scope.pv-cart .pv-cart__totals-total{font-family:var(--display);font-weight:800;font-size:24px;color:var(--primary);}
+.pv-scope.pv-cart .pv-cart__totals-row--muted .pv-cart__totals-value{
+    color:var(--text-3);font-size:12.5px;font-weight:500;font-style:italic;
+}
+/* Divider — separa el subtotal de descuentos/envío */
+.pv-scope.pv-cart .pv-cart__totals-divider{
+    height:1px;background:var(--border);
+    margin:8px 0;border:0;
+}
+/* Total row — destacado con fondo brand */
+.pv-scope.pv-cart .pv-cart__totals-row--total{
+    align-items:baseline;padding:14px 12px;margin:8px -12px 0;
+    background:linear-gradient(135deg,#FFF1F1 0%,#FFE5E5 100%);
+    border-radius:var(--r-sm);
+    border:1px solid #FFC7C7;
+    border-bottom:1px solid #FFC7C7;
+}
+.pv-scope.pv-cart .pv-cart__totals-row--total .pv-cart__totals-label{
+    font-family:var(--display);font-weight:700;font-size:15px;color:var(--text);
+}
+.pv-scope.pv-cart .pv-cart__totals-total{
+    font-family:var(--display);font-weight:800;font-size:24px;color:#E80001;
+    letter-spacing:-0.01em;
+}
 
 /* Escrow notice */
 .pv-scope.pv-cart .pv-escrow-notice{
@@ -834,9 +878,21 @@ do_action( 'woocommerce_after_main_content' );
 .pv-scope.pv-cart .pv-escrow-notice__body p{margin:0;}
 
 /* CTA */
-.pv-scope.pv-cart .pv-cart__cta{display:flex;flex-direction:column;gap:8px;padding-top:6px;}
+.pv-scope.pv-cart .pv-cart__cta{display:flex;flex-direction:column;gap:10px;padding-top:6px;}
 .pv-scope.pv-cart .pv-cart__cta .checkout-button{display:none;} /* oculto el botón WC por defecto */
-.pv-scope.pv-cart .pv-cart__checkout-cta{height:56px;}
+/* v2.9.212: Brand color CTA (red #E80001) — consistente con product page y shop cards */
+.pv-scope.pv-cart .pv-btn--brand{
+    background:#E80001;color:#fff;border:1px solid #E80001;
+}
+.pv-scope.pv-cart .pv-btn--brand:hover{
+    background:#B80001;border-color:#B80001;
+    transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28);
+}
+.pv-scope.pv-cart .pv-btn--brand:active{
+    transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20);
+}
+.pv-scope.pv-cart .pv-cart__checkout-cta{height:56px;font-size:16px;font-weight:800;letter-spacing:.01em;}
+.pv-scope.pv-cart .pv-cart__continue-cta{height:46px;font-size:14px;font-weight:600;}
 
 /* Payment methods */
 .pv-scope.pv-cart .pv-cart__payment-methods{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--border);}

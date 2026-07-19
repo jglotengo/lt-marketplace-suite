@@ -119,6 +119,12 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_before_cart', [ __CLASS__, 'strip_shipping_zone_notices' ], 1 );
         add_action( 'woocommerce_before_checkout_form', [ __CLASS__, 'strip_shipping_zone_notices' ], 1 );
 
+        // v2.9.212: Quitar el success notice "X se ha añadido a tu carrito" en
+        // la página /cart. Es redundante: el usuario ya está viendo el carrito
+        // con el producto. En product page SÍ es útil (allí el usuario no ve
+        // el carrito inmediatamente). El notice solo se quita en /cart.
+        add_action( 'woocommerce_before_cart', [ __CLASS__, 'strip_add_to_cart_success_notice' ], 1 );
+
         // Proceso de pago — solo usuarios logueados
         add_action( 'wp_ajax_ltms_process_checkout',        [ $instance, 'ajax_process_checkout' ] );
 
@@ -1048,6 +1054,60 @@ final class LTMS_Frontend_Checkout_Handler {
             $names_str
         ) );
         echo '</div></div>';
+    }
+
+    /**
+     * v2.9.212: Quita el success notice "X se ha añadido a tu carrito" en la
+     * página /cart. Es redundante porque el usuario ya está viendo el carrito
+     * con el producto añadido. En product page SÍ se mantiene (allí el usuario
+     * no ve el carrito inmediatamente).
+     *
+     * Patrones detectados (ES + EN):
+     *   - '"X" se ha añadido a tu carrito.'
+     *   - '"X" has been added to your cart.'
+     */
+    public static function strip_add_to_cart_success_notice(): void {
+        if ( ! function_exists( 'WC' ) || ! WC()->session ) {
+            return;
+        }
+
+        $notices = WC()->session->get( 'wc_notices', [] );
+        if ( empty( $notices ) ) {
+            return;
+        }
+
+        $patterns = [
+            '/se ha añadido a tu carrito/iu',
+            '/has been added to your cart/iu',
+        ];
+
+        $changed = false;
+        foreach ( [ 'success', 'notice' ] as $type ) {
+            if ( empty( $notices[ $type ] ) ) {
+                continue;
+            }
+            $filtered = [];
+            foreach ( $notices[ $type ] as $notice ) {
+                $text = is_array( $notice ) ? ( $notice['notice'] ?? '' ) : (string) $notice;
+                $should_strip = false;
+                foreach ( $patterns as $pattern ) {
+                    if ( preg_match( $pattern, $text ) ) {
+                        $should_strip = true;
+                        break;
+                    }
+                }
+                if ( ! $should_strip ) {
+                    $filtered[] = $notice;
+                } else {
+                    $changed = true;
+                }
+            }
+            $notices[ $type ] = $filtered;
+        }
+
+        if ( $changed ) {
+            WC()->session->set( 'wc_notices', $notices );
+        }
     }
 
     /**
