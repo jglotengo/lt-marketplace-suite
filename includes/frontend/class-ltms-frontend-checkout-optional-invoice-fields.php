@@ -51,8 +51,23 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
         // 4. Guardar en order meta.
         add_action( 'woocommerce_checkout_update_order_meta', [ __CLASS__, 'save_invoice_meta' ], 10, 1 );
 
-        // 5. Inyectar JS para toggle de campos condicionales (output buffering).
-        add_action( 'template_redirect', [ __CLASS__, 'start_output_buffer' ] );
+        // 5. Inyectar JS para toggle de campos condicionales via wp_footer.
+        // v2.9.225: Changed from output buffering to wp_footer (PHP_INT_MAX)
+        // because SG Optimizer strips inline scripts from ob_start callbacks.
+        add_action( 'wp_footer', [ __CLASS__, 'print_invoice_toggle_script' ], PHP_INT_MAX );
+    }
+
+    /**
+     * v2.9.225: Prints the invoice toggle script via wp_footer.
+     */
+    public static function print_invoice_toggle_script(): void {
+        if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
+            return;
+        }
+        if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+            return;
+        }
+        echo self::get_toggle_script_html();
     }
 
     /**

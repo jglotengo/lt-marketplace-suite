@@ -21,21 +21,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LTMS_Frontend_Checkout_Script_Injector {
 
     public static function init(): void {
-        // v2.9.219: output buffering to inject checkout JS after SG Optimizer.
-        add_action( 'template_redirect', [ __CLASS__, 'start_output_buffer' ] );
+        // v2.9.225: Switched from output buffering to wp_footer.
+        // SG Optimizer was stripping inline <script> tags injected via
+        // ob_start callback. wp_footer with PHP_INT_MAX priority runs
+        // AFTER SG Optimizer's HTML processing, so the script survives.
+        add_action( 'wp_footer', [ __CLASS__, 'print_checkout_script' ], PHP_INT_MAX );
     }
 
     /**
-     * Inicia output buffering solo en páginas de checkout.
+     * v2.9.225: Prints the checkout script directly via wp_footer.
+     * This runs after all SG Optimizer HTML processing.
      */
-    public static function start_output_buffer(): void {
+    public static function print_checkout_script(): void {
         if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
             return;
         }
         if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
             return;
         }
-        ob_start( [ __CLASS__, 'inject_script_into_html' ] );
+        echo self::get_checkout_script_html();
     }
 
     /**
