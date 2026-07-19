@@ -120,6 +120,14 @@ class LTMS_Native_Templates {
     public static function remove_default_related_products(): void {
         // WC default: add_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
         remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
+
+        // v2.9.213: Also remove WC's default cart collaterals hooks that produce
+        // DUPLICATE cart totals + Finalizar compra button + cross-sells on /cart.
+        // Our cart.php template renders all of these manually with PV design system.
+        // Without this, WC prints "Totales del carrito" + a 2nd "Finalizar compra"
+        // button BELOW our custom summary column.
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cross_sell_display' );
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals' );
     }
 
     /**

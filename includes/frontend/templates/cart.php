@@ -611,9 +611,22 @@ get_header( 'shop' );
         <?php
         /**
          * Hook: woocommerce_cart_collaterals
-         * Cross-sells y cart totals nativos de WC. Como ya los renderizamos
-         * manualmente, este hook queda para extensiones de terceros.
+         *
+         * v2.9.213: Removidas las acciones default de WC (woocommerce_cross_sell_display
+         * y woocommerce_cart_totals) porque YA las renderizamos manualmente arriba:
+         *   - Cross-sells: línea 443 (woocommerce_cross_sell_display() en .pv-cart__crosssells)
+         *   - Totales: en .pv-cart__summary (nuestro diseño con tarjeta + total destacado)
+         *   - CTA Finalizar compra: en .pv-cart__cta (nuestro botón brand red)
+         *
+         * Sin este remove_action, WC imprimía DUPLICADO:
+         *   - "Totales del carrito" nativo de WC debajo de nuestro summary
+         *   - "Finalizar compra" nativo de WC debajo del nuestro
+         *
+         * Mantenemos el do_action() para que extensiones de terceros puedan
+         * engancharse si lo necesitan.
          */
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cross_sell_display' );
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals' );
         do_action( 'woocommerce_cart_collaterals' );
         ?>
     </main>
