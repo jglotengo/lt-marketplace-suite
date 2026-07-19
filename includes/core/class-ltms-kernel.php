@@ -1050,6 +1050,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Optional_Invoice_Fields' ) ) {
             LTMS_Frontend_Checkout_Optional_Invoice_Fields::init();
         }
+        // v2.9.222: Vendor invoicing (Alegra/Siigo) — cada vendor emite sus
+        // propias facturas desde el panel con credenciales propias (cifradas).
+        if ( class_exists( 'LTMS_Vendor_Invoicing_Settings' ) ) {
+            LTMS_Vendor_Invoicing_Settings::init();
+        }
         // v2.1.0: selección de oficina / punto de entrega Aveonline en checkout.
         if ( class_exists( 'LTMS_Frontend_Checkout_Aveonline_Office' ) ) {
             LTMS_Frontend_Checkout_Aveonline_Office::init();

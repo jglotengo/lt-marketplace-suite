@@ -1067,6 +1067,61 @@
                 const newStatus = $(this).data('status');
                 self.updateOrderStatus(orderId, newStatus);
             });
+
+            // v2.9.222: Generar factura electrónica desde el detalle del pedido
+            $(document).on('click', '#ltms-generate-invoice-btn', function () {
+                const orderId = $(this).data('order-id');
+                const $btn = $(this);
+                const originalText = $btn.html();
+                $btn.prop('disabled', true).html('⏳ Generando...');
+
+                $.ajax({
+                    url: ltmsDashboard.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'ltms_vendor_generate_invoice',
+                        nonce: ltmsDashboard.nonce,
+                        order_id: orderId,
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            const data = response.data;
+                            // Reemplazar el botón con el badge de factura generada.
+                            $btn.replaceWith(`
+                                <div style="display:inline-flex;align-items:center;gap:8px;background:#D1FAE5;color:#065F46;padding:6px 12px;border-radius:6px;font-size:.82rem;font-weight:600;">
+                                    ✅ Factura ${data.provider.toUpperCase()} #${self.escapeHtml(data.invoice_number)}
+                                </div>
+                            `);
+                            // Toast de éxito.
+                            if (typeof LTMS.UX !== 'undefined' && LTMS.UX.toast) {
+                                LTMS.UX.toast('success', 'Factura generada', data.message, { duration: 4000 });
+                            } else {
+                                alert(data.message);
+                            }
+                            // Recargar el detalle para sincronizar.
+                            setTimeout(function () {
+                                self.openOrderDetail(orderId);
+                            }, 1500);
+                        } else {
+                            $btn.prop('disabled', false).html(originalText);
+                            const msg = (response.data && response.data.message) || 'Error al generar factura.';
+                            if (typeof LTMS.UX !== 'undefined' && LTMS.UX.toast) {
+                                LTMS.UX.toast('error', 'Error', msg, { duration: 5000 });
+                            } else {
+                                alert(msg);
+                            }
+                        }
+                    },
+                    error: function () {
+                        $btn.prop('disabled', false).html(originalText);
+                        if (typeof LTMS.UX !== 'undefined' && LTMS.UX.toast) {
+                            LTMS.UX.toast('error', 'Error', 'No se pudo conectar con el servidor.', { duration: 5000 });
+                        } else {
+                            alert('No se pudo conectar con el servidor.');
+                        }
+                    },
+                });
+            });
         },
 
         /**
@@ -1167,6 +1222,8 @@
 
                 ${d.customer_note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.85rem;"><strong>Nota del cliente:</strong> ${this.escapeHtml(d.customer_note)}</div>` : ''}
 
+                ${this.renderInvoiceBlock(d)}
+
                 <div style="margin-bottom:14px;">
                     <strong style="font-size:.85rem;">Notas del pedido</strong>
                     <div style="margin-top:6px;">${notesHtml}</div>
@@ -1182,6 +1239,70 @@
                     </div>
                 </div>
             `);
+        },
+
+        /**
+         * v2.9.222: Renderiza el bloque de facturación electrónica en el detalle del pedido.
+         * Si el vendor tiene credenciales configuradas, muestra el botón "Generar factura".
+         * Si ya se generó, muestra el número y enlace.
+         * Si no tiene credenciales, muestra un link para configurarlas.
+         */
+        renderInvoiceBlock(d) {
+            // Si no viene invoice_data del backend, asumir no configurado.
+            const invoiceData = d.invoice_data || {};
+            const hasCreds = invoiceData.has_credentials === true;
+            const existing = invoiceData.existing_invoice || null;
+            const needsInvoice = invoiceData.buyer_needs_invoice === true;
+            const buyerTaxId = invoiceData.buyer_tax_id || '';
+            const buyerCompany = invoiceData.buyer_company_name || '';
+
+            let buyerInfo = '';
+            if (needsInvoice && buyerTaxId) {
+                buyerInfo = `
+                    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:.8rem;color:#1E40AF;">
+                        <strong>📋 Comprador solicita factura:</strong><br>
+                        ${this.escapeHtml(buyerCompany)} · ${this.escapeHtml(buyerTaxId)}
+                    </div>
+                `;
+            } else {
+                buyerInfo = `
+                    <div style="font-size:.78rem;color:#9ca3af;margin-top:6px;">
+                        El comprador no solicitó factura. Puedes generar una genérica si lo deseas.
+                    </div>
+                `;
+            }
+
+            let actionHtml = '';
+            if (existing) {
+                // Ya generada.
+                actionHtml = `
+                    <div style="display:inline-flex;align-items:center;gap:8px;background:#D1FAE5;color:#065F46;padding:6px 12px;border-radius:6px;font-size:.82rem;font-weight:600;">
+                        ✅ Factura ${this.escapeHtml(existing.provider.toUpperCase())} #${this.escapeHtml(existing.invoice_number)}
+                    </div>
+                `;
+            } else if (hasCreds) {
+                actionHtml = `
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" id="ltms-generate-invoice-btn" data-order-id="${d.id}" style="background:#E80001;border-color:#E80001;">
+                        📄 Generar factura en ${this.escapeHtml((invoiceData.provider || 'Alegra').charAt(0).toUpperCase() + (invoiceData.provider || 'Alegra').slice(1))}
+                    </button>
+                `;
+            } else {
+                actionHtml = `
+                    <a href="#" data-action="load-view" data-view="settings" class="ltms-btn ltms-btn-outline ltms-btn-sm">
+                        ⚙️ Configurar facturación
+                    </a>
+                `;
+            }
+
+            return `
+                <div style="background:#FFF9F9;border:1px solid #FFD6D6;border-left:4px solid #E80001;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <strong style="font-size:.85rem;color:#1A1F2E;">📄 Facturación electrónica</strong>
+                        ${actionHtml}
+                    </div>
+                    ${buyerInfo}
+                </div>
+            `;
         },
 
         /**

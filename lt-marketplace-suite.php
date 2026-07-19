@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.221
+ * Version:           2.9.222
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -35,7 +35,7 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.221' );
+define( 'LTMS_VERSION', '2.9.222' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -484,6 +484,8 @@ function ltms_load_autoloader(): void {
                 'ltms-frontend-checkout-field-labels' => 'frontend/class-ltms-frontend-checkout-field-labels.php',
                 'ltms-frontend-checkout-script-injector' => 'frontend/class-ltms-frontend-checkout-script-injector.php',
                 'ltms-frontend-checkout-optional-invoice-fields' => 'frontend/class-ltms-frontend-checkout-optional-invoice-fields.php',
+                'ltms-vendor-invoicing-settings'    => 'frontend/class-ltms-vendor-invoicing-settings.php',
+                'ltms-vendor-invoicing-generator'   => 'frontend/class-ltms-vendor-invoicing-generator.php',
                 'ltms-frontend-payout-handler'      => 'frontend/class-ltms-frontend-payout-handler.php',
                 'ltms-admin-bookable-meta'          => 'admin/class-ltms-admin-bookable-meta.php',
                 'ltms-admin-bookings'               => 'admin/class-ltms-admin-bookings.php',

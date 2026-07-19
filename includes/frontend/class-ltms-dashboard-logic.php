@@ -1379,6 +1379,19 @@ final class LTMS_Dashboard_Logic {
             'redi_role'       => $redi_role,
             'allowed_transitions' => $this->get_allowed_status_transitions( $order->get_status() ),
             'edit_url'        => $order->get_edit_order_url(),
+            // v2.9.222: datos para el bloque de facturación electrónica del vendor.
+            'invoice_data'    => [
+                'has_credentials'      => class_exists( 'LTMS_Vendor_Invoicing_Settings' )
+                    ? LTMS_Vendor_Invoicing_Settings::is_configured( $user_id )
+                    : false,
+                'provider'             => class_exists( 'LTMS_Vendor_Invoicing_Settings' )
+                    ? LTMS_Vendor_Invoicing_Settings::get_provider( $user_id )
+                    : '',
+                'buyer_needs_invoice'  => $order->get_meta( '_ltms_buyer_needs_invoice' ) === '1',
+                'buyer_tax_id'         => (string) $order->get_meta( '_ltms_buyer_tax_id' ),
+                'buyer_company_name'   => (string) $order->get_meta( '_ltms_buyer_company_name' ),
+                'existing_invoice'     => $order->get_meta( '_ltms_vendor_invoice_' . $user_id ),
+            ],
         ] );
     }
 

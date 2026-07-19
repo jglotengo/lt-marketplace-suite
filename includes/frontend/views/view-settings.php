@@ -395,6 +395,177 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
     </div>
 <?php endif; ?>
 
+<!-- v2.9.222: Facturación electrónica (Alegra / Siigo) -->
+<?php
+$vendor_id = get_current_user_id();
+$invoice_provider = class_exists( 'LTMS_Vendor_Invoicing_Settings' )
+    ? LTMS_Vendor_Invoicing_Settings::get_provider( $vendor_id )
+    : '';
+$invoice_configured = class_exists( 'LTMS_Vendor_Invoicing_Settings' )
+    ? LTMS_Vendor_Invoicing_Settings::is_configured( $vendor_id )
+    : false;
+$alegra_email = $invoice_provider === 'alegra' ? get_user_meta( $vendor_id, 'ltms_vendor_alegra_email', true ) : '';
+$siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms_vendor_siigo_username', true ) : '';
+// Note: tokens/keys are encrypted — we don't show them back.
+?>
+<div class="ltms-card" style="margin-bottom:20px;">
+    <div class="ltms-card-header">
+        <h3>📄 <?php esc_html_e( 'Facturación electrónica', 'ltms' ); ?></h3>
+    </div>
+    <div class="ltms-card-body">
+        <p style="font-size:0.85rem;color:#6b7280;margin:0 0 16px;">
+            <?php esc_html_e( 'Configura tu cuenta de Alegra o Siigo para emitir facturas electrónicas directamente desde tus pedidos. Tus credenciales se guardan cifradas y solo tú puedes usarlas.', 'ltms' ); ?>
+        </p>
+
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                <?php esc_html_e( 'Proveedor de facturación', 'ltms' ); ?>
+            </label>
+            <select id="ltms-invoice-provider" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                <option value="" <?php selected( $invoice_provider, '' ); ?>><?php esc_html_e( 'Ninguno (no facturar)', 'ltms' ); ?></option>
+                <option value="alegra" <?php selected( $invoice_provider, 'alegra' ); ?>><?php esc_html_e( 'Alegra (Colombia)', 'ltms' ); ?></option>
+                <option value="siigo" <?php selected( $invoice_provider, 'siigo' ); ?>><?php esc_html_e( 'Siigo (México/Colombia)', 'ltms' ); ?></option>
+            </select>
+        </div>
+
+        <!-- Alegra fields -->
+        <div id="ltms-alegra-fields" style="display:<?php echo $invoice_provider === 'alegra' ? 'block' : 'none'; ?>;">
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Email de cuenta Alegra', 'ltms' ); ?>
+                </label>
+                <input type="email" id="ltms-alegra-email" value="<?php echo esc_attr( $alegra_email ); ?>"
+                       placeholder="micuenta@alegra.com"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Token de API Alegra', 'ltms' ); ?>
+                </label>
+                <input type="password" id="ltms-alegra-token" placeholder="<?php echo $invoice_configured && $invoice_provider === 'alegra' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
+                    <?php esc_html_e( 'Encuéntralo en Alegra → Configuración → API. Genera un nuevo token si lo necesitas.', 'ltms' ); ?>
+                </p>
+            </div>
+        </div>
+
+        <!-- Siigo fields -->
+        <div id="ltms-siigo-fields" style="display:<?php echo $invoice_provider === 'siigo' ? 'block' : 'none'; ?>;">
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Username Siigo', 'ltms' ); ?>
+                </label>
+                <input type="text" id="ltms-siigo-username" value="<?php echo esc_attr( $siigo_user ); ?>"
+                       placeholder="usuario@siigo.com"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
+                    <?php esc_html_e( 'Access Key Siigo', 'ltms' ); ?>
+                </label>
+                <input type="password" id="ltms-siigo-key" placeholder="<?php echo $invoice_configured && $invoice_provider === 'siigo' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
+                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
+                <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
+                    <?php esc_html_e( 'Encuéntrala en Siigo → Configuración → API / Integraciones.', 'ltms' ); ?>
+                </p>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
+            <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-save-invoicing-btn" style="background:#E80001;border-color:#E80001;">
+                💾 <?php esc_html_e( 'Guardar credenciales', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-outline" id="ltms-test-invoicing-btn">
+                🔌 <?php esc_html_e( 'Probar conexión', 'ltms' ); ?>
+            </button>
+            <span id="ltms-invoicing-notice" style="display:none;align-self:center;font-size:0.85rem;"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+// v2.9.222: vendor invoicing settings UI (inline porque es específico de esta vista).
+(function(){
+    'use strict';
+    var $ = jQuery;
+    if (!$) return;
+
+    // Toggle fields según proveedor.
+    function toggleProviderFields() {
+        var provider = $('#ltms-invoice-provider').val();
+        $('#ltms-alegra-fields').toggle(provider === 'alegra');
+        $('#ltms-siigo-fields').toggle(provider === 'siigo');
+    }
+    $('#ltms-invoice-provider').on('change', toggleProviderFields);
+    toggleProviderFields();
+
+    function showNotice(msg, type) {
+        var $n = $('#ltms-invoicing-notice');
+        $n.text(msg).css('color', type === 'error' ? '#dc2626' : type === 'success' ? '#10b981' : '#6b7280').show();
+        setTimeout(function() { $n.fadeOut(); }, 4000);
+    }
+
+    // Guardar credenciales.
+    $('#ltms-save-invoicing-btn').on('click', function() {
+        var $btn = $(this);
+        var provider = $('#ltms-invoice-provider').val();
+        var data = {
+            action: 'ltms_vendor_save_invoicing_creds',
+            nonce: ltmsDashboard.nonce,
+            provider: provider,
+        };
+        if (provider === 'alegra') {
+            data.alegra_email = $('#ltms-alegra-email').val();
+            data.alegra_token = $('#ltms-alegra-token').val();
+            if (!data.alegra_email || !data.alegra_token) {
+                showNotice('Completa email y token de Alegra.', 'error');
+                return;
+            }
+        } else if (provider === 'siigo') {
+            data.siigo_username = $('#ltms-siigo-username').val();
+            data.siigo_key = $('#ltms-siigo-key').val();
+            if (!data.siigo_username || !data.siigo_key) {
+                showNotice('Completa username y access key de Siigo.', 'error');
+                return;
+            }
+        }
+        $btn.prop('disabled', true).html('⏳ Guardando...');
+        $.post(ltmsDashboard.ajaxUrl, data, function(resp) {
+            $btn.prop('disabled', false).html('💾 Guardar credenciales');
+            if (resp.success) {
+                showNotice('✅ ' + resp.data.message, 'success');
+            } else {
+                showNotice('❌ ' + (resp.data && resp.data.message ? resp.data.message : 'Error al guardar.'), 'error');
+            }
+        }).fail(function() {
+            $btn.prop('disabled', false).html('💾 Guardar credenciales');
+            showNotice('❌ Error de conexión.', 'error');
+        });
+    });
+
+    // Probar conexión.
+    $('#ltms-test-invoicing-btn').on('click', function() {
+        var $btn = $(this);
+        $btn.prop('disabled', true).html('⏳ Probando...');
+        $.post(ltmsDashboard.ajaxUrl, {
+            action: 'ltms_vendor_test_invoicing_connection',
+            nonce: ltmsDashboard.nonce,
+        }, function(resp) {
+            $btn.prop('disabled', false).html('🔌 Probar conexión');
+            if (resp.success) {
+                showNotice(resp.data.message, 'success');
+            } else {
+                showNotice(resp.data && resp.data.message ? resp.data.message : '❌ Error.', 'error');
+            }
+        }).fail(function() {
+            $btn.prop('disabled', false).html('🔌 Probar conexión');
+            showNotice('❌ Error de conexión.', 'error');
+        });
+    });
+})();
+</script>
+
 </div>
 
 
