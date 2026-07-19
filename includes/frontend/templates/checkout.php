@@ -1180,6 +1180,86 @@ do_action( 'woocommerce_after_main_content' );
         // Dejar de observar después de 5 segundos (para no matar el performance).
         setTimeout(function() { observer.disconnect(); }, 5000);
     }
+
+    /* --- 7. v2.9.218: Sync billing_state from billing_city (DANE municipio) ---- */
+    /* El select de billing_city usa códigos DANE (5 dígitos) donde los primeros
+     * 2 dígitos = departamento. Cuando el usuario selecciona un municipio,
+     * auto-poblamos billing_state con el departamento correspondiente para que
+     * WC pueda calcular el envío (WC requiere billing_state para calcular
+     * shipping rates).
+     *
+     * Estrategia: extraer el nombre del departamento del texto del option
+     * (formato: "Municipio — Departamento") y buscarlo en las opciones de
+     * billing_state por coincidencia de texto.
+     */
+    function syncStateFromCity() {
+        var citySelect = scope.querySelector('#billing_city, #ltms-municipality-select');
+        var stateSelect = scope.querySelector('#billing_state');
+        if (!citySelect || !stateSelect) return;
+        if (!citySelect.value || citySelect.value.length < 2) return;
+
+        // Obtener el texto del option seleccionado (formato: "Municipio — Departamento")
+        var selectedOption = citySelect.options[citySelect.selectedIndex];
+        if (!selectedOption) return;
+        var optionText = selectedOption.textContent || '';
+        // Extraer el departamento (después del " — ")
+        var deptName = '';
+        var dashIdx = optionText.indexOf('—');
+        if (dashIdx !== -1) {
+            deptName = optionText.substring(dashIdx + 1).trim();
+        } else if (optionText.indexOf('-') !== -1) {
+            deptName = optionText.substring(optionText.indexOf('-') + 1).trim();
+        }
+
+        if (!deptName) return;
+
+        // Buscar la opción en billing_state que coincida con el departamento.
+        // WC usa códigos como "CO-DC" para Bogotá D.C. pero el texto visible es
+        // "Bogotá D.C." — comparamos por texto.
+        var bestMatch = null;
+        var bestScore = 0;
+        for (var i = 0; i < stateSelect.options.length; i++) {
+            var opt = stateSelect.options[i];
+            var optText = (opt.textContent || '').trim();
+            // Normalizar: quitar acentos y minúsculas para comparación robusta.
+            var normOpt = optText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            var normDept = deptName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (normOpt === normDept) {
+                bestMatch = opt;
+                bestScore = 100;
+                break;
+            }
+            // Coincidencia parcial: si el departamento está contenido en el texto
+            if (normOpt.indexOf(normDept) !== -1 || normDept.indexOf(normOpt) !== -1) {
+                var score = Math.min(normOpt.length, normDept.length);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = opt;
+                }
+            }
+        }
+
+        if (bestMatch && bestScore > 0) {
+            stateSelect.value = bestMatch.value;
+            // Disparar change event para que WC recalcule shipping.
+            stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            // También disparar el evento 'update_checkout' de WC para forzar
+            // el recálculo de shipping methods.
+            if (typeof jQuery !== 'undefined') {
+                jQuery(document.body).trigger('update_checkout');
+            }
+        }
+    }
+
+    // Enganchar al change de billing_city.
+    var citySelectForSync = scope.querySelector('#billing_city, #ltms-municipality-select');
+    if (citySelectForSync) {
+        citySelectForSync.addEventListener('change', function() {
+            setTimeout(syncStateFromCity, 100); // Pequeño delay para que WOOCCM termine.
+        });
+        // También ejecutar al cargar si ya hay un municipio seleccionado.
+        setTimeout(syncStateFromCity, 800);
+    }
 })();
 </script>
 
