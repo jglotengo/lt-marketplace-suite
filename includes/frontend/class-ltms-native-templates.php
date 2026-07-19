@@ -63,6 +63,12 @@ class LTMS_Native_Templates {
         // DISABLED: causing shop page crash. The content-product.php override
         // is triggering a fatal error when WC loads it in the loop context.
         // The single-product.php template works fine because it doesn't use
+        // v2.9.211: Remove WC's default related products output to prevent
+        // duplicate "Productos relacionados" sections. Our single-product.php
+        // template calls woocommerce_related_products() explicitly with PV
+        // design system wrapper. Elementor Theme Builder may also output its
+        // own related products — those are deduped client-side via JS.
+        add_action( 'init', [ __CLASS__, 'remove_default_related_products' ] );
         // wc_get_template_part in a loop.
         // add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_wc_template' ], 10, 3 );
         // add_filter( 'woocommerce_template_loader_files', [ __CLASS__, 'template_loader_files' ], 10, 2 );
@@ -97,6 +103,23 @@ class LTMS_Native_Templates {
     public static function register_query_vars( array $vars ): array {
         $vars[] = 'ltms_page';
         return $vars;
+    }
+
+    /**
+     * v2.9.211: Remove WC's default related products output hook.
+     *
+     * WC registers woocommerce_output_related on 'woocommerce_after_single_product_summary'
+     * priority 20. Our single-product.php template calls woocommerce_related_products()
+     * explicitly with PV design system wrapper. Removing the default hook prevents
+     * duplicate "Productos relacionados" sections when both our template and the
+     * WC default hook fire.
+     *
+     * Elementor Theme Builder may have its own related products widget — those are
+     * deduped client-side via JS (see remove_duplicate_related_sections()).
+     */
+    public static function remove_default_related_products(): void {
+        // WC default: add_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
+        remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
     }
 
     /**
@@ -373,11 +396,13 @@ class LTMS_Native_Templates {
 
             PV.enhancePriceDisplay = function() {
                 if (!document.body.classList.contains('single-product')) return;
+                // v2.9.211: Robust dedup — check both class AND data attribute.
+                if (document.querySelector('.ltms-price-shipping-info, [data-ltms-shipping-info="1"]')) return;
                 var price = document.querySelector('.single-product .price, .product .price, .price:not(.ltms-price-shipping-info)');
                 if (!price) return;
-                if (document.querySelector('.ltms-price-shipping-info')) return;
                 var info = document.createElement('div');
                 info.className = 'ltms-price-shipping-info';
+                info.setAttribute('data-ltms-shipping-info', '1');
                 info.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
                 info.innerHTML = '<span>\uD83D\uDE9A</span> <span>Envío gratis incluido</span>';
                 if (price.parentNode) price.parentNode.insertBefore(info, price.nextSibling);
@@ -554,6 +579,97 @@ class LTMS_Native_Templates {
                 }
             };
 
+            // v2.9.211: Deduplicate "Productos relacionados" sections.
+            // Both WC default hook and our explicit call may output them.
+            // Also Elementor Theme Builder may add its own. Keep only the
+            // FIRST one (which is our PV-styled section), hide the rest.
+            PV.dedupRelatedProducts = function() {
+                var sections = document.querySelectorAll('.related.products, .upsells.products, .pv-related');
+                if (sections.length <= 1) return;
+                // Keep the first one (our .pv-related if present, else first .related).
+                var kept = null;
+                // Prefer .pv-related (our PV-styled section)
+                for (var i = 0; i < sections.length; i++) {
+                    if (sections[i].classList.contains('pv-related')) { kept = sections[i]; break; }
+                }
+                if (!kept) kept = sections[0];
+                // Hide all others
+                for (var j = 0; j < sections.length; j++) {
+                    if (sections[j] !== kept) sections[j].style.display = 'none';
+                }
+            };
+
+            // v2.9.211: Enhance related product cards to match PV design system.
+            // WC's default related products use ul.products > li.product markup,
+            // which doesn't have PV card styling. Add CSS classes + fix image aspect.
+            PV.enhanceRelatedCards = function() {
+                var relatedProducts = document.querySelectorAll('.related.products ul.products > li.product, .pv-related ul.products > li.product');
+                for (var i = 0; i < relatedProducts.length; i++) {
+                    var card = relatedProducts[i];
+                    if (card.dataset.ltmsEnhanced) continue;
+                    card.dataset.ltmsEnhanced = '1';
+
+                    // Match PV card aesthetic
+                    card.style.cssText = 'position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid #E7E5EC;border-radius:14px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.06);transition:transform .25s,box-shadow .25s,border-color .25s;break-inside:avoid';
+
+                    // Image: use object-fit:contain (no crop), square aspect
+                    var img = card.querySelector('img');
+                    if (img) {
+                        var imgWrap = img.parentNode;
+                        if (imgWrap) {
+                            imgWrap.style.cssText = 'position:relative;aspect-ratio:1/1;background:#F8F7FA;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:12px';
+                        }
+                        img.style.cssText = 'width:100%;height:100%;object-fit:contain;transition:transform .4s cubic-bezier(.4,0,.2,1)';
+                    }
+
+                    // Card body (title, price)
+                    var body = card.querySelector('.woocommerce-loop-product__title, h2');
+                    if (body) {
+                        body.style.cssText = 'font-family:Albert Sans,sans-serif;font-size:14px;font-weight:600;color:#1A1F2E;line-height:1.4;margin:10px 14px 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px';
+                    }
+
+                    // Price
+                    var price = card.querySelector('.price');
+                    if (price) {
+                        price.style.cssText = 'font-family:Albert Sans,sans-serif;font-size:17px;font-weight:700;color:#1A1F2E;margin:4px 14px 12px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap';
+                        var oldPrice = price.querySelector('del');
+                        if (oldPrice) oldPrice.style.cssText = 'font-size:13px;color:#9CA3AF;text-decoration:line-through;font-weight:500';
+                        var newPrice = price.querySelector('ins');
+                        if (newPrice) newPrice.style.cssText = 'text-decoration:none;color:#0BA37F;font-weight:700';
+                    }
+
+                    // Button
+                    var btn = card.querySelector('.button, .added_to_cart');
+                    if (btn) {
+                        btn.style.cssText = 'display:block;width:calc(100% - 24px);margin:0 12px 12px;padding:10px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;background:#E80001;color:#fff;border:none;transition:all .18s';
+                        btn.onmouseover = function() { this.style.transform = 'translateY(-1px)'; this.style.boxShadow = '0 4px 12px rgba(232,0,1,0.25)'; };
+                        btn.onmouseout = function() { this.style.transform = ''; this.style.boxShadow = ''; };
+                    }
+
+                    // Hover lift on card
+                    card.addEventListener('mouseenter', function() {
+                        this.style.transform = 'translateY(-4px)';
+                        this.style.boxShadow = '0 8px 24px rgba(0,0,0,0.10)';
+                        this.style.borderColor = '#E80001';
+                        var imgInner = this.querySelector('img');
+                        if (imgInner) imgInner.style.transform = 'scale(1.06)';
+                    });
+                    card.addEventListener('mouseleave', function() {
+                        this.style.transform = '';
+                        this.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+                        this.style.borderColor = '#E7E5EC';
+                        var imgInner = this.querySelector('img');
+                        if (imgInner) imgInner.style.transform = '';
+                    });
+                }
+
+                // Ensure the grid uses consistent columns
+                var grids = document.querySelectorAll('.related.products ul.products, .pv-related ul.products');
+                for (var k = 0; k < grids.length; k++) {
+                    grids[k].style.cssText = 'display:grid !important;grid-template-columns:repeat(auto-fill,minmax(180px,1fr)) !important;gap:16px !important;list-style:none !important;padding:0 !important;margin:0 !important';
+                }
+            };
+
             // Execute all functions with delay for Elementor rendering
             setTimeout(function() {
                 if (PV.injectHeroHeadline) PV.injectHeroHeadline();
@@ -562,7 +678,14 @@ class LTMS_Native_Templates {
                 if (PV.injectBuyNow) PV.injectBuyNow();
                 if (PV.injectQtySteppers) PV.injectQtySteppers();
                 if (PV.enhanceCartPage) PV.enhanceCartPage();
+                if (PV.dedupRelatedProducts) PV.dedupRelatedProducts();
+                if (PV.enhanceRelatedCards) PV.enhanceRelatedCards();
             }, 500);
+            // Re-run dedup + enhance after 2s for late-loading Elementor widgets
+            setTimeout(function() {
+                if (PV.dedupRelatedProducts) PV.dedupRelatedProducts();
+                if (PV.enhanceRelatedCards) PV.enhanceRelatedCards();
+            }, 2000);
         })();
         </script>
         <?php

@@ -710,10 +710,17 @@
 
   /* =========================================================================
    * v2.9.200 — Price display enhancement
+   * v2.9.211 — Add dedup guard (was running twice due to native-templates
+   *            inline script redefining PV.enhancePriceDisplay).
    * ========================================================================= */
   PV.enhancePriceDisplay = function () {
     // Only on product pages
     if (!document.body.classList.contains('single-product')) return;
+
+    // v2.9.211: Dedup guard — check both class and data attribute to prevent
+    // double-injection when both plaza-viva.js and native-templates inline
+    // script run their init.
+    if (document.querySelector('.ltms-price-shipping-info, [data-ltms-shipping-info="1"]')) return;
 
     var price = qs('.single-product .price, .pv-product-page .price, .product .price');
     if (!price) return;
@@ -721,6 +728,7 @@
     // Add shipping info below price
     var shippingInfo = document.createElement('div');
     shippingInfo.className = 'ltms-price-shipping-info';
+    shippingInfo.setAttribute('data-ltms-shipping-info', '1');
     shippingInfo.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
     shippingInfo.innerHTML = '<span>🚚</span> <span>Envío gratis incluido</span>';
 
