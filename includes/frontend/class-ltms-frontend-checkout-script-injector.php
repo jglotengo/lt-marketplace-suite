@@ -91,6 +91,28 @@ class LTMS_Frontend_Checkout_Script_Injector {
     if (!scope) return;
 
     /* ===================================================================
+     * v2.9.224: Inyectar CSS para botón Confirmar pedido + otros estilos.
+     * SG Optimizer strippa <style> tags del template. Lo inyectamos via JS.
+     * =================================================================== */
+    if (!document.getElementById('ltms-checkout-fixes-css')) {
+        var style = document.createElement('style');
+        style.id = 'ltms-checkout-fixes-css';
+        style.textContent = [
+            '.pv-scope.pv-checkout .pv-btn--brand{background:#E80001 !important;color:#fff !important;border:1px solid #E80001 !important;font-weight:800 !important;letter-spacing:.01em;}',
+            '.pv-scope.pv-checkout .pv-btn--brand:hover{background:#B80001 !important;border-color:#B80001 !important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28) !important;}',
+            '.pv-scope.pv-checkout .pv-btn--brand:active{transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20) !important;}',
+            '.pv-scope.pv-checkout .pv-checkout__submit{height:60px !important;font-size:17px !important;}',
+            '.pv-scope.pv-checkout .woocommerce-shipping-fields{display:none !important;}',
+            '.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible{display:block !important;}',
+            '.pv-scope.pv-checkout #billing_address_1_field label .optional,' +
+            '.pv-scope.pv-checkout #billing_state_field label .optional,' +
+            '.pv-scope.pv-checkout #shipping_address_1_field label .optional,' +
+            '.pv-scope.pv-checkout #shipping_state_field label .optional{display:none !important;}'
+        ].join('\\n');
+        document.head.appendChild(style);
+    }
+
+    /* ===================================================================
      * v2.9.217: Fix field labels (bypass WOOCCM via JS DOM manipulation)
      * =================================================================== */
     var ltmsCountry = '{$country_js}';
@@ -277,12 +299,45 @@ class LTMS_Frontend_Checkout_Script_Injector {
     }
 
     /* ===================================================================
+     * v2.9.224: Toggle de campos de envío según checkbox.
+     * WC debería hacerlo nativamente, pero WOOCCM lo rompe. Lo forzamos via JS.
+     * =================================================================== */
+    function syncShipFieldsVisibility() {
+        var shipCheckbox = scope.querySelector('#ship-to-different-address-checkbox');
+        var shipFieldsWrap = scope.querySelector('.woocommerce-shipping-fields');
+        if (!shipCheckbox || !shipFieldsWrap) return;
+        if (shipCheckbox.checked) {
+            shipFieldsWrap.style.display = 'block';
+            shipFieldsWrap.classList.add('shipping-fields--visible');
+        } else {
+            shipFieldsWrap.style.display = 'none';
+            shipFieldsWrap.classList.remove('shipping-fields--visible');
+        }
+    }
+
+    /* ===================================================================
+     * v2.9.224: Marcar campos como required (WOOCCM los pone optional).
+     * =================================================================== */
+    function markRequiredFields() {
+        var requiredFields = ['billing_first_name', 'billing_last_name', 'billing_country',
+                              'billing_address_1', 'billing_state',
+                              'shipping_first_name', 'shipping_last_name', 'shipping_country',
+                              'shipping_address_1', 'shipping_state'];
+        requiredFields.forEach(function(fid) {
+            var el = scope.querySelector('#' + fid);
+            if (el && !el.required) el.setAttribute('required', 'required');
+        });
+    }
+
+    /* ===================================================================
      * Ejecutar fixes con múltiples retries (defense against WOOCCM)
      * =================================================================== */
     fixFieldLabels();
-    setTimeout(fixFieldLabels, 500);
-    setTimeout(fixFieldLabels, 1500);
-    setTimeout(fixFieldLabels, 3000);
+    markRequiredFields();
+    syncShipFieldsVisibility();
+    setTimeout(function() { fixFieldLabels(); markRequiredFields(); syncShipFieldsVisibility(); }, 500);
+    setTimeout(function() { fixFieldLabels(); markRequiredFields(); syncShipFieldsVisibility(); }, 1500);
+    setTimeout(function() { fixFieldLabels(); markRequiredFields(); syncShipFieldsVisibility(); }, 3000);
 
     if ('MutationObserver' in window) {
         var observer = new MutationObserver(function(mutations) {
@@ -294,10 +349,18 @@ class LTMS_Frontend_Checkout_Script_Injector {
             });
             if (shouldFix) {
                 fixFieldLabels();
+                markRequiredFields();
+                syncShipFieldsVisibility();
             }
         });
         observer.observe(scope, { childList: true, subtree: true, characterData: true });
         setTimeout(function() { observer.disconnect(); }, 8000);
+    }
+
+    // v2.9.224: Enganchar al change del checkbox 'enviar a dirección diferente'.
+    var shipCheckboxForToggle = scope.querySelector('#ship-to-different-address-checkbox');
+    if (shipCheckboxForToggle) {
+        shipCheckboxForToggle.addEventListener('change', syncShipFieldsVisibility);
     }
 
     // Sync billing_state from billing_city.
