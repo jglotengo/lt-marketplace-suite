@@ -252,40 +252,45 @@ get_header( 'shop' );
                         </section>
 
                         <!-- ============================================
-                             STEP 2: DIRECCIÓN (nombre, dirección, ciudad, postal)
+                             STEP 2: DIRECCIÓN DE FACTURACIÓN Y ENVÍO
+                             v2.9.223: Título más claro. WC muestra primero
+                             los campos de facturación (que por defecto también
+                             son los de envío). El checkbox nativo '¿Enviar a
+                             una dirección diferente?' revela los campos de
+                             envío por separado.
                              ============================================ -->
                         <section class="pv-checkout__step pv-checkout__step--2" data-step-block="2" aria-labelledby="pv-checkout-step-2-title">
                             <header class="pv-checkout__step-head">
                                 <h2 class="pv-checkout__step-title" id="pv-checkout-step-2-title">
                                     <span class="pv-checkout__step-num">2</span>
-                                    <?php esc_html_e( 'Dirección de envío', 'ltms' ); ?>
+                                    <?php esc_html_e( 'Dirección de facturación y envío', 'ltms' ); ?>
                                 </h2>
                                 <span class="pv-badge pv-badge--dot pv-badge--trust"><?php esc_html_e( 'Requerido', 'ltms' ); ?></span>
                             </header>
 
                             <div class="pv-checkout__step-body">
+                                <p style="font-size:13px;color:#565C66;margin:0 0 14px;line-height:1.45;">
+                                    <?php esc_html_e( 'Ingresa tu dirección principal. Si tu dirección de envío es diferente a la de facturación, marca el checkbox "¿Enviar a una dirección diferente?" que aparece abajo.', 'ltms' ); ?>
+                                </p>
                                 <?php
                                 /**
                                  * Hook: woocommerce_checkout_billing
-                                 * Renderiza los campos restantes de facturación
-                                 * (first_name, last_name, address_1, city, postcode, etc.).
-                                 * El orden lo define woocommerce_billing_fields filter.
+                                 * Renderiza los campos de facturación: email, teléfono,
+                                 * nombre, apellidos, país, dirección, municipio, etc.
+                                 * También renderiza el checkbox nativo de WC
+                                 * '¿Enviar a una dirección diferente?'.
                                  */
                                 do_action( 'woocommerce_checkout_billing' );
                                 ?>
 
-                                <!-- Checkbox: misma dirección de facturación -->
-                                <label class="pv-checkout__ship-toggle">
-                                    <input type="checkbox" name="ship_to_different_address" id="ship_to_different_address" value="1" <?php checked( apply_filters( 'woocommerce_ship_to_different_address_checked', 'shipping' === get_option( 'woocommerce_ship_to_destination' ) ), true ); ?> />
-                                    <span class="pv-checkout__ship-toggle-mark" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </span>
-                                    <span class="pv-checkout__ship-toggle-text">
-                                        <?php esc_html_e( 'Mi dirección de facturación es diferente a la de envío', 'ltms' ); ?>
-                                    </span>
-                                </label>
-
                                 <?php
+                                /**
+                                 * v2.9.223: NO duplicar el checkbox 'ship_to_different_address'.
+                                 * WC ya lo renderiza vía woocommerce_checkout_billing.
+                                 * Antes teníamos un checkbox duplicado aquí que causaba
+                                 * confusión: aparecían 2 toggles para lo mismo.
+                                 */
+
                                 /**
                                  * Hook: woocommerce_checkout_shipping
                                  * Renderiza los campos de envío si el checkbox

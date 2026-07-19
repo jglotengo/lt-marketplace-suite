@@ -178,6 +178,50 @@ class LTMS_Frontend_Checkout_Script_Injector {
             countrySelect.value = ltmsCountry;
             countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
+
+        // v2.9.223: Estilizar el checkbox nativo '¿Enviar a una dirección
+        // diferente?' de WC para que coincida con el design system.
+        var shipDiffWrap = scope.querySelector('#ship-to-different-address');
+        if (shipDiffWrap && !shipDiffWrap.getAttribute('data-ltms-styled')) {
+            shipDiffWrap.setAttribute('data-ltms-styled', '1');
+            shipDiffWrap.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:14px 16px;margin:16px 0 12px;background:#FFF9F9;border:1px solid #FFD6D6;border-left:4px solid #E80001;border-radius:10px;cursor:pointer;transition:all .15s';
+            shipDiffWrap.addEventListener('mouseenter', function() {
+                this.style.background = '#FFF1F1';
+                this.style.borderColor = '#E80001';
+            });
+            shipDiffWrap.addEventListener('mouseleave', function() {
+                this.style.background = '#FFF9F9';
+                this.style.borderColor = '#FFD6D6';
+            });
+            var shipDiffLabel = shipDiffWrap.querySelector('label');
+            if (shipDiffLabel) {
+                shipDiffLabel.style.cssText = 'font-size:14px;font-weight:600;color:#1A1F2E;line-height:1.5;cursor:pointer;display:flex;align-items:flex-start;gap:8px;width:100%';
+                // Añadir descripción bajo el label.
+                var desc = document.createElement('span');
+                desc.style.cssText = 'display:block;font-size:12px;font-weight:400;color:#565C66;margin-top:4px;line-height:1.45';
+                desc.textContent = 'Marca si quieres que el pedido se entregue en una dirección diferente a la de facturación.';
+                shipDiffLabel.appendChild(desc);
+            }
+            var shipDiffCheckbox = shipDiffWrap.querySelector('#ship-to-different-address-checkbox');
+            if (shipDiffCheckbox) {
+                shipDiffCheckbox.style.cssText = 'width:20px;height:20px;margin-top:2px;accent-color:#E80001;cursor:pointer;flex-shrink:0';
+            }
+        }
+
+        // v2.9.223: Cambiar el heading "Detalles de facturación" a algo más claro.
+        var billingHeading = scope.querySelector('.woocommerce-billing-fields h3, .woocommerce-billing-fields legend');
+        if (billingHeading && !billingHeading.getAttribute('data-ltms-renamed')) {
+            billingHeading.setAttribute('data-ltms-renamed', '1');
+            billingHeading.textContent = 'Datos de facturación';
+            billingHeading.style.cssText = 'font-size:15px;font-weight:700;color:#1A1F2E;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #E7E5EC';
+        }
+        // Cambiar el heading "Enviar a una dirección diferente" también.
+        var shippingHeading = scope.querySelector('.woocommerce-shipping-fields h3, .woocommerce-shipping-fields legend');
+        if (shippingHeading && !shippingHeading.getAttribute('data-ltms-renamed')) {
+            shippingHeading.setAttribute('data-ltms-renamed', '1');
+            shippingHeading.textContent = 'Dirección de entrega (envío)';
+            shippingHeading.style.cssText = 'font-size:15px;font-weight:700;color:#1A1F2E;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #E7E5EC';
+        }
     }
 
     /* ===================================================================
