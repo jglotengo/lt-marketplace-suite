@@ -89,10 +89,24 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_checkout_terms_and_conditions', [ __CLASS__, 'remove_wc_native_checkboxes' ], 1 );
         $instance = new self();
 
-        // P-02: Validar que el carrito solo tenga productos de un mismo vendedor.
-        // Evita que el método de pickup muestre la dirección incorrecta y que
-        // las comisiones se asignen al vendedor equivocado en pedidos mixtos.
-        add_filter( 'woocommerce_add_to_cart_validation', [ __CLASS__, 'validate_single_vendor_cart' ], 10, 2 );
+        // v2.9.209 — MULTI-VENDOR CART HABILITADO.
+        // Antes (v2.9.x): se bloqueaba agregar productos de un vendedor distinto
+        // al que ya estaba en el carrito. Era un band-aid temporal ANTES de que
+        // existiera el order split multi-vendor (class-ltms-order-split.php).
+        // Hoy el sistema YA soporta:
+        //   - group_items_by_vendor(): agrupa items por vendor en checkout
+        //   - record_commission(): calcula y acredita comisiones por vendor
+        //   - cross_border: procesa cada vendor por separado
+        //   - shipping: usa origen centralizado (ltms_store_city global)
+        //   - pickup: cada sub-orden tiene su propia dirección de vendor
+        // La restricción era innecesaria y mataba conversiones (UX: "vaciar
+        // el carrito primero" es fricción altísima para marketplace).
+        // add_filter( 'woocommerce_add_to_cart_validation', [ __CLASS__, 'validate_single_vendor_cart' ], 10, 2 );
+
+        // v2.9.209: Aviso informativo positivo en /cart y /checkout cuando hay
+        // productos de 2+ vendedores (estilo Amazon: "vendido por X, Y, Z").
+        add_action( 'woocommerce_before_cart', [ __CLASS__, 'show_multi_vendor_cart_notice' ], 20 );
+        add_action( 'woocommerce_before_checkout_form', [ __CLASS__, 'show_multi_vendor_cart_notice' ], 20 );
 
         // Proceso de pago — solo usuarios logueados
         add_action( 'wp_ajax_ltms_process_checkout',        [ $instance, 'ajax_process_checkout' ] );
@@ -949,63 +963,80 @@ final class LTMS_Frontend_Checkout_Handler {
     }
 
     /**
-     * P-02: Valida que el carrito solo tenga productos del mismo vendedor.
+     * P-02 (DEPRECATED in v2.9.209): Validaba que el carrito solo tuviera
+     * productos del mismo vendedor.
      *
-     * Evita que el método de pickup muestre la dirección del vendedor A cuando
-     * el carrito también contiene productos del vendedor B, y previene que las
-     * comisiones del pedido se asignen incorrectamente a un único vendedor.
+     * Esta restricción fue un band-aid temporal antes de que existiera el
+     * order split multi-vendor (class-ltms-order-split.php::group_items_by_vendor).
+     * Hoy el sistema soporta carritos mixtos:
+     *   - Comisiones: se calculan y acreditan por vendor en checkout
+     *   - Pickup: cada sub-orden tiene su propia dirección de vendor
+     *   - Shipping: usa origen centralizado (ltms_store_city global)
+     *   - Cross-border: procesa cada vendor por separado
+     *
+     * El filtro se desactivó en init() v2.9.209. El método se conserva por
+     * compatibilidad con posibles extensiones que lo llamen, pero ya no
+     * bloquea add-to-cart.
      *
      * @param bool $passed   Resultado de validaciones anteriores.
      * @param int  $product_id ID del producto que se intenta agregar.
-     * @return bool
+     * @return bool Siempre $passed (no bloquea nada).
      */
     public static function validate_single_vendor_cart( bool $passed, int $product_id ): bool {
-        if ( ! $passed || WC()->cart->is_empty() ) {
-            return $passed;
-        }
-
-        $new_vendor_id = (int) get_post_meta( $product_id, '_ltms_vendor_id', true );
-        if ( ! $new_vendor_id ) {
-            // Fallback: usar post_author si no tiene meta de vendedor
-            $new_vendor_id = (int) get_post_field( 'post_author', $product_id );
-        }
-
-        if ( ! $new_vendor_id ) {
-            return $passed; // Sin vendedor identificable, no bloquear
-        }
-
-        foreach ( WC()->cart->get_cart() as $item ) {
-            $pid            = (int) ( $item['product_id'] ?? 0 );
-            $cart_vendor_id = (int) get_post_meta( $pid, '_ltms_vendor_id', true );
-            if ( ! $cart_vendor_id ) {
-                $cart_vendor_id = (int) get_post_field( 'post_author', $pid );
-            }
-
-            if ( $cart_vendor_id && $cart_vendor_id !== $new_vendor_id ) {
-                // HI-7 FIX: get_userdata() may return false if the vendor user was
-                // deleted. On PHP 8+ accessing ->display_name on false throws
-                // TypeError. Fall back to a safe display name in that case.
-                $cart_vendor_user = get_userdata( $cart_vendor_id );
-                $cart_vendor_name = get_user_meta( $cart_vendor_id, 'ltms_store_name', true )
-                    ?: ( $cart_vendor_user ? $cart_vendor_user->display_name : __( 'Unknown vendor', 'ltms' ) );
-                $new_vendor_user  = get_userdata( $new_vendor_id );
-                $new_vendor_name  = get_user_meta( $new_vendor_id, 'ltms_store_name', true )
-                    ?: ( $new_vendor_user ? $new_vendor_user->display_name : __( 'Unknown vendor', 'ltms' ) );
-
-                wc_add_notice(
-                    sprintf(
-                        /* translators: %1$s: nombre tienda en carrito, %2$s: nombre tienda del producto nuevo */
-                        __( 'Tu carrito ya tiene productos de <strong>%1$s</strong>. Para agregar productos de <strong>%2$s</strong> debes vaciar el carrito primero.', 'ltms' ),
-                        esc_html( $cart_vendor_name ),
-                        esc_html( $new_vendor_name )
-                    ),
-                    'error'
-                );
-                return false;
-            }
-        }
-
+        // v2.9.209: Multi-vendor cart habilitado — no bloquear.
         return $passed;
+    }
+
+    /**
+     * v2.9.209: Muestra un aviso informativo POSITIVO cuando el carrito tiene
+     * productos de múltiples vendedores. NO bloquea — solo informa al cliente
+     * que su pedido se dividirá en sub-órdenes por vendedor (estilo Amazon /
+     * MercadoLibre).
+     *
+     * Se engancha en 'woocommerce_before_cart' y 'woocommerce_before_checkout_form'.
+     */
+    public static function show_multi_vendor_cart_notice(): void {
+        if ( ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
+            return;
+        }
+
+        $vendor_names = [];
+        foreach ( WC()->cart->get_cart() as $item ) {
+            $pid       = (int) ( $item['product_id'] ?? 0 );
+            $vendor_id = (int) get_post_meta( $pid, '_ltms_vendor_id', true );
+            if ( ! $vendor_id ) {
+                $vendor_id = (int) get_post_field( 'post_author', $pid );
+            }
+            if ( ! $vendor_id ) {
+                continue;
+            }
+            if ( isset( $vendor_names[ $vendor_id ] ) ) {
+                continue;
+            }
+            $vendor_user = get_userdata( $vendor_id );
+            $vendor_name = get_user_meta( $vendor_id, 'ltms_store_name', true )
+                ?: ( $vendor_user ? $vendor_user->display_name : __( 'Tienda', 'ltms' ) );
+            $vendor_names[ $vendor_id ] = $vendor_name;
+        }
+
+        // Solo mostrar si hay 2+ vendors.
+        if ( count( $vendor_names ) < 2 ) {
+            return;
+        }
+
+        $names_html = array_map( 'esc_html', array_values( $vendor_names ) );
+        $names_str  = implode( '</strong>, <strong>', $names_html );
+
+        echo '<div class="ltms-multi-vendor-notice" style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid #3B82F6;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px;color:#1E40AF;display:flex;align-items:flex-start;gap:10px;">';
+        echo '<span style="font-size:18px;line-height:1.2;flex-shrink:0;">🛍️</span>';
+        echo '<div>';
+        echo '<strong style="display:block;margin-bottom:2px;">' . esc_html__( 'Tu pedido será procesado por varias tiendas', 'ltms' ) . '</strong>';
+        echo wp_kses_post( sprintf(
+            /* translators: %s: lista de nombres de tiendas (HTML, ya escapado) */
+            __( 'Estás comprando a: <strong>%s</strong>. Cada tienda procesará y enviará sus productos por separado. Pagas todo en una sola transacción.', 'ltms' ),
+            $names_str
+        ) );
+        echo '</div></div>';
     }
 
     /**
@@ -1345,8 +1376,11 @@ final class LTMS_Frontend_Checkout_Handler {
 
         $display_currency = $display_currency ?: ( class_exists( 'LTMS_Currency_Manager' ) ? LTMS_Currency_Manager::get_display_currency() : LTMS_Core_Config::get_currency() );
 
-        // Resolve origin country from the cart's vendor (single-vendor cart is enforced
-        // by validate_single_vendor_cart — the first item's vendor is the only vendor).
+        // v2.9.209: Multi-vendor cart habilitado. Para el cálculo de customs,
+        // usamos el primer vendor encontrado como "origin country" del envío
+        // centralizado (ltms_store_city global). El order split real por
+        // vendor ocurre en class-ltms-order-split.php tras el pago, donde
+        // cada sub-orden se procesa con su propio vendor y país de origen.
         $origin_country = '';
         foreach ( WC()->cart->get_cart() as $cart_item ) {
             $pid = (int) ( $cart_item['product_id'] ?? 0 );
