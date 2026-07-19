@@ -34,7 +34,13 @@ class LTMS_Frontend_Checkout_Script_Injector {
         if ( is_admin() || wp_doing_ajax() ) {
             return;
         }
-        if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+        // v2.9.230: Use body class check as fallback — is_checkout() may
+        // not be available yet at wp_enqueue_scripts priority 10.
+        $is_checkout_page = function_exists( 'is_checkout' ) && is_checkout();
+        if ( ! $is_checkout_page ) {
+            $is_checkout_page = is_page( wc_get_page_id( 'checkout' ) );
+        }
+        if ( ! $is_checkout_page ) {
             return;
         }
 
@@ -47,7 +53,6 @@ class LTMS_Frontend_Checkout_Script_Injector {
         );
 
         // v2.9.230: Static JS file + wp_localize_script for country config.
-        // No more file_put_contents — static file is committed to git.
         wp_enqueue_script(
             'ltms-checkout-fixes',
             LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js',
