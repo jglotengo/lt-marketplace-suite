@@ -82,6 +82,8 @@ jobs:
             [[ "$JS_FILE" == *.min.js ]] && continue
             [[ "$JS_FILE" == *chart.umd* ]] && continue
             [[ "$JS_FILE" == *jquery* ]] && continue
+            # v2.9.228: Skip dynamically generated file (no static .min needed)
+            [[ "$JS_FILE" == *checkout-fixes* ]] && continue
 
             MIN_FILE="${JS_FILE%.js}.min.js"
             if [ ! -f "$MIN_FILE" ]; then
