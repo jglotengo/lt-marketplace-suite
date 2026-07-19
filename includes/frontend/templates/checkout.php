@@ -506,12 +506,22 @@ get_header( 'shop' );
                         <div class="pv-checkout__cta-wrap">
                             <?php
                             /**
+                             * v2.9.220: Hook woocommerce_review_order_before_submit.
+                             * Necesario para que LTMS_Frontend_Checkout_Handler::add_privacy_consent_field()
+                             * renderice el checkbox de consentimiento (Ley 1581/2012).
+                             * Sin este hook, el checkbox NUNCA se muestra pero la validación
+                             * validate_privacy_consent() falla con 'Debes aceptar la Política
+                             * de Tratamiento de Datos Personales para continuar.'
+                             */
+                            do_action( 'woocommerce_review_order_before_submit' );
+
+                            /**
                              * Nonce de WC para checkout.
                              * woocommerce_checkout_create_account, etc.
                              */
                             wp_nonce_field( 'woocommerce-process_checkout', 'woocommerce-process-checkout-nonce' );
                             ?>
-                            <button type="submit" class="pv-btn pv-btn--accent pv-btn--lg pv-btn--block pv-checkout__submit" name="woocommerce_checkout_place_order" id="place_order" value="<?php esc_attr_e( 'Confirmar pedido', 'ltms' ); ?>" data-value="<?php esc_attr_e( 'Confirmar pedido', 'ltms' ); ?>">
+                            <button type="submit" class="pv-btn pv-btn--brand pv-btn--lg pv-btn--block pv-checkout__submit" name="woocommerce_checkout_place_order" id="place_order" value="<?php esc_attr_e( 'Confirmar pedido', 'ltms' ); ?>" data-value="<?php esc_attr_e( 'Confirmar pedido', 'ltms' ); ?>">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 <span class="pv-checkout__submit-label"><?php esc_html_e( 'Confirmar pedido', 'ltms' ); ?></span>
                                 <span class="pv-checkout__submit-total"><?php echo wp_kses_post( WC()->cart->get_total() ); ?></span>
@@ -865,13 +875,27 @@ do_action( 'woocommerce_after_main_content' );
 .pv-scope.pv-checkout .pv-escrow-notice--compact span{color:var(--text-2);}
 
 /* CTA */
-.pv-scope.pv-checkout .pv-checkout__cta-wrap{display:flex;flex-direction:column;gap:8px;padding-top:4px;}
+.pv-scope.pv-checkout .pv-checkout__cta-wrap{display:flex;flex-direction:column;gap:10px;padding-top:4px;}
+
+/* v2.9.220: Brand color CTA (red #E80001) — consistente con cart y product page */
+.pv-scope.pv-checkout .pv-btn--brand{
+    background:#E80001;color:#fff;border:1px solid #E80001;
+}
+.pv-scope.pv-checkout .pv-btn--brand:hover{
+    background:#B80001;border-color:#B80001;
+    transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28);
+}
+.pv-scope.pv-checkout .pv-btn--brand:active{
+    transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20);
+}
+
 .pv-scope.pv-checkout .pv-checkout__submit{
-    height:60px;font-size:16px;flex-direction:row;justify-content:space-between;padding:0 22px;
+    height:60px;font-size:17px;font-weight:800;letter-spacing:.01em;
+    flex-direction:row;justify-content:space-between;padding:0 22px;
 }
 .pv-scope.pv-checkout .pv-checkout__submit[disabled],
 .pv-scope.pv-checkout .pv-checkout__submit.is-loading{
-    pointer-events:none;background:#098a6b;color:transparent;
+    pointer-events:none;background:#B80001;color:transparent;
 }
 .pv-scope.pv-checkout .pv-checkout__submit[disabled]::after,
 .pv-scope.pv-checkout .pv-checkout__submit.is-loading::after{
@@ -881,6 +905,50 @@ do_action( 'woocommerce_after_main_content' );
 }
 .pv-scope.pv-checkout .pv-checkout__submit-label{flex:1;text-align:left;padding-left:8px;}
 .pv-scope.pv-checkout .pv-checkout__submit-total{font-weight:800;}
+
+/* v2.9.220: Checkbox styling — uniforme y consistente */
+.pv-scope.pv-checkout .pv-checkout__terms-toggle,
+.pv-scope.pv-checkout .ltms-checkout-consent{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:14px 16px;margin:12px 0;
+    background:#FFF9F9;border:1px solid #FFD6D6;border-left:4px solid #E80001;
+    border-radius:10px;cursor:pointer;transition:all .15s;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle:hover,
+.pv-scope.pv-checkout .ltms-checkout-consent:hover{
+    background:#FFF1F1;border-color:#E80001;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle input[type="checkbox"],
+.pv-scope.pv-checkout .ltms-checkout-consent input[type="checkbox"]{
+    position:absolute;opacity:0;width:0;height:0;margin:0;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle .pv-checkout__ship-toggle-mark,
+.pv-scope.pv-checkout .ltms-checkout-consent .ltms-checkout-consent-mark,
+.pv-scope.pv-checkout .ltms-checkout-consent::before{
+    flex-shrink:0;width:22px;height:22px;border:2px solid #D1D5DB;
+    border-radius:6px;background:#fff;display:flex;align-items:center;
+    justify-content:center;transition:all .15s;color:#fff;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle input:checked + .pv-checkout__ship-toggle-mark,
+.pv-scope.pv-checkout .ltms-checkout-consent input:checked + .ltms-checkout-consent-mark{
+    background:#E80001;border-color:#E80001;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle input:focus-visible + .pv-checkout__ship-toggle-mark,
+.pv-scope.pv-checkout .ltms-checkout-consent input:focus-visible + .ltms-checkout-consent-mark{
+    outline:2px solid #E80001;outline-offset:2px;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle .pv-checkout__ship-toggle-text,
+.pv-scope.pv-checkout .ltms-checkout-consent span:not(.ltms-checkout-consent-mark){
+    font-size:13px;line-height:1.5;color:#1A1F2E;font-weight:500;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle a,
+.pv-scope.pv-checkout .ltms-checkout-consent a{
+    color:#E80001;font-weight:600;text-decoration:underline;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle a:hover,
+.pv-scope.pv-checkout .ltms-checkout-consent a:hover{
+    text-decoration:none;
+}
 .pv-scope.pv-checkout .pv-checkout__legal{
     text-align:center;font-size:12px;color:var(--text-3);line-height:1.45;margin:0;
 }

@@ -135,13 +135,17 @@ class LTMS_Frontend_Checkout_Script_Injector {
             if (labelEl.getAttribute('data-ltms-label-fixed') === '1') return;
             var abbr = labelEl.querySelector('abbr.required, abbr');
             var optionalSpan = labelEl.querySelector('span.optional, .optional');
+            // v2.9.220: Limpiar cualquier '(opcional)' duplicado del texto del label.
+            // El nuevo label ya puede contener '(opcional)' si lo definimos así,
+            // y WOOCCM añade OTRO span.optional — esto causaba '(opcional)(opcional)'.
             labelEl.innerHTML = '';
             labelEl.appendChild(document.createTextNode(newLabel));
             if (abbr) {
                 labelEl.appendChild(document.createTextNode(' '));
                 labelEl.appendChild(abbr);
             }
-            if (optionalSpan) {
+            // Solo añadir el span.optional si el nuevo label NO contiene '(opcional)'.
+            if (optionalSpan && newLabel.toLowerCase().indexOf('(opcional)') === -1 && newLabel.toLowerCase().indexOf('opcional') === -1) {
                 labelEl.appendChild(document.createTextNode(' '));
                 labelEl.appendChild(optionalSpan);
             }
@@ -149,22 +153,24 @@ class LTMS_Frontend_Checkout_Script_Injector {
         });
 
         // Ocultar campos duplicados.
-        var phoneLabels = scope.querySelectorAll('label[for="billing_phone"], label[for="shipping_phone"]');
-        phoneLabels.forEach(function(lbl) {
-            var text = (lbl.textContent || '').toLowerCase();
-            if (text.indexOf('whatsapp') === -1) {
-                var field = document.getElementById('billing_phone_field') || document.getElementById('shipping_phone_field');
-                if (field) field.style.display = 'none';
+        // v2.9.220: Heurística mejorada — solo ocultar si hay DOS campos
+        // billing_phone o DOS campos billing_email visibles. Antes ocultábamos
+        // basándonos solo en el texto del label, lo que causaba falsos positivos
+        // (ej. ocultábamos el campo correcto si WOOCCM cambiaba el label).
+        var phoneFields = scope.querySelectorAll('#billing_phone_field, #shipping_phone_field');
+        if (phoneFields.length > 1) {
+            // Hay 2+ campos phone — mantener solo el primero, ocultar el resto.
+            for (var p = 1; p < phoneFields.length; p++) {
+                phoneFields[p].style.display = 'none';
             }
-        });
-        var emailLabels = scope.querySelectorAll('label[for="billing_email"], label[for="shipping_email"]');
-        emailLabels.forEach(function(lbl) {
-            var text = (lbl.textContent || '').toLowerCase();
-            if (text.indexOf('correo electrónico') === -1) {
-                var field = document.getElementById('billing_email_field') || document.getElementById('shipping_email_field');
-                if (field) field.style.display = 'none';
+        }
+        var emailFields = scope.querySelectorAll('#billing_email_field, #shipping_email_field');
+        if (emailFields.length > 1) {
+            // Hay 2+ campos email — mantener solo el primero, ocultar el resto.
+            for (var e = 1; e < emailFields.length; e++) {
+                emailFields[e].style.display = 'none';
             }
-        });
+        }
 
         // Auto-seleccionar país.
         var countrySelect = scope.querySelector('#billing_country, #shipping_country');

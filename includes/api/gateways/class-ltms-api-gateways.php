@@ -225,6 +225,8 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
     /**
      * Valida que el token de Openpay fue generado antes de continuar.
      *
+     * v2.9.220: Mensaje más claro y específico sobre qué falta.
+     *
      * @return bool
      */
     public function validate_fields(): bool {
@@ -233,7 +235,11 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
             : '';
 
         if ( empty( $token ) ) {
-            wc_add_notice( __( 'Por favor completa los datos de tu tarjeta para continuar.', 'ltms' ), 'error' );
+            // v2.9.220: Mensaje más actionable.
+            wc_add_notice(
+                __( 'Completa todos los datos de tu tarjeta (número, titular, vencimiento y CVV) y espera 2 segundos antes de confirmar. Si el problema persiste, recarga la página.', 'ltms' ),
+                'error'
+            );
             return false;
         }
 
