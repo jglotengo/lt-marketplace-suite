@@ -598,10 +598,9 @@ do_action( 'woocommerce_after_main_content' );
 ?>
 
 <?php
-// v2.9.228: CSS moved to external file assets/css/ltms-checkout.css
-// SG Optimizer strips inline <style> tags from template files.
-// External CSS files are respected by SG Optimizer.
-wp_enqueue_style( 'ltms-checkout', LTMS_ASSETS_URL . 'css/ltms-checkout.css', [], LTMS_VERSION );
+// v2.9.228: CSS is enqueued via LTMS_Frontend_Checkout_Script_Injector::enqueue_checkout_fixes()
+// (wp_enqueue_scripts hook) — not here in the template, because wp_enqueue_style
+// must run before <head> is printed.
 ?>
 
 

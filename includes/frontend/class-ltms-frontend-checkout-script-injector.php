@@ -39,6 +39,14 @@ class LTMS_Frontend_Checkout_Script_Injector {
             return;
         }
 
+        // v2.9.228: Enqueue checkout CSS (moved from template <style> tag).
+        wp_enqueue_style(
+            'ltms-checkout',
+            LTMS_ASSETS_URL . 'css/ltms-checkout.css',
+            [],
+            LTMS_VERSION
+        );
+
         $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
 
         // Generate the JS file dynamically with country-specific labels.
