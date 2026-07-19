@@ -21,11 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class LTMS_Frontend_Checkout_Script_Injector {
 
     public static function init(): void {
-        // v2.9.228: Enqueue a real external JS file with all checkout fixes.
-        // SG Optimizer strips inline scripts (wp_add_inline_script, wp_footer,
-        // ob_start) but respects external .js files registered via wp_enqueue_script.
-        // The JS file is generated dynamically via a custom endpoint.
-        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_fixes' ], 100 );
+        // v2.9.229: Enqueue checkout CSS+JS as external files.
+        // Priority 10 (default) — must run early enough for wp_enqueue_script
+        // to register before WP prints the footer scripts.
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_fixes' ], 10 );
     }
 
     /**
