@@ -680,6 +680,8 @@
 
   /* =========================================================================
    * v2.9.200 — Shop page cleanup (remove duplicate search)
+   * v2.9.214 — Hide social-share widgets (Facebook/WhatsApp/Email), improve
+   *            price filter aesthetics, remove redundant 'Precio:' label.
    * ========================================================================= */
   PV.cleanShopPage = function () {
     // Only on shop/archive pages
@@ -693,7 +695,44 @@
       else s.style.display = 'none';
     });
 
-    // Enhance price filter visibility
+    // v2.9.214: Hide social-share widgets on shop page sidebar.
+    // These are theme/plugin widgets that show "Facebook / WhatsApp / Email"
+    // share buttons — useful on product pages, NOT on shop sidebar where they
+    // share the shop URL itself (low value, clutters the filter area).
+    var socialSelectors = [
+      '.widget_ltms_social_share', '.widget_ltms_social',
+      '.widget[class*="social"]',
+      '.widget-share', '.widget-social',
+      '.widget .ltms-social-share',
+      '.widget .share-buttons',
+      '.widget_facebook', '.widget_whatsapp', '.widget_email_share',
+      // Theme-specific social widgets
+      '.widget[class*="facebook"]', '.widget[class*="whatsapp"]',
+      '.widget a[href*="facebook.com/share"]', '.widget a[href*="wa.me"]',
+      '.widget a[href*="mailto:"][class*="share"]'
+    ];
+    socialSelectors.forEach(function (sel) {
+      qsa(sel).forEach(function (el) {
+        var widget = el.closest('.widget') || el;
+        widget.style.display = 'none';
+      });
+    });
+
+    // v2.9.214: Also hide widgets whose visible TEXT starts with social labels.
+    // This catches widgets without specific class names.
+    qsa('.widget-area .widget, .sidebar .widget').forEach(function (widget) {
+      if (widget.style.display === 'none') return;
+      var text = (widget.textContent || '').trim().substring(0, 100).toLowerCase();
+      // Match widgets that are PRIMARILY social share (not ones that mention
+      // whatsapp in passing, like contact info).
+      if (/^(facebook|whatsapp|email|compartir|share)\s*$/i.test(text) ||
+          /^facebook\s*whatsapp\s*email/i.test(text.replace(/\s+/g, ' ')) ||
+          /^facebook\s*\\\s*whatsapp/i.test(text)) {
+        widget.style.display = 'none';
+      }
+    });
+
+    // v2.9.214: Enhance price filter aesthetics + remove redundant 'Precio:' label
     var priceFilter = qs('.widget_price_filter, .price_filter, [class*=price-filter]');
     if (priceFilter) {
       var widget = priceFilter.closest('.widget');
@@ -704,8 +743,79 @@
         widget.style.border = '1px solid #E7E5EC';
         widget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
         widget.style.marginBottom = '16px';
+
+        // Style the widget title (e.g., "Filtrar por precio")
+        var title = widget.querySelector('.widget-title, h2, h3');
+        if (title) {
+          title.style.cssText = 'font-family:Albert Sans,sans-serif;font-size:14px;font-weight:700;color:#1A1F2E;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #E7E5EC;text-transform:uppercase;letter-spacing:0.04em';
+        }
+
+        // Style the price inputs (min/max)
+        var inputs = widget.querySelectorAll('input[type="text"], input[type="number"], .price_slider_amount input');
+        inputs.forEach(function (input) {
+          if (input.id && input.id.indexOf('min_price') !== -1) {
+            input.placeholder = 'Mín';
+            input.style.cssText = 'width:80px !important;padding:8px 10px !important;border:1px solid #E7E5EC !important;border-radius:6px !important;font-size:13px !important;font-weight:600 !important;color:#1A1F2E !important;background:#fff !important;text-align:center';
+          } else if (input.id && input.id.indexOf('max_price') !== -1) {
+            input.placeholder = 'Máx';
+            input.style.cssText = 'width:80px !important;padding:8px 10px !important;border:1px solid #E7E5EC !important;border-radius:6px !important;font-size:13px !important;font-weight:600 !important;color:#1A1F2E !important;background:#fff !important;text-align:center';
+          }
+        });
+
+        // Hide redundant "Precio:" label (the inputs already show min/max)
+        var priceLabel = widget.querySelector('.price_label, .price_slider_amount .price_label, label[for*="price"]');
+        if (priceLabel && priceLabel.textContent.trim().length < 30) {
+          priceLabel.style.display = 'none';
+        }
+
+        // Style the filter button
+        var button = widget.querySelector('button, input[type="submit"], .button');
+        if (button) {
+          button.style.cssText = 'width:100%;margin-top:10px;padding:9px;border-radius:8px;background:#E80001;color:#fff;border:none;font-weight:600;font-size:13px;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em';
+        }
+
+        // Style the slider track (if present)
+        var slider = widget.querySelector('.price_slider, .ui-slider');
+        if (slider) {
+          slider.style.cssText = 'height:6px;border-radius:3px;background:#E7E5EC;margin:14px 0;border:none';
+          var ranges = slider.querySelectorAll('.ui-slider-range');
+          ranges.forEach(function (r) { r.style.background = '#E80001'; });
+          var handles = slider.querySelectorAll('.ui-slider-handle');
+          handles.forEach(function (h) {
+            h.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #E80001;cursor:pointer;top:-7px';
+          });
+        }
       }
     }
+
+    // v2.9.214: Style other widgets in the sidebar for consistency
+    qsa('.widget-area .widget, .sidebar .widget').forEach(function (widget) {
+      if (widget.style.display === 'none') return;
+      // Skip price filter (already styled above)
+      if (widget.classList.contains('widget_price_filter')) return;
+
+      // Apply consistent card styling
+      if (!widget.dataset.ltmsStyled) {
+        widget.dataset.ltmsStyled = '1';
+        // Only style if it doesn't already have prominent styling
+        var currentBg = widget.style.background || getComputedStyle(widget).background;
+        if (!currentBg || currentBg === 'rgba(0, 0, 0, 0)' || currentBg === 'transparent') {
+          widget.style.background = '#fff';
+          widget.style.padding = '16px';
+          widget.style.borderRadius = '14px';
+          widget.style.border = '1px solid #E7E5EC';
+          widget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
+          widget.style.marginBottom = '16px';
+        }
+
+        // Style widget titles consistently
+        var title = widget.querySelector('.widget-title, h2, h3');
+        if (title && !title.dataset.ltmsStyled) {
+          title.dataset.ltmsStyled = '1';
+          title.style.cssText = 'font-family:Albert Sans,sans-serif;font-size:14px;font-weight:700;color:#1A1F2E;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #E7E5EC;text-transform:uppercase;letter-spacing:0.04em';
+        }
+      }
+    });
   };
 
   /* =========================================================================
