@@ -41,11 +41,26 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
      * @return void
      */
     public static function init(): void {
-        if ( ! class_exists( 'LTMS_Core_Config' ) || LTMS_Core_Config::get_country() !== 'CO' ) {
+        if ( ! class_exists( 'LTMS_Core_Config' ) ) {
             return;
         }
 
+        $country = LTMS_Core_Config::get_country();
         $instance = new self();
+
+        // v2.9.215: Etiquetas de campos adaptadas al país (CO y MX).
+        // WC por defecto muestra 'Región o provincia' para billing_state —
+        // en Colombia se maneja 'Departamento' y en México 'Estado'.
+        // Este filtro aplica para CO y MX (no solo CO como el resto de la clase).
+        if ( $country === 'CO' || $country === 'MX' ) {
+            add_filter( 'woocommerce_billing_fields',      [ __CLASS__, 'localize_state_field_label' ], 50, 1 );
+            add_filter( 'woocommerce_shipping_fields',     [ __CLASS__, 'localize_state_field_label' ], 50, 1 );
+        }
+
+        // El resto de la lógica (catálogo DANE, validación, meta) solo aplica CO.
+        if ( $country !== 'CO' ) {
+            return;
+        }
 
         // M-206: woocommerce_form_field dispara sobre el HTML renderizado, DESPUÉS
         // de que WOOCCM (QuadLayers) ya construyó el campo desde su propia BD.
@@ -57,8 +72,75 @@ final class LTMS_Frontend_Checkout_Municipality_Field {
         // sin WOOCCM, pero ya NO es la ruta principal.
         add_filter( 'woocommerce_form_field',          [ $instance, 'override_city_field_html' ], 9999, 4 );
         add_filter( 'woocommerce_billing_fields',      [ $instance, 'modify_billing_city_field' ], 1000, 1 );
+
         add_action( 'woocommerce_checkout_process',           [ $instance, 'validate_municipality' ] );
         add_action( 'woocommerce_checkout_update_order_meta', [ $instance, 'save_municipality_meta' ], 10, 1 );
+    }
+
+    /**
+     * v2.9.215: Localiza la etiqueta del campo 'state' (billing/shipping) según el país.
+     *
+     * - Colombia (CO): 'Departamento' (NO 'Región o provincia')
+     * - México (MX): 'Estado'
+     * - Otros: respeta el default de WC
+     *
+     * @param array $fields Campos de billing/shipping.
+     * @return array Campos con etiqueta localizada.
+     */
+    public static function localize_state_field_label( array $fields ): array {
+        $country = LTMS_Core_Config::get_country();
+        $label   = null;
+
+        if ( $country === 'CO' ) {
+            $label = __( 'Departamento', 'ltms' );
+        } elseif ( $country === 'MX' ) {
+            $label = __( 'Estado', 'ltms' );
+        }
+
+        if ( $label === null ) {
+            return $fields;
+        }
+
+        // Aplicar a billing_state y shipping_state
+        foreach ( [ 'billing_state', 'shipping_state' ] as $key ) {
+            if ( isset( $fields[ $key ] ) ) {
+                $fields[ $key ]['label']       = $label;
+                $fields[ $key ]['placeholder'] = $label;
+                // Para CO y MX, billing_state debería ser un select (no texto libre)
+                // WC lo maneja automáticamente cuando el país tiene estados definidos.
+            }
+        }
+
+        // También ajustar el label de billing_city / shipping_city:
+        // - CO: 'Municipio' (ya hecho por override_city_field_html, pero reforzamos aquí)
+        // - MX: 'Municipio' / 'Delegación' (CDMX)
+        $city_label = null;
+        if ( $country === 'CO' ) {
+            $city_label = __( 'Municipio', 'ltms' );
+        } elseif ( $country === 'MX' ) {
+            $city_label = __( 'Municipio / Alcaldía', 'ltms' );
+        }
+        if ( $city_label !== null ) {
+            foreach ( [ 'billing_city', 'shipping_city' ] as $key ) {
+                if ( isset( $fields[ $key ] ) ) {
+                    $fields[ $key ]['label']       = $city_label;
+                    $fields[ $key ]['placeholder'] = $city_label;
+                }
+            }
+        }
+
+        // Ajustar el label de billing_postcode / shipping_postcode:
+        // - CO: 'Código postal' (WC default, pero a veces sale 'ZIP')
+        // - MX: 'Código postal'
+        $postcode_label = __( 'Código postal', 'ltms' );
+        foreach ( [ 'billing_postcode', 'shipping_postcode' ] as $key ) {
+            if ( isset( $fields[ $key ] ) ) {
+                $fields[ $key ]['label']       = $postcode_label;
+                $fields[ $key ]['placeholder'] = $postcode_label;
+            }
+        }
+
+        return $fields;
     }
 
     /**

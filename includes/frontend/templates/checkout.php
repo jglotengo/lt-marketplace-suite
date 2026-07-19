@@ -314,16 +314,21 @@ get_header( 'shop' );
                                 if ( empty( $shipping_packages ) ) :
                                     ?>
                                     <div class="pv-checkout__no-shipping">
-                                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
-                                        <p><?php esc_html_e( 'No hay métodos de envío disponibles. Verifica tu dirección o contacta soporte.', 'ltms' ); ?></p>
+                                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
+                                        <div>
+                                            <p style="margin:0 0 6px;font-weight:600;color:#1A1F2E;font-size:14px;"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
+                                            <p style="margin:0;color:#565C66;font-size:13px;line-height:1.45;"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
+                                        </div>
                                     </div>
                                     <?php
                                 else :
                                     $ship_idx = 0;
+                                    $has_rates = false;
                                     foreach ( $shipping_packages as $i => $package ) :
                                         if ( empty( $package['rates'] ) ) {
                                             continue;
                                         }
+                                        $has_rates = true;
                                         ?>
                                         <ul class="pv-shipping-options" role="radiogroup" aria-label="<?php esc_attr_e( 'Opciones de envío', 'ltms' ); ?>">
                                             <?php foreach ( $package['rates'] as $rate ) :
@@ -364,6 +369,20 @@ get_header( 'shop' );
                                             <?php endforeach; ?>
                                         </ul>
                                     <?php endforeach; ?>
+                                    <?php
+                                    // v2.9.215: Si hay packages pero ninguno con rates, mostrar aviso amigable.
+                                    if ( ! $has_rates ) :
+                                        ?>
+                                        <div class="pv-checkout__no-shipping">
+                                            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
+                                            <div>
+                                                <p style="margin:0 0 6px;font-weight:600;color:#1A1F2E;font-size:14px;"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
+                                                <p style="margin:0;color:#565C66;font-size:13px;line-height:1.45;"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
+                                            </div>
+                                        </div>
+                                        <?php
+                                    endif;
+                                    ?>
                                 <?php endif; ?>
                             </div>
                         </section>
@@ -423,14 +442,21 @@ get_header( 'shop' );
                                                  * Hook: woocommerce_payment_gateway_description
                                                  * Permite que el gateway renderice su form adicional
                                                  * (ej. campos de tarjeta) bajo la radio card.
+                                                 *
+                                                 * v2.9.215: NO imprimir $gateway->get_description() aquí
+                                                 * porque payment_fields() ya la imprime internamente
+                                                 * (ver class-ltms-api-gateways.php línea 167-169).
+                                                 * Antes se imprimía DOS VECES ("Paga de forma segura
+                                                 * con Openpay." aparecía duplicado).
                                                  */
                                                 if ( $gateway->has_fields() || $gateway->get_description() ) :
                                                     echo '<div class="pv-payment-option__fields" data-pv-payment-fields="' . esc_attr( $gateway_id ) . '"' . ( $checked ? '' : ' hidden' ) . '>';
-                                                    if ( $gateway->get_description() ) {
-                                                        echo '<p class="pv-payment-option__desc">' . wp_kses_post( wpautop( $gateway->get_description() ) ) . '</p>';
-                                                    }
                                                     if ( $gateway->has_fields() ) {
                                                         $gateway->payment_fields();
+                                                    } elseif ( $gateway->get_description() ) {
+                                                        // Solo imprimir la descripción si el gateway NO tiene
+                                                        // payment_fields() propio (que ya la imprimiría).
+                                                        echo '<p class="pv-payment-option__desc">' . wp_kses_post( wpautop( $gateway->get_description() ) ) . '</p>';
                                                     }
                                                     echo '</div>';
                                                 endif;
