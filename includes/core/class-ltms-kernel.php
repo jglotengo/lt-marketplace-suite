@@ -1040,6 +1040,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Checkout_Field_Labels' ) ) {
             LTMS_Frontend_Checkout_Field_Labels::init();
         }
+        // v2.9.219: Inject checkout JS via output buffering (bypass SG Optimizer
+        // que strippa inline <script> tags de template files).
+        if ( class_exists( 'LTMS_Frontend_Checkout_Script_Injector' ) ) {
+            LTMS_Frontend_Checkout_Script_Injector::init();
+        }
         // v2.1.0: selección de oficina / punto de entrega Aveonline en checkout.
         if ( class_exists( 'LTMS_Frontend_Checkout_Aveonline_Office' ) ) {
             LTMS_Frontend_Checkout_Aveonline_Office::init();
