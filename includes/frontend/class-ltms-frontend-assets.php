@@ -258,9 +258,11 @@ final class LTMS_Frontend_Assets {
 
             // v2.9.231: Checkout fixes JS (labels, required fields, shipping toggle).
             // Enqueued here alongside other checkout assets — same hook, same timing.
+            // v2.9.233: Use .min.js suffix in production (SG Optimizer requires .min.js).
+            $fixes_suffix = $is_prod ? '.min' : '';
             wp_enqueue_script(
                 'ltms-checkout-fixes',
-                $url . 'js/ltms-checkout-fixes.js',
+                $url . 'js/ltms-checkout-fixes' . $fixes_suffix . '.js',
                 [ 'jquery' ],
                 $ver,
                 true
