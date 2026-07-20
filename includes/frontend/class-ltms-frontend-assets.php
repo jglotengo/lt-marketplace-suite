@@ -249,7 +249,16 @@ final class LTMS_Frontend_Assets {
         }
 
         // Checkout / Pasarela de pagos
-        if ( is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 ) ) {
+        // v2.9.234: is_checkout() fails on SiteGround. Triple detection.
+        $is_checkout_page = is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 );
+        if ( ! $is_checkout_page && function_exists( 'wc_get_page_id' ) ) {
+            $is_checkout_page = $page_id === (int) wc_get_page_id( 'checkout' );
+        }
+        if ( ! $is_checkout_page ) {
+            $current_url = ( isset( $_SERVER['HTTPS'] ) ? 'https' : 'http' ) . '://' . ( $_SERVER['HTTP_HOST'] ?? '' ) . ( $_SERVER['REQUEST_URI'] ?? '' );
+            $is_checkout_page = strpos( $current_url, '/checkout' ) !== false || strpos( $current_url, '/finalizar-compra' ) !== false;
+        }
+        if ( $is_checkout_page ) {
             $this->enqueue_checkout_assets( $url, $ver, $suffix );
             $this->enqueue_shipping_selector( $url, $ver, $suffix );
             $this->enqueue_stripe_assets( $url, $ver, $suffix );

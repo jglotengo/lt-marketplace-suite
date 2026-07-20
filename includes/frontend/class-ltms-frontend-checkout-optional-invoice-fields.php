@@ -57,10 +57,19 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
 
     /**
      * Marca billing_company como NO requerido (cumple minimización de datos).
+     * v2.9.235: También marca address_1, state, city como REQUIRED — son
+     * necesarios para despachar el pedido. WOOCCM los pone como optional.
      */
     public static function make_company_optional( array $fields ): array {
         if ( isset( $fields['billing_company'] ) ) {
             $fields['billing_company']['required'] = false;
+        }
+        // v2.9.235: Campos necesarios para despachar — marcar como required.
+        $required_for_shipping = [ 'billing_address_1', 'billing_state', 'billing_city' ];
+        foreach ( $required_for_shipping as $key ) {
+            if ( isset( $fields[ $key ] ) ) {
+                $fields[ $key ]['required'] = true;
+            }
         }
         return $fields;
     }

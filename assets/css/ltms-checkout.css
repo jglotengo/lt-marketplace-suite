@@ -435,3 +435,173 @@
     .pv-scope.pv-checkout .pv-shipping-option__badge,
     .pv-scope.pv-checkout .pv-payment-option__badge{display:none;}
 }
+
+/* ============================================================================
+   v2.9.235: Field required/optional fixes + collapsible sections
+   ========================================================================== */
+
+/* Ocultar "(opcional)" en campos que ahora son required */
+.pv-scope.pv-checkout #billing_address_1_field label .optional,
+.pv-scope.pv-checkout #billing_state_field label .optional,
+.pv-scope.pv-checkout #billing_city_field label .optional,
+.pv-scope.pv-checkout #shipping_address_1_field label .optional,
+.pv-scope.pv-checkout #shipping_state_field label .optional,
+.pv-scope.pv-checkout #shipping_city_field label .optional {
+    display: none !important;
+}
+
+/* Marcar visualmente los campos required con borde sutil */
+.pv-scope.pv-checkout #billing_address_1_field,
+.pv-scope.pv-checkout #billing_state_field,
+.pv-scope.pv-checkout #billing_city_field {
+    position: relative;
+}
+
+/* Shipping fields ocultos por defecto (colapsable) */
+.pv-scope.pv-checkout .woocommerce-shipping-fields {
+    display: none !important;
+}
+.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible {
+    display: block !important;
+}
+
+/* Invoice fields ocultos por defecto (colapsable) */
+.pv-scope.pv-checkout .ltms-invoice-field {
+    display: none !important;
+}
+.pv-scope.pv-checkout .ltms-invoice-field.ltms-invoice-visible {
+    display: block !important;
+}
+
+/* Consolidar T&C + Privacy en un solo bloque visual */
+.pv-scope.pv-checkout .pv-checkout__terms-toggle,
+.pv-scope.pv-checkout .ltms-checkout-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    background: #FFF9F9;
+    border: 1px solid #FFD6D6;
+    border-left: 4px solid #E80001;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle:hover,
+.pv-scope.pv-checkout .ltms-checkout-consent:hover {
+    background: #FFF1F1;
+    border-color: #E80001;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle input[type="checkbox"],
+.pv-scope.pv-checkout .ltms-checkout-consent input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: #E80001;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle label,
+.pv-scope.pv-checkout .ltms-checkout-consent label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1A1F2E;
+    line-height: 1.5;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle a,
+.pv-scope.pv-checkout .ltms-checkout-consent a {
+    color: #E80001;
+    font-weight: 600;
+    text-decoration: underline;
+}
+.pv-scope.pv-checkout .pv-checkout__terms-toggle a:hover,
+.pv-scope.pv-checkout .ltms-checkout-consent a:hover {
+    text-decoration: none;
+}
+
+/* v2.9.235: Toggle para checkbox 'Enviar a dirección diferente' */
+.pv-scope.pv-checkout #ship-to-different-address {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    margin: 16px 0 12px;
+    background: #FFF9F9;
+    border: 1px solid #FFD6D6;
+    border-left: 4px solid #E80001;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.pv-scope.pv-checkout #ship-to-different-address:hover {
+    background: #FFF1F1;
+    border-color: #E80001;
+}
+.pv-scope.pv-checkout #ship-to-different-address label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1A1F2E;
+    line-height: 1.5;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+.pv-scope.pv-checkout #ship-to-different-address-checkbox {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: #E80001;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* v2.9.235: Invoice toggle card */
+.pv-scope.pv-checkout .ltms-invoice-toggle-row {
+    padding: 14px 16px !important;
+    margin: 12px 0 !important;
+    background: #FFF9F9 !important;
+    border: 1px solid #FFD6D6 !important;
+    border-left: 4px solid #E80001 !important;
+    border-radius: 10px !important;
+}
+.pv-scope.pv-checkout .ltms-invoice-toggle-row label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1A1F2E;
+    cursor: pointer;
+}
+.pv-scope.pv-checkout .ltms-invoice-toggle-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: #E80001;
+    cursor: pointer;
+}
+
+/* Headings renombrados */
+.pv-scope.pv-checkout .woocommerce-billing-fields h3,
+.pv-scope.pv-checkout .woocommerce-billing-fields legend {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1A1F2E;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E7E5EC;
+}
+.pv-scope.pv-checkout .woocommerce-shipping-fields h3,
+.pv-scope.pv-checkout .woocommerce-shipping-fields legend {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1A1F2E;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #E7E5EC;
+}
