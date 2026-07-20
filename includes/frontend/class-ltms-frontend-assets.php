@@ -255,6 +255,20 @@ final class LTMS_Frontend_Assets {
             $this->enqueue_stripe_assets( $url, $ver, $suffix );
             // v3.1.0 — Cross-Border motor (Task 63-D): currency switcher widget.
             $this->enqueue_currency_switcher( $url, $ver, $suffix );
+
+            // v2.9.231: Checkout fixes JS (labels, required fields, shipping toggle).
+            // Enqueued here alongside other checkout assets — same hook, same timing.
+            wp_enqueue_script(
+                'ltms-checkout-fixes',
+                $url . 'js/ltms-checkout-fixes.js',
+                [ 'jquery' ],
+                $ver,
+                true
+            );
+            $country = LTMS_Core_Config::get_country();
+            wp_localize_script( 'ltms-checkout-fixes', 'ltmsCheckoutFixes', [
+                'country' => $country,
+            ] );
         }
 
         // Login y Registro de vendedores — detección por ID o por shortcode (M-121 fallback)
