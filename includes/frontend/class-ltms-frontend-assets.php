@@ -249,7 +249,8 @@ final class LTMS_Frontend_Assets {
         }
 
         // Checkout / Pasarela de pagos
-        // v2.9.234: is_checkout() fails on SiteGround. Triple detection.
+        // v2.9.236: Cargar checkout assets en TODAS las páginas — el JS hace
+        // auto-detección via .pv-checkout scope. is_checkout() falla en SG.
         $is_checkout_page = is_checkout() || $page_id === (int) ( $pages['ltms-store'] ?? 0 );
         if ( ! $is_checkout_page && function_exists( 'wc_get_page_id' ) ) {
             $is_checkout_page = $page_id === (int) wc_get_page_id( 'checkout' );
@@ -258,7 +259,11 @@ final class LTMS_Frontend_Assets {
             $current_url = ( isset( $_SERVER['HTTPS'] ) ? 'https' : 'http' ) . '://' . ( $_SERVER['HTTP_HOST'] ?? '' ) . ( $_SERVER['REQUEST_URI'] ?? '' );
             $is_checkout_page = strpos( $current_url, '/checkout' ) !== false || strpos( $current_url, '/finalizar-compra' ) !== false;
         }
-        if ( $is_checkout_page ) {
+        // v2.9.236: Si no podemos detectar checkout, cargar en todas las páginas.
+        // El JS hace return si no encuentra .pv-scope.pv-checkout.
+        $load_checkout_assets = $is_checkout_page;
+
+        if ( $load_checkout_assets ) {
             $this->enqueue_checkout_assets( $url, $ver, $suffix );
             $this->enqueue_shipping_selector( $url, $ver, $suffix );
             $this->enqueue_stripe_assets( $url, $ver, $suffix );
@@ -268,6 +273,26 @@ final class LTMS_Frontend_Assets {
             // v2.9.231: Checkout fixes JS (labels, required fields, shipping toggle).
             // Enqueued here alongside other checkout assets — same hook, same timing.
             // v2.9.233: Use .min.js suffix in production (SG Optimizer requires .min.js).
+            $fixes_suffix = $is_prod ? '.min' : '';
+            wp_enqueue_script(
+                'ltms-checkout-fixes',
+                $url . 'js/ltms-checkout-fixes' . $fixes_suffix . '.js',
+                [ 'jquery' ],
+                $ver,
+                true
+            );
+            $country = LTMS_Core_Config::get_country();
+            wp_localize_script( 'ltms-checkout-fixes', 'ltmsCheckoutFixes', [
+                'country' => $country,
+            ] );
+        }
+
+        // v2.9.236: Cargar checkout-fixes.js SIEMPRE (en todas las páginas).
+        // El JS hace return inmediato si no encuentra .pv-scope.pv-checkout.
+        // Esto es necesario porque is_checkout() falla en SiteGround y todos
+        // los métodos de detección han fallado. Cargar en todas las páginas
+        // tiene costo mínimo (201 líneas, ~12KB) y garantiza funcionamiento.
+        if ( ! wp_script_is( 'ltms-checkout-fixes', 'enqueued' ) ) {
             $fixes_suffix = $is_prod ? '.min' : '';
             wp_enqueue_script(
                 'ltms-checkout-fixes',

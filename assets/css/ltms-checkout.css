@@ -605,3 +605,78 @@
     padding-bottom: 8px;
     border-bottom: 1px solid #E7E5EC;
 }
+
+/* ============================================================================
+   v2.9.236: Fix checkbox visibility + rename facturación → entrega
+   ========================================================================== */
+
+/* CRITICAL: Hacer visibles TODOS los checkboxes del checkout */
+.pv-scope.pv-checkout input[type="checkbox"] {
+    opacity: 1 !important;
+    width: 20px !important;
+    height: 20px !important;
+    position: static !important;
+    margin-top: 2px !important;
+    accent-color: #E80001 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+}
+
+/* Ocultar el custom mark que WC usa para reemplazar el checkbox nativo */
+.pv-scope.pv-checkout .pv-checkout__ship-toggle-mark,
+.pv-scope.pv-checkout .woocommerce-form__input-checkbox + span {
+    display: none !important;
+}
+
+/* CRITICAL: Shipping fields DEBEN estar ocultos por defecto (colapsable) */
+.pv-scope.pv-checkout .woocommerce-shipping-fields {
+    display: none !important;
+}
+
+/* Solo visibles si el checkbox está marcado — JS añade esta clase */
+.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible {
+    display: block !important;
+}
+
+/* CRITICAL: Invoice fields DEBEN estar ocultos por defecto */
+.pv-scope.pv-checkout .ltms-invoice-field {
+    display: none !important;
+}
+.pv-scope.pv-checkout .ltms-invoice-field.ltms-invoice-visible {
+    display: block !important;
+}
+
+/* Renombrar headings: facturación → entrega (marketplace no factura) */
+.pv-scope.pv-checkout .woocommerce-billing-fields h3::before {
+    content: 'Datos de entrega';
+    display: block;
+}
+.pv-scope.pv-checkout .woocommerce-billing-fields h3 {
+    font-size: 0 !important;
+    color: transparent !important;
+}
+.pv-scope.pv-checkout .woocommerce-billing-fields h3::before {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #1A1F2E !important;
+    margin: 0 0 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #E7E5EC !important;
+}
+
+.pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
+    content: 'Dirección de entrega alternativa';
+    display: block;
+}
+.pv-scope.pv-checkout .woocommerce-shipping-fields h3 {
+    font-size: 0 !important;
+    color: transparent !important;
+}
+.pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #1A1F2E !important;
+    margin: 0 0 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #E7E5EC !important;
+}

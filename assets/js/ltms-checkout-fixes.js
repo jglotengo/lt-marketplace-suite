@@ -1,10 +1,10 @@
-// LTMS Checkout Fixes — v2.9.230
-// This file is loaded via wp_enqueue_script on checkout pages.
+// LTMS Checkout Fixes — v2.9.236
+// Auto-loads on any page with .pv-checkout scope. No dependency on is_checkout().
 // Country-specific labels are passed via wp_localize_script (window.ltmsCheckoutFixes).
 (function(){
     'use strict';
     var scope = document.querySelector('.pv-scope.pv-checkout');
-    if (!scope) return;
+    if (!scope) return; // Not a checkout page — bail silently.
 
     var config = window.ltmsCheckoutFixes || { country: 'CO' };
     var ltmsCountry = config.country;
