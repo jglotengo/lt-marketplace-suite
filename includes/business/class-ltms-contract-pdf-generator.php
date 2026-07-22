@@ -36,7 +36,7 @@ class LTMS_Contract_PDF_Generator {
                 'cc'        => '94.534.855',
                 'matricula' => '1263517-16 (C.Comercio Cali)',
                 'ciiu'      => '4791 / 6312',
-                'email'     => 'operaciones@lo-tengo.com.co',
+                'email'     => 'dircomercialcol@lo-tengo.com.co',
                 'url'       => 'https://lo-tengo.com.co',
                 'ciudad'    => 'Cali, Valle del Cauca',
         ];
