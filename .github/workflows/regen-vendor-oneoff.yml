@@ -3,6 +3,9 @@ name: One-off - Regenerate vendor (dompdf ^3.0)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   regenerate:
     runs-on: ubuntu-latest
