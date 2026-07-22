@@ -213,10 +213,26 @@ final class LTMS_ZapSign_Manager {
         \WP_User $user,
         int $vendor_id
     ): array {
-        $phone   = get_user_meta( $vendor_id, 'ltms_phone', true )
-                ?: get_user_meta( $vendor_id, 'billing_phone', true )
-                ?: '';
+        // El teléfono se guarda con o sin indicativo de país. ZapSign requiere
+        // el código de país (Colombia = 57) y el número separados en dos
+        // campos planos (signer_phone_country / signer_phone_number), no un
+        // único campo "phone" combinado.
+        $raw_phone    = get_user_meta( $vendor_id, 'ltms_phone', true )
+                     ?: get_user_meta( $vendor_id, 'billing_phone', true )
+                     ?: '';
+        $phone_digits = preg_replace( '/\D/', '', (string) $raw_phone );
 
+        $phone_country = '57';
+        $phone_number  = $phone_digits;
+        if ( 0 === strpos( $phone_digits, '57' ) && strlen( $phone_digits ) > 10 ) {
+            // Ya viene con el indicativo 57 incluido (ej: 573001234567).
+            $phone_number = substr( $phone_digits, 2 );
+        }
+
+        // API oficial: POST /models/create-doc/ (sin {template_id} en la
+        // URL — va en el body). Este endpoint acepta UN solo firmante por
+        // request, con campos planos "signer_*" (no un array "signers").
+        // Ver: https://docs.zapsign.com.br/english/documentos/criar-documento-via-modelo
         $payload = [
             'template_id'          => $template_id,
             'name'                 => sprintf(
@@ -227,33 +243,33 @@ final class LTMS_ZapSign_Manager {
             'external_id'          => (string) $vendor_id,
             'lang'                 => 'es',
             'send_automatic_email' => true,
-            'sandbox'              => $client->is_sandbox(),
-            'signers'              => [[
-                'name'        => $user->display_name,
-                'email'       => $user->user_email,
-                'phone'       => preg_replace( '/\D/', '', $phone ),
-                'auth_mode'   => 'assinaturaTela',
-                'external_id' => (string) $vendor_id,
-                // Pre-llenar campos del formulario de la plantilla
-                'data'        => [
-                    [ 'de' => 'vendedor_nombre',    'para' => $user->display_name ],
-                    [ 'de' => 'vendedor_email',     'para' => $user->user_email ],
-                    // L-7: enmascarar documento antes de enviar a ZapSign (solo últimos 4 dígitos)
-                    [ 'de' => 'vendedor_documento', 'para' => (function( $num ) use ( $vendor_id ) {
-                        $raw = get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '';
-                        if ( class_exists( 'LTMS_Core_Security' ) && ! empty( $raw ) ) {
-                            try { $raw = LTMS_Core_Security::decrypt( $raw ); } catch ( \Throwable $e ) {}
-                        }
-                        return strlen( $raw ) > 4 ? str_repeat( '*', strlen( $raw ) - 4 ) . substr( $raw, -4 ) : $raw;
-                    })( get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '' ) ],
-                    [ 'de' => 'vendedor_ciudad',    'para' => get_user_meta( $vendor_id, 'billing_city', true ) ?: '' ],
-                    [ 'de' => 'vendedor_tienda',    'para' => get_user_meta( $vendor_id, 'ltms_store_name', true ) ?: '' ],
-                    [ 'de' => 'fecha_contrato',     'para' => gmdate( 'd/m/Y' ) ],
-                ],
-            ]],
+            'signer_name'          => $user->display_name,
+            'signer_email'         => $user->user_email,
+            'signer_phone_country' => $phone_country,
+            'signer_phone_number'  => $phone_number,
+            // Pre-llenar campos del formulario de la plantilla
+            'data'                 => [
+                [ 'de' => 'vendedor_nombre',    'para' => $user->display_name ],
+                [ 'de' => 'vendedor_email',     'para' => $user->user_email ],
+                // L-7: enmascarar documento antes de enviar a ZapSign (solo últimos 4 dígitos)
+                [ 'de' => 'vendedor_documento', 'para' => (function() use ( $vendor_id ) {
+                    $raw = get_user_meta( $vendor_id, 'ltms_document_number', true ) ?: '';
+                    if ( class_exists( 'LTMS_Core_Security' ) && ! empty( $raw ) ) {
+                        try { $raw = LTMS_Core_Security::decrypt( $raw ); } catch ( \Throwable $e ) {}
+                    }
+                    return strlen( $raw ) > 4 ? str_repeat( '*', strlen( $raw ) - 4 ) . substr( $raw, -4 ) : $raw;
+                })() ],
+                [ 'de' => 'vendedor_ciudad',    'para' => get_user_meta( $vendor_id, 'billing_city', true ) ?: '' ],
+                [ 'de' => 'vendedor_tienda',    'para' => get_user_meta( $vendor_id, 'ltms_store_name', true ) ?: '' ],
+                [ 'de' => 'fecha_contrato',     'para' => gmdate( 'd/m/Y' ) ],
+            ],
         ];
 
-        $response = $client->perform_request( 'POST', '/models/' . $template_id . '/create-doc/', $payload );
+        if ( $client->is_sandbox() ) {
+            $payload['sandbox'] = true;
+        }
+
+        $response = $client->perform_request( 'POST', '/models/create-doc/', $payload );
 
         if ( empty( $response['token'] ) ) {
             return [
