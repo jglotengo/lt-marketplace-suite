@@ -1,0 +1,29 @@
+name: One-off - Regenerate vendor (dompdf ^3.0)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer:v2
+
+      - name: composer update dompdf
+        run: composer update dompdf/dompdf --with-all-dependencies --no-interaction --prefer-dist
+
+      - name: Commit regenerated vendor/ and composer.lock
+        run: |
+          git config user.name "ltms-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add composer.lock vendor
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore(deps): regenerate vendor/ and composer.lock for dompdf ^3.0 [one-off]"
+          git push origin main
