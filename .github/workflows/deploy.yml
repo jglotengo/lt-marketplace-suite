@@ -13,19 +13,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Copy QA script to server via SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PASS: ${{ secrets.SSH_PASS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
         run: |
           sudo apt-get install -y sshpass 2>/dev/null || true
-          sshpass -p 'sT6v>2@1,@11' scp -o StrictHostKeyChecking=no -P 18765 \
+          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-qa.php \
-            u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co:/home/customer/www/lo-tengo.com.co/public_html/ltms-qa.php \
+            "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/ltms-qa.php" \
             2>&1 || echo "SCP failed (non-critical)"
-          sshpass -p 'sT6v>2@1,@11' scp -o StrictHostKeyChecking=no -P 18765 \
+          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-fix-sellers-now.php \
-            u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co:/home/customer/www/lo-tengo.com.co/public_html/ltms-fix-sellers-now.php \
+            "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/ltms-fix-sellers-now.php" \
             2>&1 || echo "SCP fix-sellers failed (non-critical)"
-          sshpass -p 'sT6v>2@1,@11' scp -o StrictHostKeyChecking=no -P 18765 \
+          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-publish-legal-pages-2026-07-22.php \
-            u1549-ruo8hvwpk9dt@ssh.lo-tengo.com.co:/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/deploy/ltms-publish-legal-pages-2026-07-22.php \
+            "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/deploy/ltms-publish-legal-pages-2026-07-22.php" \
             2>&1 || echo "SCP legal-pages failed (non-critical)"
 
       - name: Trigger deploy webhook
