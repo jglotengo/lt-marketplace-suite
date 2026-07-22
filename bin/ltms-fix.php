@@ -49,7 +49,7 @@ if ($item_bd && $contact) {
 }
 chdir($plugin);
 system('git add includes/business/class-ltms-alegra-sync.php');
-system('git -c user.email=bot@ltms.co -c user.name="LTMS Bot" commit -m "fix(alegra): get_option directo en prepare_commission_items"');
+system('git -c user.email=dircomercialcol@lo-tengo.com.co -c user.name="LTMS Bot" commit -m "fix(alegra): get_option directo en prepare_commission_items"');
 system('git remote set-url origin https://jglotengo:GITHUB_TOKEN_REMOVED@github.com/jglotengo/lt-marketplace-suite.git');
 system('git push origin main && echo PUSH_OK');
 echo "\n=== DONE ===\n";
