@@ -6,7 +6,7 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
-    'Svg\\' => array($vendorDir . '/phenx/php-svg-lib/src/Svg'),
+    'Svg\\' => array($vendorDir . '/dompdf/php-svg-lib/src/Svg'),
     'Stripe\\' => array($vendorDir . '/stripe/stripe-php/lib'),
     'Sabberworm\\CSS\\' => array($vendorDir . '/sabberworm/php-css-parser/src'),
     'Ramsey\\Uuid\\' => array($vendorDir . '/ramsey/uuid/src'),
@@ -18,7 +18,7 @@ return array(
     'LTMS\\Tests\\Unit\\' => array($baseDir . '/tests/unit'),
     'LTMS\\Tests\\Integration\\' => array($baseDir . '/tests/integration'),
     'LTMS\\' => array($baseDir . '/includes'),
-    'FontLib\\' => array($vendorDir . '/phenx/php-font-lib/src/FontLib'),
+    'FontLib\\' => array($vendorDir . '/dompdf/php-font-lib/src/FontLib'),
     'Firebase\\JWT\\' => array($vendorDir . '/firebase/php-jwt/src'),
     'Dompdf\\' => array($vendorDir . '/dompdf/dompdf/src'),
     'Doctrine\\Instantiator\\' => array($vendorDir . '/doctrine/instantiator/src/Doctrine/Instantiator'),
