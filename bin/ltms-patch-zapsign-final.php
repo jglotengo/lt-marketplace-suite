@@ -76,7 +76,7 @@ if ($content !== $original) {
 // 6. Git commit + push
 chdir($plugin_dir);
 system('git add assets/contracts/ includes/api/class-ltms-api-zapsign.php');
-system('git -c user.email=bot@ltms.co -c user.name="LTMS Bot" commit -m "fix(zapsign): pdf_base64 en sandbox; get_contract_pdf_base64 con 3 fallbacks; contrato PDF en assets/contracts/"');
+system('git -c user.email=dircomercialcol@lo-tengo.com.co -c user.name="LTMS Bot" commit -m "fix(zapsign): pdf_base64 en sandbox; get_contract_pdf_base64 con 3 fallbacks; contrato PDF en assets/contracts/"');
 system('git remote set-url origin https://jglotengo:GITHUB_TOKEN_REMOVED@github.com/jglotengo/lt-marketplace-suite.git');
 system('git push origin main && echo "PUSH_OK"');
 
