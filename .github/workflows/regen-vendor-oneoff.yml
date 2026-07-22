@@ -16,10 +16,25 @@ jobs:
           php-version: '8.1'
           tools: composer:v2
 
-      - name: composer update dompdf
-        run: composer update dompdf/dompdf --with-all-dependencies --no-interaction --prefer-dist
+      - name: composer update dompdf (capture output)
+        id: composer_step
+        run: |
+          set +e
+          composer update dompdf/dompdf --with-all-dependencies --no-interaction --prefer-dist > composer-debug.log 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat composer-debug.log
 
-      - name: Commit regenerated vendor/ and composer.lock
+      - name: Commit debug log always
+        if: always()
+        run: |
+          git config user.name "ltms-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add composer-debug.log
+          git diff --cached --quiet && echo "No log changes" || git commit -m "chore(ci): composer-debug.log [one-off, temp]"
+          git push origin main || true
+
+      - name: Commit regenerated vendor/ and composer.lock (only if success)
+        if: steps.composer_step.outputs.exit_code == '0'
         run: |
           git config user.name "ltms-bot"
           git config user.email "actions@users.noreply.github.com"
