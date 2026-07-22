@@ -1467,7 +1467,7 @@ final class LTMS_Dashboard_Logic {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT id, type, amount, description, created_at FROM `{$table}` WHERE user_id = %d ORDER BY created_at DESC LIMIT 50",
+                "SELECT id, type, amount, description, created_at FROM `{$table}` WHERE vendor_id = %d ORDER BY created_at DESC LIMIT 50",
                 $vendor_id
             ),
             ARRAY_A
