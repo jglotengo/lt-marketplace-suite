@@ -611,6 +611,8 @@ $files = [
     'patchwork.json',
     // DIAG temp
     'deploy/ltms-panel-diag.php',
+    // TASK: legal pages publisher (terms/privacy/returns) — 2026-07-22
+    'deploy/ltms-publish-legal-pages-2026-07-22.php',
     // v2.9.183 — Plaza Viva design system + native templates
     'assets/css/ltms-plaza-viva.css',
     'assets/css/ltms-plaza-viva.min.css',
