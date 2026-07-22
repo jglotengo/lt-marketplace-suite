@@ -593,13 +593,13 @@ Sí. Ve a PosGold > Sincronizar y click en "Sincronizar ahora".
 ¿Qué hago si perdí mi teléfono con 2FA?
 ---------------------------------------
 Usa uno de los 8 códigos de respaldo que guardaste al activar 2FA.
-Si tampoco los tienes, escribe a soporte@ltmarketplace.co para que el
+Si tampoco los tienes, escribe a sellerscolombia@lo-tengo.com.co para que el
 admin revoque tu 2FA y puedas reactivarlo.
 
 ¿Cómo contacto al soporte?
 -----------------------------
 Desde tu panel ve a Configuración > Soporte, o escribe a:
-soporte@ltmarketplace.co
+sellerscolombia@lo-tengo.com.co
 
 ================================================================================
  FIN DEL MANUAL DEL VENDEDOR — LT Marketplace Suite v2.9.35
