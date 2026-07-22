@@ -1,0 +1,204 @@
+Running 2.10.2 (2026-07-01 11:24:45) with PHP 8.1.34 on Linux / 6.17.0-1020-azure
+Reading ./composer.json (/home/runner/work/lt-marketplace-suite/lt-marketplace-suite/composer.json)
+Loading config file /home/runner/.composer/auth.json
+Loading config file ./composer.json (/home/runner/work/lt-marketplace-suite/lt-marketplace-suite/composer.json)
+Checked CA file /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem does not exist or it is not a file.
+Checked directory /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem does not exist or it is not a directory.
+Checked CA file /etc/pki/tls/certs/ca-bundle.crt does not exist or it is not a file.
+Checked directory /etc/pki/tls/certs/ca-bundle.crt does not exist or it is not a directory.
+Checked CA file /etc/ssl/certs/ca-certificates.crt: valid
+Reading /home/runner/.composer/composer.json
+Loading config file /home/runner/.composer/auth.json
+Loading config file /home/runner/.composer/composer.json (/home/runner/.composer/composer.json)
+Loading config file /home/runner/.composer/auth.json
+Reading /home/runner/.composer/auth.json
+Reading /home/runner/work/lt-marketplace-suite/lt-marketplace-suite/vendor/composer/installed.json
+Loading plugin PHPCSStandards\Composer\Plugin\Installers\PHPCodeSniffer\Plugin (from dealerdirect/phpcodesniffer-composer-installer)
+Reading ./composer.lock (/home/runner/work/lt-marketplace-suite/lt-marketplace-suite/composer.lock)
+Loading composer repositories with package information
+Downloading https://repo.packagist.org/packages.json
+[200] https://repo.packagist.org/packages.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/packages.json into cache
+Downloading https://repo.packagist.org/p2/dompdf/dompdf.json
+[200] https://repo.packagist.org/p2/dompdf/dompdf.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~dompdf.json into cache
+Downloading https://repo.packagist.org/p2/dompdf/php-font-lib.json
+Downloading https://repo.packagist.org/p2/dompdf/php-svg-lib.json
+[200] https://repo.packagist.org/p2/dompdf/php-font-lib.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-font-lib.json into cache
+[200] https://repo.packagist.org/p2/dompdf/php-svg-lib.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-svg-lib.json into cache
+Built pool.
+Running security advisory pool filter.
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~dompdf.json from cache
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-font-lib.json from cache
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-svg-lib.json from cache
+Security advisory pool filter completed in 0.002 seconds
+Found 190 package versions referenced in your dependency graph. 9 (5%) were filtered away.
+Running filter list pool filter.
+Downloading https://repo.packagist.org/p2/brick/math.json
+Downloading https://repo.packagist.org/p2/firebase/php-jwt.json
+Downloading https://repo.packagist.org/p2/masterminds/html5.json
+Downloading https://repo.packagist.org/p2/phenx/php-font-lib.json
+Downloading https://repo.packagist.org/p2/phenx/php-svg-lib.json
+Downloading https://repo.packagist.org/p2/ramsey/collection.json
+Downloading https://repo.packagist.org/p2/ramsey/uuid.json
+Downloading https://repo.packagist.org/p2/sabberworm/php-css-parser.json
+Downloading https://repo.packagist.org/p2/stripe/stripe-php.json
+Downloading https://repo.packagist.org/p2/antecedent/patchwork.json
+Downloading https://repo.packagist.org/p2/brain/monkey.json
+Downloading https://repo.packagist.org/p2/dealerdirect/phpcodesniffer-composer-installer.json
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~dompdf.json from cache
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-font-lib.json from cache
+Reading /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dompdf~php-svg-lib.json from cache
+[200] https://repo.packagist.org/p2/masterminds/html5.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-masterminds~html5.json into cache
+[200] https://repo.packagist.org/p2/phenx/php-font-lib.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phenx~php-font-lib.json into cache
+Downloading https://repo.packagist.org/p2/doctrine/instantiator.json
+Downloading https://repo.packagist.org/p2/hamcrest/hamcrest-php.json
+[200] https://repo.packagist.org/p2/firebase/php-jwt.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-firebase~php-jwt.json into cache
+Downloading https://repo.packagist.org/p2/mockery/mockery.json
+[200] https://repo.packagist.org/p2/ramsey/collection.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-ramsey~collection.json into cache
+Downloading https://repo.packagist.org/p2/myclabs/deep-copy.json
+[200] https://repo.packagist.org/p2/sabberworm/php-css-parser.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sabberworm~php-css-parser.json into cache
+Downloading https://repo.packagist.org/p2/nikic/php-parser.json
+[200] https://repo.packagist.org/p2/antecedent/patchwork.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-antecedent~patchwork.json into cache
+Downloading https://repo.packagist.org/p2/phar-io/manifest.json
+[200] https://repo.packagist.org/p2/brick/math.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-brick~math.json into cache
+Downloading https://repo.packagist.org/p2/phar-io/version.json
+[200] https://repo.packagist.org/p2/phenx/php-svg-lib.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phenx~php-svg-lib.json into cache
+Downloading https://repo.packagist.org/p2/phpcompatibility/php-compatibility.json
+[200] https://repo.packagist.org/p2/stripe/stripe-php.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-stripe~stripe-php.json into cache
+Downloading https://repo.packagist.org/p2/phpcsstandards/phpcsextra.json
+[200] https://repo.packagist.org/p2/ramsey/uuid.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-ramsey~uuid.json into cache
+Downloading https://repo.packagist.org/p2/phpcsstandards/phpcsutils.json
+[200] https://repo.packagist.org/p2/brain/monkey.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-brain~monkey.json into cache
+Downloading https://repo.packagist.org/p2/phpstan/phpstan.json
+[200] https://repo.packagist.org/p2/dealerdirect/phpcodesniffer-composer-installer.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-dealerdirect~phpcodesniffer-composer-installer.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/php-code-coverage.json
+[200] https://repo.packagist.org/p2/doctrine/instantiator.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-doctrine~instantiator.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/php-file-iterator.json
+[200] https://repo.packagist.org/p2/hamcrest/hamcrest-php.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-hamcrest~hamcrest-php.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/php-invoker.json
+[200] https://repo.packagist.org/p2/mockery/mockery.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-mockery~mockery.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/php-text-template.json
+[200] https://repo.packagist.org/p2/myclabs/deep-copy.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-myclabs~deep-copy.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/php-timer.json
+[200] https://repo.packagist.org/p2/nikic/php-parser.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-nikic~php-parser.json into cache
+Downloading https://repo.packagist.org/p2/phpunit/phpunit.json
+[200] https://repo.packagist.org/p2/phar-io/manifest.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phar-io~manifest.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/cli-parser.json
+[200] https://repo.packagist.org/p2/phar-io/version.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phar-io~version.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/code-unit.json
+[200] https://repo.packagist.org/p2/phpcompatibility/php-compatibility.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpcompatibility~php-compatibility.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/code-unit-reverse-lookup.json
+[200] https://repo.packagist.org/p2/phpcsstandards/phpcsextra.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpcsstandards~phpcsextra.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/comparator.json
+[200] https://repo.packagist.org/p2/phpcsstandards/phpcsutils.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpcsstandards~phpcsutils.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/complexity.json
+[200] https://repo.packagist.org/p2/phpstan/phpstan.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpstan~phpstan.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/diff.json
+[200] https://repo.packagist.org/p2/phpunit/php-code-coverage.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~php-code-coverage.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/environment.json
+[200] https://repo.packagist.org/p2/phpunit/php-invoker.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~php-invoker.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/exporter.json
+[200] https://repo.packagist.org/p2/phpunit/php-file-iterator.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~php-file-iterator.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/global-state.json
+[200] https://repo.packagist.org/p2/phpunit/php-text-template.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~php-text-template.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/lines-of-code.json
+[200] https://repo.packagist.org/p2/phpunit/php-timer.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~php-timer.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/object-enumerator.json
+[200] https://repo.packagist.org/p2/phpunit/phpunit.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-phpunit~phpunit.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/object-reflector.json
+[200] https://repo.packagist.org/p2/sebastian/cli-parser.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~cli-parser.json into cache
+[200] https://repo.packagist.org/p2/sebastian/code-unit.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~code-unit.json into cache
+[200] https://repo.packagist.org/p2/sebastian/code-unit-reverse-lookup.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~code-unit-reverse-lookup.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/recursion-context.json
+Downloading https://repo.packagist.org/p2/sebastian/resource-operations.json
+Downloading https://repo.packagist.org/p2/sebastian/type.json
+[200] https://repo.packagist.org/p2/sebastian/comparator.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~comparator.json into cache
+Downloading https://repo.packagist.org/p2/sebastian/version.json
+[200] https://repo.packagist.org/p2/sebastian/complexity.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~complexity.json into cache
+Downloading https://repo.packagist.org/p2/squizlabs/php_codesniffer.json
+[200] https://repo.packagist.org/p2/sebastian/diff.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~diff.json into cache
+Downloading https://repo.packagist.org/p2/theseer/tokenizer.json
+[200] https://repo.packagist.org/p2/sebastian/environment.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~environment.json into cache
+Downloading https://repo.packagist.org/p2/wp-coding-standards/wpcs.json
+[200] https://repo.packagist.org/p2/sebastian/global-state.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~global-state.json into cache
+Downloading https://repo.packagist.org/p2/yoast/phpunit-polyfills.json
+[200] https://repo.packagist.org/p2/sebastian/exporter.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~exporter.json into cache
+[200] https://repo.packagist.org/p2/sebastian/lines-of-code.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~lines-of-code.json into cache
+[200] https://repo.packagist.org/p2/sebastian/object-enumerator.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~object-enumerator.json into cache
+[200] https://repo.packagist.org/p2/sebastian/object-reflector.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~object-reflector.json into cache
+[200] https://repo.packagist.org/p2/sebastian/resource-operations.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~resource-operations.json into cache
+[200] https://repo.packagist.org/p2/sebastian/recursion-context.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~recursion-context.json into cache
+[200] https://repo.packagist.org/p2/sebastian/version.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~version.json into cache
+[200] https://repo.packagist.org/p2/sebastian/type.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-sebastian~type.json into cache
+[200] https://repo.packagist.org/p2/squizlabs/php_codesniffer.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-squizlabs~php_codesniffer.json into cache
+[200] https://repo.packagist.org/p2/theseer/tokenizer.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-theseer~tokenizer.json into cache
+[200] https://repo.packagist.org/p2/wp-coding-standards/wpcs.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-wp-coding-standards~wpcs.json into cache
+[200] https://repo.packagist.org/p2/yoast/phpunit-polyfills.json
+Writing /home/runner/.cache/composer/repo/https---repo.packagist.org/provider-yoast~phpunit-polyfills.json into cache
+Running pool optimizer.
+Pool optimizer completed in 0.002 seconds
+Found 181 package versions referenced in your dependency graph. 3 (2%) were optimized away.
+Updating dependencies
+Generating rules
+Resolving dependencies through SAT
+
+Dependency resolution completed in 0.001 seconds
+Your requirements could not be resolved to an installable set of packages.
+
+  Problem 1
+    - ramsey/uuid is locked to version 4.9.2 and an update of this package was not requested.
+    - brick/math 0.14.8 requires php ^8.2 -> your php version (8.1.34) does not satisfy that requirement.
+    - ramsey/uuid 4.9.2 requires brick/math ^0.8.16 || ^0.9 || ^0.10 || ^0.11 || ^0.12 || ^0.13 || ^0.14 -> satisfiable by brick/math[0.14.8].
+
+::error ::Your requirements could not be resolved to an installable set of packages.%0A%0A  Problem 1%0A    - ramsey/uuid is locked to version 4.9.2 and an update of this package was not requested.%0A    - brick/math 0.14.8 requires php ^8.2 -> your php version (8.1.34) does not satisfy that requirement.%0A    - ramsey/uuid 4.9.2 requires brick/math ^0.8.16 || ^0.9 || ^0.10 || ^0.11 || ^0.12 || ^0.13 || ^0.14 -> satisfiable by brick/math[0.14.8].%0A
