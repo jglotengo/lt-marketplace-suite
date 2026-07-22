@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-07-22
+### Fixed
+- `fix(deploy)`: added `deploy/ltms-publish-legal-pages-2026-07-22.php` to the deploy webhook's hardcoded file whitelist (`ltms-deploy-webhook.php`). Root cause: the webhook does not perform a generic `git pull`; it only fetches an explicit list of files via the GitHub Contents API. New `deploy/` scripts (besides the special-cased `ltms-panel-diag.php`) never reach the server unless added to this list. Documented as a lesson for future deploy scripts.
+
 > **Resumen acumulado v2.9.142 → v2.9.187 (15 ciclos de auditoría):**
 > 129 bugs fixeados (64 P0 + 49 P1 + 16 P2) — ver entries individuales abajo.
 > 178 test methods nuevos en 9 módulos (CI 100% verde, **3,283 tests**).
