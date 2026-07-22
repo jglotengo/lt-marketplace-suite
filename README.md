@@ -384,6 +384,6 @@ Proprietary — See [EULA](https://ltmarketplace.co/eula)
 ## Support
 
 - **Documentation:** `docs/` directory
-- **Security issues:** security@ltmarketplace.co
+- **Security issues:** pqrscolombia@lo-tengo.com.co
 - **Issues:** Use the GitHub issue tracker
 - **Production:** lo-tengo.com.co (SiteGround hosting)
