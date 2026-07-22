@@ -49,7 +49,13 @@ final class LTMS_Core_Firewall {
         // emit error messages containing exfiltrated data (version, table names,
         // credentials). Common in automated SQLi tools (sqlmap default mode).
         'sql_injection_error'    => '/(\bextractvalue\s*\(|\bupdatexml\s*\()/i',
-        'sql_injection_comment'  => '/(?:(?<![\w\-])-{2,}(?![\w\-])|#[^\n]*$|\/\*[\s\S]*?\*\/)/mi', // SEC-L1+M-120: avoid matching -- in base64/URLs
+        // FIX 403-ADDRESS: se removió la alternativa '#[^\n]*$' — marcaba como
+        // comentario SQL cualquier línea con '#', lo que disparaba falso positivo
+        // en el formato estándar de nomenclatura urbana colombiana
+        // (ej. "Calle 123 #45-67"). '--' y /* */ siguen detectándose, y las
+        // reglas dedicadas (union/drop/insert/delete/ddl/recon/blind/error) ya
+        // cubren los vectores reales de inyección con firma de alta confianza.
+        'sql_injection_comment'  => '/(?:(?<![\w\-])-{2,}(?![\w\-])|\/\*[\s\S]*?\*\/)/mi', // SEC-L1+M-120: avoid matching -- in base64/URLs
         'xss_script'             => '/<\s*script(\s[^>]*)?>/is',
         // FW-2 FIX: expanded event-handler list. The previous list (load/click/
         // mouseover/error/focus/blur/change/submit) missed modern XSS vectors:
@@ -270,6 +276,13 @@ final class LTMS_Core_Firewall {
             'password', 'pwd', 'pass',             // passwords no escanear (pueden contener --)
             'description', 'content', 'message',  // rich-text fields
             'store_description', 'banner_url',
+            // FIX 403-ADDRESS: campos de dirección. La nomenclatura urbana
+            // colombiana estándar usa '#' (ej. "Calle 123 #45-67"), lo que
+            // disparaba un falso positivo en la regla sql_injection_comment.
+            'billing_address_1', 'billing_address_2',
+            'shipping_address_1', 'shipping_address_2',
+            'address', 'address_1', 'address_2', 'direccion',
+            'domicilio_fiscal_mx', 'store_address', 'vendor_address',
         ];
 
         $params_to_check = array_merge(
