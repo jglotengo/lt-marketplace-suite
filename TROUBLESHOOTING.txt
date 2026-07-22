@@ -362,7 +362,7 @@ Contacto de Soporte
 Si el problema persiste después de revisar esta guía:
   1. Recopilar: error exacto, versión de PHP, versión de WP, versión de LTMS
   2. Adjuntar extracto del debug.log
-  3. Enviar a: soporte@ltmarketplace.co
+  3. Enviar a: sellerscolombia@lo-tengo.com.co
 
 ================================================================================
 13. PROBLEMAS DE POSGOLD (NUEVO v2.9.35)
