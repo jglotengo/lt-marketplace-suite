@@ -42,7 +42,7 @@ class LTMS_Audit_Listeners {
         if ( $vendor && $vendor->user_email ) {
             $subject = __( '[Lo Tengo] Tu billetera ha sido congelada', 'ltms' );
             $message = sprintf(
-                __( "Hola %s,\n\nTu billetera en Lo Tengo ha sido congelada temporalmente.\n\nMotivo: %s\n\nSi tienes preguntas, contacta a soporte@lo-tengo.com.co.\n\nEquipo Lo Tengo", 'ltms' ),
+                __( "Hola %s,\n\nTu billetera en Lo Tengo ha sido congelada temporalmente.\n\nMotivo: %s\n\nSi tienes preguntas, contacta a sellerscolombia@lo-tengo.com.co.\n\nEquipo Lo Tengo", 'ltms' ),
                 $vendor->display_name,
                 $reason
             );
