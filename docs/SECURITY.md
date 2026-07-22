@@ -20,7 +20,7 @@
 
 **DO NOT** report security vulnerabilities through public GitHub issues.
 
-**Email:** security@ltmarketplace.co
+**Email:** pqrscolombia@lo-tengo.com.co
 **PGP Key:** Available on request
 **Response SLA:** 48 hours acknowledgment / 7 days initial assessment
 
@@ -364,4 +364,4 @@ We appreciate responsible disclosure. Depending on severity:
 
 ---
 
-*For urgent security matters, email security@ltmarketplace.co*
+*For urgent security matters, email pqrscolombia@lo-tengo.com.co*
