@@ -540,7 +540,7 @@ echo "✅ OPcache invalidado\n";
 // ── 6. Git commit + push ──────────────────────────────────────────────────────
 chdir( $plugin );
 system( 'git add includes/admin/views/html-admin-kyc.php includes/admin/class-ltms-admin-kyc.php' );
-system( 'git -c user.email=bot@ltms.co -c user.name="LTMS Bot" commit -m "feat(kyc-admin): modal visualización documentos + ajax_get_kyc_details con 3 fuentes de docs"' );
+system( 'git -c user.email=dircomercialcol@lo-tengo.com.co -c user.name="LTMS Bot" commit -m "feat(kyc-admin): modal visualización documentos + ajax_get_kyc_details con 3 fuentes de docs"' );
 system( 'git remote set-url origin https://jglotengo:GITHUB_TOKEN_REMOVED@github.com/jglotengo/lt-marketplace-suite.git' );
 system( 'git push origin main && echo "PUSH_OK"' );
 
