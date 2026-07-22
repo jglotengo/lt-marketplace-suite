@@ -166,7 +166,7 @@ final class LTMS_Core_Firewall {
             return true;
         }
         // Vendedor autenticado (cualquier rol ltms_*) en ruta admin-ajax.
-        if ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
+        if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
             return LTMS_Utils::is_ltms_vendor( get_current_user_id() );
         }
         // Fallback: verificar roles directamente.
@@ -186,7 +186,7 @@ final class LTMS_Core_Firewall {
         if ( ! is_user_logged_in() ) {
             return false;
         }
-        if ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
+        if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) ) {
             return LTMS_Utils::is_ltms_vendor( get_current_user_id() );
         }
         $user = wp_get_current_user();
