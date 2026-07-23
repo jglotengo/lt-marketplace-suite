@@ -151,7 +151,20 @@ final class LTMS_Public_Auth_Handler {
     public function render_register_form( array $atts = [] ): string {
         // M-56: si el user ya es vendor → notice + link al panel (no tiene sentido
         // re-registrarse). Si es admin u otro rol, mostrar el form igual.
-        if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
+        //
+        // FIX-PROFILE-LOOP: excepción cuando el vendor necesita completar su perfil
+        // (flujo Google OAuth, ver UX-06 en form-register.php). Sin esta excepción,
+        // este guard bloqueaba SIEMPRE el wizard de "Completa tu Perfil" para
+        // cualquier vendor ya logueado, sin importar ?complete_profile=1 ni el meta
+        // ltms_profile_incomplete — el dashboard redirigía aquí (ver
+        // ajax_get_dashboard_data()) y esta página lo rebotaba de vuelta al panel
+        // en un loop infinito, sin mostrar nunca el formulario de completar datos.
+        $needs_profile_completion = is_user_logged_in() && (
+            ( isset( $_GET['complete_profile'] ) && $_GET['complete_profile'] === '1' ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            || get_user_meta( get_current_user_id(), 'ltms_profile_incomplete', true )
+        );
+
+        if ( is_user_logged_in() && $this->current_user_is_vendor() && ! $needs_profile_completion ) {
             return $this->render_already_logged_in();
         }
 
