@@ -52,31 +52,38 @@ final class LTMS_Frontend_Assets {
         // refrescaba. Sesiones largas sin recargar (ej. cuentas operadas por
         // un asistente/agente que mantiene la pestaña abierta por horas)
         // terminaban con el nonce vencido, provocando 403 en cada AJAX del
-        // panel. Se refresca vía WP Heartbeat; el JS consumidor está en
-        // ltms-dashboard.js -> initNonceRefresh().
-        add_filter( 'heartbeat_received', [ $instance, 'ltms_heartbeat_refresh_dashboard_nonce' ], 10, 2 );
+        // panel.
+        //
+        // FIX-403-NONCE-2: el intento original usaba WP Heartbeat
+        // (heartbeat_received), pero este hosting (SiteGround Optimizer)
+        // desregistra wp_ajax_heartbeat — el propio heartbeat.js de WP Core
+        // seguía disparando action=heartbeat contra el router custom
+        // ?ltms_ajax=1, que lo rechazaba con 400 en cada tick ("Unknown
+        // action: heartbeat"), generando un bucle constante de peticiones
+        // fallidas. Se reemplaza por un endpoint AJAX propio
+        // (ltms_refresh_dashboard_nonce) que sí pasa por el router custom
+        // sin problema, porque lo registramos nosotros mismos. El JS
+        // consumidor está en ltms-dashboard.js -> initNonceRefresh().
+        add_action( 'wp_ajax_ltms_refresh_dashboard_nonce', [ $instance, 'ajax_refresh_dashboard_nonce' ] );
     }
 
     /**
-     * FIX-403-NONCE: refresca el nonce del dashboard vía WP Heartbeat.
+     * FIX-403-NONCE-2: refresca el nonce del dashboard vía endpoint AJAX
+     * propio, sin depender de WP Heartbeat.
      *
-     * El JS envía la clave 'ltms_refresh_dashboard_nonce' en cada tick de
-     * heartbeat mientras el panel de vendedor está abierto; aquí se regenera
-     * el nonce para el usuario actual y se devuelve en la respuesta, para
-     * que el JS pueda actualizar ltmsDashboard.nonce sin recargar la página.
+     * El JS hace polling periódico contra esta acción mientras el panel de
+     * vendedor está abierto; aquí se regenera el nonce para el usuario
+     * actual y se devuelve, para que el JS actualice ltmsDashboard.nonce
+     * en memoria sin recargar la página.
      *
-     * @param array $response Datos de respuesta del heartbeat.
-     * @param array $data     Datos enviados por el cliente en este tick.
-     * @return array
+     * @return void
      */
-    public function ltms_heartbeat_refresh_dashboard_nonce( array $response, array $data ): array {
-        if ( empty( $data['ltms_refresh_dashboard_nonce'] ) || ! is_user_logged_in() ) {
-            return $response;
+    public function ajax_refresh_dashboard_nonce(): void {
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => 'not_logged_in' ], 401 );
         }
 
-        $response['ltms_dashboard_nonce'] = wp_create_nonce( 'ltms_dashboard_nonce' );
-
-        return $response;
+        wp_send_json_success( [ 'nonce' => wp_create_nonce( 'ltms_dashboard_nonce' ) ] );
     }
 
     /**
@@ -540,9 +547,10 @@ final class LTMS_Frontend_Assets {
         wp_enqueue_script(
             'ltms-dashboard',
             $url . 'js/ltms-dashboard' . $dash_suffix . '.js',
-            // FIX-403-NONCE: 'heartbeat' agregado para que initNonceRefresh()
-            // en ltms-dashboard.js pueda enganchar 'heartbeat-send'/'heartbeat-tick'.
-            [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications', 'heartbeat' ],
+            // FIX-403-NONCE-2: sin dependencia de 'heartbeat' — initNonceRefresh()
+            // en ltms-dashboard.js ahora usa su propio polling AJAX, no WP Heartbeat
+            // (ver FIX-403-NONCE-2 en self::init() para el porqué).
+            [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications' ],
             $ver,
             true
         );
