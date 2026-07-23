@@ -48,6 +48,63 @@
             this.initBreadcrumbs();     // v2.9.82 P2
             this.initGlobalSearch();    // v2.9.84 P1
             this.initKeyboardShortcuts(); // v2.9.91 P3
+            this.initNonceRefresh();    // FIX-403-NONCE
+        },
+
+        /**
+         * FIX-403-NONCE: mantiene ltmsDashboard.nonce vivo mientras el panel
+         * está abierto, vía WP Heartbeat. Sin esto, el nonce generado al
+         * cargar la página vence tras ~12-24h y toda llamada AJAX posterior
+         * falla con 403 — típico en sesiones largas sin recargar (cuentas
+         * operadas por un asistente/agente que no cierra la pestaña).
+         *
+         * Doble mecanismo:
+         * 1) Heartbeat: en cada tick, pide al servidor un nonce fresco y
+         *    actualiza ltmsDashboard.nonce en memoria (sin recargar nada).
+         * 2) Respaldo: si a pesar de esto una llamada AJAX del dashboard
+         *    recibe 403, se fuerza una recarga completa de la página (con
+         *    candado de 60s para no entrar en loop de recargas).
+         */
+        initNonceRefresh() {
+            if (typeof jQuery === 'undefined' || !$(document).on) {
+                return;
+            }
+
+            // 1) Refresco proactivo vía Heartbeat.
+            $(document).on('heartbeat-send', function (e, data) {
+                data.ltms_refresh_dashboard_nonce = true;
+            });
+
+            $(document).on('heartbeat-tick', function (e, data) {
+                if (data && data.ltms_dashboard_nonce && typeof ltmsDashboard !== 'undefined') {
+                    ltmsDashboard.nonce = data.ltms_dashboard_nonce;
+                }
+            });
+
+            // Acelera el tick de Heartbeat mientras el panel está abierto,
+            // si la API está disponible (no todos los temas la exponen igual).
+            if (window.wp && wp.heartbeat && typeof wp.heartbeat.interval === 'function') {
+                wp.heartbeat.interval('fast'); // ~15-60s en vez de 60s+ por defecto
+            }
+
+            // 2) Respaldo: recarga forzada si un 403 se cuela de todas formas.
+            var lastReloadAttempt = 0;
+            $(document).ajaxError(function (event, jqXHR, ajaxSettings) {
+                var isDashboardCall = typeof ltmsDashboard !== 'undefined' &&
+                    ajaxSettings && ajaxSettings.url === ltmsDashboard.ajax_url;
+
+                if (!isDashboardCall || jqXHR.status !== 403) {
+                    return;
+                }
+
+                var now = Date.now();
+                if (now - lastReloadAttempt < 60000) {
+                    return; // candado de 60s: evita loop de recargas.
+                }
+                lastReloadAttempt = now;
+
+                window.location.reload();
+            });
         },
 
         /**
