@@ -1344,8 +1344,20 @@
             const origLoadView = LTMS.Dashboard.loadView;
             if (typeof origLoadView === 'function') {
                 LTMS.Dashboard.loadView = function (view, forceRefresh) {
-                    // Mostrar skeleton inmediatamente
-                    setTimeout(() => showSkeleton(view), 0);
+                    // AUD-01 FIX: solo mostrar skeleton si la vista tiene un
+                    // método load<View>View dedicado (es decir, va a hacer AJAX).
+                    // Las vistas estáticas (insurance, bookings, marketing,
+                    // security, donations, posgold, shipping-statement, etc.)
+                    // no hacen AJAX ltms_get_* → el overlay nunca se quitaría
+                    // via ajaxComplete y el usuario vería la vista "en blanco"
+                    // durante 6s (failsafe) sobre contenido ya renderizado.
+                    var normalized = view.split('-').map(function(w) {
+                        return w.charAt(0).toUpperCase() + w.slice(1);
+                    }).join('');
+                    var loadMethod = 'load' + normalized + 'View';
+                    if (typeof this[loadMethod] === 'function') {
+                        setTimeout(() => showSkeleton(view), 0);
+                    }
                     // Llamar al método original
                     return origLoadView.call(this, view, forceRefresh);
                 };
