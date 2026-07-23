@@ -492,6 +492,9 @@ if ( $ltms_unit_only ) {
     // ── Sales Booster (FIX 403-SOCIALPROOF: SalesBoosterTest) ──────────────────
     require_once $ltms_base . '/business/class-ltms-sales-booster.php';
 
+    // ── Frontend Assets (FIX-403-NONCE: FrontendAssetsNonceRefreshTest) ────────
+    require_once $ltms_base . '/frontend/class-ltms-frontend-assets.php';
+
     // ── Constantes del plugin ──────────────────────────────────────────────────
     $plugin_root = dirname( __DIR__ ) . DIRECTORY_SEPARATOR;
     defined( 'LTMS_VERSION' )         || define( 'LTMS_VERSION',         '2.0.0' );
