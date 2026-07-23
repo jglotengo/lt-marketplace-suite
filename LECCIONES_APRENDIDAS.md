@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-18
-> **Versión del plugin:** 2.9.188
-> **Total de lecciones:** 112 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 12 del ciclo Plaza Viva v2.9.178-188)
+> **Última actualización:** 2026-07-23
+> **Versión del plugin:** 2.9.239
+> **Total de lecciones:** 123 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239)
 
 ---
 
@@ -23,6 +23,7 @@
 11. [Reglas Preventivas para la IA](#11-reglas-preventivas-para-la-ia)
 12. [**v2.9.36-98 — Lecciones Nuevas (REG/DEEP/UIUX Audits)**](#12-v2936-98--lecciones-nuevas-regdeepuiux-audits)
 13. [**v2.9.178-187 — Lecciones Nuevas (Ciclo Plaza Viva)**](#13-v29178-187--lecciones-nuevas-ciclo-plaza-viva)
+14. [**v2.9.222-239 — Skeleton Loader, Refresco de Nonce (Heartbeat→AJAX propio), WAF, Sincronía Test/Código**](#14-v29222-239--skeleton-loader-refresco-de-nonce-heartbeatajax-propio-waf-sincronía-testcódigo)
 
 ---
 
@@ -1562,3 +1563,109 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Causa raíz:** NO era nuestro template `archive-product.php`. Incluso la versión minimal (90 líneas, solo WC hooks) causaba el mismo error. El problema era que `is_shop()` dentro de `maybe_override()` disparaba el query setup de WC que chocaba con Elementor.
 **Fix:** Detectar Elementor al inicio de `maybe_override()` con `did_action('elementor/loaded')`. Si Elementor está activo, SOLO override single-product, cart y checkout (páginas donde Elementor no tiene Theme Builder template). Para shop/category/tag/account, retornar el template original inmediatamente sin llamar ninguna función WC condicional.
 **Regla preventiva:** Cuando uses `template_include` con Elementor Pro activo, SIEMPRE verificar `did_action('elementor/loaded')` antes de llamar `is_shop()`, `is_product_category()`, etc. Elementor tiene su propio handler de template_include que conflictúa con el query setup de WC.
+
+---
+
+## 14. v2.9.222-239 — Skeleton Loader, Refresco de Nonce (Heartbeat→AJAX propio), WAF, Sincronía Test/Código
+
+> 10 lecciones nuevas (#114-#123) extraídas de la investigación y resolución del bug "panel de vendedor en blanco" (Asistente Ventas AI 3), el skeleton loader que se quedaba pegado en Inicio/Billetera/Envíos, y el fallo de CI causado por un test huérfano de una sesión anterior. Estas lecciones son especialmente relevantes para cualquier trabajo futuro sobre el dashboard SPA del vendedor, el router `?ltms_ajax=1`, o el WAF propio del plugin.
+
+### Lección #114: `showSkeleton()` sin container explícito destruye el DOM de la sección visible
+
+**Error:** `initSkeletonLoaders()` hace monkey-patch de `LTMS.Dashboard.loadView()` y llama `showSkeleton(view)` sin pasar el contenedor. La función buscaba genéricamente `.ltms-view-section` visible en ese momento y ejecutaba `target.innerHTML = template`, reemplazando (no cubriendo) el contenido real — métricas, tablas, `#ltms-wallet-tbody`, etc.
+
+**Causa raíz:** Selector genérico ("cualquier sección visible") en vez de recibir el contenedor explícito de la vista que se está cargando.
+
+**Fix:** `showSkeleton()` ahora inserta un `<div class="ltms-skeleton-overlay">` como hijo posicionado encima (`position:absolute; inset:0`), sin tocar el DOM original debajo.
+
+**Regla preventiva:** Un loading-state NUNCA debe hacer `target.innerHTML = ...` sobre un contenedor con datos reales. Usar un overlay (elemento hijo posicionado encima) que se pueda remover sin haber destruido el contenido original.
+
+### Lección #115: Función "consumidora" documentada en un comentario pero nunca escrita (dos veces en el mismo módulo)
+
+**Error:** `initSkeletonLoaders()` mostraba el skeleton al navegar, pero `hideSkeleton()` — la función que debía revertirlo cuando llegaban los datos reales — no existía en ningún archivo del repo (cero ocurrencias). El `loadView()` original seguía su curso y actualizaba selectores que el skeleton ya había borrado; sin error visible, el skeleton se quedaba pegado para siempre. Este es el mismo patrón que causó por separado el bug de refresco de nonce (ver Lección #119): un comentario `FIX-403-NONCE` describía que "el JS ya consume esto en `initNonceRefresh()`", pero esa función tampoco existía todavía.
+
+**Causa raíz:** Se escribió la mitad del mecanismo (mostrar/filtrar) y se asumió que la otra mitad (ocultar/consumir) ya existía o se agregaría después, sin confirmarlo.
+
+**Fix:** Implementar `hideSkeleton(view)` real, enganchado vía `jQuery(document).on('ajaxComplete', ...)` filtrando por `action` que empiece con `ltms_get_`, más un timer de seguridad de 6s que auto-elimina el overlay si nada más lo hace.
+
+**Regla preventiva:** Antes de dar por buena una función que "muestra" un estado temporal (loading, skeleton, modal, toast) o un filtro del lado servidor, hacer `grep` explícito por su contraparte (la función que lo oculta/revierte, o el JS que lo consume). Si no aparece con cero ocurrencias, no está implementada — no asumir que existe en otro archivo sin confirmarlo con evidencia.
+
+### Lección #116: WP Heartbeat API puede estar desregistrado en hosting compartido con optimizadores
+
+**Error:** Se implementó el refresco de nonce del dashboard vía `heartbeat_received` (WP Heartbeat API nativo). Al desplegar, las peticiones de `heartbeat.js` (que sigue corriendo en el núcleo de WP aunque nadie lo use explícitamente) empezaron a fallar con 400 `"Unknown action: heartbeat"` contra el router custom `?ltms_ajax=1`.
+
+**Causa raíz:** SiteGround Optimizer (u otro plugin de rendimiento similar) desregistra `wp_ajax_heartbeat` en este hosting. Nada en el frontend usaba antes el Heartbeat API, así que el problema pasó desapercibido hasta que se agregó esta dependencia nueva.
+
+**Fix:** Reemplazar por un endpoint AJAX propio (`wp_ajax_ltms_refresh_dashboard_nonce`), registrado y despachado por nuestro propio código, en vez de depender del ciclo de vida de Heartbeat.
+
+**Regla preventiva:** En este hosting, NO asumir que el WP Heartbeat API nativo está disponible. Para cualquier polling periódico cliente-servidor nuevo, preferir un endpoint AJAX propio verificado end-to-end, no un hook del core que puede estar desactivado silenciosamente por el hosting.
+
+### Lección #117: El router custom `?ltms_ajax=1` rechaza acciones de WP Core no contempladas en su whitelist
+
+**Error:** El endpoint custom de bypass anti-bot (`?ltms_ajax=1`, creado para esquivar el bloqueo de SiteGround sobre `admin-ajax.php`) tiene su propia whitelist de acciones LTMS. Al depender de Heartbeat (Lección #116), WP Core empezó a mandar `action=heartbeat` por esa misma ruta reescrita (vía el filtro global de `admin_url`), y el router respondía `{"success":false,"data":{"message":"Unknown action: heartbeat"}}`.
+
+**Causa raíz:** El filtro que reescribe `admin_url('admin-ajax.php')` hacia `?ltms_ajax=1` es global (aplica a CUALQUIER llamada AJAX del frontend, no solo a las de LTMS), pero el router del otro lado solo reconoce acciones LTMS explícitas.
+
+**Fix:** Evitar depender de acciones nativas de WP Core (heartbeat, autosave, etc.) para código que pasará por este router.
+
+**Regla preventiva:** Antes de agregar una dependencia nueva de script que dispara acciones AJAX nativas de WP, verificar si esas acciones pasan por el router custom `?ltms_ajax=1` y si están contempladas en su lista de acciones reconocidas.
+
+### Lección #118: Nonce generado una sola vez en sesiones largas sin recarga = 403 diferido e intermitente
+
+**Error:** El nonce del dashboard (`ltmsDashboard.nonce`) se generaba una sola vez al renderizar la página (`wp_create_nonce()` en `localize_dashboard_script()`) y nunca se refrescaba. Cuentas operadas por un asistente/agente que mantiene la pestaña abierta por horas sin recargar terminan con el nonce vencido (~24h), y desde ese punto cada AJAX del panel falla con 403.
+
+**Causa raíz:** Falta de mecanismo de refresco activo — se asumió que el usuario recargaría la página periódicamente, como haría un humano típico.
+
+**Fix:** Endpoint AJAX propio (`ajax_refresh_dashboard_nonce`) + polling desde `initNonceRefresh()` en JS que actualiza `ltmsDashboard.nonce` en memoria sin recargar la página.
+
+**Regla preventiva:** Cualquier nonce embebido una sola vez al renderizar una SPA/dashboard de larga duración necesita un mecanismo de refresco activo — no asumir que "el usuario recargará antes de que expire", especialmente si la cuenta puede ser operada por un agente/bot que no cierra pestañas.
+
+### Lección #119: Test desincronizado tras un cambio de enfoque a mitad de sesión rompe CI en un commit no relacionado, semanas después
+
+**Error:** El primer intento de fix de nonce (Heartbeat, Lección #116) tenía un test (`FrontendAssetsNonceRefreshTest.php`) cubriendo el método `ltms_heartbeat_refresh_dashboard_nonce()`. Cuando se abandonó ese enfoque por el endpoint AJAX propio (`ajax_refresh_dashboard_nonce()`), el archivo de test NUNCA se actualizó ni se eliminó. Días después, un commit totalmente no relacionado (bump de `LTMS_VERSION` a 2.9.239 para el fix del skeleton loader) hizo fallar el CI completo porque la suite seguía ejecutando ese test huérfano contra un método que ya no existía.
+
+**Causa raíz:** Al reemplazar una implementación a mitad de sesión, se actualizó el código de producción pero no su test — y como el test seguía siendo sintácticamente válido (solo fallaba en tiempo de ejecución al invocar un método inexistente), nada lo detectó localmente hasta la siguiente corrida completa de PHPUnit en CI.
+
+**Fix:** Reescribir el test para cubrir el método real (`ajax_refresh_dashboard_nonce()`), reutilizando el patrón ya establecido en el proyecto (`Monkey\Functions\when()->alias()` + excepción para capturar `wp_send_json_success`/`wp_send_json_error`, ver `AdminPayoutsTest.php`) en vez de introducir un estilo nuevo.
+
+**Regla preventiva:** Cuando se abandona un enfoque técnico a mitad de sesión (rename, refactor o pivote de diseño), el/los test(s) que cubrían el método viejo deben actualizarse o eliminarse en el MISMO commit que lo reemplaza — nunca dejarlos "para después". Un test huérfano no falla de inmediato si nadie corre la suite completa localmente, pero eventualmente rompe CI en un commit que no tiene nada que ver con el cambio original, generando una investigación costosa para encontrar una causa raíz vieja.
+
+### Lección #120: `function_exists('NombreDeClase')` siempre es `false` — usar `class_exists()`
+
+**Error:** En `class-ltms-firewall.php`, la excepción del WAF para vendedores autenticados en `?ltms_ajax=1` estaba guardada por `if ( function_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' ) )`. `LTMS_Utils` es una `final class`, no una función — `function_exists()` sobre un nombre de clase SIEMPRE devuelve `false`, así que esa rama nunca se ejecutaba y el código caía siempre al fallback de roles (`str_starts_with($r, 'ltms_')`).
+
+**Causa raíz:** Confusión entre `function_exists()` (funciones) y `class_exists()` (clases) al escribir un guard defensivo — al menos 2 ocurrencias idénticas del mismo error en el mismo archivo.
+
+**Fix:** Cambiar a `class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'is_ltms_vendor' )` en ambas ocurrencias.
+
+**Regla preventiva:** Antes de escribir un guard `function_exists()`/`class_exists()`, confirmar si el símbolo es una función o una clase (`grep -n "^class \|^final class "` vs `^function `). Un guard con la comprobación equivocada nunca lanza error — simplemente nunca se activa, y el código cae silenciosamente a una ruta alternativa que puede comportarse distinto al camino previsto, sin que nada lo señale como roto.
+
+### Lección #121: El WAF no escribe en `error_log` — audita vía tabla propia `bkr_lt_security_events`
+
+**Error:** Se buscó evidencia de bloqueos del WAF revisando `error_log`/`debug.log`, que estaban vacíos, lo que llevó a descartar erróneamente al WAF como causa de una serie de 403.
+
+**Causa raíz:** `block_request()` no registra nada en los logs de texto de PHP — hace `wp_die()` con 403 directo. El único rastro real de un bloqueo por patrón queda en la tabla de auditoría `bkr_lt_security_events` (columnas: `created_at`, `event_type`, `ip_address`, `user_id`, `request_uri`, `rule_matched`, `payload`).
+
+**Fix:** Consultar `bkr_lt_security_events` en vez de (o además de) los logs de archivo al investigar bloqueos del WAF: `SELECT created_at, event_type, ip_address, user_id, request_uri, rule_matched, payload FROM bkr_lt_security_events ORDER BY created_at DESC LIMIT 20;`.
+
+**Regla preventiva:** "No hay nada en el `error_log`" NO significa "nada fue bloqueado". Antes de descartar el WAF/firewall propio como causa de un 403, verificar su tabla de auditoría dedicada, no solo los logs de PHP estándar.
+
+### Lección #122: Alto volumen de peticiones fallidas de un endpoint no crítico puede enmascarar (o incluso causar) el diagnóstico de "todo está roto"
+
+**Error:** El endpoint `ltms_get_social_proof` (toast de "compra reciente") fallaba con 403 en el 100% de sus llamadas porque el JS nunca enviaba el nonce requerido desde el fix de seguridad SEC-3. Al correr en un `setInterval` en cada página pública (incluido el panel de vendedor), generaba miles de peticiones fallidas por sesión, dando la falsa impresión de que "todo el panel estaba roto" cuando los endpoints core del dashboard (`ltms_get_dashboard_data`, etc.) en realidad respondían con éxito al probarlos de forma aislada.
+
+**Causa raíz:** Un bug acotado y de bajo impacto (un toast decorativo sin nonce) generó tanto ruido en Network/Console que contaminó por completo la investigación de un síntoma distinto (panel en blanco), y en hipótesis posteriores se sospechó que ese mismo volumen de fallos podía disparar bloqueos de IP a nivel de WAF/hosting, afectando también a peticiones legítimas de la misma IP.
+
+**Fix:** Usar `window.ltmsUX.nonce` (ya inyectado globalmente vía `wp_add_inline_script` sobre `jquery-core`) en el payload del `$.post`.
+
+**Regla preventiva:** Al investigar "todo está roto", aislar cada `action` de AJAX fallido por separado antes de generalizar el diagnóstico. Un endpoint de bajo impacto con alto volumen de fallos puede parecer (y hasta causar, si dispara bloqueos por IP) una falla generalizada sin serlo — verificar cada `action` real de las peticiones fallidas, no asumir que todas comparten la misma causa.
+
+### Lección #123: Verificar con un fetch directo en Console en vez de confiar en capturas sucesivas de Network/Payload
+
+**Error:** Varias capturas de pantalla sucesivas del panel "Payload" de Chrome DevTools mostraban el mismo `action` (`ltms_get_social_proof`) aunque se pedía inspeccionar filas distintas — lo que sugiere que el panel no se había refrescado a la fila recién seleccionada, no que las peticiones fueran realmente idénticas.
+
+**Causa raíz:** Depender de que una persona navegue manualmente DevTools y reporte un valor puntual es propenso a este tipo de desincronización de UI (el panel de detalle no siempre se actualiza al hacer clic en una fila nueva).
+
+**Fix:** Pedir un one-liner ejecutable directo en la Console (`jQuery.post(ltmsDashboard.ajax_url, {...}).done(...).fail(...)`) que imprime el resultado real de una llamada específica, en vez de depender de que la persona encuentre y lea la fila correcta en la lista de Network.
+
+**Regla preventiva:** Cuando se necesite un dato puntual de una petición AJAX específica y no haya acceso directo a un navegador, preferir pedirle a la persona que ejecute un script corto en la Console que devuelva la respuesta directamente, en vez de instrucciones de "haz clic en la fila X, mira el panel Y" — más simple, y evita falsos negativos por paneles de DevTools no refrescados.
