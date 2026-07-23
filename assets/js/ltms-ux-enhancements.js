@@ -1275,9 +1275,22 @@
         `,
     };
 
+    /**
+     * FIX-SKELETON-01: showSkeleton() ya NO reemplaza target.innerHTML.
+     * Antes borraba por completo el contenido real de la sección (métricas,
+     * tablas, #ltms-wallet-tbody, etc.), y como hideSkeleton() nunca existió,
+     * ese contenido no volvía — el AJAX real actualizaba selectores que ya
+     * no estaban en el DOM y fallaba en silencio. Ahora se pinta un overlay
+     * ENCIMA (ver .ltms-skeleton-overlay en ltms-ux-enhancements.css) que se
+     * puede quitar sin haber tocado el DOM original.
+     */
     function showSkeleton(view, container) {
-        const target = container || document.querySelector('.ltms-view-section[style*="block"], .ltms-view-section:not([style*="none"])');
+        const target = container || document.getElementById('ltms-view-' + view)
+            || document.querySelector('.ltms-view-section[style*="block"], .ltms-view-section:not([style*="none"])');
         if (!target) return;
+
+        // Ya hay un overlay activo para esta sección — no duplicar.
+        if (target.querySelector(':scope > .ltms-skeleton-overlay')) return;
 
         const template = (SKELETON_TEMPLATES[view] || SKELETON_TEMPLATES.default).replace(/repeat="(\d+)"/g, (m, n) => {
             const count = parseInt(n, 10);
@@ -1285,10 +1298,45 @@
             return Array(count).fill(el).join('');
         });
 
-        target.innerHTML = template;
+        const overlay = document.createElement('div');
+        overlay.className = 'ltms-skeleton-overlay';
+        overlay.setAttribute('data-ltms-skeleton-view', view || '');
+        overlay.innerHTML = template;
+
+        // El overlay necesita un ancestro con position != static para
+        // cubrir exactamente la sección (position:absolute; inset:0;).
+        if (window.getComputedStyle(target).position === 'static') {
+            target.classList.add('ltms-skeleton-host');
+        }
+
+        target.appendChild(overlay);
+
+        // Failsafe: si por lo que sea nadie llama hideSkeleton() (vista sin
+        // AJAX propio, respuesta que nunca dispara ajaxComplete, etc.), el
+        // overlay se autoelimina — nunca debe quedar pegado para siempre.
+        overlay.dataset.ltmsSkeletonTimer = String(setTimeout(() => {
+            if (overlay.parentNode) overlay.remove();
+        }, 6000));
+    }
+
+    /**
+     * FIX-SKELETON-01: contraparte de showSkeleton(), antes inexistente.
+     * Quita el overlay de la sección indicada sin tocar su contenido real.
+     */
+    function hideSkeleton(view, container) {
+        const target = container || document.getElementById('ltms-view-' + view);
+        if (!target) return;
+
+        const overlay = (view && target.querySelector(':scope > .ltms-skeleton-overlay[data-ltms-skeleton-view="' + view + '"]'))
+            || target.querySelector(':scope > .ltms-skeleton-overlay');
+        if (!overlay) return;
+
+        clearTimeout(Number(overlay.dataset.ltmsSkeletonTimer));
+        overlay.remove();
     }
 
     LTMS.UX.showSkeleton = showSkeleton;
+    LTMS.UX.hideSkeleton = hideSkeleton;
 
     function initSkeletonLoaders() {
         // Hook en navegación del dashboard para mostrar skeleton
@@ -1302,6 +1350,25 @@
                     return origLoadView.call(this, view, forceRefresh);
                 };
             }
+
+            // FIX-SKELETON-01: quitar el skeleton cuando responde el AJAX
+            // real del dashboard (éxito o error) — antes nada lo hacía.
+            jQuery(document).on('ajaxComplete', function (event, xhr, settings) {
+                const rawData = settings && settings.data;
+                let action = null;
+
+                if (typeof rawData === 'string') {
+                    const match = rawData.match(/(?:^|&)action=([^&]+)/);
+                    if (match) action = decodeURIComponent(match[1]);
+                } else if (rawData && typeof rawData === 'object') {
+                    action = rawData.action;
+                }
+
+                if (!action || action.indexOf('ltms_get_') !== 0) return;
+
+                const view = LTMS.Dashboard.currentView;
+                if (view) hideSkeleton(view);
+            });
         }
     }
 
