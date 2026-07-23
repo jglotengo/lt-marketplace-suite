@@ -46,6 +46,37 @@ final class LTMS_Frontend_Assets {
         add_action( 'wp_head',            [ $instance, 'inject_pwa_tags' ] );
         add_action( 'wp_head',            [ $instance, 'inject_ajaxurl' ], 1 );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
+
+        // FIX-403-NONCE: el nonce del dashboard se generaba una sola vez al
+        // renderizar la página (ver localize_dashboard_script()) y nunca se
+        // refrescaba. Sesiones largas sin recargar (ej. cuentas operadas por
+        // un asistente/agente que mantiene la pestaña abierta por horas)
+        // terminaban con el nonce vencido, provocando 403 en cada AJAX del
+        // panel. Se refresca vía WP Heartbeat; el JS consumidor está en
+        // ltms-dashboard.js -> initNonceRefresh().
+        add_filter( 'heartbeat_received', [ $instance, 'ltms_heartbeat_refresh_dashboard_nonce' ], 10, 2 );
+    }
+
+    /**
+     * FIX-403-NONCE: refresca el nonce del dashboard vía WP Heartbeat.
+     *
+     * El JS envía la clave 'ltms_refresh_dashboard_nonce' en cada tick de
+     * heartbeat mientras el panel de vendedor está abierto; aquí se regenera
+     * el nonce para el usuario actual y se devuelve en la respuesta, para
+     * que el JS pueda actualizar ltmsDashboard.nonce sin recargar la página.
+     *
+     * @param array $response Datos de respuesta del heartbeat.
+     * @param array $data     Datos enviados por el cliente en este tick.
+     * @return array
+     */
+    public function ltms_heartbeat_refresh_dashboard_nonce( array $response, array $data ): array {
+        if ( empty( $data['ltms_refresh_dashboard_nonce'] ) || ! is_user_logged_in() ) {
+            return $response;
+        }
+
+        $response['ltms_dashboard_nonce'] = wp_create_nonce( 'ltms_dashboard_nonce' );
+
+        return $response;
     }
 
     /**
@@ -509,7 +540,9 @@ final class LTMS_Frontend_Assets {
         wp_enqueue_script(
             'ltms-dashboard',
             $url . 'js/ltms-dashboard' . $dash_suffix . '.js',
-            [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications' ],
+            // FIX-403-NONCE: 'heartbeat' agregado para que initNonceRefresh()
+            // en ltms-dashboard.js pueda enganchar 'heartbeat-send'/'heartbeat-tick'.
+            [ 'jquery', 'chart-js', 'ltms-modal', 'ltms-notifications', 'heartbeat' ],
             $ver,
             true
         );
