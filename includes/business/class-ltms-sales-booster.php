@@ -744,7 +744,16 @@ class LTMS_Sales_Booster {
         jQuery(function($){
             // Social proof toasts.
             var toastInterval = setInterval(function() {
-                $.post(ajaxurl, { action: 'ltms_get_social_proof' }, function(resp) {
+                // FIX 403-SOCIALPROOF: ajax_get_social_proof() exige
+                // ltms_ux_nonce desde v2.9.100 (SEC-3), pero esta llamada
+                // nunca lo mandaba -> 403 "Token inválido" en cada tick,
+                // en cada página pública. window.ltmsUX.nonce ya se
+                // inyecta globalmente vía wp_add_inline_script en
+                // jquery-core (ver class-ltms-frontend-assets.php), así
+                // que está disponible antes de que corra este script de
+                // wp_footer.
+                var spNonce = ( window.ltmsUX && window.ltmsUX.nonce ) ? window.ltmsUX.nonce : '';
+                $.post(ajaxurl, { action: 'ltms_get_social_proof', nonce: spNonce }, function(resp) {
                     if (resp && resp.success && resp.data) {
                         var d = resp.data;
                         var cities = ['Bogotá', 'Medellín', 'Cali', 'CDMX', 'Guadalajara', 'Barranquilla', 'Cartagena', 'Monterrey'];

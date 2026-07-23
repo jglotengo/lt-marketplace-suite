@@ -93,10 +93,23 @@ class FirewallTest extends TestCase
         $this->assertSame( 'sql_injection_comment', $rule );
     }
 
-    public function test_sqli_comment_hash_detected(): void
+    /**
+     * FIX 403-ADDRESS (commit 3d0b75a5f5): '#' solo ya NO se trata como
+     * comentario SQL — la nomenclatura urbana colombiana estándar lo usa
+     * (ej. "Calle 123 #45-67") y disparaba falso positivo. '--' y /* *\/
+     * siguen cubiertos por test_sqli_comment_double_dash_detected y
+     * test_sqli_comment_block_detected.
+     */
+    public function test_standalone_hash_not_detected_as_comment(): void
     {
         $rule = $this->callPrivate( 'check_patterns', ["admin'#"] );
-        $this->assertSame( 'sql_injection_comment', $rule );
+        $this->assertNull( $rule );
+    }
+
+    /** NEW — regresión directa del caso que motivó el fix 403-ADDRESS */
+    public function test_colombian_address_with_hash_returns_null(): void
+    {
+        $this->assertNull( $this->callPrivate( 'check_patterns', ['Calle 123 #45-67'] ) );
     }
 
     public function test_sqli_comment_block_detected(): void

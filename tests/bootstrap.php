@@ -489,6 +489,9 @@ if ( $ltms_unit_only ) {
     require_once $ltms_base . '/business/class-ltms-referral-tree.php';
     require_once $ltms_base . '/business/class-ltms-order-split.php';
 
+    // ── Sales Booster (FIX 403-SOCIALPROOF: SalesBoosterTest) ──────────────────
+    require_once $ltms_base . '/business/class-ltms-sales-booster.php';
+
     // ── Constantes del plugin ──────────────────────────────────────────────────
     $plugin_root = dirname( __DIR__ ) . DIRECTORY_SEPARATOR;
     defined( 'LTMS_VERSION' )         || define( 'LTMS_VERSION',         '2.0.0' );
