@@ -252,6 +252,19 @@
                 },
                 success: (response) => {
                     if (response.success) {
+                        // FIX-NAN-HOME: cuando el perfil está incompleto (ej. registro
+                        // vía Google OAuth), el servidor responde success:true pero SIN
+                        // monthly_sales/monthly_orders/monthly_commissions/wallet_balance
+                        // — solo trae profile_incomplete + redirect (ver UX-06 en
+                        // ajax_get_dashboard_data()). Antes esto se pasaba directo a
+                        // renderHomeView(), que pintaba "NaN" en las 3 métricas porque
+                        // nunca se revisaba este flag ni se ejecutaba el redirect.
+                        if (response.data && response.data.profile_incomplete) {
+                            if (response.data.redirect) {
+                                window.location.href = response.data.redirect;
+                            }
+                            return;
+                        }
                         self.dataCache[cacheKey] = response.data;
                         self.renderHomeView(response.data);
                     } else {
