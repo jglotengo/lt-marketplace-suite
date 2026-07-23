@@ -66,26 +66,36 @@
          *    candado de 60s para no entrar en loop de recargas).
          */
         initNonceRefresh() {
-            if (typeof jQuery === 'undefined' || !$(document).on) {
+            if (typeof jQuery === 'undefined' || typeof ltmsDashboard === 'undefined') {
                 return;
             }
 
-            // 1) Refresco proactivo vía Heartbeat.
-            $(document).on('heartbeat-send', function (e, data) {
-                data.ltms_refresh_dashboard_nonce = true;
-            });
+            // 1) Refresco proactivo vía polling propio.
+            //
+            // FIX-403-NONCE-2: WP Heartbeat (heartbeat-send/heartbeat-tick)
+            // NO es confiable en este hosting — SiteGround Optimizer
+            // desregistra wp_ajax_heartbeat, así que el propio script
+            // heartbeat.js de WP Core dispara action=heartbeat contra
+            // ?ltms_ajax=1 y el router custom lo rechaza con 400 en cada
+            // tick (ver Network tab: POST ?ltms_ajax=1 400 en bucle).
+            // En vez de depender del Heartbeat de WP, usamos nuestro propio
+            // endpoint AJAX (ltms_refresh_dashboard_nonce), que sí pasa por
+            // el router custom sin problema porque lo registramos nosotros.
+            $.post(ltmsDashboard.ajax_url, {
+                action: 'ltms_refresh_dashboard_nonce',
+                nonce: ltmsDashboard.nonce
+            }); // ping inicial, no crítico si falla — el intervalo abajo reintenta.
 
-            $(document).on('heartbeat-tick', function (e, data) {
-                if (data && data.ltms_dashboard_nonce && typeof ltmsDashboard !== 'undefined') {
-                    ltmsDashboard.nonce = data.ltms_dashboard_nonce;
-                }
-            });
-
-            // Acelera el tick de Heartbeat mientras el panel está abierto,
-            // si la API está disponible (no todos los temas la exponen igual).
-            if (window.wp && wp.heartbeat && typeof wp.heartbeat.interval === 'function') {
-                wp.heartbeat.interval('fast'); // ~15-60s en vez de 60s+ por defecto
-            }
+            setInterval(function () {
+                $.post(ltmsDashboard.ajax_url, {
+                    action: 'ltms_refresh_dashboard_nonce',
+                    nonce: ltmsDashboard.nonce
+                }).done(function (resp) {
+                    if (resp && resp.success && resp.data && resp.data.nonce) {
+                        ltmsDashboard.nonce = resp.data.nonce;
+                    }
+                });
+            }, 600000); // cada 10 min — de sobra frente a la vida útil del nonce (~12-24h).
 
             // 2) Respaldo: recarga forzada si un 403 se cuela de todas formas.
             var lastReloadAttempt = 0;
