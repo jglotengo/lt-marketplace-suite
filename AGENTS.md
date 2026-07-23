@@ -68,6 +68,13 @@ No saltes directo a editar código, ni siquiera en tareas que parezcan simples.
 - Si la ambigüedad lo permite, deja verificación automática no-negociable configurada
   (`php -l` tras cada edición) en vez de depender solo del juicio del modelo en
   cada paso.
+- Si abandonas un enfoque técnico a mitad de tarea (rename de método, refactor,
+  pivote de diseño — ej. reemplazar una implementación por otra), actualiza o
+  elimina en el MISMO commit cualquier test que cubriera el método/enfoque viejo.
+  Un test huérfano no falla de inmediato (sigue siendo sintácticamente válido),
+  pero rompe la suite completa en un commit futuro no relacionado, obligando a
+  investigar una causa raíz vieja como si fuera nueva. Ver
+  `LECCIONES_APRENDIDAS.md` #119 para un caso real de este proyecto.
 
 ## Contra los "fixes cosméticos"
 - Un cambio que "se ve" resuelto no cuenta como resuelto hasta que verificaste el
