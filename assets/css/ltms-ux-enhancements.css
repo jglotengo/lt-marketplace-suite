@@ -4083,6 +4083,19 @@
    10.37 SKELETON LOADERS — Placeholders estructurados
    ═══════════════════════════════════════════════════════════════ */
 
+/* FIX-SKELETON-01: overlay que se pinta ENCIMA de la sección sin
+   reemplazar su innerHTML real (ver assets/js/ltms-ux-enhancements.js,
+   showSkeleton()). Antes se hacía target.innerHTML = template, lo que
+   borraba los elementos reales (.ltms-metric-sales, #ltms-wallet-tbody,
+   etc.) y nunca se restauraban porque hideSkeleton() no existía. */
+.ltms-skeleton-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: #fff;
+    overflow: hidden;
+}
+
 .ltms-skeleton-view {
     padding: 24px;
 }
