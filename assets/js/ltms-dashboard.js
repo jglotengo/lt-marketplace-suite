@@ -1018,6 +1018,17 @@
             const main    = document.querySelector('.ltms-main-content');
             const TOPBAR_H = 52;
 
+            // AUD-02 FIX: botón "Más" en bottom-nav abre el sidebar completo
+            // en móvil, dando acceso a las ~17 vistas no listadas en la
+            // bottom-nav de 5 items.
+            $(document).on('click', '.ltms-bottom-nav-item[data-action="open-sidebar"]', function(e) {
+                e.preventDefault();
+                if (sidebar) {
+                    sidebar.classList.add('ltms-sidebar-open');
+                    if (overlay) overlay.style.display = 'block';
+                }
+            });
+
             // Medir el header del tema (elementos fixed/sticky fuera del panel)
             const getThemeHeaderH = () => {
                 let maxBottom = 0;

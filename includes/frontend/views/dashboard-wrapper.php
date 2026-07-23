@@ -399,6 +399,17 @@ if ( $_show_drivers ) {
             <span class="ltms-bottom-nav-icon">⚙️</span>
             <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Ajustes', 'ltms' ); ?></span>
         </button>
+        <?php
+        // AUD-02 FIX: 6° item "Más" que abre el sidebar completo en móvil,
+        // dando acceso a las ~17 vistas no listadas en la bottom-nav
+        // (envios, insurance, bookings, marketing, security, donations,
+        // posgold, redi, incidents, kitchen, drivers, ordenes-compra,
+        // shipping-statement, sellers-landing, aveonline-onboarding, analytics).
+        ?>
+        <button class="ltms-bottom-nav-item" data-action="open-sidebar" aria-label="<?php esc_attr_e( 'Más opciones', 'ltms' ); ?>">
+            <span class="ltms-bottom-nav-icon">☰</span>
+            <span class="ltms-bottom-nav-label"><?php esc_html_e( 'Más', 'ltms' ); ?></span>
+        </button>
     </nav>
 
     <style>
