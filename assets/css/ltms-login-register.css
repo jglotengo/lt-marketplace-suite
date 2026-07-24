@@ -531,3 +531,28 @@
     opacity: .6;
     cursor: not-allowed;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   UX-REG-04 FIX: Feedback visual al seleccionar business_type.
+   Antes, los radios tenían opacity:0 y los labels no cambiaban de estilo
+   al seleccionarse — el usuario no sabía cuál eligió. Ahora el label
+   del radio :checked cambia de color.
+   ════════════════════════════════════════════════════════════════ */
+.ltms-btype-lbl:has(input:checked) {
+    border-color: #6d28d9 !important;
+    background: #f5f3ff !important;
+    box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.2) !important;
+}
+.ltms-btype-lbl:has(input:checked) span {
+    color: #6d28d9 !important;
+}
+/* Fallback para navegadores sin :has() — clase .ltms-btype-selected
+   agregada via JS en ltms-login-register.js */
+.ltms-btype-lbl.ltms-btype-selected {
+    border-color: #6d28d9 !important;
+    background: #f5f3ff !important;
+    box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.2) !important;
+}
+.ltms-btype-lbl.ltms-btype-selected span {
+    color: #6d28d9 !important;
+}

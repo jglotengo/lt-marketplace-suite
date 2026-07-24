@@ -325,6 +325,24 @@
     btypeRadios.forEach(function (radio) {
         radio.addEventListener('change', updateBtypeNotices);
     });
+
+    // UX-REG-04 FIX: Feedback visual al seleccionar business_type.
+    // Agregar clase .ltms-btype-selected al label del radio :checked
+    // (fallback para navegadores sin CSS :has()).
+    btypeRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            // Remover clase de todos los labels
+            form.querySelectorAll('.ltms-btype-lbl').forEach(function (lbl) {
+                lbl.classList.remove('ltms-btype-selected');
+            });
+            // Agregar clase al label del radio seleccionado
+            var checked = form.querySelector('input[name="business_type"]:checked');
+            if (checked) {
+                var lbl = checked.closest('.ltms-btype-lbl');
+                if (lbl) lbl.classList.add('ltms-btype-selected');
+            }
+        });
+    });
     updateBtypeNotices();
 
 })();
