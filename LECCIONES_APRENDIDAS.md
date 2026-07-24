@@ -1735,3 +1735,13 @@ if opens != closes: print(f'UNBALANCED: {opens} opens, {closes} closes')
 **Fix:** Agregar avisos inline en el paso 2 del wizard que aparecen dinámicamente cuando se selecciona `restaurant` (INVIMA/COFEPRIS) o `tourism` (RNT/SECTUR), adelantando la información al momento de decisión.
 
 **Regla preventiva:** Todo requisito documental post-registro debe anunciarse DURANTE el wizard de registro, no después. El vendor debe poder tomar una decisión informada antes de crear su cuenta: "¿tengo los documentos necesarios para este tipo de negocio?".
+
+### Lección #129: Al togglear `display` via JS, usar valores explícitos ('block'/'none'), no string vacío
+
+**Error:** `goToPage()` en `ltms-login-register.js` usaba `p.style.display = ''` (string vacío) para mostrar la página activa del wizard. Tras la validación exitosa del paso 1, el clic en "Siguiente" ejecutaba `goToPage(2)` que seteaba `p2.style.display = ''` — removiendo el inline style. Pero el CSS externo `.ltms-wizard-page { display: none; }` (línea 330 de `ltms-login-register.css`) tomaba control y ocultaba p2 de nuevo. El wizard nunca avanzaba visualmente aunque la validación pasara.
+
+**Causa raíz:** String vacío en `style.display` NO significa "mostrar" — significa "remover inline style y heredar del CSS". Si el CSS externo tiene `display: none` por defecto, el elemento queda oculto.
+
+**Fix:** Usar `'block'` explícito: `p.style.display = (pageNum === actual) ? 'block' : 'none'`.
+
+**Regla preventiva:** Al manipular `style.display` via JS para mostrar/ocultar elementos, SIEMPRE usar valores explícitos (`'block'`, `'none'`, `'flex'`, `'grid'`), nunca string vacío (`''`). String vacío remueve el inline style y deja que el CSS externo decida, lo que puede causar bugs difíciles de diagnosticar cuando hay reglas CSS con `display: none` por defecto.
