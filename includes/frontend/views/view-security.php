@@ -84,7 +84,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
     </div>
 
     <!-- Modal de configuración (oculto por defecto) -->
-    <div id="ltms-2fa-setup-modal" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-setup-title" style="background:rgba(0,0,0,0.5);z-index:9999;padding:20px;">
+    <div id="ltms-2fa-setup-modal" class="ltms-modal ltms-2fa-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-setup-title">
         <div style="background:#fff;border-radius:12px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;">
             <div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
                 <h3 id="ltms-2fa-setup-title" style="margin:0;">🔐 <?php esc_html_e( 'Configurar 2FA', 'ltms' ); ?></h3>
@@ -135,7 +135,7 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
     </div>
 
     <!-- Modal de desactivación -->
-    <div id="ltms-2fa-disable-modal" class="ltms-modal" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-disable-title" style="background:rgba(0,0,0,0.5);z-index:9999;padding:20px;">
+    <div id="ltms-2fa-disable-modal" class="ltms-modal ltms-2fa-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ltms-2fa-disable-title">
         <div style="background:#fff;border-radius:12px;max-width:420px;width:100%;">
             <div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;">
                 <h3 id="ltms-2fa-disable-title" style="margin:0;color:#dc2626;">⚠ <?php esc_html_e( 'Desactivar 2FA', 'ltms' ); ?></h3>

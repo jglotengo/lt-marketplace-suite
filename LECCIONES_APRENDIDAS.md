@@ -1669,3 +1669,39 @@ grep -rn 'onclick=\|onchange=\|onfocus=\|onsubmit=\|onload=' includes/frontend/v
 **Fix:** Pedir un one-liner ejecutable directo en la Console (`jQuery.post(ltmsDashboard.ajax_url, {...}).done(...).fail(...)`) que imprime el resultado real de una llamada específica, en vez de depender de que la persona encuentre y lea la fila correcta en la lista de Network.
 
 **Regla preventiva:** Cuando se necesite un dato puntual de una petición AJAX específica y no haya acceso directo a un navegador, preferir pedirle a la persona que ejecute un script corto en la Console que devuelva la respuesta directamente, en vez de instrucciones de "haz clic en la fila X, mira el panel Y" — más simple, y evita falsos negativos por paneles de DevTools no refrescados.
+
+---
+
+## Sección 15 — Ciclo de auditoría panel del vendedor (2026-07-24, v2.9.240 → v2.9.242)
+
+> Auditoría full-stack del panel del vendedor siguiendo `AGENTS.md` → "Loop de auditoría autónoma" y `prompt-engineering-loops.md`. 25 vistas SPA auditadas con VLM (glm-5v-turbo) en móvil 375px y desktop 1440px. 7 hallazgos (1 P0, 2 P1, 4 P2). Causa raíz del bug histórico "9 vistas en blanco" resuelta.
+
+### Lección #124: El skeleton loader debe respetar el contrato de cada vista (AJAX vs estática)
+
+**Error:** `initSkeletonLoaders()` en `ltms-ux-enhancements.js` monkey-patcheaba `LTMS.Dashboard.loadView()` para llamar `showSkeleton(view)` en TODAS las vistas, incluso las 10 que no tienen método `load<View>View` dedicado y por tanto no hacen AJAX `ltms_get_*` (insurance, bookings, marketing, security, donations, posgold, shipping-statement, ordenes-compra, sellers-landing, aveonline-onboarding). Como `hideSkeleton()` está enganchado a `ajaxComplete`, nunca se disparaba para esas vistas, dejando el overlay gris 6 segundos (failsafe) sobre contenido ya renderizado — síntoma idéntico al de "vista en blanco".
+
+**Causa raíz:** El skeleton loader asumía que todas las vistas cargan datos vía AJAX, pero el dashboard tiene dos categorías de vistas: dinámicas (con `load*View` que hace fetch) y estáticas (PHP ya renderizado, solo `showSection()`). Aplicar el mismo loader a ambas rompe las estáticas.
+
+**Fix:** Verificar `typeof this[load<View>View] === 'function'` antes de llamar `showSkeleton()`. Las vistas estáticas muestran su contenido PHP inmediatamente, sin overlay.
+
+**Regla preventiva:** Antes de aplicar un mecanismo de loading a todas las vistas de un SPA, verificar si todas siguen el mismo contrato de carga. Si hay vistas estáticas y dinámicas, el loader debe respetar la distinción o se vuelve un bug para la categoría equivocada.
+
+### Lección #125: Un `</div>` faltante en una view PHP hace que el browser parser reanide TODAS las vistas siguientes dentro de la sección display:none previa
+
+**Error:** `view-envios.php` tenía 37 `<div>` abiertos pero solo 36 `</div>` cerrados. El `<div class="ltms-view-pad">` de la línea 23 nunca se cerraba. El browser parser, al encontrar el fin del archivo sin cerrar ese div, reanidaba TODAS las vistas siguientes (shipping-statement, redi, incidents, kitchen, ordenes-compra, bookings, marketing, security, donations, posgold, insurance, drivers, analytics — 13 vistas) dentro de `#ltms-view-envios` en el DOM parseado.
+
+**Causa raíz:** `#ltms-view-envios` tiene `style="display:none;"` por defecto (el dashboard la muestra solo al hacer clic en "Envíos"). Las 13 vistas anidadas dentro heredaban `display:none` del padre, sin importar qué `display` les pusiera `loadView()` en su propio style. `getBoundingClientRect()` devolvía `w:0, h:0` para todas. El síntoma visible: 9 vistas aparecían "en blanco" sin error de JS, sin skeleton pegado, sin nada — solo el fondo gris del panel.
+
+**Diagnóstico clave:** La inspección DOM reveló `#ltms-view-redi.parentElement.id === 'ltms-view-envios'` (debería ser `ltms-main-content`). Esto indicó inmediatamente un problema de nesting por HTML mal cerrado, no un bug de JS.
+
+**Fix:** Agregar el `</div>` faltante al final de `view-envios.php` para cerrar `.ltms-view-pad`. Tras el fix, las 13 vistas volvieron a ser hermanas de `ltms-main-content` y todas renderizan correctamente.
+
+**Regla preventiva:** Siempre validar div balance (`grep -c '<div' archivo.php` vs `grep -c '</div>' archivo.php`) en views PHP antes de hacer commit. Un solo `</div>` falso hace que el browser parser reanide todo el contenido siguiente, y el síntoma (vistas en blanco sin error de JS) no apunta obviamente a la causa (HTML mal cerrado en un archivo distinto al de la vista afectada). El diagnóstico "vistas en blanco" debe incluir SIEMPRE la verificación de `parentElement.id` de la vista afectada — si no es el contenedor esperado (`ltms-main-content`), el problema es estructural, no de JS.
+
+**Herramienta de diagnóstico:** Un script Python simple puede detectar esto en CI:
+```python
+import re
+with open('view-XXX.php') as f: c = f.read()
+opens, closes = len(re.findall(r'<div\b', c)), len(re.findall(r'</div>', c))
+if opens != closes: print(f'UNBALANCED: {opens} opens, {closes} closes')
+```

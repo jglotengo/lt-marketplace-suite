@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-07-24
+### Fixed — Ciclo de auditoría panel del vendedor (v2.9.240 → v2.9.242)
+
+> Auditoría full-stack del panel del vendedor siguiendo `AGENTS.md` → "Loop de auditoría autónoma". 25 vistas SPA auditadas con VLM (glm-5v-turbo) en móvil 375px y desktop 1440px. 7 hallazgos (1 P0, 2 P1, 4 P2). **Causa raíz del bug histórico "9 vistas en blanco" resuelta.**
+
+- **`fix(dashboard)` (AUD-07, P0, v2.9.242)** [`2bc41047`]: **CAUSA RAÍZ del bug "9 vistas en blanco"** del historial de sesiones. `view-envios.php` tenía 37 `<div>` abiertos pero solo 36 `</div>` cerrados — el `<div class="ltms-view-pad">` (línea 23) nunca se cerraba. El browser parser reanidaba TODAS las 13 vistas siguientes (shipping-statement, redi, incidents, kitchen, ordenes-compra, bookings, marketing, security, donations, posgold, insurance, drivers, analytics) DENTRO de `#ltms-view-envios` en el DOM parseado. Como `#ltms-view-envios` tiene `display:none` por defecto, todas esas vistas quedaban invisibles sin importar qué `display` les pusiera `loadView()`. `getBoundingClientRect()` devolvía `w:0, h:0` para todas. Fix: agregar el `</div>` faltante al final de `view-envios.php`. Verificado en producción con VLM: las 9 vistas críticas (REDI, Novedades, Fletes, Seguros, Reservas, Marketing, Seguridad, Donaciones, PosGold) ahora muestran contenido real. Ver `LECCIONES_APRENDIDAS.md` #125.
+- `fix(dashboard)` (AUD-01, P1, v2.9.241) [`b028f143`]: `initSkeletonLoaders()` en `ltms-ux-enhancements.js` monkey-patcheaba `loadView()` para llamar `showSkeleton(view)` en TODAS las vistas, incluso las 10 estáticas sin AJAX (insurance, bookings, marketing, security, donations, posgold, etc.). Como `hideSkeleton()` se engancha a `ajaxComplete`, nunca se disparaba para esas vistas, dejando el overlay gris 6s (failsafe) sobre contenido ya renderizado. Fix: verificar `typeof this[load<View>View] === 'function'` antes de mostrar skeleton. (Red herring del AUD-07, pero fix correcto independientemente.) Ver `LECCIONES_APRENDIDAS.md` #124.
+- `fix(ui)` (AUD-02, P1, v2.9.241) [`8a76a3cd`]: Mobile bottom-nav tenía solo 5 items fijos (Inicio, Pedidos, Productos, Billetera, Ajustes). Las ~17 vistas restantes (envios, insurance, bookings, marketing, security, donations, posgold, redi, incidents, kitchen, drivers, ordenes-compra, shipping-statement, sellers-landing, aveonline-onboarding, analytics) eran inaccesibles desde móvil sin abrir el menú hamburguesa. Fix: 6° item "Más" (☰) con `data-action="open-sidebar"` que abre el sidebar completo. Handler en `initMobileMenu()` vía event delegation.
+- `chore(deploy)` [`c2a1a55f`]: bump `LTMS_VERSION` → 2.9.241 (cache-busting para AUD-01/AUD-02).
+- `docs`: agregadas 2 lecciones nuevas (#124-#125) a `LECCIONES_APRENDIDAS.md` sección 15 cubriendo el ciclo: skeleton loader debe respetar contrato AJAX vs estática, y `</div>` faltante causa reanidamiento DOM.
+
+### Hallazgos VLM (Fase 3 — auditoría visual con glm-5v-turbo)
+- `vlm(redi/incidents/fletes/seguros/reservas/marketing/seguridad/donaciones/posgold)`: confirmado vía VLM que las 9 vistas críticas ahora muestran contenido real en desktop 1440px tras AUD-07. Empty states apropiados (mensajes informativos, iconos, tablas vacías con headers).
+- `vlm(móvil 375px)`: REDI usable sin scroll horizontal. Donaciones (VLM-05, P1): overlays de notificaciones + chat cubren ~90% de la pantalla, bloqueando contenido — pendiente fix. Marketing (VLM-06, P2): notificación inferior solapada con modal — fricción menor.
+
 ## [Unreleased] — 2026-07-23
 ### Fixed
 - `test(frontend)` [`4f79445`]: `FrontendAssetsNonceRefreshTest.php` quedó huérfano tras el pivote de Heartbeat a endpoint AJAX propio (ver entrada `fix(frontend)` de nonce más abajo) — seguía probando el método eliminado `ltms_heartbeat_refresh_dashboard_nonce()`, rompiendo el CI de un commit no relacionado (bump de `LTMS_VERSION` a 2.9.239). Reescrito para cubrir `ajax_refresh_dashboard_nonce()` real, usando el patrón `Monkey\Functions\when()->alias()` + excepción ya establecido en `AdminPayoutsTest.php`. Ver `LECCIONES_APRENDIDAS.md` #119.

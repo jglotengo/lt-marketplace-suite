@@ -1689,9 +1689,19 @@ final class LTMS_Dashboard_Logic {
         $login_id = $pages['ltms-login'] ?? 0;
         $login_url = $login_id ? get_permalink( $login_id ) : wp_login_url( get_permalink() );
 
+        // VLM-01 FIX: empty state visualmente pobre. Antes era un <div class="ltms-notice">
+        // pequeño alineado a la izquierda que se perdía en el espacio blanco del panel.
+        // El CTA "Iniciar sesión" era solo texto subrayado, no un botón prominente.
+        // Ahora: tarjeta centrada con icono, mensaje claro, y botón CTA sólido.
         return sprintf(
-            '<div class="ltms-notice ltms-notice-info"><p>%s <a href="%s">%s</a></p></div>',
-            esc_html__( 'Debes iniciar sesión para acceder al panel.', 'ltms' ),
+            '<div class="ltms-empty-state ltms-empty-state-login" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:48px 24px;">
+                <div style="font-size:4rem;margin-bottom:16px;" aria-hidden="true">🔒</div>
+                <h2 style="margin:0 0 12px;font-size:1.5rem;font-weight:700;color:#111827;">%s</h2>
+                <p style="margin:0 0 24px;font-size:1rem;color:#6b7280;max-width:400px;">%s</p>
+                <a href="%s" style="display:inline-block;padding:14px 32px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:1rem;transition:background 0.2s;">%s</a>
+            </div>',
+            esc_html__( 'Acceso restringido', 'ltms' ),
+            esc_html__( 'Debes iniciar sesión como vendedor para acceder a tu panel de control.', 'ltms' ),
             esc_url( $login_url ),
             esc_html__( 'Iniciar sesión', 'ltms' )
         );
