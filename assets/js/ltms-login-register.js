@@ -179,8 +179,12 @@
     function goToPage(pageNum) {
         if (pageNum < 1 || pageNum > totalPages) return;
         currentPage = pageNum;
+        // UX-REG-02 FIX: antes usabamos '' (string vacio) para mostrar la pagina
+        // activa, lo que removia el inline style y dejaba que el CSS externo
+        // (.ltms-wizard-page { display: none; }) la ocultara de nuevo. Ahora
+        // usamos 'block' explicito para garantizar visibilidad.
         pages.forEach(function (p) {
-            p.style.display = (parseInt(p.dataset.page, 10) === pageNum) ? '' : 'none';
+            p.style.display = (parseInt(p.dataset.page, 10) === pageNum) ? 'block' : 'none';
         });
         // Update step indicators
         steps.forEach(function (s, i) {
