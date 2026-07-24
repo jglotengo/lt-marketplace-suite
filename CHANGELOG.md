@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-07-24 (2)
+### Fixed — Ciclo de auditoría registro de vendedores (v2.9.243 → v2.9.244)
+
+> Auditoría full-stack del flujo de registro de nuevos vendedores cubriendo los 5 business_types (physical, digital, services, tourism, restaurant). 11 hallazgos (2 P0, 4 P1, 5 P2) — todos fixeados en un solo commit.
+
+- **`fix(reg)` (UX-REG-01, P0)** [`24639247`]: **Wizard de registro completamente roto** — los botones "Siguiente"/"Atrás" del wizard de 3 pasos no tenían handler JavaScript. El `<script>` inline original fue eliminado en el fix CSP "FASE2B P0 FIX" pero nunca migrado al JS externo `ltms-login-register.js` (que solo manejaba Turnstile + country/document). Recreado handler completo (271 líneas): navegación entre pasos, validación por paso (email, teléfono E.164, password match, campos required), submit AJAX vía `ltms_register_vendor`, manejo de errores con `aria-live`, honeypot check, loading state. Ver `LECCIONES_APRENDIDAS.md` #126.
+- **`fix(compliance)` (REG-02, P0)**: `can_publish_accommodation()` retornaba `true` si `ltms_booking_rnt_required=false` (el DEFAULT), permitiendo a vendors de turismo publicar alojamiento SIN RNT — violando Ley 2068/2020 (FONTUR). Default cambiado a `true` (exigir RNT). Solo desactivable explícitamente para testing/staging. Ver `LECCIONES_APRENDIDAS.md` #127.
+- `fix(reg)` (REG-03, P1): Restaurant/tourism vendors no eran avisados durante el wizard sobre requisitos adicionales (INVIMA/COFEPRIS, RNT/SECTUR). Agregados avisos inline dinámicos en paso 2 que aparecen al seleccionar `restaurant` o `tourism`. Ver `LECCIONES_APRENDIDAS.md` #128.
+- `fix(security)` (REG-07, P1): `ajax_complete_profile` no tenía rate limiting. Agregado 5/15min/IP vía transient (igual que register/login).
+- `fix(a11y)` (A11Y-REG-01/02, P1): Agregado `aria-required=true` a todos los campos required. `aria-invalid` + `aria-describedby` seteados dinámicamente en validación.
+- `fix(reg)` (REG-04, P2): tourism ahora marca `ltms_is_tourism=yes` (igual que restaurant marca `ltms_is_restaurant=yes`). Aplicado en ambos `ajax_register_vendor` y `ajax_complete_profile`.
+- `fix(security)` (REG-12, P2): Google OAuth ahora exige `email_verified=true` del perfil de Google (antes aceptaba cualquier email).
+- `fix(a11y)` (A11Y-REG-03, P2): `aria-live=polite` en notice de registro para screen readers.
+- `docs`: agregadas 3 lecciones nuevas (#126-#128) a `LECCIONES_APRENDIDAS.md` sección 16.
+
+### Backlog (no fixeado en este ciclo)
+- REG-01 (P2): digital y services sin módulo compliance específico — pendiente decidir si necesitan validaciones extra.
+- REG-05 (P2): no hay validación cruzada tax_regime vs business_type — pendiente análisis legal.
+- REG-02 follow-up: `can_publish_accommodation()` sigue siendo código muerto (nadie la llama) — necesita hook integration en `woocommerce_can_publish_product` o similar.
+
 ## [Unreleased] — 2026-07-24
 ### Fixed — Ciclo de auditoría panel del vendedor (v2.9.240 → v2.9.242)
 

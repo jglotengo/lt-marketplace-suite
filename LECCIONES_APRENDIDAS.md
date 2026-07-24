@@ -1705,3 +1705,33 @@ with open('view-XXX.php') as f: c = f.read()
 opens, closes = len(re.findall(r'<div\b', c)), len(re.findall(r'</div>', c))
 if opens != closes: print(f'UNBALANCED: {opens} opens, {closes} closes')
 ```
+
+### Lección #126: Al migrar inline `<script>` a JS externo por CSP, auditar que TODA la funcionalidad se migre
+
+**Error:** El fix "FASE2B P0 FIX (CSP)" migró el `<script>` inline de `form-register.php` a `assets/js/ltms-login-register.js`, pero solo migró 2 de las 5 funcionalidades del script original (Turnstile + country/document). Las otras 3 (navegación del wizard, validación, submit AJAX) se perdieron silenciosamente. El wizard de registro de 3 pasos quedó completamente roto — los botones "Siguiente"/"Atrás" no hacían nada.
+
+**Causa raíz:** La migración CSP se hizo script-por-script sin verificar funcionalidad end-to-end después. Los tests e2e (`tests/e2e/vendor-checkout.spec.js`) hacían clic en `.ltms-wizard-next` pero los tests e2e no corrían en CI (solo unit/integration), así que la regresión no se detectó.
+
+**Fix:** Recrear el handler completo del wizard en `ltms-login-register.js` (271 líneas): navegación, validación por paso, submit AJAX, manejo de errores, honeypot, loading state.
+
+**Regla preventiva:** Al migrar `<script>` inline a JS externo por CSP, SIEMPRE: (1) leer el script original completo antes de eliminarlo, (2) auditar que cada `addEventListener`/`onclick`/function del original tenga equivalente en el nuevo archivo, (3) verificar funcionalidad end-to-end en navegador después, (4) si hay tests e2e que cubren el flujo, correrlos o añadirlos al CI.
+
+### Lección #127: Cumplimiento legal por defecto, no por configuración opt-in
+
+**Error:** `can_publish_accommodation()` retornaba `true` si `ltms_booking_rnt_required` era `false` — y el DEFAULT era `false`. Esto significaba que cualquier vendor de turismo podía publicar alojamiento SIN RNT vigente, violando la Ley 2068/2020 (CO) que exige RNT de FONTUR para servicios de hospedaje.
+
+**Causa raíz:** La configuración se diseñó como opt-in (el admin debe activar compliance) en vez de opt-out (el admin debe desactivarlo explícitamente). Para requisitos legales, el default seguro es "exigir"; solo se relaja con decisión explícita.
+
+**Fix:** Cambiar el default a `true` (exigir RNT). Solo entornos de testing/staging pueden desactivarlo vía `ltms_booking_rnt_required=false`.
+
+**Regla preventiva:** Toda configuración que controle cumplimiento legal (SAGRILAFT, RNT, INVIMA, GDPR, Ley 1581) debe tener como default el valor que cumpla la ley. La relajación debe ser opt-in explícita del admin, documentada, y solo para entornos no productivos.
+
+### Lección #128: El registro de vendedor debe avisar DURANTE el wizard qué documentos extra necesitará
+
+**Error:** Los vendors de restaurante solo se enteraban del requisito de INVIMA/COFEPRIS al llegar al paso de KYC post-registro. Los de turismo, del RNT. Esto generaba fricción, abandono, y frustración — el vendor ya había completado 3 pasos del wizard y creado su cuenta antes de descubrir que necesitaba un documento adicional.
+
+**Causa raíz:** El wizard de registro mostraba los 5 business_types con iconos y hints cortos, pero NO avisaba qué requisitos adicionales implicaba cada uno. La información estaba dispersa en módulos de compliance que solo se activaban después.
+
+**Fix:** Agregar avisos inline en el paso 2 del wizard que aparecen dinámicamente cuando se selecciona `restaurant` (INVIMA/COFEPRIS) o `tourism` (RNT/SECTUR), adelantando la información al momento de decisión.
+
+**Regla preventiva:** Todo requisito documental post-registro debe anunciarse DURANTE el wizard de registro, no después. El vendor debe poder tomar una decisión informada antes de crear su cuenta: "¿tengo los documentos necesarios para este tipo de negocio?".
