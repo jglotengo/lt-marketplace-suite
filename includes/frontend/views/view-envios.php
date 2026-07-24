@@ -215,3 +215,11 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-envios.js
 wp_enqueue_script( 'ltms-envios', LTMS_ASSETS_URL . 'js/ltms-envios.js', [ 'jquery' ], LTMS_VERSION, true );
 ?>
+</div><!-- /.ltms-view-pad — AUD-07 FIX: this closing div was missing,
+          causing all subsequent view sections (shipping-statement, redi,
+          incidents, kitchen, ordenes-compra, bookings, marketing, security,
+          donations, posgold, insurance, drivers, analytics) to be parsed
+          as NESTED inside #ltms-view-envios in the DOM. Since envios has
+          display:none, all those views were invisible even when their own
+          display was set to block by loadView(). This is the root cause of
+          the '9 vistas en blanco' bug from the session historial. -->
