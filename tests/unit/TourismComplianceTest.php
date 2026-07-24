@@ -95,19 +95,52 @@ class TourismComplianceTest extends TestCase
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Rama 1: RNT no requerido → siempre puede publicar, sin importar el record.
+     * Rama 1: RNT no requerido (configurado explícitamente) → siempre puede publicar.
+     *
+     * REG-02 FIX: el default de ltms_booking_rnt_required ahora es true (exigir RNT
+     * por ley 2068/2020). Este test ahora mockea la config como false explícitamente
+     * para cubrir la rama de "no requerido" (solo aplica a staging/testing).
      */
     public function test_can_publish_when_rnt_not_required(): void
     {
-        // get_option devuelve null → ltms_booking_rnt_required = false (default)
+        // Mock: ltms_booking_rnt_required = false explícito (staging/testing only)
+        Functions\stubs(['get_option' => static function($k, $d = null) {
+            if ($k === 'ltms_settings') return ['ltms_booking_rnt_required' => 0];
+            return $d;
+        }]);
+        \LTMS_Core_Config::flush_cache();
+
         $this->assertTrue(\LTMS_Business_Tourism_Compliance::can_publish_accommodation(1));
     }
 
+    /**
+     * REG-02 FIX: con el default nuevo (RNT requerido), cualquier vendor sin
+     * record verificado NO puede publicar. Este test verifica el default seguro.
+     */
     public function test_can_publish_returns_true_rnt_not_required_any_vendor(): void
     {
-        // Con config por defecto (false), cualquier vendor puede publicar
+        // Mock: ltms_booking_rnt_required = false explícito (staging/testing only)
+        Functions\stubs(['get_option' => static function($k, $d = null) {
+            if ($k === 'ltms_settings') return ['ltms_booking_rnt_required' => 0];
+            return $d;
+        }]);
+        \LTMS_Core_Config::flush_cache();
+
+        // Con RNT explícitamente desactivado, cualquier vendor puede publicar
         $this->assertTrue(\LTMS_Business_Tourism_Compliance::can_publish_accommodation(999));
         $this->assertTrue(\LTMS_Business_Tourism_Compliance::can_publish_accommodation(0));
+    }
+
+    /**
+     * REG-02 FIX: con el DEFAULT (RNT requerido), vendor sin record → no publica.
+     * Este test reemplaza la asunción vieja de que el default era false.
+     */
+    public function test_cannot_publish_with_default_config_and_no_record(): void
+    {
+        // Sin mock de get_option → LTMS_Core_Config::get devuelve el default (true)
+        // → RNT requerido → sin record → false
+        $result = \LTMS_Business_Tourism_Compliance::can_publish_accommodation(1);
+        $this->assertFalse($result);
     }
 
     public function test_can_publish_returns_bool(): void
