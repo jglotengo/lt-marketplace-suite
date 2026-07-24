@@ -255,6 +255,14 @@ final class LTMS_Google_OAuth {
             return new \WP_Error( 'google_profile_error', 'No se recibió email del perfil de Google.' );
         }
 
+        // REG-12 FIX: validar que el email de Google esté verificado por Google
+        // y que el dominio no sea sospechoso. Antes se aceptaba cualquier email
+        // que Google retornara sin verificar email_verified, permitiendo cuentas
+        // @gmail arbitrarias no verificadas. Ahora exigimos email_verified=true.
+        if ( empty( $body['email_verified'] ) ) {
+            return new \WP_Error( 'google_email_not_verified', 'El email de Google no está verificado. Verifica tu cuenta de Google primero.' );
+        }
+
         return [
             'google_id'  => sanitize_text_field( $body['sub'] ?? '' ),
             'email'      => sanitize_email( $body['email'] ),

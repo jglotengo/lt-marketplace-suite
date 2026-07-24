@@ -167,6 +167,24 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                 <small class="ltms-field-hint" style="margin-top:6px;display:block;">
                     <?php esc_html_e( 'Puedes ofrecer más de un tipo — elige el principal. Podrás ajustarlo desde tu panel luego.', 'ltms' ); ?>
                 </small>
+
+                <?php
+                // REG-03 FIX: avisar al vendor DURANTE el registro qué documentos
+                // extra necesitará según el business_type elegido. Antes, el vendor
+                // solo se enteraba de INVIMA/COFEPRIS (restaurant) o RNT (tourism)
+                // al llegar al paso de KYC post-registro, generando fricción y
+                // abandono. Ahora el wizard lo adelanta.
+                ?>
+                <div id="ltms-btype-notice-restaurant" class="ltms-notice ltms-notice-info" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;font-size:0.82rem;">
+                    <strong>🍽️ Requisito adicional:</strong> Como restaurante, necesitarás tu
+                    <strong>registro sanitario INVIMA</strong> (Colombia) o <strong>COFEPRIS</strong> (México)
+                    para completar la verificación KYC. Tenlo listo.
+                </div>
+                <div id="ltms-btype-notice-tourism" class="ltms-notice ltms-notice-info" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;font-size:0.82rem;">
+                    <strong>🏨 Requisito adicional:</strong> Como turismo/alojamiento, necesitarás tu
+                    <strong>Registro Nacional de Turismo (RNT)</strong> (Colombia, FONTUR) o
+                    <strong>folio SECTUR</strong> (México) para publicar alojamientos. Tenlo listo.
+                </div>
             </div>
 
             <div class="ltms-form-group">

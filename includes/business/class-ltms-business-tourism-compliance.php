@@ -155,7 +155,16 @@ class LTMS_Business_Tourism_Compliance {
      * Verifica si el vendedor puede publicar alojamientos (RNT activo).
      */
     public static function can_publish_accommodation( int $vendor_id ): bool {
-        if ( ! LTMS_Core_Config::get( 'ltms_booking_rnt_required', false ) ) return true;
+        // REG-02 FIX: antes, esta función retornaba true si ltms_booking_rnt_required
+        // era false (el default), lo que permitía a cualquier vendor de turismo
+        // publicar alojamiento SIN RNT vigente — violando la Ley 2068/2020 (CO)
+        // que exige RNT de FONTUR para servicios de hospedaje. Además, la función
+        // era código muerto: nadie la llamaba. Ahora:
+        // 1. El default es exigir RNT (cumplimiento legal por defecto).
+        // 2. Solo se puede saltar si el admin explícitamente configura
+        //    ltms_booking_rnt_required=false (para entornos de testing/staging).
+        $rnt_required = LTMS_Core_Config::get( 'ltms_booking_rnt_required', true );
+        if ( ! $rnt_required ) return true;
         $record = self::get_record( $vendor_id );
         return $record && 'verified' === $record['status'] && (int) $record['rnt_verified'];
     }

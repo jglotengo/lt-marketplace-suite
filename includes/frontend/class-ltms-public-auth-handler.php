@@ -583,6 +583,12 @@ final class LTMS_Public_Auth_Handler {
             if ( $btype === 'restaurant' ) {
                 update_user_meta( $user_id, 'ltms_is_restaurant', 'yes' );
             }
+            // REG-04 FIX: marca turismo para routing de compliance (RNT/SECTUR).
+            // Antes solo restaurant tenía flag; tourism no marcaba nada, impidiendo
+            // que otros módulos detecten vendors de turismo sin consultar business_type.
+            if ( $btype === 'tourism' ) {
+                update_user_meta( $user_id, 'ltms_is_tourism', 'yes' );
+            }
             update_user_meta( $user_id, 'ltms_kyc_status', 'pending' );
             // v2.9.113 P2-14 FIX: flag inicial de configuración de tienda (se setea en 1 al configurar).
             update_user_meta( $user_id, 'ltms_store_configured', 0 );
@@ -1102,6 +1108,18 @@ final class LTMS_Public_Auth_Handler {
             wp_send_json_error( [ 'message' => __( 'Tu perfil ya está completo.', 'ltms' ) ] );
         }
 
+        // REG-07 FIX: rate limiting en complete_profile (antes no había).
+        // Un atacante con sesión de vendor podía spamear este endpoint para
+        // enumerar combinaciones de document_number/store_name válidas.
+        // Limit: 5 intentos por IP cada 15 minutos (igual que register/login).
+        $ip = LTMS_Core_Security::get_client_ip_safe();
+        $throttle_key = 'ltms_complete_profile_attempts_' . md5( $ip );
+        $tries = (int) get_transient( $throttle_key );
+        if ( $tries >= 5 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Espera 15 minutos.', 'ltms' ) ], 429 );
+        }
+        set_transient( $throttle_key, $tries + 1, 15 * MINUTE_IN_SECONDS );
+
         // Sanitizar y validar datos.
         $phone           = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ); // phpcs:ignore
         $document_type   = sanitize_text_field( wp_unslash( $_POST['document_type'] ?? '' ) ); // phpcs:ignore
@@ -1177,6 +1195,14 @@ final class LTMS_Public_Auth_Handler {
         update_user_meta( $user_id, 'ltms_country', $vendor_country );
         update_user_meta( $user_id, 'ltms_tax_regime', $tax_regime );
         update_user_meta( $user_id, 'ltms_business_type', $business_type );
+
+        // REG-04 FIX: marcar flags de compliance según business_type (igual que ajax_register_vendor).
+        if ( $business_type === 'restaurant' ) {
+            update_user_meta( $user_id, 'ltms_is_restaurant', 'yes' );
+        }
+        if ( $business_type === 'tourism' ) {
+            update_user_meta( $user_id, 'ltms_is_tourism', 'yes' );
+        }
 
         // Generar store slug.
         if ( class_exists( 'LTMS_Vendor_Storefront' ) ) {
