@@ -221,10 +221,11 @@
 }
 
 /* ── Steps / Wizard ─────────────────────────────────────────── */
-/* UX-REG-03 FIX v2: ambos CSS (frontend + login-register) deben usar el
-   MISMO counter name. Antes usaban 'step' vs 'ltms-step' (colisión),
-   luego 'ltms-fe-step' vs 'ltms-step' (mismatch — content leía un counter
-   que nunca se incrementaba). Ahora ambos usan 'ltms-step' unificado. */
+/* UX-REG-03 FIX v3: scoping con .ltms-steps > para que NO aplique cuando
+   el parent es .ltms-wizard-steps (que usa ltms-login-register.css).
+   Antes, ambos CSS definían counter-increment:ltms-step en .ltms-step,
+   causando double-increment (2-4-6 en vez de 1-2-3). Ahora este CSS
+   solo aplica a steppers con parent .ltms-steps (no .ltms-wizard-steps). */
 .ltms-steps {
     display: flex;
     gap: 0;
@@ -232,7 +233,7 @@
     counter-reset: ltms-step;
 }
 
-.ltms-step {
+.ltms-steps > .ltms-step {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -241,7 +242,7 @@
     text-align: center;
 }
 
-.ltms-step::before {
+.ltms-steps > .ltms-step::before {
     counter-increment: ltms-step;
     content: counter(ltms-step);
     width: 32px;
@@ -258,18 +259,18 @@
     z-index: 1;
 }
 
-.ltms-step.active::before {
+.ltms-steps > .ltms-step.active::before {
     background: var(--ltms-primary);
     color: #fff;
 }
 
-.ltms-step.completed::before {
+.ltms-steps > .ltms-step.completed::before {
     background: var(--ltms-success);
     color: #fff;
     content: '✓';
 }
 
-.ltms-step + .ltms-step::after {
+.ltms-steps > .ltms-step + .ltms-step::after {
     content: '';
     position: absolute;
     top: 16px;
@@ -280,7 +281,7 @@
     z-index: 0;
 }
 
-.ltms-step.completed + .ltms-step::after {
+.ltms-steps > .ltms-step.completed + .ltms-step::after {
     background: var(--ltms-success);
 }
 
