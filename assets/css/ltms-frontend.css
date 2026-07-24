@@ -221,11 +221,15 @@
 }
 
 /* ── Steps / Wizard ─────────────────────────────────────────── */
+/* UX-REG-03 FIX: counter renombrado de 'step' a 'ltms-fe-step' para evitar
+   colisión con ltms-login-register.css que usa 'ltms-step'. Antes, ambos
+   CSS definían .ltms-step con counters distintos ('step' vs 'ltms-step'),
+   y el último en cargarse ganaba, causando que los 3 steps mostraran "1". */
 .ltms-steps {
     display: flex;
     gap: 0;
     margin-bottom: 24px;
-    counter-reset: step;
+    counter-reset: ltms-fe-step;
 }
 
 .ltms-step {
@@ -238,8 +242,8 @@
 }
 
 .ltms-step::before {
-    counter-increment: step;
-    content: counter(step);
+    counter-increment: ltms-fe-step;
+    content: counter(ltms-fe-step);
     width: 32px;
     height: 32px;
     border-radius: 50%;
