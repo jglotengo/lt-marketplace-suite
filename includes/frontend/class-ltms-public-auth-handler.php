@@ -465,7 +465,10 @@ final class LTMS_Public_Auth_Handler {
             // registered" email to the existing address with a login link.
             $existing_user = get_user_by( 'email', $data['email'] );
             if ( $existing_user ) {
-                $login_url = wp_login_url();
+                // UX-REG-09 FIX: usar la página de login del vendedor, no wp-login.php.
+                $_pages   = get_option( 'ltms_installed_pages', [] );
+                $_login_id = $_pages['ltms-login'] ?? 0;
+                $login_url = $_login_id ? get_permalink( $_login_id ) : home_url( '/login-vendedor/' );
                 $subject   = sprintf( __( '[%s] Ya tienes una cuenta', 'ltms' ), get_bloginfo( 'name' ) );
                 $message   = sprintf(
                     __( "Hola,\n\nAlguien intentó registrar una nueva cuenta con tu email en %s.\n\nSi fuiste tú, ya tienes una cuenta. Puedes iniciar sesión aquí: %s\n\nSi no fuiste tú, ignora este correo — tu cuenta está segura.\n\nSaludos,\nEquipo %s", 'ltms' ),
@@ -949,7 +952,10 @@ final class LTMS_Public_Auth_Handler {
         // login, no a home_url('/'). Antes, el usuario hacía click, se verificaba
         // el email, pero luego el redirect al dashboard fallaba porque no estaba
         // logueado. Ahora apunta al login con un parámetro de "verificación exitosa".
-        $login_url = wp_login_url();
+        // UX-REG-09 FIX: usar la página de login del vendedor (/login-vendedor/),
+        // no wp-login.php que confunde a los vendedores.
+        $login_id = $pages['ltms-login'] ?? 0;
+        $login_url = $login_id ? get_permalink( $login_id ) : home_url( '/login-vendedor/' );
         $verify_url = add_query_arg(
             [
                 'ltms_verify_email' => $verify_token,
