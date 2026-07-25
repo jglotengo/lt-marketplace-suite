@@ -1544,6 +1544,7 @@
                                 '<option value="digital">💾 Digital</option>' +
                                 '<option value="service">🔧 Servicio</option>' +
                                 '<option value="booking">🏨 Turismo</option>' +
+                                '<option value="restaurant">🍽️ Restaurante</option>' +
                             '</select>' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
@@ -1570,6 +1571,26 @@
                             '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Largo (cm)</label><input type="number" id="ltms-np-length" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
                             '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Ancho (cm)</label><input type="number" id="ltms-np-width" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
                             '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Alto (cm)</label><input type="number" id="ltms-np-height" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción corta <small style="font-weight:400;color:#666;">(resumen junto al precio)</small></label>' +
+                            '<textarea id="ltms-np-short-desc" rows="2" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Resumen breve del producto (máx 200 caracteres)"></textarea>' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">SKU <small style="font-weight:400;color:#666;">(código único, opcional)</small></label>' +
+                            '<input type="text" id="ltms-np-sku" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Ej: CAM-AZUL-M">' +
+                        '</div>' +
+                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Etiquetas <small style="font-weight:400;color:#666;">(separa con comas)</small></label>' +
+                            '<input type="text" id="ltms-np-tags" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="rojo, algodón, verano">' +
+                        '</div>' +
+                        '<div id="ltms-np-digital-fields" style="display:none;margin-bottom:15px;padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:5px;">💾 Archivo descargable</label>' +
+                            '<input type="url" id="ltms-np-download-url" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;" placeholder="https://... (URL del archivo)">' +
+                            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Límite descargas (0=ilimitado)</label><input type="number" id="ltms-np-download-limit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
+                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Expira en días (0=nunca)</label><input type="number" id="ltms-np-download-expiry" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
                             '</div>' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
@@ -1604,6 +1625,11 @@
                         '</div>' +
                     '</div>';
                     jQuery('#ltms-view-products').html(html);
+                    // PROD-01: Mostrar/ocultar campos según tipo de producto
+                    jQuery('#ltms-np-type').on('change', function() {
+                        var tipo = jQuery(this).val();
+                        jQuery('#ltms-np-digital-fields').toggle(tipo === 'digital');
+                    });
                     jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
                     var npGalleryIds = [];
                     jQuery('#ltms-np-add-gallery-btn').on('click', function(){ var gi=document.getElementById('ltms-np-gallery-input'); gi.multiple=true; gi.click(); });
@@ -1690,15 +1716,21 @@
                             action: 'ltms_create_product', nonce: nonce,
                             name: name, price: price, status: status,
                             description: jQuery('#ltms-np-desc').val(),
+                            short_description: jQuery('#ltms-np-short-desc').val(),
                             category_id: jQuery('#ltms-np-cat').val(),
                             product_type: jQuery('#ltms-np-type').val(),
                             stock: jQuery('#ltms-np-stock').val(),
                             sale_price: jQuery('#ltms-np-sale-price').val(),
+                            sku: jQuery('#ltms-np-sku').val(),
+                            tags: jQuery('#ltms-np-tags').val(),
                             catalog_visibility: jQuery('#ltms-np-visibility').val(),
                             weight: jQuery('#ltms-np-weight').val(),
                             dim_length: jQuery('#ltms-np-length').val(),
                             dim_width: jQuery('#ltms-np-width').val(),
                             dim_height: jQuery('#ltms-np-height').val(),
+                            download_url: jQuery('#ltms-np-download-url').val(),
+                            download_limit: jQuery('#ltms-np-download-limit').val(),
+                            download_expiry: jQuery('#ltms-np-download-expiry').val(),
                             image_id: jQuery('#ltms-np-img-id').val(),
                             gallery_ids: jQuery('#ltms-np-gallery-ids').val(),
                             redi_enabled: jQuery('#ltms-np-redi-enabled').is(':checked') ? 1 : 0,
