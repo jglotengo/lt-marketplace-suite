@@ -803,6 +803,18 @@ final class LTMS_Core_Activator {
                 'content' => '[ltms_vendor_rnt]',
                 'slug'    => 'rnt-turismo',
             ],
+            // UX-REG-05 FIX: páginas de Términos y Condiciones + Política de Privacidad.
+            // Antes no se creaban → los enlaces del wizard de registro apuntaban a '#'.
+            'ltms-terms'           => [
+                'title'   => 'Términos y Condiciones',
+                'content' => "<h1>Términos y Condiciones</h1>\n\n<p>Al registrarte como vendedor en Lo Tengo, aceptas los siguientes términos:</p>\n\n<h2>1. Objeto</h2>\n<p>Lo Tengo es una plataforma de marketplace multi-vendedor que conecta vendedores con compradores en Colombia y México.</p>\n\n<h2>2. Obligaciones del Vendedor</h2>\n<ul>\n<li>Mantener información de producto precisa y actualizada</li>\n<li>Cumplir con las leyes fiscales aplicables (DIAN/SAT)</li>\n<li>Completar el proceso de verificación KYC</li>\n<li>Entregar productos en el tiempo acordado</li>\n</ul>\n\n<h2>3. Comisiones</h2>\n<p>Lo Tengo retiene una comisión sobre cada venta, según el plan del vendedor y el volumen mensual.</p>\n\n<h2>4. Cumplimiento Legal</h2>\n<p>El vendedor declara que cumple con SAGRILAFT (Colombia) y las normativas fiscales aplicables. Para turismo, exige RNT vigente (Ley 2068/2020). Para restaurantes, registro sanitario INVIMA/COFEPRIS.</p>\n\n<h2>5. Suspensión</h2>\n<p>Lo Tengo puede suspender cuentas por incumplimiento, fraude, o actividad sospechosa.</p>\n\n<p><em>Última actualización: 2026-07-24</em></p>",
+                'slug'    => 'terminos-y-condiciones',
+            ],
+            'ltms-privacy'         => [
+                'title'   => 'Política de Privacidad',
+                'content' => "<h1>Política de Privacidad</h1>\n\n<p>Lo Tengo cumple con la Ley 1581 de 2012 (Habeas Data, Colombia) y la LFPDPPP (México).</p>\n\n<h2>1. Datos Recopilados</h2>\n<ul>\n<li>Información de identidad (documento, KYC)</li>\n<li>Datos bancarios (cifrados AES-256)</li>\n<li>Información de transacciones</li>\n<li>Datos de navegación (cookies)</li>\n</ul>\n\n<h2>2. Uso de Datos</h2>\n<p>Los datos se usan para verificación de identidad, cumplimiento SAGRILAFT, prevención de fraude, y gestión de la plataforma.</p>\n\n<h2>3. Almacenamiento</h2>\n<p>Los documentos KYC se almacenan cifrados en Backblaze B2. Los datos sensibles se cifran con AES-256-GCM.</p>\n\n<h2>4. Retención</h2>\n<p>Los datos se conservan según SAGRILAFT (5 años, Colombia) y LFPDPPP (10 años, México).</p>\n\n<h2>5. Derechos ARCO</h2>\n<p>Puedes ejercer tus derechos de acceso, rectificación, cancelación y oposición escribiendo a pqrscolombia@lo-tengo.com.co</p>\n\n<p><em>Última actualización: 2026-07-24</em></p>",
+                'slug'    => 'politica-de-privacidad',
+            ],
         ];
 
         // ltms_installed_pages puede ser un array indexado (legado) o asociativo (nuevo).
@@ -831,6 +843,14 @@ final class LTMS_Core_Activator {
 
             if ( ! is_wp_error( $page_id ) ) {
                 $installed[ $key ] = $page_id;
+                // UX-REG-05: guardar page IDs de términos y privacidad en options
+                // separadas para que form-register.php los pueda resolver.
+                if ( $key === 'ltms-terms' ) {
+                    update_option( 'ltms_terms_page_id', $page_id );
+                }
+                if ( $key === 'ltms-privacy' ) {
+                    update_option( 'ltms_privacy_page_id', $page_id );
+                }
             }
         }
 

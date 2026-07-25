@@ -260,7 +260,7 @@
 
         // Collect form data
         var formData = new FormData(form);
-        formData.append('action', 'ltms_register_vendor');
+        formData.append('action', 'ltms_vendor_register');
         formData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
 
         fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
