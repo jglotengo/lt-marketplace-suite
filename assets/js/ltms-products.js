@@ -119,7 +119,7 @@
         if (!name || isNaN(price) || price <= 0){
             $notice.removeClass('ltms-notice-success')
                    .addClass('ltms-notice-error')
-                   .text('')
+                   .text('Nombre y precio son obligatorios.')
                    .show();
             return;
         }
@@ -132,19 +132,31 @@
             url: ltmsDashboard.ajax_url,
             method: 'POST',
             data: {
-                action:       'ltms_create_product',
-                nonce:        ltmsDashboard.nonce,
-                name:         name,
-                description:  $('#ltms-np-desc').val(),
-                price:        price,
-                stock:        $('#ltms-np-stock').val(),
-                category_id:  $('#ltms-np-category').val(),
-                image_id:     $('#ltms-np-image-id').val(),
-                gallery_ids:  $('#ltms-np-gallery-ids').val(),
-                status:       $('#ltms-np-status').val(),
-                product_type:    $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
-                redi_enabled:    $('#ltms-np-redi-enabled').is(':checked') ? 'yes' : 'no',
-                redi_rate:       parseFloat($('#ltms-np-redi-rate').val()) || 0,
+                action:           'ltms_create_product',
+                nonce:            ltmsDashboard.nonce,
+                name:             name,
+                description:      $('#ltms-np-desc').val(),
+                short_description: $('#ltms-np-short-desc').val(),
+                price:            price,
+                sale_price:       $('#ltms-np-sale-price').val(),
+                stock:            $('#ltms-np-stock').val(),
+                sku:              $('#ltms-np-sku').val(),
+                category_id:      $('#ltms-np-category').val(),
+                image_id:         $('#ltms-np-image-id').val(),
+                gallery_ids:      $('#ltms-np-gallery-ids').val(),
+                status:           $('#ltms-np-status').val(),
+                product_type:     $('input[name="ltms_np_tipo"]:checked').val() || 'physical',
+                weight:           $('#ltms-np-weight').val(),
+                dim_length:       $('#ltms-np-length').val(),
+                dim_width:        $('#ltms-np-width').val(),
+                dim_height:       $('#ltms-np-height').val(),
+                shipping_class_id: $('#ltms-np-shipping-class').val(),
+                tags:             $('#ltms-np-tags').val(),
+                download_url:     $('#ltms-np-download-url').val(),
+                download_limit:   $('#ltms-np-download-limit').val(),
+                download_expiry:  $('#ltms-np-download-expiry').val(),
+                redi_enabled:     $('#ltms-np-redi-enabled').is(':checked') ? 'yes' : 'no',
+                redi_rate:        parseFloat($('#ltms-np-redi-rate').val()) || 0,
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -383,3 +395,19 @@
     });
 
 })(jQuery);
+
+    // ── PROD-01: Campos condicionales según tipo de producto ─────
+    // Mostrar/ocultar campos según el tipo seleccionado
+    function updateProductTypeFields() {
+        var tipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
+        // Peso/dimensiones/SKU/shipping class: solo physical y restaurant
+        var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-np-physical-fields').toggle(showPhysical);
+        // Archivo descargable: solo digital
+        $('#ltms-np-digital-fields').toggle(tipo === 'digital');
+        // Stock: ocultar para digital y service (no manejan stock físico)
+        var showStock = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-np-stock').closest('div').toggle(showStock);
+    }
+    $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
+    updateProductTypeFields();

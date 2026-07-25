@@ -672,13 +672,67 @@ class LTMS_Products_Ajax {
         // aparezcan en el dashboard del vendedor (get_vendor_orders filtra por esta meta).
         update_post_meta( $product_id, '_ltms_vendor_id', $current_user_id );
 
-        // CS-05: guardar tipo (physical/digital/service/booking) para lógica de comisiones
+        // CS-05: guardar tipo (physical/digital/service/booking/restaurant) para lógica de comisiones
         // Mapeo legacy: 'product' → 'physical'
-        $product_type = sanitize_key( $_POST['product_type'] ?? 'physical' );
-        if ( $product_type === 'product' || ! in_array( $product_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
+        $product_type = sanitize_key( $_POST['product_type'] ?? 'physical' ); // phpcs:ignore
+        if ( $product_type === 'product' || ! in_array( $product_type, [ 'physical', 'digital', 'service', 'booking', 'restaurant' ], true ) ) {
             $product_type = 'physical';
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
+
+        // PROD-09: Short description (excerpt)
+        $short_desc = isset( $_POST['short_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['short_description'] ) ) : ''; // phpcs:ignore
+        if ( $short_desc ) {
+            $product->set_short_description( $short_desc );
+            $product->save();
+        }
+
+        // PROD-06: SKU
+        $sku = isset( $_POST['sku'] ) ? sanitize_text_field( wp_unslash( $_POST['sku'] ) ) : ''; // phpcs:ignore
+        if ( $sku ) {
+            try { $product->set_sku( $sku ); $product->save(); } catch ( \Throwable $e ) { /* SKU duplicado — ignorar */ }
+        }
+
+        // PROD-07: Shipping class
+        $shipping_class_id = isset( $_POST['shipping_class_id'] ) ? absint( $_POST['shipping_class_id'] ) : 0; // phpcs:ignore
+        if ( $shipping_class_id ) {
+            $product->set_shipping_class_id( $shipping_class_id );
+            $product->save();
+        }
+
+        // PROD-12: Virtual para servicios
+        if ( $product_type === 'service' ) {
+            $product->set_virtual( true );
+            $product->save();
+        }
+
+        // PROD-03: Archivo descargable para productos digitales
+        if ( $product_type === 'digital' ) {
+            $download_url = isset( $_POST['download_url'] ) ? esc_url_raw( wp_unslash( $_POST['download_url'] ) ) : ''; // phpcs:ignore
+            if ( $download_url ) {
+                $product->set_downloadable( true );
+                $download = new WC_Product_Download();
+                $download->set_id( md5( $download_url ) );
+                $download->set_name( $name );
+                $download->set_file( $download_url );
+                $product->set_downloads( [ $download ] );
+                $download_limit = isset( $_POST['download_limit'] ) ? absint( $_POST['download_limit'] ) : 0; // phpcs:ignore
+                $download_expiry = isset( $_POST['download_expiry'] ) ? absint( $_POST['download_expiry'] ) : 0; // phpcs:ignore
+                $product->set_download_limit( $download_limit );
+                $product->set_download_expiry( $download_expiry );
+                $product->set_virtual( true );
+                $product->save();
+            }
+        }
+
+        // PROD-08: Tags
+        $tags_raw = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : ''; // phpcs:ignore
+        if ( $tags_raw ) {
+            $tags = array_filter( array_map( 'trim', explode( ',', $tags_raw ) ) );
+            if ( ! empty( $tags ) ) {
+                wp_set_object_terms( $product_id, $tags, 'product_tag' );
+            }
+        }
 
         // CS-08: ReDi toggle + tasa con validación de rango
         if ( 'yes' === get_option( 'ltms_redi_enabled' ) ) {

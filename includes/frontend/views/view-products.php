@@ -155,11 +155,21 @@ $products  = wc_get_products([
             <textarea id="ltms-np-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;" placeholder="<?php esc_attr_e( 'Describe tu producto...', 'ltms' ); ?>"></textarea>
         </div>
 
-        <!-- Precio y Stock en fila -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <!-- PROD-09: Descripción corta (excerpt) — aparece en la página de producto como short description -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Descripción Corta', 'ltms' ); ?></label>
+            <textarea id="ltms-np-short-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;" placeholder="<?php esc_attr_e( 'Resumen breve que aparece junto al precio (máx 200 caracteres)...', 'ltms' ); ?>"></textarea>
+        </div>
+
+        <!-- Precio, Precio de oferta y Stock en fila -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
             <div>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Precio *', 'ltms' ); ?></label>
                 <input type="number" id="ltms-np-price" min="0" step="0.01" required style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="0.00">
+            </div>
+            <div>
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Oferta', 'ltms' ); ?></label>
+                <input type="number" id="ltms-np-sale-price" min="0" step="0.01" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>">
             </div>
             <div>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Stock', 'ltms' ); ?></label>
@@ -167,29 +177,96 @@ $products  = wc_get_products([
             </div>
         </div>
 
-        <!-- CS-07: Tipo — grilla 2×2 con los 4 tipos definidos por el marketplace -->
+        <!-- CS-07 + PROD-01: Tipo — grilla 2×3 con los 5 tipos (agregado restaurant) -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                 <?php esc_html_e( 'Tipo de Producto', 'ltms' ); ?>
             </label>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-physical-lbl">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-physical-lbl">
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-physical" value="physical" checked style="accent-color:#1a5276;">
-                    <span>📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
+                    <span style="font-size:0.8rem;">📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-digital-lbl">
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-digital-lbl">
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-digital" value="digital" style="accent-color:#1a5276;">
-                    <span>💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
+                    <span style="font-size:0.8rem;">💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-service-lbl">
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-service-lbl">
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-service" value="service" style="accent-color:#1a5276;">
-                    <span>🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
+                    <span style="font-size:0.8rem;">🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-booking-lbl">
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-booking-lbl">
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-booking" value="booking" style="accent-color:#1a5276;">
-                    <span>🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                    <span style="font-size:0.8rem;">🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-restaurant-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-restaurant" value="restaurant" style="accent-color:#1a5276;">
+                    <span style="font-size:0.8rem;">🍽️ <?php esc_html_e( 'Restaurante', 'ltms' ); ?></span>
                 </label>
             </div>
+        </div>
+
+        <!-- PROD-06: SKU + PROD-05: Peso y dimensiones (solo para physical y restaurant) -->
+        <div id="ltms-np-physical-fields" style="margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'SKU', 'ltms' ); ?></label>
+                    <input type="text" id="ltms-np-sku" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Peso (kg)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-weight" min="0" step="0.01" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Largo (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-length" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Ancho (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-width" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Alto (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-height" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Clase de envío', 'ltms' ); ?></label>
+                    <select id="ltms-np-shipping-class" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                        <option value=""><?php esc_html_e( 'Sin clase', 'ltms' ); ?></option>
+                        <?php
+                        $np_ship_classes = get_terms([ 'taxonomy' => 'product_shipping_class', 'hide_empty' => false ]);
+                        if ( ! is_wp_error( $np_ship_classes ) ) :
+                            foreach ( $np_ship_classes as $np_sc ) :
+                        ?>
+                        <option value="<?php echo esc_attr( $np_sc->term_id ); ?>"><?php echo esc_html( $np_sc->name ); ?></option>
+                        <?php endforeach; endif; ?>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROD-03: Archivo descargable (solo para digital) -->
+        <div id="ltms-np-digital-fields" style="display:none;margin-bottom:14px;padding:14px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">💾 <?php esc_html_e( 'Archivo descargable', 'ltms' ); ?></label>
+            <input type="url" id="ltms-np-download-url" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;margin-bottom:8px;" placeholder="<?php esc_attr_e( 'https://... (URL del archivo a descargar)', 'ltms' ); ?>">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Límite descargas', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-download-limit" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( '0 = ilimitado', 'ltms' ); ?>">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Expira (días)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-download-expiry" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( '0 = nunca', 'ltms' ); ?>">
+                </div>
+            </div>
+        </div>
+
+        <!-- PROD-08: Tags -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Etiquetas', 'ltms' ); ?></label>
+            <input type="text" id="ltms-np-tags" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="<?php esc_attr_e( 'Separa con comas: rojo, algodón, verano', 'ltms' ); ?>">
         </div>
 
         <!-- Categoría -->
