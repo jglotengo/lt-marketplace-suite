@@ -276,8 +276,19 @@
 
             if (data.success) {
                 // Registration successful — redirect or show success
-                if (data.data && data.data.redirect) {
-                    showNotice('<strong>¡Cuenta creada!</strong> Redirigiendo…', 'success');
+                if (data.data && data.data.email_verification_required) {
+                    // Email verification required — NO auto-login. Show clear message
+                    // and redirect to login page so user knows to check inbox.
+                    showNotice('<strong>¡Cuenta creada!</strong> Te enviamos un email de verificación. Revisa tu bandeja de entrada (y spam) y haz clic en el enlace para activar tu cuenta.', 'success');
+                    // Redirect to login after 4s (give user time to read)
+                    setTimeout(function () {
+                        if (data.data.redirect) {
+                            window.location.href = data.data.redirect;
+                        }
+                    }, 4000);
+                } else if (data.data && data.data.redirect) {
+                    // Auto-login — redirect to dashboard
+                    showNotice('<strong>¡Cuenta creada!</strong> Redirigiendo a tu panel…', 'success');
                     setTimeout(function () { window.location.href = data.data.redirect; }, 1500);
                 } else {
                     showNotice('<strong>¡Cuenta creada!</strong> Revisa tu email para verificar tu cuenta.', 'success');

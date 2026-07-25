@@ -135,7 +135,17 @@ final class LTMS_Public_Auth_Handler {
             return $this->render_already_logged_in();
         }
 
+        // UX-REG-07: mostrar mensaje de "verifica tu email" si viene del registro.
+        $registered_notice = '';
+        if ( isset( $_GET['registered'] ) && $_GET['registered'] === '1' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $registered_notice = '<div class="ltms-notice ltms-notice-success" style="padding:16px;margin-bottom:20px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">'
+                . '<h3 style="margin:0 0 8px;color:#15803d;">✅ ¡Cuenta creada exitosamente!</h3>'
+                . '<p style="margin:0;color:#166534;">Te enviamos un email de verificación. <strong>Revisa tu bandeja de entrada y tu carpeta de spam</strong>. Haz clic en el enlace del email para activar tu cuenta y acceder a tu panel de vendedor.</p>'
+                . '</div>';
+        }
+
         ob_start();
+        echo $registered_notice; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — HTML estático, seguro
         $view = LTMS_INCLUDES_DIR . 'frontend/views/vendor-parts/form-login.php';
         if ( file_exists( $view ) ) {
             include $view;
@@ -674,7 +684,10 @@ final class LTMS_Public_Auth_Handler {
             // No auth cookie — the user must click the verification link in the
             // welcome email. Redirect them to the login page with a clear
             // message so they know to check their inbox.
-            $redirect = $login_id ? get_permalink( $login_id ) : home_url();
+            $login_url = $login_id ? get_permalink( $login_id ) : home_url();
+            // UX-REG-07: agregar ?registered=1 para que el login page muestre
+            // un mensaje claro de "verifica tu email" en vez de solo el form.
+            $redirect = add_query_arg( 'registered', '1', $login_url );
             $message  = __( 'Registration successful. Please check your email to verify your account.', 'ltms' );
         } else {
             // Email verification is optional — auto-login (legacy behavior).
