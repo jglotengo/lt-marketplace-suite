@@ -75,7 +75,85 @@
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 3. UX-REG-01 FIX: Wizard navigation handler (was missing entirely).
+    // 3. UX-REG-08 FIX: Login form handler — must be BEFORE the registration
+    //    form check (if (!form) return) because on the login page there is
+    //    no registration form, and the early return would skip this handler.
+    // ════════════════════════════════════════════════════════════════
+    var loginForm = document.getElementById('ltms-login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            var loginNotice = document.getElementById('ltms-login-notice');
+            function showLoginNotice(message, type) {
+                if (!loginNotice) return;
+                loginNotice.className = 'ltms-notice ltms-notice-' + (type || 'info');
+                loginNotice.innerHTML = '<p>' + message + '</p>';
+                loginNotice.style.display = 'block';
+            }
+            function clearLoginNotice() {
+                if (!loginNotice) return;
+                loginNotice.style.display = 'none';
+                loginNotice.innerHTML = '';
+            }
+
+            clearLoginNotice();
+
+            var username = loginForm.querySelector('#ltms-login-username');
+            var password = loginForm.querySelector('#ltms-login-password');
+            var remember = loginForm.querySelector('input[name="rememberme"]');
+            var submitBtn = document.getElementById('ltms-login-btn');
+            var btnText = submitBtn ? submitBtn.querySelector('.ltms-btn-text') : null;
+            var btnSpinner = submitBtn ? submitBtn.querySelector('.ltms-btn-spinner') : null;
+
+            if (!username.value || !password.value) {
+                showLoginNotice('Usuario y contraseña son requeridos.', 'error');
+                return;
+            }
+
+            if (submitBtn) submitBtn.disabled = true;
+            if (btnText) btnText.style.display = 'none';
+            if (btnSpinner) btnSpinner.style.display = 'inline-block';
+
+            var loginData = new FormData();
+            loginData.append('action', 'ltms_vendor_login');
+            loginData.append('username', username.value);
+            loginData.append('password', password.value);
+            loginData.append('remember', remember && remember.checked ? '1' : '0');
+            loginData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
+
+            fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                body: loginData,
+                credentials: 'same-origin'
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (submitBtn) submitBtn.disabled = false;
+                if (btnText) btnText.style.display = '';
+                if (btnSpinner) btnSpinner.style.display = 'none';
+
+                if (data.success) {
+                    showLoginNotice('<strong>¡Bienvenido!</strong> Redirigiendo…', 'success');
+                    if (data.data && data.data.redirect) {
+                        setTimeout(function () { window.location.href = data.data.redirect; }, 1000);
+                    }
+                } else {
+                    var msg = data.data && data.data.message ? data.data.message : 'Usuario o contraseña incorrectos.';
+                    showLoginNotice(msg, 'error');
+                }
+            })
+            .catch(function (err) {
+                if (submitBtn) submitBtn.disabled = false;
+                if (btnText) btnText.style.display = '';
+                if (btnSpinner) btnSpinner.style.display = 'none';
+                showLoginNotice('Error de conexión. Intenta de nuevo.', 'error');
+            });
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 4. UX-REG-01 FIX: Wizard navigation handler (registration page only).
     // ════════════════════════════════════════════════════════════════
     var form = document.getElementById('ltms-register-form');
     if (!form) return;
@@ -351,85 +429,5 @@
         });
     });
     updateBtypeNotices();
-
-    // ════════════════════════════════════════════════════════════════
-    // 7. UX-REG-08 FIX: Login form handler (was missing entirely — same
-    //    bug as UX-REG-01 but for the login form. The #ltms-login-form
-    //    had type="submit" but no JS handler, so the form POSTed normally
-    //    and WordPress didn't know how to process it → page reloaded →
-    //    user never logged in → redirected to registration.
-    // ════════════════════════════════════════════════════════════════
-    var loginForm = document.getElementById('ltms-login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            var loginNotice = document.getElementById('ltms-login-notice');
-            function showLoginNotice(message, type) {
-                if (!loginNotice) return;
-                loginNotice.className = 'ltms-notice ltms-notice-' + (type || 'info');
-                loginNotice.innerHTML = '<p>' + message + '</p>';
-                loginNotice.style.display = 'block';
-            }
-            function clearLoginNotice() {
-                if (!loginNotice) return;
-                loginNotice.style.display = 'none';
-                loginNotice.innerHTML = '';
-            }
-
-            clearLoginNotice();
-
-            var username = loginForm.querySelector('#ltms-login-username');
-            var password = loginForm.querySelector('#ltms-login-password');
-            var remember = loginForm.querySelector('input[name="rememberme"]');
-            var submitBtn = document.getElementById('ltms-login-btn');
-            var btnText = submitBtn ? submitBtn.querySelector('.ltms-btn-text') : null;
-            var btnSpinner = submitBtn ? submitBtn.querySelector('.ltms-btn-spinner') : null;
-
-            if (!username.value || !password.value) {
-                showLoginNotice('Usuario y contraseña son requeridos.', 'error');
-                return;
-            }
-
-            if (submitBtn) submitBtn.disabled = true;
-            if (btnText) btnText.style.display = 'none';
-            if (btnSpinner) btnSpinner.style.display = 'inline-block';
-
-            var loginData = new FormData();
-            loginData.append('action', 'ltms_vendor_login');
-            loginData.append('username', username.value);
-            loginData.append('password', password.value);
-            loginData.append('remember', remember && remember.checked ? '1' : '0');
-            loginData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
-
-            fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
-                method: 'POST',
-                body: loginData,
-                credentials: 'same-origin'
-            })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (submitBtn) submitBtn.disabled = false;
-                if (btnText) btnText.style.display = '';
-                if (btnSpinner) btnSpinner.style.display = 'none';
-
-                if (data.success) {
-                    showLoginNotice('<strong>¡Bienvenido!</strong> Redirigiendo…', 'success');
-                    if (data.data && data.data.redirect) {
-                        setTimeout(function () { window.location.href = data.data.redirect; }, 1000);
-                    }
-                } else {
-                    var msg = data.data && data.data.message ? data.data.message : 'Usuario o contraseña incorrectos.';
-                    showLoginNotice(msg, 'error');
-                }
-            })
-            .catch(function (err) {
-                if (submitBtn) submitBtn.disabled = false;
-                if (btnText) btnText.style.display = '';
-                if (btnSpinner) btnSpinner.style.display = 'none';
-                showLoginNotice('Error de conexión. Intenta de nuevo.', 'error');
-            });
-        });
-    }
 
 })();
