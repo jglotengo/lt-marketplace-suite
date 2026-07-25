@@ -400,21 +400,27 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
             </div>
         </div>
 
-        <!-- Tipo — grilla 2×2 -->
+        <!-- Tipo — grilla 2×3 con 6 tipos (PROD-01: agregado restaurant + variable) -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Tipo de Producto', 'ltms' ); ?></label>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-physical-lbl">
-                    <input type="radio" name="ltms_ep_tipo" value="physical" style="accent-color:#1a5276;"> <span>📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-physical-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="physical" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">📦 <?php esc_html_e( 'Físico', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-digital-lbl">
-                    <input type="radio" name="ltms_ep_tipo" value="digital" style="accent-color:#1a5276;"> <span>💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-digital-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="digital" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">💾 <?php esc_html_e( 'Digital', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-service-lbl">
-                    <input type="radio" name="ltms_ep_tipo" value="service" style="accent-color:#1a5276;"> <span>🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-service-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="service" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">🔧 <?php esc_html_e( 'Servicio', 'ltms' ); ?></span>
                 </label>
-                <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-booking-lbl">
-                    <input type="radio" name="ltms_ep_tipo" value="booking" style="accent-color:#1a5276;"> <span>🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-booking-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="booking" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">🏨 <?php esc_html_e( 'Turismo', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-restaurant-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="restaurant" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">🍽️ <?php esc_html_e( 'Restaurante', 'ltms' ); ?></span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-ep-tipo-variable-lbl">
+                    <input type="radio" name="ltms_ep_tipo" value="variable" style="accent-color:#1a5276;"> <span style="font-size:0.8rem;">🎨 <?php esc_html_e( 'Variaciones', 'ltms' ); ?></span>
                 </label>
             </div>
         </div>

@@ -283,7 +283,7 @@
 
     // Highlight tipo en modal edición
     $(document).on('change','input[name="ltms_ep_tipo"]',function(){
-        ['physical','digital','service','booking'].forEach(function(t){ $('#ltms-ep-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'}); });
+        ['physical','digital','service','booking','restaurant','variable'].forEach(function(t){ $('#ltms-ep-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'}); });
         $('#ltms-ep-tipo-'+$(this).val()+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
     });
 
