@@ -672,13 +672,90 @@ class LTMS_Products_Ajax {
         // aparezcan en el dashboard del vendedor (get_vendor_orders filtra por esta meta).
         update_post_meta( $product_id, '_ltms_vendor_id', $current_user_id );
 
-        // CS-05: guardar tipo (physical/digital/service/booking/restaurant) para lógica de comisiones
-        // Mapeo legacy: 'product' → 'physical'
+        // CS-05 + PROD-02: guardar tipo (physical/digital/service/booking/restaurant/variable)
         $product_type = sanitize_key( $_POST['product_type'] ?? 'physical' ); // phpcs:ignore
-        if ( $product_type === 'product' || ! in_array( $product_type, [ 'physical', 'digital', 'service', 'booking', 'restaurant' ], true ) ) {
+        if ( $product_type === 'product' || ! in_array( $product_type, [ 'physical', 'digital', 'service', 'booking', 'restaurant', 'variable' ], true ) ) {
             $product_type = 'physical';
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
+
+        // PROD-02: Crear variaciones si el tipo es 'variable'
+        $variation_attrs_raw = isset( $_POST['variation_attributes'] ) ? wp_unslash( $_POST['variation_attributes'] ) : ''; // phpcs:ignore
+        if ( $product_type === 'variable' && ! empty( $variation_attrs_raw ) ) {
+            $variation_attrs = json_decode( $variation_attrs_raw, true );
+            if ( is_array( $variation_attrs ) && ! empty( $variation_attrs ) ) {
+                // Convertir el producto simple a variable
+                // WC no permite cambiar el tipo directamente, pero podemos usar wp_set_object_terms
+                wp_set_object_terms( $product_id, [ 'variable' ], 'product_type' );
+
+                // Crear atributos
+                $attributes = [];
+                foreach ( $variation_attrs as $attr ) {
+                    $attr_name = sanitize_text_field( $attr['name'] );
+                    $attr_values = array_map( 'sanitize_text_field', $attr['values'] );
+                    if ( empty( $attr_name ) || empty( $attr_values ) ) continue;
+
+                    // Crear o obtener la taxonomía de atributo
+                    $taxonomy = wc_attribute_taxonomy_name( $attr_name );
+                    if ( ! taxonomy_exists( $taxonomy ) ) {
+                        $attr_id = wc_create_attribute( [ 'name' => $attr_name, 'slug' => sanitize_title( $attr_name ), 'type' => 'select' ] );
+                        if ( is_wp_error( $attr_id ) ) continue;
+                        register_taxonomy( $taxonomy, 'product_variation', [ 'hierarchical' => false ] );
+                    }
+
+                    // Asignar términos al producto
+                    $term_ids = [];
+                    foreach ( $attr_values as $val ) {
+                        $term = get_term_by( 'name', $val, $taxonomy );
+                        if ( ! $term ) {
+                            $term = wp_insert_term( $val, $taxonomy );
+                            if ( is_wp_error( $term ) ) continue;
+                            $term_ids[] = $term['term_id'];
+                        } else {
+                            $term_ids[] = $term->term_id;
+                        }
+                    }
+                    wp_set_post_terms( $product_id, $term_ids, $taxonomy );
+
+                    // Configurar el atributo en el producto
+                    $attribute = new WC_Product_Attribute();
+                    $attribute->set_id( wc_attribute_taxonomy_id_by_name( $attr_name ) );
+                    $attribute->set_name( $taxonomy );
+                    $attribute->set_options( $term_ids );
+                    $attribute->set_position( 0 );
+                    $attribute->set_visible( true );
+                    $attribute->set_variation( true );
+                    $attributes[ $taxonomy ] = $attribute;
+                }
+
+                if ( ! empty( $attributes ) ) {
+                    $variable_product = wc_get_product( $product_id );
+                    if ( $variable_product ) {
+                        $variable_product->set_attributes( $attributes );
+                        $variable_product->save();
+
+                        // Crear variaciones (una por combinación de valores)
+                        $base_price = (float) $price;
+                        // Para simplicidad: crear una variación por cada valor del primer atributo
+                        $first_attr = reset( $variation_attrs );
+                        $first_taxonomy = wc_attribute_taxonomy_name( sanitize_text_field( $first_attr['name'] ) );
+                        foreach ( $first_attr['values'] as $val ) {
+                            $variation = new WC_Product_Variation();
+                            $variation->set_parent_id( $product_id );
+                            $variation->set_regular_price( (string) $base_price );
+                            $variation->set_status( 'publish' );
+
+                            // Asignar el atributo a la variación
+                            $term = get_term_by( 'name', sanitize_text_field( $val ), $first_taxonomy );
+                            if ( $term ) {
+                                $variation->set_attributes( [ $first_taxonomy => sanitize_title( $term->slug ) ] );
+                            }
+                            $variation->save();
+                        }
+                    }
+                }
+            }
+        }
 
         // PROD-09: Short description (excerpt)
         $short_desc = isset( $_POST['short_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['short_description'] ) ) : ''; // phpcs:ignore

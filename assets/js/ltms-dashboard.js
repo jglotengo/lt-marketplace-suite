@@ -1545,6 +1545,7 @@
                                 '<option value="service">🔧 Servicio</option>' +
                                 '<option value="booking">🏨 Turismo</option>' +
                                 '<option value="restaurant">🍽️ Restaurante</option>' +
+                                '<option value="variable">🎨 Con Variaciones (tallas/colores)</option>' +
                             '</select>' +
                         '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
@@ -1593,6 +1594,15 @@
                             '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Expira en días (0=nunca)</label><input type="number" id="ltms-np-download-expiry" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
                             '</div>' +
                         '</div>' +
+                        '<div id="ltms-np-variable-fields" style="display:none;margin-bottom:15px;padding:14px;background:#faf5ff;border:1px solid #ddd6fe;border-radius:8px;">' +
+                            '<label style="display:block;font-weight:600;margin-bottom:8px;">🎨 Variaciones del producto</label>' +
+                            '<p style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">Define atributos (tallas, colores, etc.) y el precio de cada variación.</p>' +
+                            '<div id="ltms-np-attributes" style="margin-bottom:12px;">' +
+                            '</div>' +
+                            '<button type="button" id="ltms-np-add-attribute" style="padding:8px 14px;border:1px dashed #8b5cf6;border-radius:6px;background:#f5f3ff;cursor:pointer;color:#6d28d9;font-size:0.85rem;">+ Agregar atributo (ej: Talla)</button>' +
+                            '<div id="ltms-np-variations" style="margin-top:12px;">' +
+                            '</div>' +
+                        '</div>' +
                         '<div class="ltms-form-group" style="margin-bottom:15px;">' +
                             '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
                             '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
@@ -1629,6 +1639,21 @@
                     jQuery('#ltms-np-type').on('change', function() {
                         var tipo = jQuery(this).val();
                         jQuery('#ltms-np-digital-fields').toggle(tipo === 'digital');
+                        jQuery('#ltms-np-variable-fields').toggle(tipo === 'variable');
+                    });
+                    // PROD-02: Agregar atributo para variaciones
+                    var npAttrCount = 0;
+                    jQuery('#ltms-np-add-attribute').on('click', function() {
+                        npAttrCount++;
+                        var attrId = 'ltms-np-attr-' + npAttrCount;
+                        var html = '<div id="' + attrId + '" style="margin-bottom:10px;padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;">' +
+                            '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+                            '<input type="text" id="' + attrId + '-name" placeholder="Nombre (ej: Talla)" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                            '<button type="button" onclick="jQuery(\'#' + attrId + '\').remove()" style="padding:4px 8px;border:none;background:#fee;color:#c00;border-radius:4px;cursor:pointer;font-size:0.8rem;">✕</button>' +
+                            '</div>' +
+                            '<input type="text" id="' + attrId + '-values" placeholder="Valores separados por | (ej: S|M|L|XL)" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                            '</div>';
+                        jQuery('#ltms-np-attributes').append(html);
                     });
                     jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
                     var npGalleryIds = [];
@@ -1712,6 +1737,17 @@
                         }
                         jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
                         const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
+                        // PROD-02: Recopilar atributos para variaciones
+                        var varAttributes = [];
+                        if (jQuery('#ltms-np-type').val() === 'variable') {
+                            jQuery('#ltms-np-attributes > div').each(function() {
+                                var name = jQuery(this).find('input[id$="-name"]').val();
+                                var values = jQuery(this).find('input[id$="-values"]').val();
+                                if (name && values) {
+                                    varAttributes.push({ name: name, values: values.split('|').map(function(v){return v.trim();}).filter(Boolean) });
+                                }
+                            });
+                        }
                         jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
                             action: 'ltms_create_product', nonce: nonce,
                             name: name, price: price, status: status,
@@ -1731,6 +1767,7 @@
                             download_url: jQuery('#ltms-np-download-url').val(),
                             download_limit: jQuery('#ltms-np-download-limit').val(),
                             download_expiry: jQuery('#ltms-np-download-expiry').val(),
+                            variation_attributes: varAttributes.length ? JSON.stringify(varAttributes) : '',
                             image_id: jQuery('#ltms-np-img-id').val(),
                             gallery_ids: jQuery('#ltms-np-gallery-ids').val(),
                             redi_enabled: jQuery('#ltms-np-redi-enabled').is(':checked') ? 1 : 0,
