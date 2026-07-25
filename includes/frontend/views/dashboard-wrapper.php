@@ -179,7 +179,31 @@ if ( $_show_drivers ) {
         </div>
 
         <nav class="ltms-sidebar-nav">
-            <?php foreach ( $nav_items as $item ) : ?>
+            <?php
+            // UX-REG-11: Agrupar nav items en secciones visuales para evitar
+            // que 20+ items se vean amontonados. Las secciones son labels
+            // no interactivos que mejoran la navegación.
+            $nav_sections = [
+                'Vender'      => [ 'home', 'orders', 'products' ],
+                'Logística'   => [ 'envios', 'shipping-statement', 'drivers', 'ordi', 'incidents', 'kitchen', 'ordenes-compra', 'redi' ],
+                'Finanzas'    => [ 'wallet', 'insurance', 'donations' ],
+                'Herramientas' => [ 'bookings', 'marketing', 'posgold', 'analytics', 'security' ],
+                'Cuenta'      => [ 'settings' ],
+            ];
+            $section_map = [];
+            foreach ( $nav_sections as $section_name => $views ) {
+                foreach ( $views as $v ) {
+                    $section_map[ $v ] = $section_name;
+                }
+            }
+            $current_section = '';
+            foreach ( $nav_items as $item ) :
+                $item_section = $section_map[ $item['view'] ] ?? 'Otros';
+                if ( $item_section !== $current_section ) :
+                    $current_section = $item_section;
+            ?>
+            <div class="ltms-nav-section-label"><?php echo esc_html( $current_section ); ?></div>
+            <?php endif; ?>
             <button type="button"
                     class="ltms-nav-item <?php echo $item['view'] === 'home' ? 'active' : ''; ?>"
                     data-view="<?php echo esc_attr( $item['view'] ); ?>">

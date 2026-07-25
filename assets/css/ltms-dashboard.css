@@ -1107,3 +1107,54 @@ select.ltms-form-control   { cursor: pointer; }
     height: 260px;
     display: block;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   UX-REG-11 FIX: Sidebar scrollable + secciones colapsables.
+   El sidebar tenía hasta 20+ items que desbordaban el viewport
+   causando overlap con el contenido. Ahora el nav es scrollable
+   y los items están agrupados en secciones visuales.
+   ════════════════════════════════════════════════════════════════ */
+.ltms-sidebar-nav {
+    padding: 8px 0;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+.ltms-sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+.ltms-sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ltms-sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+}
+
+/* Secciones del sidebar (separadores visuales) */
+.ltms-nav-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 12px 20px 4px;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Asegurar que el sidebar no crezca más allá del viewport */
+.ltms-sidebar {
+    max-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* En desktop, asegurar scroll solo en el nav, no en todo el sidebar */
+@media (min-width: 769px) {
+    .ltms-sidebar-nav {
+        max-height: calc(100vh - 140px); /* viewport - logo - balance */
+    }
+}
