@@ -620,7 +620,15 @@ class LTMS_Products_Ajax {
         $stock              = isset( $_POST['stock'] ) && $_POST['stock'] !== '' ? intval( $_POST['stock'] ) : null;
         $category_id        = intval( $_POST['category_id'] ?? 0 );
         $image_id           = intval( $_POST['image_id'] ?? 0 );
-        $status             = sanitize_text_field( $_POST['status'] ?? 'pending' );
+        $status             = sanitize_text_field( $_POST['status'] ?? 'pending' ); // phpcs:ignore
+        // PROD-QA-01 FIX: si el vendor tiene KYC aprobado y solicita 'publish',
+        // permitirlo. Si no tiene KYC, forzar 'pending' (no puede publicar directamente).
+        // Antes, el JS siempre enviaba 'pending' incluso cuando el botón decía
+        // "Publicar Producto", causando que los productos no se vieran en el storefront.
+        $kyc_status = get_user_meta( get_current_user_id(), 'ltms_kyc_status', true );
+        if ( $status === 'publish' && $kyc_status !== 'approved' ) {
+            $status = 'pending'; // Sin KYC aprobado, no puede publicar directamente.
+        }
         $catalog_visibility = sanitize_key( $_POST['catalog_visibility'] ?? 'visible' );
         $weight             = isset( $_POST['weight'] ) && $_POST['weight'] !== '' ? sanitize_text_field( wp_unslash( $_POST['weight'] ) ) : null;
         $dim_length         = isset( $_POST['dim_length'] ) && $_POST['dim_length'] !== '' ? sanitize_text_field( wp_unslash( $_POST['dim_length'] ) ) : null;

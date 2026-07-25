@@ -376,6 +376,61 @@ do_action( 'woocommerce_before_main_content' );
                 </div>
 
                 <?php
+                // PROD-DIG-01 / PROD-SVC-01 / PROD-REST-01: Badge de tipo de producto
+                $_ltms_type = get_post_meta( $product_id, '_ltms_product_type', true );
+                $_type_labels = [
+                    'physical'   => [ 'icon' => '📦', 'label' => __( 'Producto físico', 'ltms' ) ],
+                    'digital'    => [ 'icon' => '💾', 'label' => __( 'Producto digital (descarga inmediata)', 'ltms' ) ],
+                    'service'    => [ 'icon' => '🔧', 'label' => __( 'Servicio', 'ltms' ) ],
+                    'booking'    => [ 'icon' => '🏨', 'label' => __( 'Turismo / Alojamiento', 'ltms' ) ],
+                    'restaurant' => [ 'icon' => '🍽️', 'label' => __( 'Producto de restaurante', 'ltms' ) ],
+                    'variable'   => [ 'icon' => '🎨', 'label' => __( 'Producto con variaciones', 'ltms' ) ],
+                ];
+                if ( isset( $_type_labels[ $_ltms_type ] ) ) :
+                    $_tl = $_type_labels[ $_ltms_type ];
+                ?>
+                <div class="pv-product-type-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f3f4f6;border-radius:20px;font-size:0.8rem;color:#374151;margin-bottom:12px;">
+                    <span><?php echo esc_html( $_tl['icon'] ); ?></span>
+                    <span><?php echo esc_html( $_tl['label'] ); ?></span>
+                </div>
+                <?php endif; ?>
+
+                <?php
+                // PROD-DIG-01: Info de descarga para productos digitales
+                if ( $_ltms_type === 'digital' && $product->is_downloadable() ) :
+                    $_downloads = $product->get_downloads();
+                    $_dl_limit = $product->get_download_limit();
+                    $_dl_expiry = $product->get_download_expiry();
+                ?>
+                <div class="pv-digital-info" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:12px;">
+                    <p style="margin:0;font-size:0.85rem;color:#166534;">
+                        💾 <strong><?php esc_html_e( 'Descarga digital', 'ltms' ); ?></strong> —
+                        <?php echo esc_html( sprintf( _n( '%d archivo disponible', '%d archivos disponibles', count( $_downloads ), 'ltms' ), count( $_downloads ) ) ); ?>
+                        <?php if ( $_dl_limit > 0 ) : ?> · <?php echo esc_html( sprintf( _n( 'máx. %d descarga', 'máx. %d descargas', $_dl_limit, 'ltms' ), $_dl_limit ) ); ?><?php endif; ?>
+                        <?php if ( $_dl_expiry > 0 ) : ?> · <?php echo esc_html( sprintf( _n( 'expira en %d día', 'expira en %d días', $_dl_expiry, 'ltms' ), $_dl_expiry ) ); ?><?php endif; ?>
+                    </p>
+                </div>
+                <?php endif; ?>
+
+                <?php
+                // PROD-REST-01: Info de registro sanitario para restaurantes
+                if ( $_ltms_type === 'restaurant' && $vendor_id > 0 ) :
+                    $_sanitary = get_user_meta( $vendor_id, 'ltms_sanitary_registration', true );
+                    if ( $_sanitary ) :
+                        $_country = get_user_meta( $vendor_id, 'ltms_country', true ) ?: 'CO';
+                        $_reg_label = $_country === 'MX' ? __( 'Aviso de funcionamiento COFEPRIS', 'ltms' ) : __( 'Registro sanitario INVIMA', 'ltms' );
+                ?>
+                <div class="pv-restaurant-info" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;margin-bottom:12px;">
+                    <p style="margin:0;font-size:0.85rem;color:#9a3412;">
+                        🍽️ <strong><?php echo esc_html( $_reg_label ); ?>:</strong> <?php echo esc_html( $_sanitary ); ?>
+                    </p>
+                </div>
+                <?php
+                    endif;
+                endif;
+                ?>
+
+                <?php
                 /* -----------------------------------------------------------------
                  * Add to cart — envuelto en .pv-product-actions.
                  * woocommerce_template_single_add_to_cart() renderiza el form
@@ -559,6 +614,28 @@ do_action( 'woocommerce_before_main_content' );
                 do_action( 'ltms_single_product_shipping_section', $product, $vendor_id );
                 ?>
                 <?php if ( ! has_action( 'ltms_single_product_shipping_section' ) ) : ?>
+                    <?php
+                    // PROD-11: Mostrar peso y dimensiones del producto en la sección de envío
+                    $_has_weight = $product->has_weight();
+                    $_has_dims = $product->has_dimensions();
+                    $_shipping_class = $product->get_shipping_class();
+                    if ( $_has_weight || $_has_dims || $_shipping_class ) :
+                    ?>
+                    <div class="pv-shipping-info" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:16px;">
+                        <h4 style="margin:0 0 8px;font-size:0.9rem;color:#374151;">📦 Datos de envío</h4>
+                        <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#6b7280;">
+                            <?php if ( $_has_weight ) : ?>
+                            <li><strong>Peso:</strong> <?php echo esc_html( wc_format_weight( $product->get_weight() ) ); ?></li>
+                            <?php endif; ?>
+                            <?php if ( $_has_dims ) : ?>
+                            <li><strong>Dimensiones:</strong> <?php echo esc_html( wc_format_dimensions( $product->get_dimensions( false ) ) ); ?></li>
+                            <?php endif; ?>
+                            <?php if ( $_shipping_class ) : ?>
+                            <li><strong>Clase de envío:</strong> <?php echo esc_html( $_shipping_class ); ?></li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                    <?php endif; ?>
                     <p>
                         <?php esc_html_e( 'El tiempo de entrega estimado se calcula al finalizar la compra según tu ubicación y el método de envío seleccionado.', 'ltms' ); ?>
                     </p>

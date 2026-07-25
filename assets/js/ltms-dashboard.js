@@ -1788,7 +1788,7 @@
                         jQuery('#ltms-np-redi-rate-wrap').toggle(this.checked);
                         if (!this.checked) jQuery('#ltms-np-redi-rate').val('');
                     });
-                    jQuery('#ltms-np-submit').on('click', function() { submitProduct('pending'); });
+                    jQuery('#ltms-np-submit').on('click', function() { submitProduct('publish'); });
                     jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
                 }
             });
