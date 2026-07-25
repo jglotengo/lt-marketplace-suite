@@ -338,7 +338,8 @@
 
         // Collect form data
         var formData = new FormData(form);
-        formData.append('action', 'ltms_vendor_register');
+        var isCompleteProfile = window.location.search.indexOf('complete_profile=1') > -1;
+        formData.append('action', isCompleteProfile ? 'ltms_complete_profile' : 'ltms_vendor_register');
         formData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
 
         fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
@@ -354,7 +355,14 @@
 
             if (data.success) {
                 // Registration successful — redirect or show success
-                if (data.data && data.data.email_verification_required) {
+                if (isCompleteProfile) {
+                    showNotice('<strong>¡Perfil completado!</strong> Redirigiendo a tu panel…', 'success');
+                    setTimeout(function () {
+                        if (data.data && data.data.redirect) {
+                            window.location.href = data.data.redirect;
+                        }
+                    }, 1500);
+                } else if (data.data && data.data.email_verification_required) {
                     // Email verification required — NO auto-login. Show clear message
                     // and redirect to login page so user knows to check inbox.
                     showNotice('<strong>¡Cuenta creada!</strong> Te enviamos un email de verificación. Revisa tu bandeja de entrada (y spam) y haz clic en el enlace para activar tu cuenta.', 'success');
