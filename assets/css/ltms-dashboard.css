@@ -106,7 +106,7 @@
 }
 
 /* ── Main Content ───────────────────────────────────────────── */
-.ltms-main-content {
+.ltms-dashboard-container > .ltms-main-content {
     margin-left: var(--ltms-sidebar-w);
     flex: 1;
     display: flex;
@@ -485,7 +485,8 @@
         overflow-x: visible !important;
     }
 
-    /* Contenido principal */
+    /* Contenido principal — UX-REG-10 v4: fusionado en una sola regla
+       para que el minificador no separe margin-left:0 del @media. */
     .ltms-main-content {
         margin-left: 0 !important;
         width: 100% !important;
