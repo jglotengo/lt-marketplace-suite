@@ -462,12 +462,22 @@ window.elementor=window.elementor||{modules:{}};
 .ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important;text-decoration:none!important}
 
 /* ── HEADER OVERLAP FIX ───────────────────────────────────────────
-   El tema (WoodMart) imprime su header propio (con botones VENDER / MI CUENTA)
-   via wp_head/wp_footer hooks. Ese header es position:fixed/sticky con z-index
-   alto y cubre nuestra .ltms-sf-topbar (que tiene el carrito 🛒), haciendo
-   que el carrito sea invisible en desktop.
-   Solución: ocultar los selectores comunes del header del tema en la vitrina
-   y asegurar que nuestra topbar quede visible encima. */
+   PRODUCCIÓN v2.9.268: el overlap real NO es del tema WoodMart (la vitrina
+   usa Hello Elementor). El overlap lo causan elementos PROPIOS de LTMS:
+   1. #ltms-floating-access (ltms-header-nav.js) — botones VENDER / MI CUENTA
+      con position:fixed z-index:99997, se appenda a <body> cuando no hay
+      .site-header del tema.
+   2. #ltms-welcome-banner — banner azul "¡Bienvenido!" con position:fixed
+      z-index:99999 top:0, tapa la storefront topbar (z-index:9999).
+   Solución: ocultar ambos en la vitrina (la vitrina tiene su propio topbar
+   con logo, volver y carrito), más selectores del tema por defensa. */
+body.ltms-storefront-page #ltms-floating-access,
+body.ltms-storefront-page #ltms-hello-access,
+body.ltms-storefront-page #ltms-header-access,
+body.ltms-storefront-page .ltms-header-access,
+body.ltms-storefront-page #ltms-welcome-banner,
+body.ltms-storefront-page .ltms-live-chat-header,
+body.ltms-storefront-page .ltms-live-chat-header-info,
 body.ltms-storefront-page .whb-header,
 body.ltms-storefront-page .whb-sticky-header,
 body.ltms-storefront-page .woodmart-header,
@@ -479,7 +489,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
 
 /* Garantizar que nuestra topbar (con logo, volver y carrito) tenga el z-index
    más alto y quede fija arriba del todo. */
-.ltms-sf-topbar{position:sticky!important;top:0!important;z-index:9999!important}
+.ltms-sf-topbar{position:sticky!important;top:0!important;z-index:100000!important}
 </style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
