@@ -59,19 +59,19 @@ class LTMS_Native_Templates {
         // Override template_include con prioridad alta (después de WC y Elementor).
         add_filter( 'template_include', [ __CLASS__, 'maybe_override' ], 99 );
 
-        // Override de plantillas de WC content (parts).
-        // DISABLED: causing shop page crash. The content-product.php override
-        // is triggering a fatal error when WC loads it in the loop context.
-        // The single-product.php template works fine because it doesn't use
+        // SF-00 FIX: Override content-product.php en el loop de WC.
+        // Antes estaba deshabilitado por fatal error, pero el problema era
+        // que el filter woocommerce_locate_template interfería con TODOS
+        // los templates de WC. Ahora usamos woocommerce_get_template_part
+        // que es más específico y solo afecta content-product.
+        add_filter( 'woocommerce_get_template_part', [ __CLASS__, 'override_content_product' ], 10, 3 );
+
         // v2.9.211: Remove WC's default related products output to prevent
         // duplicate "Productos relacionados" sections. Our single-product.php
         // template calls woocommerce_related_products() explicitly with PV
         // design system wrapper. Elementor Theme Builder may also output its
         // own related products — those are deduped client-side via JS.
         add_action( 'init', [ __CLASS__, 'remove_default_related_products' ] );
-        // wc_get_template_part in a loop.
-        // add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_wc_template' ], 10, 3 );
-        // add_filter( 'woocommerce_template_loader_files', [ __CLASS__, 'template_loader_files' ], 10, 2 );
 
         // Enqueue design system assets.
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ], 20 );
@@ -117,6 +117,27 @@ class LTMS_Native_Templates {
      * Elementor Theme Builder may have its own related products widget — those are
      * deduped client-side via JS (see remove_duplicate_related_sections()).
      */
+    /**
+     * SF-00 FIX: Override content-product.php en el loop de WC.
+     *
+     * Intercepta woocommerce_get_template_part para reemplazar 'content-product'
+     * con nuestro template nativo (pv-product-card con vendor, rating, favoritos,
+     * quick view, discount badge, swatches, ATC AJAX).
+     *
+     * Solo afecta el template part 'content'/'product' — no interfiere con
+     * otros templates de WC (emails, admin, etc.).
+     */
+    public static function override_content_product( $template, $slug, $name ) {
+        // Solo interceptar content-product
+        if ( $slug === 'content' && $name === 'product' ) {
+            $native = self::$template_dir . 'wc-parts/content-product.php';
+            if ( file_exists( $native ) ) {
+                return $native;
+            }
+        }
+        return $template;
+    }
+
     public static function remove_default_related_products(): void {
         // WC default: add_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
         remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );

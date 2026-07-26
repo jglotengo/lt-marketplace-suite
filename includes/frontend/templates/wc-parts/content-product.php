@@ -72,6 +72,22 @@ $pv_manage_stock = $product->managing_stock();
 
 $pv_type = $product->get_type();
 
+// SF-04: Verificar si el producto tiene envío gratis (free shipping absorbed)
+$pv_free_shipping = false;
+$pv_vendor_id_temp = (int) get_post_field( 'post_author', $pv_pid );
+if ( $pv_vendor_id_temp > 0 ) {
+    $pv_ship_mode = get_user_meta( $pv_vendor_id_temp, 'ltms_shipping_mode', true );
+    if ( $pv_ship_mode === 'free_absorbed' ) {
+        $pv_free_shipping = true;
+    }
+}
+
+// SF-11: Stock urgency (solo si quedan pocos)
+$pv_stock_urgency = '';
+if ( $pv_manage_stock && $pv_in_stock && $pv_stock_qty !== null && $pv_stock_qty > 0 && $pv_stock_qty <= 5 ) {
+    $pv_stock_urgency = sprintf( __( '¡Solo quedan %d!', 'ltms' ), $pv_stock_qty );
+}
+
 /* ---------------------------------------------------------------------------
  * 2. Vendor (autor del producto)
  * ------------------------------------------------------------------------- */
@@ -173,6 +189,11 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
         <?php /* Out of stock badge */ ?>
         <?php if ( ! $pv_in_stock ) : ?>
             <span class="pv-product-card__discount pv-product-card__discount--muted"><?php esc_html_e( 'Agotado', 'ltms' ); ?></span>
+        <?php endif; ?>
+
+        <?php /* SF-04: Free shipping badge */ ?>
+        <?php if ( $pv_free_shipping && $pv_in_stock ) : ?>
+            <span class="pv-product-card__free-shipping"><?php esc_html_e( 'Envío gratis', 'ltms' ); ?></span>
         <?php endif; ?>
 
         <?php /* Fav button (wishlist) — enlace a ?add_to_wishlist=ID + data attribute para AJAX */ ?>

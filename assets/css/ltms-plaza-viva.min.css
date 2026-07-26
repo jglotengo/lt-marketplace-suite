@@ -880,3 +880,71 @@
 }
 
 /* end of file · ltms-plaza-viva.css */
+
+/* ════════════════════════════════════════════════════════════════
+   SF-04: Badge "Envío gratis" en product cards
+   SF-11: Stock urgency en product cards
+   ════════════════════════════════════════════════════════════════ */
+.pv-product-card__free-shipping {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    z-index: 2;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.pv-product-card__stock-urgency {
+    font-size: 0.7rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.pv-product-card__stock-urgency::before {
+    content: '🔥';
+    font-size: 0.85rem;
+}
+
+/* SF-06: Infinite scroll loader */
+.pv-infinite-scroll-loader {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-3);
+    font-size: 0.85rem;
+}
+.pv-infinite-scroll-loader svg {
+    animation: pv-spin 1s linear infinite;
+}
+@keyframes pv-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* SF-15: Skeleton loading para product grid */
+.pv-skeleton-card {
+    background: #f3f4f6;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+}
+.pv-skeleton-card::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: pv-shimmer 1.5s infinite;
+}
+@keyframes pv-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
