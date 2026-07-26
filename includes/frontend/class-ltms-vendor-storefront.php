@@ -416,12 +416,28 @@ window.elementor=window.elementor||{modules:{}};
    sobre cualquier estilo del tema WoodMart o WooCommerce. NO usar en el
    archivo .css externo donde el orden de carga no está garantizado. */
 
-/* Grid: siempre 2 columnas en móvil, 4 en desktop */
-.ltms-sf-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important;list-style:none!important;margin:0!important;padding:0!important}
-@media(min-width:768px){.ltms-sf-grid{grid-template-columns:repeat(4,1fr)!important;gap:20px!important}}
+/* Grid: siempre 2 columnas en móvil, 4 en desktop.
+   Scoping a .ltms-sf-view-grid para NO aplastar la vista lista
+   (.ltms-sf-view-list usa display:flex y flex-direction:column). */
+.ltms-sf-grid.ltms-sf-view-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important;list-style:none!important;margin:0!important;padding:0!important}
+@media(min-width:768px){.ltms-sf-grid.ltms-sf-view-grid{grid-template-columns:repeat(4,1fr)!important;gap:20px!important}}
 
-/* Card: flex column, sin herencia de float/text-align del tema */
-.ltms-sf-card{display:flex!important;flex-direction:column!important;background:#fff!important;border-radius:8px!important;overflow:hidden!important;text-align:left!important;float:none!important;width:auto!important;margin:0!important;padding:0!important}
+/* Vista lista: overrides con !important para ganar sobre el tema.
+   El external CSS (.ltms-sf-view-list{display:flex}) pierde ante el inline
+   grid !important anterior, por eso hay que repetirlo aquí con !important
+   y scope .ltms-sf-view-list. */
+.ltms-sf-grid.ltms-sf-view-list{display:flex!important;flex-direction:column!important;gap:12px!important;list-style:none!important;margin:0!important;padding:0!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-card{flex-direction:row!important;align-items:stretch!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-card-img{width:140px!important;min-width:140px!important;height:auto!important;padding-bottom:0!important;flex-shrink:0!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-card-img-link{position:relative!important;width:140px!important;height:140px!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-img-main,.ltms-sf-grid.ltms-sf-view-list .ltms-sf-img-hover{position:absolute!important;inset:0!important;width:140px!important;height:140px!important;object-fit:cover!important;padding:4px!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-card-body{flex:1 1 auto!important;padding:12px 16px!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-add-to-cart,.ltms-sf-grid.ltms-sf-view-list a.ltms-sf-add-to-cart.button{width:auto!important;min-width:140px!important;margin-top:8px!important}
+
+/* Card: flex column, sin herencia de float/text-align del tema.
+   Scoping a .ltms-sf-view-grid para que la vista lista pueda usar flex-row. */
+.ltms-sf-grid.ltms-sf-view-grid .ltms-sf-card{display:flex!important;flex-direction:column!important;background:#fff!important;border-radius:8px!important;overflow:hidden!important;text-align:left!important;float:none!important;width:auto!important;margin:0!important;padding:0!important}
+.ltms-sf-grid.ltms-sf-view-list .ltms-sf-card{display:flex!important;background:#fff!important;border-radius:8px!important;overflow:hidden!important;text-align:left!important;float:none!important;width:auto!important;margin:0!important;padding:0!important}
 
 /* Contenedor de imagen: padding-bottom hack 1:1 indestructible */
 .ltms-sf-card .ltms-sf-card-img{position:relative!important;width:100%!important;height:0!important;padding-bottom:100%!important;overflow:hidden!important;background:#F8F8F8!important}
@@ -444,6 +460,26 @@ window.elementor=window.elementor||{modules:{}};
 .ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;box-sizing:border-box!important;min-height:34px!important;padding:7px 4px!important;border-radius:7px!important;border:1.5px solid #E80001!important;background:#fff!important;color:#E80001!important;font-size:10.5px!important;font-weight:700!important;text-transform:none!important;letter-spacing:-0.01em!important;text-decoration:none!important;box-shadow:none!important;margin-top:auto!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.2!important;cursor:pointer!important}
 @media(min-width:768px){.ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{min-height:38px!important;padding:8px 10px!important;font-size:12.5px!important;letter-spacing:0!important}}
 .ltms-sf-card .ltms-sf-add-to-cart:hover,.ltms-sf-card a.ltms-sf-add-to-cart.button:hover{background:#E80001!important;color:#fff!important;text-decoration:none!important}
+
+/* ── HEADER OVERLAP FIX ───────────────────────────────────────────
+   El tema (WoodMart) imprime su header propio (con botones VENDER / MI CUENTA)
+   via wp_head/wp_footer hooks. Ese header es position:fixed/sticky con z-index
+   alto y cubre nuestra .ltms-sf-topbar (que tiene el carrito 🛒), haciendo
+   que el carrito sea invisible en desktop.
+   Solución: ocultar los selectores comunes del header del tema en la vitrina
+   y asegurar que nuestra topbar quede visible encima. */
+body.ltms-storefront-page .whb-header,
+body.ltms-storefront-page .whb-sticky-header,
+body.ltms-storefront-page .woodmart-header,
+body.ltms-storefront-page .site-header,
+body.ltms-storefront-page #masthead,
+body.ltms-storefront-page .elementor-location-header,
+body.ltms-storefront-page .header-template,
+body.ltms-storefront-page .wh-header{display:none!important}
+
+/* Garantizar que nuestra topbar (con logo, volver y carrito) tenga el z-index
+   más alto y quede fija arriba del todo. */
+.ltms-sf-topbar{position:sticky!important;top:0!important;z-index:9999!important}
 </style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
