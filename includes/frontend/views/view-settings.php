@@ -319,9 +319,9 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
         </div>
     </div>
 
-    <!-- v2.9.83 P2: Horarios y Redes Sociales (Woodmart-inspired) -->
+    <!-- v2.9.83 P2: Horarios de atención (sin redes sociales — anti-fuga de ventas) -->
     <div class="ltms-card" style="margin-bottom:20px;">
-        <div class="ltms-card-header">🕐 <?php esc_html_e( 'Horarios y Redes Sociales', 'ltms' ); ?></div>
+        <div class="ltms-card-header">🕐 <?php esc_html_e( 'Horarios de Atención', 'ltms' ); ?></div>
         <div class="ltms-card-body">
             <div style="margin-bottom:12px;">
                 <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;"><?php esc_html_e( 'Horario de atención', 'ltms' ); ?></label>
@@ -329,26 +329,9 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
                        placeholder="<?php esc_attr_e( 'Ej: Lun-Vie 9am-6pm, Sáb 10am-2pm', 'ltms' ); ?>"
                        style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div>
-                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">📷 Instagram</label>
-                    <input type="text" name="ltms_store_instagram" value="<?php echo esc_attr( $store_instagram ); ?>"
-                           placeholder="<?php esc_attr_e( '@mitienda', 'ltms' ); ?>"
-                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
-                </div>
-                <div>
-                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">👍 Facebook</label>
-                    <input type="text" name="ltms_store_facebook" value="<?php echo esc_attr( $store_facebook ); ?>"
-                           placeholder="<?php esc_attr_e( 'facebook.com/mitienda', 'ltms' ); ?>"
-                           style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
-                </div>
-            </div>
-            <div style="margin-top:12px;">
-                <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:5px;">💬 WhatsApp</label>
-                <input type="text" name="ltms_store_whatsapp" value="<?php echo esc_attr( $store_whatsapp ); ?>"
-                       placeholder="<?php esc_attr_e( '+57 300 000 0000', 'ltms' ); ?>"
-                       style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
-            </div>
+            <p style="font-size:0.75rem;color:#6b7280;margin-top:8px;padding:10px;background:#fef3c7;border-radius:6px;border:1px solid #fde68a;">
+                💡 <?php esc_html_e( 'Las redes sociales del vendedor no se muestran en la tienda para evitar fugas de ventas. Atrae tráfico desde tus redes a tu tienda de Lo Tengo.', 'ltms' ); ?>
+            </p>
         </div>
     </div>
 

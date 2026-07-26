@@ -185,6 +185,16 @@ class LTMS_Native_Templates {
                     return $native;
                 }
             }
+
+            // VS-FIX: Vendor store SIEMPRE usa el template nativo de Plaza Viva
+            // (con stats, tabs, reseñas, grid mejorado) — incluso con Elementor activo.
+            if ( self::is_vendor_store_page() ) {
+                $native = self::$template_dir . 'vendor-store.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+
             // For ALL other pages (shop, category, tag, account, etc.),
             // return the original template — let Elementor handle it.
             return $template;
