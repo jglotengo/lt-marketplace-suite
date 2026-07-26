@@ -842,3 +842,137 @@
 .ltms-sf-card:has(.ltms-sf-img-hover):hover .ltms-sf-img-main { opacity: 0 !important; }
 .ltms-sf-card:hover .ltms-sf-img-hover { opacity: 1 !important; }
 .ltms-sf-grid { list-style: none !important; }
+
+/* ============================================================
+   UX AUDIT IMPROVEMENTS v2.9.270 — Sprint 1+2+3
+   ============================================================ */
+
+/* ── P0-3: Rating stars + "No reviews" badge ── */
+.ltms-sf-card-rating{display:flex;align-items:center;gap:4px;margin-bottom:6px;font-size:12px}
+.ltms-sf-stars{color:#FBBF24;letter-spacing:1px;font-size:13px}
+.ltms-sf-rating-count{color:#6B7280;font-size:11px}
+.ltms-sf-no-reviews{font-size:11px;color:#9CA3AF;font-style:italic;margin-bottom:6px}
+
+/* ── P1-2: Quick View modal ── */
+.ltms-sf-qv-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100001;display:none;align-items:center;justify-content:center;padding:20px}
+.ltms-sf-qv-overlay.is-open{display:flex}
+.ltms-sf-qv-modal{background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;position:relative}
+.ltms-sf-qv-close{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;border:none;background:#F3F4F6;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+.ltms-sf-qv-close:hover{background:#E5E7EB}
+.ltms-sf-qv-content{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.ltms-sf-qv-img{padding:24px;background:#F9FAFB;display:flex;align-items:center;justify-content:center}
+.ltms-sf-qv-img img{max-width:100%;max-height:400px;object-fit:contain}
+.ltms-sf-qv-body{padding:24px;display:flex;flex-direction:column;gap:12px}
+.ltms-sf-qv-name{font-size:20px;font-weight:700;color:#242424;margin:0}
+.ltms-sf-qv-price{font-size:24px;font-weight:700;color:#E80001}
+.ltms-sf-qv-price del{color:#6B7280;font-size:16px;font-weight:400}
+.ltms-sf-qv-desc{font-size:14px;color:#4B5563;line-height:1.5}
+.ltms-sf-qv-cta{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;background:#E80001;color:#fff;font-size:15px;font-weight:700;border-radius:8px;text-decoration:none;margin-top:8px}
+.ltms-sf-qv-cta:hover{background:#B90001}
+
+/* ── P1-3: Banner CTA ── */
+.ltms-sf-banner-cta{display:inline-flex;align-items:center;gap:6px;padding:10px 24px;background:#fff;color:#E80001;font-size:14px;font-weight:700;border-radius:50px;text-decoration:none;margin-top:12px;transition:transform 0.2s}
+.ltms-sf-banner-cta:hover{transform:scale(1.05)}
+
+/* ── P1-4: Sticky header compact ── */
+.ltms-sf-topbar.is-compact{height:48px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.ltms-sf-topbar.is-compact .ltms-sf-topbar-back{display:none}
+.ltms-sf-topbar.is-compact .ltms-sf-topbar-logo{font-size:14px}
+.ltms-sf-topbar-search-mini{display:none;flex:1;max-width:400px;margin:0 auto}
+.ltms-sf-topbar.is-compact .ltms-sf-topbar-search-mini{display:flex}
+.ltms-sf-topbar-search-mini input{width:100%;padding:6px 12px;border:1px solid #E5E7EB;border-radius:20px;font-size:13px;outline:none}
+
+/* ── P1-6: Badge envío gratis ── */
+.ltms-badge--free-ship{background:#15803D;color:#fff;font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;display:inline-flex;align-items:center;gap:3px}
+
+/* ── P1-7: Vendor rating in banner + contact vendor ── */
+.ltms-sf-vendor-rating{display:flex;align-items:center;gap:6px;margin-top:4px}
+.ltms-sf-vendor-rating .ltms-sf-stars{font-size:14px}
+.ltms-sf-vendor-rating-text{color:rgba(255,255,255,0.9);font-size:12px}
+.ltms-sf-contact-vendor{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;background:#fff;border:1.5px solid #E80001;color:#E80001;font-size:13px;font-weight:600;border-radius:8px;text-decoration:none;cursor:pointer;margin-top:10px}
+.ltms-sf-contact-vendor:hover{background:#FEF2F2}
+
+/* ── P1-1: Price filter ── */
+.ltms-sf-price-filter{padding:8px 0}
+.ltms-sf-price-inputs{display:flex;align-items:center;gap:8px;margin-top:10px}
+.ltms-sf-price-inputs input{width:100%;padding:6px 8px;border:1px solid #E5E7EB;border-radius:6px;font-size:12px;text-align:center}
+.ltms-sf-price-inputs span{font-size:12px;color:#6B7280}
+.ltms-sf-price-apply{width:100%;margin-top:8px;padding:6px;background:#E80001;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+
+/* ── P2-1: Autocomplete dropdown ── */
+.ltms-sf-autocomplete{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 8px 8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;display:none;max-height:400px;overflow-y:auto}
+.ltms-sf-autocomplete.is-open{display:block}
+.ltms-sf-ac-item{display:flex;align-items:center;gap:10px;padding:10px 12px;text-decoration:none;color:#242424;border-bottom:1px solid #F3F4F6;cursor:pointer}
+.ltms-sf-ac-item:hover{background:#F9FAFB}
+.ltms-sf-ac-item:last-child{border-bottom:none}
+.ltms-sf-ac-img{width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.ltms-sf-ac-info{min-width:0;flex:1}
+.ltms-sf-ac-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ltms-sf-ac-price{font-size:12px;color:#E80001;font-weight:700}
+.ltms-sf-ac-section{padding:8px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;background:#F9FAFB}
+
+/* ── P2-2: Wishlist counter in topbar ── */
+.ltms-sf-topbar-wishlist{display:flex;align-items:center;gap:4px;text-decoration:none;color:#242424;font-size:18px;padding:6px;border-radius:8px;flex-shrink:0;position:relative}
+.ltms-sf-topbar-wishlist:hover{background:var(--sf-border)}
+.ltms-sf-wishlist-count{background:#E80001;color:#fff;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;padding:0 4px;font-family:var(--font-body);position:absolute;top:0;right:0}
+
+/* ── P2-3: Load more button ── */
+.ltms-sf-load-more-wrap{display:flex;justify-content:center;padding:24px 0}
+.ltms-sf-load-more{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 32px;background:#fff;border:2px solid #E80001;color:#E80001;font-size:14px;font-weight:700;border-radius:8px;cursor:pointer;text-decoration:none;transition:all 0.2s}
+.ltms-sf-load-more:hover{background:#E80001;color:#fff}
+.ltms-sf-load-more.is-loading{opacity:0.6;pointer-events:none}
+
+/* ── P2-4: Trust bar ── */
+.ltms-sf-trust-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:14px 16px;margin:24px 0;background:#fff;border:1px solid #E5E7EB;border-radius:10px}
+.ltms-sf-trust-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#4B5563;font-weight:500}
+.ltms-sf-trust-item svg{flex-shrink:0}
+
+/* ── P2-5: Sticky add-to-cart bar mobile ── */
+.ltms-sf-sticky-cart{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E5E7EB;box-shadow:0 -2px 10px rgba(0,0,0,0.08);padding:10px 16px;z-index:99998;display:none;align-items:center;gap:12px;justify-content:space-between}
+.ltms-sf-sticky-cart.is-visible{display:flex}
+.ltms-sf-sticky-cart-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.ltms-sf-sticky-cart-name{font-size:13px;font-weight:600;color:#242424;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ltms-sf-sticky-cart-price{font-size:15px;font-weight:700;color:#E80001}
+.ltms-sf-sticky-cart-btn{padding:10px 20px;background:#E80001;color:#fff;font-size:13px;font-weight:700;border:none;border-radius:8px;cursor:pointer;text-decoration:none;white-space:nowrap}
+
+/* ── P2-9: Breadcrumbs ── */
+.ltms-sf-breadcrumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 0;font-size:12px;color:#6B7280}
+.ltms-sf-breadcrumbs a{color:#6B7280;text-decoration:none}
+.ltms-sf-breadcrumbs a:hover{color:#E80001}
+.ltms-sf-breadcrumbs .ltms-sf-bc-current{color:#242424;font-weight:600}
+.ltms-sf-bc-sep{color:#D1D5DB}
+
+/* ── P2-10: Stock urgency badge ── */
+.ltms-badge--stock-low{background:#B45309;color:#fff;font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;display:inline-flex;align-items:center;gap:3px}
+
+/* ── P2-7: Mobile typography fixes (min 14px body, 13px secondary) ── */
+@media(max-width:767px){
+  .ltms-sf-card .ltms-sf-card-cat{font-size:11px!important}
+  .ltms-sf-card .ltms-sf-card-name{font-size:13px!important;line-height:1.4!important}
+  .ltms-sf-card .ltms-sf-card-price{font-size:14px!important}
+  .ltms-sf-card .ltms-sf-card-price del{font-size:11px!important}
+  .ltms-sf-card .ltms-sf-add-to-cart,.ltms-sf-card a.ltms-sf-add-to-cart.button{font-size:11px!important;min-height:36px!important;padding:8px 4px!important}
+  .ltms-sf-action-btn{width:44px!important;height:44px!important}
+  .ltms-sf-banner-img{max-height:100px!important}
+  .ltms-sf-banner-overlay{padding:14px 16px!important}
+  .ltms-sf-name{font-size:16px!important}
+  .ltms-sf-meta-row,.ltms-sf-city,.ltms-sf-rnt,.ltms-sf-count{font-size:11px!important}
+  .ltms-sf-description{display:none!important}
+  .ltms-sf-banner-cta{font-size:12px;padding:8px 16px}
+  .ltms-sf-trust-bar{gap:10px;padding:10px}
+  .ltms-sf-trust-item{font-size:11px}
+  .ltms-sf-qv-content{grid-template-columns:1fr}
+  .ltms-sf-qv-modal{max-height:85vh;border-radius:8px}
+  .ltms-sf-qv-name{font-size:16px}
+  .ltms-sf-qv-price{font-size:20px}
+}
+
+/* ── P2-8: Banner mobile compact (above-fold optimization) ── */
+@media(max-width:767px){
+  .ltms-sf-banner{min-height:100px}
+  .ltms-sf-banner-overlay{padding:12px 14px}
+  .ltms-sf-logo{width:48px;height:48px}
+  .ltms-sf-name{font-size:15px}
+  .ltms-sf-meta-row{display:none}
+  .ltms-sf-banner-cta{padding:6px 14px;font-size:11px}
+}

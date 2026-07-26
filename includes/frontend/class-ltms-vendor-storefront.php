@@ -73,6 +73,18 @@ class LTMS_Vendor_Storefront {
             add_filter( 'sgo_html_minify',    '__return_false' );
         } );
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'cart_count_fragment' ] );
+
+        // AJAX handlers — UX improvements Sprint 2+3
+        add_action( 'wp_ajax_ltms_sf_quick_view',        [ __CLASS__, 'ajax_quick_view' ] );
+        add_action( 'wp_ajax_nopriv_ltms_sf_quick_view', [ __CLASS__, 'ajax_quick_view' ] );
+        add_action( 'wp_ajax_ltms_sf_autocomplete',        [ __CLASS__, 'ajax_autocomplete' ] );
+        add_action( 'wp_ajax_nopriv_ltms_sf_autocomplete', [ __CLASS__, 'ajax_autocomplete' ] );
+        add_action( 'wp_ajax_ltms_sf_load_more',        [ __CLASS__, 'ajax_load_more' ] );
+        add_action( 'wp_ajax_nopriv_ltms_sf_load_more', [ __CLASS__, 'ajax_load_more' ] );
+        add_action( 'wp_ajax_ltms_sf_contact_vendor',        [ __CLASS__, 'ajax_contact_vendor' ] );
+        add_action( 'wp_ajax_nopriv_ltms_sf_contact_vendor', [ __CLASS__, 'ajax_contact_vendor' ] );
+        add_action( 'wp_ajax_ltms_sf_toggle_wishlist',        [ __CLASS__, 'ajax_toggle_wishlist' ] );
+        add_action( 'wp_ajax_nopriv_ltms_sf_toggle_wishlist', [ __CLASS__, 'ajax_toggle_wishlist' ] );
     }
 
     public static function register_rewrite_rule(): void {
@@ -264,6 +276,13 @@ class LTMS_Vendor_Storefront {
             LTMS_VERSION,
             true
         );
+
+        // Localize AJAX endpoint + nonce for Sprint 2+3 UX interactions
+        wp_localize_script( 'ltms-storefront', 'ltmsSF', [
+            'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'ltms_sf_nonce' ),
+            'vendorId' => (int) ( self::detect_request_slug() ? get_query_var( self::QUERY_VAR ) : 0 ),
+        ] );
 
         // wp_add_inline_style garantiza que el CSS crítico llegue al browser
         // aunque SiteGround Optimizer combine/cachee el archivo .css externo.
@@ -507,6 +526,11 @@ body.ltms-storefront-page .wh-header{display:none!important}
             ?>
         </a>
         <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back">&larr; Volver a la tienda</a>
+        <!-- P2-2: Wishlist icon in topbar -->
+        <a href="<?php echo esc_url( home_url( '/lista-deseos/' ) ); ?>" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="ltms-sf-wishlist-count" id="ltms-sf-wishlist-count">0</span>
+        </a>
         <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
            class="ltms-sf-topbar-cart" aria-label="Ver carrito">
             🛒 <span class="ltms-sf-cart-count"><?php
@@ -642,10 +666,31 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                     <?php echo esc_html( wp_trim_words( $vendor->description, 25 ) ); ?>
                                 </p>
                             <?php endif; ?>
+                            <?php
+                            // P1-7: Vendor rating in banner
+                            $vendor_rating = self::get_vendor_rating( $vendor->id );
+                            if ( $vendor_rating['avg'] > 0 ) :
+                            ?>
+                                <div class="ltms-sf-vendor-rating">
+                                    <span class="ltms-sf-stars" style="--rating:<?php echo esc_attr( ( $vendor_rating['avg'] / 5 ) * 100 ); ?>%" aria-hidden="true">★★★★★</span>
+                                    <span class="ltms-sf-vendor-rating-text"><?php echo esc_html( $vendor_rating['avg'] ); ?> (<?php echo esc_html( $vendor_rating['total'] ); ?> reseñas)</span>
+                                </div>
+                            <?php endif; ?>
+                            <!-- P1-3: Banner CTA -->
+                            <a href="#ltms-sf-content" class="ltms-sf-banner-cta">Ver productos &darr;</a>
                         </div>
                     </div>
                 </div>
             </div><!-- .ltms-sf-banner -->
+
+            <!-- P2-9: Breadcrumbs -->
+            <nav class="ltms-sf-breadcrumbs" aria-label="Migas de pan">
+                <a href="<?php echo esc_url( home_url( '/' ) ); ?>">Inicio</a>
+                <span class="ltms-sf-bc-sep">›</span>
+                <a href="<?php echo esc_url( home_url( '/vendedores/' ) ); ?>">Vendedores</a>
+                <span class="ltms-sf-bc-sep">›</span>
+                <span class="ltms-sf-bc-current"><?php echo esc_html( $vendor->name ); ?></span>
+            </nav>
 
             <!-- BARRA DE BÚSQUEDA -->
             <div class="ltms-sf-searchbar">
@@ -714,6 +759,32 @@ body.ltms-storefront-page .wh-header{display:none!important}
                         </div>
                     </div>
 
+                    <!-- P1-1: Filtro por rango de precio -->
+                    <div class="ltms-sf-filter-group">
+                        <button class="ltms-sf-filter-heading" aria-expanded="true" aria-controls="ltms-filter-price">
+                            Precio
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                        </button>
+                        <div class="ltms-sf-filter-body" id="ltms-filter-price">
+                            <div class="ltms-sf-price-filter">
+                                <div class="ltms-sf-price-inputs">
+                                    <input type="number" name="min_price" placeholder="$ Min" min="0" value="<?php echo esc_attr( $_GET['min_price'] ?? '' ); ?>">
+                                    <span>—</span>
+                                    <input type="number" name="max_price" placeholder="$ Max" min="0" value="<?php echo esc_attr( $_GET['max_price'] ?? '' ); ?>">
+                                </div>
+                                <button type="button" class="ltms-sf-price-apply" id="ltms-sf-price-apply">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- P1-7: Contactar vendedor -->
+                    <div class="ltms-sf-filter-group">
+                        <button type="button" class="ltms-sf-contact-vendor" id="ltms-sf-contact-vendor-btn" data-vendor-id="<?php echo esc_attr( $vendor->id ); ?>">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            Contactar vendedor
+                        </button>
+                    </div>
+
                     <!-- Botones de acción -->
                     <div class="ltms-sf-filter-actions">
                         <?php if ( $active_filters ) : ?>
@@ -724,7 +795,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
                 </aside><!-- .ltms-sf-sidebar -->
 
                 <!-- CONTENIDO PRINCIPAL -->
-                <div class="ltms-sf-content">
+                <div class="ltms-sf-content" id="ltms-sf-content">
 
                     <!-- BARRA SUPERIOR: conteo + orden + toggle vista -->
                     <div class="ltms-sf-topbar-content">
@@ -806,7 +877,9 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                 if ( $product->is_on_sale() && $product->get_regular_price() > 0 ) {
                                     $discount_pct = round( ( ( $product->get_regular_price() - $product->get_sale_price() ) / $product->get_regular_price() ) * 100 );
                                 }
-                                $cats = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
+                                $cats      = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
+                                $stock_qty = (int) $product->get_stock_quantity();
+                                $free_ship = get_post_meta( get_the_ID(), '_ltms_free_shipping', true );
                             ?>
                                 <article class="ltms-sf-card" itemscope itemtype="https://schema.org/Product">
                                     <div class="ltms-sf-card-img">
@@ -842,6 +915,11 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                             <?php endif; ?>
                                             <?php if ( ! $product->is_in_stock() ) : ?>
                                                 <span class="ltms-badge ltms-badge--soldout">AGOTADO</span>
+                                            <?php elseif ( $stock_qty > 0 && $stock_qty <= 5 ) : ?>
+                                                <span class="ltms-badge ltms-badge--stock-low">¡Solo <?php echo esc_html( $stock_qty ); ?>!</span>
+                                            <?php endif; ?>
+                                            <?php if ( $free_ship ) : ?>
+                                                <span class="ltms-badge ltms-badge--free-ship">🚚 Envío gratis</span>
                                             <?php endif; ?>
                                         </div>
 
@@ -872,10 +950,12 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                                 <span class="ltms-sf-stars" style="--rating:<?php echo esc_attr( ( $avg_rating / 5 ) * 100 ); ?>%" aria-hidden="true">★★★★★</span>
                                                 <span class="ltms-sf-rating-count">(<?php echo esc_html( $rating_count ); ?>)</span>
                                             </div>
+                                        <?php else : ?>
+                                            <div class="ltms-sf-no-reviews">Sin reseñas</div>
                                         <?php endif; ?>
                                         <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
                                             <meta itemprop="priceCurrency" content="COP">
-                                            <?php echo wp_kses_post( $product->get_price_html() ); ?>
+                                            <?php echo wp_kses_post( $product->get_price_html() ) ?: '<span style="color:#6B7280">Consultar precio</span>'; ?>
                                         </div>
                                         <?php if ( $product->is_purchasable() && ( $product->is_in_stock() || $product->backorders_allowed() ) ) : ?>
                                             <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>"
@@ -898,6 +978,20 @@ body.ltms-storefront-page .wh-header{display:none!important}
                         </div><!-- .ltms-sf-grid -->
 
                         <?php if ( $pages > 1 ) : ?>
+                            <!-- P2-3: Load More button (AJAX) -->
+                            <div class="ltms-sf-load-more-wrap" id="ltms-sf-load-more-wrap"
+                                 data-vendor-id="<?php echo esc_attr( $vendor->id ); ?>"
+                                 data-paged="<?php echo esc_attr( $paged ); ?>"
+                                 data-pages="<?php echo esc_attr( $pages ); ?>"
+                                 data-cat="<?php echo esc_attr( $cat_slug ); ?>"
+                                 data-order="<?php echo esc_attr( $orderby ); ?>"
+                                 data-s="<?php echo esc_attr( $search_q ); ?>"
+                                 data-instock="<?php echo $in_stock ? '1' : ''; ?>"
+                                 data-view="<?php echo esc_attr( $view_mode ); ?>">
+                                <button type="button" class="ltms-sf-load-more" id="ltms-sf-load-more">
+                                    Cargar más productos
+                                </button>
+                            </div>
                             <nav class="ltms-sf-pagination" aria-label="Paginación">
                                 <?php if ( $paged > 1 ) : ?>
                                     <a href="<?php echo esc_url( add_query_arg( 'pg', $paged - 1, add_query_arg( $_GET, $base_url ) ) ); ?>" class="ltms-sf-page-btn ltms-sf-page-prev" aria-label="Anterior">‹</a>
@@ -923,6 +1017,26 @@ body.ltms-storefront-page .wh-header{display:none!important}
                             </nav>
                         <?php endif; ?>
 
+                        <!-- P2-4: Trust bar -->
+                        <div class="ltms-sf-trust-bar">
+                            <div class="ltms-sf-trust-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                Pago seguro
+                            </div>
+                            <div class="ltms-sf-trust-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                Envío nacional
+                            </div>
+                            <div class="ltms-sf-trust-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                                30 días devolución
+                            </div>
+                            <div class="ltms-sf-trust-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                                Soporte WhatsApp
+                            </div>
+                        </div>
+
                     <?php else : ?>
                         <div class="ltms-sf-empty">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -934,6 +1048,24 @@ body.ltms-storefront-page .wh-header{display:none!important}
                 </div><!-- .ltms-sf-content -->
             </div><!-- .ltms-sf-layout -->
         </div><!-- .ltms-storefront -->
+
+        <!-- P1-2: Quick View modal (hidden, populated by JS) -->
+        <div class="ltms-sf-qv-overlay" id="ltms-sf-qv-overlay" aria-hidden="true">
+            <div class="ltms-sf-qv-modal" role="dialog" aria-label="Vista rápida del producto">
+                <button type="button" class="ltms-sf-qv-close" id="ltms-sf-qv-close" aria-label="Cerrar">&times;</button>
+                <div class="ltms-sf-qv-content" id="ltms-sf-qv-content"></div>
+            </div>
+        </div>
+
+        <!-- P2-5: Sticky add-to-cart bar mobile (hidden, shown by JS on scroll) -->
+        <div class="ltms-sf-sticky-cart" id="ltms-sf-sticky-cart" style="display:none;">
+            <div class="ltms-sf-sticky-cart-info">
+                <span class="ltms-sf-sticky-cart-name" id="ltms-sf-sticky-cart-name"></span>
+                <span class="ltms-sf-sticky-cart-price" id="ltms-sf-sticky-cart-price"></span>
+            </div>
+            <a href="#" class="ltms-sf-sticky-cart-btn" id="ltms-sf-sticky-cart-btn">Ver carrito</a>
+        </div>
+
         <?php
         self::print_foot();
     }
@@ -954,6 +1086,280 @@ body.ltms-storefront-page .wh-header{display:none!important}
             $vendor_id
         ) );
         return is_array( $results ) ? $results : [];
+    }
+
+    // ================================================================
+    // UX IMPROVEMENTS — Helper methods + AJAX handlers (Sprint 2+3)
+    // ================================================================
+
+    /**
+     * Calcula el rating promedio del vendedor basado en reviews de productos.
+     */
+    private static function get_vendor_rating( int $vendor_id ): array {
+        global $wpdb;
+        $results = $wpdb->get_row( $wpdb->prepare(
+            "SELECT AVG(CAST(pm.meta_value AS DECIMAL(2,1))) as avg_rating,
+                    COUNT(*) as total_reviews
+             FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+             WHERE pm.meta_key = '_wc_average_rating'
+               AND pm.meta_value > 0
+               AND p.post_type = 'product'
+               AND p.post_status = 'publish'
+               AND p.post_author = %d",
+            $vendor_id
+        ) );
+        return [
+            'avg'   => $results ? round( (float) $results->avg_rating, 1 ) : 0,
+            'total' => $results ? (int) $results->total_reviews : 0,
+        ];
+    }
+
+    /**
+     * AJAX: Quick View — retorna datos de producto para modal.
+     */
+    public static function ajax_quick_view(): void {
+        check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
+        $product_id = (int) ( $_POST['product_id'] ?? 0 );
+        if ( ! $product_id ) wp_send_json_error( 'Invalid product ID' );
+
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) wp_send_json_error( 'Product not found' );
+
+        wp_send_json_success( [
+            'id'          => $product->get_id(),
+            'name'        => $product->get_name(),
+            'price'       => $product->get_price_html(),
+            'image'       => wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_single' ),
+            'description' => wp_trim_words( wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ), 30 ),
+            'permalink'   => $product->get_permalink(),
+            'rating'      => (float) $product->get_average_rating(),
+            'reviews'     => (int) $product->get_rating_count(),
+            'in_stock'    => $product->is_in_stock(),
+            'purchasable' => $product->is_purchasable(),
+            'cart_url'    => $product->add_to_cart_url(),
+            'cart_text'   => $product->is_in_stock() ? 'Agregar al carrito' : 'Ver producto',
+        ] );
+    }
+
+    /**
+     * AJAX: Autocomplete — retorna productos sugeridos para búsqueda.
+     */
+    public static function ajax_autocomplete(): void {
+        check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
+        $q         = sanitize_text_field( wp_unslash( $_POST['q'] ?? '' ) );
+        $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 );
+        if ( ! $q || strlen( $q ) < 2 || ! $vendor_id ) wp_send_json_success( [ 'products' => [] ] );
+
+        $query = new \WP_Query( [
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => 6,
+            'author'         => $vendor_id,
+            's'              => $q,
+            'meta_query'     => [ [ 'key' => '_price', 'value' => 0, 'compare' => '>' ] ],
+        ] );
+
+        $products = [];
+        while ( $query->have_posts() ) {
+            $query->the_post();
+            $p = wc_get_product( get_the_ID() );
+            if ( ! $p ) continue;
+            $products[] = [
+                'id'    => $p->get_id(),
+                'name'  => $p->get_name(),
+                'price' => $p->get_price_html(),
+                'image' => wp_get_attachment_image_url( $p->get_image_id(), 'thumbnail' ),
+                'url'   => $p->get_permalink(),
+            ];
+        }
+        wp_reset_postdata();
+        wp_send_json_success( [ 'products' => $products ] );
+    }
+
+    /**
+     * AJAX: Load More — retorna HTML de productos para paginación AJAX.
+     */
+    public static function ajax_load_more(): void {
+        check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
+        $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 );
+        $paged     = (int) ( $_POST['paged'] ?? 2 );
+        $cat_slug  = sanitize_title( $_POST['cat'] ?? '' );
+        $orderby   = sanitize_text_field( $_POST['order'] ?? 'date' );
+        $search_q  = sanitize_text_field( wp_unslash( $_POST['s'] ?? '' ) );
+        $in_stock  = ! empty( $_POST['instock'] );
+        $view_mode = in_array( $_POST['view'] ?? '', [ 'grid', 'list' ], true ) ? $_POST['view'] : 'grid';
+
+        if ( ! $vendor_id ) wp_send_json_error( 'Invalid vendor' );
+
+        $tax_query  = $cat_slug ? [ [ 'taxonomy' => 'product_cat', 'field' => 'slug', 'terms' => $cat_slug ] ] : [];
+        $meta_query = $in_stock ? [ [ 'key' => '_stock_status', 'value' => 'instock' ] ] : [];
+        $wc_order   = match ( $orderby ) {
+            'price'      => [ 'orderby' => 'meta_value_num', 'order' => 'ASC', 'meta_key' => '_price' ],
+            'price-desc' => [ 'orderby' => 'meta_value_num', 'order' => 'DESC', 'meta_key' => '_price' ],
+            default      => [ 'orderby' => 'date', 'order' => 'DESC' ],
+        };
+
+        $args = array_merge( [
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'posts_per_page' => 12,
+            'paged'          => $paged,
+            'author'         => $vendor_id,
+            'tax_query'      => $tax_query,
+            'meta_query'     => $meta_query,
+            's'              => $search_q,
+        ], $wc_order );
+
+        $query = new \WP_Query( $args );
+        ob_start();
+
+        while ( $query->have_posts() ) {
+            $query->the_post();
+            global $product;
+            $product = wc_get_product( get_the_ID() );
+            if ( ! $product ) continue;
+
+            $gallery_ids  = $product->get_gallery_image_ids();
+            $hover_img_id = $gallery_ids ? $gallery_ids[0] : 0;
+            $avg_rating   = (float) $product->get_average_rating();
+            $rating_count = (int) $product->get_rating_count();
+            $is_new       = ( strtotime( get_the_date( 'c' ) ) > strtotime( '-15 days' ) );
+            $discount_pct = 0;
+            if ( $product->is_on_sale() && $product->get_regular_price() > 0 ) {
+                $discount_pct = round( ( ( $product->get_regular_price() - $product->get_sale_price() ) / $product->get_regular_price() ) * 100 );
+            }
+            $cats      = wp_get_post_terms( get_the_ID(), 'product_cat', [ 'number' => 1 ] );
+            $stock_qty = (int) $product->get_stock_quantity();
+            $free_ship = get_post_meta( get_the_ID(), '_ltms_free_shipping', true );
+            ?>
+            <article class="ltms-sf-card" itemscope itemtype="https://schema.org/Product">
+                <div class="ltms-sf-card-img">
+                    <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-card-img-link" aria-label="<?php echo esc_attr( get_the_title() ); ?>">
+                        <?php if ( has_post_thumbnail() ) : ?>
+                            <?php echo wp_get_attachment_image( get_post_thumbnail_id(), 'woocommerce_thumbnail', false, [ 'class' => 'ltms-sf-img-main', 'loading' => 'lazy', 'alt' => esc_attr( get_the_title() ) ] ); ?>
+                        <?php else : ?>
+                            <div class="ltms-sf-card-no-img">Sin imagen</div>
+                        <?php endif; ?>
+                        <?php if ( $hover_img_id ) : ?>
+                            <?php echo wp_get_attachment_image( $hover_img_id, 'woocommerce_thumbnail', false, [ 'class' => 'ltms-sf-img-hover', 'loading' => 'eager', 'alt' => '' ] ); ?>
+                        <?php endif; ?>
+                    </a>
+                    <div class="ltms-sf-badges">
+                        <?php if ( $discount_pct > 0 ) : ?>
+                            <span class="ltms-badge ltms-badge--pct">-<?php echo esc_html( $discount_pct ); ?>%</span>
+                        <?php elseif ( $product->is_on_sale() ) : ?>
+                            <span class="ltms-badge ltms-badge--sale">OFERTA</span>
+                        <?php endif; ?>
+                        <?php if ( $is_new ) : ?>
+                            <span class="ltms-badge ltms-badge--new">NUEVO</span>
+                        <?php endif; ?>
+                        <?php if ( ! $product->is_in_stock() ) : ?>
+                            <span class="ltms-badge ltms-badge--soldout">AGOTADO</span>
+                        <?php elseif ( $stock_qty > 0 && $stock_qty <= 5 ) : ?>
+                            <span class="ltms-badge ltms-badge--stock-low">Solo <?php echo esc_html( $stock_qty ); ?>!</span>
+                        <?php endif; ?>
+                        <?php if ( $free_ship ) : ?>
+                            <span class="ltms-badge ltms-badge--free-ship">Envío gratis</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ltms-sf-card-actions">
+                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-wishlist" data-product-id="<?php echo esc_attr( get_the_ID() ); ?>" aria-label="Favoritos">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        </button>
+                        <button type="button" class="ltms-sf-action-btn ltms-sf-action-quickview" data-product-id="<?php echo esc_attr( get_the_ID() ); ?>" aria-label="Vista rápida">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ltms-sf-card-body">
+                    <p class="ltms-sf-card-cat"><?php echo $cats ? esc_html( $cats[0]->name ) : ''; ?></p>
+                    <h2 class="ltms-sf-card-name" itemprop="name"><a href="<?php echo esc_url( get_permalink() ); ?>"><?php echo esc_html( get_the_title() ); ?></a></h2>
+                    <?php if ( $rating_count > 0 ) : ?>
+                        <div class="ltms-sf-card-rating" aria-label="<?php echo esc_attr( $avg_rating ); ?> de 5">
+                            <span class="ltms-sf-stars" style="--rating:<?php echo esc_attr( ( $avg_rating / 5 ) * 100 ); ?>%" aria-hidden="true">★★★★★</span>
+                            <span class="ltms-sf-rating-count">(<?php echo esc_html( $rating_count ); ?>)</span>
+                        </div>
+                    <?php else : ?>
+                        <div class="ltms-sf-no-reviews">Sin reseñas</div>
+                    <?php endif; ?>
+                    <div class="ltms-sf-card-price" itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+                        <meta itemprop="priceCurrency" content="COP">
+                        <?php echo $product->get_price_html() ?: '<span style="color:#6B7280">Consultar precio</span>'; ?>
+                    </div>
+                    <?php if ( $product->is_purchasable() && ( $product->is_in_stock() || $product->backorders_allowed() ) ) : ?>
+                        <a href="<?php echo esc_url( $product->add_to_cart_url() ); ?>" data-quantity="1" class="ltms-sf-add-to-cart button ajax_add_to_cart add_to_cart_button" data-product_id="<?php echo esc_attr( $product->get_id() ); ?>" aria-label="Agregar al carrito" rel="nofollow">Agregar al carrito</a>
+                    <?php else : ?>
+                        <a href="<?php echo esc_url( get_permalink() ); ?>" class="ltms-sf-add-to-cart ltms-sf-view-product">Ver producto</a>
+                    <?php endif; ?>
+                </div>
+            </article>
+            <?php
+        }
+        wp_reset_postdata();
+        $html = ob_get_clean();
+        wp_send_json_success( [
+            'html'      => $html,
+            'has_more'  => $paged < $query->max_num_pages,
+            'next_page' => $paged + 1,
+        ] );
+    }
+
+    /**
+     * AJAX: Contact Vendor — envía mensaje al vendedor.
+     */
+    public static function ajax_contact_vendor(): void {
+        check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
+        $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 );
+        $name      = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+        $email     = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+        $message   = sanitize_textarea_field( wp_unslash( $_POST['message'] ?? '' ) );
+
+        if ( ! $vendor_id || ! $name || ! is_email( $email ) || ! $message ) {
+            wp_send_json_error( 'Todos los campos son obligatorios' );
+        }
+
+        $vendor = get_userdata( $vendor_id );
+        if ( ! $vendor ) wp_send_json_error( 'Vendedor no encontrado' );
+
+        $subject = sprintf( '[Lo Tengo] Nuevo mensaje de %s', $name );
+        $body    = sprintf( "Nombre: %s\nEmail: %s\n\nMensaje:\n%s", $name, $email, $message );
+
+        $sent = wp_mail( $vendor->user_email, $subject, $body, [ 'Reply-To: ' . $email ] );
+
+        if ( $sent ) {
+            wp_send_json_success( [ 'message' => 'Mensaje enviado correctamente' ] );
+        } else {
+            wp_send_json_error( 'Error al enviar el mensaje' );
+        }
+    }
+
+    /**
+     * AJAX: Toggle Wishlist — agrega/remueve producto de favoritos.
+     */
+    public static function ajax_toggle_wishlist(): void {
+        check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
+        $product_id = (int) ( $_POST['product_id'] ?? 0 );
+        if ( ! $product_id ) wp_send_json_error( 'Invalid product ID' );
+
+        $user_id = get_current_user_id();
+        if ( $user_id > 0 ) {
+            $wishlist = get_user_meta( $user_id, '_ltms_wishlist', true ) ?: [];
+            if ( in_array( $product_id, $wishlist, true ) ) {
+                $wishlist  = array_diff( $wishlist, [ $product_id ] );
+                $is_added  = false;
+            } else {
+                $wishlist[] = $product_id;
+                $is_added   = true;
+            }
+            update_user_meta( $user_id, '_ltms_wishlist', array_values( $wishlist ) );
+            $count = count( $wishlist );
+        } else {
+            $is_added = true;
+            $count    = 0;
+        }
+
+        wp_send_json_success( [ 'is_added' => $is_added, 'count' => $count ] );
     }
 }
 
