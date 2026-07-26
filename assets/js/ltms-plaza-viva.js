@@ -891,3 +891,80 @@
   }
 
 })(window, document);
+
+    // ─────────────────────────────────────────────────────────────
+    // SF-00 v2: Inyectar vendor, rating, favoritos en cards de Elementor
+    // ─────────────────────────────────────────────────────────────
+    function enhanceElementorCards() {
+        var cards = document.querySelectorAll('li.product:not(.pv-enhanced)');
+        if (!cards.length) return;
+
+        cards.forEach(function(card) {
+            card.classList.add('pv-enhanced');
+            var productId = card.className.match(/post-(\d+)/);
+            productId = productId ? parseInt(productId[1], 10) : 0;
+            if (!productId) return;
+
+            var titleEl = card.querySelector('.woocommerce-loop-product__title');
+            var linkEl = card.querySelector('.woocommerce-loop-product__link');
+            if (!titleEl) return;
+
+            // 1. Inyectar rating si no existe
+            if (!card.querySelector('.star-rating, .pv-card-rating')) {
+                var ratingEl = document.createElement('div');
+                ratingEl.className = 'pv-card-rating';
+                ratingEl.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:4px;font-size:12px;color:#f59e0b;';
+                ratingEl.innerHTML = '<span style="color:#f59e0b;">★★★★★</span><span style="color:#9ca3af;font-size:11px;">(0)</span>';
+                titleEl.parentElement.insertBefore(ratingEl, titleEl.nextSibling);
+            }
+
+            // 2. Inyectar vendor name si no existe
+            if (!card.querySelector('.pv-card-vendor')) {
+                var vendorEl = document.createElement('div');
+                vendorEl.className = 'pv-card-vendor';
+                vendorEl.style.cssText = 'font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-top:6px;';
+                vendorEl.textContent = 'Tienda Lo Tengo';
+                titleEl.parentElement.insertBefore(vendorEl, titleEl);
+            }
+
+            // 3. Inyectar botón favoritos si no existe
+            if (!card.querySelector('.pv-card-fav')) {
+                var favEl = document.createElement('button');
+                favEl.className = 'pv-card-fav';
+                favEl.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.9);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:all 0.2s;';
+                favEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+                favEl.setAttribute('aria-label', 'Añadir a favoritos');
+                favEl.setAttribute('data-pv-wishlist-toggle', productId);
+                favEl.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var svg = this.querySelector('svg');
+                    if (svg.getAttribute('fill') === 'none') {
+                        svg.setAttribute('fill', '#ef4444');
+                        svg.setAttribute('stroke', '#ef4444');
+                    } else {
+                        svg.setAttribute('fill', 'none');
+                        svg.setAttribute('stroke', '#6b7280');
+                    }
+                });
+                // Asegurar que el card tiene position:relative
+                card.style.position = 'relative';
+                card.appendChild(favEl);
+            }
+        });
+    }
+
+    // Ejecutar después de que Elementor renderice
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', enhanceElementorCards);
+    } else {
+        enhanceElementorCards();
+    }
+    // Re-ejecutar después de 2s (Elementor a veces renderiza tarde)
+    setTimeout(enhanceElementorCards, 2000);
+    // Re-ejecutar en scroll (lazy load de Elementor)
+    var enhanceTimer;
+    window.addEventListener('scroll', function() {
+        clearTimeout(enhanceTimer);
+        enhanceTimer = setTimeout(enhanceElementorCards, 300);
+    }, { passive: true });

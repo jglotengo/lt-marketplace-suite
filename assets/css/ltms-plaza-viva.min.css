@@ -948,3 +948,52 @@
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   SF-00 v2: Cards de Elementor mejoradas
+   ════════════════════════════════════════════════════════════════ */
+li.product.pv-enhanced {
+    position: relative !important;
+    border-radius: 12px !important;
+    overflow: visible !important;
+    transition: box-shadow 0.2s !important;
+}
+li.product.pv-enhanced:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+}
+.pv-card-vendor {
+    font-size: 11px !important;
+    color: #6b7280 !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+    margin-top: 6px !important;
+}
+.pv-card-rating {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-top: 4px !important;
+    font-size: 12px !important;
+}
+.pv-card-fav {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    background: rgba(255,255,255,0.95) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 34px !important;
+    height: 34px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    z-index: 5 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+    transition: all 0.2s !important;
+}
+.pv-card-fav:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
