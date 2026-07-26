@@ -422,16 +422,16 @@ class LTMS_Amazon_Enhancements {
                 <?php foreach ( $products as $p ) :
                     $vendor_id = (int) get_post_field( 'post_author', $p->get_id() );
                 ?>
-                    <div class="ltms-browsing-item" style="flex:0 0 140px;text-align:center;position:relative;">
+                    <div class="ltms-browsing-item" style="flex:0 0 140px;max-width:140px;min-width:0;text-align:center;position:relative;overflow:hidden;">
                         <button type="button" class="ltms-browsing-remove" data-product-id="<?php echo esc_attr( $p->get_id() ); ?>"
                                 data-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_remove_browsing' ) ); ?>"
-                                style="position:absolute;top:0;right:0;background:rgba(255,255,255,0.9);border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;color:#6b7280;z-index:2;">&times;</button>
-                        <a href="<?php echo esc_url( $p->get_permalink() ); ?>" style="text-decoration:none;">
-                            <?php echo $p->get_image( 'thumbnail', [ 'style' => 'width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;' ] ); ?>
-                            <div style="font-size:11px;margin:6px 0 2px;line-height:1.3;color:#374151;">
+                                style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,0.95);border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;color:#6b7280;z-index:2;line-height:1;">&times;</button>
+                        <a href="<?php echo esc_url( $p->get_permalink() ); ?>" style="text-decoration:none;display:block;overflow:hidden;">
+                            <?php echo $p->get_image( 'thumbnail', [ 'style' => 'width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;display:block;margin:0 auto;' ] ); ?>
+                            <div style="font-size:11px;margin:6px 4px 2px;line-height:1.3;color:#374151;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;overflow-wrap:anywhere;min-width:0;">
                                 <?php echo esc_html( wp_trim_words( $p->get_name(), 5 ) ); ?>
                             </div>
-                            <div style="font-size:12px;font-weight:700;color:#16a34a;"><?php echo $p->get_price_html(); ?></div>
+                            <div style="font-size:12px;font-weight:700;color:#16a34a;margin:0 4px 6px;line-height:1.3;overflow:hidden;max-width:100%;min-width:0;word-break:break-word;overflow-wrap:anywhere;"><?php echo $p->get_price_html(); ?></div>
                         </a>
                     </div>
                 <?php endforeach; ?>
