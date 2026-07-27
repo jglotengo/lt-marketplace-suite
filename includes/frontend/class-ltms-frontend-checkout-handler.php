@@ -84,6 +84,10 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_checkout_process',            [ __CLASS__, 'validate_privacy_consent' ] );
         add_action( 'woocommerce_checkout_order_created',      [ __CLASS__, 'save_privacy_consent' ] );
 
+        // v2.9.287: Optimizar campos del checkout — eliminar redundantes
+        add_filter( 'woocommerce_billing_fields', [ __CLASS__, 'optimize_checkout_fields' ], 200, 1 );
+        add_filter( 'woocommerce_shipping_fields', [ __CLASS__, 'optimize_checkout_fields' ], 200, 1 );
+
         // FIX CHECKOUT-01: LTMS ya tiene su propio checkbox de consentimiento (Ley 1581).
         // Eliminamos los checkboxes nativos de WooCommerce para evitar duplicados.
         add_action( 'woocommerce_checkout_terms_and_conditions', [ __CLASS__, 'remove_wc_native_checkboxes' ], 1 );
@@ -1260,6 +1264,101 @@ final class LTMS_Frontend_Checkout_Handler {
             $order->update_meta_data( '_ltms_privacy_consent_ip', sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
             $order->save();
         }
+    }
+
+    /**
+     * v2.9.287: Optimizar campos del checkout.
+     *
+     * Elimina campos redundantes y reordena los campos para un flujo
+     * más lógico basado en la auditoría VLM:
+     * - Elimina código postal (irrelevante para logística colombiana)
+     * - Elimina país (siempre Colombia, hidden input)
+     * - Hace company opcional (ya hecho en otro filtro, pero refuerza)
+     * - Reordena: email → teléfono → nombre → apellido → dirección → ciudad → estado
+     *
+     * @param array $fields Campos de billing/shipping de WC.
+     * @return array Campos optimizados.
+     */
+    public static function optimize_checkout_fields( array $fields ): array {
+        // 1. Eliminar código postal (irrelevante para Colombia)
+        // Las transportadoras usan Departamento + Ciudad + Dirección, no CP.
+        $cp_keys = [ 'billing_postcode', 'shipping_postcode' ];
+        foreach ( $cp_keys as $key ) {
+            if ( isset( $fields[ $key ] ) ) {
+                // No eliminar completamente (WC puede necesitarlo internamente),
+                // pero hacerlo oculto y opcional.
+                $fields[ $key ]['required'] = false;
+                $fields[ $key ]['class']    = [ 'form-row-hidden' ];
+                $fields[ $key ]['type']     = 'hidden';
+                $fields[ $key ]['default']  = '110111'; // CP genérico Bogotá
+            }
+        }
+
+        // 2. Eliminar país (siempre Colombia en este marketplace)
+        $country_keys = [ 'billing_country', 'shipping_country' ];
+        foreach ( $country_keys as $key ) {
+            if ( isset( $fields[ $key ] ) ) {
+                $fields[ $key ]['type']    = 'hidden';
+                $fields[ $key ]['default'] = 'CO';
+                $fields[ $key ]['class']   = [ 'form-row-hidden' ];
+            }
+        }
+
+        // 3. Hacer company opcional (refuerzo)
+        if ( isset( $fields['billing_company'] ) ) {
+            $fields['billing_company']['required'] = false;
+        }
+
+        // 4. Reordenar campos para flujo lógico
+        // Orden óptimo: email → phone → first_name → last_name → address_1 → address_2 → city → state
+        $priority_map = [
+            'billing_email'      => 10,
+            'billing_phone'      => 20,
+            'billing_first_name' => 30,
+            'billing_last_name'  => 40,
+            'billing_address_1'  => 50,
+            'billing_address_2'  => 60,
+            'billing_city'       => 70,
+            'billing_state'      => 80,
+            'billing_company'    => 90,
+            'billing_country'    => 100,
+            'billing_postcode'   => 110,
+        ];
+        foreach ( $priority_map as $key => $priority ) {
+            if ( isset( $fields[ $key ] ) ) {
+                $fields[ $key ]['priority'] = $priority;
+            }
+        }
+
+        // 5. Mejorar placeholders y labels
+        if ( isset( $fields['billing_first_name'] ) ) {
+            $fields['billing_first_name']['placeholder'] = 'Ej: Juan';
+        }
+        if ( isset( $fields['billing_last_name'] ) ) {
+            $fields['billing_last_name']['placeholder'] = 'Ej: Pérez';
+        }
+        if ( isset( $fields['billing_address_1'] ) ) {
+            $fields['billing_address_1']['placeholder'] = 'Calle, carrera, número, barrio';
+        }
+        if ( isset( $fields['billing_address_2'] ) ) {
+            $fields['billing_address_2']['label']       = 'Apartamento / Suite (opcional)';
+            $fields['billing_address_2']['placeholder'] = 'Apto, casa, interior, etc.';
+            $fields['billing_address_2']['required']    = false;
+        }
+        if ( isset( $fields['billing_city'] ) ) {
+            $fields['billing_city']['placeholder'] = 'Ej: Cali, Bogotá, Medellín';
+        }
+        if ( isset( $fields['billing_state'] ) ) {
+            $fields['billing_state']['label']       = 'Departamento';
+            $fields['billing_state']['placeholder'] = 'Selecciona tu departamento';
+        }
+        if ( isset( $fields['billing_phone'] ) ) {
+            $fields['billing_phone']['label']       = 'Teléfono / WhatsApp';
+            $fields['billing_phone']['placeholder'] = 'Ej: 300 123 4567';
+            $fields['billing_phone']['type']        = 'tel';
+        }
+
+        return $fields;
     }
 
     // =========================================================================
