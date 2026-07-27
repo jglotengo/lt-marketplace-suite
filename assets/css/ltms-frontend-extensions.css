@@ -1656,3 +1656,32 @@
 #ltms-cart-drawer-overlay:not(.ltms-cart-drawer-overlay) {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.278 — Ocultar popups de social proof invasivos
+   El toast "X compró Abrelatas" aparece con mucha frecuencia y no es
+   clickeable, va en detrimento de la marca. Ocultar todos los toasts
+   de social proof (LTMS + terceros) globalmente.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* LTMS social proof */
+.ltms-social-proof,
+.ltms-social-proof-toast,
+.ltms-social-proof-container {
+    display: none !important;
+}
+
+/* Terceros: toasts comunes de social proof */
+[class*="social-proof"]:not(.ltms-social-proof-bar),
+[class*="recent-purchase"],
+[class*="purchase-notification"],
+[class*="sales-pop"],
+[class*="fomo-notification"],
+[class*="proof-notification"] {
+    display: none !important;
+}
+
+/* Notificacion toast generica que muestra 'X compro Y' */
+div[class*="toast"][class*="notification"]:not(.ltms-toast):not(.ltms-notice) {
+    display: none !important;
+}

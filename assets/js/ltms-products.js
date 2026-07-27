@@ -409,5 +409,8 @@
         var showStock = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-stock').closest('div').toggle(showStock);
     }
-    $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
-    updateProductTypeFields();
+    // v2.9.278 FIX: wrap in document.ready to ensure jQuery and DOM are ready
+    $(function() {
+        $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
+        updateProductTypeFields();
+    });

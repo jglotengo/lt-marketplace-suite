@@ -425,7 +425,7 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                     <?php esc_html_e( 'Token de API Alegra', 'ltms' ); ?>
                 </label>
-                <input type="password" id="ltms-alegra-token" placeholder="<?php echo $invoice_configured && $invoice_provider === 'alegra' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
+                <input type="password" id="ltms-alegra-token" autocomplete="off" placeholder="<?php echo $invoice_configured && $invoice_provider === 'alegra' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
                        style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
                 <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
                     <?php esc_html_e( 'Encuéntralo en Alegra → Configuración → API. Genera un nuevo token si lo necesitas.', 'ltms' ); ?>
@@ -447,7 +447,7 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                     <?php esc_html_e( 'Access Key Siigo', 'ltms' ); ?>
                 </label>
-                <input type="password" id="ltms-siigo-key" placeholder="<?php echo $invoice_configured && $invoice_provider === 'siigo' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
+                <input type="password" id="ltms-siigo-key" autocomplete="off" placeholder="<?php echo $invoice_configured && $invoice_provider === 'siigo' ? esc_attr__( '•••••••• (configurado)', 'ltms' ) : ''; ?>"
                        style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
                 <p style="font-size:0.78rem;color:#9ca3af;margin-top:4px;">
                     <?php esc_html_e( 'Encuéntrala en Siigo → Configuración → API / Integraciones.', 'ltms' ); ?>
