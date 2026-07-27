@@ -268,6 +268,59 @@ $products  = wc_get_products([
             </div>
         </div>
 
+        <!-- v2.9.285: Campos de booking/turismo (solo para booking) -->
+        <div id="ltms-np-booking-fields" style="display:none;margin-bottom:14px;padding:14px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:8px;">🏨 <?php esc_html_e( 'Configuración de Reserva (Turismo)', 'ltms' ); ?></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Tipo de reserva', 'ltms' ); ?></label>
+                    <select id="ltms-np-booking-type" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                        <option value="accommodation"><?php esc_html_e( 'Hospedaje (noches)', 'ltms' ); ?></option>
+                        <option value="experience"><?php esc_html_e( 'Experiencia (horas)', 'ltms' ); ?></option>
+                        <option value="rental"><?php esc_html_e( 'Alquiler', 'ltms' ); ?></option>
+                        <option value="professional_service"><?php esc_html_e( 'Servicio profesional', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Capacidad (personas)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-booking-capacity" min="1" value="1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Mín. noches', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-min-nights" min="1" value="1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Máx. noches (0=sin límite)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-max-nights" min="0" value="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Check-in', 'ltms' ); ?></label>
+                    <input type="time" id="ltms-np-checkin-time" value="15:00" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Check-out', 'ltms' ); ?></label>
+                    <input type="time" id="ltms-np-checkout-time" value="11:00" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Modo de pago', 'ltms' ); ?></label>
+                    <select id="ltms-np-payment-mode" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                        <option value="full"><?php esc_html_e( 'Pago total', 'ltms' ); ?></option>
+                        <option value="deposit"><?php esc_html_e( 'Depósito + saldo', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div id="ltms-np-deposit-pct-wrap" style="display:none;">
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Depósito (%)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-np-deposit-pct" min="10" max="90" value="30" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+        </div>
+
         <!-- PROD-08: Tags -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Etiquetas', 'ltms' ); ?></label>

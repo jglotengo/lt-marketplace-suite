@@ -687,6 +687,33 @@ class LTMS_Products_Ajax {
         }
         update_post_meta( $product_id, '_ltms_product_type', $product_type );
 
+        // v2.9.285 FIX: si el tipo es 'booking' (turismo), convertir el producto WC
+        // a tipo 'ltms_bookable' para que el calendario de reservas aparezca.
+        // Antes solo se guardaba la meta _ltms_product_type pero el WC product type
+        // seguía siendo 'simple', por lo que el calendario nunca se renderizaba.
+        if ( $product_type === 'booking' ) {
+            wp_set_object_terms( $product_id, [ 'ltms_bookable' ], 'product_type' );
+
+            // Guardar campos de booking si vienen en la petición
+            $booking_type    = sanitize_text_field( wp_unslash( $_POST['booking_type'] ?? 'accommodation' ) ); // phpcs:ignore
+            $min_nights      = (int) ( $_POST['min_nights'] ?? 1 ); // phpcs:ignore
+            $max_nights      = (int) ( $_POST['max_nights'] ?? 0 ); // phpcs:ignore
+            $capacity        = (int) ( $_POST['booking_capacity'] ?? 1 ); // phpcs:ignore
+            $checkin_time    = sanitize_text_field( wp_unslash( $_POST['checkin_time'] ?? '15:00' ) ); // phpcs:ignore
+            $checkout_time   = sanitize_text_field( wp_unslash( $_POST['checkout_time'] ?? '11:00' ) ); // phpcs:ignore
+            $payment_mode    = sanitize_text_field( wp_unslash( $_POST['payment_mode'] ?? 'full' ) ); // phpcs:ignore
+            $deposit_pct     = (float) ( $_POST['deposit_pct'] ?? 0 ); // phpcs:ignore
+
+            update_post_meta( $product_id, '_ltms_booking_type', $booking_type );
+            update_post_meta( $product_id, '_ltms_min_nights', max( 1, $min_nights ) );
+            update_post_meta( $product_id, '_ltms_max_nights', $max_nights );
+            update_post_meta( $product_id, '_ltms_capacity', max( 1, $capacity ) );
+            update_post_meta( $product_id, '_ltms_checkin_time', $checkin_time );
+            update_post_meta( $product_id, '_ltms_checkout_time', $checkout_time );
+            update_post_meta( $product_id, '_ltms_payment_mode', $payment_mode );
+            update_post_meta( $product_id, '_ltms_deposit_pct', $deposit_pct );
+        }
+
         // PROD-02: Crear variaciones si el tipo es 'variable'
         $variation_attrs_raw = isset( $_POST['variation_attributes'] ) ? wp_unslash( $_POST['variation_attributes'] ) : ''; // phpcs:ignore
         if ( $product_type === 'variable' && ! empty( $variation_attrs_raw ) ) {

@@ -157,6 +157,15 @@
                 download_expiry:  $('#ltms-np-download-expiry').val(),
                 redi_enabled:     $('#ltms-np-redi-enabled').is(':checked') ? 'yes' : 'no',
                 redi_rate:        parseFloat($('#ltms-np-redi-rate').val()) || 0,
+                // v2.9.285: campos de booking/turismo
+                booking_type:     $('#ltms-np-booking-type').val() || 'accommodation',
+                min_nights:       parseInt($('#ltms-np-min-nights').val()) || 1,
+                max_nights:       parseInt($('#ltms-np-max-nights').val()) || 0,
+                booking_capacity: parseInt($('#ltms-np-booking-capacity').val()) || 1,
+                checkin_time:     $('#ltms-np-checkin-time').val() || '15:00',
+                checkout_time:    $('#ltms-np-checkout-time').val() || '11:00',
+                payment_mode:     $('#ltms-np-payment-mode').val() || 'full',
+                deposit_pct:      parseFloat($('#ltms-np-deposit-pct').val()) || 0,
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -403,18 +412,24 @@
 
     // ── PROD-01: Campos condicionales según tipo de producto ─────
     // v2.9.283 FIX: mover DENTRO del IIFE para que $ esté disponible.
-    // Antes estaba fuera de })(jQuery); causando '$ is not a function'.
+    // v2.9.285: añadir soporte para booking (turismo) fields.
     function updateProductTypeFields() {
         var tipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
         var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-physical-fields').toggle(showPhysical);
         $('#ltms-np-digital-fields').toggle(tipo === 'digital');
+        // v2.9.285: mostrar campos de booking/turismo
+        $('#ltms-np-booking-fields').toggle(tipo === 'booking');
         var showStock = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-stock').closest('div').toggle(showStock);
     }
     $(function() {
         $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
         updateProductTypeFields();
+        // v2.9.285: toggle depósito % según modo de pago
+        $('#ltms-np-payment-mode').on('change', function() {
+            $('#ltms-np-deposit-pct-wrap').toggle($(this).val() === 'deposit');
+        });
     });
 
 })(jQuery);
