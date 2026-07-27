@@ -480,9 +480,13 @@ final class LTMS_Public_Auth_Handler {
                 $_pages   = get_option( 'ltms_installed_pages', [] );
                 $_login_id = $_pages['ltms-login'] ?? 0;
                 $login_url = $_login_id ? get_permalink( $_login_id ) : home_url( '/login-vendedor/' );
-                $subject   = sprintf( __( '[%s] Ya tienes una cuenta', 'ltms' ), get_bloginfo( 'name' ) );
+                $subject   = sprintf( __( '[%s] Ya tienes una cuenta de vendedor', 'ltms' ), get_bloginfo( 'name' ) );
+                // v2.9.284 FIX: mensaje menos confuso — antes decía "Alguien intentó
+                // registrar" lo que alarmaba a usuarios que simplemente intentaron
+                // registrarse dos veces. Ahora es claro: "Ya tienes una cuenta".
                 $message   = sprintf(
-                    __( "Hola,\n\nAlguien intentó registrar una nueva cuenta con tu email en %s.\n\nSi fuiste tú, ya tienes una cuenta. Puedes iniciar sesión aquí: %s\n\nSi no fuiste tú, ignora este correo — tu cuenta está segura.\n\nSaludos,\nEquipo %s", 'ltms' ),
+                    __( "Hola,\n\nEl email %s ya tiene una cuenta de vendedor en %s.\n\nSi tú intentaste registrarte, tu cuenta ya existe. Puedes iniciar sesión aquí: %s\n\nSi no creaste esta cuenta, contacta a soporte respondiendo a este correo.\n\nSaludos,\nEquipo %s", 'ltms' ),
+                    $data['email'],
                     get_bloginfo( 'name' ),
                     $login_url,
                     get_bloginfo( 'name' )

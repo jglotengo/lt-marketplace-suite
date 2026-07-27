@@ -222,6 +222,38 @@ if ( $_show_drivers ) {
 .ltms-dashboard-container .ltms-view-pad p{
     color:#2c3e50!important;
 }
+/* v2.9.284 FIX: forzar texto blanco en topbar azul (antes se veía gris) */
+.ltms-dashboard-container .ltms-topbar *,
+.ltms-dashboard-container .ltms-topbar-actions *,
+.ltms-dashboard-container #ltms-notif-bell,
+.ltms-dashboard-container .ltms-topbar-notif{
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-topbar-actions .ltms-btn{
+    border-color:rgba(255,255,255,0.5)!important;
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-form-group label,
+.ltms-dashboard-container .ltms-card label,
+.ltms-dashboard-container form label{
+    color:#374151!important;
+    font-weight:500!important;
+}
+.ltms-dashboard-container input[type="text"],
+.ltms-dashboard-container input[type="email"],
+.ltms-dashboard-container input[type="password"],
+.ltms-dashboard-container input[type="number"],
+.ltms-dashboard-container input[type="tel"],
+.ltms-dashboard-container input[type="search"],
+.ltms-dashboard-container select,
+.ltms-dashboard-container textarea{
+    background:#fff!important;
+    color:#2c3e50!important;
+    border:1.5px solid #d1d5db!important;
+    border-radius:6px!important;
+    padding:8px 12px!important;
+    font-size:14px!important;
+}
 </style>
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
 
