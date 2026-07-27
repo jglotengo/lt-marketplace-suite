@@ -527,10 +527,10 @@ body.ltms-storefront-page .wh-header{display:none!important}
         </a>
         <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back">&larr; Volver a la tienda</a>
         <!-- P2-2: Wishlist icon in topbar -->
-        <a href="<?php echo esc_url( home_url( '/lista-deseos/' ) ); ?>" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos">
+        <button type="button" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos" id="ltms-sf-topbar-wishlist-btn" style="background:none;border:none;cursor:pointer;font-family:inherit;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             <span class="ltms-sf-wishlist-count" id="ltms-sf-wishlist-count">0</span>
-        </a>
+        </button>
         <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
            class="ltms-sf-topbar-cart" aria-label="Ver carrito">
             🛒 <span class="ltms-sf-cart-count"><?php
@@ -559,7 +559,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
     private static function render( object $vendor ): void {
         // ── Parámetros de filtro/orden/paginación ──
         $paged      = max( 1, (int) ( $_GET['pg'] ?? 1 ) );
-        $per_page   = 12;
+        $per_page   = 8;
         $cat_slug   = sanitize_title( $_GET['cat'] ?? '' );
         $orderby    = in_array( $_GET['order'] ?? '', [ 'price', 'price-desc', 'date' ], true )
                       ? sanitize_text_field( $_GET['order'] ) : 'date';
@@ -1026,14 +1026,6 @@ body.ltms-storefront-page .wh-header{display:none!important}
                             <div class="ltms-sf-trust-item">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                                 Envío nacional
-                            </div>
-                            <div class="ltms-sf-trust-item">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                                30 días devolución
-                            </div>
-                            <div class="ltms-sf-trust-item">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                                Soporte WhatsApp
                             </div>
                         </div>
 

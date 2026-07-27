@@ -167,6 +167,47 @@
                 sfAjax('ltms_sf_toggle_wishlist', { product_id: productId }, function () {});
         });
 
+        /* ── P2-2: Topbar wishlist button — show panel with saved products ── */
+        $(document).on('click', '#ltms-sf-topbar-wishlist-btn', function (e) {
+                e.preventDefault();
+                var wl = getWishlist();
+                if (wl.length === 0) {
+                        alert('Tu lista de deseos está vacía.\n\nPara agregar productos, haz clic en el icono ♥ de cualquier tarjeta de producto.');
+                        return;
+                }
+                // Show a simple panel with saved product IDs
+                var html = '<div class="ltms-sf-qv-overlay is-open" id="ltms-sf-wishlist-panel" style="display:flex">' +
+                        '<div class="ltms-sf-qv-modal" style="max-width:500px">' +
+                        '<button type="button" class="ltms-sf-qv-close" onclick="jQuery(\'#ltms-sf-wishlist-panel\').remove();jQuery(\'body\').css(\'overflow\',\'\')">&times;</button>' +
+                        '<div class="ltms-sf-qv-body" style="grid-column:1/-1">' +
+                        '<h2 class="ltms-sf-qv-name">Mi lista de deseos (' + wl.length + ')</h2>' +
+                        '<p style="color:#6B7280;font-size:13px">Tienes ' + wl.length + ' producto(s) guardado(s).</p>' +
+                        '<div id="ltms-sf-wishlist-items">Cargando...</div>' +
+                        '</div></div></div>';
+                $('body').append(html).css('overflow', 'hidden');
+
+                // Load product data for each wishlist item via AJAX
+                var loaded = 0;
+                var itemsHtml = '';
+                wl.forEach(function (pid) {
+                        sfAjax('ltms_sf_quick_view', { product_id: pid }, function (res) {
+                                loaded++;
+                                if (res.success) {
+                                        var p = res.data;
+                                        itemsHtml += '<div style="display:flex;gap:10px;padding:10px;border-bottom:1px solid #F3F4F6">' +
+                                                (p.image ? '<img src="' + p.image + '" alt="" style="width:50px;height:50px;object-fit:cover;border-radius:6px">' : '') +
+                                                '<div style="flex:1"><div style="font-weight:600;font-size:13px">' + p.name + '</div>' +
+                                                '<div style="color:#E80001;font-weight:700;font-size:13px">' + p.price + '</div></div>' +
+                                                '<a href="' + p.permalink + '" style="padding:6px 12px;background:#E80001;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">Ver</a>' +
+                                                '</div>';
+                                }
+                                if (loaded === wl.length) {
+                                        $('#ltms-sf-wishlist-items').html(itemsHtml || '<p>No se pudieron cargar los productos.</p>');
+                                }
+                        });
+                });
+        });
+
         /* ── P1-4: Sticky header compact on scroll ── */
         var $topbar = $('.ltms-sf-topbar');
         var lastScroll = 0;

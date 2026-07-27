@@ -969,10 +969,12 @@
 
 /* ── P2-8: Banner mobile compact (above-fold optimization) ── */
 @media(max-width:767px){
-  .ltms-sf-banner{min-height:100px}
-  .ltms-sf-banner-overlay{padding:12px 14px}
+  .ltms-sf-banner{min-height:100px;overflow:visible}
+  .ltms-sf-banner-overlay{padding:12px 14px;flex-direction:column;align-items:flex-start;gap:8px}
+  .ltms-sf-header{flex-direction:row;align-items:center;gap:10px;width:100%}
   .ltms-sf-logo{width:48px;height:48px}
   .ltms-sf-name{font-size:15px}
   .ltms-sf-meta-row{display:none}
-  .ltms-sf-banner-cta{padding:6px 14px;font-size:11px}
+  .ltms-sf-banner-cta{padding:6px 14px;font-size:11px;margin-top:4px;align-self:flex-start;display:inline-flex;position:static}
+  .ltms-sf-banner .ltms-sf-meta{width:100%}
 }

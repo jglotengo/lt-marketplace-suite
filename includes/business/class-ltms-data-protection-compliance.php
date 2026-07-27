@@ -438,8 +438,7 @@ class LTMS_Data_Protection_Compliance {
         $privacy_url = get_privacy_policy_url();
         if ( ! $privacy_url ) return;
         echo '<div style="text-align:center;font-size:11px;color:#6b7280;padding:8px;">';
-        echo '<a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Aviso de Privacidad Integral', 'ltms' ) . '</a> | ';
-        echo '<a href="' . esc_url( admin_url( 'admin.php?page=ltms-data-protection' ) ) . '">' . esc_html__( 'DPO y Registro SIC', 'ltms' ) . '</a>';
+        echo '<a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener">' . esc_html__( 'Aviso de Privacidad Integral', 'ltms' ) . '</a>';
         echo '</div>';
     }
 
