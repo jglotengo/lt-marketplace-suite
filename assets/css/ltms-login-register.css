@@ -21,6 +21,7 @@
     padding: 40px;
     width: 100%;
     max-width: 480px;
+    margin: 0 auto; /* CENTRADO en desktop — el tema Hello Elementor no renderiza .ltms-auth-container */
 }
 
 .ltms-auth-logo {
@@ -270,8 +271,9 @@
     font-weight: 600;
     color: #9ca3af;
     text-align: center;
-    padding-top: 36px;
+    padding-top: 44px; /* aumentado de 36px a 44px para evitar overlap del círculo con texto */
     counter-increment: ltms-step;
+    min-height: 60px;
 }
 .ltms-step::before {
     content: counter(ltms-step);
@@ -555,4 +557,59 @@
 }
 .ltms-btype-lbl.ltms-btype-selected span {
     color: #6d28d9 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.272 FIXES — UX audit login/registro/panel
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ocultar carrito de Elementor en páginas de auth/panel (no es tienda) */
+body.page-id-14344 .elementor-menu-cart, /* login-vendedor */
+body.page-id-14342 .elementor-menu-cart, /* registro-vendedor */
+body.page-id-14343 .elementor-menu-cart, /* panel-vendedor */
+body.page-id-14344 .elementor-widget-woocommerce-menu-cart,
+body.page-id-14342 .elementor-widget-woocommerce-menu-cart,
+body.page-id-14343 .elementor-widget-woocommerce-menu-cart {
+    display: none !important;
+}
+
+/* Asegurar centrado de la card de auth en desktop */
+@media (min-width: 768px) {
+    .ltms-auth-card.ltms-login-card,
+    .ltms-auth-card.ltms-register-card {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+}
+
+/* Stepper fix: evitar overlap de números con texto en mobile */
+@media (max-width: 480px) {
+    .ltms-step {
+        padding-top: 40px;
+        min-height: 56px;
+        font-size: 0.65rem;
+    }
+    .ltms-step::before {
+        width: 26px;
+        height: 26px;
+        font-size: 0.72rem;
+    }
+}
+
+/* Checkbox fix: evitar overlap con texto en mobile */
+@media (max-width: 480px) {
+    .ltms-auth-checkbox,
+    .ltms-checkbox-label {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+        line-height: 1.4 !important;
+    }
+    .ltms-auth-checkbox input[type="checkbox"],
+    .ltms-checkbox-label input[type="checkbox"] {
+        width: 18px !important;
+        height: 18px !important;
+        flex-shrink: 0 !important;
+        margin-top: 1px !important;
+    }
 }
