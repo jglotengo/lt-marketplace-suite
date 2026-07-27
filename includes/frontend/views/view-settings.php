@@ -413,11 +413,12 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
 
         <!-- Alegra fields -->
         <div id="ltms-alegra-fields" style="display:<?php echo $invoice_provider === 'alegra' ? 'block' : 'none'; ?>;">
+            <form action="javascript:void(0)" autocomplete="off">
             <div style="margin-bottom:12px;">
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                     <?php esc_html_e( 'Email de cuenta Alegra', 'ltms' ); ?>
                 </label>
-                <input type="email" id="ltms-alegra-email" value="<?php echo esc_attr( $alegra_email ); ?>"
+                <input type="email" id="ltms-alegra-email" autocomplete="off" value="<?php echo esc_attr( $alegra_email ); ?>"
                        placeholder="micuenta@alegra.com"
                        style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
             </div>
@@ -431,15 +432,17 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
                     <?php esc_html_e( 'Encuéntralo en Alegra → Configuración → API. Genera un nuevo token si lo necesitas.', 'ltms' ); ?>
                 </p>
             </div>
+            </form>
         </div>
 
         <!-- Siigo fields -->
         <div id="ltms-siigo-fields" style="display:<?php echo $invoice_provider === 'siigo' ? 'block' : 'none'; ?>;">
+            <form action="javascript:void(0)" autocomplete="off">
             <div style="margin-bottom:12px;">
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">
                     <?php esc_html_e( 'Username Siigo', 'ltms' ); ?>
                 </label>
-                <input type="text" id="ltms-siigo-username" value="<?php echo esc_attr( $siigo_user ); ?>"
+                <input type="text" id="ltms-siigo-username" autocomplete="off" value="<?php echo esc_attr( $siigo_user ); ?>"
                        placeholder="usuario@siigo.com"
                        style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;">
             </div>
@@ -453,6 +456,7 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
                     <?php esc_html_e( 'Encuéntrala en Siigo → Configuración → API / Integraciones.', 'ltms' ); ?>
                 </p>
             </div>
+            </form>
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
