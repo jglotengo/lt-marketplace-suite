@@ -613,3 +613,37 @@ body.page-id-14343 .elementor-widget-woocommerce-menu-cart {
         margin-top: 1px !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.275 FIX — Checkbox 'Recordarme' overlap with password field
+   The .ltms-form-row (containing checkbox + forgot password link)
+   had no margin-top, causing it to overlap with the password input
+   group above it (checkbox top:689 vs password bottom:696 = 7px overlap).
+   Fix: add margin-top to .ltms-form-row to separate from password field.
+   ═══════════════════════════════════════════════════════════════ */
+.ltms-form-row {
+    margin-top: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+}
+
+@media (max-width: 480px) {
+    .ltms-form-row {
+        margin-top: 20px !important;
+        flex-wrap: wrap !important;
+    }
+    .ltms-checkbox-label {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-shrink: 0 !important;
+    }
+    .ltms-checkbox-label input[type="checkbox"] {
+        width: 18px !important;
+        height: 18px !important;
+        flex-shrink: 0 !important;
+        margin: 0 !important;
+    }
+}
