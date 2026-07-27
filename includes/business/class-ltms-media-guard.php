@@ -159,6 +159,12 @@ class LTMS_Media_Guard {
         $bucket  = LTMS_Core_Config::get( 'ltms_backblaze_private_bucket', '' )
             ?: LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' );
 
+        // v2.9.282 FIX: fallback local si Backblaze B2 no está configurado o falla.
+        // Antes, si B2 fallaba, el vendor no podía subir documentos KYC en absoluto.
+        // Ahora: intentar B2 primero, si falla guardar localmente en wp-content/uploads/ltms-kyc/
+        $b2_success = false;
+        $result     = null;
+
         try {
             $b2     = LTMS_Api_Factory::get( 'backblaze' );
             $result = $b2->upload_file( $bucket, $key, $content, $mime, [
@@ -166,9 +172,31 @@ class LTMS_Media_Guard {
                 'original_name' => sanitize_file_name( $file['name'] ),
                 'file_hash'     => $hash,
             ] );
+            $b2_success = true;
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'KYC_UPLOAD_B2_FAILED', $e->getMessage() );
-            return new \WP_Error( 'upload_failed', __( 'Error al subir el archivo. Por favor intenta de nuevo.', 'ltms' ) );
+            // Fallback: guardar localmente
+            $upload_dir = wp_upload_dir();
+            $local_dir  = $upload_dir['basedir'] . '/ltms-kyc/kyc/' . $vendor_id;
+            if ( ! is_dir( $local_dir ) ) {
+                wp_mkdir_p( $local_dir );
+            }
+            $local_file = $local_dir . '/' . basename( $key );
+            $saved      = file_put_contents( $local_file, $content );
+
+            if ( false === $saved ) {
+                return new \WP_Error( 'upload_failed', __( 'Error al guardar el archivo. Verifica permisos del servidor.', 'ltms' ) );
+            }
+
+            // .htaccess para bloquear acceso directo a documentos KYC
+            $htaccess = $upload_dir['basedir'] . '/ltms-kyc/.htaccess';
+            if ( ! file_exists( $htaccess ) ) {
+                file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" );
+            }
+
+            LTMS_Core_Logger::info( 'KYC_UPLOAD_LOCAL_FALLBACK', sprintf( 'Vendor #%d saved KYC locally: %s', $vendor_id, $local_file ) );
+            $result    = [ 'fileId' => 'local:' . $key ];
+            $b2_success = false;
         }
 
         // FIX-3: limpiar archivo temporal del servidor una vez subido a B2
