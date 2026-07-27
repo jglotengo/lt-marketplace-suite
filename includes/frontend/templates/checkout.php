@@ -220,7 +220,10 @@ get_header( 'shop' );
                                 ?>
                                 <div class="pv-checkout__contact-fields">
                                     <?php
-                                    // Si el usuario no está logueado, mostrar login form opcional.
+                                    // v2.9.286: Si el usuario no está logueado, mostrar login form opcional
+                                    // en un <details> colapsable (NO expandido por defecto para no confundir).
+                                    // Antes el login form se mostraba expandido causando un checkbox
+                                    // "Recuérdame" duplicado y confuso en el checkout.
                                     if ( ! is_user_logged_in() && function_exists( 'woocommerce_checkout_login_form' ) ) {
                                         echo '<details class="pv-checkout__login-toggle"><summary>' . esc_html__( '¿Ya tienes cuenta? Inicia sesión', 'ltms' ) . '</summary><div class="pv-checkout__login-body">';
                                         woocommerce_checkout_login_form();

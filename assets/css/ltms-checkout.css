@@ -680,3 +680,90 @@
     padding-bottom: 8px !important;
     border-bottom: 1px solid #E7E5EC !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.286 FIX — Checkout: checkboxes limpios + orden campos
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Login toggle: colapsado por defecto, estilo sutil */
+.pv-checkout__login-toggle {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+.pv-checkout__login-toggle summary {
+    cursor: pointer;
+    color: #2563eb;
+    font-weight: 600;
+    user-select: none;
+}
+.pv-checkout__login-toggle summary:hover { color: #1e40af; }
+.pv-checkout__login-body { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+
+/* Checkbox "Crear cuenta": ocultar por defecto (causa confusión) */
+.pv-checkout__form .createaccount,
+.pv-checkout__form #createaccount {
+    display: none !important;
+}
+.pv-checkout__form label:has(#createaccount) {
+    display: none !important;
+}
+
+/* Checkbox "Recuérdame" del login form: solo visible dentro del toggle */
+.pv-checkout__login-body .woocommerce-form-login__rememberme {
+    font-size: 0.82rem;
+    margin-top: 8px;
+}
+
+/* Asegurar que todos los checkboxes visibles tengan texto legible */
+.pv-checkout__form input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #E80001;
+    flex-shrink: 0;
+    margin-right: 8px;
+    cursor: pointer;
+}
+.pv-checkout__form input[type="checkbox"] + span,
+.pv-checkout__form label.checkbox {
+    font-size: 0.85rem !important;
+    color: #374151 !important;
+    line-height: 1.4;
+}
+
+/* Consentimiento de privacidad: destacar */
+.ltms-checkout-consent {
+    padding: 12px 14px !important;
+    background: #fefce8 !important;
+    border: 1.5px solid #facc15 !important;
+    border-radius: 8px !important;
+    margin: 12px 0 !important;
+}
+.ltms-checkout-consent label {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+}
+
+/* Términos y condiciones: destacar */
+.pv-checkout__terms-toggle {
+    padding: 12px 14px;
+    background: #eff6ff;
+    border: 1.5px solid #3b82f6;
+    border-radius: 8px;
+    margin: 12px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* Campos opcionales: estilo sutil */
+.pv-checkout__form .optional {
+    color: #9ca3af;
+    font-size: 0.78rem;
+    font-weight: 400;
+}
