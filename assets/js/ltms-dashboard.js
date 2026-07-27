@@ -1075,7 +1075,7 @@
                 const title = topbar.querySelector('.ltms-topbar-title');
                 if (title) Object.assign(title.style, { flex: '1', textAlign: 'center', color: '#fff', fontSize: '0.95rem', fontWeight: '600' });
                 const menuBtn = topbar.querySelector('.ltms-mobile-menu-btn');
-                if (menuBtn) Object.assign(menuBtn.style, { background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none' });
+                if (menuBtn) Object.assign(menuBtn.style, { background: 'var(--ltms-primary, #E80001)', color: '#fff', border: 'none' });
                 topbar.querySelectorAll('.ltms-btn').forEach(b => { b.style.borderColor = 'rgba(255,255,255,0.5)'; b.style.color = '#fff'; });
                 const notif = topbar.querySelector('.ltms-topbar-notif');
                 if (notif) notif.style.color = '#fff';
@@ -1089,10 +1089,27 @@
             if (overlay) { overlay.style.top = panelTop + 'px'; overlay.style.height = 'calc(100vh - ' + panelTop + 'px)'; }
             if (main) main.style.paddingTop = panelTop + 'px';
 
-            const open  = () => { sidebar?.classList.add('ltms-sidebar-open'); overlay?.classList.add('active'); document.body.style.overflow = 'hidden'; };
-            const close = () => { sidebar?.classList.remove('ltms-sidebar-open'); overlay?.classList.remove('active'); document.body.style.overflow = ''; };
+            const open  = () => { if (sidebar) { sidebar.classList.add('ltms-sidebar-open'); sidebar.style.display = 'block'; } if (overlay) { overlay.classList.add('active'); overlay.style.display = 'block'; } document.body.style.overflow = 'hidden'; };
+            const close = () => { if (sidebar) { sidebar.classList.remove('ltms-sidebar-open'); } if (overlay) { overlay.classList.remove('active'); overlay.style.display = 'none'; } document.body.style.overflow = ''; };
 
-            $(document).on('click', '.ltms-mobile-menu-btn', e => { e.stopPropagation(); sidebar?.classList.contains('ltms-sidebar-open') ? close() : open(); });
+            // v2.9.280 FIX: hamburguesa no funciona al primer click.
+            // Root cause: el handler delegado no disparaba si el sidebar
+            // no tenía display:block inicialmente. Fix: usar handler directo
+            // en el botón + toggle display explícito.
+            const menuBtnEl = document.querySelector('.ltms-mobile-menu-btn');
+            if (menuBtnEl) {
+                menuBtnEl.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (sidebar && sidebar.classList.contains('ltms-sidebar-open')) {
+                        close();
+                    } else {
+                        open();
+                    }
+                });
+            }
+            // Mantener el delegado como fallback
+            $(document).on('click', '.ltms-mobile-menu-btn', e => { e.stopPropagation(); });
             $(document).on('click', '.ltms-sidebar-overlay', close);
             $(document).on('click', '.ltms-sidebar-close-btn', close);
             $(document).on('click', '.ltms-nav-item', () => close());

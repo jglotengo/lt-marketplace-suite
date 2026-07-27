@@ -1159,3 +1159,37 @@ select.ltms-form-control   { cursor: pointer; }
         max-height: calc(100vh - 140px); /* viewport - logo - balance */
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.280 FIX — Panel mobile: hamburguesa color + topbar overlap
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hamburguesa: mantener color primario al click (no quedarse blanco) */
+.ltms-mobile-menu-btn:active,
+.ltms-mobile-menu-btn.is-active {
+    background: var(--ltms-primary, #E80001) !important;
+    color: #fff !important;
+    opacity: 0.85;
+}
+
+/* Asegurar que el topbar no tape el contenido del formulario */
+@media (max-width: 768px) {
+    .ltms-main-content {
+        padding-top: 60px !important;
+    }
+    .ltms-topbar {
+        z-index: 9999 !important;
+    }
+}
+
+/* Sidebar mobile: asegurar que se muestre al abrir */
+@media (max-width: 768px) {
+    .ltms-sidebar.ltms-sidebar-open {
+        display: block !important;
+        transform: translateX(0) !important;
+    }
+    .ltms-sidebar-overlay.active {
+        display: block !important;
+        opacity: 1 !important;
+    }
+}
