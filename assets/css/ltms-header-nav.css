@@ -130,66 +130,69 @@
 }
 .ltms-nav-btn-wrap:hover .ltms-nav-tooltip { opacity: 1; }
 
-/* ── Avatar / Chip usuario logueado ──────────────────────── */
+/* ── Avatar / Chip usuario logueado (v2.9.276 — mejor contraste) ── */
 .ltms-user-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px 6px 6px;
+  padding: 6px 14px 6px 6px;
   border-radius: 40px;
-  background: rgba(255,255,255,0.1);
-  border: 1.5px solid rgba(255,255,255,0.25);
-  color: var(--ltms-white) !important;
+  background: var(--ltms-gold);
+  border: 2px solid var(--ltms-gold);
+  color: var(--ltms-dark) !important;
   text-decoration: none !important;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--ltms-font);
   transition: all var(--ltms-transition);
   cursor: pointer;
   user-select: none;
+  box-shadow: 0 2px 8px rgba(247,183,49,0.3);
 }
 .ltms-user-chip:hover,
 .ltms-user-chip:focus {
-  background: rgba(255,255,255,0.18);
-  border-color: rgba(255,255,255,0.5);
+  background: #e5a800;
+  border-color: #e5a800;
+  box-shadow: 0 4px 16px rgba(247,183,49,0.45);
+  transform: translateY(-1px);
 }
 .ltms-user-chip .ltms-avatar-initials {
   width: 28px; height: 28px;
   border-radius: 50%;
-  background: var(--ltms-gold);
-  color: var(--ltms-dark);
+  background: var(--ltms-dark);
+  color: var(--ltms-gold);
   font-size: 11px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+.ltms-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ltms-chip-arrow { opacity: 0.7; }
 
-/* ── Dropdown ────────────────────────────────────────────── */
+/* ── Dropdown (v2.9.276 — click-based, mejor contraste) ── */
 .ltms-user-dropdown-wrap {
   position: relative;
   display: inline-flex;
-  z-index: 100000; /* por encima de CUALQUIER header */
+  z-index: 100000;
 }
 .ltms-user-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   right: 0;
-  min-width: 200px;
+  min-width: 220px;
   background: var(--ltms-white);
   border-radius: var(--ltms-radius);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
   overflow: hidden;
   z-index: 100001;
   opacity: 0;
-  transform: translateY(-6px) scale(0.98);
+  transform: translateY(-8px) scale(0.97);
   pointer-events: none;
   transition: all var(--ltms-transition);
-  /* Evitar que el header del tema corte el dropdown */
   transform-origin: top right;
+  border: 1px solid rgba(0,0,0,0.08);
 }
 
-/* Mostrar en hover (desktop) Y cuando tiene clase .is-open (mobile/touch) */
-.ltms-user-dropdown-wrap:hover .ltms-user-dropdown,
-.ltms-user-dropdown-wrap:focus-within .ltms-user-dropdown,
+/* Mostrar SOLO con clase .is-open (click-based, no hover — más fácil de seleccionar) */
 .ltms-user-dropdown-wrap.is-open .ltms-user-dropdown {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -199,20 +202,27 @@
 .ltms-user-dropdown a {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 11px 16px;
-  font-size: 13px;
+  gap: 10px;
+  padding: 13px 18px;
+  font-size: 14px;
   font-family: var(--ltms-font);
-  color: var(--ltms-dark) !important;
+  color: #1a1a1a !important;
   text-decoration: none !important;
-  transition: background var(--ltms-transition);
+  transition: background 0.15s, color 0.15s;
   border-bottom: 1px solid #f0f0f0;
-  font-weight: 500;
+  font-weight: 600;
+  min-height: 44px; /* touch target */
 }
 .ltms-user-dropdown a:last-child { border-bottom: none; }
-.ltms-user-dropdown a:hover { background: #fff9e6; color: var(--ltms-red) !important; }
-.ltms-user-dropdown a svg { width:15px; height:15px; flex-shrink:0; fill:currentColor; }
-.ltms-dropdown-divider { height:1px; background:#eee; margin:4px 0; }
+.ltms-user-dropdown a:hover,
+.ltms-user-dropdown a:focus {
+  background: #fff9e6;
+  color: var(--ltms-red) !important;
+}
+.ltms-user-dropdown a svg { width:16px; height:16px; flex-shrink:0; fill:currentColor; }
+.ltms-dropdown-divider { height:1px; background:#e5e5e5; margin:4px 0; }
+.ltms-dropdown-logout { color: var(--ltms-red) !important; }
+.ltms-dropdown-logout:hover { background: #fef2f2 !important; color: var(--ltms-red-dark) !important; }
 
 /* Overlay invisible para cerrar dropdown al click afuera */
 .ltms-dropdown-overlay {
