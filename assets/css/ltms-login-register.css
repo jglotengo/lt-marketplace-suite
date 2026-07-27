@@ -647,3 +647,64 @@ body.page-id-14343 .elementor-widget-woocommerce-menu-cart {
         margin: 0 !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.277 FIX — Ocultar header/footer del tema en páginas auth/panel
+   Las barras superiores (rojas y negras con buscador, redes, menú) y
+   el footer inferior del tema son ruido visual en login/registro/panel.
+   Ocultarlas deja el foco 100% en el formulario/menu — patrón SaaS.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ocultar header del tema (barras rojas + negras) */
+body.page-id-14344 .elementor-location-header, /* login-vendedor */
+body.page-id-14342 .elementor-location-header, /* registro-vendedor */
+body.page-id-14343 .elementor-location-header, /* panel-vendedor */
+body.page-id-14344 header.site-header,
+body.page-id-14342 header.site-header,
+body.page-id-14343 header.site-header,
+body.page-id-14344 #masthead,
+body.page-id-14342 #masthead,
+body.page-id-14343 #masthead {
+    display: none !important;
+}
+
+/* Ocultar footer del tema */
+body.page-id-14344 .elementor-location-footer,
+body.page-id-14342 .elementor-location-footer,
+body.page-id-14343 .elementor-location-footer,
+body.page-id-14344 footer.site-footer,
+body.page-id-14342 footer.site-footer,
+body.page-id-14343 footer.site-footer,
+body.page-id-14344 #colophon,
+body.page-id-14342 #colophon,
+body.page-id-14343 #colophon {
+    display: none !important;
+}
+
+/* Ocultar barras inferiores del tema (newsletter, legal, etc.) */
+body.page-id-14344 .elementor-element-25fec764,
+body.page-id-14342 .elementor-element-25fec764,
+body.page-id-14343 .elementor-element-25fec764 {
+    display: none !important;
+}
+
+/* Asegurar que el contenido principal empiece desde arriba (sin offset del header oculto) */
+body.page-id-14344 main,
+body.page-id-14342 main,
+body.page-id-14343 main,
+body.page-id-14344 .elementor-location-single,
+body.page-id-14342 .elementor-location-single,
+body.page-id-14343 .elementor-location-single {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Mantener el componente ltms-header-access (user dropdown) visible */
+body.page-id-14344 .ltms-header-access,
+body.page-id-14342 .ltms-header-access,
+body.page-id-14343 .ltms-header-access,
+body.page-id-14344 #ltms-floating-access,
+body.page-id-14342 #ltms-floating-access,
+body.page-id-14343 #ltms-floating-access {
+    display: flex !important;
+}
