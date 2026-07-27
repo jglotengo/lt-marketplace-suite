@@ -1685,3 +1685,78 @@
 div[class*="toast"][class*="notification"]:not(.ltms-toast):not(.ltms-notice) {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.283 EXPANDED — Ocultar toasts de social proof de terceros
+   Plugin sospechoso: NotificationX, Fomo, TrustPulse, ProveSource,
+   Nudgify, SalesPop, CareCart, ProofFactor, etc.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* NotificationX */
+.nx-notification,
+.nx-bar,
+[class*="notificationx"],
+[class*="NotificationX"],
+#notificationx {
+    display: none !important;
+}
+
+/* Fomo / WPFomo */
+.fomo-notification,
+.wpfomo-notification,
+[class*="wpfomo"],
+[class*="Fomo"],
+#fomo-container,
+.fomo-container {
+    display: none !important;
+}
+
+/* TrustPulse */
+.tp-pulse-bar,
+[class*="trustpulse"],
+[class*="TrustPulse"],
+#trustpulse-container {
+    display: none !important;
+}
+
+/* ProveSource */
+.provesource-notification,
+[class*="provesource"],
+[class*="ProveSource"],
+#provesource-container {
+    display: none !important;
+}
+
+/* Nudgify */
+.nudgify-notification,
+[class*="nudgify"],
+[class*="Nudgify"] {
+    display: none !important;
+}
+
+/* SalesPop / CareCart */
+.sales-pop,
+.salespop,
+[class*="sales-pop"],
+[class*="salespop"],
+#carecart-sp,
+.cp-popup,
+[class*="proof-factor"],
+[class*="prooffactor"] {
+    display: none !important;
+}
+
+/* Generic: cualquier toast flotante bottom-left/bottom-right que muestre
+   "X compró Y" o "hace N min" — patrón común de social proof */
+div[style*="position: fixed"][style*="bottom"][style*="left"]:not(.ltms-cookie-consent):not(.ltms-sticky-cart):not(#ltms-floating-access),
+div[style*="position:fixed"][style*="bottom"][style*="left"]:not(.ltms-cookie-consent):not(.ltms-sticky-cart):not(#ltms-floating-access) {
+    display: none !important;
+}
+
+/* Cualquier elemento con data-attribute de social proof */
+[data-social-proof],
+[data-proof],
+[data-fomo],
+[data-notificationx] {
+    display: none !important;
+}

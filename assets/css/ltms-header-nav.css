@@ -240,7 +240,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 99998;
+  z-index: 100002; /* v2.9.283: sobre el overlay 99998 para que dropdown sea clickeable */
   pointer-events: none;
 }
 #ltms-floating-access .ltms-header-access {
@@ -399,12 +399,15 @@ li.ltms-menu-item-access {
 }
 
 /* ── Mobile rescue: botones reubicados al .site-header ──────────── */
+/* v2.9.283 FIX: z-index 9999 → 100000 para que el dropdown no quede
+   atrapado debajo del overlay (z-index 99998). El duplicado anterior
+   creaba un stacking context que bloqueaba los clicks en las opciones. */
 #ltms-hello-access {
   position: absolute;
   top: 50%;
-  right: 80px; /* izquierda del burger menu */
+  right: 80px;
   transform: translateY(-50%);
-  z-index: 9999;
+  z-index: 100000;
   display: flex;
   align-items: center;
 }

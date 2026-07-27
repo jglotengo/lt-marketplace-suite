@@ -373,14 +373,14 @@
                 if (res.success) {
                     closeDeleteProductModal();
                     if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastSuccess === 'function') {
-                        LTMS.UX.toastSuccess('', '');
+                        LTMS.UX.toastSuccess('Eliminado', 'El producto fue eliminado correctamente.');
                     }
                     LTMS.Dashboard.loadView('products', true);
                 } else {
                     var msg = res.data || '';
                     $('#ltms-dp-notice').text(msg).show();
                     if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastError === 'function') {
-                        LTMS.UX.toastError('', msg);
+                        LTMS.UX.toastError('Error', msg);
                     }
                 }
             },
@@ -388,29 +388,33 @@
                 $btn.prop('disabled', false).text('');
                 $('#ltms-dp-notice').text('').show();
                 if (typeof LTMS !== 'undefined' && LTMS.UX && typeof LTMS.UX.toastError === 'function') {
-                    LTMS.UX.toastError('', '');
+                    LTMS.UX.toastError('Error', 'No se pudo eliminar el producto. Intenta de nuevo.');
                 }
             }
         });
     });
 
-})(jQuery);
+    // v2.9.283: botón Volver en vista de productos
+    $(document).on('click', '#ltms-products-back-btn', function() {
+        if (typeof LTMS !== 'undefined' && LTMS.Dashboard) {
+            LTMS.Dashboard.loadView('home');
+        }
+    });
 
     // ── PROD-01: Campos condicionales según tipo de producto ─────
-    // Mostrar/ocultar campos según el tipo seleccionado
+    // v2.9.283 FIX: mover DENTRO del IIFE para que $ esté disponible.
+    // Antes estaba fuera de })(jQuery); causando '$ is not a function'.
     function updateProductTypeFields() {
         var tipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
-        // Peso/dimensiones/SKU/shipping class: solo physical y restaurant
         var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-physical-fields').toggle(showPhysical);
-        // Archivo descargable: solo digital
         $('#ltms-np-digital-fields').toggle(tipo === 'digital');
-        // Stock: ocultar para digital y service (no manejan stock físico)
         var showStock = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-stock').closest('div').toggle(showStock);
     }
-    // v2.9.278 FIX: wrap in document.ready to ensure jQuery and DOM are ready
     $(function() {
         $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
         updateProductTypeFields();
     });
+
+})(jQuery);

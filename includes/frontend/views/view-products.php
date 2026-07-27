@@ -21,9 +21,14 @@ $products  = wc_get_products([
 
     <div class="ltms-view-header">
         <h2><?php esc_html_e( 'Mis Productos', 'ltms' ); ?></h2>
-        <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">
-            ➕ <?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?>
-        </button>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-products-back-btn" title="Volver al inicio">
+                ← <?php esc_html_e( 'Volver', 'ltms' ); ?>
+            </button>
+            <button type="button" class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">
+                ➕ <?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?>
+            </button>
+        </div>
     </div>
 
     <?php if ( empty( $products ) ) : ?>

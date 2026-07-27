@@ -88,9 +88,11 @@
             $overlay.hide();
         }
 
-        $overlay.on('click touchstart', function(e) { e.preventDefault(); closeAll(); });
+        $overlay.on('click', function(e) { e.preventDefault(); closeAll(); });
 
-        $(document).on('click touchstart', '.ltms-user-chip', function(e) {
+        // v2.9.283 FIX: solo 'click' (no 'touchstart') para evitar double-fire
+        // en mobile que cerraba el dropdown inmediatamente.
+        $(document).on('click', '.ltms-user-chip', function(e) {
             e.preventDefault(); e.stopPropagation();
             var $wrap = $(this).closest('.ltms-user-dropdown-wrap');
             var wasOpen = $wrap.hasClass('is-open');
@@ -104,7 +106,7 @@
         });
 
         $(document).on('keydown', function(e) { if (e.key === 'Escape') closeAll(); });
-        $(document).on('click touchstart', '.ltms-user-dropdown', function(e) { e.stopPropagation(); });
+        $(document).on('click', '.ltms-user-dropdown', function(e) { e.stopPropagation(); });
     }
 
     function injectButtons() {
