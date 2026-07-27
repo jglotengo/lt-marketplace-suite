@@ -135,12 +135,23 @@ final class LTMS_Public_Auth_Handler {
             return $this->render_already_logged_in();
         }
 
-        // UX-REG-07: mostrar mensaje de "verifica tu email" si viene del registro.
+        // UX-REG-07 v2.9.281: mensaje "verifica tu email" como overlay prominente
+        // (antes era un notice pequeño arriba del form, fácil de perder).
         $registered_notice = '';
         if ( isset( $_GET['registered'] ) && $_GET['registered'] === '1' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            $registered_notice = '<div class="ltms-notice ltms-notice-success" style="padding:16px;margin-bottom:20px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">'
-                . '<h3 style="margin:0 0 8px;color:#15803d;">✅ ¡Cuenta creada exitosamente!</h3>'
-                . '<p style="margin:0;color:#166534;">Te enviamos un email de verificación. <strong>Revisa tu bandeja de entrada y tu carpeta de spam</strong>. Haz clic en el enlace del email para activar tu cuenta y acceder a tu panel de vendedor.</p>'
+            $registered_notice = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px;" id="ltms-reg-success-overlay">'
+                . '<div style="background:#fff;border-radius:16px;max-width:500px;width:100%;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;">'
+                . '<button type="button" onclick="document.getElementById(\'ltms-reg-success-overlay\').style.display=\'none\'" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;">&times;</button>'
+                . '<div style="font-size:3.5rem;margin-bottom:16px;">✅</div>'
+                . '<h2 style="margin:0 0 12px;color:#15803d;font-size:1.5rem;font-weight:800;">¡Cuenta creada exitosamente!</h2>'
+                . '<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:16px 20px;margin:20px 0;">'
+                . '<div style="font-size:2rem;margin-bottom:8px;">📧</div>'
+                . '<p style="margin:0;color:#92400e;font-size:1.05rem;font-weight:700;line-height:1.5;">¡Revisa tu email ahora mismo!</p>'
+                . '<p style="margin:8px 0 0;color:#92400e;font-size:0.9rem;line-height:1.5;">Te enviamos un correo de verificación. <strong>Revisa tu bandeja de entrada y tu carpeta de spam</strong>. Haz clic en el enlace del email para activar tu cuenta.</p>'
+                . '</div>'
+                . '<p style="color:#6b7280;font-size:0.85rem;margin:16px 0 0;line-height:1.5;">Sin verificar tu email no podrás acceder a tu panel de vendedor. Si no recibes el correo en 5 minutos, revisa tu carpeta de spam o correo no deseado.</p>'
+                . '<button type="button" onclick="document.getElementById(\'ltms-reg-success-overlay\').style.display=\'none\'" style="margin-top:20px;padding:12px 32px;background:#E80001;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Entendido</button>'
+                . '</div>'
                 . '</div>';
         }
 

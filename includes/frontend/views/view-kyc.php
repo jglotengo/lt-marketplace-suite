@@ -89,9 +89,17 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
     <?php else : ?>
         <!-- Formulario de envío KYC -->
         <?php if ( 'rejected' === $status && $kyc && $kyc->notes ) : ?>
-            <div class="ltms-card ltms-modal-error" style="padding:16px;margin-bottom:16px;border-radius:8px;">
-                <strong><?php esc_html_e( 'Solicitud rechazada:', 'ltms' ); ?></strong>
-                <?php echo esc_html( $kyc->notes ); ?>
+            <div class="ltms-card ltms-modal-error" style="padding:20px;margin-bottom:16px;border-radius:8px;background:#fef2f2;border:1.5px solid #ef4444;">
+                <div style="font-size:1.8rem;margin-bottom:8px;">⚠️</div>
+                <h3 style="margin:0 0 8px;color:#ef4444;font-size:1.1rem;">Tu solicitud de KYC fue rechazada</h3>
+                <p style="color:#991b1b;margin:0 0 8px;font-size:.9rem;"><strong>Motivo:</strong> <?php echo esc_html( $kyc->notes ); ?></p>
+                <p style="color:#6b7280;margin:8px 0 0;font-size:.85rem;line-height:1.5;">No te preocupes — puedes corregir los documentos y reenviar tu solicitud. Revisa que los archivos sean legibles, estén vigentes y coincidan con los datos de tu cuenta.</p>
+            </div>
+        <?php elseif ( 'none' === $status ) : ?>
+            <div class="ltms-card" style="padding:20px;margin-bottom:16px;border-radius:8px;background:#eff6ff;border:1.5px solid #2563eb;">
+                <div style="font-size:1.8rem;margin-bottom:8px;">📋</div>
+                <h3 style="margin:0 0 8px;color:#1e40af;font-size:1.1rem;">Aún no has enviado tus documentos</h3>
+                <p style="color:#1e3a8a;margin:0;font-size:.85rem;line-height:1.5;">Para vender en Lo Tengo, necesitas completar la verificación de identidad. Sube tus documentos abajo y nuestro equipo los revisará en 1-2 días hábiles.</p>
             </div>
         <?php endif; ?>
 

@@ -462,14 +462,20 @@
             `).join('');
 
             $banner.html(`
-                <div class="ltms-card" style="padding:20px;border-left:4px solid #2563eb;">
-                    <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:4px;">
+                <div class="ltms-card" style="padding:24px;border-left:4px solid #2563eb;background:#fff;">
+                    <div style="font-weight:800;font-size:1.15rem;color:#111827;margin-bottom:6px;">
                         👋 ${t('ob_welcome', '¡Bienvenido a Lo Tengo!')}
                     </div>
-                    <div style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">
-                        ${t('ob_subtitle', 'Completa estos pasos para aprovechar al máximo tu tienda.')}
+                    <div style="font-size:.9rem;color:#374151;margin-bottom:16px;line-height:1.5;">
+                        ${t('ob_subtitle', 'Para habilitar tu tienda y empezar a vender, completa estos 4 pasos en orden. Cada paso desbloquea el siguiente.')}
+                    </div>
+                    <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;font-weight:600;">
+                        ⏳ Tiempo estimado: 10-15 minutos · Si tienes dudas, contacta soporte@lo-tengo.com.co
                     </div>
                     ${stepsHtml}
+                    <div style="margin-top:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;font-size:.8rem;color:#6b7280;line-height:1.5;">
+                        <strong>¿Qué pasa después?</strong> Una vez completados los 4 pasos, nuestro equipo revisa tu información (1-2 días hábiles). Recibirás un email cuando tu tienda esté 100% habilitada para vender.
+                    </div>
                 </div>
             `).show();
 

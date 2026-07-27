@@ -165,6 +165,64 @@ if ( $_show_drivers ) {
     }
 }
 ?>
+<style id="ltms-dash-critical">
+/* v2.9.281 CRITICAL: inline CSS para garantizar contraste/fondo incluso
+   si el CSS externo no carga (SG cache, browser cache, CDN issue).
+   Sin esto, algunos usuarios ven el panel sin fondo blanco y con
+   sombras/texto invisible — el tema Hello Elementor aplica estilos
+   que el dashboard CSS debe override. */
+.ltms-dashboard-container,#ltms-dashboard-container{
+    background:#f4f7f9!important;
+    color:#2c3e50!important;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif!important;
+    font-size:15px!important;
+    min-height:100vh!important;
+}
+.ltms-dashboard-container .ltms-main-content,#ltms-dashboard-container .ltms-main-content{
+    background:#fff!important;
+    color:#2c3e50!important;
+    padding:20px!important;
+}
+.ltms-dashboard-container .ltms-card,#ltms-dashboard-container .ltms-card{
+    background:#fff!important;
+    color:#2c3e50!important;
+    border:1px solid #e5e7eb!important;
+    border-radius:8px!important;
+    padding:16px!important;
+}
+.ltms-dashboard-container .ltms-topbar,#ltms-dashboard-container .ltms-topbar{
+    background:#1a5276!important;
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-topbar-title,#ltms-dashboard-container .ltms-topbar-title{
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-sidebar,#ltms-dashboard-container .ltms-sidebar{
+    background:#1a5276!important;
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-nav-item,#ltms-dashboard-container .ltms-nav-item{
+    color:rgba(255,255,255,0.85)!important;
+    background:transparent!important;
+}
+.ltms-dashboard-container .ltms-nav-item.active,#ltms-dashboard-container .ltms-nav-item.active{
+    background:rgba(255,255,255,0.15)!important;
+    color:#fff!important;
+}
+.ltms-dashboard-container h1,.ltms-dashboard-container h2,.ltms-dashboard-container h3,
+.ltms-dashboard-container h4,.ltms-dashboard-container h5,.ltms-dashboard-container p,
+.ltms-dashboard-container span,.ltms-dashboard-container div,.ltms-dashboard-container label,
+.ltms-dashboard-container a,.ltms-dashboard-container button,.ltms-dashboard-container input,
+.ltms-dashboard-container select,.ltms-dashboard-container textarea{
+    color:inherit!important;
+}
+.ltms-dashboard-container .ltms-metric-value,
+.ltms-dashboard-container .ltms-metric-label,
+.ltms-dashboard-container .ltms-view-header h2,
+.ltms-dashboard-container .ltms-view-pad p{
+    color:#2c3e50!important;
+}
+</style>
 <div class="ltms-dashboard-container" id="ltms-dashboard-container">
 
     <!-- v2.9.95 P3: Accessibility skip-link (CSS-only, no inline handlers) -->
