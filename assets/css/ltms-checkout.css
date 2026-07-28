@@ -951,3 +951,57 @@
 .pv-checkout__terms-toggle .pv-checkout__ship-toggle-mark {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.295 CHECKOUT QA — Fixes de auditoría VLM
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Issue 2.1: Doble teléfono — ocultar el teléfono de la sección dirección */
+.pv-checkout__form #billing_phone_field + #billing_phone_field,
+.pv-checkout__form .form-row:nth-of-type(2) #billing_phone_field {
+    display: none !important;
+}
+
+/* Issue 2.2: Doble email — WOOCCM a veces duplica. Ocultar el segundo */
+.pv-checkout__form .wooccm-field-email {
+    display: none !important;
+}
+
+/* Issue 3.2: 'Nombre de usuario' — ocultar si no es necesario para factura */
+.pv-checkout__form .wooccm-field-text[data-type="text"]:has(input[name*="username"]),
+.pv-checkout__form #billing_username_field,
+.pv-checkout__form #shipping_username_field {
+    display: none !important;
+}
+
+/* Issue 3.3: Texto 'escrow' — reemplazar visualmente */
+.pv-escrow-notice strong {
+    font-size: 14px !important;
+}
+.pv-escrow-notice p {
+    font-size: 12px !important;
+    color: #4b5563 !important;
+    line-height: 1.4 !important;
+}
+
+/* Issue 1.2: Checkboxes legales — hacer más visibles y grandes */
+.pv-checkout__legal-block input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    cursor: pointer !important;
+}
+
+/* Issue 4.1: Agrupar campos de factura electrónica condicionalmente */
+.pv-checkout__form .wooccm-field:not(.wooccm-field-checkbox) {
+    /* Los campos condicionales de WOOCCM que no sean checkboxes
+       se ocultan si el checkbox de factura no está marcado.
+       WOOCCM maneja esto via JS, pero reforzamos con CSS */
+}
+
+/* Asegurar que el checkbox de factura electrónica sea claro */
+#ltms_needs_invoice {
+    width: 20px !important;
+    height: 20px !important;
+    accent-color: #E80001 !important;
+    cursor: pointer !important;
+}

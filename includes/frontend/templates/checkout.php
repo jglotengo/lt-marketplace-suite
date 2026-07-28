@@ -500,7 +500,7 @@ get_header( 'shop' );
                                     <span style="font-size:14px;color:#374151;line-height:1.5;">
                                         <?php
                                         printf(
-                                            wp_kses_post( __( 'He leído y acepto la <a href="%s" target="_blank">Política de Tratamiento de Datos Personales</a>. Autorizo el uso de mis datos para gestión del pedido conforme a la Ley 1581/2012. *', 'ltms' ) ),
+                                            wp_kses_post( __( 'He leído y acepto la <a href="%s" target="_blank">Política de Tratamiento de Datos Personales</a>. *', 'ltms' ) ),
                                             esc_url( $privacy_url )
                                         );
                                         ?>
@@ -516,8 +516,8 @@ get_header( 'shop' );
                         <div class="pv-escrow-notice pv-checkout__escrow" role="note">
                             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <div class="pv-escrow-notice__body">
-                                <strong><?php esc_html_e( 'Tus fondos están protegidos', 'ltms' ); ?></strong>
-                                <p><?php esc_html_e( 'El pago se mantiene en custodia (escrow) hasta que confirmes la recepción del pedido. Solo entonces se libera al vendedor.', 'ltms' ); ?></p>
+                                <strong><?php esc_html_e( 'Tu dinero está seguro', 'ltms' ); ?></strong>
+                                <p><?php esc_html_e( 'No liberamos el pago al vendedor hasta que confirmes que recibiste tu pedido.', 'ltms' ); ?></p>
                             </div>
                         </div>
 
