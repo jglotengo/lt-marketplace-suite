@@ -630,11 +630,18 @@
     display: none !important;
 }
 /* v2.9.291: Asegurar que el span del consentimiento SIEMPRE sea visible */
+/* Usar máxima especificidad para ganar sobre .woocommerce-form__input-checkbox + span */
 .pv-scope.pv-checkout .ltms-checkout-consent .woocommerce-form__input-checkbox + span,
+.pv-scope.pv-checkout .ltms-checkout-consent label span,
 .pv-scope.pv-checkout .ltms-checkout-consent span {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    font-size: 14px !important;
+    color: #374151 !important;
+    line-height: 1.5 !important;
 }
 
 /* CRITICAL: Shipping fields DEBEN estar ocultos por defecto (colapsable) */
