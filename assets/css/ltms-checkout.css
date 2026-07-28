@@ -797,3 +797,86 @@
 #billing_country, #shipping_country {
     value: 'CO' !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.290 FIX — Checkbox 'Recuérdame' texto visible + login form colapsado
+   El VLM veía el checkbox sin texto porque el span con 'Recuérdame'
+   estaba visualmente desconectado del checkbox.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Login form en checkout: colapsar por defecto (no expandido) */
+.pv-checkout .woocommerce-form-login {
+    display: none !important;
+}
+.pv-checkout__login-toggle[open] .woocommerce-form-login {
+    display: block !important;
+}
+
+/* Checkbox 'Recuérdame': alinear texto junto al checkbox */
+.woocommerce-form-login__rememberme,
+.woocommerce-form-login .woocommerce-form__label-for-checkbox {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+    font-size: 14px !important;
+    color: #374151 !important;
+    cursor: pointer !important;
+}
+.woocommerce-form-login__rememberme input[type="checkbox"],
+.woocommerce-form-login input[name="rememberme"] {
+    width: 18px !important;
+    height: 18px !important;
+    accent-color: #E80001 !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+}
+.woocommerce-form-login__rememberme span,
+.woocommerce-form-login .woocommerce-form__label-for-checkbox span {
+    font-size: 14px !important;
+    color: #374151 !important;
+    font-weight: 500 !important;
+}
+
+/* Login form: mejorar campos */
+.pv-checkout .woocommerce-form-login .form-row {
+    margin-bottom: 10px !important;
+}
+.pv-checkout .woocommerce-form-login input[type="text"],
+.pv-checkout .woocommerce-form-login input[type="password"] {
+    width: 100% !important;
+    padding: 10px 14px !important;
+    border: 1.5px solid #d1d5db !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+}
+.pv-checkout .woocommerce-form-login .woocommerce-form-login__submit {
+    background: #E80001 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px 24px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+}
+.pv-checkout .woocommerce-form-login .woocommerce-form-login__submit:hover {
+    background: #B90001 !important;
+}
+
+/* Asegurar que el link 'Acceder' del toggle sea claro */
+.pv-checkout__login-toggle summary {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #2563eb !important;
+    cursor: pointer !important;
+    padding: 8px 0 !important;
+}
+.pv-checkout__login-toggle summary:hover {
+    color: #1e40af !important;
+}
+
+/* Ocultar el checkbox 'Recuérdame' duplicado si hay dos login forms */
+.woocommerce-form-login + .woocommerce-form-login .woocommerce-form-login__rememberme {
+    display: none !important;
+}
