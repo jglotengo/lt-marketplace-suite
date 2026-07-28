@@ -274,9 +274,6 @@ get_header( 'shop' );
                             </header>
 
                             <div class="pv-checkout__step-body">
-                                <p style="font-size:13px;color:#565C66;margin:0 0 14px;line-height:1.45;">
-                                    <?php esc_html_e( 'Ingresa tu dirección principal. Si tu dirección de envío es diferente a la de facturación, marca el checkbox "¿Enviar a una dirección diferente?" que aparece abajo.', 'ltms' ); ?>
-                                </p>
                                 <?php
                                 /**
                                  * Hook: woocommerce_checkout_billing

@@ -1023,6 +1023,23 @@ final class LTMS_Dashboard_Logic {
         );
         $kyc_status = $kyc_status ?: 'none';
 
+        // v2.9.294 FIX: Si el status es 'rejected' pero no fue revisado por nadie,
+        // tratarlo como 'none'. Evita que vendedores vean "Rechazado" sin razón.
+        if ( 'rejected' === $kyc_status ) {
+            $kyc_reviewer = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT reviewed_by FROM `{$kyc_table}` WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
+                $vendor_id
+            ) );
+            if ( empty( $kyc_reviewer ) ) {
+                $kyc_status = 'none';
+                // Corregir user_meta
+                $meta_status = get_user_meta( $vendor_id, 'ltms_kyc_status', true );
+                if ( 'rejected' === $meta_status ) {
+                    update_user_meta( $vendor_id, 'ltms_kyc_status', 'none' );
+                }
+            }
+        }
+
         $has_products = (bool) count_user_posts( $vendor_id, 'product', true );
 
         // v2.9.71 P3-1: Verificar si la tienda está configurada (logo o descripción).

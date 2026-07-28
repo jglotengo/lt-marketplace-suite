@@ -26,7 +26,18 @@ $kyc = $wpdb->get_row( $wpdb->prepare(
     $user_id
 ) );
 
-$status        = $kyc ? $kyc->status : 'none';
+// v2.9.294 FIX: Si el status es 'rejected' pero no fue revisado por nadie
+// (reviewed_by IS NULL), tratarlo como 'none' — NO fue rechazado realmente.
+// Esto pasa cuando hay state drift o data stale de versiones anteriores.
+$status = $kyc ? $kyc->status : 'none';
+if ( 'rejected' === $status && empty( $kyc->reviewed_by ) ) {
+    $status = 'none';
+    // Corregir el user_meta también
+    $meta_status = get_user_meta( $user_id, 'ltms_kyc_status', true );
+    if ( 'rejected' === $meta_status ) {
+        update_user_meta( $user_id, 'ltms_kyc_status', 'none' );
+    }
+}
 $status_labels = [
     'none'     => '—',
     'pending'  => 'En revisión',
