@@ -767,3 +767,33 @@
     font-size: 0.78rem;
     font-weight: 400;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.289 FIX — CSS fallback para ocultar postcode y country
+   WOOCCM sobreescribe los filtros PHP, así que ocultamos via CSS.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ocultar código postal (irrelevante para Colombia) */
+.pv-checkout__form #billing_postcode_field,
+.pv-checkout__form #shipping_postcode_field,
+.woocommerce-checkout #billing_postcode_field,
+.woocommerce-checkout #shipping_postcode_field,
+#customer_details #billing_postcode_field,
+#customer_details #shipping_postcode_field {
+    display: none !important;
+}
+
+/* Ocultar país (siempre Colombia) */
+.pv-checkout__form #billing_country_field,
+.pv-checkout__form #shipping_country_field,
+.woocommerce-checkout #billing_country_field,
+.woocommerce-checkout #shipping_country_field,
+#customer_details #billing_country_field,
+#customer_details #shipping_country_field {
+    display: none !important;
+}
+
+/* Pero asegurar que el valor CO se envíe */
+#billing_country, #shipping_country {
+    value: 'CO' !important;
+}
