@@ -476,19 +476,16 @@ get_header( 'shop' );
                                     </ul>
                                 <?php endif; ?>
 
-                                <!-- Términos y condiciones (si WC requiere aceptación) -->
+                                <!-- v2.9.292: Términos + Privacidad agrupados en un bloque -->
+                                <div class="pv-checkout__legal-block" style="padding:16px;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:10px;margin-top:12px;">
                                 <?php
                                 if ( function_exists( 'wc_terms_and_conditions_checkbox_enabled' ) && wc_terms_and_conditions_checkbox_enabled() ) :
                                     ?>
-                                    <label class="pv-checkout__terms-toggle">
-                                        <input type="checkbox" name="terms" id="terms" value="1" <?php checked( apply_filters( 'woocommerce_terms_is_checked_default', isset( $_POST['terms'] ) ), true ); ?> />
-                                        <span class="pv-checkout__ship-toggle-mark" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                        </span>
-                                        <span class="pv-checkout__ship-toggle-text">
+                                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:10px;">
+                                        <input type="checkbox" name="terms" id="terms" value="1" style="width:18px;height:18px;accent-color:#E80001;flex-shrink:0;margin-top:2px;cursor:pointer;" <?php checked( apply_filters( 'woocommerce_terms_is_checked_default', isset( $_POST['terms'] ) ), true ); ?> />
+                                        <span style="font-size:14px;color:#374151;line-height:1.5;">
                                             <?php
                                             printf(
-                                                /* translators: %s: link a Términos y condiciones. */
                                                 wp_kses_post( __( 'He leído y acepto los <a href="%s" target="_blank">Términos y condiciones</a>.', 'ltms' ) ),
                                                 esc_url( get_permalink( wc_terms_and_conditions_page_id() ) )
                                             );
@@ -496,11 +493,28 @@ get_header( 'shop' );
                                         </span>
                                     </label>
                                 <?php endif; ?>
+
+                                <?php
+                                // v2.9.292: Privacy consent renderizado AQUÍ junto al terms.
+                                $privacy_url = get_privacy_policy_url() ?: get_permalink( get_option( 'ltms_privacy_page_id' ) ) ?: '#';
+                                ?>
+                                <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" name="ltms_privacy_consent" id="ltms-privacy-consent" value="1" required style="width:18px;height:18px;accent-color:#E80001;flex-shrink:0;margin-top:2px;cursor:pointer;" />
+                                    <span style="font-size:14px;color:#374151;line-height:1.5;">
+                                        <?php
+                                        printf(
+                                            wp_kses_post( __( 'He leído y acepto la <a href="%s" target="_blank">Política de Tratamiento de Datos Personales</a>. Autorizo el uso de mis datos para gestión del pedido conforme a la Ley 1581/2012. *', 'ltms' ) ),
+                                            esc_url( $privacy_url )
+                                        );
+                                        ?>
+                                    </span>
+                                </label>
+                                </div>
                             </div>
                         </section>
 
                         <!-- ============================================
-                             ESCROW DISCLOSURE (cierre del form)
+                             ESCROW DISCLOSURE (después de los checkboxes)
                              ============================================ -->
                         <div class="pv-escrow-notice pv-checkout__escrow" role="note">
                             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -516,13 +530,12 @@ get_header( 'shop' );
                         <div class="pv-checkout__cta-wrap">
                             <?php
                             /**
-                             * v2.9.220: Hook woocommerce_review_order_before_submit.
-                             * Necesario para que LTMS_Frontend_Checkout_Handler::add_privacy_consent_field()
-                             * renderice el checkbox de consentimiento (Ley 1581/2012).
-                             * Sin este hook, el checkbox NUNCA se muestra pero la validación
-                             * validate_privacy_consent() falla con 'Debes aceptar la Política
-                             * de Tratamiento de Datos Personales para continuar.'
+                             * v2.9.292: El consentimiento ya se renderiza arriba junto al terms.
+                             * Remover el hook para evitar duplicación del checkbox de privacidad.
                              */
+                            if ( class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
+                                remove_action( 'woocommerce_review_order_before_submit', [ LTMS_Frontend_Checkout_Handler::class, 'add_privacy_consent_field' ] );
+                            }
                             do_action( 'woocommerce_review_order_before_submit' );
 
                             /**
