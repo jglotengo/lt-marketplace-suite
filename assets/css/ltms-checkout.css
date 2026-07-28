@@ -623,9 +623,18 @@
 }
 
 /* Ocultar el custom mark que WC usa para reemplazar el checkbox nativo */
-.pv-scope.pv-checkout .pv-checkout__ship-toggle-mark,
-.pv-scope.pv-checkout .woocommerce-form__input-checkbox + span {
+/* v2.9.291 FIX: NO ocultar .woocommerce-form__input-checkbox + span porque
+   también oculta el texto del consentimiento de privacidad (Ley 1581).
+   Solo ocultar .pv-checkout__ship-toggle-mark (el SVG checkmark custom). */
+.pv-scope.pv-checkout .pv-checkout__ship-toggle-mark {
     display: none !important;
+}
+/* v2.9.291: Asegurar que el span del consentimiento SIEMPRE sea visible */
+.pv-scope.pv-checkout .ltms-checkout-consent .woocommerce-form__input-checkbox + span,
+.pv-scope.pv-checkout .ltms-checkout-consent span {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 /* CRITICAL: Shipping fields DEBEN estar ocultos por defecto (colapsable) */
