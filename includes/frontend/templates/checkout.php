@@ -110,10 +110,12 @@ get_header( 'shop' );
     <?php
     /**
      * Hook: woocommerce_before_checkout_form
-     * Imprime notices, login form (si no logueado), y coupon form nativo.
-     * Priority 10: woocommerce_checkout_login_form (si no logueado).
-     * Priority 10: woocommerce_checkout_coupon_form.
+     * v2.9.290: Remover woocommerce_checkout_login_form del hook nativo
+     * porque ya tenemos nuestro propio <details> toggle dentro del form.
+     * Sin esto, WC renderiza el login form ABOVE del checkout con un
+     * checkbox 'Recuérdame' que el VLM detecta como 'sin texto'.
      */
+    remove_action( 'woocommerce_before_checkout_form', 'woocommerce_checkout_login_form' );
     do_action( 'woocommerce_before_checkout_form', $checkout );
     ?>
 
