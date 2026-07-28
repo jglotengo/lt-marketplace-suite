@@ -294,7 +294,11 @@ final class LTMS_Public_Auth_Handler {
         }
 
         // Successful login — clear the throttle counter.
+        // v2.9.293: delete_transient puede no limpiar la option en la DB
+        // si el transiente usó wp_options directamente. Limpiar ambas.
         delete_transient( $throttle_key );
+        delete_option( $throttle_key );
+        delete_option( '_transient_timeout_' . $throttle_key );
 
         $pages        = get_option( 'ltms_installed_pages', [] );
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
@@ -742,7 +746,22 @@ final class LTMS_Public_Auth_Handler {
     public function ajax_vendor_logout(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
 
+        // v2.9.293: Destruir TODAS las sesiones del usuario, no solo la cookie.
+        // Antes, wp_logout() solo destruía la cookie actual pero dejaba session
+        // tokens en la DB que podían interferir con el próximo login.
+        $user_id = get_current_user_id();
+        if ( $user_id ) {
+            // Destruir todas las sesiones activas del usuario
+            $manager = WP_Session_Tokens::get_instance( $user_id );
+            $manager->destroy_all();
+        }
+
         wp_logout();
+
+        // v2.9.293: Limpiar cookies explícitamente
+        wp_clear_auth_cookie();
+        setcookie( LOGGED_IN_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
+        setcookie( AUTH_COOKIE, ' ', time() - YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
 
         $pages    = get_option( 'ltms_installed_pages', [] );
         $login_id = $pages['ltms-login'] ?? 0;

@@ -60,6 +60,7 @@ $nav_items = [
     [ 'view' => 'envios',        'icon' => $svg_icons['envios'],   'label' => __( 'Envíos', 'ltms' ) ],
     [ 'view' => 'shipping-statement', 'icon' => $svg_icons['shipping-statement'], 'label' => __( 'Fletes', 'ltms' ) ],
     [ 'view' => 'wallet',   'icon' => $svg_icons['wallet'],   'label' => __( 'Billetera', 'ltms' ) ],
+    [ 'view' => 'kyc',      'icon' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/><path d="M9 12l2 2 4-4"/></svg>', 'label' => __( 'Verificación KYC', 'ltms' ) ],
     [ 'view' => 'bookings', 'icon' => $svg_icons['bookings'], 'label' => __( 'Reservas', 'ltms' ) ],
     [ 'view' => 'marketing', 'icon' => $svg_icons['marketing'], 'label' => __( 'Marketing', 'ltms' ) ],
     [ 'view' => 'security', 'icon' => $svg_icons['security'], 'label' => __( 'Seguridad', 'ltms' ) ],
@@ -448,6 +449,11 @@ if ( $_show_drivers ) {
 
         <div class="ltms-view-section" id="ltms-view-security" style="display:none;">
             <?php if ( file_exists( __DIR__ . '/view-security.php' ) ) { try { include __DIR__ . '/view-security.php'; } catch ( \Throwable $e ) { echo '<div class="ltms-notice ltms-notice-error"><p>Error: ' . esc_html( $e->getMessage() ) . '</p></div>'; } } ?>
+        </div>
+
+        <!-- v2.9.293: Sección KYC en el dashboard SPA -->
+        <div class="ltms-view-section" id="ltms-view-kyc" style="display:none;">
+            <?php if ( file_exists( __DIR__ . '/view-kyc.php' ) ) { try { include __DIR__ . '/view-kyc.php'; } catch ( \Throwable $e ) { echo '<div class="ltms-notice ltms-notice-error"><p>Error: ' . esc_html( $e->getMessage() ) . '</p></div>'; } } ?>
         </div>
 
         <div class="ltms-view-section" id="ltms-view-donations" style="display:none;">

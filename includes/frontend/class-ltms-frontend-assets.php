@@ -555,6 +555,18 @@ final class LTMS_Frontend_Assets {
             true
         );
 
+        // v2.9.293: Encolar ltms-products.js a nivel de página del dashboard
+        // (antes solo se encolaba dentro de view-products.php que se renderiza
+        // via AJAX en el SPA, donde wp_enqueue_script no funciona).
+        $products_suffix = $this->get_suffix( 'js/ltms-products.js', $suffix );
+        wp_enqueue_script(
+            'ltms-products',
+            $url . 'js/ltms-products' . $products_suffix . '.js',
+            [ 'jquery', 'ltms-dashboard' ],
+            $ver,
+            true
+        );
+
         $this->localize_dashboard_script();
     }
 
