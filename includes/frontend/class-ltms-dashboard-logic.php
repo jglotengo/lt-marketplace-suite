@@ -740,12 +740,22 @@ final class LTMS_Dashboard_Logic {
         // only to user_meta, causing ajax_approve_kyc() to read null values and skip bank sync.
         $kyc_notes = $name_mismatch_note ?: '';
 
-        // Encrypt bank account number before storing in the KYC table (column is VARCHAR(50)).
+        // Encrypt bank account number before storing in the KYC table.
+        // v2.9.297 FIX: el valor cifrado (v2:base64(iv):base64(tag):base64(ciphertext))
+        // puede exceder VARCHAR(50). Si la columna es muy corta, guardar en user_meta
+        // en su lugar y dejar NULL en la tabla KYC.
         $bank_account_to_store = $bank_account_number;
         if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
             $encrypted_acc = LTMS_Core_Security::encrypt( $bank_account_number );
             if ( $encrypted_acc ) {
-                $bank_account_to_store = $encrypted_acc;
+                // Verificar que no exceda el tamaño de la columna
+                if ( strlen( $encrypted_acc ) <= 250 ) {
+                    $bank_account_to_store = $encrypted_acc;
+                } else {
+                    // Guardar en user_meta (no tiene límite de tamaño)
+                    update_user_meta( $vendor_id, 'ltms_kyc_bank_account_encrypted', $encrypted_acc );
+                    $bank_account_to_store = null; // NULL en la tabla KYC
+                }
             }
         }
 
@@ -801,7 +811,56 @@ final class LTMS_Dashboard_Logic {
         $inserted = $wpdb->insert( $table, $insert_data, $insert_format );
 
         if ( false === $inserted ) {
-            wp_send_json_error( __( 'Error al guardar la solicitud. Intenta de nuevo.', 'ltms' ) );
+            // v2.9.297: Log del error exacto de MySQL para diagnosticar.
+            // Antes, el error era silencioso — el usuario solo veía 'Error al guardar'.
+            $db_error = $wpdb->last_error;
+            LTMS_Core_Logger::error(
+                'KYC_SUBMIT_DB_ERROR',
+                sprintf(
+                    'Vendor #%d KYC insert failed. DB error: %s. Data keys: %s. Format count: %d. Data count: %d.',
+                    $vendor_id,
+                    $db_error ?: '(empty)',
+                    implode( ',', array_keys( $insert_data ) ),
+                    count( $insert_format ),
+                    count( $insert_data )
+                )
+            );
+
+            // v2.9.297: Si el error es por columnas faltantes, intentar insertar
+            // solo las columnas que existen en la tabla.
+            $existing_cols = $wpdb->get_col( "DESCRIBE `{$table}`", 0 );
+            if ( ! empty( $existing_cols ) ) {
+                $filtered_data  = [];
+                $filtered_format = [];
+                foreach ( $insert_data as $key => $val ) {
+                    if ( in_array( $key, $existing_cols, true ) ) {
+                        $filtered_data[ $key ]  = $val;
+                        $filtered_format[]      = $insert_format[ array_search( $key, array_keys( $insert_data ), true ) ];
+                    }
+                }
+                if ( count( $filtered_data ) < count( $insert_data ) ) {
+                    LTMS_Core_Logger::info(
+                        'KYC_SUBMIT_RETRY',
+                        sprintf(
+                            'Retrying with %d columns (original: %d). Missing: %s',
+                            count( $filtered_data ),
+                            count( $insert_data ),
+                            implode( ',', array_diff( array_keys( $insert_data ), $existing_cols ) )
+                        )
+                    );
+                    $inserted = $wpdb->insert( $table, $filtered_data, $filtered_format );
+                }
+            }
+
+            if ( false === $inserted ) {
+                wp_send_json_error(
+                    sprintf(
+                        /* translators: %s: database error message */
+                        __( 'Error al guardar la solicitud: %s. Contacta soporte si el problema persiste.', 'ltms' ),
+                        $db_error ?: 'error desconocido'
+                    )
+                );
+            }
         }
 
         // Sync user meta so dashboard/settings show correct status immediately
