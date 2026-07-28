@@ -34,7 +34,33 @@ if ( ! empty( $bank_account_raw ) ) {
         $bank_account = '';
     }
 }
-$kyc_status   = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) ?: 'pending';
+$kyc_status_raw = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) ?: 'pending';
+
+// v2.9.295 FIX: Verificar el status REAL desde la DB, no solo el user_meta.
+// El user_meta puede tener state drift (rejected sin revisión real).
+global $wpdb;
+$kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+$kyc_db = $wpdb->get_row( $wpdb->prepare(
+    "SELECT status, reviewed_by, notes FROM `{$kyc_table}` WHERE vendor_id = %d ORDER BY id DESC LIMIT 1",
+    $vendor_id
+) );
+if ( $kyc_db ) {
+    $kyc_status = $kyc_db->status;
+    // Si rejected sin reviewer, tratar como 'none'
+    if ( 'rejected' === $kyc_status && empty( $kyc_db->reviewed_by ) ) {
+        $kyc_status = 'none';
+        if ( 'rejected' === $kyc_status_raw ) {
+            update_user_meta( $vendor_id, 'ltms_kyc_status', 'none' );
+        }
+    }
+} else {
+    // No hay registro en la DB — usar el meta, pero si dice 'rejected', corregir
+    $kyc_status = $kyc_status_raw;
+    if ( 'rejected' === $kyc_status ) {
+        $kyc_status = 'none';
+        update_user_meta( $vendor_id, 'ltms_kyc_status', 'none' );
+    }
+}
 $referral_code = get_user_meta( $vendor_id, 'ltms_referral_code', true );
 // v2.3.0 — Analytics por vendedor
 $vendor_ga4_id    = get_user_meta( $vendor_id, 'ltms_vendor_ga4_id',    true );
@@ -76,12 +102,20 @@ $kyc_badge = $kyc_badges[ $kyc_status ] ?? $kyc_badges['pending'];
             <?php if ( $kyc_status === 'approved' ) : ?>
             <p style="color:#166534;margin:0;">✓ <?php esc_html_e( 'Tu identidad ha sido verificada exitosamente.', 'ltms' ); ?></p>
             <?php elseif ( $kyc_status === 'pending' ) : ?>
+            <p style="margin:0 0 12px;"><?php esc_html_e( 'Tu verificación está en revisión. Te notificaremos por email cuando esté lista.', 'ltms' ); ?></p>
+            <?php elseif ( $kyc_status === 'rejected' && ! empty( $kyc_db->reviewed_by ) ) : ?>
+            <p style="color:#991b1b;margin:0 0 8px;"><?php esc_html_e( 'Tu verificación fue rechazada.', 'ltms' ); ?></p>
+            <?php if ( ! empty( $kyc_db->notes ) ) : ?>
+            <p style="color:#6b7280;margin:0 0 12px;font-size:.85rem;"><strong>Motivo:</strong> <?php echo esc_html( $kyc_db->notes ); ?></p>
+            <?php endif; ?>
+            <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" data-action="goto-kyc">
+                <?php esc_html_e( 'Reenviar documentos', 'ltms' ); ?>
+            </button>
+            <?php else : ?>
             <p style="margin:0 0 12px;"><?php esc_html_e( 'Para solicitar retiros, debes completar la verificación de identidad.', 'ltms' ); ?></p>
             <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" data-action="goto-kyc">
                 <?php esc_html_e( 'Completar KYC', 'ltms' ); ?>
             </button>
-            <?php else : ?>
-            <p style="color:#991b1b;margin:0;"><?php esc_html_e( 'Tu verificación fue rechazada. Contacta soporte.', 'ltms' ); ?></p>
             <?php endif; ?>
         </div>
     </div>

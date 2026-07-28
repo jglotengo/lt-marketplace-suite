@@ -567,6 +567,18 @@ final class LTMS_Frontend_Assets {
             true
         );
 
+        // v2.9.295: Encolar ltms-kyc.js a nivel de página del dashboard
+        // (mismo problema que ltms-products.js — el enqueue dentro de view-kyc.php
+        // no funciona en el contexto SPA del dashboard).
+        $kyc_suffix = $this->get_suffix( 'js/ltms-kyc.js', $suffix );
+        wp_enqueue_script(
+            'ltms-kyc',
+            $url . 'js/ltms-kyc' . $kyc_suffix . '.js',
+            [ 'jquery', 'ltms-dashboard' ],
+            $ver,
+            true
+        );
+
         $this->localize_dashboard_script();
     }
 
