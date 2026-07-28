@@ -85,8 +85,11 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_checkout_order_created',      [ __CLASS__, 'save_privacy_consent' ] );
 
         // v2.9.287: Optimizar campos del checkout — eliminar redundantes
-        add_filter( 'woocommerce_billing_fields', [ __CLASS__, 'optimize_checkout_fields' ], 200, 1 );
-        add_filter( 'woocommerce_shipping_fields', [ __CLASS__, 'optimize_checkout_fields' ], 200, 1 );
+        // v2.9.288: prioridad 10000 para sobreescribir WOOCCM (que corre a 1000-2000)
+        add_filter( 'woocommerce_billing_fields', [ __CLASS__, 'optimize_checkout_fields' ], 10000, 1 );
+        add_filter( 'woocommerce_shipping_fields', [ __CLASS__, 'optimize_checkout_fields' ], 10000, 1 );
+        // v2.9.288: también hook en woocommerce_checkout_fields (WOOCCM usa este)
+        add_filter( 'woocommerce_checkout_fields', [ __CLASS__, 'optimize_checkout_fields_late' ], 10000, 1 );
 
         // FIX CHECKOUT-01: LTMS ya tiene su propio checkbox de consentimiento (Ley 1581).
         // Eliminamos los checkboxes nativos de WooCommerce para evitar duplicados.
@@ -1356,6 +1359,79 @@ final class LTMS_Frontend_Checkout_Handler {
             $fields['billing_phone']['label']       = 'Teléfono / WhatsApp';
             $fields['billing_phone']['placeholder'] = 'Ej: 300 123 4567';
             $fields['billing_phone']['type']        = 'tel';
+        }
+
+        return $fields;
+    }
+
+    /**
+     * v2.9.288: Optimizar campos en woocommerce_checkout_fields (hook tardío).
+     * WOOCCM (WooCommerce Checkout Manager) usa este hook en lugar de
+     * woocommerce_billing_fields, así que necesitamos interceptarlo también.
+     */
+    public static function optimize_checkout_fields_late( array $fields ): array {
+        // Aplicar a billing y shipping
+        foreach ( [ 'billing', 'shipping' ] as $group ) {
+            if ( ! isset( $fields[ $group ] ) ) continue;
+
+            // Ocultar código postal
+            $cp_key = $group . '_postcode';
+            if ( isset( $fields[ $group ][ $cp_key ] ) ) {
+                $fields[ $group ][ $cp_key ]['required'] = false;
+                $fields[ $group ][ $cp_key ]['class'][]  = 'form-row-hidden';
+                $fields[ $group ][ $cp_key ]['type']     = 'hidden';
+                $fields[ $group ][ $cp_key ]['default']  = '110111';
+            }
+
+            // Ocultar país
+            $country_key = $group . '_country';
+            if ( isset( $fields[ $group ][ $country_key ] ) ) {
+                $fields[ $group ][ $country_key ]['type']    = 'hidden';
+                $fields[ $group ][ $country_key ]['default'] = 'CO';
+                $fields[ $group ][ $country_key ]['class'][] = 'form-row-hidden';
+            }
+
+            // Company opcional
+            $company_key = $group . '_company';
+            if ( isset( $fields[ $group ][ $company_key ] ) ) {
+                $fields[ $group ][ $company_key ]['required'] = false;
+            }
+
+            // Reordenar
+            $priority_map = [
+                $group . '_email'      => 10,
+                $group . '_phone'      => 20,
+                $group . '_first_name' => 30,
+                $group . '_last_name'  => 40,
+                $group . '_address_1'  => 50,
+                $group . '_address_2'  => 60,
+                $group . '_city'       => 70,
+                $group . '_state'      => 80,
+                $group . '_company'    => 90,
+                $group . '_country'    => 100,
+                $group . '_postcode'   => 110,
+            ];
+            foreach ( $priority_map as $key => $priority ) {
+                if ( isset( $fields[ $group ][ $key ] ) ) {
+                    $fields[ $group ][ $key ]['priority'] = $priority;
+                }
+            }
+
+            // Labels y placeholders
+            if ( isset( $fields[ $group ][ $group . '_phone' ] ) ) {
+                $fields[ $group ][ $group . '_phone' ]['label']       = 'Teléfono / WhatsApp';
+                $fields[ $group ][ $group . '_phone' ]['placeholder'] = 'Ej: 300 123 4567';
+                $fields[ $group ][ $group . '_phone' ]['type']        = 'tel';
+            }
+            if ( isset( $fields[ $group ][ $group . '_state' ] ) ) {
+                $fields[ $group ][ $group . '_state' ]['label']       = 'Departamento';
+                $fields[ $group ][ $group . '_state' ]['placeholder'] = 'Selecciona tu departamento';
+            }
+            if ( isset( $fields[ $group ][ $group . '_address_2' ] ) ) {
+                $fields[ $group ][ $group . '_address_2' ]['label']       = 'Apartamento / Suite (opcional)';
+                $fields[ $group ][ $group . '_address_2' ]['placeholder'] = 'Apto, casa, interior, etc.';
+                $fields[ $group ][ $group . '_address_2' ]['required']    = false;
+            }
         }
 
         return $fields;
