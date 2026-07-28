@@ -880,3 +880,58 @@
 .woocommerce-form-login + .woocommerce-form-login .woocommerce-form-login__rememberme {
     display: none !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v2.9.291 FIX — Texto de checkboxes visible (display:none del span)
+   Root cause: el span con el texto del consentimiento tenía
+   display:none por CSS del tema o WC. El checkbox aparecía vacío.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Forzar visibilidad del texto del consentimiento de privacidad */
+.ltms-checkout-consent label,
+.ltms-checkout-consent span {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    font-size: 14px !important;
+    color: #374151 !important;
+    line-height: 1.5 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Checkbox del consentimiento: alineado con el texto */
+.ltms-checkout-consent input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    accent-color: #E80001 !important;
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+    cursor: pointer !important;
+}
+
+/* Términos: asegurar texto visible */
+.pv-checkout__terms-toggle span,
+.pv-checkout__terms-toggle .pv-checkout__ship-toggle-text {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #374151 !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Checkbox términos: alineado */
+.pv-checkout__terms-toggle input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    accent-color: #E80001 !important;
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+    cursor: pointer !important;
+}
+
+/* Ocultar el SVG checkmark custom (causa confusión visual) */
+.pv-checkout__terms-toggle .pv-checkout__ship-toggle-mark {
+    display: none !important;
+}
