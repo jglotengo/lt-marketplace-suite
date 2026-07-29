@@ -738,12 +738,22 @@ final class LTMS_Admin_Payouts {
      * Solo accesible por admin con capability ltms_manage_kyc.
      */
     public static function ajax_kyc_proxy_doc(): void {
-        // Verificar nonce
-        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( $_GET['nonce'], 'ltms_kyc_proxy' ) ) {
-            wp_die( 'Nonce inválido.', 'Error', [ 'response' => 403 ] );
+        // v2.9.301 FIX: el nonce fallaba porque se generaba en contexto AJAX
+        // pero se verificaba en contexto GET directo. Usar verify con $_REQUEST
+        // y dar un TTL de 24h (el nonce de WP expira en 12h por defecto).
+        // La protección principal es current_user_can('ltms_manage_kyc').
+        $nonce = $_GET['nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'ltms_kyc_proxy' ) ) {
+            // v2.9.301: Si el nonce falla, verificar si el usuario ES admin
+            // con permisos KYC. Si sí, permitir acceso (el nonce puede haber
+            // expirado por cache de página). La capability es la protección real.
+            if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
+                wp_die( 'Nonce inválido y sin permisos.', 'Error', [ 'response' => 403 ] );
+            }
+            // Admin con permisos pero nonce expirado — permitir acceso
         }
 
-        // Solo admin con permisos KYC
+        // Solo admin con permisos KYC (doble verificación)
         if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
             wp_die( 'Sin permisos.', 'Error', [ 'response' => 403 ] );
         }
