@@ -240,6 +240,21 @@ class LTMS_Products_Ajax {
             // CS-08: ReDi
             'redi_enabled'        => get_post_meta( $product_id, '_ltms_redi_enabled', true ) ?: 'no',
             'redi_rate'           => (float) get_post_meta( $product_id, '_ltms_redi_rate', true ) * 100,
+            // AUDIT-PROD-044: devolver campos de booking para poblar el modal Edit
+            // (paridad con create_product — antes el modal Edit no recibía estos valores).
+            'booking_type'        => get_post_meta( $product_id, '_ltms_booking_type', true ) ?: 'accommodation',
+            'min_nights'          => (int) get_post_meta( $product_id, '_ltms_min_nights', true ) ?: 1,
+            'max_nights'          => (int) get_post_meta( $product_id, '_ltms_max_nights', true ) ?: 0,
+            'booking_capacity'    => (int) get_post_meta( $product_id, '_ltms_capacity', true ) ?: 1,
+            'checkin_time'        => get_post_meta( $product_id, '_ltms_checkin_time', true ) ?: '15:00',
+            'checkout_time'       => get_post_meta( $product_id, '_ltms_checkout_time', true ) ?: '11:00',
+            'payment_mode'        => get_post_meta( $product_id, '_ltms_payment_mode', true ) ?: 'full',
+            'deposit_pct'         => (float) get_post_meta( $product_id, '_ltms_deposit_pct', true ) ?: 0,
+            // AUDIT-PROD-044: devolver short_desc, sku, tags y atributos de variaciones para
+            // poblar el modal Edit con el mismo nivel de detalle que create_product acepta.
+            'short_description'   => $product->get_short_description(),
+            'sku'                 => $product->get_sku(),
+            'shipping_class_id'   => $product->get_shipping_class_id(),
         ] );
     }
 
@@ -312,12 +327,15 @@ class LTMS_Products_Ajax {
         update_post_meta( $product_id, '_ltms_vendor_id', get_current_user_id() );
 
         // CS-05: actualizar tipo si viene en la petición
+        // AUDIT-PROD-044: extender allowlist con 'restaurant' y 'variable' (paridad con create_product).
+        $product_type_for_update = null;
         if ( isset( $_POST['product_type'] ) ) { // phpcs:ignore
             $upd_type = sanitize_key( $_POST['product_type'] ); // phpcs:ignore
             // Mapeo legacy: 'product' → 'physical'
             if ( $upd_type === 'product' ) { $upd_type = 'physical'; }
-            if ( in_array( $upd_type, [ 'physical', 'digital', 'service', 'booking' ], true ) ) {
+            if ( in_array( $upd_type, [ 'physical', 'digital', 'service', 'booking', 'restaurant', 'variable' ], true ) ) {
                 update_post_meta( $product_id, '_ltms_product_type', $upd_type );
+                $product_type_for_update = $upd_type;
             }
         }
 
@@ -336,6 +354,53 @@ class LTMS_Products_Ajax {
 
         // CS-07: commission_rate es de exclusiva gestión del admin — no se acepta desde el frontend.
 
+        // AUDIT-PROD-044: persistir campos de booking en edición (paridad con create_product).
+        if ( $product_type_for_update === 'booking' ) {
+            $booking_type  = sanitize_text_field( wp_unslash( $_POST['booking_type'] ?? 'accommodation' ) ); // phpcs:ignore
+            $min_nights    = (int) ( $_POST['min_nights'] ?? 1 ); // phpcs:ignore
+            $max_nights    = (int) ( $_POST['max_nights'] ?? 0 ); // phpcs:ignore
+            $capacity      = (int) ( $_POST['booking_capacity'] ?? 1 ); // phpcs:ignore
+            $checkin_time  = sanitize_text_field( wp_unslash( $_POST['checkin_time'] ?? '15:00' ) ); // phpcs:ignore
+            $checkout_time = sanitize_text_field( wp_unslash( $_POST['checkout_time'] ?? '11:00' ) ); // phpcs:ignore
+            $payment_mode  = sanitize_text_field( wp_unslash( $_POST['payment_mode'] ?? 'full' ) ); // phpcs:ignore
+            $deposit_pct   = (float) ( $_POST['deposit_pct'] ?? 0 ); // phpcs:ignore
+
+            // Actualizar el WC product type para que el calendario de reservas se renderice.
+            wp_set_object_terms( $product_id, [ 'ltms_bookable' ], 'product_type' );
+
+            update_post_meta( $product_id, '_ltms_booking_type', $booking_type );
+            update_post_meta( $product_id, '_ltms_min_nights', max( 1, $min_nights ) );
+            update_post_meta( $product_id, '_ltms_max_nights', $max_nights );
+            update_post_meta( $product_id, '_ltms_capacity', max( 1, $capacity ) );
+            update_post_meta( $product_id, '_ltms_checkin_time', $checkin_time );
+            update_post_meta( $product_id, '_ltms_checkout_time', $checkout_time );
+            update_post_meta( $product_id, '_ltms_payment_mode', $payment_mode );
+            update_post_meta( $product_id, '_ltms_deposit_pct', $deposit_pct );
+        } elseif ( $product_type_for_update && $product_type_for_update !== 'booking' ) {
+            // Si el producto cambia de booking a otro tipo, limpiar metas de booking
+            // y restaurar el WC product type a 'simple' para que el calendario no se renderice.
+            $booking_metas = [ '_ltms_booking_type', '_ltms_min_nights', '_ltms_max_nights', '_ltms_capacity', '_ltms_checkin_time', '_ltms_checkout_time', '_ltms_payment_mode', '_ltms_deposit_pct' ];
+            foreach ( $booking_metas as $bk_meta ) { delete_post_meta( $product_id, $bk_meta ); }
+            if ( get_post_meta( $product_id, '_ltms_product_type', true ) === 'booking' ) {
+                wp_set_object_terms( $product_id, [ 'simple' ], 'product_type' );
+            }
+        }
+
+        // AUDIT-PROD-044: persistir variation_attributes en edición (paridad con create_product).
+        // Si el tipo es 'variable' y llegan atributos, reconstruir variaciones; si era variable y
+        // cambió a otro tipo, limpiar la taxonomía 'variable' del WC product type.
+        $variation_attrs_raw_upd = isset( $_POST['variation_attributes'] ) ? wp_unslash( $_POST['variation_attributes'] ) : ''; // phpcs:ignore
+        if ( $product_type_for_update === 'variable' && ! empty( $variation_attrs_raw_upd ) ) {
+            $this->sync_variable_product( $product_id, $variation_attrs_raw_upd, (float) $price );
+        } elseif ( $product_type_for_update && $product_type_for_update !== 'variable' ) {
+            // Si era variable y se cambia a simple/bookable, restaurar el WC product type.
+            $current_terms = wp_get_post_terms( $product_id, 'product_type', [ 'fields' => 'names' ] );
+            if ( is_array( $current_terms ) && in_array( 'variable', $current_terms, true ) ) {
+                $restore_type = ( $product_type_for_update === 'booking' ) ? 'ltms_bookable' : 'simple';
+                wp_set_object_terms( $product_id, [ $restore_type ], 'product_type' );
+            }
+        }
+
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
 
@@ -347,6 +412,115 @@ class LTMS_Products_Ajax {
             $cats[] = [ 'id' => $t->term_id, 'name' => $t->name ];
         }
         wp_send_json_success( [ 'categories' => $cats ] );
+    }
+
+    /**
+     * AUDIT-PROD-044: Sincroniza un producto variable con sus attributes + variations.
+     *
+     * Helper compartido por create_product() y update_product() para evitar duplicar
+     * ~60 líneas de lógica de WC_Product_Attribute + wp_set_object_terms. Sobre-escribe
+     * los atributos del producto y recrea las variaciones para el primer atributo,
+     * asignando el precio del producto padre a cada variación (paridad con el path
+     * original de create_product).
+     *
+     * @param int    $product_id         ID del producto padre.
+     * @param string $variation_attrs_raw JSON string: [{ "name": "Talla", "values": ["S","M","L"] }, ...]
+     * @param float  $base_price         Precio regular a asignar a cada variación.
+     * @return void
+     */
+    private function sync_variable_product( $product_id, $variation_attrs_raw, $base_price ) {
+        $variation_attrs = json_decode( $variation_attrs_raw, true );
+        if ( ! is_array( $variation_attrs ) || empty( $variation_attrs ) ) {
+            return;
+        }
+
+        // Convertir el producto a tipo 'variable' a nivel de WC.
+        wp_set_object_terms( $product_id, [ 'variable' ], 'product_type' );
+
+        $attributes = [];
+        foreach ( $variation_attrs as $attr ) {
+            $attr_name   = sanitize_text_field( $attr['name'] ?? '' );
+            $attr_values = array_map( 'sanitize_text_field', (array) ( $attr['values'] ?? [] ) );
+            if ( empty( $attr_name ) || empty( $attr_values ) ) {
+                continue;
+            }
+
+            // Crear o reusar la taxonomía del atributo.
+            $taxonomy = wc_attribute_taxonomy_name( $attr_name );
+            if ( ! taxonomy_exists( $taxonomy ) ) {
+                $attr_id = wc_create_attribute( [
+                    'name'  => $attr_name,
+                    'slug'  => sanitize_title( $attr_name ),
+                    'type'  => 'select',
+                ] );
+                if ( is_wp_error( $attr_id ) ) {
+                    continue;
+                }
+                register_taxonomy( $taxonomy, 'product_variation', [ 'hierarchical' => false ] );
+            }
+
+            // Asignar términos al producto.
+            $term_ids = [];
+            foreach ( $attr_values as $val ) {
+                $term = get_term_by( 'name', $val, $taxonomy );
+                if ( ! $term ) {
+                    $term = wp_insert_term( $val, $taxonomy );
+                    if ( is_wp_error( $term ) ) {
+                        continue;
+                    }
+                    $term_ids[] = $term['term_id'];
+                } else {
+                    $term_ids[] = $term->term_id;
+                }
+            }
+            wp_set_post_terms( $product_id, $term_ids, $taxonomy );
+
+            // Configurar el atributo en el producto.
+            $attribute = new WC_Product_Attribute();
+            $attribute->set_id( wc_attribute_taxonomy_id_by_name( $attr_name ) );
+            $attribute->set_name( $taxonomy );
+            $attribute->set_options( $term_ids );
+            $attribute->set_position( 0 );
+            $attribute->set_visible( true );
+            $attribute->set_variation( true );
+            $attributes[ $taxonomy ] = $attribute;
+        }
+
+        if ( empty( $attributes ) ) {
+            return;
+        }
+
+        $variable_product = wc_get_product( $product_id );
+        if ( ! $variable_product ) {
+            return;
+        }
+        $variable_product->set_attributes( $attributes );
+        $variable_product->save();
+
+        // AUDIT-PROD-044 (update): si el producto ya tenía variaciones, eliminarlas antes
+        // de recrearlas, para evitar variaciones huérfanas al cambiar los atributos.
+        $existing_variations = $variable_product->get_children();
+        if ( is_array( $existing_variations ) ) {
+            foreach ( $existing_variations as $var_id ) {
+                wp_delete_post( $var_id, true );
+            }
+        }
+
+        // Crear una variación por cada valor del primer atributo (paridad con create_product).
+        $first_attr      = reset( $variation_attrs );
+        $first_taxonomy  = wc_attribute_taxonomy_name( sanitize_text_field( $first_attr['name'] ?? '' ) );
+        foreach ( $first_attr['values'] as $val ) {
+            $variation = new WC_Product_Variation();
+            $variation->set_parent_id( $product_id );
+            $variation->set_regular_price( (string) $base_price );
+            $variation->set_status( 'publish' );
+
+            $term = get_term_by( 'name', sanitize_text_field( $val ), $first_taxonomy );
+            if ( $term ) {
+                $variation->set_attributes( [ $first_taxonomy => sanitize_title( $term->slug ) ] );
+            }
+            $variation->save();
+        }
     }
 
     /**

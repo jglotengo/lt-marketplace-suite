@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LT Marketplace Suite - Vendor Dashboard SPA
  * Panel del Vendedor - Single Page Application
  * Version: 1.5.2
@@ -9,7 +9,7 @@
 (function ($) {
     'use strict';
 
-    // ── Namespace del Dashboard ──────────────────────────────────
+    // â”€â”€ Namespace del Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     window.LTMS = window.LTMS || {};
 
     /**
@@ -29,7 +29,7 @@
         /** Timer de polling para notificaciones */
         notifTimer: null,
 
-        /** Última fecha de notificación recibida */
+        /** Ãšltima fecha de notificaciÃ³n recibida */
         lastNotifDate: null,
 
         /**
@@ -53,16 +53,16 @@
 
         /**
          * FIX-403-NONCE: mantiene ltmsDashboard.nonce vivo mientras el panel
-         * está abierto, vía WP Heartbeat. Sin esto, el nonce generado al
-         * cargar la página vence tras ~12-24h y toda llamada AJAX posterior
-         * falla con 403 — típico en sesiones largas sin recargar (cuentas
-         * operadas por un asistente/agente que no cierra la pestaña).
+         * estÃ¡ abierto, vÃ­a WP Heartbeat. Sin esto, el nonce generado al
+         * cargar la pÃ¡gina vence tras ~12-24h y toda llamada AJAX posterior
+         * falla con 403 â€” tÃ­pico en sesiones largas sin recargar (cuentas
+         * operadas por un asistente/agente que no cierra la pestaÃ±a).
          *
          * Doble mecanismo:
          * 1) Heartbeat: en cada tick, pide al servidor un nonce fresco y
          *    actualiza ltmsDashboard.nonce en memoria (sin recargar nada).
          * 2) Respaldo: si a pesar de esto una llamada AJAX del dashboard
-         *    recibe 403, se fuerza una recarga completa de la página (con
+         *    recibe 403, se fuerza una recarga completa de la pÃ¡gina (con
          *    candado de 60s para no entrar en loop de recargas).
          */
         initNonceRefresh() {
@@ -70,21 +70,21 @@
                 return;
             }
 
-            // 1) Refresco proactivo vía polling propio.
+            // 1) Refresco proactivo vÃ­a polling propio.
             //
             // FIX-403-NONCE-2: WP Heartbeat (heartbeat-send/heartbeat-tick)
-            // NO es confiable en este hosting — SiteGround Optimizer
-            // desregistra wp_ajax_heartbeat, así que el propio script
+            // NO es confiable en este hosting â€” SiteGround Optimizer
+            // desregistra wp_ajax_heartbeat, asÃ­ que el propio script
             // heartbeat.js de WP Core dispara action=heartbeat contra
             // ?ltms_ajax=1 y el router custom lo rechaza con 400 en cada
             // tick (ver Network tab: POST ?ltms_ajax=1 400 en bucle).
             // En vez de depender del Heartbeat de WP, usamos nuestro propio
-            // endpoint AJAX (ltms_refresh_dashboard_nonce), que sí pasa por
+            // endpoint AJAX (ltms_refresh_dashboard_nonce), que sÃ­ pasa por
             // el router custom sin problema porque lo registramos nosotros.
             $.post(ltmsDashboard.ajax_url, {
                 action: 'ltms_refresh_dashboard_nonce',
                 nonce: ltmsDashboard.nonce
-            }); // ping inicial, no crítico si falla — el intervalo abajo reintenta.
+            }); // ping inicial, no crÃ­tico si falla â€” el intervalo abajo reintenta.
 
             setInterval(function () {
                 $.post(ltmsDashboard.ajax_url, {
@@ -95,7 +95,7 @@
                         ltmsDashboard.nonce = resp.data.nonce;
                     }
                 });
-            }, 600000); // cada 10 min — de sobra frente a la vida útil del nonce (~12-24h).
+            }, 600000); // cada 10 min â€” de sobra frente a la vida Ãºtil del nonce (~12-24h).
 
             // 2) Respaldo: recarga forzada si un 403 se cuela de todas formas.
             var lastReloadAttempt = 0;
@@ -118,7 +118,7 @@
         },
 
         /**
-         * Vincula los eventos de navegación del sidebar.
+         * Vincula los eventos de navegaciÃ³n del sidebar.
          */
         bindNavigation() {
             const self = this;
@@ -136,11 +136,11 @@
                 $('.ltms-bottom-nav-item').removeClass('active');
                 $('.ltms-bottom-nav-item[data-view="' + view + '"]').addClass('active');
 
-                // Actualizar el título del topbar
+                // Actualizar el tÃ­tulo del topbar
                 const title = $(this).find('.ltms-nav-label').text();
                 $('.ltms-topbar-title').text(title);
 
-                // Cerrar sidebar en móvil
+                // Cerrar sidebar en mÃ³vil
                 if ($(window).width() <= 768) {
                     $('.ltms-sidebar').removeClass('ltms-sidebar-open');
                 }
@@ -167,7 +167,7 @@
                 }
             });
 
-            // v2.9.84 P1: Delegated handlers for data-action (CSP compliance — no inline onclick).
+            // v2.9.84 P1: Delegated handlers for data-action (CSP compliance â€” no inline onclick).
             $(document).on('click', '[data-action]', function(e) {
                 e.preventDefault();
                 var action = $(this).data('action');
@@ -192,7 +192,7 @@
                         var code = $(this).prev('input').val() || $(this).closest('.ltms-form-group').find('input').val() || '';
                         if (navigator.clipboard) {
                             navigator.clipboard.writeText(code).then(() => {
-                                $(this).text('✓ Copiado!');
+                                $(this).text('âœ“ Copiado!');
                                 setTimeout(() => { $(this).text('Copiar'); }, 2000);
                             });
                         }
@@ -205,7 +205,7 @@
          * Carga y renderiza una vista del SPA.
          *
          * @param {string} view Nombre de la vista.
-         * @param {boolean} forceRefresh Forzar recarga ignorando caché.
+         * @param {boolean} forceRefresh Forzar recarga ignorando cachÃ©.
          */
         loadView(view, forceRefresh = false) {
             this.currentView = view;
@@ -213,24 +213,24 @@
             // Ocultar todas las secciones
             $('.ltms-view-section').hide();
 
-            // v2.9.110 FIX: Mostrar la sección INMEDIATAMENTE antes del AJAX.
+            // v2.9.110 FIX: Mostrar la secciÃ³n INMEDIATAMENTE antes del AJAX.
             // Esto garantiza que el contenido PHP renderizado sea visible incluso
             // si el AJAX falla (403, 500, etc.). El AJAX solo actualiza datos
-            // dinámicos dentro de la sección, no la reemplaza.
+            // dinÃ¡micos dentro de la secciÃ³n, no la reemplaza.
             this.showSection('#ltms-view-' + view);
 
-            // v2.9.75 FIX: Normalizar el nombre del view para construir el método.
+            // v2.9.75 FIX: Normalizar el nombre del view para construir el mÃ©todo.
             const normalized = view.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
             const loadMethod = 'load' + normalized + 'View';
 
             if (typeof this[loadMethod] === 'function') {
                 this[loadMethod](forceRefresh);
             }
-            // Si no hay método específico, la sección ya está visible arriba.
+            // Si no hay mÃ©todo especÃ­fico, la secciÃ³n ya estÃ¡ visible arriba.
         },
 
         /**
-         * Carga la vista Home con métricas y gráficas.
+         * Carga la vista Home con mÃ©tricas y grÃ¡ficas.
          *
          * @param {boolean} forceRefresh
          */
@@ -252,12 +252,12 @@
                 },
                 success: (response) => {
                     if (response.success) {
-                        // FIX-NAN-HOME: cuando el perfil está incompleto (ej. registro
-                        // vía Google OAuth), el servidor responde success:true pero SIN
+                        // FIX-NAN-HOME: cuando el perfil estÃ¡ incompleto (ej. registro
+                        // vÃ­a Google OAuth), el servidor responde success:true pero SIN
                         // monthly_sales/monthly_orders/monthly_commissions/wallet_balance
-                        // — solo trae profile_incomplete + redirect (ver UX-06 en
+                        // â€” solo trae profile_incomplete + redirect (ver UX-06 en
                         // ajax_get_dashboard_data()). Antes esto se pasaba directo a
-                        // renderHomeView(), que pintaba "NaN" en las 3 métricas porque
+                        // renderHomeView(), que pintaba "NaN" en las 3 mÃ©tricas porque
                         // nunca se revisaba este flag ni se ejecutaba el redirect.
                         if (response.data && response.data.profile_incomplete) {
                             if (response.data.redirect) {
@@ -268,14 +268,14 @@
                         self.dataCache[cacheKey] = response.data;
                         self.renderHomeView(response.data);
                     } else {
-                        // v2.9.110: No mostrar error — la vista PHP ya está visible.
-                        // FASE2B P1 FIX: removed console.log — production JS should not
+                        // v2.9.110: No mostrar error â€” la vista PHP ya estÃ¡ visible.
+                        // FASE2B P1 FIX: removed console.log â€” production JS should not
                         // leak internal AJAX responses to browser console.
                     }
                 },
                 error: () => {
-                    // v2.9.110: No mostrar error — la vista PHP ya está visible.
-                    // FASE2B P1 FIX: removed console.log — expected error, silent fail.
+                    // v2.9.110: No mostrar error â€” la vista PHP ya estÃ¡ visible.
+                    // FASE2B P1 FIX: removed console.log â€” expected error, silent fail.
                 },
             });
         },
@@ -286,7 +286,7 @@
          * @param {Object} data Datos del dashboard.
          */
         renderHomeView(data) {
-            // Actualizar métricas
+            // Actualizar mÃ©tricas
             this.updateMetric('.ltms-metric-sales', data.monthly_sales, true);
             this.updateMetric('.ltms-metric-orders', data.monthly_orders, false);
             this.updateMetric('.ltms-metric-commissions', data.monthly_commissions, true);
@@ -295,13 +295,13 @@
             // M-AUDIT-REG-07: banner de onboarding (puramente informativo, no bloquea nada).
             this.renderOnboardingBanner(data.onboarding);
 
-            // Cargar gráfica de ventas
+            // Cargar grÃ¡fica de ventas
             this.loadSalesChart();
 
             // v2.9.90 P2: Cargar widgets adicionales
             this.loadHomeWidgets();
 
-            // Mostrar la sección
+            // Mostrar la secciÃ³n
             this.showSection('#ltms-view-home');
         },
 
@@ -322,7 +322,7 @@
                     if (!orders.length) {
                         $('#ltms-home-recent-orders').html(
                             '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">' +
-                            'No tienes pedidos todavía</div>'
+                            'No tienes pedidos todavÃ­a</div>'
                         );
                         return;
                     }
@@ -362,18 +362,18 @@
                     if (!products.length) {
                         $('#ltms-home-top-products').html(
                             '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:0.85rem;">' +
-                            'No tienes productos todavía</div>'
+                            'No tienes productos todavÃ­a</div>'
                         );
                         return;
                     }
                     var html = products.map(function(p, i) {
-                        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                        var medal = i === 0 ? 'ðŸ¥‡' : i === 1 ? 'ðŸ¥ˆ' : i === 2 ? 'ðŸ¥‰' : (i + 1);
                         // FASE2B P1 FIX (XSS): escape p.name and p.image from AJAX response.
                         var safeName = self.escapeHtml(p.name || '');
                         var safeImage = p.image ? self.escapeHtml(p.image) : '';
                         return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
                             '<span style="font-size:1rem;width:24px;text-align:center;">' + medal + '</span>' +
-                            (safeImage ? '<img src="' + safeImage + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#9ca3af;">📦</div>') +
+                            (safeImage ? '<img src="' + safeImage + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#9ca3af;">ðŸ“¦</div>') +
                             '<div style="flex:1;min-width:0;">' +
                                 '<div style="font-weight:600;font-size:0.82rem;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + safeName + '</div>' +
                                 '<div style="font-size:0.72rem;color:#9ca3af;">' + (p.stock !== null ? 'Stock: ' + p.stock : 'Sin stock') + '</div>' +
@@ -391,7 +391,7 @@
 
         /**
          * Renderiza (o esconde) el banner de checklist de onboarding del vendedor.
-         * No bloquea ninguna acción — solo informa qué pasos faltan.
+         * No bloquea ninguna acciÃ³n â€” solo informa quÃ© pasos faltan.
          *
          * @param {Object} ob Datos de onboarding (email_verified, kyc_status, kyc_url, has_products, all_done).
          */
@@ -411,10 +411,10 @@
 
             const kycLabels = {
                 none: { text: t('kyc_none', 'Pendiente de iniciar'), color: '#9ca3af' },
-                pending: { text: t('kyc_pending', 'En revisión'), color: '#f59e0b' },
+                pending: { text: t('kyc_pending', 'En revisiÃ³n'), color: '#f59e0b' },
                 approved: { text: t('kyc_approved', 'Aprobado'), color: '#10b981' },
-                rejected: { text: t('kyc_rejected', 'Rechazado — corrige y reenvía'), color: '#ef4444' },
-                expired: { text: t('kyc_expired', 'Expirado — renueva'), color: '#6b7280' },
+                rejected: { text: t('kyc_rejected', 'Rechazado â€” corrige y reenvÃ­a'), color: '#ef4444' },
+                expired: { text: t('kyc_expired', 'Expirado â€” renueva'), color: '#6b7280' },
             };
             const kyc = kycLabels[ob.kyc_status] || kycLabels.none;
             const kycDone = ob.kyc_status === 'approved';
@@ -422,37 +422,37 @@
             const steps = [
                 {
                     done: !!ob.email_verified,
-                    icon: '✉️',
+                    icon: 'âœ‰ï¸',
                     title: t('ob_email_title', 'Verifica tu email'),
                     detail: ob.email_verified ? t('ob_email_done', 'Verificado') : t('ob_email_pending', 'Revisa tu bandeja de entrada (y spam) para confirmar tu cuenta.'),
                     action: null,
                 },
                 {
                     done: kycDone,
-                    icon: '🪪',
-                    title: t('ob_kyc_title', 'Completa tu verificación de identidad (KYC)'),
+                    icon: 'ðŸªª',
+                    title: t('ob_kyc_title', 'Completa tu verificaciÃ³n de identidad (KYC)'),
                     detail: kyc.text,
                     action: kycDone ? null : { label: t('ob_kyc_action', 'Completar KYC'), url: ob.kyc_url },
                 },
                 {
                     done: !!ob.store_configured,
-                    icon: '🏪',
+                    icon: 'ðŸª',
                     title: t('ob_store_title', 'Configura tu tienda'),
-                    detail: ob.store_configured ? t('ob_store_done', 'Tienda configurada') : t('ob_store_pending', 'Añade logo, descripción y banner a tu tienda.'),
+                    detail: ob.store_configured ? t('ob_store_done', 'Tienda configurada') : t('ob_store_pending', 'AÃ±ade logo, descripciÃ³n y banner a tu tienda.'),
                     action: ob.store_configured ? null : { label: t('ob_store_action', 'Configurar tienda'), view: 'settings' },
                 },
                 {
                     done: !!ob.has_products,
-                    icon: '🛍️',
+                    icon: 'ðŸ›ï¸',
                     title: t('ob_product_title', 'Publica tu primer producto'),
-                    detail: ob.has_products ? t('ob_product_done', 'Ya tienes productos publicados') : t('ob_product_pending', 'Tu tienda aún no tiene productos visibles.'),
+                    detail: ob.has_products ? t('ob_product_done', 'Ya tienes productos publicados') : t('ob_product_pending', 'Tu tienda aÃºn no tiene productos visibles.'),
                     action: ob.has_products ? null : { label: t('ob_product_action', 'Agregar producto'), view: 'products' },
                 },
             ];
 
             const stepsHtml = steps.map((s, i) => `
                 <div style="display:flex;align-items:center;gap:12px;padding:10px 0;${i < steps.length - 1 ? 'border-bottom:1px solid #e5e7eb;' : ''}">
-                    <span style="font-size:1.3rem;flex-shrink:0;">${s.done ? '✅' : s.icon}</span>
+                    <span style="font-size:1.3rem;flex-shrink:0;">${s.done ? 'âœ…' : s.icon}</span>
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:600;font-size:.9rem;color:#111827;${s.done ? 'text-decoration:line-through;color:#9ca3af;' : ''}">${s.title}</div>
                         <div style="font-size:.8rem;color:#6b7280;">${s.detail}</div>
@@ -464,17 +464,17 @@
             $banner.html(`
                 <div class="ltms-card" style="padding:24px;border-left:4px solid #2563eb;background:#fff;">
                     <div style="font-weight:800;font-size:1.15rem;color:#111827;margin-bottom:6px;">
-                        👋 ${t('ob_welcome', '¡Bienvenido a Lo Tengo!')}
+                        ðŸ‘‹ ${t('ob_welcome', 'Â¡Bienvenido a Lo Tengo!')}
                     </div>
                     <div style="font-size:.9rem;color:#374151;margin-bottom:16px;line-height:1.5;">
                         ${t('ob_subtitle', 'Para habilitar tu tienda y empezar a vender, completa estos 4 pasos en orden. Cada paso desbloquea el siguiente.')}
                     </div>
                     <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;font-weight:600;">
-                        ⏳ Tiempo estimado: 10-15 minutos · Si tienes dudas, contacta soporte@lo-tengo.com.co
+                        â³ Tiempo estimado: 10-15 minutos Â· Si tienes dudas, contacta soporte@lo-tengo.com.co
                     </div>
                     ${stepsHtml}
                     <div style="margin-top:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;font-size:.8rem;color:#6b7280;line-height:1.5;">
-                        <strong>¿Qué pasa después?</strong> Una vez completados los 4 pasos, nuestro equipo revisa tu información (1-2 días hábiles). Recibirás un email cuando tu tienda esté 100% habilitada para vender.
+                        <strong>Â¿QuÃ© pasa despuÃ©s?</strong> Una vez completados los 4 pasos, nuestro equipo revisa tu informaciÃ³n (1-2 dÃ­as hÃ¡biles). RecibirÃ¡s un email cuando tu tienda estÃ© 100% habilitada para vender.
                     </div>
                 </div>
             `).show();
@@ -491,7 +491,7 @@
         },
 
         /**
-         * Carga la gráfica de ventas del vendedor.
+         * Carga la grÃ¡fica de ventas del vendedor.
          */
         loadSalesChart() {
             const canvas = document.getElementById('ltms-vendor-sales-chart');
@@ -565,9 +565,9 @@
         },
 
         /**
-         * Estado de la vista de Pedidos: página/filtro actuales, para que
-         * paginación y filtro trabajen sobre el mismo estado en vez de
-         * mandar siempre page:1 (bug de la versión anterior).
+         * Estado de la vista de Pedidos: pÃ¡gina/filtro actuales, para que
+         * paginaciÃ³n y filtro trabajen sobre el mismo estado en vez de
+         * mandar siempre page:1 (bug de la versiÃ³n anterior).
          */
         ordersState: { page: 1, perPage: 20, status: '', totalPages: 1, dateFilter: '', search: '' },
 
@@ -580,8 +580,8 @@
         },
 
         /**
-         * Hace la petición AJAX real usando el estado actual (página/filtro)
-         * y renderiza tabla + controles de paginación.
+         * Hace la peticiÃ³n AJAX real usando el estado actual (pÃ¡gina/filtro)
+         * y renderiza tabla + controles de paginaciÃ³n.
          */
         fetchOrders() {
             const self = this;
@@ -616,7 +616,7 @@
 
         /**
          * Renderiza la tabla de pedidos del vendedor.
-         * P-01: columna de tipo de envío, badge pickup diferenciado, etiquetas en español.
+         * P-01: columna de tipo de envÃ­o, badge pickup diferenciado, etiquetas en espaÃ±ol.
          * audit-pedidos: filas clicables que abren el modal de detalle.
          *
          * @param {Array} orders Lista de pedidos.
@@ -626,7 +626,7 @@
             $tbody.empty();
 
             if (!orders || orders.length === 0) {
-                $tbody.append('<tr><td colspan="7" class="ltms-empty-cell">No tienes pedidos aún.</td></tr>');
+                $tbody.append('<tr><td colspan="7" class="ltms-empty-cell">No tienes pedidos aÃºn.</td></tr>');
                 return;
             }
 
@@ -634,15 +634,15 @@
                 const statusClass = this.getOrderStatusClass(order.status);
                 const statusLabel = this.getOrderStatusLabel(order.status);
 
-                // Columna de tipo de envío: ícono de tienda para pickup, texto normal para el resto
+                // Columna de tipo de envÃ­o: Ã­cono de tienda para pickup, texto normal para el resto
                 let shippingCell = '';
                 if (order.is_pickup) {
                     const addr = order.store_info && order.store_info.address
                         ? `<div style="font-size:.75rem;color:#6b7280;margin-top:2px;">${this.escapeHtml(order.store_info.address)}</div>`
                         : '';
-                    shippingCell = `<span style="color:#1a5276;font-weight:600;">🏪 Recogida</span>${addr}`;
+                    shippingCell = `<span style="color:#1a5276;font-weight:600;">ðŸª Recogida</span>${addr}`;
                 } else {
-                    shippingCell = `<span style="color:#6b7280;font-size:.85rem;">${this.escapeHtml(order.shipping_label || '—')}</span>`;
+                    shippingCell = `<span style="color:#6b7280;font-size:.85rem;">${this.escapeHtml(order.shipping_label || 'â€”')}</span>`;
                 }
 
                 $tbody.append(`
@@ -653,7 +653,7 @@
                         <td><strong>${order.formatted}</strong></td>
                         <td>${shippingCell}</td>
                         <td><span class="ltms-badge ${statusClass}">${statusLabel}</span></td>
-                        <td>${order.is_redi ? '<span style="background:#E80001;color:#fff;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:600;">ReDi ' + (order.redi_role === 'origin' ? '📍' : '🔁') + '</span>' : '<span style="color:#ccc;">—</span>'}</td>
+                        <td>${order.is_redi ? '<span style="background:#E80001;color:#fff;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:600;">ReDi ' + (order.redi_role === 'origin' ? 'ðŸ“' : 'ðŸ”') + '</span>' : '<span style="color:#ccc;">â€”</span>'}</td>
                         <td>${order.date}</td>
                     </tr>
                 `);
@@ -661,7 +661,7 @@
         },
 
         /**
-         * Renderiza los controles de paginación (Anterior / página X de Y / Siguiente)
+         * Renderiza los controles de paginaciÃ³n (Anterior / pÃ¡gina X de Y / Siguiente)
          * debajo de la tabla de pedidos.
          *
          * @param {Object} data Respuesta de ltms_get_orders_data (total, page, total_pages).
@@ -680,10 +680,10 @@
             if (total === 0) { $pager.empty(); return; }
 
             $pager.html(`
-                <span>Página ${page} de ${totalPages} · ${total} pedido(s)</span>
+                <span>PÃ¡gina ${page} de ${totalPages} Â· ${total} pedido(s)</span>
                 <div style="display:flex;gap:8px;">
-                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-prev" ${page <= 1 ? 'disabled' : ''} aria-label="Página anterior">‹ Anterior</button>
-                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-next" ${page >= totalPages ? 'disabled' : ''} aria-label="Página siguiente">Siguiente ›</button>
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-prev" ${page <= 1 ? 'disabled' : ''} aria-label="PÃ¡gina anterior">â€¹ Anterior</button>
+                    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" id="ltms-orders-next" ${page >= totalPages ? 'disabled' : ''} aria-label="PÃ¡gina siguiente">Siguiente â€º</button>
                 </div>
             `);
         },
@@ -694,9 +694,9 @@
         loadWalletView() {
             const self = this;
 
-            // v2.9.75: Mostrar la sección inmediatamente, antes del AJAX.
-            // Así, si el AJAX falla, el vendor aún ve la estructura de la vista
-            // (aunque sin datos dinámicos) en vez de quedarse en "Cargando...".
+            // v2.9.75: Mostrar la secciÃ³n inmediatamente, antes del AJAX.
+            // AsÃ­, si el AJAX falla, el vendor aÃºn ve la estructura de la vista
+            // (aunque sin datos dinÃ¡micos) en vez de quedarse en "Cargando...".
             self.showSection('#ltms-view-wallet');
 
             $.ajax({
@@ -714,7 +714,7 @@
                     }
                 },
                 error: () => {
-                    // No mostrar error — la vista ya está visible con datos estáticos.
+                    // No mostrar error â€” la vista ya estÃ¡ visible con datos estÃ¡ticos.
                 },
             });
         },
@@ -742,9 +742,9 @@
             data.transactions.forEach(tx => {
                 const isCredit = parseFloat(tx.amount) >= 0;
                 // C5-4 fix: handler devuelve tx.formatted (no tx.formatted_amount)
-                const displayAmount = tx.formatted || tx.formatted_amount || tx.amount || '—';
+                const displayAmount = tx.formatted || tx.formatted_amount || tx.amount || 'â€”';
                 // C5-5 fix: handler devuelve tx.date (no tx.created_at)
-                const displayDate = tx.date || tx.created_at || '—';
+                const displayDate = tx.date || tx.created_at || 'â€”';
                 $tbody.append(`
                     <tr>
                         <td>${displayDate}</td>
@@ -771,7 +771,7 @@
                 if ($modal.length === 0) return;
                 $('#ltms-payout-amount').attr('max', balance);
                 $('#ltms-payout-balance-display').text(self.formatMoney(balance));
-                // Usar LTMS.Modal si está disponible, sino mostrar directamente
+                // Usar LTMS.Modal si estÃ¡ disponible, sino mostrar directamente
                 if (typeof LTMS.Modal !== 'undefined' && typeof LTMS.Modal.open === 'function') {
                     LTMS.Modal.open('ltms-modal-payout');
                 } else {
@@ -779,7 +779,7 @@
                     $('body').addClass('ltms-modal-body-lock');
                 }
             };
-            // Si el modal no está en el DOM, navegar a wallet primero
+            // Si el modal no estÃ¡ en el DOM, navegar a wallet primero
             if ($('#ltms-modal-payout').length === 0) {
                 this.loadView('wallet');
                 const wait = setInterval(() => {
@@ -795,7 +795,7 @@
         },
 
         /**
-         * Envía la solicitud de retiro.
+         * EnvÃ­a la solicitud de retiro.
          */
         submitPayoutRequest() {
             if (!confirm(ltmsDashboard.i18n.confirm_payout)) return;
@@ -825,7 +825,7 @@
                         this.showToast('success', response.data.message);
                         this.loadView('wallet', true);
                     } else {
-                        // M-123 FIX: response.data puede ser objeto o string — extraer mensaje seguro
+                        // M-123 FIX: response.data puede ser objeto o string â€” extraer mensaje seguro
                         const errMsg = (typeof response.data === 'string')
                             ? response.data
                             : (response.data?.message || ltmsDashboard.i18n.error);
@@ -835,7 +835,7 @@
             });
         },
 
-        // ── Notificaciones ────────────────────────────────────────
+        // â”€â”€ Notificaciones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /**
          * Inicia el polling de notificaciones.
@@ -848,7 +848,7 @@
         },
 
         /**
-         * Obtiene notificaciones no leídas del servidor.
+         * Obtiene notificaciones no leÃ­das del servidor.
          */
         fetchNotifications() {
             $.ajax({
@@ -862,9 +862,9 @@
                 success: (response) => {
                     if (!response.success) return;
 
-                    // M-15 FIX: usar `count` (total real no leídas) para el badge SIEMPRE,
+                    // M-15 FIX: usar `count` (total real no leÃ­das) para el badge SIEMPRE,
                     // independientemente de si hay nuevas. Esto permite que el badge se
-                    // ponga en 0 cuando el vendedor marca todo como leído.
+                    // ponga en 0 cuando el vendedor marca todo como leÃ­do.
                     this.updateNotificationBadge(response.data.count);
 
                     // Solo renderizar si hay notificaciones nuevas desde `since`
@@ -880,7 +880,7 @@
         /**
          * Actualiza el contador de notificaciones en el topbar.
          *
-         * @param {number} count Número de notificaciones.
+         * @param {number} count NÃºmero de notificaciones.
          */
         updateNotificationBadge(count) {
             const $badge = $('.ltms-badge-count');
@@ -921,9 +921,9 @@
         },
 
         /**
-         * Marca una notificación como leída.
+         * Marca una notificaciÃ³n como leÃ­da.
          *
-         * @param {number} id    ID de la notificación.
+         * @param {number} id    ID de la notificaciÃ³n.
          * @param {jQuery} $item Elemento jQuery del item.
          */
         markNotificationRead(id, $item) {
@@ -948,12 +948,12 @@
             });
         },
 
-        // ── UI Helpers ────────────────────────────────────────────
+        // â”€â”€ UI Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /**
-         * Muestra una sección del SPA.
+         * Muestra una secciÃ³n del SPA.
          *
-         * @param {string} selector Selector CSS de la sección.
+         * @param {string} selector Selector CSS de la secciÃ³n.
          */
         showSection(selector) {
             $('.ltms-view-loader').hide();
@@ -972,7 +972,7 @@
         },
 
         /**
-         * Muestra un mensaje de error en una sección.
+         * Muestra un mensaje de error en una secciÃ³n.
          *
          * @param {string} selector Selector CSS.
          * @param {string} message  Mensaje de error.
@@ -986,7 +986,7 @@
         },
 
         /**
-         * Muestra una notificación tipo toast.
+         * Muestra una notificaciÃ³n tipo toast.
          *
          * @param {string} type    'success'|'error'|'info'.
          * @param {string} message Mensaje.
@@ -999,7 +999,7 @@
         },
 
         /**
-         * Actualiza el valor de una métrica con animación.
+         * Actualiza el valor de una mÃ©trica con animaciÃ³n.
          *
          * @param {string}  selector  Selector CSS del elemento.
          * @param {number}  value     Nuevo valor.
@@ -1013,7 +1013,7 @@
         },
 
         /**
-         * Inicializa el menú móvil (toggle del sidebar).
+         * Inicializa el menÃº mÃ³vil (toggle del sidebar).
          */
         initMobileMenu() {
             if (window.innerWidth > 768) return;
@@ -1024,8 +1024,8 @@
             const main    = document.querySelector('.ltms-main-content');
             const TOPBAR_H = 52;
 
-            // AUD-02 FIX: botón "Más" en bottom-nav abre el sidebar completo
-            // en móvil, dando acceso a las ~17 vistas no listadas en la
+            // AUD-02 FIX: botÃ³n "MÃ¡s" en bottom-nav abre el sidebar completo
+            // en mÃ³vil, dando acceso a las ~17 vistas no listadas en la
             // bottom-nav de 5 items.
             $(document).on('click', '.ltms-bottom-nav-item[data-action="open-sidebar"]', function(e) {
                 e.preventDefault();
@@ -1100,8 +1100,8 @@
 
             // v2.9.280 FIX: hamburguesa no funciona al primer click.
             // Root cause: el handler delegado no disparaba si el sidebar
-            // no tenía display:block inicialmente. Fix: usar handler directo
-            // en el botón + toggle display explícito.
+            // no tenÃ­a display:block inicialmente. Fix: usar handler directo
+            // en el botÃ³n + toggle display explÃ­cito.
             const menuBtnEl = document.querySelector('.ltms-mobile-menu-btn');
             if (menuBtnEl) {
                 menuBtnEl.addEventListener('click', function(e) {
@@ -1123,7 +1123,7 @@
         },
 
         /**
-         * Vincula el botón de logout.
+         * Vincula el botÃ³n de logout.
          */
         bindLogout() {
             $(document).on('click', '.ltms-logout-btn', (e) => {
@@ -1150,7 +1150,7 @@
                 self.fetchOrders();
             });
 
-            // Paginación
+            // PaginaciÃ³n
             $(document).on('click', '#ltms-orders-prev', function () {
                 if (self.ordersState.page > 1) {
                     self.ordersState.page -= 1;
@@ -1164,7 +1164,7 @@
                 }
             });
 
-            // Fila clicable → abre modal de detalle (clic o Enter/Espacio por accesibilidad)
+            // Fila clicable â†’ abre modal de detalle (clic o Enter/Espacio por accesibilidad)
             $(document).on('click', '.ltms-order-row', function () {
                 self.openOrderDetail($(this).data('order-id'));
             });
@@ -1182,12 +1182,12 @@
                 self.updateOrderStatus(orderId, newStatus);
             });
 
-            // v2.9.222: Generar factura electrónica desde el detalle del pedido
+            // v2.9.222: Generar factura electrÃ³nica desde el detalle del pedido
             $(document).on('click', '#ltms-generate-invoice-btn', function () {
                 const orderId = $(this).data('order-id');
                 const $btn = $(this);
                 const originalText = $btn.html();
-                $btn.prop('disabled', true).html('⏳ Generando...');
+                $btn.prop('disabled', true).html('â³ Generando...');
 
                 $.ajax({
                     url: ltmsDashboard.ajaxUrl,
@@ -1200,13 +1200,13 @@
                     success: function (response) {
                         if (response.success) {
                             const data = response.data;
-                            // Reemplazar el botón con el badge de factura generada.
+                            // Reemplazar el botÃ³n con el badge de factura generada.
                             $btn.replaceWith(`
                                 <div style="display:inline-flex;align-items:center;gap:8px;background:#D1FAE5;color:#065F46;padding:6px 12px;border-radius:6px;font-size:.82rem;font-weight:600;">
-                                    ✅ Factura ${data.provider.toUpperCase()} #${self.escapeHtml(data.invoice_number)}
+                                    âœ… Factura ${data.provider.toUpperCase()} #${self.escapeHtml(data.invoice_number)}
                                 </div>
                             `);
-                            // Toast de éxito.
+                            // Toast de Ã©xito.
                             if (typeof LTMS.UX !== 'undefined' && LTMS.UX.toast) {
                                 LTMS.UX.toast('success', 'Factura generada', data.message, { duration: 4000 });
                             } else {
@@ -1239,7 +1239,7 @@
         },
 
         /**
-         * Abre el modal de detalle de un pedido y carga su información completa.
+         * Abre el modal de detalle de un pedido y carga su informaciÃ³n completa.
          *
          * @param {number} orderId
          */
@@ -1284,7 +1284,7 @@
 
             const storeHtml = d.is_pickup && d.store_info && d.store_info.address
                 ? `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.85rem;">
-                       🏪 <strong>Recogida en tienda</strong><br>${this.escapeHtml(d.store_info.address)}
+                       ðŸª <strong>Recogida en tienda</strong><br>${this.escapeHtml(d.store_info.address)}
                    </div>`
                 : '';
 
@@ -1294,7 +1294,7 @@
             }).join(' ');
 
             const notesHtml = (d.notes || []).length
-                ? d.notes.map(n => `<div style="font-size:.8rem;color:#6b7280;border-left:2px solid #e5e7eb;padding-left:8px;margin-bottom:6px;">${this.escapeHtml(n.content)} <span style="color:#9ca3af;">· ${n.date}</span></div>`).join('')
+                ? d.notes.map(n => `<div style="font-size:.8rem;color:#6b7280;border-left:2px solid #e5e7eb;padding-left:8px;margin-bottom:6px;">${this.escapeHtml(n.content)} <span style="color:#9ca3af;">Â· ${n.date}</span></div>`).join('')
                 : '<div style="font-size:.8rem;color:#9ca3af;">Sin notas.</div>';
 
             $('#ltms-order-detail-body').html(`
@@ -1314,7 +1314,7 @@
                         ${d.customer_phone ? this.escapeHtml(d.customer_phone) : ''}
                     </div>
                     <div>
-                        <strong>Envío</strong><br>
+                        <strong>EnvÃ­o</strong><br>
                         ${this.escapeHtml(d.shipping_label)}
                         ${storeHtml}
                     </div>
@@ -1329,7 +1329,7 @@
                     <tbody>${itemsHtml}</tbody>
                     <tfoot>
                         <tr><td colspan="2" style="text-align:right;padding-top:8px;color:#6b7280;">Subtotal</td><td style="text-align:right;padding-top:8px;">${d.subtotal}</td></tr>
-                        <tr><td colspan="2" style="text-align:right;color:#6b7280;">Envío</td><td style="text-align:right;">${d.shipping_total}</td></tr>
+                        <tr><td colspan="2" style="text-align:right;color:#6b7280;">EnvÃ­o</td><td style="text-align:right;">${d.shipping_total}</td></tr>
                         <tr><td colspan="2" style="text-align:right;font-weight:700;">Total</td><td style="text-align:right;font-weight:700;">${d.total}</td></tr>
                     </tfoot>
                 </table>
@@ -1348,17 +1348,17 @@
                         ${transitionsHtml || '<span style="font-size:.8rem;color:#9ca3af;">Sin acciones disponibles para este estado.</span>'}
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                        ${d.is_redi ? `<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" onclick="LTMS.Dashboard.openIncidentModal(${d.id})" style="border-color:#E80001;color:#E80001;">⚠️ Abrir Novedad</button>` : ''}
-                        <a href="${d.edit_url}" target="_blank" rel="noopener" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="Ver pedido completo en WordPress">Ver en WordPress ↗</a>
+                        ${d.is_redi ? `<button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm" onclick="LTMS.Dashboard.openIncidentModal(${d.id})" style="border-color:#E80001;color:#E80001;">âš ï¸ Abrir Novedad</button>` : ''}
+                        <a href="${d.edit_url}" target="_blank" rel="noopener" class="ltms-btn ltms-btn-outline ltms-btn-sm" aria-label="Ver pedido completo en WordPress">Ver en WordPress â†—</a>
                     </div>
                 </div>
             `);
         },
 
         /**
-         * v2.9.222: Renderiza el bloque de facturación electrónica en el detalle del pedido.
-         * Si el vendor tiene credenciales configuradas, muestra el botón "Generar factura".
-         * Si ya se generó, muestra el número y enlace.
+         * v2.9.222: Renderiza el bloque de facturaciÃ³n electrÃ³nica en el detalle del pedido.
+         * Si el vendor tiene credenciales configuradas, muestra el botÃ³n "Generar factura".
+         * Si ya se generÃ³, muestra el nÃºmero y enlace.
          * Si no tiene credenciales, muestra un link para configurarlas.
          */
         renderInvoiceBlock(d) {
@@ -1374,14 +1374,14 @@
             if (needsInvoice && buyerTaxId) {
                 buyerInfo = `
                     <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:.8rem;color:#1E40AF;">
-                        <strong>📋 Comprador solicita factura:</strong><br>
-                        ${this.escapeHtml(buyerCompany)} · ${this.escapeHtml(buyerTaxId)}
+                        <strong>ðŸ“‹ Comprador solicita factura:</strong><br>
+                        ${this.escapeHtml(buyerCompany)} Â· ${this.escapeHtml(buyerTaxId)}
                     </div>
                 `;
             } else {
                 buyerInfo = `
                     <div style="font-size:.78rem;color:#9ca3af;margin-top:6px;">
-                        El comprador no solicitó factura. Puedes generar una genérica si lo deseas.
+                        El comprador no solicitÃ³ factura. Puedes generar una genÃ©rica si lo deseas.
                     </div>
                 `;
             }
@@ -1391,19 +1391,19 @@
                 // Ya generada.
                 actionHtml = `
                     <div style="display:inline-flex;align-items:center;gap:8px;background:#D1FAE5;color:#065F46;padding:6px 12px;border-radius:6px;font-size:.82rem;font-weight:600;">
-                        ✅ Factura ${this.escapeHtml(existing.provider.toUpperCase())} #${this.escapeHtml(existing.invoice_number)}
+                        âœ… Factura ${this.escapeHtml(existing.provider.toUpperCase())} #${this.escapeHtml(existing.invoice_number)}
                     </div>
                 `;
             } else if (hasCreds) {
                 actionHtml = `
                     <button type="button" class="ltms-btn ltms-btn-primary ltms-btn-sm" id="ltms-generate-invoice-btn" data-order-id="${d.id}" style="background:#E80001;border-color:#E80001;">
-                        📄 Generar factura en ${this.escapeHtml((invoiceData.provider || 'Alegra').charAt(0).toUpperCase() + (invoiceData.provider || 'Alegra').slice(1))}
+                        ðŸ“„ Generar factura en ${this.escapeHtml((invoiceData.provider || 'Alegra').charAt(0).toUpperCase() + (invoiceData.provider || 'Alegra').slice(1))}
                     </button>
                 `;
             } else {
                 actionHtml = `
                     <a href="#" data-action="load-view" data-view="settings" class="ltms-btn ltms-btn-outline ltms-btn-sm">
-                        ⚙️ Configurar facturación
+                        âš™ï¸ Configurar facturaciÃ³n
                     </a>
                 `;
             }
@@ -1411,7 +1411,7 @@
             return `
                 <div style="background:#FFF9F9;border:1px solid #FFD6D6;border-left:4px solid #E80001;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <strong style="font-size:.85rem;color:#1A1F2E;">📄 Facturación electrónica</strong>
+                        <strong style="font-size:.85rem;color:#1A1F2E;">ðŸ“„ FacturaciÃ³n electrÃ³nica</strong>
                         ${actionHtml}
                     </div>
                     ${buyerInfo}
@@ -1424,7 +1424,7 @@
          * desde el detalle de un pedido ReDi.
          */
         openIncidentModal(orderId) {
-            // Navegar a la vista de Novedades + abrir el modal de creación.
+            // Navegar a la vista de Novedades + abrir el modal de creaciÃ³n.
             this.loadView('incidents');
             // Esperar a que la vista cargue, luego abrir el modal con el order_id prellenado.
             setTimeout(function() {
@@ -1442,7 +1442,7 @@
         },
 
         /**
-         * Cambia el estado de un pedido (acción del vendedor desde el modal de detalle).
+         * Cambia el estado de un pedido (acciÃ³n del vendedor desde el modal de detalle).
          *
          * @param {number} orderId
          * @param {string} newStatus
@@ -1456,7 +1456,7 @@
                 success(response) {
                     if (response.success) {
                         self.openOrderDetail(orderId); // recarga el modal con el nuevo estado
-                        self.fetchOrders(); // refresca la tabla detrás
+                        self.fetchOrders(); // refresca la tabla detrÃ¡s
                     } else {
                         alert(response.data || 'No se pudo cambiar el estado.');
                     }
@@ -1468,596 +1468,24 @@
             const self = this;
             // v2.9.99 FIX: mostrar la vista PHP directamente (loadGenericView) en lugar de
             // sobreescribirla con renderProductsView(). La vista PHP tiene pagination,
-            // search, gallery upload, ReDi toggle, etc. — el JS render era una versión
-            // simplificada que perdía todas esas features.
+            // search, gallery upload, ReDi toggle, etc. â€” el JS render era una versiÃ³n
+            // simplificada que perdÃ­a todas esas features.
             self.showSection('#ltms-view-products');
             // La vista PHP ya tiene su propia lógica de carga via AJAX inline.
         },
-        renderProductsView(data) {
-            const products = (data && data.products) ? data.products : [];
-            let rows = products.length === 0
-                ? '<tr><td colspan="6" class="ltms-empty-cell">Aún no tienes productos. Crea tu primer producto con el botón de arriba.</td></tr>'
-                : products.map(p => `<tr><td style="width:60px;padding:4px;"><img src="${p.image||''}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;background:#f0f0f0;" onerror="this.style.background='#e0e0e0';this.src='';" /></td><td>${this.escapeHtml(p.name)}</td><td>${this.formatMoney(p.price)}</td><td>${this.escapeHtml(p.status)}</td><td>${({'physical':'📦 Físico','product':'📦 Físico','digital':'💾 Digital','service':'🔧 Servicio','booking':'🏨 Turismo'}[p.product_type] || '📦 Físico')}</td><td>${p.stock ?? '-'}</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-  <button class="ltms-btn ltms-btn-sm ltms-edit-product-btn" data-id="${p.id}" style="background:#1976d2;color:#fff;border:none;font-weight:600;">✏️ Editar</button>
-  <button class="ltms-btn ltms-btn-sm ltms-toggle-product-btn" data-id="${p.id}" data-status="${p.status}" style="${p.status==='publish'?'background:#f59e0b;color:#fff;border:none;font-weight:600;':'background:#16a34a;color:#fff;border:none;font-weight:600;'}">${p.status==='publish'?'⏸ Pausar':'▶ Publicar'}</button>
-  <button class="ltms-btn ltms-btn-sm ltms-delete-product-btn" data-id="${p.id}" data-name="${this.escapeHtml(p.name)}" style="background:transparent;color:#dc2626;border:1px solid #dc2626;font-weight:600;">🗑</button>
-</div></td></tr>`).join('');
-            const addUrl = (ltmsDashboard.add_product_url || '/wp-admin/post-new.php?post_type=product');
-            $('#ltms-view-products').html(`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h3>Mis Productos</h3><button class="ltms-btn ltms-btn-primary" id="ltms-add-product-btn">+ Nuevo Producto</button></div><div class="ltms-table-wrap"><table class="ltms-table"><thead><tr><th style="width:60px;"></th><th>Producto</th><th>Precio</th><th>Estado</th><th>Tipo</th><th>Stock</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`);
-        $(document).off('click','#ltms-add-product-btn').on('click','#ltms-add-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); LTMS.Dashboard.loadNewProductView(); });
-            $(document).off('click','.ltms-edit-product-btn').on('click','.ltms-edit-product-btn', function(e){ e.stopPropagation(); e.preventDefault(); var pid=$(this).data('id'); LTMS.Dashboard.loadEditProductView(pid); });
-            $(document).off('click','.ltms-toggle-product-btn').on('click','.ltms-toggle-product-btn', function(e){
-                e.stopPropagation(); e.preventDefault();
-                var pid=$(this).data('id');
-                var status=$(this).data('status');
-                var newStatus = (status==='publish') ? 'draft' : 'publish';
-                var label = (status==='publish') ? 'Despublicar' : 'Publicar';
-                var nonce=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.nonce:'';
-                var ajaxUrl=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.ajax_url:'/wp-admin/admin-ajax.php';
-                var $btn=$(this);
-                $btn.prop('disabled',true).text('...');
-                $.ajax({ url:ajaxUrl, type:'POST', data:{ action:'ltms_toggle_product_status', nonce:nonce, product_id:pid, new_status:newStatus },
-                    success:function(r){
-                        if(r.success){ LTMS.Dashboard.loadView('products'); }
-                        else{ alert('Error: '+(r.data||'No se pudo cambiar estado')); $btn.prop('disabled',false).text(label); }
-                    },
-                    error:function(){ alert('Error de red'); $btn.prop('disabled',false).text(label); }
-                });
-            });
-            $(document).off('click','.ltms-delete-product-btn').on('click','.ltms-delete-product-btn', function(e){
-                e.stopPropagation(); e.preventDefault();
-                var pid=$(this).data('id');
-                var pname=$(this).data('name') || 'este producto';
-                if(!confirm('\u00bfEliminar "' + pname + '"? Esta accion no se puede deshacer.')) return;
-                var nonce=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.nonce:'';
-                var ajaxUrl=(typeof ltmsDashboard!=='undefined')?ltmsDashboard.ajax_url:'/wp-admin/admin-ajax.php';
-                var $btn=$(this);
-                $btn.prop('disabled',true).text('Eliminando...');
-                $.ajax({ url:ajaxUrl, type:'POST', data:{ action:'ltms_delete_product', nonce:nonce, product_id:pid },
-                    success:function(r){
-                        if(r.success){ LTMS.Dashboard.loadView('products'); }
-                        else{ alert('Error: '+(r.data||'No se pudo eliminar')); $btn.prop('disabled',false).text('Eliminar'); }
-                    },
-                    error:function(){ alert('Error de red'); $btn.prop('disabled',false).text('Eliminar'); }
-                });
-            });
-        },
-        loadNewProductView() {
-            const self = this;
-            const nonce = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '';
-            // Cargar categorías
-            jQuery.ajax({
-                url: (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php',
-                type: 'POST',
-                data: { action: 'ltms_get_categories', nonce: nonce },
-                success: function(res) {
-                    let catOptions = '<option value="">-- Sin categoría --</option>';
-                    if (res.success && res.data.categories) {
-                        res.data.categories.forEach(function(c) {
-                            catOptions += '<option value="' + c.id + '">' + c.name + '</option>';
-                        });
-                    }
-                    var rediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                    var rediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
-                    var rediMin = rediMinRaw < 1 ? Math.round(rediMinRaw * 100) : rediMinRaw;
-                    var rediMax = rediMaxRaw < 1 ? Math.round(rediMaxRaw * 100) : rediMaxRaw;
-                    const html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
-                        '<h3 style="margin-bottom:20px;">Nuevo Producto</h3>' +
-                        '<div id="ltms-np-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Nombre del producto *</label>' +
-                            '<input type="text" id="ltms-np-name" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Nombre del producto">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio (COP) *</label>' +
-                            '<input type="number" id="ltms-np-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción</label>' +
-                            '<textarea id="ltms-np-desc" rows="4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Descripción del producto"></textarea>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
-                            '<select id="ltms-np-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
-                            '<select id="ltms-np-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                                '<option value="physical">📦 Físico</option>' +
-                                '<option value="digital">💾 Digital</option>' +
-                                '<option value="service">🔧 Servicio</option>' +
-                                '<option value="booking">🏨 Turismo</option>' +
-                                '<option value="restaurant">🍽️ Restaurante</option>' +
-                                '<option value="variable">🎨 Con Variaciones (tallas/colores)</option>' +
-                            '</select>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (dejar vacío = ilimitado)</label>' +
-                            '<input type="number" id="ltms-np-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Cantidad en stock" min="0">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio de oferta (COP) <small style="font-weight:400;color:#666;">Opcional — debe ser menor al precio regular</small></label>' +
-                            '<input type="number" id="ltms-np-sale-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Dejar vacío si no hay oferta" min="0">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Visibilidad en catálogo</label>' +
-                            '<select id="ltms-np-visibility" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                            '<option value="visible">Visible en catálogo y búsqueda</option>' +
-                            '<option value="catalog">Solo en catálogo</option>' +
-                            '<option value="search">Solo en búsqueda</option>' +
-                            '<option value="hidden">Oculto (no visible)</option>' +
-                            '</select>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:8px;">Peso y dimensiones <small style="font-weight:400;color:#666;">(para envíos — dejar vacío si no aplica)</small></label>' +
-                            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Peso (kg)</label><input type="number" id="ltms-np-weight" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0.000" min="0" step="0.001"></div>' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Largo (cm)</label><input type="number" id="ltms-np-length" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Ancho (cm)</label><input type="number" id="ltms-np-width" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Alto (cm)</label><input type="number" id="ltms-np-height" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción corta <small style="font-weight:400;color:#666;">(resumen junto al precio)</small></label>' +
-                            '<textarea id="ltms-np-short-desc" rows="2" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Resumen breve del producto (máx 200 caracteres)"></textarea>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">SKU <small style="font-weight:400;color:#666;">(código único, opcional)</small></label>' +
-                            '<input type="text" id="ltms-np-sku" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="Ej: CAM-AZUL-M">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Etiquetas <small style="font-weight:400;color:#666;">(separa con comas)</small></label>' +
-                            '<input type="text" id="ltms-np-tags" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" placeholder="rojo, algodón, verano">' +
-                        '</div>' +
-                        '<div id="ltms-np-digital-fields" style="display:none;margin-bottom:15px;padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">💾 Archivo descargable</label>' +
-                            '<input type="url" id="ltms-np-download-url" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;" placeholder="https://... (URL del archivo)">' +
-                            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Límite descargas (0=ilimitado)</label><input type="number" id="ltms-np-download-limit" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
-                            '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Expira en días (0=nunca)</label><input type="number" id="ltms-np-download-expiry" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" placeholder="0" min="0"></div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div id="ltms-np-variable-fields" style="display:none;margin-bottom:15px;padding:14px;background:#faf5ff;border:1px solid #ddd6fe;border-radius:8px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:8px;">🎨 Variaciones del producto</label>' +
-                            '<p style="font-size:0.8rem;color:#6b7280;margin-bottom:10px;">Define atributos (tallas, colores, etc.) y el precio de cada variación.</p>' +
-                            '<div id="ltms-np-attributes" style="margin-bottom:12px;">' +
-                            '</div>' +
-                            '<button type="button" id="ltms-np-add-attribute" style="padding:8px 14px;border:1px dashed #8b5cf6;border-radius:6px;background:#f5f3ff;cursor:pointer;color:#6d28d9;font-size:0.85rem;">+ Agregar atributo (ej: Talla)</button>' +
-                            '<div id="ltms-np-variations" style="margin-top:12px;">' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
-                            '<div id="ltms-np-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;"><span style="color:#999;font-size:13px;">+ Imagen</span></div>' +
-                            '<input type="file" id="ltms-np-img-input" accept="image/*" style="display:none;">' +
-                            '<input type="hidden" id="ltms-np-img-id" value="">' +
-                        '</div>' +
-                        '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                            '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
-                            '<div id="ltms-np-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
-                            '<button type="button" id="ltms-np-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
-                            '<input type="file" id="ltms-np-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
-                            '<input type="hidden" id="ltms-np-gallery-ids" value="">' +
-                        '</div>' +
-                        '<div style="background:#f0f7ff;border:1px solid #c2d9f5;border-radius:8px;padding:16px;margin-top:16px;">' +
-                            '<label style="font-weight:600;font-size:14px;color:#1a4a8a;display:block;margin-bottom:10px;">🔁 Distribución ReDi</label>' +
-                            '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">' +
-                                '<input type="checkbox" id="ltms-np-redi-enabled" style="width:16px;height:16px;">' +
-                                '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
-                            '</label>' +
-                            '<div id="ltms-np-redi-rate-wrap" style="display:none;">' +
-                                '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
-                                '<input type="number" id="ltms-np-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="1" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" oninput="(function(el){var v=parseFloat(el.value),mn=' + rediMin + ',mx=' + rediMax + ';el.style.borderColor=(isNaN(v)||v<mn||v>mx)?\'#c00\':\'#4CAF50\';})(this)">' +
-                                '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">' +
-                            '<button id="ltms-np-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:100px;">Publicar Producto</button>' +
-                            '<button id="ltms-np-draft" class="ltms-btn" style="flex:1;min-width:100px;background:#f5f5f5;color:#333;">Guardar Borrador</button>' +
-                            '<button id="ltms-np-cancel" class="ltms-btn" style="flex:1;min-width:80px;background:#f5f5f5;color:#333;">Cancelar</button>' +
-                        '</div>' +
-                    '</div>';
-                    jQuery('#ltms-view-products').html(html);
-                    // PROD-01: Mostrar/ocultar campos según tipo de producto
-                    jQuery('#ltms-np-type').on('change', function() {
-                        var tipo = jQuery(this).val();
-                        jQuery('#ltms-np-digital-fields').toggle(tipo === 'digital');
-                        jQuery('#ltms-np-variable-fields').toggle(tipo === 'variable');
-                    });
-                    // PROD-02: Agregar atributo para variaciones
-                    var npAttrCount = 0;
-                    jQuery('#ltms-np-add-attribute').on('click', function() {
-                        npAttrCount++;
-                        var attrId = 'ltms-np-attr-' + npAttrCount;
-                        var html = '<div id="' + attrId + '" style="margin-bottom:10px;padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;">' +
-                            '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
-                            '<input type="text" id="' + attrId + '-name" placeholder="Nombre (ej: Talla)" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
-                            '<button type="button" onclick="jQuery(\'#' + attrId + '\').remove()" style="padding:4px 8px;border:none;background:#fee;color:#c00;border-radius:4px;cursor:pointer;font-size:0.8rem;">✕</button>' +
-                            '</div>' +
-                            '<input type="text" id="' + attrId + '-values" placeholder="Valores separados por | (ej: S|M|L|XL)" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
-                            '</div>';
-                        jQuery('#ltms-np-attributes').append(html);
-                    });
-                    jQuery('#ltms-np-img-preview').on('click', function(){ jQuery('#ltms-np-img-input').trigger('click'); });
-                    var npGalleryIds = [];
-                    jQuery('#ltms-np-add-gallery-btn').on('click', function(){ var gi=document.getElementById('ltms-np-gallery-input'); gi.multiple=true; gi.click(); });
-                    jQuery('#ltms-np-gallery-input').on('change', function() {
-                        var files = this.files;
-                        if (!files.length) return;
-                        Array.from(files).forEach(function(file) {
-                            var fd = new FormData();
-                            fd.append('action','ltms_upload_product_image');
-                            fd.append('nonce', nonce);
-                            fd.append('image', file);
-                            var ajaxUrl2 = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-                            jQuery.ajax({ url: ajaxUrl2, type:'POST', data:fd, processData:false, contentType:false,
-                                success: function(r) {
-                                    if (r.success) {
-                                        npGalleryIds.push(r.data.attachment_id);
-                                        jQuery('#ltms-np-gallery-ids').val(npGalleryIds.join(','));
-                                        var thumb = '<div style="position:relative;width:80px;height:80px;">' +
-                                            '<img src="'+r.data.url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
-                                            '<button type="button" data-id="'+r.data.attachment_id+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-np-rm-gallery">×</button>' +
-                                        '</div>';
-                                        jQuery('#ltms-np-gallery-wrap').append(thumb);
-                                    }
-                                }
-                            });
-                        });
-                        this.value = '';
-                    });
-                    jQuery('#ltms-np-gallery-wrap').on('click', '.ltms-np-rm-gallery', function() {
-                        var rid = parseInt(jQuery(this).data('id'));
-                        npGalleryIds = npGalleryIds.filter(function(i){ return i !== rid; });
-                        jQuery('#ltms-np-gallery-ids').val(npGalleryIds.join(','));
-                        jQuery(this).parent().remove();
-                    });
-
-                    // Upload imagen
-                    jQuery('#ltms-np-img-input').on('change', function() {
-                        const file = this.files[0];
-                        if (!file) return;
-                        const formData = new FormData();
-                        formData.append('action', 'ltms_upload_product_image');
-                        formData.append('nonce', nonce);
-                        formData.append('image', file);
-                        const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-                        jQuery.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
-                            success: function(r) {
-                                if (r.success) {
-                                    jQuery('#ltms-np-img-id').val(r.data.attachment_id);
-                                    jQuery('#ltms-np-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
-                                }
-                            }
-                        });
-                    });
-
-                    // Cancelar
-                    jQuery('#ltms-np-cancel').on('click', function() { self.loadView('products'); });
-
-                    // Submit
-                    function submitProduct(status) {
-                        const name = jQuery('#ltms-np-name').val().trim();
-                        const price = jQuery('#ltms-np-price').val();
-                        if (!name || !price) {
-                            jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
-                            return;
-                        }
-                        // Validar tasa ReDi si está activa
-                        if (jQuery('#ltms-np-redi-enabled').is(':checked')) {
-                            var npRediVal = parseFloat(jQuery('#ltms-np-redi-rate').val());
-                            var npRediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                            var npRediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
-                            var npRediMin = npRediMinRaw < 1 ? Math.round(npRediMinRaw * 100) : npRediMinRaw;
-                            var npRediMax = npRediMaxRaw < 1 ? Math.round(npRediMaxRaw * 100) : npRediMaxRaw;
-                            if (isNaN(npRediVal) || npRediVal < npRediMin || npRediVal > npRediMax) {
-                                jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'})
-                                    .text('⚠️ La tasa ReDi debe estar entre ' + npRediMin + '% y ' + npRediMax + '%.');
-                                jQuery('#ltms-np-redi-rate').focus().css('border-color','#c00');
-                                return;
-                            }
-                            jQuery('#ltms-np-redi-rate').css('border-color','#ccc');
-                        }
-                        jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', true).text('Guardando...');
-                        const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-                        // PROD-02: Recopilar atributos para variaciones
-                        var varAttributes = [];
-                        if (jQuery('#ltms-np-type').val() === 'variable') {
-                            jQuery('#ltms-np-attributes > div').each(function() {
-                                var name = jQuery(this).find('input[id$="-name"]').val();
-                                var values = jQuery(this).find('input[id$="-values"]').val();
-                                if (name && values) {
-                                    varAttributes.push({ name: name, values: values.split('|').map(function(v){return v.trim();}).filter(Boolean) });
-                                }
-                            });
-                        }
-                        jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
-                            action: 'ltms_create_product', nonce: nonce,
-                            name: name, price: price, status: status,
-                            description: jQuery('#ltms-np-desc').val(),
-                            short_description: jQuery('#ltms-np-short-desc').val(),
-                            category_id: jQuery('#ltms-np-cat').val(),
-                            product_type: jQuery('#ltms-np-type').val(),
-                            stock: jQuery('#ltms-np-stock').val(),
-                            sale_price: jQuery('#ltms-np-sale-price').val(),
-                            sku: jQuery('#ltms-np-sku').val(),
-                            tags: jQuery('#ltms-np-tags').val(),
-                            catalog_visibility: jQuery('#ltms-np-visibility').val(),
-                            weight: jQuery('#ltms-np-weight').val(),
-                            dim_length: jQuery('#ltms-np-length').val(),
-                            dim_width: jQuery('#ltms-np-width').val(),
-                            dim_height: jQuery('#ltms-np-height').val(),
-                            download_url: jQuery('#ltms-np-download-url').val(),
-                            download_limit: jQuery('#ltms-np-download-limit').val(),
-                            download_expiry: jQuery('#ltms-np-download-expiry').val(),
-                            variation_attributes: varAttributes.length ? JSON.stringify(varAttributes) : '',
-                            image_id: jQuery('#ltms-np-img-id').val(),
-                            gallery_ids: jQuery('#ltms-np-gallery-ids').val(),
-                            redi_enabled: jQuery('#ltms-np-redi-enabled').is(':checked') ? 1 : 0,
-                            redi_rate: jQuery('#ltms-np-redi-rate').val()
-                        }, success: function(r) {
-                            if (r.success) {
-                                jQuery('#ltms-np-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
-                                setTimeout(function() { self.loadView('products'); }, 1500);
-                            } else {
-                                jQuery('#ltms-np-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
-                                jQuery('#ltms-np-submit, #ltms-np-draft').prop('disabled', false);
-                                jQuery('#ltms-np-submit').text('Publicar Producto');
-                                jQuery('#ltms-np-draft').text('Guardar Borrador');
-                            }
-                        }});
-                    }
-                    jQuery('#ltms-np-redi-enabled').on('change', function() {
-                        jQuery('#ltms-np-redi-rate-wrap').toggle(this.checked);
-                        if (!this.checked) jQuery('#ltms-np-redi-rate').val('');
-                    });
-                    jQuery('#ltms-np-submit').on('click', function() { submitProduct('publish'); });
-                    jQuery('#ltms-np-draft').on('click', function() { submitProduct('draft'); });
-                }
-            });
-        },
-
-        loadEditProductView(productId) {
-            const nonce = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.nonce : '';
-            const ajaxUrl = (typeof ltmsDashboard !== 'undefined') ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php';
-            jQuery('#ltms-view-products').html('<div style="padding:40px;text-align:center;color:#999;">Cargando producto...</div>');
-            // Cargar producto y categorías en paralelo
-            var prodReq = jQuery.ajax({ url: ajaxUrl, type: 'POST', data: { action: 'ltms_get_product', nonce: nonce, product_id: productId } });
-            var catReq  = jQuery.ajax({ url: ajaxUrl, type: 'POST', data: { action: 'ltms_get_categories', nonce: nonce } });
-            jQuery.when(prodReq, catReq).done(function(prodRes, catRes) {
-                var p = prodRes[0].data;
-                var cats = catRes[0].data.categories || [];
-                if (!prodRes[0].success) {
-                    jQuery('#ltms-view-products').html('<div style="padding:20px;color:red;">Error: ' + (prodRes[0].data || 'Producto no encontrado') + '</div>');
-                    return;
-                }
-                var catOptions = '<option value="">-- Sin categoría --</option>';
-                cats.forEach(function(c) {
-                    catOptions += '<option value="' + c.id + '"' + (c.id == p.category_id ? ' selected' : '') + '>' + c.name + '</option>';
-                });
-                var imgHtml = p.image_url
-                    ? '<img src="' + p.image_url + '" style="width:100%;height:100%;object-fit:cover;">'
-                    : '<span style="color:#999;font-size:13px;">+ Imagen</span>';
-                var rediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                var rediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
-                var rediMin = rediMinRaw < 1 ? Math.round(rediMinRaw * 100) : rediMinRaw;
-                var rediMax = rediMaxRaw < 1 ? Math.round(rediMaxRaw * 100) : rediMaxRaw;
-                var html = '<div class="ltms-new-product-form" style="max-width:600px;margin:0 auto;">' +
-                    '<h3 style="margin-bottom:20px;">Editar Producto</h3>' +
-                    '<div id="ltms-ep-msg" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;"></div>' +
-                    '<input type="hidden" id="ltms-ep-product-id" value="' + p.id + '">' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Nombre del producto *</label>' +
-                        '<input type="text" id="ltms-ep-name" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.name || '') + '">' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio (COP) *</label>' +
-                        '<input type="number" id="ltms-ep-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.price || '') + '" min="0">' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Descripción</label>' +
-                        '<textarea id="ltms-ep-desc" rows="4" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + (p.description || '') + '</textarea>' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Categoría</label>' +
-                        '<select id="ltms-ep-cat" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' + catOptions + '</select>' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Tipo *</label>' +
-                        '<select id="ltms-ep-type" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                            '<option value="physical"'  + (['physical','product',''].indexOf(p.product_type||'') >= 0 ? ' selected' : '') + '>📦 Físico</option>' +
-                            '<option value="digital"'  + (p.product_type === 'digital'  ? ' selected' : '') + '>💾 Digital</option>' +
-                            '<option value="service"'  + (p.product_type === 'service'  ? ' selected' : '') + '>🔧 Servicio</option>' +
-                            '<option value="booking"'  + (p.product_type === 'booking'  ? ' selected' : '') + '>🏨 Turismo</option>' +
-                        '</select>' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Stock (vacío = ilimitado)</label>' +
-                        '<input type="number" id="ltms-ep-stock" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.stock !== null ? p.stock : '') + '" min="0">' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Precio de oferta (COP) <small style="font-weight:400;color:#666;">Opcional — debe ser menor al precio regular</small></label>' +
-                        '<input type="number" id="ltms-ep-sale-price" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;" value="' + (p.sale_price || '') + '" placeholder="Dejar vacío si no hay oferta" min="0">' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Visibilidad en catálogo</label>' +
-                        '<select id="ltms-ep-visibility" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;">' +
-                        '<option value="visible"' + (p.catalog_visibility === 'visible' ? ' selected' : '') + '>Visible en catálogo y búsqueda</option>' +
-                        '<option value="catalog"' + (p.catalog_visibility === 'catalog' ? ' selected' : '') + '>Solo en catálogo</option>' +
-                        '<option value="search"' + (p.catalog_visibility === 'search' ? ' selected' : '') + '>Solo en búsqueda</option>' +
-                        '<option value="hidden"' + (p.catalog_visibility === 'hidden' ? ' selected' : '') + '>Oculto (no visible)</option>' +
-                        '</select>' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:8px;">Peso y dimensiones <small style="font-weight:400;color:#666;">(para envíos — dejar vacío si no aplica)</small></label>' +
-                        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Peso (kg)</label><input type="number" id="ltms-ep-weight" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.weight || '') + '" placeholder="0.000" min="0" step="0.001"></div>' +
-                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Largo (cm)</label><input type="number" id="ltms-ep-length" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.length || '') + '" placeholder="0" min="0"></div>' +
-                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Ancho (cm)</label><input type="number" id="ltms-ep-width" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.width || '') + '" placeholder="0" min="0"></div>' +
-                        '<div><label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Alto (cm)</label><input type="number" id="ltms-ep-height" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;" value="' + (p.height || '') + '" placeholder="0" min="0"></div>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Imagen del producto</label>' +
-                        '<div id="ltms-ep-img-preview" style="width:120px;height:120px;border:2px dashed #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;">' + imgHtml + '</div>' +
-                        '<input type="file" id="ltms-ep-img-input" accept="image/*" style="display:none;">' +
-                        '<input type="hidden" id="ltms-ep-img-id" value="' + (p.image_id || '') + '">' +
-                    '</div>' +
-                    '<div class="ltms-form-group" style="margin-bottom:15px;">' +
-                        '<label style="display:block;font-weight:600;margin-bottom:5px;">Imágenes adicionales (galería)</label>' +
-                        '<div id="ltms-ep-gallery-wrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>' +
-                        '<button type="button" id="ltms-ep-add-gallery-btn" style="padding:8px 16px;border:1px dashed #aaa;border-radius:6px;background:#f9f9f9;cursor:pointer;">+ Agregar imagen</button>' +
-                        '<input type="file" id="ltms-ep-gallery-input" accept="image/*" multiple style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px;" >' +
-                        '<input type="hidden" id="ltms-ep-gallery-ids" value="' + (p.gallery_ids ? p.gallery_ids.join(",") : "") + '">' +
-                    '</div>' +
-                    '<div style="background:#f0f7ff;border:1px solid #c2d9f5;border-radius:8px;padding:16px;margin-top:16px;">' +
-                        '<label style="font-weight:600;font-size:14px;color:#1a4a8a;display:block;margin-bottom:10px;">🔁 Distribución ReDi</label>' +
-                        '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">' +
-                            '<input type="checkbox" id="ltms-ep-redi-enabled" ' + (p.redi_enabled ? 'checked' : '') + ' style="width:16px;height:16px;">' +
-                            '<span style="font-size:13px;color:#333;">Habilitar este producto para reventa por otros vendedores</span>' +
-                        '</label>' +
-                        '<div id="ltms-ep-redi-rate-wrap" style="display:' + (p.redi_enabled ? 'block' : 'none') + ';">' +
-                            '<label style="font-size:13px;font-weight:500;color:#555;">Tasa de comisión ReDi — entre ' + rediMin + '% y ' + rediMax + '%</label>' +
-                            '<input type="number" id="ltms-ep-redi-rate" min="' + rediMin + '" max="' + rediMax + '" step="1" value="' + (p.redi_rate || '') + '" placeholder="Ej: ' + Math.round((rediMin + rediMax) / 2) + '" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" oninput="(function(el){var v=parseFloat(el.value),mn=' + rediMin + ',mx=' + rediMax + ';el.style.borderColor=(isNaN(v)||v<mn||v>mx)?\'#c00\':\'#4CAF50\';})(this)">' +
-                            '<p style="font-size:11px;color:#777;margin-top:4px;">Porcentaje del precio que recibirá el revendedor al vender este producto.</p>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;">' +
-                        '<button id="ltms-ep-submit" class="ltms-btn ltms-btn-primary" style="flex:1;min-width:120px;">Guardar Cambios</button>' +
-                        '<button id="ltms-ep-cancel" class="ltms-btn" style="flex:1;min-width:80px;background:#f5f5f5;color:#333;">Cancelar</button>' +
-                    '</div>' +
-                '</div>';
-                jQuery('#ltms-view-products').html(html);
-                // Click en preview abre file input
-                jQuery('#ltms-ep-img-preview').on('click', function(){ jQuery('#ltms-ep-img-input').trigger('click'); });
-                // Cargar galería existente
-                var epGalleryIds = p.gallery_ids ? p.gallery_ids.slice() : [];
-                if (p.gallery_urls && p.gallery_urls.length) {
-                    p.gallery_urls.forEach(function(url, idx) {
-                        var gid = p.gallery_ids[idx];
-                        var thumb = '<div style="position:relative;width:80px;height:80px;">' +
-                            '<img src="'+url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
-                            '<button type="button" data-id="'+gid+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-ep-rm-gallery">×</button>' +
-                        '</div>';
-                        jQuery('#ltms-ep-gallery-wrap').append(thumb);
-                    });
-                }
-                jQuery('#ltms-ep-add-gallery-btn').on('click', function(){ var gi=document.getElementById('ltms-ep-gallery-input'); gi.multiple=true; gi.click(); });
-                jQuery('#ltms-ep-gallery-input').on('change', function() {
-                    var files = this.files;
-                    if (!files.length) return;
-                    Array.from(files).forEach(function(file) {
-                        var fd = new FormData();
-                        fd.append('action','ltms_upload_product_image');
-                        fd.append('nonce', nonce);
-                        fd.append('image', file);
-                        jQuery.ajax({ url: ajaxUrl, type:'POST', data:fd, processData:false, contentType:false,
-                            success: function(r) {
-                                if (r.success) {
-                                    epGalleryIds.push(r.data.attachment_id);
-                                    jQuery('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
-                                    var thumb = '<div style="position:relative;width:80px;height:80px;">' +
-                                        '<img src="'+r.data.url+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">' +
-                                        '<button type="button" data-id="'+r.data.attachment_id+'" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;" class="ltms-ep-rm-gallery">×</button>' +
-                                    '</div>';
-                                    jQuery('#ltms-ep-gallery-wrap').append(thumb);
-                                }
-                            }
-                        });
-                    });
-                    this.value = '';
-                });
-                jQuery('#ltms-ep-gallery-wrap').on('click', '.ltms-ep-rm-gallery', function() {
-                    var rid = parseInt(jQuery(this).data('id'));
-                    epGalleryIds = epGalleryIds.filter(function(i){ return i !== rid; });
-                    jQuery('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
-                    jQuery(this).parent().remove();
-                });
-                // Upload imagen
-                jQuery('#ltms-ep-img-input').on('change', function() {
-                    var file = this.files[0];
-                    if (!file) return;
-                    var formData = new FormData();
-                    formData.append('action', 'ltms_upload_product_image');
-                    formData.append('nonce', nonce);
-                    formData.append('image', file);
-                    jQuery.ajax({ url: ajaxUrl, type: 'POST', data: formData, processData: false, contentType: false,
-                        success: function(r) {
-                            if (r.success) {
-                                jQuery('#ltms-ep-img-id').val(r.data.attachment_id);
-                                jQuery('#ltms-ep-img-preview').html('<img src="' + r.data.url + '" style="width:100%;height:100%;object-fit:cover;">');
-                            }
-                        }
-                    });
-                });
-                // Cancelar
-                jQuery('#ltms-ep-cancel').on('click', function() { LTMS.Dashboard.loadView('products'); });
-                // ReDi toggle
-                jQuery('#ltms-ep-redi-enabled').on('change', function() {
-                    jQuery('#ltms-ep-redi-rate-wrap').toggle(this.checked);
-                    if (!this.checked) jQuery('#ltms-ep-redi-rate').val('');
-                });
-                // Guardar
-                jQuery('#ltms-ep-submit').on('click', function() {
-                    var name = jQuery('#ltms-ep-name').val().trim();
-                    var price = jQuery('#ltms-ep-price').val();
-                    if (!name || !price) {
-                        jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Nombre y precio son requeridos.');
-                        return;
-                    }
-                    // Validar tasa ReDi si está activa
-                    if (jQuery('#ltms-ep-redi-enabled').is(':checked')) {
-                        var epRediVal = parseFloat(jQuery('#ltms-ep-redi-rate').val());
-                        var epRediMinRaw = (ltmsDashboard.redi_min_rate !== undefined ? parseFloat(ltmsDashboard.redi_min_rate) : 5);
-                        var epRediMaxRaw = (ltmsDashboard.redi_max_rate !== undefined ? parseFloat(ltmsDashboard.redi_max_rate) : 40);
-                        var epRediMin = epRediMinRaw < 1 ? Math.round(epRediMinRaw * 100) : epRediMinRaw;
-                        var epRediMax = epRediMaxRaw < 1 ? Math.round(epRediMaxRaw * 100) : epRediMaxRaw;
-                        if (isNaN(epRediVal) || epRediVal < epRediMin || epRediVal > epRediMax) {
-                            jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'})
-                                .text('⚠️ La tasa ReDi debe estar entre ' + epRediMin + '% y ' + epRediMax + '%.');
-                            jQuery('#ltms-ep-redi-rate').focus().css('border-color','#c00');
-                            return;
-                        }
-                        jQuery('#ltms-ep-redi-rate').css('border-color','#ccc');
-                    }
-                    jQuery('#ltms-ep-submit').prop('disabled', true).text('Guardando...');
-                    jQuery.ajax({ url: ajaxUrl, type: 'POST', data: {
-                        action: 'ltms_update_product', nonce: nonce,
-                        product_id: jQuery('#ltms-ep-product-id').val(),
-                        name: name, price: price,
-                        description: jQuery('#ltms-ep-desc').val(),
-                        category_id: jQuery('#ltms-ep-cat').val(),
-                        product_type: jQuery('#ltms-ep-type').val(),
-                        stock: jQuery('#ltms-ep-stock').val(),
-                        sale_price: jQuery('#ltms-ep-sale-price').val(),
-                        catalog_visibility: jQuery('#ltms-ep-visibility').val(),
-                        weight: jQuery('#ltms-ep-weight').val(),
-                        dim_length: jQuery('#ltms-ep-length').val(),
-                        dim_width: jQuery('#ltms-ep-width').val(),
-                        dim_height: jQuery('#ltms-ep-height').val(),
-                        image_id: jQuery('#ltms-ep-img-id').val(),
-                        gallery_ids: jQuery('#ltms-ep-gallery-ids').val(),
-                        redi_enabled: jQuery('#ltms-ep-redi-enabled').is(':checked') ? 1 : 0,
-                        redi_rate: jQuery('#ltms-ep-redi-rate').val()
-                    }, success: function(r) {
-                        if (r.success) {
-                            jQuery('#ltms-ep-msg').show().css({background:'#efe','color':'#060','border':'1px solid #060'}).text('✅ ' + r.data.message);
-                            setTimeout(function() { LTMS.Dashboard.loadView('products'); }, 1500);
-                        } else {
-                            jQuery('#ltms-ep-msg').show().css({background:'#fee','color':'#c00','border':'1px solid #c00'}).text('Error: ' + r.data);
-                            jQuery('#ltms-ep-submit').prop('disabled', false).text('Guardar Cambios');
-                        }
-                    }});
-                });
-            });
-        },
+        // v2.9.99 FIX confirmed: renderProductsView removed — the PHP view (view-products.php)
+        // is the single source of truth for the product list and modals.
+        // AUDIT-PROD-044 FIX: loadNewProductView / loadEditProductView also removed —
+        // their existence caused ltms-products.js:207 to prefer them over the modal PHP,
+        // making the modal PHP (with variable/visibility/booking fields) dead code.
+        // Now ltms-products.js opens ltms-modal-new-product directly (the source of truth).
 
         loadSettingsView(forceRefresh = false) {
             const self = this;
             // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene los 7
             // campos nuevos (vacation_mode, store_logo, schedule, social links), logo
-            // upload, copy-referral, checkbox fix — el JS render era una versión
-            // simplificada que sobreescribía todos esos fixes.
+            // upload, copy-referral, checkbox fix â€” el JS render era una versiÃ³n
+            // simplificada que sobreescribÃ­a todos esos fixes.
             self.showSection('#ltms-view-settings');
         },
         renderSettingsView(data) {
@@ -2067,63 +1495,63 @@
             const store = data.store || {};
             const kycUrl = ltmsDashboard.kyc_url || '/verificacion-identidad/';
             const kycBlock = kyc !== 'approved'
-                ? `<p style="margin:10px 0;color:#666;">Para solicitar retiros, debes completar la verificación de identidad.</p><a href="${kycUrl}" class="ltms-btn ltms-btn-outline">Completar KYC</a>`
-                : '<p style="color:#10b981;">✓ Identidad verificada.</p>';
+                ? `<p style="margin:10px 0;color:#666;">Para solicitar retiros, debes completar la verificaciÃ³n de identidad.</p><a href="${kycUrl}" class="ltms-btn ltms-btn-outline">Completar KYC</a>`
+                : '<p style="color:#10b981;">âœ“ Identidad verificada.</p>';
             $('#ltms-view-settings').html(`
-                <h3 style="margin-bottom:20px;">Configuración de Mi Cuenta</h3>
+                <h3 style="margin-bottom:20px;">ConfiguraciÃ³n de Mi Cuenta</h3>
                 <div class="ltms-card" style="margin-bottom:20px;padding:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <strong>Verificación de Identidad (KYC)</strong>
+                        <strong>VerificaciÃ³n de Identidad (KYC)</strong>
                         <span style="color:${kycColor};font-weight:600;">${kycLabel}</span>
                     </div>${kycBlock}
                 </div>
                 <div class="ltms-card" style="padding:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
                     <h4 style="margin-bottom:15px;">Datos de la Tienda</h4>
                     <div class="ltms-form-group"><label>Nombre de la Tienda</label><input type="text" class="ltms-form-control" name="store_name" value="${this.escapeHtml(store.name||'')}" placeholder="Mi Tienda"></div>
-                    <div class="ltms-form-group"><label>Teléfono de Contacto</label><input type="text" class="ltms-form-control" name="store_phone" value="${this.escapeHtml(store.phone||'')}" placeholder="+57 300 000 0000"></div>
-                    <div class="ltms-form-group"><label>Descripción</label><textarea class="ltms-form-control" name="store_description" rows="3">${this.escapeHtml(store.description||'')}</textarea></div>
+                    <div class="ltms-form-group"><label>TelÃ©fono de Contacto</label><input type="text" class="ltms-form-control" name="store_phone" value="${this.escapeHtml(store.phone||'')}" placeholder="+57 300 000 0000"></div>
+                    <div class="ltms-form-group"><label>DescripciÃ³n</label><textarea class="ltms-form-control" name="store_description" rows="3">${this.escapeHtml(store.description||'')}</textarea></div>
                     <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:12px;">
-                        <p style="font-size:0.78rem;font-weight:600;color:#374151;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px;">🏦 Cuenta Bancaria para Retiros</p>
-                        <p style="font-size:0.75rem;color:#6b7280;margin:0 0 12px;">Esta cuenta se usará automáticamente al solicitar un retiro.</p>
+                        <p style="font-size:0.78rem;font-weight:600;color:#374151;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px;">ðŸ¦ Cuenta Bancaria para Retiros</p>
+                        <p style="font-size:0.75rem;color:#6b7280;margin:0 0 12px;">Esta cuenta se usarÃ¡ automÃ¡ticamente al solicitar un retiro.</p>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
                             <div class="ltms-form-group" style="margin:0;"><label>Banco</label><input type="text" class="ltms-form-control" name="ltms_bank_name" value="${this.escapeHtml(store.bank_name||'')}" placeholder="Ej: Bancolombia"></div>
                             <div class="ltms-form-group" style="margin:0;"><label>Tipo de Cuenta</label><select class="ltms-form-control" name="ltms_bank_account_type"><option value="ahorros" ${(store.bank_account_type||'ahorros')==='ahorros'?'selected':''}>Ahorros</option><option value="corriente" ${(store.bank_account_type||'')==='corriente'?'selected':''}>Corriente</option><option value="nequi" ${(store.bank_account_type||'')==='nequi'?'selected':''}>Nequi</option><option value="daviplata" ${(store.bank_account_type||'')==='daviplata'?'selected':''}>Daviplata</option></select></div>
                         </div>
-                        <div class="ltms-form-group" style="margin-bottom:10px;"><label>Número de Cuenta</label><input type="text" class="ltms-form-control" name="ltms_bank_account_number" value="${this.escapeHtml(store.bank_account_number||'')}" placeholder="Ej: 69812345678"></div>
+                        <div class="ltms-form-group" style="margin-bottom:10px;"><label>NÃºmero de Cuenta</label><input type="text" class="ltms-form-control" name="ltms_bank_account_number" value="${this.escapeHtml(store.bank_account_number||'')}" placeholder="Ej: 69812345678"></div>
                         <div class="ltms-form-group" style="margin:0;"><label>Nombre del Titular</label><input type="text" class="ltms-form-control" name="ltms_bank_account_holder" value="${this.escapeHtml(store.bank_account_holder||'')}" placeholder="Nombre como aparece en el banco"></div>
                     </div>
-                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-settings-btn">💾 Guardar Cambios</button>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-settings-btn">ðŸ’¾ Guardar Cambios</button>
                     <span class="ltms-settings-msg" style="margin-left:10px;display:none;"></span>
                 </div>
                 <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-                    <h4 style="margin-bottom:15px;">Perfil Público de la Tienda</h4>
-                    <div class="ltms-form-group"><label>Nombre Público</label><input type="text" class="ltms-form-control" name="ltms_store_name" value="${this.escapeHtml(store.store_name||store.name||'')}" placeholder="Nombre visible al comprador"></div>
-                    <div class="ltms-form-group"><label>Dirección</label><input type="text" class="ltms-form-control" name="ltms_store_address" value="${this.escapeHtml(store.store_address||'')}" placeholder="Calle, carrera, barrio"></div>
-                    <div class="ltms-form-group"><label>Ciudad</label><input type="text" class="ltms-form-control" name="ltms_store_city" value="${this.escapeHtml(store.store_city||'')}" placeholder="Bogotá, Medellín..."></div>
-                    <div class="ltms-form-group"><label>Teléfono Público</label><input type="text" class="ltms-form-control" name="ltms_store_phone" value="${this.escapeHtml(store.store_phone||store.phone||'')}" placeholder="+57 300 000 0000"></div>
-                    <div class="ltms-form-group"><label>Horario de Atención</label><textarea class="ltms-form-control" name="ltms_store_schedule" rows="2" placeholder="Lun-Vie 8am-6pm">${this.escapeHtml(store.store_schedule||'')}</textarea></div>
-                    <div class="ltms-form-group"><label>Categorías (separadas por coma)</label><input type="text" class="ltms-form-control" name="ltms_store_categories" value="${this.escapeHtml(store.store_categories||'')}" placeholder="Ropa, Calzado, Accesorios"></div>
-                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-profile-btn">💾 Guardar Perfil</button>
+                    <h4 style="margin-bottom:15px;">Perfil PÃºblico de la Tienda</h4>
+                    <div class="ltms-form-group"><label>Nombre PÃºblico</label><input type="text" class="ltms-form-control" name="ltms_store_name" value="${this.escapeHtml(store.store_name||store.name||'')}" placeholder="Nombre visible al comprador"></div>
+                    <div class="ltms-form-group"><label>DirecciÃ³n</label><input type="text" class="ltms-form-control" name="ltms_store_address" value="${this.escapeHtml(store.store_address||'')}" placeholder="Calle, carrera, barrio"></div>
+                    <div class="ltms-form-group"><label>Ciudad</label><input type="text" class="ltms-form-control" name="ltms_store_city" value="${this.escapeHtml(store.store_city||'')}" placeholder="BogotÃ¡, MedellÃ­n..."></div>
+                    <div class="ltms-form-group"><label>TelÃ©fono PÃºblico</label><input type="text" class="ltms-form-control" name="ltms_store_phone" value="${this.escapeHtml(store.store_phone||store.phone||'')}" placeholder="+57 300 000 0000"></div>
+                    <div class="ltms-form-group"><label>Horario de AtenciÃ³n</label><textarea class="ltms-form-control" name="ltms_store_schedule" rows="2" placeholder="Lun-Vie 8am-6pm">${this.escapeHtml(store.store_schedule||'')}</textarea></div>
+                    <div class="ltms-form-group"><label>CategorÃ­as (separadas por coma)</label><input type="text" class="ltms-form-control" name="ltms_store_categories" value="${this.escapeHtml(store.store_categories||'')}" placeholder="Ropa, Calzado, Accesorios"></div>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-profile-btn">ðŸ’¾ Guardar Perfil</button>
                     <span class="ltms-profile-msg" style="margin-left:10px;display:none;"></span>
                 </div>
                 <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-                    <h4 style="margin-bottom:4px;">🖼️ Banner de la Tienda</h4>
+                    <h4 style="margin-bottom:4px;">ðŸ–¼ï¸ Banner de la Tienda</h4>
                     <p style="font-size:.8rem;color:#6b7280;margin:0 0 12px;">
-                        Esta imagen aparece como fondo del encabezado de tu página pública en
+                        Esta imagen aparece como fondo del encabezado de tu pÃ¡gina pÃºblica en
                         <strong>lo-tengo.com.co/vendedor/tu-tienda</strong>.
                     </p>
                     <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;color:#0369a1;line-height:1.6;">
-                        <strong>📐 Tamaño recomendado:</strong> 1440 × 320 píxeles (relación 4.5:1)<br>
-                        <strong>📱 En móvil</strong> se recorta al centro — pon lo importante en el medio.<br>
-                        <strong>⚖️ Peso máximo:</strong> 3 MB · Formatos: JPG, PNG, WebP<br>
-                        <strong>💡 Consejo:</strong> fondos sólidos, degradados o fotos con poco texto funcionan mejor.
+                        <strong>ðŸ“ TamaÃ±o recomendado:</strong> 1440 Ã— 320 pÃ­xeles (relaciÃ³n 4.5:1)<br>
+                        <strong>ðŸ“± En mÃ³vil</strong> se recorta al centro â€” pon lo importante en el medio.<br>
+                        <strong>âš–ï¸ Peso mÃ¡ximo:</strong> 3 MB Â· Formatos: JPG, PNG, WebP<br>
+                        <strong>ðŸ’¡ Consejo:</strong> fondos sÃ³lidos, degradados o fotos con poco texto funcionan mejor.
                     </div>
                     <div id="ltms-banner-current-wrap" style="display:none;margin-bottom:16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <p style="font-size:.78rem;font-weight:600;color:#374151;margin:0;">🖼️ Banner actual</p>
+                            <p style="font-size:.78rem;font-weight:600;color:#374151;margin:0;">ðŸ–¼ï¸ Banner actual</p>
                             <button type="button" class="ltms-delete-banner-btn"
                                     style="display:inline-flex;align-items:center;gap:5px;background:#fff;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;">
-                                🗑️ Eliminar
+                                ðŸ—‘ï¸ Eliminar
                             </button>
                         </div>
                         <img id="ltms-banner-current" src="" alt="Banner actual"
@@ -2136,38 +1564,38 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                         <label style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1.5px solid #d1d5db;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:.85rem;font-weight:500;">
-                            📂 Seleccionar imagen
+                            ðŸ“‚ Seleccionar imagen
                             <input type="file" id="ltms-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                         </label>
-                        <button type="button" class="ltms-btn ltms-btn-primary ltms-upload-banner-btn">🖼️ Subir Banner</button>
+                        <button type="button" class="ltms-btn ltms-btn-primary ltms-upload-banner-btn">ðŸ–¼ï¸ Subir Banner</button>
                         <span class="ltms-banner-msg" style="font-size:.85rem;display:none;"></span>
                     </div>
                     <p id="ltms-banner-filename" style="font-size:.78rem;color:#6b7280;margin:6px 0 0;display:none;"></p>
                 </div>
                 <div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">
                     <h4 style="margin-bottom:15px;">Zona de Despacho</h4>
-                    <div class="ltms-form-group"><label>Ciudades de cobertura (separadas por coma)</label><input type="text" class="ltms-form-control" id="ltms-dz-cities" value="${this.escapeHtml((store.delivery_zone&&store.delivery_zone.cities||[]).join(', '))}" placeholder="Bogotá, Soacha"></div>
-                    <div class="ltms-form-group"><label>Radio máximo (km)</label><input type="number" class="ltms-form-control" id="ltms-dz-radius" min="0" value="${store.delivery_zone&&store.delivery_zone.radius_km||0}"></div>
-                    <div class="ltms-form-group"><label>Envío gratis desde (COP)</label><input type="number" class="ltms-form-control" id="ltms-dz-free" min="0" value="${store.delivery_zone&&store.delivery_zone.free_from||0}"></div>
-                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-zone-btn">💾 Guardar Zona</button>
+                    <div class="ltms-form-group"><label>Ciudades de cobertura (separadas por coma)</label><input type="text" class="ltms-form-control" id="ltms-dz-cities" value="${this.escapeHtml((store.delivery_zone&&store.delivery_zone.cities||[]).join(', '))}" placeholder="BogotÃ¡, Soacha"></div>
+                    <div class="ltms-form-group"><label>Radio mÃ¡ximo (km)</label><input type="number" class="ltms-form-control" id="ltms-dz-radius" min="0" value="${store.delivery_zone&&store.delivery_zone.radius_km||0}"></div>
+                    <div class="ltms-form-group"><label>EnvÃ­o gratis desde (COP)</label><input type="number" class="ltms-form-control" id="ltms-dz-free" min="0" value="${store.delivery_zone&&store.delivery_zone.free_from||0}"></div>
+                    <button type="button" class="ltms-btn ltms-btn-primary ltms-save-zone-btn">ðŸ’¾ Guardar Zona</button>
                     <span class="ltms-zone-msg" style="margin-left:10px;display:none;"></span>
                 </div>`);
             // Analytics card (appended separately to avoid nested backtick issues)
             if (data.store.vendor_ga4_enabled || data.store.vendor_pixel_enabled) {
                 let analyticsHtml = '<div class="ltms-card" style="padding:20px;margin-top:20px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08);">';
-                analyticsHtml += '<h4 style="margin-bottom:8px;">📊 Analytics & Tracking de Mi Tienda</h4>';
-                analyticsHtml += '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el tráfico hacia tus productos. Solo se activan en las páginas de tus productos.</p>';
+                analyticsHtml += '<h4 style="margin-bottom:8px;">ðŸ“Š Analytics & Tracking de Mi Tienda</h4>';
+                analyticsHtml += '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:16px;">Configura tu propio pixel para medir el trÃ¡fico hacia tus productos. Solo se activan en las pÃ¡ginas de tus productos.</p>';
                 if (data.store.vendor_ga4_enabled) {
-                    analyticsHtml += '<div class="ltms-form-group"><label>Google Analytics 4 — Measurement ID</label>';
+                    analyticsHtml += '<div class="ltms-form-group"><label>Google Analytics 4 â€” Measurement ID</label>';
                     analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-ga4" value="' + this.escapeHtml(data.store.vendor_ga4_id||'') + '" placeholder="G-XXXXXXXXXX">';
-                    analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Google Analytics → Admin → Flujos de datos.</small></div>';
+                    analyticsHtml += '<small style="color:#9ca3af;">EncuÃ©ntralo en Google Analytics â†’ Admin â†’ Flujos de datos.</small></div>';
                 }
                 if (data.store.vendor_pixel_enabled) {
                     analyticsHtml += '<div class="ltms-form-group"><label>Meta Pixel ID (Facebook / Instagram)</label>';
                     analyticsHtml += '<input type="text" class="ltms-form-control" id="ltms-vendor-pixel" value="' + this.escapeHtml(data.store.vendor_pixel_id||'') + '" placeholder="123456789012345">';
-                    analyticsHtml += '<small style="color:#9ca3af;">Encuéntralo en Meta Business Suite → Fuentes de datos → Píxeles.</small></div>';
+                    analyticsHtml += '<small style="color:#9ca3af;">EncuÃ©ntralo en Meta Business Suite â†’ Fuentes de datos â†’ PÃ­xeles.</small></div>';
                 }
-                analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">💾 Guardar Analytics</button>';
+                analyticsHtml += '<button type="button" class="ltms-btn ltms-btn-primary ltms-save-analytics-btn">ðŸ’¾ Guardar Analytics</button>';
                 analyticsHtml += '<span class="ltms-analytics-msg" style="margin-left:10px;display:none;"></span></div>';
                 document.getElementById('ltms-view-settings') && (document.getElementById('ltms-view-settings').insertAdjacentHTML('beforeend', analyticsHtml));
             }
@@ -2179,7 +1607,7 @@
                 $('#ltms-banner-current-wrap').show();
             }
 
-            // Handler: guardar configuración básica (products-ajax)
+            // Handler: guardar configuraciÃ³n bÃ¡sica (products-ajax)
             $(document).off('click','.ltms-save-settings-btn').on('click','.ltms-save-settings-btn', function() {
                 const btn=$(this); btn.prop('disabled',true).text('Guardando...');
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
@@ -2195,15 +1623,15 @@
                             ltms_bank_account_holder:$('[name="ltms_bank_account_holder"]').val()||'',
                         }
                     },
-                    success(r) { btn.prop('disabled',false).text('💾 Guardar Cambios');
+                    success(r) { btn.prop('disabled',false).text('ðŸ’¾ Guardar Cambios');
                         const m=$('.ltms-settings-msg');
-                        m.text(r.success?'✓ Guardado':'Error al guardar').css('color',r.success?'#10b981':'#ef4444').show();
+                        m.text(r.success?'âœ“ Guardado':'Error al guardar').css('color',r.success?'#10b981':'#ef4444').show();
                         setTimeout(()=>m.hide(),3000); },
-                    error(){ btn.prop('disabled',false).text('💾 Guardar Cambios'); }
+                    error(){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Cambios'); }
                 });
             });
 
-            // Handler: guardar perfil público (ltms_save_vendor_profile — Vendor_Settings_Saver)
+            // Handler: guardar perfil pÃºblico (ltms_save_vendor_profile â€” Vendor_Settings_Saver)
             $(document).off('click','.ltms-save-profile-btn').on('click','.ltms-save-profile-btn', function() {
                 const btn=$(this); btn.prop('disabled',true).text('Guardando...');
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
@@ -2217,12 +1645,12 @@
                         ltms_store_schedule:$('[name="ltms_store_schedule"]').val(),
                         ltms_store_categories:$('[name="ltms_store_categories"]').val(),
                     },
-                    success(r){ btn.prop('disabled',false).text('💾 Guardar Perfil');
+                    success(r){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Perfil');
                         const m=$('.ltms-profile-msg');
-                        m.text(r.success?'✓ Perfil guardado':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        m.text(r.success?'âœ“ Perfil guardado':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
                         setTimeout(()=>m.hide(),3000);
                     },
-                    error(){ btn.prop('disabled',false).text('💾 Guardar Perfil'); }
+                    error(){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Perfil'); }
                 });
             });
 
@@ -2233,14 +1661,14 @@
                 const maxMB = 3;
                 if (file.size > maxMB * 1024 * 1024) {
                     const m = $('.ltms-banner-msg');
-                    m.text('La imagen pesa ' + (file.size/1024/1024).toFixed(1) + ' MB. El máximo es ' + maxMB + ' MB.').css('color','#ef4444').show();
+                    m.text('La imagen pesa ' + (file.size/1024/1024).toFixed(1) + ' MB. El mÃ¡ximo es ' + maxMB + ' MB.').css('color','#ef4444').show();
                     this.value = '';
                     $('#ltms-banner-preview-wrap').hide();
                     $('#ltms-banner-filename').hide();
                     return;
                 }
                 $('.ltms-banner-msg').hide();
-                $('#ltms-banner-filename').text('📄 ' + file.name + ' — ' + (file.size/1024).toFixed(0) + ' KB').show();
+                $('#ltms-banner-filename').text('ðŸ“„ ' + file.name + ' â€” ' + (file.size/1024).toFixed(0) + ' KB').show();
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     $('#ltms-banner-preview').attr('src', e.target.result);
@@ -2249,7 +1677,7 @@
                 reader.readAsDataURL(file);
             });
 
-            // Handler: subir banner (ltms_upload_store_banner — Vendor_Settings_Saver)
+            // Handler: subir banner (ltms_upload_store_banner â€” Vendor_Settings_Saver)
             $(document).off('click','.ltms-upload-banner-btn').on('click','.ltms-upload-banner-btn', function() {
                 const file = $('#ltms-banner-file')[0].files[0];
                 const m = $('.ltms-banner-msg');
@@ -2261,8 +1689,8 @@
                 fd.append('banner',file);
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST', data:fd,
                     processData:false, contentType:false,
-                    success(r){ btn.prop('disabled',false).text('🖼️ Subir Banner');
-                        m.text(r.success?'✅ Banner actualizado correctamente':'❌ Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                    success(r){ btn.prop('disabled',false).text('ðŸ–¼ï¸ Subir Banner');
+                        m.text(r.success?'âœ… Banner actualizado correctamente':'âŒ Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
                         if (r.success && r.data && r.data.url) {
                             $('#ltms-banner-current').attr('src', r.data.url);
                             $('#ltms-banner-current-wrap').show();
@@ -2272,15 +1700,15 @@
                         }
                         setTimeout(()=>m.hide(),5000);
                     },
-                    error(){ btn.prop('disabled',false).text('🖼️ Subir Banner');
-                        m.text('❌ Error de red, intente de nuevo.').css('color','#ef4444').show();
+                    error(){ btn.prop('disabled',false).text('ðŸ–¼ï¸ Subir Banner');
+                        m.text('âŒ Error de red, intente de nuevo.').css('color','#ef4444').show();
                     }
                 });
             });
 
-            // Handler: eliminar banner (ltms_delete_store_banner — Vendor_Settings_Saver)
+            // Handler: eliminar banner (ltms_delete_store_banner â€” Vendor_Settings_Saver)
             $(document).off('click','.ltms-delete-banner-btn').on('click','.ltms-delete-banner-btn', function() {
-                if (!confirm('¿Eliminar el banner actual? Esta acción no se puede deshacer.')) return;
+                if (!confirm('Â¿Eliminar el banner actual? Esta acciÃ³n no se puede deshacer.')) return;
                 const btn=$(this); btn.prop('disabled',true).text('Eliminando...');
                 const m=$('.ltms-banner-msg');
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
@@ -2289,32 +1717,32 @@
                         if (r.success) {
                             $('#ltms-banner-current-wrap').hide();
                             $('#ltms-banner-current').attr('src','');
-                            m.text('✅ Banner eliminado correctamente').css('color','#10b981').show();
+                            m.text('âœ… Banner eliminado correctamente').css('color','#10b981').show();
                         } else {
-                            btn.text('🗑️ Eliminar banner');
-                            m.text('❌ Error: '+(r.data||'intente de nuevo')).css('color','#ef4444').show();
+                            btn.text('ðŸ—‘ï¸ Eliminar banner');
+                            m.text('âŒ Error: '+(r.data||'intente de nuevo')).css('color','#ef4444').show();
                         }
                         setTimeout(()=>m.hide(),5000);
                     },
-                    error(){ btn.prop('disabled',false).text('🗑️ Eliminar banner');
-                        m.text('❌ Error de red.').css('color','#ef4444').show();
+                    error(){ btn.prop('disabled',false).text('ðŸ—‘ï¸ Eliminar banner');
+                        m.text('âŒ Error de red.').css('color','#ef4444').show();
                     }
                 });
             });
 
-            // Handler: guardar zona de despacho (ltms_save_delivery_zone — Vendor_Settings_Saver)
+            // Handler: guardar zona de despacho (ltms_save_delivery_zone â€” Vendor_Settings_Saver)
             $(document).off('click','.ltms-save-zone-btn').on('click','.ltms-save-zone-btn', function() {
                 const btn=$(this); btn.prop('disabled',true).text('Guardando...');
                 const cities=$('#ltms-dz-cities').val().split(',').map(s=>s.trim()).filter(Boolean);
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
                     data:{ action:'ltms_save_delivery_zone', nonce:ltmsDashboard.nonce,
                         cities:cities, radius_km:$('#ltms-dz-radius').val(), free_from:$('#ltms-dz-free').val() },
-                    success(r){ btn.prop('disabled',false).text('💾 Guardar Zona');
+                    success(r){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Zona');
                         const m=$('.ltms-zone-msg');
-                        m.text(r.success?'✓ Zona guardada':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
+                        m.text(r.success?'âœ“ Zona guardada':'Error: '+(r.data||'intente de nuevo')).css('color',r.success?'#10b981':'#ef4444').show();
                         setTimeout(()=>m.hide(),3000);
                     },
-                    error(){ btn.prop('disabled',false).text('💾 Guardar Zona'); }
+                    error(){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Zona'); }
                 });
             });
 
@@ -2326,26 +1754,26 @@
                 if ($('#ltms-vendor-pixel').length) settings['ltms_vendor_pixel_id'] = $('#ltms-vendor-pixel').val();
                 $.ajax({ url:ltmsDashboard.ajax_url, method:'POST',
                     data:{ action:'ltms_save_vendor_settings', nonce:ltmsDashboard.nonce, settings:settings },
-                    success(r){ btn.prop('disabled',false).text('💾 Guardar Analytics');
+                    success(r){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Analytics');
                         const m=$('.ltms-analytics-msg');
-                        m.text(r.success?'✅ Guardado':'❌ Error').css('color',r.success?'#10b981':'#ef4444').show();
+                        m.text(r.success?'âœ… Guardado':'âŒ Error').css('color',r.success?'#10b981':'#ef4444').show();
                         setTimeout(()=>m.hide(),3000);
                     },
-                    error(){ btn.prop('disabled',false).text('💾 Guardar Analytics'); }
+                    error(){ btn.prop('disabled',false).text('ðŸ’¾ Guardar Analytics'); }
                 });
             });
         },
         /**
-         * Carga una vista genérica como fallback.
+         * Carga una vista genÃ©rica como fallback.
          *
          * @param {string} view Nombre de la vista.
          */
-        // ── Vista: Seguros ────────────────────────────────────────
+        // â”€â”€ Vista: Seguros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         loadInsuranceView(forceRefresh = false) {
             const self = this;
             // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene KPIs,
-            // coverage info card, filtros, CSV export, empty state SVG — el JS render
-            // era una versión simplificada que perdía todas esas features.
+            // coverage info card, filtros, CSV export, empty state SVG â€” el JS render
+            // era una versiÃ³n simplificada que perdÃ­a todas esas features.
             self.showSection('#ltms-view-insurance');
         },
 
@@ -2353,7 +1781,7 @@
             const policies = data.policies || [];
             let rows = '';
             if (policies.length === 0) {
-                rows = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">Sin pólizas registradas.</td></tr>';
+                rows = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#888;">Sin pÃ³lizas registradas.</td></tr>';
             } else {
                 policies.forEach(p => {
                     const statusColor = p.status === 'active' ? '#10b981' : p.status === 'claimed' ? '#f59e0b' : '#6b7280';
@@ -2363,17 +1791,17 @@
                         <td>${this.escapeHtml(p.policy_number || p.policy_id || '')}</td>
                         <td>${this.formatMoney(parseFloat(p.premium_amount || 0))}</td>
                         <td><span style="color:${statusColor};font-weight:600;">${p.status}</span></td>
-                        <td>${p.certificate_url ? `<a href="${this.escapeHtml(p.certificate_url)}" target="_blank">📄 Ver</a>` : '—'}</td>
+                        <td>${p.certificate_url ? `<a href="${this.escapeHtml(p.certificate_url)}" target="_blank">ðŸ“„ Ver</a>` : 'â€”'}</td>
                     </tr>`;
                 });
             }
             this.showSection('#ltms-view-insurance');
             $('#ltms-view-insurance').html(`
-                <div class="ltms-section-header"><h2>🛡️ Mis Seguros</h2></div>
+                <div class="ltms-section-header"><h2>ðŸ›¡ï¸ Mis Seguros</h2></div>
                 <div class="ltms-card" style="overflow-x:auto;">
                     <table class="ltms-table" style="width:100%;border-collapse:collapse;">
                         <thead><tr>
-                            <th>Pedido</th><th>Tipo</th><th>Póliza</th>
+                            <th>Pedido</th><th>Tipo</th><th>PÃ³liza</th>
                             <th>Prima</th><th>Estado</th><th>Certificado</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
@@ -2381,12 +1809,12 @@
                 </div>`);
         },
 
-        // ── Vista: ReDi ───────────────────────────────────────────
+        // â”€â”€ Vista: ReDi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         loadRediView(forceRefresh = false) {
             const self = this;
             // v2.9.99 FIX: mostrar la vista PHP directamente. La vista PHP tiene
-            // wc_price correcto, redi_rate ×100, toggleRediRow DOM swap — el JS render
-            // era una versión simplificada que sobreescribía todos esos fixes.
+            // wc_price correcto, redi_rate Ã—100, toggleRediRow DOM swap â€” el JS render
+            // era una versiÃ³n simplificada que sobreescribÃ­a todos esos fixes.
             self.showSection('#ltms-view-redi');
         },
 
@@ -2419,12 +1847,12 @@
 
             this.showSection('#ltms-view-redi');
             $('#ltms-view-redi').html(`
-                <div class="ltms-section-header"><h2>🔁 ReDi — Productos en Reventa</h2></div>
+                <div class="ltms-section-header"><h2>ðŸ” ReDi â€” Productos en Reventa</h2></div>
                 <div class="ltms-card" style="margin-bottom:20px;">
                     <h4 style="margin-bottom:12px;">Mis Acuerdos Activos</h4>
                     <div style="overflow-x:auto;">
                         <table class="ltms-table" style="width:100%;border-collapse:collapse;">
-                            <thead><tr><th>Producto</th><th>Comisión</th><th>Estado</th><th>Acción</th></tr></thead>
+                            <thead><tr><th>Producto</th><th>ComisiÃ³n</th><th>Estado</th><th>AcciÃ³n</th></tr></thead>
                             <tbody>${agreementRows}</tbody>
                         </table>
                     </div>
@@ -2433,7 +1861,7 @@
                     <h4 style="margin-bottom:12px;">Productos Disponibles para Adoptar</h4>
                     <div style="overflow-x:auto;">
                         <table class="ltms-table" style="width:100%;border-collapse:collapse;">
-                            <thead><tr><th>Producto</th><th>Comisión</th><th>Acción</th></tr></thead>
+                            <thead><tr><th>Producto</th><th>ComisiÃ³n</th><th>AcciÃ³n</th></tr></thead>
                             <tbody>${availableRows}</tbody>
                         </table>
                     </div>
@@ -2457,7 +1885,7 @@
 
             // Handler: Revocar acuerdo ReDi
             $(document).off('click', '.ltms-revoke-redi').on('click', '.ltms-revoke-redi', function () {
-                if (!confirm('¿Confirmar revocación del acuerdo?')) return;
+                if (!confirm('Â¿Confirmar revocaciÃ³n del acuerdo?')) return;
                 const btn = $(this); const agreementId = btn.data('id');
                 btn.prop('disabled', true).text('Revocando...');
                 $.ajax({
@@ -2473,7 +1901,7 @@
             });
         },
 
-        // ── Vista: Descargas Seguras ──────────────────────────────
+        // â”€â”€ Vista: Descargas Seguras â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         loadDownloadsView(forceRefresh = false) {
             const self = this;
             if (!forceRefresh && this.dataCache['downloads']) {
@@ -2481,7 +1909,7 @@
                 return;
             }
             // La vista de descargas la renderiza PHP directamente; solo mostramos
-            // la sección estática y un botón para generar token de descarga si hay productos digitales.
+            // la secciÃ³n estÃ¡tica y un botÃ³n para generar token de descarga si hay productos digitales.
             $.ajax({
                 url: ltmsDashboard.ajax_url, method: 'POST',
                 data: { action: 'ltms_get_dashboard_data', section: 'downloads', nonce: ltmsDashboard.nonce },
@@ -2498,7 +1926,7 @@
             const downloads = data.downloads || [];
             let rows = '';
             if (downloads.length === 0) {
-                rows = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">Sin productos digitales vendidos aún.</td></tr>';
+                rows = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">Sin productos digitales vendidos aÃºn.</td></tr>';
             } else {
                 downloads.forEach(d => {
                     rows += `<tr>
@@ -2509,14 +1937,14 @@
                         <td>
                             <button class="ltms-btn ltms-btn-sm ltms-btn-outline ltms-gen-token"
                                 data-product="${d.product_id}" data-order="${d.order_id}"
-                                style="font-size:12px;">🔑 Generar Token</button>
+                                style="font-size:12px;">ðŸ”‘ Generar Token</button>
                         </td>
                     </tr>`;
                 });
             }
             this.showSection('#ltms-view-downloads');
             $('#ltms-view-downloads').html(`
-                <div class="ltms-section-header"><h2>📦 Descargas Seguras</h2></div>
+                <div class="ltms-section-header"><h2>ðŸ“¦ Descargas Seguras</h2></div>
                 <div class="ltms-card" style="overflow-x:auto;">
                     <table class="ltms-table" style="width:100%;border-collapse:collapse;">
                         <thead><tr>
@@ -2540,16 +1968,16 @@
                         order_id: btn.data('order'),
                     },
                     success(r) {
-                        btn.prop('disabled', false).text('🔑 Generar Token');
+                        btn.prop('disabled', false).text('ðŸ”‘ Generar Token');
                         if (r.success && r.data.token_url) {
                             $('#ltms-token-result')
-                                .html(`✅ Token generado: <a href="${r.data.token_url}" target="_blank">${r.data.token_url}</a>`)
+                                .html(`âœ… Token generado: <a href="${r.data.token_url}" target="_blank">${r.data.token_url}</a>`)
                                 .show();
                         } else {
                             alert(r.data || 'Error al generar token.');
                         }
                     },
-                    error() { btn.prop('disabled', false).text('🔑 Generar Token'); }
+                    error() { btn.prop('disabled', false).text('ðŸ”‘ Generar Token'); }
                 });
             });
         },
@@ -2558,13 +1986,13 @@
             this.showSection('#ltms-view-' + view);
         },
 
-        // ── Formatters ────────────────────────────────────────────
+        // â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /**
-         * Formatea un número como moneda local.
+         * Formatea un nÃºmero como moneda local.
          *
          * @param {number}  amount    Monto.
-         * @param {boolean} compact   Si usar notación compacta.
+         * @param {boolean} compact   Si usar notaciÃ³n compacta.
          * @returns {string}
          */
         formatMoney(amount, compact = false) {
@@ -2581,7 +2009,7 @@
 
         // v2.9.95 P3: Localized date formatter
         formatDate(dateStr, includeTime = false) {
-            if (!dateStr) return '—';
+            if (!dateStr) return 'â€”';
             try {
                 var d = new Date(dateStr);
                 var locale = ltmsDashboard.country === 'MX' ? 'es-MX' : 'es-CO';
@@ -2593,7 +2021,7 @@
 
         // v2.9.95 P3: Relative time formatter
         formatRelative(dateStr) {
-            if (!dateStr) return '—';
+            if (!dateStr) return 'â€”';
             try {
                 var d = new Date(dateStr);
                 var now = new Date();
@@ -2601,7 +2029,7 @@
                 if (diff < 60) return 'Hace un momento';
                 if (diff < 3600) return 'Hace ' + Math.floor(diff / 60) + ' min';
                 if (diff < 86400) return 'Hace ' + Math.floor(diff / 3600) + ' h';
-                if (diff < 604800) return 'Hace ' + Math.floor(diff / 86400) + ' días';
+                if (diff < 604800) return 'Hace ' + Math.floor(diff / 86400) + ' dÃ­as';
                 return this.formatDate(dateStr);
             } catch(e) { return dateStr; }
         },
@@ -2614,7 +2042,7 @@
          */
         /**
          * Obtiene la clase CSS para el estado de un pedido.
-         * P-01: incluye ready-for-pickup con su propio badge y etiquetas en español.
+         * P-01: incluye ready-for-pickup con su propio badge y etiquetas en espaÃ±ol.
          *
          * @param {string} status Estado WC del pedido.
          * @returns {string}
@@ -2632,7 +2060,7 @@
         },
 
         /**
-         * Devuelve la etiqueta legible en español para un estado de pedido.
+         * Devuelve la etiqueta legible en espaÃ±ol para un estado de pedido.
          * P-01: evita mostrar el slug crudo (ej. "ready-for-pickup") en la tabla.
          *
          * @param {string} status Estado WC.
@@ -2642,7 +2070,7 @@
             const map = {
                 pending:            'Pendiente',
                 processing:         'Procesando',
-                'ready-for-pickup': '📦 Listo para Recoger',
+                'ready-for-pickup': 'ðŸ“¦ Listo para Recoger',
                 completed:          'Completado',
                 cancelled:          'Cancelado',
                 refunded:           'Reembolsado',
@@ -2652,9 +2080,9 @@
         },
 
         /**
-         * Obtiene la clase CSS para el tipo de transacción.
+         * Obtiene la clase CSS para el tipo de transacciÃ³n.
          *
-         * @param {string} type Tipo de transacción.
+         * @param {string} type Tipo de transacciÃ³n.
          * @returns {string}
          */
         getTxTypeBadge(type) {
@@ -2680,20 +2108,20 @@
             return div.innerHTML;
         },
 
-        // ── v2.9.82 P2: Dark Mode Toggle ──────────────────────────────
+        // â”€â”€ v2.9.82 P2: Dark Mode Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         initDarkMode() {
             if (localStorage.getItem('ltms-dark-mode') === 'yes') {
                 document.body.classList.add('ltms-dark-mode');
-                $('#ltms-dark-mode-toggle').text('☀️');
+                $('#ltms-dark-mode-toggle').text('â˜€ï¸');
             }
             $(document).on('click', '#ltms-dark-mode-toggle', function() {
                 var isDark = document.body.classList.toggle('ltms-dark-mode');
                 localStorage.setItem('ltms-dark-mode', isDark ? 'yes' : 'no');
-                $(this).text(isDark ? '☀️' : '🌙');
+                $(this).text(isDark ? 'â˜€ï¸' : 'ðŸŒ™');
             });
         },
 
-        // ── v2.9.82 P2: CSV Export para Wallet ────────────────────────
+        // â”€â”€ v2.9.82 P2: CSV Export para Wallet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         initCsvExport() {
             $(document).on('click', '#ltms-wallet-export-csv', function() {
                 $.ajax({
@@ -2731,16 +2159,16 @@
             });
         },
 
-        // ── v2.9.82 P2: Breadcrumbs dinámicos ─────────────────────────
+        // â”€â”€ v2.9.82 P2: Breadcrumbs dinÃ¡micos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         initBreadcrumbs() {
             const self = this;
             const labels = {
                 home: 'Inicio', orders: 'Pedidos', products: 'Productos',
-                wallet: 'Billetera', settings: 'Configuración', envios: 'Envíos',
+                wallet: 'Billetera', settings: 'ConfiguraciÃ³n', envios: 'EnvÃ­os',
                 'shipping-statement': 'Fletes', redi: 'ReDi', incidents: 'Novedades',
                 bookings: 'Reservas', marketing: 'Marketing', security: 'Seguridad',
                 donations: 'Donaciones', posgold: 'PosGold', kitchen: 'Cocina',
-                'ordenes-compra': 'Órdenes de Compra', analytics: 'Analytics'
+                'ordenes-compra': 'Ã“rdenes de Compra', analytics: 'Analytics'
             };
             const origLoadView = this.loadView.bind(this);
             this.loadView = function(view, forceRefresh) {
@@ -2757,7 +2185,7 @@
             };
         },
 
-        // ── v2.9.84 P1: Global Search en topbar ───────────────────────
+        // â”€â”€ v2.9.84 P1: Global Search en topbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         initGlobalSearch() {
             let searchTimer = null;
             $(document).on('input', '#ltms-topbar-search-input', function() {
@@ -2783,7 +2211,7 @@
             });
         },
 
-        // ── v2.9.91 P3: Keyboard Shortcuts ────────────────────────────
+        // â”€â”€ v2.9.91 P3: Keyboard Shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         initKeyboardShortcuts() {
             const self = this;
             const shortcuts = {
@@ -2796,7 +2224,7 @@
             let keyTimer = null;
 
             $(document).on('keydown', function(e) {
-                // Ignorar si está escribiendo en un input/textarea
+                // Ignorar si estÃ¡ escribiendo en un input/textarea
                 if ($(e.target).is('input, textarea, select, [contenteditable]')) return;
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -2850,7 +2278,7 @@
         },
     };
 
-    // ── Inicializar cuando el DOM esté listo ─────────────────────
+    // â”€â”€ Inicializar cuando el DOM estÃ© listo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     $(document).ready(function () {
         if (typeof ltmsDashboard !== 'undefined' && $('#ltms-dashboard-container').length) {
             LTMS.Dashboard.init();

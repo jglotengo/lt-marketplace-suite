@@ -208,6 +208,11 @@ $products  = wc_get_products([
                     <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-restaurant" value="restaurant" style="accent-color:#1a5276;">
                     <span style="font-size:0.8rem;">🍽️ <?php esc_html_e( 'Restaurante', 'ltms' ); ?></span>
                 </label>
+                <?php // AUDIT-PROD-044: añadido el 6º tipo 'variable' — paridad con loadNewProductView (eliminado). ?>
+                <label style="display:flex;align-items:center;gap:6px;padding:10px 10px;border:1.5px solid #d1d5db;border-radius:8px;cursor:pointer;background:#f9fafb;" id="ltms-np-tipo-variable-lbl">
+                    <input type="radio" name="ltms_np_tipo" id="ltms-np-tipo-variable" value="variable" style="accent-color:#1a5276;">
+                    <span style="font-size:0.8rem;">🎨 <?php esc_html_e( 'Variaciones', 'ltms' ); ?></span>
+                </label>
             </div>
         </div>
 
@@ -321,6 +326,14 @@ $products  = wc_get_products([
             </div>
         </div>
 
+        <!-- AUDIT-PROD-044: Campos de variaciones (solo para variable) — paridad con loadNewProductView (eliminado) -->
+        <div id="ltms-np-variable-fields" style="display:none;margin-bottom:14px;padding:14px;background:#faf5ff;border:1.5px solid #ddd6fe;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:8px;">🎨 <?php esc_html_e( 'Variaciones del producto', 'ltms' ); ?></label>
+            <p style="font-size:0.78rem;color:#6b7280;margin-bottom:10px;"><?php esc_html_e( 'Define atributos (tallas, colores, etc.) y el precio de cada variación.', 'ltms' ); ?></p>
+            <div id="ltms-np-attributes" style="margin-bottom:12px;"></div>
+            <button type="button" id="ltms-np-add-attribute" style="padding:8px 14px;border:1.5px dashed #8b5cf6;border-radius:6px;background:#f5f3ff;cursor:pointer;color:#6d28d9;font-size:0.8rem;">+ <?php esc_html_e( 'Agregar atributo (ej: Talla)', 'ltms' ); ?></button>
+        </div>
+
         <!-- PROD-08: Tags -->
         <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Etiquetas', 'ltms' ); ?></label>
@@ -343,12 +356,23 @@ $products  = wc_get_products([
         </div>
 
         <!-- Estado -->
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Estado al Publicar', 'ltms' ); ?></label>
             <select id="ltms-np-status" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                 <option value="pending"><?php esc_html_e( 'Pendiente de revisión', 'ltms' ); ?></option>
                 <option value="draft"><?php esc_html_e( 'Borrador', 'ltms' ); ?></option>
                 <option value="publish"><?php esc_html_e( 'Publicado directamente', 'ltms' ); ?></option>
+            </select>
+        </div>
+
+        <?php // AUDIT-PROD-044: visibilidad en catálogo — paridad con loadNewProductView (eliminado). ?>
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Visibilidad en catálogo', 'ltms' ); ?></label>
+            <select id="ltms-np-visibility" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+                <option value="visible"><?php esc_html_e( 'Visible en catálogo y búsqueda', 'ltms' ); ?></option>
+                <option value="catalog"><?php esc_html_e( 'Solo en catálogo', 'ltms' ); ?></option>
+                <option value="search"><?php esc_html_e( 'Solo en búsqueda', 'ltms' ); ?></option>
+                <option value="hidden"><?php esc_html_e( 'Oculto (no visible)', 'ltms' ); ?></option>
             </select>
         </div>
 
@@ -499,13 +523,85 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
         </div>
 
         <!-- Estado -->
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:14px;">
             <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Estado', 'ltms' ); ?></label>
             <select id="ltms-ep-status" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                 <option value="pending"><?php esc_html_e( 'Pendiente de revisión', 'ltms' ); ?></option>
                 <option value="draft"><?php esc_html_e( 'Borrador', 'ltms' ); ?></option>
                 <option value="publish"><?php esc_html_e( 'Publicado', 'ltms' ); ?></option>
             </select>
+        </div>
+
+        <?php // AUDIT-PROD-044: visibilidad en catálogo en modal Edit — paridad con get_product (catalog_visibility ya retorna). ?>
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Visibilidad en catálogo', 'ltms' ); ?></label>
+            <select id="ltms-ep-visibility" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+                <option value="visible"><?php esc_html_e( 'Visible en catálogo y búsqueda', 'ltms' ); ?></option>
+                <option value="catalog"><?php esc_html_e( 'Solo en catálogo', 'ltms' ); ?></option>
+                <option value="search"><?php esc_html_e( 'Solo en búsqueda', 'ltms' ); ?></option>
+                <option value="hidden"><?php esc_html_e( 'Oculto (no visible)', 'ltms' ); ?></option>
+            </select>
+        </div>
+
+        <!-- AUDIT-PROD-044: Campos de booking en modal Edit (paridad con modal New + create_product) -->
+        <div id="ltms-ep-booking-fields" style="display:none;margin-bottom:14px;padding:14px;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:8px;">🏨 <?php esc_html_e( 'Configuración de Reserva (Turismo)', 'ltms' ); ?></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Tipo de reserva', 'ltms' ); ?></label>
+                    <select id="ltms-ep-booking-type" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                        <option value="accommodation"><?php esc_html_e( 'Hospedaje (noches)', 'ltms' ); ?></option>
+                        <option value="experience"><?php esc_html_e( 'Experiencia (horas)', 'ltms' ); ?></option>
+                        <option value="rental"><?php esc_html_e( 'Alquiler', 'ltms' ); ?></option>
+                        <option value="professional_service"><?php esc_html_e( 'Servicio profesional', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Capacidad (personas)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-booking-capacity" min="1" value="1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Mín. noches', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-min-nights" min="1" value="1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Máx. noches (0=sin límite)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-max-nights" min="0" value="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Check-in', 'ltms' ); ?></label>
+                    <input type="time" id="ltms-ep-checkin-time" value="15:00" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Check-out', 'ltms' ); ?></label>
+                    <input type="time" id="ltms-ep-checkout-time" value="11:00" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Modo de pago', 'ltms' ); ?></label>
+                    <select id="ltms-ep-payment-mode" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                        <option value="full"><?php esc_html_e( 'Pago total', 'ltms' ); ?></option>
+                        <option value="deposit"><?php esc_html_e( 'Depósito + saldo', 'ltms' ); ?></option>
+                    </select>
+                </div>
+                <div id="ltms-ep-deposit-pct-wrap" style="display:none;">
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Depósito (%)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-deposit-pct" min="10" max="90" value="30" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+        </div>
+
+        <!-- AUDIT-PROD-044: Campos de variaciones en modal Edit (paridad con modal New) -->
+        <div id="ltms-ep-variable-fields" style="display:none;margin-bottom:14px;padding:14px;background:#faf5ff;border:1.5px solid #ddd6fe;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:8px;">🎨 <?php esc_html_e( 'Variaciones del producto', 'ltms' ); ?></label>
+            <p style="font-size:0.78rem;color:#6b7280;margin-bottom:10px;"><?php esc_html_e( 'Define atributos (tallas, colores, etc.). Al guardar, se recrearán las variaciones.', 'ltms' ); ?></p>
+            <div id="ltms-ep-attributes" style="margin-bottom:12px;"></div>
+            <button type="button" id="ltms-ep-add-attribute" style="padding:8px 14px;border:1.5px dashed #8b5cf6;border-radius:6px;background:#f5f3ff;cursor:pointer;color:#6d28d9;font-size:0.8rem;">+ <?php esc_html_e( 'Agregar atributo (ej: Talla)', 'ltms' ); ?></button>
         </div>
 
         <!-- CS-08: ReDi toggle + tasa (edición) -->

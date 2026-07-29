@@ -128,6 +128,21 @@
         const origText = $btn.html();
         $btn.prop('disabled', true).text('Guardando...');
 
+        // AUDIT-PROD-044: recopilar atributos de variaciones (paridad con loadNewProductView eliminado).
+        var npVarAttributes = [];
+        if ( $('input[name="ltms_np_tipo"]:checked').val() === 'variable' ) {
+            $('#ltms-np-attributes > div').each(function() {
+                var aName = $(this).find('.ltms-np-attr-name').val();
+                var aValues = $(this).find('.ltms-np-attr-values').val();
+                if (aName && aValues) {
+                    npVarAttributes.push({
+                        name: aName,
+                        values: aValues.split('|').map(function(v){ return v.trim(); }).filter(Boolean)
+                    });
+                }
+            });
+        }
+
         $.ajax({
             url: ltmsDashboard.ajax_url,
             method: 'POST',
@@ -166,6 +181,9 @@
                 checkout_time:    $('#ltms-np-checkout-time').val() || '11:00',
                 payment_mode:     $('#ltms-np-payment-mode').val() || 'full',
                 deposit_pct:      parseFloat($('#ltms-np-deposit-pct').val()) || 0,
+                // AUDIT-PROD-044: visibilidad + variaciones
+                catalog_visibility: $('#ltms-np-visibility').val() || 'visible',
+                variation_attributes: npVarAttributes.length ? JSON.stringify(npVarAttributes) : '',
             },
             success: function(res){
                 $btn.prop('disabled', false).html(origText);
@@ -201,14 +219,14 @@
         });
     });
 
-    // ── Botones del estado inicial PHP → SPA fallback ────────────
+    // ── Botones del estado inicial PHP → abrir modal PHP ─────────
+    // AUDIT-PROD-044 FIX: eliminar la rama `if (typeof LTMS.Dashboard.loadNewProductView === 'function')`
+    // queprefería la versión JS atajo (ltms-dashboard.js) sobre el modal PHP source of truth.
+    // Al quitar ltms-dashboard.js#loadNewProductView, este handler ahora abre siempre el modal PHP
+    // (ltms-modal-new-product en view-products.php), que tiene todos los campos avanzados.
     $(document).on('click', '#ltms-add-product-btn, #ltms-add-product-btn-empty', function(e){
         e.preventDefault();
-        if (typeof LTMS !== 'undefined' && LTMS.Dashboard && typeof LTMS.Dashboard.loadNewProductView === 'function') {
-            LTMS.Dashboard.loadNewProductView();
-        } else {
-            LTMS.Modal.open('ltms-modal-new-product');
-        }
+        LTMS.Modal.open('ltms-modal-new-product');
     });
 
     // ── Limpiar modal al cerrar ───────────────────────────────────
@@ -219,16 +237,18 @@
         $('#ltms-np-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-np-img-status').text('');
         $('input[name="ltms_np_tipo"][value="physical"]').prop('checked', true);
-        // CS-04: reset visual de los 4 tipos
-        ['physical','digital','service','booking'].forEach(function(t){
+        // CS-04: reset visual de los tipos — AUDIT-PROD-044: incluir 'restaurant' y 'variable'.
+        ['physical','digital','service','booking','restaurant','variable'].forEach(function(t){
             $('#ltms-np-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
         });
         $('#ltms-np-tipo-physical-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+        // AUDIT-PROD-044: limpiar atributos de variaciones al cerrar el modal.
+        $('#ltms-np-attributes').empty();
     });
 
-    // CS-04/CS-06: highlight para los 4 tipos
+    // CS-04/CS-06: highlight para los tipos — AUDIT-PROD-044: incluir 'restaurant' y 'variable'.
     $(document).on('change', 'input[name="ltms_np_tipo"]', function(){
-        ['physical','digital','service','booking'].forEach(function(t){
+        ['physical','digital','service','booking','restaurant','variable'].forEach(function(t){
             $('#ltms-np-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
         });
         $('#ltms-np-tipo-'+$(this).val()+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
@@ -270,6 +290,22 @@
                 $('#ltms-ep-redi-enabled').prop('checked', rediOn);
                 $('#ltms-ep-redi-rate-wrap').toggle(rediOn);
                 if (d.redi_rate) { $('#ltms-ep-redi-rate').val(d.redi_rate); }
+                // AUDIT-PROD-044: poblar visibilidad + booking fields (paridad con get_product extended).
+                if (d.catalog_visibility) { $('#ltms-ep-visibility').val(d.catalog_visibility); }
+                if (d.booking_type) { $('#ltms-ep-booking-type').val(d.booking_type); }
+                if (d.booking_capacity) { $('#ltms-ep-booking-capacity').val(d.booking_capacity); }
+                if (d.min_nights) { $('#ltms-ep-min-nights').val(d.min_nights); }
+                if (d.max_nights !== undefined) { $('#ltms-ep-max-nights').val(d.max_nights); }
+                if (d.checkin_time) { $('#ltms-ep-checkin-time').val(d.checkin_time); }
+                if (d.checkout_time) { $('#ltms-ep-checkout-time').val(d.checkout_time); }
+                if (d.payment_mode) { $('#ltms-ep-payment-mode').val(d.payment_mode); }
+                if (d.deposit_pct) { $('#ltms-ep-deposit-pct').val(d.deposit_pct); }
+                $('#ltms-ep-deposit-pct-wrap').toggle(d.payment_mode === 'deposit');
+                // AUDIT-PROD-044: limpiar atributos de variaciones al abrir el modal Edit
+                // (no se devuelven desde get_product para evitar complejidad de parsearlos;
+                // el vendor puede redefinirlos y, al guardar, el backend recrea las variaciones).
+                $('#ltms-ep-attributes').empty();
+                updateEditProductTypeFields();
                 LTMS.Modal.open('ltms-modal-edit-product');
             }
         });
@@ -303,6 +339,22 @@
         var $n    = $('#ltms-ep-notice');
         if(!name || isNaN(price) || price<=0){ $n.removeClass('ltms-notice-success').addClass('ltms-notice-error').text('Nombre y precio son obligatorios.').show(); return; }
         var $btn = $(this); $btn.prop('disabled',true).text('Guardando...');
+
+        // AUDIT-PROD-044: recopilar atributos de variaciones en edición (paridad con create_product).
+        var epVarAttributes = [];
+        if ( $('input[name="ltms_ep_tipo"]:checked').val() === 'variable' ) {
+            $('#ltms-ep-attributes > div').each(function() {
+                var aName = $(this).find('.ltms-ep-attr-name').val();
+                var aValues = $(this).find('.ltms-ep-attr-values').val();
+                if (aName && aValues) {
+                    epVarAttributes.push({
+                        name: aName,
+                        values: aValues.split('|').map(function(v){ return v.trim(); }).filter(Boolean)
+                    });
+                }
+            });
+        }
+
         $.ajax({
             url: ltmsDashboard.ajax_url, method:'POST',
             data:{
@@ -316,6 +368,17 @@
                 product_type:$('input[name="ltms_ep_tipo"]:checked').val()||'physical',
                 redi_enabled:$('#ltms-ep-redi-enabled').is(':checked') ? 'yes' : 'no',
                 redi_rate:parseFloat($('#ltms-ep-redi-rate').val())||0,
+                // AUDIT-PROD-044: visibilidad + variaciones + booking (paridad con create_product).
+                catalog_visibility: $('#ltms-ep-visibility').val() || 'visible',
+                variation_attributes: epVarAttributes.length ? JSON.stringify(epVarAttributes) : '',
+                booking_type:     $('#ltms-ep-booking-type').val() || 'accommodation',
+                min_nights:       parseInt($('#ltms-ep-min-nights').val()) || 1,
+                max_nights:       parseInt($('#ltms-ep-max-nights').val()) || 0,
+                booking_capacity: parseInt($('#ltms-ep-booking-capacity').val()) || 1,
+                checkin_time:     $('#ltms-ep-checkin-time').val() || '15:00',
+                checkout_time:    $('#ltms-ep-checkout-time').val() || '11:00',
+                payment_mode:     $('#ltms-ep-payment-mode').val() || 'full',
+                deposit_pct:      parseFloat($('#ltms-ep-deposit-pct').val()) || 0,
             },
             success:function(res){
                 $btn.prop('disabled',false).text('Guardar Cambios');
@@ -413,6 +476,7 @@
     // ── PROD-01: Campos condicionales según tipo de producto ─────
     // v2.9.283 FIX: mover DENTRO del IIFE para que $ esté disponible.
     // v2.9.285: añadir soporte para booking (turismo) fields.
+    // AUDIT-PROD-044: añadir soporte para 'variable' en ambos modales (New + Edit).
     function updateProductTypeFields() {
         var tipo = $('input[name="ltms_np_tipo"]:checked').val() || 'physical';
         var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
@@ -420,15 +484,71 @@
         $('#ltms-np-digital-fields').toggle(tipo === 'digital');
         // v2.9.285: mostrar campos de booking/turismo
         $('#ltms-np-booking-fields').toggle(tipo === 'booking');
+        // AUDIT-PROD-044: mostrar campos de variaciones
+        $('#ltms-np-variable-fields').toggle(tipo === 'variable');
         var showStock = (tipo === 'physical' || tipo === 'restaurant');
         $('#ltms-np-stock').closest('div').toggle(showStock);
     }
+
+    // AUDIT-PROD-044: campos condicionales para modal Edit (mismo patrón que New).
+    function updateEditProductTypeFields() {
+        var tipo = $('input[name="ltms_ep_tipo"]:checked').val() || 'physical';
+        var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-ep-booking-fields').toggle(tipo === 'booking');
+        $('#ltms-ep-variable-fields').toggle(tipo === 'variable');
+    }
+
     $(function() {
         $('input[name="ltms_np_tipo"]').on('change', updateProductTypeFields);
         updateProductTypeFields();
-        // v2.9.285: toggle depósito % según modo de pago
+        $('input[name="ltms_ep_tipo"]').on('change', function(){
+            ['physical','digital','service','booking','restaurant','variable'].forEach(function(t){
+                $('#ltms-ep-tipo-'+t+'-lbl').css({'border-color':'#d1d5db','background':'#f9fafb'});
+            });
+            $('#ltms-ep-tipo-'+$(this).val()+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
+            updateEditProductTypeFields();
+        });
+        // v2.9.285: toggle depósito % según modo de pago (modal New)
         $('#ltms-np-payment-mode').on('change', function() {
             $('#ltms-np-deposit-pct-wrap').toggle($(this).val() === 'deposit');
+        });
+        // AUDIT-PROD-044: toggle depósito % en modal Edit.
+        $('#ltms-ep-payment-mode').on('change', function() {
+            $('#ltms-ep-deposit-pct-wrap').toggle($(this).val() === 'deposit');
+        });
+        // AUDIT-PROD-044: boton "+ Agregar atributo" para variaciones (modal New).
+        var npAttrCount = 0;
+        $(document).on('click', '#ltms-np-add-attribute', function() {
+            npAttrCount++;
+            var attrId = 'ltms-np-attr-' + npAttrCount;
+            var html = '<div id="' + attrId + '" style="margin-bottom:10px;padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;">' +
+                '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+                '<input type="text" class="ltms-np-attr-name" placeholder="Nombre (ej: Talla)" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                '<button type="button" class="ltms-np-attr-remove" style="padding:4px 8px;border:none;background:#fee;color:#c00;border-radius:4px;cursor:pointer;font-size:0.8rem;">✕</button>' +
+                '</div>' +
+                '<input type="text" class="ltms-np-attr-values" placeholder="Valores separados por | (ej: S|M|L|XL)" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                '</div>';
+            $('#ltms-np-attributes').append(html);
+        });
+        $(document).on('click', '.ltms-np-attr-remove', function() {
+            $(this).closest('div').parent().remove();
+        });
+        // AUDIT-PROD-044: boton "+ Agregar atributo" para variaciones (modal Edit).
+        var epAttrCount = 0;
+        $(document).on('click', '#ltms-ep-add-attribute', function() {
+            epAttrCount++;
+            var attrId = 'ltms-ep-attr-' + epAttrCount;
+            var html = '<div id="' + attrId + '" style="margin-bottom:10px;padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;">' +
+                '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+                '<input type="text" class="ltms-ep-attr-name" placeholder="Nombre (ej: Talla)" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                '<button type="button" class="ltms-ep-attr-remove" style="padding:4px 8px;border:none;background:#fee;color:#c00;border-radius:4px;cursor:pointer;font-size:0.8rem;">✕</button>' +
+                '</div>' +
+                '<input type="text" class="ltms-ep-attr-values" placeholder="Valores separados por | (ej: S|M|L|XL)" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">' +
+                '</div>';
+            $('#ltms-ep-attributes').append(html);
+        });
+        $(document).on('click', '.ltms-ep-attr-remove', function() {
+            $(this).closest('div').parent().remove();
         });
     });
 
