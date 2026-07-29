@@ -200,7 +200,7 @@ class AdminPayoutsTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 
         \LTMS_Admin_Payouts::init();
 
-        $this->assertSame(9, $count); // b8c6c23: ltms_get_kyc_details hook added (KYC modal)
+        $this->assertSame(10, $count); // v2.9.300: ltms_kyc_proxy_doc hook added (PDF proxy)
     }
 
     // ── SECCIÓN 2: ajax_approve_payout() ─────────────────────────────────────
