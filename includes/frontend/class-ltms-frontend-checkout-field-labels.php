@@ -77,15 +77,34 @@ final class LTMS_Frontend_Checkout_Field_Labels {
         //   (WOOCCM a veces lo duplica)
         // - billing_email en step 2: ya está en step 1
         // Pero NO ocultar si el campo es shipping_phone o shipping_email.
+        //
+        // FIX #10 (CHECKOUT-AUDIT): la lógica anterior miraba el texto del label
+        // para decidir cuál era el "duplicado" (los que no dijeran 'WhatsApp'
+        // o 'Correo electrónico'). Pero este mismo filter reescribe el label a
+        // 'Teléfono / WhatsApp' / 'Correo electrónico', así que tras cualquier
+        // re-render AMBOS campos terminan con el mismo label y la heurística ya
+        // no distingue el bueno del malo → nunca se oculta.
+        //
+        // Reemplazo: mantener un contador estático de cuántas veces hemos visto
+        // el campo en este request. La PRIMERA ocurrencia es el campo de step 1
+        // (permanece); las SUBSECUENTES son duplicados de WOOCCM (ocultos).
+        static $seen_phone = 0;
+        static $seen_email = 0;
+
         $hide_keys = [ 'billing_phone', 'billing_email' ];
         if ( in_array( $key, $hide_keys, true ) ) {
-            // Verificar si este campo ya fue renderizado en step 1 (contact info).
-            // Heuristic: si el field_html contiene 'Teléfono / WhatsApp' o
-            // 'Correo electrónico' como label, es el de step 1 — mantenerlo.
-            // Si solo dice 'Teléfono' o 'Email', es el duplicado de step 2 — ocultarlo.
-            $is_step1_phone = ( $key === 'billing_phone' && strpos( $field_html, 'WhatsApp' ) !== false );
-            $is_step1_email = ( $key === 'billing_email' && strpos( $field_html, 'Correo electrónico' ) !== false );
-            if ( ! $is_step1_phone && ! $is_step1_email ) {
+            $is_duplicate = false;
+            if ( $key === 'billing_phone' ) {
+                $seen_phone++;
+                // La primera vez que vemos billing_phone es el de step 1.
+                // Las siguientes son duplicados WOOCCM.
+                $is_duplicate = ( $seen_phone > 1 );
+            } elseif ( $key === 'billing_email' ) {
+                $seen_email++;
+                $is_duplicate = ( $seen_email > 1 );
+            }
+
+            if ( $is_duplicate ) {
                 // Ocultar el campo duplicado con display:none.
                 $field_html = preg_replace(
                     '/<p class="form-row/',
@@ -95,8 +114,9 @@ final class LTMS_Frontend_Checkout_Field_Labels {
                 );
                 return $field_html;
             }
-            // Si es el campo de step 1, mantenerlo pero asegurar el label correcto.
-            if ( $is_step1_phone ) {
+            // Si es el campo de step 1 (primera ocurrencia), mantenerlo pero
+            // asegurar el label correcto.
+            if ( $key === 'billing_phone' ) {
                 $new_label = __( 'Teléfono / WhatsApp', 'ltms' );
             } else {
                 $new_label = __( 'Correo electrónico', 'ltms' );

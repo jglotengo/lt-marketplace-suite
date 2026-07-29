@@ -1501,17 +1501,49 @@ final class LTMS_Frontend_Checkout_Handler {
 
         // Order is still pending — the gateway never confirmed payment.
         // Restore the cart from the snapshot so the customer can retry.
+        //
+        // FIX #13 (CHECKOUT-AUDIT): antes este bloque llamaba
+        // WC()->cart->empty_cart() incondicionalmente y reinyectaba los items
+        // del snapshot. Si el cron corría mientras el cliente armaba un carrito
+        // nuevo, el carrito actual se borraba silenciosamente y se reemplazaba
+        // por el snapshot del pedido fallido anterior — pérdida silenciosa.
+        //
+        // Ahora sólo restauramos si el carrito actual está vacío (no hay nada
+        // que perder) Y el snapshot pertenece al mismo usuario/sesión activa
+        // (evita restaurar carritos de un usuario logueado en sesión anon, etc.).
         $saved_cart = $snapshot['cart'] ?? [];
         if ( is_array( $saved_cart ) && function_exists( 'WC' ) && WC()->cart ) {
-            WC()->cart->empty_cart();
-            foreach ( $saved_cart as $cart_item ) {
-                $product_id   = (int) ( $cart_item['product_id'] ?? 0 );
-                $quantity     = (int) ( $cart_item['quantity'] ?? 1 );
-                $variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
-                if ( $product_id && $quantity > 0 ) {
-                    WC()->cart->add_to_cart( $product_id, $quantity, $variation_id );
+            $current_user = get_current_user_id();
+            $snapshot_user = (int) ( $snapshot['user_id'] ?? 0 );
+
+            $is_same_owner = false;
+            if ( $current_user && $snapshot_user === $current_user ) {
+                $is_same_owner = true;
+            } elseif ( ! $current_user && ! $snapshot_user && WC()->session ) {
+                $session_customer_id = WC()->session->get_customer_id();
+                // Si la sesión WC actual corresponde al mismo customer que el
+                // snapshot, asumimos mismo owner. Como el snapshot no guardaba
+                // el customer WC, usamos el heurístico de carrito-vacío como
+                // protección mínima para guests.
+                $is_same_owner = ( $session_customer_id > 0 );
+            }
+
+            // Solo restaurar si el carrito actual NO tiene items (no destruir
+            // carrito nuevo del usuario) y el snapshot es del mismo owner.
+            if ( $is_same_owner && WC()->cart->is_empty() ) {
+                foreach ( $saved_cart as $cart_item ) {
+                    $product_id   = (int) ( $cart_item['product_id'] ?? 0 );
+                    $quantity     = (int) ( $cart_item['quantity'] ?? 1 );
+                    $variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
+                    if ( $product_id && $quantity > 0 ) {
+                        WC()->cart->add_to_cart( $product_id, $quantity, $variation_id );
+                    }
                 }
             }
+            // Si el carrito actual NO está vacío, NO tocamos el carrito actual.
+            // El snapshot se elimina igual (línea siguiente) porque el pedido
+            // ya no se va a recuperar via este flujo — el usuario tomó la
+            // decisión de armar un carrito nuevo.
         }
 
         delete_transient( $transient_key );

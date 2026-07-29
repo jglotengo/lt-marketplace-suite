@@ -781,28 +781,25 @@ do_action( 'woocommerce_after_main_content' );
                 labelEl.appendChild(optionalSpan);
             }
         });
-
         // Ocultar campos duplicados:
         // - billing_phone en step 2 (ya está en step 1 como 'Teléfono / WhatsApp')
         // - billing_email en step 2 (ya está en step 1)
-        // Heuristic: si el label NO contiene 'WhatsApp' o 'Correo', es el duplicado.
-        var phoneLabels = scope.querySelectorAll('label[for="billing_phone"], label[for="shipping_phone"]');
-        phoneLabels.forEach(function(lbl) {
-            var text = (lbl.textContent || '').toLowerCase();
-            if (text.indexOf('whatsapp') === -1) {
-                var field = document.getElementById('billing_phone_field') || document.getElementById('shipping_phone_field');
+        //
+        // FIX #10 (CHECKOUT-AUDIT): en vez de inspeccionar el texto del label
+        // (que este mismo filter reescribe), contamos cuántos <label for="...">
+        // existen para el mismo target. El primero se conserva, los demás
+        // (duplicados de WOOCCM) se ocultan.
+        var phoneEmailKeys = ['billing_phone','shipping_phone','billing_email','shipping_email'];
+        var occurrenceCount = {};
+        phoneEmailKeys.forEach(function(k){ occurrenceCount[k] = 0; });
+        phoneEmailKeys.forEach(function(fieldKey) {
+            scope.querySelectorAll('label[for="' + fieldKey + '"]').forEach(function(lbl) {
+                occurrenceCount[fieldKey]++;
+                if (occurrenceCount[fieldKey] < 2) return;
+                var fieldId = fieldKey + '_field';
+                var field = scope.querySelector('#' + fieldId);
                 if (field) field.style.display = 'none';
-            }
-        });
-        var emailLabels = scope.querySelectorAll('label[for="billing_email"], label[for="shipping_email"]');
-        emailLabels.forEach(function(lbl) {
-            var text = (lbl.textContent || '').toLowerCase();
-            // Si el label dice 'Correo electrónico' ES el de step 1 (mantener).
-            // Si solo dice 'Email' o 'Dirección de correo electrónico', es duplicado.
-            if (text.indexOf('correo electrónico') === -1) {
-                var field = document.getElementById('billing_email_field') || document.getElementById('shipping_email_field');
-                if (field) field.style.display = 'none';
-            }
+            });
         });
 
         // Auto-seleccionar país: CO o MX según configuración.

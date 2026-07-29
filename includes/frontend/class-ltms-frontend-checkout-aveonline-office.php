@@ -169,9 +169,13 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 			this.$select.prop('disabled', true).html('<option value=""><?php echo esc_js( __( '— Cargando oficinas… —', 'ltms' ) ); ?></option>');
 			this.$note.text('');
 
-			// Extraer carrier code del rate ID: formato ltms_aveonline:INSTANCEID_CARRIERCODE_oficina
-			// Ej: ltms_aveonline:5_1016_oficina -> carrier = 1016
-			var carrierMatch = rateId.match(/_(\d{2,4})_oficina$/);
+			// Extraer carrier code del rate ID. FIX #14 (CHECKOUT-AUDIT):
+			// La regex anterior `_(\d{2,4})_oficina$` fallaba para carriers
+			// alfanuméricos (sanitize_key de transportadora name) y colisionaba
+			// con instance_ids de 2-4 dígitos. Aceptamos alfanumérico:
+			//   ltms_aveonline:5_1016_oficina -> 1016
+			//   ltms_aveonline:5_servientrega_oficina -> servientrega
+			var carrierMatch = rateId.match(/_([A-Za-z0-9]{1,32})_oficina$/);
 			var carrier = carrierMatch ? carrierMatch[1] : '';
 
 			$.ajax({
@@ -243,8 +247,11 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 		$carrier = sanitize_text_field( wp_unslash( $_POST['carrier'] ?? '' ) );
 		$rate_id = sanitize_text_field( wp_unslash( $_POST['rate_id'] ?? '' ) );
 
-		// Si no viene carrier explícito, extraerlo del rate_id: ..._1016_oficina -> 1016
-		if ( '' === $carrier && preg_match( '/(\d{2,4})_oficina$/', $rate_id, $m ) ) {
+		// Si no viene carrier explícito, extraerlo del rate_id. FIX #14:
+		// aceptar alfanumérico (no solo dígitos) para carriers textuales como
+		// 'servientrega', 'interrapidisimo', etc. que se generan cuando
+		// $carrier_code es NULL en add_rate() y se cae a sanitize_key(name).
+		if ( '' === $carrier && preg_match( '/_([A-Za-z0-9]{1,32})_oficina$/', $rate_id, $m ) ) {
 			$carrier = $m[1];
 		}
 		// Fallback a la opción global si todavía no hay carrier.
@@ -317,12 +324,46 @@ class LTMS_Frontend_Checkout_Aveonline_Office {
 			return; // No se eligió oficina — probablemente modo domicilio.
 		}
 
-		// Extraer carrier del rate elegido: ltms_aveonline:5_1016_oficina -> 1016
+		// Extraer carrier del rate elegido. FIX #14 (CHECKOUT-AUDIT):
+		// Antes extraíamos con `/_(\d{2,4})_oficina$/`, que sólo funciona cuando
+		// el carrier_code es numérico Y el instance_id no cae en el rango 2-4
+		// dígitos. Si carrier es texto (sanitize_key de transportadora name) o
+		// el instance_id colisiona, se guarda el carrier erróneo en meta → el
+		// order_split posterior falla al identificar la transportadora.
+		//
+		// Estrategia robusta:
+		//   1. Buscar los paquetes WC y localizar el rate por ID → usar
+		//      get_meta('ltms_carrier_code') (fuente canónica que el método de
+		//      envío ya guarda en add_rate()).
+		//   2. Fallback: regex no-numérica `_${1,32}_oficina$` para carriers
+		//      alfanuméricos (cuando no haya paquetes disponibles).
 		$chosen  = WC()->session ? WC()->session->get( 'chosen_shipping_methods' ) : [];
 		$rate_id = is_array( $chosen ) ? ( $chosen[0] ?? '' ) : '';
 		$carrier = '';
-		if ( preg_match( '/_(\d{2,4})_oficina$/', $rate_id, $m ) ) {
-			$carrier = $m[1];
+
+		// (1) Fuente canónica: meta_data del rate.
+		if ( $rate_id && function_exists( 'WC' ) && WC()->shipping ) {
+			foreach ( WC()->shipping->get_packages() as $package ) {
+				if ( empty( $package['rates'][ $rate_id ] ) ) {
+					continue;
+				}
+				$rate    = $package['rates'][ $rate_id ];
+				$carrier = (string) $rate->get_meta_data( 'ltms_carrier_code' );
+				if ( $carrier ) {
+					break;
+				}
+			}
+		}
+
+		// (2) Fallback: regex alfanumérica (carriers tipo 'servientrega', 'envia', etc.).
+		if ( '' === $carrier && $rate_id ) {
+			if ( preg_match( '/_([A-Za-z0-9]{1,32})_oficina$/', $rate_id, $m ) ) {
+				// Aceptamos alfanumérico, pero descartamos кандидatas que sean
+				// puramente el instance_id (caso: 'ltms_aveonline:5_5_oficina'
+				// nomenclature ambigua). No hay forma de distinguir 100% sin
+				// meta, por eso la fuente (1) es la preferida.
+				$carrier = $m[1];
+			}
 		}
 
 		update_post_meta( $order_id, self::META_KEY_OFFICE,  $office );

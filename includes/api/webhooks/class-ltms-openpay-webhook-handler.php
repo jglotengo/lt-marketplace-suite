@@ -340,18 +340,42 @@ Equipo Lo Tengo",
     private static function find_order_by_txn( string $txn_id ): int {
         if ( ! $txn_id ) return 0;
         global $wpdb;
-        // HPOS-aware: intentar primero meta de órdenes
-        $order_id = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT order_id FROM {$wpdb->prefix}wc_orders_meta WHERE meta_key = '_openpay_transaction_id' AND meta_value = %s LIMIT 1",
-            $txn_id
-        ) );
-        if ( ! $order_id ) {
+
+        // FIX #2 (CHECKOUT-AUDIT): el handler de checkout guarda el charge_id
+        // Openpay en distintas meta keys según el método de pago (PSE, Nequi,
+        // Daviplata, OXXO, SPEI, tarjeta). Antes solo buscábamos
+        // `_openpay_transaction_id`, que NUNCA se setea para esos métodos → el
+        // webhook no encontraba el pedido → PSE/Nequi/Daviplata nunca se marcaban
+        // como pagados → comisiones y order_split no se liquidaban (bug P0).
+        //
+        // Ahora iteramos las meta keys que el handler realmente escribe, en
+        // orden de probabilidad. La consulta se hace contra HPOS (wc_orders_meta)
+        // primero y luego contra postmeta (legacy CPT storage) como fallback.
+        $meta_keys = [
+            '_openpay_transaction_id',
+            '_ltms_pse_charge_id',
+            '_ltms_nequi_charge_id',
+            '_ltms_daviplata_charge_id',
+            '_ltms_oxxo_charge_id',
+            '_ltms_spei_charge_id',
+        ];
+
+        foreach ( $meta_keys as $key ) {
+            // HPOS-aware lookup.
             $order_id = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_openpay_transaction_id' AND meta_value = %s LIMIT 1",
-                $txn_id
+                "SELECT order_id FROM {$wpdb->prefix}wc_orders_meta WHERE meta_key = %s AND meta_value = %s LIMIT 1",
+                $key, $txn_id
             ) );
+            if ( $order_id ) return $order_id;
+
+            // Legacy CPT storage.
+            $order_id = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value = %s LIMIT 1",
+                $key, $txn_id
+            ) );
+            if ( $order_id ) return $order_id;
         }
-        return $order_id;
+        return 0;
     }
 
     /**

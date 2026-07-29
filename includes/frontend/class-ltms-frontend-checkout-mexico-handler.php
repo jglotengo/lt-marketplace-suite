@@ -42,8 +42,21 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
 
     /**
      * Registra los hooks AJAX del handler (solo en México).
+     *
+     * FIX #4 (CHECKOUT-AUDIT): antes no había verificación de país en init().
+     * Los endpoints `ltms_create_oxxo_reference`, `ltms_create_spei_reference`,
+     * `ltms_get_msi_options` quedaban registrados globalmente aún en stores CO.
+     * Si las credenciales Openpay MX estaban configuradas (ej. durante migración
+     * cross-border), cualquier cliente de una store CO podía invocarlas y
+     * crear cargos contra la cuenta México. Ahora el handler solo se registra
+     * cuando la store opera en México.
      */
     public static function init(): void {
+        // FIX #4: guard country — el handler MX solo aplica en stores México.
+        if ( ! class_exists( 'LTMS_Core_Config' ) || LTMS_Core_Config::get_country() !== 'MX' ) {
+            return;
+        }
+
         $instance = new self();
 
         add_action( 'wp_ajax_ltms_create_oxxo_reference',       [ $instance, 'ajax_create_oxxo_reference' ] );
@@ -103,16 +116,21 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
                 (float) $order->get_total(),
                 sprintf( __( 'Pedido #%d', 'ltms' ), $order->get_id() ),
                 $customer,
-                'LTMS-' . $order->get_id() . '-' . time()
+                'LTMS-' . $order->get_id() . '-' . gmdate( 'YmdHis' ) . '-' . wp_generate_password( 6, false )
             );
 
             $reference   = $charge['payment_method']['reference'] ?? '';
             $barcode_url = $charge['payment_method']['barcode_url'] ?? '';
-            $expiry_date = gmdate( 'd/m/Y', strtotime( '+3 days' ) );
 
             if ( empty( $reference ) ) {
                 wp_send_json_error( [ 'message' => __( 'No se pudo generar la referencia OXXO.', 'ltms' ) ] );
             }
+
+            // FIX #9 (CHECKOUT-AUDIT): la expiry_date se calcula DESPUÉS de
+            // confirmar que la API devolvió referencia válida. Antes se seteaba
+            // antes del if(empty($reference)) → si la API fallaba quedaba expiry
+            // sin referencia asociada → ambigüedad en admin.
+            $expiry_date = gmdate( 'd/m/Y', strtotime( '+3 days' ) );
 
             $order->update_meta_data( '_ltms_oxxo_reference', $reference );
             $order->update_meta_data( '_ltms_oxxo_barcode_url', $barcode_url );
@@ -214,11 +232,14 @@ final class LTMS_Frontend_Checkout_Mexico_Handler {
             ];
 
             // M-114: SPEI es México — usar create_spei_reference(), no create_pse_charge() (Colombia)
+            // FIX #5 (CHECKOUT-AUDIT): sufijo random para evitar colisión de
+            // order_ref en checkouts concurrentes del mismo segundo (Openpay
+            // dedupea cargos por order_ref → pérdida silenciosa de transacción).
             $charge = $openpay->create_spei_reference(
                 (float) $order->get_total(),
                 sprintf( __( 'Pedido #%d — Lo Tengo', 'ltms' ), $order->get_id() ),
                 $customer,
-                'LTMS-SPEI-' . $order->get_id() . '-' . time()
+                'LTMS-SPEI-' . $order->get_id() . '-' . gmdate( 'YmdHis' ) . '-' . wp_generate_password( 6, false )
             );
 
             $clabe       = $charge['payment_method']['clabe'] ?? '';

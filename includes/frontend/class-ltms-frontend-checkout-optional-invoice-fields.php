@@ -215,6 +215,40 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
     }
 
     /**
+     * Valida el dígito de verificación (DV) de un NIT colombiano mediante módulo 11.
+     *
+     * Algoritmo DIAN: los 8-10 dígitos del NIT se ponderan con la secuencia
+     * descendente [41, 37, 29, 23, 19, 17, 13, 7, 3] alineada a la derecha,
+     * se suman los productos, se divide por 11 y se aplica:
+     *   - resto < 2  → DV = resto
+     *   - resto = 11 → DV = 0
+     *   - resto > 1  → DV = 11 - resto
+     *
+     * @param string $nit_digits Cuerpo numérico del NIT (8-10 dígitos, sin DV).
+     * @param string $dv         Dígito de verificación declarado por el usuario.
+     * @return bool True si el DV coincide con el cálculo módulo 11.
+     */
+    private static function validate_nit_dv( string $nit_digits, string $dv ): bool {
+        if ( ! ctype_digit( $nit_digits ) || strlen( $nit_digits ) < 8 || strlen( $nit_digits ) > 10 ) {
+            return false;
+        }
+        if ( ! ctype_digit( $dv ) || strlen( $dv ) !== 1 ) {
+            return false;
+        }
+        $weights = [ 41, 37, 29, 23, 19, 17, 13, 7, 3 ];
+        $len     = strlen( $nit_digits );
+        $sum     = 0;
+        $offset  = count( $weights ) - $len;
+        for ( $i = 0; $i < $len; $i++ ) {
+            $w   = $weights[ $offset + $i ] ?? 0;
+            $sum += (int) $nit_digits[ $i ] * $w;
+        }
+        $rest   = $sum % 11;
+        $calc_d = ( $rest < 2 ) ? $rest : ( 11 - $rest );
+        return (int) $dv === $calc_d;
+    }
+
+    /**
      * Valida el formato del NIT (CO) o RFC (MX) si el checkbox está marcado.
      */
     public static function validate_invoice_fields(): void {
@@ -236,11 +270,20 @@ class LTMS_Frontend_Checkout_Optional_Invoice_Fields {
         }
 
         if ( $country === 'CO' ) {
-            // NIT: formato 999999999-X (con o sin puntos, con DV).
-            // Cédula: 6-10 dígitos.
-            $clean = preg_replace( '/[.\s-]/', '', $tax_id );
-            if ( ! preg_match( '/^\d{6,10}[0-9]$/', $clean ) && ! preg_match( '/^\d{8,9}\d$/', $clean ) ) {
-                wc_add_notice( __( 'NIT o Cédula inválido. Formato esperado: 900.123.456-7 o cédula de 6-10 dígitos.', 'ltms' ), 'error' );
+            // NIT: formato 999999999-X (con o sin puntos, con DV verificado módulo 11).
+            // Cédula: 6-10 dígitos (sin DV).
+            $clean      = preg_replace( '/[.\s-]/', '', $tax_id );
+            $is_valid   = false;
+            // Cédula colombiana: 6-10 dígitos numéricos puros (sin DV).
+            if ( preg_match( '/^\d{6,10}$/', $clean ) ) {
+                $is_valid = true;
+            }
+            // NIT: 8-10 dígitos numéricos sin DV → recortar para validar DV módulo 11.
+            if ( ! $is_valid && preg_match( '/^(\d{8,10})(\d)$/', $clean, $m ) ) {
+                $is_valid = self::validate_nit_dv( $m[1], $m[2] );
+            }
+            if ( ! $is_valid ) {
+                wc_add_notice( __( 'NIT o Cédula inválido. Formato esperado: 900.123.456-7 (con dígito de verificación correcto) o cédula de 6-10 dígitos.', 'ltms' ), 'error' );
             }
         } elseif ( $country === 'MX' ) {
             // RFC: persona moral (12 chars: 3 letras + 6 dígitos + 3 alfanum)

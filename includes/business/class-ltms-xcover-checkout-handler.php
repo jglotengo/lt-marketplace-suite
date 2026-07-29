@@ -224,16 +224,35 @@ class LTMS_XCover_Checkout_Handler {
         }
 
         // Determine selected type: prefer POST (live checkout update), fall back to session.
-        $selected = 'no';
+        // FIX #3 (CHECKOUT-AUDIT): antes, si el cliente marcaba seguro y luego lo
+        // desmarcaba, el POST `ltms_insurance_selected=no` caía en la rama "no
+        // seleccionado" que leía el fallback de sesión (que seguía en 'yes') y el
+        // fee se agregaba igual → el cliente pagaba seguro que no eligió.
+        //
+        // Distingamos explícitamente:
+        //   - POST presente => el cliente interactuó activamente con el form =>
+        //     respetamos su decisión (yes o no) SIN fallback a sesión.
+        //   - POST ausente (refresh de cart fragments, AJAX parcial) => usamos
+        //     la sesión como única fuente de verdad.
+        $selected = '';
         $type     = '';
-        if ( ! empty( $_POST['ltms_insurance_selected'] ) ) { // phpcs:ignore
-            $selected = sanitize_key( $_POST['ltms_insurance_selected'] ); // phpcs:ignore
+        $post_has_selected = isset( $_POST['ltms_insurance_selected'] ); // phpcs:ignore
+        if ( $post_has_selected ) {
+            $selected = sanitize_key( wp_unslash( $_POST['ltms_insurance_selected'] ) ); // phpcs:ignore
             $type     = sanitize_key( $_POST['ltms_insurance_type'] ?? '' ); // phpcs:ignore
-        }
-        if ( $selected !== 'yes' ) {
+        } else {
             $selected = (string) WC()->session->get( 'ltms_xcover_selected', 'no' );
             $type     = (string) WC()->session->get( 'ltms_xcover_selected_type', '' );
         }
+
+        // Sincronizar la sesión con la decisión activa del cliente (incluida
+        // la deselección). Así el siguiente `calculate_totals` sin POST ve el
+        // estado correcto. FIX #3.
+        if ( $post_has_selected ) {
+            WC()->session->set( 'ltms_xcover_selected', $selected );
+            WC()->session->set( 'ltms_xcover_selected_type', ( $selected === 'yes' ) ? $type : '' );
+        }
+
         if ( $selected !== 'yes' || ! $type ) {
             return;
         }
