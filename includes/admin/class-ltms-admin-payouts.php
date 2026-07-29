@@ -611,12 +611,13 @@ final class LTMS_Admin_Payouts {
         foreach ( (array) $kyc_rows as $row ) {
             $docs_by_type[ strtolower( $row['document_type'] ) ] = $row['file_path'];
         }
-        // Intentar B2 presigned URL si el path no es una URL completa
-        $b2_bucket = LTMS_Core_Config::get( 'ltms_b2_kyc_bucket', 'lotengo-kyc-docs' );
+        // v2.9.299 FIX: usar el option key correcto (ltms_backblaze_kyc_bucket, no ltms_b2_kyc_bucket)
+        // y añadir fallback de URL directa igual que $make_signed_url en html-admin-kyc.php
+        $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
+                        LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
         $sign_doc  = static function( string $path ) use ( $b2_bucket ): string {
             if ( empty( $path ) ) return '';
             // Convertir URLs legacy ltms-vault a key B2 relativa
-            // Ej: https://lo-tengo.com.co/ltms-vault/kyc/168/file.pdf → kyc/168/file.pdf
             if ( filter_var( $path, FILTER_VALIDATE_URL ) ) {
                 if ( str_contains( $path, '/ltms-vault/' ) ) {
                     $path = preg_replace( '#^.*/ltms-vault/#', '', $path );
@@ -625,6 +626,7 @@ final class LTMS_Admin_Payouts {
                     return $path;
                 }
             }
+            // Intentar B2 presigned URL
             if ( class_exists( 'LTMS_Api_Factory' ) ) {
                 try {
                     $b2  = LTMS_Api_Factory::get( 'backblaze' );
@@ -632,7 +634,10 @@ final class LTMS_Admin_Payouts {
                     return $b2->get_signed_url( $b2_bucket, $path, $ttl );
                 } catch ( \Throwable $e ) {}
             }
-            return $path;
+            // v2.9.299 FIX: fallback — construir URL directa con endpoint B2
+            // (igual que $make_signed_url en html-admin-kyc.php)
+            $endpoint = rtrim( LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '' ), '/' );
+            return $endpoint ? $endpoint . '/' . $b2_bucket . '/' . ltrim( $path, '/' ) : '#';
         };
         $doc_url_cedula = $sign_doc( $docs_by_type['cc'] ?? $docs_by_type['cedula'] ?? $kyc['file_path'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_cedula', true ) ?: get_user_meta( $vendor_id, 'ltms_kyc_doc_path', true ) );
         $doc_url_rut    = $sign_doc( $docs_by_type['rut'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_rut', true ) );

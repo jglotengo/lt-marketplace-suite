@@ -864,17 +864,15 @@ final class LTMS_Dashboard_Logic {
         update_user_meta( $vendor_id, 'ltms_document_type', $document_type );
         update_user_meta( $vendor_id, 'ltms_country',        $vendor_country );
 
-        // M-120: guardar documentos adicionales (RUT, Cámara de Comercio) como user_meta
-        $file_path_rut    = sanitize_text_field( wp_unslash( $_POST['file_path_rut']    ?? '' ) ); // phpcs:ignore
-        $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
+        // v2.9.299 FIX: Guardar documentos en user_meta INMEDIATAMENTE después del insert
+        // (antes estaban después y si el insert fallaba, los paths se perdían).
+        // RUT, Cámara, Banco ya fueron leídos arriba (lines 582-583, 588).
         if ( $file_path_rut )    update_user_meta( $vendor_id, 'ltms_kyc_file_rut',    $file_path_rut );
         if ( $file_path_camara ) update_user_meta( $vendor_id, 'ltms_kyc_file_camara', $file_path_camara );
-        // KYC-BANCO-1: guardar certificación bancaria y datos del representante legal
         if ( $file_path_banco )     update_user_meta( $vendor_id, 'ltms_kyc_file_banco',         $file_path_banco );
         if ( $bank_rep_legal_name ) update_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal',     $bank_rep_legal_name );
         if ( $bank_name )           update_user_meta( $vendor_id, 'ltms_kyc_bank_name',          $bank_name );
         if ( $bank_account_number ) update_user_meta( $vendor_id, 'ltms_kyc_bank_account',       $bank_account_number );
-        // Snapshot de titularidad: debe coincidir con el representante legal al momento del KYC
         update_user_meta( $vendor_id, 'ltms_kyc_bank_verified_at', current_time( 'mysql', true ) );
 
         // L-8: registrar consentimiento de Habeas Data con timestamp e IP (trazabilidad legal)
