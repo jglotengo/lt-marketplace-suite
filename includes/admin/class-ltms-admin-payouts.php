@@ -706,11 +706,14 @@ final class LTMS_Admin_Payouts {
             'country_code'      => $kyc['country_code'] ?? 'CO',
             'expires_at'        => $kyc['expires_at'] ?? null,
             'docs' => [
-                'cedula'  => $doc_url_cedula  ? esc_url( $doc_url_cedula )  : '',
-                'rut'     => $doc_url_rut     ? esc_url( $doc_url_rut )     : '',
-                'camara'  => $doc_url_camara  ? esc_url( $doc_url_camara )  : '',
-                'selfie'  => $doc_url_selfie  ? esc_url( $doc_url_selfie )  : '',
-                'banco'   => $doc_url_banco   ? esc_url( $doc_url_banco )   : '',
+                // v2.9.303 FIX: NO usar esc_url() — rompe los & de los query params
+                // del proxy (convierte & a &#038;). Las URLs ya son seguras porque
+                // se construyen con admin_url() + rawurlencode() + wp_create_nonce().
+                'cedula'  => $doc_url_cedula  ?: '',
+                'rut'     => $doc_url_rut     ?: '',
+                'camara'  => $doc_url_camara  ?: '',
+                'selfie'  => $doc_url_selfie  ?: '',
+                'banco'   => $doc_url_banco   ?: '',
             ],
         ]);
     }
@@ -765,9 +768,12 @@ final class LTMS_Admin_Payouts {
 
         $key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
         if ( empty( $key ) ) {
-            // v2.9.302: Si no hay key, dar un mensaje más útil con diagnóstico
-            $all_params = json_encode( $_GET );
-            wp_die( 'Key requerido. Parámetros recibidos: ' . esc_html( $all_params ), 'Error', [ 'response' => 400 ] );
+            // v2.9.303: Log para diagnóstico
+            LTMS_Core_Logger::error(
+                'KYC_PROXY_NO_KEY',
+                'Proxy recibido sin key. GET: ' . json_encode( $_GET ) . ' REQUEST: ' . json_encode( $_REQUEST )
+            );
+            wp_die( 'Key requerido. Parámetros recibidos: ' . esc_html( json_encode( $_GET ) ), 'Error', [ 'response' => 400 ] );
         }
 
         // Convertir URL legacy ltms-vault a key B2
