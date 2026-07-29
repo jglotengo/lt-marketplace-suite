@@ -288,6 +288,57 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @return bool True si se eliminó correctamente.
      * @throws \RuntimeException Si la eliminación falla.
      */
+    /**
+     * v2.9.300: Descarga un archivo del bucket especificado.
+     *
+     * Usa GET con Sig V4 (igual que upload_file) para descargar el contenido.
+     * La app key tiene capability readFiles que permite esto (a diferencia
+     * de shareFiles que se necesita para presigned URLs).
+     *
+     * @param string $bucket Nombre del bucket.
+     * @param string $key    Clave del objeto a descargar.
+     * @return string Contenido binario del archivo.
+     * @throws \RuntimeException Si la descarga falla.
+     */
+    public function download_file( string $bucket, string $key ): string {
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
+        }
+        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
+        }
+        $encoded_key = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
+        $path        = '/' . $bucket . '/' . $encoded_key;
+
+        $headers = [
+            'x-amz-content-sha256' => hash( 'sha256', '' ),
+        ];
+
+        $signed_headers = $this->sign_request( 'GET', $path, $headers, '' );
+
+        $response = wp_remote_request(
+            $this->api_url . $path,
+            [
+                'method'      => 'GET',
+                'headers'     => $signed_headers,
+                'timeout'     => 30,
+                'redirection' => 0,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            throw new \RuntimeException( '[backblaze] Download failed: ' . $response->get_error_message() );
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        if ( $code !== 200 ) {
+            $body = wp_remote_retrieve_body( $response );
+            throw new \RuntimeException( '[backblaze] Download failed: HTTP ' . $code . ' — ' . substr( $body, 0, 200 ) );
+        }
+
+        return wp_remote_retrieve_body( $response );
+    }
+
     public function delete_file( string $bucket, string $key ): bool {
         // INTEGRATIONS-AUDIT P0 FIX: validate bucket + key (same as upload_file).
         if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {

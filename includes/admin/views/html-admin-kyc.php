@@ -92,6 +92,7 @@ $total_kyc = array_sum( $count_map );
         if ( $b2_available ) {
             try { $b2_client = new LTMS_Api_Backblaze(); } catch ( \Throwable $e ) { $b2_client = null; }
         }
+        // v2.9.300 FIX: usar proxy PHP en vez de presigned URL (B2 UnauthorizedAccess)
         $make_signed_url = static function( string $key ) use ( $b2_client, $kyc_bucket ): string {
             if ( empty( $key ) ) return '';
             // Convertir URLs legacy ltms-vault a key B2 relativa
@@ -102,13 +103,8 @@ $total_kyc = array_sum( $count_map );
                     return $key; // URL externa real
                 }
             }
-            // Generar URL pre-firmada — TTL 3600 s (1 hora)
-            if ( $b2_client ) {
-                try { return $b2_client->get_signed_url( $kyc_bucket, $key, 3600 ); } catch ( \Throwable $e ) {}
-            }
-            // Fallback: construir URL con endpoint público (solo si bucket fuera público)
-            $endpoint = rtrim( LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '' ), '/' );
-            return $endpoint ? $endpoint . '/' . $kyc_bucket . '/' . ltrim( $key, '/' ) : '#';
+            // v2.9.300: Usar proxy PHP en vez de presigned URL.
+            return admin_url( 'admin-ajax.php' ) . '?action=ltms_kyc_proxy_doc&key=' . rawurlencode( $key ) . '&nonce=' . wp_create_nonce( 'ltms_kyc_proxy' );
         };
         ?>
         <table class="ltms-table">

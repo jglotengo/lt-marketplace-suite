@@ -38,6 +38,7 @@ final class LTMS_Admin_Payouts {
         add_action( 'wp_ajax_ltms_quick_approve_kyc', [ $instance, 'ajax_quick_approve_kyc' ] ); // A-5
         add_action( 'wp_ajax_ltms_reject_kyc',      [ $instance, 'ajax_reject_kyc' ] );
         add_action( 'wp_ajax_ltms_get_kyc_details', [ $instance, 'ajax_get_kyc_details' ] ); // Modal docs
+        add_action( 'wp_ajax_ltms_kyc_proxy_doc',  [ __CLASS__, 'ajax_kyc_proxy_doc' ] ); // v2.9.300: proxy para visualizar PDFs
         add_action( 'wp_ajax_ltms_freeze_wallet',   [ $instance, 'ajax_freeze_wallet' ] );
         add_action( 'wp_ajax_ltms_unfreeze_wallet', [ $instance, 'ajax_unfreeze_wallet' ] );
         add_action( 'wp_ajax_ltms_export_payouts',  [ $instance, 'ajax_export_payouts' ] );
@@ -612,7 +613,9 @@ final class LTMS_Admin_Payouts {
             $docs_by_type[ strtolower( $row['document_type'] ) ] = $row['file_path'];
         }
         // v2.9.299 FIX: usar el option key correcto (ltms_backblaze_kyc_bucket, no ltms_b2_kyc_bucket)
-        // y añadir fallback de URL directa igual que $make_signed_url en html-admin-kyc.php
+        // v2.9.300 FIX: B2 presigned URL da 'UnauthorizedAccess' — usar proxy PHP via admin-ajax
+        // El proxy descarga el archivo de B2 usando la misma auth que upload_file (que sí funciona)
+        // y lo sirve directamente al browser.
         $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
                         LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
         $sign_doc  = static function( string $path ) use ( $b2_bucket ): string {
@@ -622,22 +625,14 @@ final class LTMS_Admin_Payouts {
                 if ( str_contains( $path, '/ltms-vault/' ) ) {
                     $path = preg_replace( '#^.*/ltms-vault/#', '', $path );
                 } else {
-                    // URL externa real (ya es una URL pública/firmada) — devolverla tal cual
                     return $path;
                 }
             }
-            // Intentar B2 presigned URL
-            if ( class_exists( 'LTMS_Api_Factory' ) ) {
-                try {
-                    $b2  = LTMS_Api_Factory::get( 'backblaze' );
-                    $ttl = (int) LTMS_Core_Config::get( 'ltms_vault_signed_url_ttl_seconds', 300 );
-                    return $b2->get_signed_url( $b2_bucket, $path, $ttl );
-                } catch ( \Throwable $e ) {}
-            }
-            // v2.9.299 FIX: fallback — construir URL directa con endpoint B2
-            // (igual que $make_signed_url en html-admin-kyc.php)
-            $endpoint = rtrim( LTMS_Core_Config::get( 'ltms_backblaze_endpoint', '' ), '/' );
-            return $endpoint ? $endpoint . '/' . $b2_bucket . '/' . ltrim( $path, '/' ) : '#';
+            // v2.9.300: Usar proxy PHP en vez de presigned URL.
+            // El proxy usa download_file() que funciona con la auth de la app key.
+            // Presigned URL falla con 'UnauthorizedAccess' porque la app key
+            // no tiene permisos de shareFiles en el bucket.
+            return admin_url( 'admin-ajax.php' ) . '?action=ltms_kyc_proxy_doc&key=' . rawurlencode( $path ) . '&nonce=' . wp_create_nonce( 'ltms_kyc_proxy' );
         };
         $doc_url_cedula = $sign_doc( $docs_by_type['cc'] ?? $docs_by_type['cedula'] ?? $kyc['file_path'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_cedula', true ) ?: get_user_meta( $vendor_id, 'ltms_kyc_doc_path', true ) );
         $doc_url_rut    = $sign_doc( $docs_by_type['rut'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_rut', true ) );
@@ -731,6 +726,98 @@ final class LTMS_Admin_Payouts {
         );
 
         return (int) $vendor_id;
+    }
+
+    /**
+     * v2.9.300: Proxy PHP para visualizar documentos KYC desde B2 o local.
+     *
+     * B2 presigned URL falla con 'UnauthorizedAccess' porque la app key
+     * no tiene permisos shareFiles. Este proxy usa download_file() que
+     * funciona con readFiles capability (que la key SÍ tiene).
+     *
+     * Solo accesible por admin con capability ltms_manage_kyc.
+     */
+    public static function ajax_kyc_proxy_doc(): void {
+        // Verificar nonce
+        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( $_GET['nonce'], 'ltms_kyc_proxy' ) ) {
+            wp_die( 'Nonce inválido.', 'Error', [ 'response' => 403 ] );
+        }
+
+        // Solo admin con permisos KYC
+        if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
+            wp_die( 'Sin permisos.', 'Error', [ 'response' => 403 ] );
+        }
+
+        $key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
+        if ( empty( $key ) ) {
+            wp_die( 'Key requerido.', 'Error', [ 'response' => 400 ] );
+        }
+
+        // Convertir URL legacy ltms-vault a key B2
+        if ( str_contains( $key, '/ltms-vault/' ) ) {
+            $key = preg_replace( '#^.*/ltms-vault/#', '', $key );
+        }
+
+        // Determinar MIME type por extensión
+        $ext      = strtolower( pathinfo( $key, PATHINFO_EXTENSION ) );
+        $mime_map = [
+            'pdf'  => 'application/pdf',
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png'  => 'image/png',
+            'gif'  => 'image/gif',
+            'webp' => 'image/webp',
+        ];
+        $mime = $mime_map[ $ext ] ?? 'application/octet-stream';
+
+        $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
+                        LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
+
+        // Intentar descargar de B2
+        $content = null;
+        if ( class_exists( 'LTMS_Api_Factory' ) ) {
+            try {
+                $b2      = LTMS_Api_Factory::get( 'backblaze' );
+                $content = $b2->download_file( $b2_bucket, $key );
+            } catch ( \Throwable $e ) {
+                $content = null;
+            }
+        }
+
+        // Fallback: intentar desde local
+        if ( $content === null ) {
+            $upload_dir   = wp_upload_dir();
+            $local_file   = $upload_dir['basedir'] . '/ltms-kyc/' . $key;
+            if ( file_exists( $local_file ) ) {
+                $content = file_get_contents( $local_file ); // phpcs:ignore
+            }
+        }
+
+        if ( $content === null || $content === false ) {
+            wp_die( 'Documento no encontrado.', 'Error', [ 'response' => 404 ] );
+        }
+
+        // Log de acceso (Ley 1581 art. 15 — bitácora)
+        if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+            $vendor_id = (int) preg_replace( '/^kyc\/(\d+)\/.*$/', '$1', $key );
+            if ( $vendor_id > 0 ) {
+                LTMS_Legal_Compliance::log_vault_access(
+                    $vendor_id,
+                    get_current_user_id(),
+                    'kyc_proxy_doc',
+                    'view',
+                    'admin_kyc_proxy'
+                );
+            }
+        }
+
+        // Servir el archivo
+        nocache_headers();
+        header( 'Content-Type: ' . $mime );
+        header( 'Content-Length: ' . strlen( $content ) );
+        header( 'Content-Disposition: inline; filename="' . basename( $key ) . '"' );
+        echo $content; // phpcs:ignore
+        exit;
     }
 }
 
