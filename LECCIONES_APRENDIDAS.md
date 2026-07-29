@@ -1745,3 +1745,21 @@ if opens != closes: print(f'UNBALANCED: {opens} opens, {closes} closes')
 **Fix:** Usar `'block'` explícito: `p.style.display = (pageNum === actual) ? 'block' : 'none'`.
 
 **Regla preventiva:** Al manipular `style.display` via JS para mostrar/ocultar elementos, SIEMPRE usar valores explícitos (`'block'`, `'none'`, `'flex'`, `'grid'`), nunca string vacío (`''`). String vacío remueve el inline style y deja que el CSS externo decida, lo que puede causar bugs difíciles de diagnosticar cuando hay reglas CSS con `display: none` por defecto.
+
+### Lección #130: Un "fallback" JS (`if (typeof X...) { X() } else { Y() }`) puede volverse el único camino de ejecución
+
+**Error:** `ltms-products.js:207` tenía el patrón:
+```js
+if (typeof LTMS.Dashboard.loadNewProductView === 'function') {
+    LTMS.Dashboard.loadNewProductView();
+} else {
+    LTMS.Modal.open('ltms-modal-new-product');
+}
+```
+Como `loadNewProductView` SÍ existía en `ltms-dashboard.js` (era una versión JS simplificada del formulario de nuevo producto), la rama `else` (el modal PHP, source of truth con gallery upload, booking fields completos, ReDi toggle, radio `variable` con variaciones, etc.) **siempre** quedaba como código muerto. El comentario del desarrollador decía que el modal PHP era el "source of truth" — pero en runtime nunca se ejecutaba. Múltiples commits posteriores respondieron a "bugs" del modal PHP (campos faltantes, visibilidad, etc.) que en realidad NO existían para el vendor en runtime, porque el vendor veía el atajo JS simplificado. El código muerto PHP recibía fixes innecesarios.
+
+**Causa raíz:** El patrón `if (typeof X === 'function') { X(); } else { Y(); }` se introdujo como "fallback" pero se convirtió en el único camino de ejecución: nadie se dio cuenta de que el fallback `Y()` (el modal PHP) nunca corría porque la condición `typeof X === 'function'` siempre era verdadera. Cuando el atajo JS Y el source of truth PHP estaban pensados como "el primero es un atajo mejorado del segundo" (no como "el primero es un fallback del segundo"), el patrón es contraproducente: el "fallback" se vuelve el normal path.
+
+**Fix:** Eliminar las funciones JS atajo (`loadNewProductView`, `loadEditProductView`) de `ltms-dashboard.js` para que la rama `Y()` (modal PHP) se convierta en el único camino. Y antes de eliminarlas, auditar features que el atajo JS tenía pero el modal PHP no — en este caso fueron 3: radio `variable` (variaciones), `catalog_visibility`, y booking fields completos en el modal Edit. Migrar esas 3 features al modal PHP y al backend (`update_product` + `get_product`) ANTES de eliminar el atajo. No asumir que el "source of truth" es también "feature-complete" — comparar feature-by-feature.
+
+**Regla preventiva:** Antes de añadir un patrón `if (typeof X === 'function') { X(); } else { Y(); }` como "fallback", verificar que la rama `Y()` realmente cae en algún caso de uso en runtime (no que quede como "lado muerto"). Si `X` siempre existe, ese fallback es muerto. Si se va a eliminar `X` para revivir `Y`, primero comparar feature-by-feature qué hace `X` que `Y` no hace, y migrar lo faltante antes — no asumirlo basado en comentarios de intención. Caso real: AUDIT-PROD-044 (commit `50791296`) requirió tocar 4 archivos en bloque coordinado (2 modales PHP, JS, backend PHP) para migrar 3 features que el atajo JS tenía y el modal PHP no.
