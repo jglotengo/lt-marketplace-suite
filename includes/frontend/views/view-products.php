@@ -470,11 +470,48 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
             <textarea id="ltms-ep-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;"></textarea>
         </div>
 
-        <!-- Precio y Stock -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <?php // AUDIT-PROD-H3 (re-auditoría): paridad modal Edit → fields de create_product. ?>
+        <!-- Descripción corta -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Descripción Corta', 'ltms' ); ?></label>
+            <textarea id="ltms-ep-short-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;" placeholder="<?php esc_attr_e( 'Resumen breve que aparece junto al precio (máx 200 caracteres)...', 'ltms' ); ?>"></textarea>
+        </div>
+
+        <!-- SKU + Etiquetas + Shipping class (3 cols) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+                <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'SKU', 'ltms' ); ?></label>
+                <input type="text" id="ltms-ep-sku" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>">
+            </div>
+            <div>
+                <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Etiquetas', 'ltms' ); ?></label>
+                <input type="text" id="ltms-ep-tags" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( 'rojo, algodón, verano', 'ltms' ); ?>">
+            </div>
+            <div>
+                <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Clase de envío', 'ltms' ); ?></label>
+                <select id="ltms-ep-shipping-class" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                    <option value=""><?php esc_html_e( 'Sin clase', 'ltms' ); ?></option>
+                    <?php
+                    $ep_ship_classes = get_terms([ 'taxonomy' => 'product_shipping_class', 'hide_empty' => false ]);
+                    if ( ! is_wp_error( $ep_ship_classes ) ) :
+                        foreach ( $ep_ship_classes as $ep_sc ) :
+                    ?>
+                    <option value="<?php echo esc_attr( $ep_sc->term_id ); ?>"><?php echo esc_html( $ep_sc->name ); ?></option>
+                    <?php endforeach; endif; ?>
+                </select>
+            </div>
+        </div>
+
+        <!-- Precio, Oferta y Stock -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
             <div>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Precio *', 'ltms' ); ?></label>
                 <input type="number" id="ltms-ep-price" min="0" step="0.01" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
+            </div>
+            <div>
+                <?php // AUDIT-PROD-H4 (re-auditoría): precio de oferta editable en modal Edit.?>
+                <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Oferta', 'ltms' ); ?></label>
+                <input type="number" id="ltms-ep-sale-price" min="0" step="0.01" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>">
             </div>
             <div>
                 <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Stock', 'ltms' ); ?></label>
@@ -592,6 +629,22 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
                 <div id="ltms-ep-deposit-pct-wrap" style="display:none;">
                     <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Depósito (%)', 'ltms' ); ?></label>
                     <input type="number" id="ltms-ep-deposit-pct" min="10" max="90" value="30" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
+                </div>
+            </div>
+        </div>
+
+        <!-- AUDIT-PROD-H1 (re-auditoría): Archivo descargable para digital en modal Edit (paridad con modal New) -->
+        <div id="ltms-ep-digital-fields" style="display:none;margin-bottom:14px;padding:14px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;">💾 <?php esc_html_e( 'Archivo descargable', 'ltms' ); ?></label>
+            <input type="url" id="ltms-ep-download-url" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;margin-bottom:8px;" placeholder="<?php esc_attr_e( 'https://... (URL del archivo a descargar)', 'ltms' ); ?>">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Límite descargas', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-download-limit" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( '0 = ilimitado', 'ltms' ); ?>">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Expira (días)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-download-expiry" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( '0 = nunca', 'ltms' ); ?>">
                 </div>
             </div>
         </div>

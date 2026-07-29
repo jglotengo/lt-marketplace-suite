@@ -27,10 +27,12 @@ final class LTMS_Admin_Product_Meta {
 
     /** Tipos de producto válidos */
     private const PRODUCT_TYPES = [
-        'physical' => '📦 Físico',
-        'digital'  => '💾 Digital',
-        'service'  => '🔧 Servicio',
-        'booking'  => '🏨 Turismo / Reserva',
+        'physical'   => '📦 Físico',
+        'digital'    => '💾 Digital',
+        'service'    => '🔧 Servicio',
+        'booking'    => '🏨 Turismo / Reserva',
+        'restaurant' => '🍽️ Restaurante',
+        'variable'   => '🎨 Variaciones',
     ];
 
     public static function init(): void {

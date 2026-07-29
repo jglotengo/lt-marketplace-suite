@@ -255,6 +255,11 @@ class LTMS_Products_Ajax {
             'short_description'   => $product->get_short_description(),
             'sku'                 => $product->get_sku(),
             'shipping_class_id'   => $product->get_shipping_class_id(),
+            // AUDIT-PROD-H7 (re-auditoría): devolver tags como CSV para poblar #ltms-ep-tags.
+            // ANTES el campo no se devolvía → el JS no poblaba el input → el modal always enviaba
+            // `tags: ''` → `update_product` ejecutaba `wp_set_post_terms( $pid, [], 'product_tag', false )`
+            // → TODOS los tags existentes se borraban al editar el producto sin tocarlos. Bug silencioso.
+            'tags'                => implode( ',', wp_get_post_terms( $product_id, 'product_tag', [ 'fields' => 'names' ] ) ),
         ] );
     }
 
@@ -401,6 +406,95 @@ class LTMS_Products_Ajax {
             }
         }
 
+        // AUDIT-PROD-H1 (re-auditoría): paridad digital/service en update_product (paridad con create_product lineas ~990-1011).
+        // Si el tipo pasa a 'digital', marcar downloadable+virtual y procesar download_url.
+        // Si pasa a 'service', marcar virtual.
+        // Si cambia fuera de digital/service, limpiar esos flags (preservar si ya era el mismo tipo).
+        $product_refreshed = wc_get_product( $product_id );
+
+        // AUDIT-PROD-H3 (re-auditoría): persistir sku, short_description y shipping_class_id en
+        // edición (paridad con create_product lineas ~960-1014). Antes el modal Edit no los
+        // enviaba, así que cualquier valor creado con create NO se podía actualizar ni tampoco
+        // se preservaba correctamente al cambiar otro campo.
+        if ( $product_refreshed ) {
+            // short_description (PROD-09)
+            if ( isset( $_POST['short_description'] ) ) { // phpcs:ignore
+                $upd_short_desc = sanitize_textarea_field( wp_unslash( $_POST['short_description'] ) ); // phpcs:ignore
+                $product_refreshed->set_short_description( $upd_short_desc );
+            }
+            // sku (PROD-06) — try/catch para SKU duplicado, como en create_product.
+            if ( isset( $_POST['sku'] ) ) { // phpcs:ignore
+                $upd_sku = sanitize_text_field( wp_unslash( $_POST['sku'] ) ); // phpcs:ignore
+                if ( $upd_sku === '' ) {
+                    $product_refreshed->set_sku( '' );
+                } else {
+                    try {
+                        $product_refreshed->set_sku( $upd_sku );
+                    } catch ( \Throwable $e ) { /* SKU duplicado — ignorar como en create_product */ }
+                }
+            }
+            // shipping_class_id (PROD-07)
+            if ( isset( $_POST['shipping_class_id'] ) ) { // phpcs:ignore
+                $upd_sc = absint( $_POST['shipping_class_id'] ); // phpcs:ignore
+                $product_refreshed->set_shipping_class_id( $upd_sc );
+            }
+            // AUDIT-PROD-H6 (re-auditoría): NO re-aplicar set_weight() aquí. El peso ya se
+            // persiste líneas arriba (línea 314: `if ( $weight !== null ) $product->set_weight( $weight )`)
+            // sobre la misma entidad WC, y se persiste con $product->save() en línea 322.
+            // El bloque previo `set_weight( $weight ?? '' )` era una regresión introducida por
+            // el fix H3: cuando $_POST['weight'] llegaba vacío, $weight es null → escribía '' →
+            // borraba el peso del producto. Eliminado.
+            // tags (PROD-08): wp_set_post_terms con product_tag.
+            if ( isset( $_POST['tags'] ) ) { // phpcs:ignore
+                $upd_tags_raw = sanitize_text_field( wp_unslash( $_POST['tags'] ) ); // phpcs:ignore
+                $upd_tag_slugs = array_filter( array_map( 'trim', explode( ',', $upd_tags_raw ) ) );
+                if ( empty( $upd_tag_slugs ) ) {
+                    wp_set_post_terms( $product_id, [], 'product_tag', false );
+                } else {
+                    // wp_set_post_terms acepta slugs/names en append=false (reemplaza).
+                    wp_set_post_terms( $product_id, $upd_tag_slugs, 'product_tag', false );
+                }
+            }
+            $product_refreshed->save();
+        }
+
+        if ( $product_refreshed ) {
+            if ( $product_type_for_update === 'digital' ) {
+                $product_refreshed->set_virtual( true );
+                $product_refreshed->set_downloadable( true );
+                $download_url_upd = isset( $_POST['download_url'] ) ? esc_url_raw( wp_unslash( $_POST['download_url'] ) ) : ''; // phpcs:ignore
+                if ( $download_url_upd ) {
+                    $download = new WC_Product_Download();
+                    $download->set_id( md5( $download_url_upd ) );
+                    $download->set_name( $product_refreshed->get_name() );
+                    $download->set_file( $download_url_upd );
+                    $product_refreshed->set_downloads( [ $download ] );
+
+                    $download_limit_upd  = isset( $_POST['download_limit'] ) && $_POST['download_limit'] !== '' ? (int) $_POST['download_limit'] : -1; // phpcs:ignore
+                    $download_expiry_upd = isset( $_POST['download_expiry'] ) && $_POST['download_expiry'] !== '' ? (int) $_POST['download_expiry'] : -1; // phpcs:ignore
+                    $product_refreshed->set_download_limit( $download_limit_upd );
+                    $product_refreshed->set_download_expiry( $download_expiry_upd );
+                }
+                $product_refreshed->save();
+            } elseif ( $product_type_for_update === 'service' ) {
+                $product_refreshed->set_virtual( true );
+                // Un servicio no es descargable: si era digital antes, limpiar el flag.
+                $product_refreshed->set_downloadable( false );
+                $product_refreshed->set_downloads( [] );
+                $product_refreshed->save();
+            } elseif ( $product_type_for_update && $product_type_for_update !== 'digital' && $product_type_for_update !== 'service' ) {
+                // Cambió de digital/service a otro tipo: limpiar virtual+downloadable+downloads.
+                $old_meta_type = get_post_meta( $product_id, '_ltms_product_type', true );
+                // Solo limpiar si antes era digital o service (evitar limpiar si el producto ya era physical/booking/...)
+                if ( $old_meta_type === 'digital' || $old_meta_type === 'service' ) {
+                    $product_refreshed->set_virtual( false );
+                    $product_refreshed->set_downloadable( false );
+                    $product_refreshed->set_downloads( [] );
+                    $product_refreshed->save();
+                }
+            }
+        }
+
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
     }
 
@@ -494,11 +588,61 @@ class LTMS_Products_Ajax {
         if ( ! $variable_product ) {
             return;
         }
+
+        // AUDIT-PROD-H2 (re-auditoría): NO recrear variaciones si los atributos entrantes
+        // son idénticos a los que ya tiene el producto — esto evita perder stock propio,
+        // SKU y referencias en pedidos históricos al editar un producto variable sin
+        // tocar los atributos (ej. solo cambia el título). Comparamos firmas canónicas:
+        // [ 'taxonomy' => [ sorted term names ] ].
+        $incoming_signature = [];
+        foreach ( $variation_attrs as $attr ) {
+            $name   = sanitize_text_field( $attr['name'] ?? '' );
+            $values = array_map( 'sanitize_text_field', (array) ( $attr['values'] ?? [] ) );
+            if ( empty( $name ) || empty( $values ) ) {
+                continue;
+            }
+            $incoming_taxonomy = wc_attribute_taxonomy_name( $name );
+            $sorted_values     = array_values( array_unique( $values ) );
+            sort( $sorted_values );
+            $incoming_signature[ $incoming_taxonomy ] = $sorted_values;
+        }
+        ksort( $incoming_signature );
+
+        $existing_signature = [];
+        if ( class_exists( 'WC_Product' ) && method_exists( $variable_product, 'get_attributes' ) ) {
+            $existing_attrs = $variable_product->get_attributes();
+            if ( is_array( $existing_attrs ) ) {
+                foreach ( $existing_attrs as $taxonomy => $attr_obj ) {
+                    // Solo nos interesan los atributos marcados para variación (set_variation(true)).
+                    if ( $attr_obj instanceof \WC_Product_Attribute && $attr_obj->get_variation() ) {
+                        $term_ids = $attr_obj->get_options();
+                        $term_names = [];
+                        if ( is_array( $term_ids ) ) {
+                            foreach ( $term_ids as $tid ) {
+                                $term = get_term_by( 'id', $tid, $taxonomy );
+                                if ( $term && ! is_wp_error( $term ) ) {
+                                    $term_names[] = $term->name;
+                                }
+                            }
+                        }
+                        sort( $term_names );
+                        $existing_signature[ $taxonomy ] = $term_names;
+                    }
+                }
+            }
+        }
+        ksort( $existing_signature );
+
         $variable_product->set_attributes( $attributes );
         $variable_product->save();
 
         // AUDIT-PROD-044 (update): si el producto ya tenía variaciones, eliminarlas antes
         // de recrearlas, para evitar variaciones huérfanas al cambiar los atributos.
+        // AUDIT-PROD-H2 FIJ: SOLO recrear si los atributos realmente cambiaron.
+        if ( $incoming_signature === $existing_signature ) {
+            return; // Atributos idénticos: preservar variaciones existentes (stock, SKU, refs en pedidos).
+        }
+
         $existing_variations = $variable_product->get_children();
         if ( is_array( $existing_variations ) ) {
             foreach ( $existing_variations as $var_id ) {

@@ -262,7 +262,7 @@
         var pid = $(this).data('product-id');
         $('#ltms-ep-notice').hide().text('');
         $('#ltms-ep-product-id').val(pid);
-        $('#ltms-ep-name,#ltms-ep-desc,#ltms-ep-price,#ltms-ep-stock').val('');
+        $('#ltms-ep-name,#ltms-ep-desc,#ltms-ep-price,#ltms-ep-stock,#ltms-ep-sale-price,#ltms-ep-short-desc,#ltms-ep-sku,#ltms-ep-tags').val('');
         $('#ltms-ep-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-ep-image-id').val('');
         $.ajax({
@@ -276,6 +276,17 @@
                 $('#ltms-ep-desc').val(d.description);
                 $('#ltms-ep-price').val(d.price);
                 $('#ltms-ep-stock').val(d.stock !== null ? d.stock : '');
+                // AUDIT-PROD-H4 (re-auditoría): poblar precio de oferta.
+                $('#ltms-ep-sale-price').val(d.sale_price || '');
+                // AUDIT-PROD-H3 (re-auditoría): poblar short_desc, sku, shipping_class.
+                $('#ltms-ep-short-desc').val(d.short_description || '');
+                $('#ltms-ep-sku').val(d.sku || '');
+                if (d.shipping_class_id) { $('#ltms-ep-shipping-class').val(d.shipping_class_id); }
+                // AUDIT-PROD-H7 (re-auditoría): poblar tags como CSV desde get_product().
+                // ANTES este input quedaba vacío siempre → update_product recibía `tags: ''`
+                // → wp_set_post_terms reemplazaba todos los tags existentes por []. Bug silencioso
+                // que borraba los tags del producto en cada edición. Ver LECCIONES_APRENDIDAS.md #130.
+                $('#ltms-ep-tags').val(d.tags || '');
                 $('#ltms-ep-category').val(d.category_id);
                 $('#ltms-ep-status').val(d.status);
                 $('#ltms-ep-image-id').val(d.image_id);
@@ -362,6 +373,11 @@
                 product_id: $('#ltms-ep-product-id').val(),
                 name:name, description:$('#ltms-ep-desc').val(),
                 price:price, stock:$('#ltms-ep-stock').val(),
+                sale_price:$('#ltms-ep-sale-price').val(),
+                short_description:$('#ltms-ep-short-desc').val(),
+                sku:$('#ltms-ep-sku').val(),
+                tags:$('#ltms-ep-tags').val(),
+                shipping_class_id:$('#ltms-ep-shipping-class').val(),
                 category_id:$('#ltms-ep-category').val(),
                 status:$('#ltms-ep-status').val(),
                 image_id:$('#ltms-ep-image-id').val(),
@@ -379,6 +395,10 @@
                 checkout_time:    $('#ltms-ep-checkout-time').val() || '11:00',
                 payment_mode:     $('#ltms-ep-payment-mode').val() || 'full',
                 deposit_pct:      parseFloat($('#ltms-ep-deposit-pct').val()) || 0,
+                // AUDIT-PROD-H1 (re-auditoría): download_url (cuando tipo=digital) — paridad con create_product.
+                download_url:     $('#ltms-ep-download-url').val() || '',
+                download_limit:   $('#ltms-ep-download-limit').val() || '',
+                download_expiry:  $('#ltms-ep-download-expiry').val() || '',
             },
             success:function(res){
                 $btn.prop('disabled',false).text('Guardar Cambios');
@@ -491,9 +511,11 @@
     }
 
     // AUDIT-PROD-044: campos condicionales para modal Edit (mismo patrón que New).
+    // AUDIT-PROD-H1 (re-auditoría): también mostrar/ocultar el bloque digital.
     function updateEditProductTypeFields() {
         var tipo = $('input[name="ltms_ep_tipo"]:checked').val() || 'physical';
         var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-ep-digital-fields').toggle(tipo === 'digital');
         $('#ltms-ep-booking-fields').toggle(tipo === 'booking');
         $('#ltms-ep-variable-fields').toggle(tipo === 'variable');
     }

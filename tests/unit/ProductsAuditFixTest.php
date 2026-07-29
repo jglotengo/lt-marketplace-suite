@@ -292,4 +292,246 @@ class ProductsAuditFixTest extends LTMS_Unit_Test_Case {
 				"get_product debe devolver la clave {$key} en su respuesta JSON (AUDIT-PROD-044 paridad con create_product)." );
 		}
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H5 (re-auditoría) — LTMS_Admin_Product_Meta::PRODUCT_TYPES incluye
+	//             'restaurant' y 'variable' (sino el admin wp-admin resetea el
+	//             tipo al guardar un producto creado como restaurant/variable).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h5_admin_product_meta_types_includes_restaurant_and_variable(): void {
+		$admin_meta_path = dirname( __DIR__, 2 ) . '/includes/admin/class-ltms-admin-product-meta.php';
+		if ( ! file_exists( $admin_meta_path ) ) {
+			$this->markTestSkipped( 'class-ltms-admin-product-meta.php no disponible.' );
+		}
+		require_once $admin_meta_path;
+		if ( ! class_exists( 'LTMS_Admin_Product_Meta' ) ) {
+			$this->markTestSkipped( 'LTMS_Admin_Product_Meta no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Admin_Product_Meta' );
+		$this->assertTrue( $reflection->hasConstant( 'PRODUCT_TYPES' ) );
+		$types = $reflection->getConstant( 'PRODUCT_TYPES' );
+		$this->assertIsArray( $types, 'PRODUCT_TYPES debe ser un array.' );
+		$this->assertArrayHasKey( 'restaurant', $types, 'PRODUCT_TYPES debe incluir restaurant (AUDIT-PROD-H5).' );
+		$this->assertArrayHasKey( 'variable',   $types, 'PRODUCT_TYPES debe incluir variable (AUDIT-PROD-H5).' );
+		// Y no debe haber perdido los tipos anteriores.
+		$this->assertArrayHasKey( 'physical', $types );
+		$this->assertArrayHasKey( 'digital',  $types );
+		$this->assertArrayHasKey( 'service',  $types );
+		$this->assertArrayHasKey( 'booking',  $types );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H2 (re-auditoría) — sync_variable_product compara firmas canónicas
+	//             de atributos y omite el delete+recreate si son idénticos, así
+	//             preserva stock propio, SKU y referencias en pedidos históricos.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h2_sync_variable_has_signature_comparison_before_recreate(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'sync_variable_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H2: el helper debe construir una firma canónica (incoming + existing)
+		// y salir temprano si son idénticos, en vez de siempre delete+recreate.
+		$this->assertStringContainsString( '$incoming_signature', $body,
+			'sync_variable_product debe construir $incoming_signature para comparar (AUDIT-PROD-H2).' );
+		$this->assertStringContainsString( '$existing_signature', $body,
+			'sync_variable_product debe construir $existing_signature para comparar (AUDIT-PROD-H2).' );
+		$this->assertStringContainsString( '=== $existing_signature', $body,
+			'sync_variable_product debe tener un early-return si $incoming_signature === $existing_signature (preserva variaciones).' );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H1 (re-auditoría) — update_product aplica set_virtual/set_downloadable
+	//             cuando el tipo cambia a digital/service (paridad con create_product).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h1_update_product_applies_virtual_and_downloadable_for_digital(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'update_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H1:
+		$this->assertStringContainsString( 'set_virtual( true )', $body,
+			'update_product debe llamar set_virtual(true) para digital/service (paridad con create_product).' );
+		$this->assertStringContainsString( 'set_downloadable( true )', $body,
+			'update_product debe llamar set_downloadable(true) para digital (paridad con create_product).' );
+		$this->assertStringContainsString( "set_downloads( [", $body,
+			'update_product debe asignar downloads para digital (paridad con create_product).' );
+		$this->assertStringContainsString( "'download_url'", $body,
+			'update_product debe leer download_url de $_POST cuando el tipo es digital.' );
+		$this->assertStringContainsString( '$product_type_for_update === \'service\'', $body,
+			'update_product debe tener rama explicita para tipo service.' );
+	}
+
+	public function test_h1_update_product_clears_flags_when_changing_away_from_digital_service(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'update_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H1 (clean-on-change): si el tipo cambia fuera de digital/service,
+		// el método debe limpiar set_virtual(false) y set_downloadable(false).
+		$this->assertStringContainsString( 'set_virtual( false )', $body,
+			'update_product debe limpiar set_virtual(false) cuando cambia fuera de digital/service.' );
+		$this->assertStringContainsString( 'set_downloadable( false )', $body,
+			'update_product debe limpiar set_downloadable(false) cuando cambia fuera de digital/service.' );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H3+H4 (re-auditoría) — update_product persiste sku/short_desc/
+	//             shipping_class/tags y sale_price ya estaba phép pero no llegaba
+	//             via JS — este test verifica el backend; el JS se cubre por smoke.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h3h4_update_product_persists_full_field_set(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'update_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H3: backend persiste los 4 campos nuevos.
+		$this->assertStringContainsString( 'set_short_description(', $body,
+			'update_product debe persistir short_description (AUDIT-PROD-H3).' );
+		$this->assertStringContainsString( 'set_sku(', $body,
+			'update_product debe persistir sku (AUDIT-PROD-H3).' );
+		$this->assertStringContainsString( 'set_shipping_class_id(', $body,
+			'update_product debe persistir shipping_class_id (AUDIT-PROD-H3).' );
+		$this->assertStringContainsString( "'product_tag'", $body,
+			'update_product debe persistir tags via wp_set_post_terms con product_tag (AUDIT-PROD-H3).' );
+
+		// AUDIT-PROD-H4: sale_price se procesa (venía del ciclo original):
+		// el campo sale_price en $_POST y la set_sale_price correspondiente.
+		$this->assertStringContainsString( "'sale_price'", $body,
+			'update_product debe tener el campo sale_price en $_POST (AUDIT-PROD-H4 ya cubierto por original).' );
+		$this->assertStringContainsString( 'set_sale_price(', $body,
+			'update_product debe llamar set_sale_price (AUDIT-PROD-H4).' );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H6 (re-auditoría) — Eliminada la línea redundante y peligrosa
+	//             `$product_refreshed->set_weight( $weight ?? '' )` dentro del
+	//             bloque H3. Esa línea, introducida junto con el fix H3,
+	//             recargaba el peso SOBRE la misma entidad WC ya persistida
+	//             líneas arriba (línea 314: `if ( $weight !== null ) $product->set_weight( $weight )`),
+	//             pero con un comportamiento distinto y buggy: cuando $_POST['weight']
+	//             llegaba vacío, $weight === null → set_weight( '' ) → el peso
+	//             del producto se reseteaba a string vacío al editar cualquier
+	//             otro campo. Validamos que esa línea ya no está presente en el
+	//             cuerpo de update_product (regresión introducida y fixeada en
+	//             el mismo ciclo de re-auditoría).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h6_no_redundant_set_weight_with_null_coalesce_in_update_product(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'update_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H6: la línea peligrosa debe estar ausente. Validamos con un patrón
+		// que asegure que es una SENTENCIA PHP (con `;`) y no una mención en comentario.
+		// Esto evita falsos positivos cuando el propio comentario del fix menciona el bug.
+		$this->assertDoesNotMatchRegularExpression(
+			'/set_weight\(\s*\$weight\s*\?\?\s*\'\'\s*\)\s*;/',
+			$body,
+			'update_product NO debe contener la sentencia `set_weight( $weight ?? \'\' );` (AUDIT-PROD-H6): esa línea resetea el peso a string vacío cuando $_POST[\'weight\'] viene vacío. El peso ya se persiste líneas arriba con `if ( $weight !== null ) $product->set_weight( $weight )`.'
+		);
+
+		// Sanity check: la línea buena sigue presente (no la hemos borrado por error).
+		// La sentencia original está en línea 314 con 8 espacios de indentación inicial.
+		$this->assertStringContainsString(
+			'if ( $weight !== null )     $product->set_weight( $weight );',
+			$body,
+			'update_product debe preservar la persistencia correcta de peso en la línea original (línea 314).'
+		);
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// FIX-H7 (re-auditoría) — Tags se borraban silenciosamente en cada edición.
+	//             get_product() NO devolvía tags → el JS never populaba #ltms-ep-tags →
+	//             el modal siempre enviaba `tags: ''` → update_product ejecutaba
+	//             `wp_set_post_terms( $pid, [], 'product_tag', false )` y borrraba
+	//             TODOS los tags existentes. Bug silencioso de pérdida de datos.
+	//             Fix: get_product() ahora devuelve 'tags' como CSV de names de termos
+	//             ((wp_get_post_terms con fields=names + implode). El JS lo lee en el
+	//             success handler AJAX y popula el input #ltms-ep-tags.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_h7_get_product_returns_tags_as_csv(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'get_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		// AUDIT-PROD-H7: get_product debe devolver la clave 'tags' en la respuesta.
+		$this->assertStringContainsString( "'tags'", $body,
+			'get_product debe devolver la clave \'tags\' en wp_send_json_success (AUDIT-PROD-H7).' );
+
+		// Sanity: usa wp_get_post_terms con fields=names (no IDs) para que el CSV sea
+		// legible por el humano y reutilizable al editar.
+		$this->assertStringContainsString( "wp_get_post_terms( \$product_id, 'product_tag'", $body,
+			'get_product debe obtener los tags via wp_get_post_terms con taxonomia product_tag (AUDIT-PROD-H7).' );
+		$this->assertStringContainsString( "'fields' => 'names'", $body,
+			'get_product debe pedir fields=names para poblar el input con legibilidad humana (AUDIT-PROD-H7).' );
+		$this->assertStringContainsString( "implode( ',',", $body,
+			'get_product debe unir los names de tags con implode para enviarlos como CSV (AUDIT-PROD-H7).' );
+	}
 }

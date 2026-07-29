@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-07-23
-> **Versión del plugin:** 2.9.239
-> **Total de lecciones:** 123 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239)
+> **Última actualización:** 2026-07-29
+> **Versión del plugin:** 2.9.293
+> **Total de lecciones:** 132 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293)
 
 ---
 
@@ -1763,3 +1763,56 @@ Como `loadNewProductView` SÍ existía en `ltms-dashboard.js` (era una versión 
 **Fix:** Eliminar las funciones JS atajo (`loadNewProductView`, `loadEditProductView`) de `ltms-dashboard.js` para que la rama `Y()` (modal PHP) se convierta en el único camino. Y antes de eliminarlas, auditar features que el atajo JS tenía pero el modal PHP no — en este caso fueron 3: radio `variable` (variaciones), `catalog_visibility`, y booking fields completos en el modal Edit. Migrar esas 3 features al modal PHP y al backend (`update_product` + `get_product`) ANTES de eliminar el atajo. No asumir que el "source of truth" es también "feature-complete" — comparar feature-by-feature.
 
 **Regla preventiva:** Antes de añadir un patrón `if (typeof X === 'function') { X(); } else { Y(); }` como "fallback", verificar que la rama `Y()` realmente cae en algún caso de uso en runtime (no que quede como "lado muerto"). Si `X` siempre existe, ese fallback es muerto. Si se va a eliminar `X` para revivir `Y`, primero comparar feature-by-feature qué hace `X` que `Y` no hace, y migrar lo faltante antes — no asumirlo basado en comentarios de intención. Caso real: AUDIT-PROD-044 (commit `50791296`) requirió tocar 4 archivos en bloque coordinado (2 modales PHP, JS, backend PHP) para migrar 3 features que el atajo JS tenía y el modal PHP no.
+
+---
+
+### Lección #131: Persistir un campo en backend sin que el frontend lo pueble al editar = borrado silencioso de datos
+
+**Error:** `get_product()` (AJAX que puebla el modal Edit) NO devolvía la clave `tags` en su respuesta. El JS del modal (`ltms-products.js`) por lo tanto nunca poblaba `#ltms-ep-tags` — el input siempre quedaba vacío. Cuando el vendor editaba un producto que ya tenía tags y guardaba (sin tocar el campo tags, que estaba vacío), `update_product` recibía `$_POST['tags'] = ''`, sanitizaba a string vacío → `$upd_tag_slugs = []` → `wp_set_post_terms( $product_id, [], 'product_tag', false )` → **todos los tags existentes se borraban**.
+
+Lo insidioso: el modal no mostraba indicios de "no tengo datos" — el input vacío se interpretaba como "el producto no tiene tags". Para el vendor era transparente: editaba, guardaba, los tags desaparecían. Cero error, cero log, cero feedback.
+
+**Causa raíz:** Break de la paridad frontend↔backend. El POST handler de `update_product` aceptaba `tags` (full feature, reemplazaba todos los tags via `wp_set_post_terms` con `append=false`). Pero `get_product` (con su función espejo de "leer para poblar el modal") **nunca fue extendida para devolver tags**. Cuando se añade una feature al **write path** (POST) sin extender el **read path** (GET que alimenta el form), el formulario se convierte en un destructor de datos: cualquier field no poblado regresará como vacío y el backend lo interpretará como "vaciar el campo".
+
+Este patrón ya estaba documentado indirectamente en la lección #130, pero desde el lado JS. Aquí el ángulo es el backend: **cada campo que el backend acepta en escritura (`update`) DEBE tener un campo correspondiente que el backend devuelve en lectura (`get`)**, y el populate JS debe existir. Si solo agregás el write path, estás introduciendo un destructor silencioso.
+
+**Fix:** `get_product()` ahora devuelve `'tags' => implode( ',', wp_get_post_terms( $product_id, 'product_tag', [ 'fields' => 'names' ] ) )`. El JS puebla `$('#ltms-ep-tags').val(d.tags || '')` antes de abrir el modal. Test `test_h7_get_product_returns_tags_as_csv` valida los 3 componentes (clave `'tags'`, uso de `wp_get_post_terms` con `fields=names`, e `implode`).
+
+**Regla preventiva:** Antes de añadir un campo al POST handler de cualquier AJAX de edición (`update_*`), verificar:
+1. ¿El AJAX de lectura (`get_*`) devuelve ese campo? Si no, agregarlo primero.
+2. ¿El JS del modal popula el input correspondiente? Si no, agregarlo primero.
+3. Si el backend trata "campo vacío" como "borrar el campo" (vía `wp_set_post_terms append=false`, `set_*('')`, `delete_post_meta` en condición `empty($v)`), el fix es **obligatorio** — sin read path, el formulario se convierte en un destructor silencioso.
+
+Antipatrón equivalente: `update_post_meta( $pid, '_x', sanitize_text_field($_POST['x'] ?? '') )` — si el frontend no puebla `$_POST['x']`, default `''` sobreescribe el valor existente. Si el frontend no manda la clave en absoluto (unset), el `??` lo captura, pero si la manda vacía (input vacío), la destrucción ocurre. La distinción unset-vs-empty debe ser deliberada, no accidental. Caso real: AUDIT-PROD-H7 (commit `<FIXME>`).
+
+---
+
+### Lección #132: Un fix en una sección nueva del mismo método puede regresar el campo que ya se había persistido correctamente más arriba
+
+**Error:** Durante el ciclo AUDIT-PROD-044 se añadió al método `update_product()` (en `class-ltms-products-ajax.php`) un nuevo bloque H3 para persistir `short_description`, `sku`, `shipping_class_id`, `tags`, etc. — campos que hasta entonces solo se persistían en `create_product`. El autor copió el patrón de `create_product` que termina con `$product->save()` propio para su bloque de "campos extra", pero incluyó una línea que ya existía más arriba en el mismo método:
+
+```php
+// Bloque nuevo (líneas ~437-439 del nuevo bloque H3):
+if ( isset( $_POST['weight'] ) ) {
+    $product_refreshed->set_weight( $weight ?? '' );   // ← BUG
+}
+```
+
+La línea original arriba (línea ~314, sin ser tocada por el fix):
+```php
+if ( $weight !== null )     $product->set_weight( $weight );
+```
+
+**Bug introducido:** cuando `$_POST['weight']` llegaba empty (vacío en el form, o el modal no lo enviará en el caso H8 aún no fixeado), `$weight` era `null` (línea 277 lo define así). En la línea 314, `if ($weight !== null)` falseaba y no se ejecutaba → el peso se preservaba correctamente. **Pero en la nueva línea 438, `if (isset($_POST['weight']))` era true (la clave del POST existe aunque el valor sea ''), y `$weight ?? ''` caía a `''`** → `set_weight('')` se ejecutaba → el peso del producto se reseteaba a string vacío al editar cualquier otro campo sin tocar peso.
+
+**Causa raíz:** Cuando se añade un bloque nuevo a un método existente para soportar nuevos campos (H3 cubrió short_description/sku/shipping/tags), es fácil copiar "el patrón de `create_product`" como referencia e incluir línea por línea, incluyendo campos (peso, dimensiones) que **ya estaban siendo persistidos correctamente en el bloque original del método**. Eso duplica la persistencia con _semántica distinta_ (la nueva copia suele tener un `?? ''` más condescendiente mientras la original usa `!== null` estricto). La divergencia no rompe en happy-path (cuando todos los campos llegan seteados), pero introduce un bug de edge-case que solo se activa cuando un campo está vacío — exactamente el caso del hallazgo H8 (peso/dimensiones no editables en el modal Edit → siempre llegan como vacío o unset).
+
+Lo mismo puede ocurrir con `set_virtual`, `set_downloadable`, `set_sku`, `set_short_description` — cualquier setter WC llamado dos veces con semántica distinta es candidato.
+
+**Fix:** Eliminar la línea peligrosa. El peso ya se persiste correctamente en la línea 314 con `$product->save()` (línea 322). El bloque nuevo H3 solo debe persistir los **campos nuevos** (short_description/sku/shipping_class/tags), no recargar campos ya gestionados arriba. Ver AUDIT-PROD-H6 (commit `<FIXME>`) y comentario in-source dejado en `class-ltms-products-ajax.php` para explicar por qué no se re-aplica `set_weight`.
+
+**Regla preventiva:** Antes de unificar el patrón de persistencia de un método con el de `create_product` mediante copy-paste:
+1. **Inventariar campo por campo** qué persiste el método original arriba vs qué persistirá el bloque nuevo. Cada campo debe persistirse **una sola vez**. Si `weight`, `dim_*`, `sale_price`, etc. ya están arriba, NO reincorporarlos abajo con `$weight ?? ''`.
+2. **La semántica de "vacío"** debe ser deliberada: el bloque original usa `!== null` (estricto, preserva el valor existente si el campo no viene seteado). El bloque nuevo copiado acarrea el `$x ?? ''` permisivo que convierte "no viene el campo" en "vaciar el campo".
+3. Si el método realimenta la entidad WC con un segundo `$product_refreshed = wc_get_product()` (antipatrón, ver H14), **debe persistirse solo lo nuevo** en el segundo save — no recargar campos ya persistidos en el primer save.
+4. **Re-auditar el método completo al terminar el fix**, no solo el bloque nuevo. El estilo "fix bug → re-audit → detectar nueva regression introducida por tu propio fix" es parte del loop de auditoría del AGENTS.md. Caso real: AUDIT-PROD-H6 fue detectada y fixeada en la misma iteración de re-auditoría que detectó AUDIT-PROD-H1-H5.

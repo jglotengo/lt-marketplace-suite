@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-07-29
+### Fixed — Re-auditoría módulo productos (v2.9.293 → v2.9.294)
+
+> Re-auditoría del módulo de productos siguiendo `AGENTS.md` → "Loop de auditoría autónoma" (paso 5: re-auditar el módulo tocado por los fixes anteriores para detectar regresiones o hallazgos nuevos introducidos por los propios fixes del ciclo AUDIT-PROD-044). 2 hallazgos P1 detectados y fixeados. 8 hallazgos más (4 P1 + 4 P2) dejados en backlog documentado — no son regresiones introducidas por fixesprevios, son gaps de paridad preexistentes.
+
+- **`fix(products)` (AUDIT-PROD-H6, P1, regresión del propio fix AUDIT-PROD-H3)**: La línea `$product_refreshed->set_weight( $weight ?? '' )` introducida en el nuevo bloque H3 (post-fix AUDIT-PROD-044) **reseteaba el peso del producto a string vacío** al editar cualquier campo sin tocar peso. Cuando `$_POST['weight']` llegaba empty (vacío en form o no enviado por el modal Edit — ver H8 en backlog), `$weight` era `null` (línea 277) → en la línea original 314 `if ($weight !== null)` se omite correctamente (preserva el peso); pero en la nueva línea 438 `if (isset($_POST['weight']))` era true y `$weight ?? ''` caía a `''` → `set_weight('')` se ejecutaba → peso borrado. La línea 437-439 era **redundante** con la línea 314 (que ya persiste peso correctamente vía `$product->save()` en línea 322). Eliminadas las 3 líneas peligrosas + comentario in-source explicativo. Test nuevo: `test_h6_no_redundant_set_weight_with_null_coalesce_in_update_product` (valida con regex `set_weight\(\s*\$weight\s*\?\?\s*''\s*\)\s*;` que la sentencia peligrosa NO está — el patrón regex distingue la sentencia PHP de la mención en el comentario del propio fix). Ver `LECCIONES_APRENDIDAS.md` #132.
+- **`fix(products)` (AUDIT-PROD-H7, P1, pérdida de datos silenciosa)**: **Tags borrados en cada edición**. `get_product()` no devolvía la clave `tags` en su respuesta AJAX → el JS del modal Edit nunca poblaba `#ltms-ep-tags` (el input siempre quedaba vacío) → el modal siempre enviaba `tags: ''` → `update_product` ejecutaba `wp_set_post_terms( $product_id, [], 'product_tag', false )` y **borraba TODOS los tags existentes** al guardar. Bug 100% silencioso: cero error, cero log, cero feedback al vendor. Fix: `get_product()` ahora devuelve `'tags' => implode(',', wp_get_post_terms($product_id, 'product_tag', ['fields' => 'names']))` para poblar el input; el JS lee `d.tags` en el success handler y hace `$('#ltms-ep-tags').val(d.tags || '')`. Test nuevo: `test_h7_get_product_returns_tags_as_csv` valida los 3 componentes (clave `'tags'`, `wp_get_post_terms` con `fields=names`, e `implode`). Ver `LECCIONES_APRENDIDAS.md` #131.
+- `test(products)`: agregadas 4 assertions nuevas en `ProductsAuditFixTest.php` (H6: 2 assertions; H7: 4 assertions). Suite `audit-prod` ahora cubre 16 tests (62 assertions). Grupo `Product*` extendido: 209 tests en verde (--filter "Product" local).
+- `docs(lessons)`: agregadas 2 lecciones nuevas (#131-#132) a `LECCIONES_APRENDIDAS.md`. Header del doc actualizado (Total 123 → 132, versión 2.9.239 → 2.9.293, fecha 2026-07-23 → 2026-07-29).
+
+### Backlog (no fixeado en este ciclo — re-auditoría módulo productos)
+- AUDIT-PROD-H8 (P1): peso/dimensiones no se editan en modal Edit (la UI no los expone — gaps de paridad del modal New↔Edit, no regresión). Backend preserva el valor correctamente (no se borra), pero el vendor no puede actualizarlos desde el modal.
+- AUDIT-PROD-H9 (P1): galería no editable en modal Edit (mismo patrón que H8 — solo backend preserva, UI no expone).
+- AUDIT-PROD-H10 (P1): `download_limit`/`download_expiry` units mismatch entre create (`-1`/`0`) y update (`-1`/`-1`). Divergencia de semántica de "ilimitado" en WooCommerce.
+- AUDIT-PROD-H12 (P1): tags asignados via `wp_set_post_terms` con names → riesgo de termos duplicados case-diferentes (`Verano` vs `verano`). Afecta ambos métodos (create y update). Fix sugerido: sanitizar a slug lowercase antes.
+- AUDIT-PROD-H13 (P1): `sync_variable_product` — `set_attributes + save` se ejecuta antes de la comparación de firmas (H2), invalidando parcialmente el "preservar variaciones". Edge case de `$attributes` vacío deja estado inconsistente. Reordenar comparación antes del set_attributes.
+- AUDIT-PROD-H11 (P2): `_ltms_vendor_id` re-escritura defensiva en update_product probablemente redundante en WC 8+ (comentario histórico refiere a WC pre-3.0).
+- AUDIT-PROD-H14 (P2): antipatrón `$product_refreshed = wc_get_product()` + 3-4 `$product->save()` redundantes en update_product. Refactor pendiente a un único save con la entidad original `$product`.
+- AUDIT-PROD-H15 (P2): ni create ni update disparan hooks LTMS propios (`ltms_product_created`/`ltms_product_updated`). Dependen de `woocommerce_new_product`/`woocommerce_update_product` implícitos. Follow-up: auditar consumidores (comisiones, warehouse).
+- AUDIT-PROD-H16 (P2, **decisión de producto pendiente**): `update_product` y `get_product` validan `post_author == get_current_user_id()` — un sub-usuario del vendor (asistente) no puede editar productos creados por el vendor principal. Si el modelo de negocio contempla asistentes, este es P1. Requiere confirmación de producto antes de cambiar.
+
 ## [Unreleased] — 2026-07-24 (2)
 ### Fixed — Ciclo de auditoría registro de vendedores (v2.9.243 → v2.9.244)
 
