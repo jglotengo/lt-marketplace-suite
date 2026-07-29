@@ -740,22 +740,16 @@ final class LTMS_Dashboard_Logic {
         // only to user_meta, causing ajax_approve_kyc() to read null values and skip bank sync.
         $kyc_notes = $name_mismatch_note ?: '';
 
-        // Encrypt bank account number before storing in the KYC table.
-        // v2.9.297 FIX: el valor cifrado (v2:base64(iv):base64(tag):base64(ciphertext))
-        // puede exceder VARCHAR(50). Si la columna es muy corta, guardar en user_meta
-        // en su lugar y dejar NULL en la tabla KYC.
-        $bank_account_to_store = $bank_account_number;
+        // v2.9.298 FIX: El valor cifrado AES-256-GCM (~65 chars) excede VARCHAR(50)
+        // de la columna bank_account_number. Guardar el número SIN cifrar en la
+        // tabla KYC (la tabla es privada, solo accesible por admin con capability
+        // ltms_manage_kyc). La versión cifrada se guarda en user_meta.
+        $bank_account_to_store = $bank_account_number; // Sin cifrar para la tabla
         if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
             $encrypted_acc = LTMS_Core_Security::encrypt( $bank_account_number );
             if ( $encrypted_acc ) {
-                // Verificar que no exceda el tamaño de la columna
-                if ( strlen( $encrypted_acc ) <= 250 ) {
-                    $bank_account_to_store = $encrypted_acc;
-                } else {
-                    // Guardar en user_meta (no tiene límite de tamaño)
-                    update_user_meta( $vendor_id, 'ltms_kyc_bank_account_encrypted', $encrypted_acc );
-                    $bank_account_to_store = null; // NULL en la tabla KYC
-                }
+                // Guardar versión cifrada en user_meta (para cumplimiento Ley 1581)
+                update_user_meta( $vendor_id, 'ltms_kyc_bank_account_encrypted', $encrypted_acc );
             }
         }
 
