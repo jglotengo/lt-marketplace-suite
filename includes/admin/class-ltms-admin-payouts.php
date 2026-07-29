@@ -619,19 +619,24 @@ final class LTMS_Admin_Payouts {
         $b2_bucket = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
                         LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
         $sign_doc  = static function( string $path ) use ( $b2_bucket ): string {
-            if ( empty( $path ) ) return '';
-            // Convertir URLs legacy ltms-vault a key B2 relativa
+            if ( empty( $path ) ) return ''; // JS filtra vacíos
+            // v2.9.302: Si el path es una URL http completa que NO es ltms-vault,
+            // podría ser una URL directa de B2 o un archivo local. En ambos casos,
+            // extraer la key B2 del path.
             if ( filter_var( $path, FILTER_VALIDATE_URL ) ) {
                 if ( str_contains( $path, '/ltms-vault/' ) ) {
+                    // URL legacy: https://site/ltms-vault/kyc/168/uuid.pdf → kyc/168/uuid.pdf
                     $path = preg_replace( '#^.*/ltms-vault/#', '', $path );
+                } elseif ( str_contains( $path, 'backblazeb2.com' ) ) {
+                    // URL directa de B2: https://s3.us-east-005.backblazeb2.com/lotengo-kyc-docs/kyc/168/uuid.pdf
+                    // Extraer la key después del bucket
+                    $path = preg_replace( '#^https?://[^/]+/[^/]+/#', '', $path );
                 } else {
+                    // URL externa real — devolverla tal cual
                     return $path;
                 }
             }
-            // v2.9.300: Usar proxy PHP en vez de presigned URL.
-            // El proxy usa download_file() que funciona con la auth de la app key.
-            // Presigned URL falla con 'UnauthorizedAccess' porque la app key
-            // no tiene permisos de shareFiles en el bucket.
+            // v2.9.300: Usar proxy PHP.
             return admin_url( 'admin-ajax.php' ) . '?action=ltms_kyc_proxy_doc&key=' . rawurlencode( $path ) . '&nonce=' . wp_create_nonce( 'ltms_kyc_proxy' );
         };
         $doc_url_cedula = $sign_doc( $docs_by_type['cc'] ?? $docs_by_type['cedula'] ?? $kyc['file_path'] ?? get_user_meta( $vendor_id, 'ltms_kyc_file_cedula', true ) ?: get_user_meta( $vendor_id, 'ltms_kyc_doc_path', true ) );
@@ -760,7 +765,9 @@ final class LTMS_Admin_Payouts {
 
         $key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
         if ( empty( $key ) ) {
-            wp_die( 'Key requerido.', 'Error', [ 'response' => 400 ] );
+            // v2.9.302: Si no hay key, dar un mensaje más útil con diagnóstico
+            $all_params = json_encode( $_GET );
+            wp_die( 'Key requerido. Parámetros recibidos: ' . esc_html( $all_params ), 'Error', [ 'response' => 400 ] );
         }
 
         // Convertir URL legacy ltms-vault a key B2

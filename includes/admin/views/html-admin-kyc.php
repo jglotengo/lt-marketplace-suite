@@ -93,12 +93,17 @@ $total_kyc = array_sum( $count_map );
             try { $b2_client = new LTMS_Api_Backblaze(); } catch ( \Throwable $e ) { $b2_client = null; }
         }
         // v2.9.300 FIX: usar proxy PHP en vez de presigned URL (B2 UnauthorizedAccess)
+        // v2.9.300 FIX: usar proxy PHP en vez de presigned URL (B2 UnauthorizedAccess)
+        // v2.9.302 FIX: manejar URLs de B2 directas + ltms-vault + keys relativas
         $make_signed_url = static function( string $key ) use ( $b2_client, $kyc_bucket ): string {
             if ( empty( $key ) ) return '';
             // Convertir URLs legacy ltms-vault a key B2 relativa
             if ( str_starts_with( $key, 'http' ) ) {
                 if ( str_contains( $key, '/ltms-vault/' ) ) {
                     $key = preg_replace( '#^.*/ltms-vault/#', '', $key );
+                } elseif ( str_contains( $key, 'backblazeb2.com' ) ) {
+                    // URL directa de B2 — extraer key
+                    $key = preg_replace( '#^https?://[^/]+/[^/]+/#', '', $key );
                 } else {
                     return $key; // URL externa real
                 }
@@ -280,7 +285,7 @@ $total_kyc = array_sum( $count_map );
             return;
         }
         $.each( docs, function( i, url ) {
-            if ( ! url || url === '#' ) return;
+            if ( ! url || url === '#' || url === '' ) return;
             var ext = url.split('.').pop().toLowerCase().split('?')[0];
             var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1;
             var label = decodeURIComponent( url.split('/').pop().split('?')[0] );
