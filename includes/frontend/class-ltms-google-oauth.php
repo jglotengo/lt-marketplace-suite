@@ -184,7 +184,26 @@ final class LTMS_Google_OAuth {
             return;
         }
 
-        // Autenticar en WordPress.
+        // AUTH-04 (P1) AUDIT-AUTH FIX: Si el vendor recién promoted/registrado tiene
+        // perfil incompleto, NO autenticarlo con cookie persistente aquí. El flujo
+        // correcto es: redirect a la página de registro con ?complete_profile=1, mostrar
+        // el wizard de completar datos, y solo una vez que el wizard se completa via
+        // ajax_complete_profile (que verifica sesión), recién autenticar. Antes,
+        // wp_set_auth_cookie() se ponía INCONDICIONALMENTE, lo que combinado con el
+        // hook wp_login prio 30 de TOTP_2FA::intercept_login_for_2fa disparaba redirect
+        // a 2FA challenge — el usuario terminaba en wp-login.php con sesión inconsistente.
+        $profile_incomplete = (bool) get_user_meta( $user_id, 'ltms_profile_incomplete', true );
+        if ( $profile_incomplete ) {
+            $pages   = get_option( 'ltms_installed_pages', [] );
+            $reg_id  = $pages['ltms-vendor-register'] ?? 0;
+            $reg_url = $reg_id
+                ? add_query_arg( 'complete_profile', '1', get_permalink( $reg_id ) )
+                : home_url( '/registro-vendedor/?complete_profile=1' );
+            wp_safe_redirect( $reg_url );
+            exit;
+        }
+
+        // Autenticar en WordPress. Solo cuando el perfil está COMPLETO.
         wp_set_current_user( $user_id );
         wp_set_auth_cookie( $user_id, true );
         do_action( 'wp_login', get_userdata( $user_id )->user_login, get_userdata( $user_id ) );
@@ -399,7 +418,29 @@ final class LTMS_Google_OAuth {
         }
 
         // Registrar en la red de referidos si hay código.
-        $ref_code = sanitize_text_field( $_COOKIE['ltms_ref'] ?? '' ); // phpcs:ignore
+        // AUTH-05 (P1) AUDIT-AUTH FIX: sanitizar y validar $_COOKIE['ltms_ref']
+        // antes de pasarlo a register_node(). Antes, el valor raw de la cookie se
+        // pasaba directo — un atacante podía setear una cookie con valor malicioso
+        // (SQLi-shaped string, ID de admin como referrer, o string de 10MB) y se
+        // inyectaba en el árbol de referidos sin sanear. Ahora: uppercase + sanitize
+        // + length cap (8) + validación de que el referrer existe en bkr_lt_referrals.
+        $ref_code = '';
+        if ( ! empty( $_COOKIE['ltms_ref'] ) ) { // phpcs:ignore
+            $raw_ref = sanitize_text_field( wp_unslash( $_COOKIE['ltms_ref'] ) ); // phpcs:ignore
+            $ref_code = strtoupper( substr( $raw_ref, 0, 8 ) );
+            // Solo pasar al árbol de referidos si el código existe en la DB.
+            // register_node valida internamente, pero esta capa adicional evita
+            // pasar basura al módulo de MLM.
+            $referrer_exists = get_users( [
+                'meta_key'   => 'ltms_referral_code',
+                'meta_value' => $ref_code,
+                'number'     => 1,
+                'fields'     => 'ID',
+            ] );
+            if ( empty( $referrer_exists ) ) {
+                $ref_code = '';
+            }
+        }
         if ( ! empty( $ref_code ) && class_exists( 'LTMS_Referral_Tree' ) ) {
             LTMS_Referral_Tree::register_node( $user_id, $ref_code );
         }

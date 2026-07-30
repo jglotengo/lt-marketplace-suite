@@ -283,7 +283,16 @@ class LTMS_TOTP_2FA {
         }
 
         // Vendors con payouts recientes: obligatorio.
-        if ( in_array( 'vendor', $user->roles, true ) ) {
+        // AUTH-07 (P2) AUDIT-AUTH FIX: el rol correcto en LTMS es 'ltms_vendor' o
+        // 'ltms_vendor_premium', NO 'vendor' (rol WP default que no existe en este
+        // plugin). Antes, la condición `in_array('vendor', $user->roles)` era
+        // SIEMPRE false, así que ltms_2fa_required_vendors='yes' (default del admin)
+        // nunca aplicaba — los vendors con payouts recientes NUNCA eran forzados a 2FA.
+        // El original usaba 'vendor' que es el rol legacy/default de WooCommerce, no
+        // el rol del marketplace. Array intersecado con roles, validar si cualquier
+        // rol-matching está presente.
+        $vendor_roles = [ 'ltms_vendor', 'ltms_vendor_premium' ];
+        if ( ! empty( array_intersect( $vendor_roles, (array) $user->roles ) ) ) {
             if ( LTMS_Core_Config::get( 'ltms_2fa_required_vendors', 'yes' ) === 'yes' ) {
                 return self::vendor_has_recent_payouts( $user->ID );
             }

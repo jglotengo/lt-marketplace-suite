@@ -233,39 +233,50 @@ final class LTMS_Public_Auth_Handler {
         $expires      = $now + self::LOGIN_WINDOW;
 
         // Check if the transient already expired → reset to 0.
+        // AUTH-10 (P2) AUDIT-AUTH FIX: el reset separado del incremento tenía una
+        // race subtle: si el transient expira en medio de un request, el UPDATE de
+        // reset y el INSERT...ON DUPLICATE pueden no ver el estado consistente. La
+        // simplificación: si el timeout expiró, forzar el INSERT a empezar en 1
+        // (no hacer increment en este caso, sobreescribir). El SELECT+UPDATE
+        // no es atómico pero el downgrade de 0→1 es garantizado por el UPDATE.
         $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
             $timeout_name
         ) );
 
-        if ( $timeout_val && $timeout_val < $now ) {
-            // Expired — reset counter to 0 before incrementing.
+        $expired = $timeout_val && $timeout_val < $now;
+
+        if ( $expired ) {
+            // Expiró → forzar contador a 1 (este request es el primero de la ventana).
             $wpdb->query( $wpdb->prepare(
-                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+                 ON DUPLICATE KEY UPDATE option_value = '1'",
                 $option_name
             ) );
             $wpdb->query( $wpdb->prepare(
-                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
-                $expires, $timeout_name
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+                 ON DUPLICATE KEY UPDATE option_value = %d",
+                $timeout_name, $expires, $expires
+            ) );
+            $tries = 1;
+        } else {
+            // Atomic increment — race-safe under concurrent requests.
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+                 ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+                $option_name
+            ) );
+            // Ensure timeout is set (only on first attempt; don't extend on subsequent).
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+                 ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+                $timeout_name, $expires, $now, $expires
+            ) );
+            $tries = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+                $option_name
             ) );
         }
-
-        // Atomic increment — race-safe under concurrent requests.
-        $wpdb->query( $wpdb->prepare(
-            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
-             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
-            $option_name
-        ) );
-        // Ensure timeout is set (only on first attempt; don't extend on subsequent).
-        $wpdb->query( $wpdb->prepare(
-            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
-             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
-            $timeout_name, $expires, $now, $expires
-        ) );
-        $tries = (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
-            $option_name
-        ) );
 
         if ( $tries > self::LOGIN_MAX_ATTEMPTS ) {
             LTMS_Core_Logger::security(
@@ -293,13 +304,6 @@ final class LTMS_Public_Auth_Handler {
             wp_send_json_error( __( 'Usuario o contraseña incorrectos.', 'ltms' ) );
         }
 
-        // Successful login — clear the throttle counter.
-        // v2.9.293: delete_transient puede no limpiar la option en la DB
-        // si el transiente usó wp_options directamente. Limpiar ambas.
-        delete_transient( $throttle_key );
-        delete_option( $throttle_key );
-        delete_option( '_transient_timeout_' . $throttle_key );
-
         $pages        = get_option( 'ltms_installed_pages', [] );
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
 
@@ -309,6 +313,36 @@ final class LTMS_Public_Auth_Handler {
                    || in_array( 'ltms_vendor_premium', $user_roles, true );
         $is_admin   = in_array( 'administrator', $user_roles, true )
                    || in_array( 'editor', $user_roles, true );
+
+        // AUTH-01 (P0) AUDIT-AUTH FIX: Si el rol es vendor y el policy
+        // ltms_require_email_verification='yes' (default), rechazar el login si el
+        // email del vendor no está verificado. ANTES, wp_signon() aceptaba al
+        // vendor y la validación de ltms_email_verified solo se hacía en la UI del
+        // dashboard (lógica de UX, no de seguridad). Un atacante con el email y
+        // password correctos pero email no verificado podía acceder al panel.
+        // Ahora bloqueamos en origen. La throttle NO se reinicia (sigue contando
+        // como intento fallido) para evitar que un atacante con credenciales
+        // correctas pero email no verificado intente infinitas veces.
+        if ( $is_vendor && get_option( 'ltms_require_email_verification', 'yes' ) !== 'no' ) {
+            $email_verified = (bool) get_user_meta( $user->ID, 'ltms_email_verified', true );
+            if ( ! $email_verified ) {
+                // Logout inmediato — wp_signon ya emitió auth cookie.
+                wp_logout();
+                wp_clear_auth_cookie();
+
+                $login_id  = $pages['ltms-login'] ?? 0;
+                $login_url = $login_id ? get_permalink( $login_id ) : home_url( '/login-vendedor/' );
+                $resend_url = add_query_arg(
+                    [ 'resend_verification' => '1' ],
+                    add_query_arg( 'registered', '1', $login_url )
+                );
+                wp_send_json_error([
+                    'message' => __( 'Debes verificar tu email antes de iniciar sesión. Revisa tu correo (incluyendo spam) o solicita reenviar el enlace de verificación.', 'ltms' ),
+                    'errors'  => [ [ 'field' => 'email', 'message' => __( 'Email no verificado.', 'ltms' ) ] ],
+                    'redirect' => $resend_url,
+                ], 403 );
+            }
+        }
 
         if ( $is_vendor ) {
             // Vendedor → su panel
@@ -320,6 +354,23 @@ final class LTMS_Public_Auth_Handler {
             // Otro usuario (cliente WC) → mi-cuenta de WooCommerce
             $redirect = wc_get_page_permalink( 'myaccount' ) ?: home_url();
         }
+
+        // Successful login — clear the throttle counter.
+        // v2.9.293: delete_transient puede no limpiar la option en la DB
+        // si el transiente usó wp_options directamente. Limpiar ambas.
+        //
+        // RA-AUTH-01 (P1) AUDIT-AUTH RE-FIX: el reset se hace AQUÍ, justo
+        // antes de responder success, NO antes del check AUTH-01. Antes,
+        // el bloque AUTH-01 (líneas 324-352) rechazaba el login por email
+        // no verificado DESPUÉS de que la throttle se había reseteado, lo
+        // que permitía a un atacante con credenciales correctas pero email
+        // no verificado patear el endpoint infinitamente sin throttle. Con
+        // el reset aquí, la throttle sigue contando los intentos rechazados
+        // por AUTH-01 (que es lo que el comentario del fix original decía
+        // pero el código no hacía).
+        delete_transient( $throttle_key );
+        delete_option( $throttle_key );
+        delete_option( '_transient_timeout_' . $throttle_key );
 
         wp_send_json_success([
             'redirect' => $redirect,
@@ -591,13 +642,24 @@ final class LTMS_Public_Auth_Handler {
             // LTMS_Core_Security::encrypt() directamente y log_vault_access() por separado.
             $encrypted_doc = LTMS_Core_Security::encrypt( $data['document'] );
             update_user_meta( $user_id, 'ltms_document', $encrypted_doc );
-            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                // M-FIX-REG-04: log_vault_access() requiere $accessor_id (int) como segundo
-                // parámetro — pasar el tipo de documento ahí causaba un TypeError fatal
-                // (capturado por el catch de abajo, produciendo el MISMO rollback que el
-                // bug original). El propio vendedor es quien declara su documento al
-                // registrarse, así que accessor_id = user_id.
-                LTMS_Legal_Compliance::log_vault_access( $user_id, $user_id, 'ltms_document', 'write', 'registration' );
+            // M-FIX-REG-04: log_vault_access() requiere $accessor_id (int) como segundo
+            // parámetro — pasar el tipo de documento ahí causaba un TypeError fatal
+            // (capturado por el catch de abajo, produciendo el MISMO rollback que el
+            // bug original). El propio vendedor es quien declara su documento al
+            // registrarse, así que accessor_id = user_id.
+            // AUTH-03 (P1) AUDIT-AUTH FIX: envolver log_vault_access en try-catch drain.
+            // Antes, fallaba dentro del try{} principal y disparaba rollback de TODO el
+            // registro. Vault logging es observabilidad crítica pero no debe bloquear el
+            // registro del vendor — el documento YA está cifrado en meta arriba.
+            try {
+                if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                    LTMS_Legal_Compliance::log_vault_access( $user_id, $user_id, 'ltms_document', 'write', 'registration' );
+                }
+            } catch ( \Throwable $e ) {
+                LTMS_Core_Logger::warning(
+                    'REGISTER_VAULT_LOG_FAILED',
+                    sprintf( 'uid=%d: %s', $user_id, $e->getMessage() )
+                );
             }
             update_user_meta( $user_id, 'ltms_document_type', $data['document_type'] );
             // M-MX-1: guardar país del vendedor para routing fiscal y wallet.
@@ -633,8 +695,26 @@ final class LTMS_Public_Auth_Handler {
 
             // L-6: guardar consentimiento explícito de datos (Ley 1581/2012 art. 9).
             // M-FIX-REG-02: save_consent() no existe — usar log_consent() con los parámetros reales.
-            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::log_consent( $user_id, 'terms_and_conditions', true, '1.0', 'web' );
+            //
+            // AUTH-03 (P1) AUDIT-AUTH FIX: envolver log_consent() en try-catch
+            // drain. Antes, este bloque estaba dentro del try{} principal que
+            // hace rollback del vendor si CUALQUIER cosa falla. Como
+            // LTMS_Legal_Compliance puede no estar inicializada correctamente
+            // en ciertos despliegues (auto-loader tardío), un TypeError en
+            // log_consent() deshacía TODO el registro — el vendor quedaba
+            // rollback tras haberse creado user + wallet + metas. legal logging
+            // es observabilidad, no core del registration: si falla, loggeamos
+            // el error pero el vendor YA está creado. El consentimiento tiene
+            // fallback en ltms_terms_accepted_at meta (línea 627).
+            try {
+                if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                    LTMS_Legal_Compliance::log_consent( $user_id, 'terms_and_conditions', true, '1.0', 'web' );
+                }
+            } catch ( \Throwable $e ) {
+                LTMS_Core_Logger::warning(
+                    'REGISTER_CONSENT_LOG_FAILED',
+                    sprintf( 'uid=%d: %s', $user_id, $e->getMessage() )
+                );
             }
 
             // C-3: token de verificación de email (48h).
@@ -657,11 +737,21 @@ final class LTMS_Public_Auth_Handler {
 
             // L-2 FIX: Registrar consentimiento de tratamiento de datos (Ley 1581/2012, art. 9).
             // M-FIX-REG-03: PURPOSE_REGISTRATION constante no existe — usar string literal.
-            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-                LTMS_Legal_Compliance::log_consent( $user_id, 'data_treatment', true, '1.0', 'web' );
-                if ( ! empty( $data['sagrilaft_accepted'] ) ) {
-                    LTMS_Legal_Compliance::log_consent( $user_id, 'sagrilaft', true, '1.0', 'web' );
+            // AUTH-03 (P1) AUDIT-AUTH FIX: mismo drenaje del log_consent que el de terms arriba.
+            // Si legal logging falla aquí, el vendor ya está creado plus se disparó la action
+            // ltms_vendor_registered, así que no retroceder — solo log.
+            try {
+                if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                    LTMS_Legal_Compliance::log_consent( $user_id, 'data_treatment', true, '1.0', 'web' );
+                    if ( ! empty( $data['sagrilaft_accepted'] ) ) {
+                        LTMS_Legal_Compliance::log_consent( $user_id, 'sagrilaft', true, '1.0', 'web' );
+                    }
                 }
+            } catch ( \Throwable $e ) {
+                LTMS_Core_Logger::warning(
+                    'REGISTER_CONSENT_LOG_FAILED_DT',
+                    sprintf( 'uid=%d: %s', $user_id, $e->getMessage() )
+                );
             }
 
             // C-2: enviar email de bienvenida con link de verificación.
@@ -786,6 +876,69 @@ final class LTMS_Public_Auth_Handler {
             return;
         }
 
+        // AUTH-02 (P0) AUDIT-AUTH FIX: Rate-limit por IP en el endpoint de
+        // verificación de email. Antes NINGÚN rate limit existía — un atacante
+        // podía spamear ?ltms_verify_email=...&uid=N billones de veces buscando
+        // colisión de tokens (improbable pero el vector de brute-force existía).
+        // Max 10 intentos por IP cada 15 minutos.
+        //
+        // RA-AUTH-02 (P2) AUDIT-AUTH RE-FIX: migrar de get_transient+set_transient
+        // (NO atómico, TOCTOU) a INSERT...ON DUPLICATE KEY atómico — mismo patrón
+        // que AUTH-08 (líneas ~1251) y AUTH-09 (líneas ~1335). Antes, N requests
+        // concurrentes leían todos $verify_tries=k, todos escribían k+1, dejando
+        // el contador en k+1 en vez de k+N — bypassando el límite de 10/15min.
+        // La severidad es P2 (no P0) porque el token tiene 32 chars de entropía
+        // (2^192) y el brute-force es impracticable de cualquier forma, pero el
+        // rate-limit es defensa en profundidad y debe ser consistente con el resto
+        // del módulo auth.
+        $ip = LTMS_Utils::get_ip();
+        $verify_throttle = 'ltms_email_verify_attempts_' . md5( $ip );
+        global $wpdb;
+        $verify_option  = '_transient_' . $verify_throttle;
+        $verify_timeout = '_transient_timeout_' . $verify_throttle;
+        $verify_now     = time();
+        $verify_expires = $verify_now + 15 * MINUTE_IN_SECONDS;
+
+        // Reset si el transient anterior expiró.
+        $verify_timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $verify_timeout
+        ) );
+        if ( $verify_timeout_val && $verify_timeout_val < $verify_now ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                $verify_option
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $verify_expires, $verify_timeout
+            ) );
+        }
+
+        // Increment atómico (race-safe bajo concurrencia).
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+            $verify_option
+        ) );
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+            $verify_timeout, $verify_expires, $verify_now, $verify_expires
+        ) );
+        $verify_tries = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $verify_option
+        ) );
+
+        if ( $verify_tries > 10 ) {
+            wp_die(
+                esc_html__( 'Demasiados intentos de verificación. Espera 15 minutos.', 'ltms' ),
+                esc_html__( 'Verificación de email', 'ltms' ),
+                [ 'response' => 429, 'back_link' => true ]
+            );
+        }
+
         $stored  = (string) get_user_meta( $user_id, 'ltms_email_verify_token', true );
         $expires = (int) get_user_meta( $user_id, 'ltms_email_verify_expires', true );
 
@@ -798,6 +951,9 @@ final class LTMS_Public_Auth_Handler {
         }
 
         if ( $expires > 0 && time() > $expires ) {
+            // Token expirado — eliminarlo para prevenir futuros intentos con token muerto.
+            delete_user_meta( $user_id, 'ltms_email_verify_token' );
+            delete_user_meta( $user_id, 'ltms_email_verify_expires' );
             wp_die(
                 esc_html__( 'El link de verificación expiró. Solicita uno nuevo desde tu panel.', 'ltms' ),
                 esc_html__( 'Verificación de email', 'ltms' ),
@@ -805,10 +961,19 @@ final class LTMS_Public_Auth_Handler {
             );
         }
 
-        update_user_meta( $user_id, 'ltms_email_verified', 1 );
-        update_user_meta( $user_id, 'ltms_email_verified_at', LTMS_Utils::now_utc() );
+        // AUTH-02 (P0) AUDIT-AUTH FIX: Invalidar el token ANTES de marcar verificado
+        // (compare-and-swap atómico). Antes, el token se eliminaba DESPUÉS de
+        // marcar ltms_email_verified=1, dejando una ventana de race condition donde
+        // 2 requests concurrentes con el mismo token válido ambos pasaban
+        // hash_equals() y ambos marcaban el email como verificado. Aunque el
+        // efecto práctico era idéntico (email verified=1), el token permanecía
+        // utilizable en la ventana. Ahora consumimos el token primero. Si el
+        // marcado like falla después, el usuario puede solicitar un nuevo link.
         delete_user_meta( $user_id, 'ltms_email_verify_token' );
         delete_user_meta( $user_id, 'ltms_email_verify_expires' );
+
+        update_user_meta( $user_id, 'ltms_email_verified', 1 );
+        update_user_meta( $user_id, 'ltms_email_verified_at', LTMS_Utils::now_utc() );
 
         LTMS_Core_Logger::info(
             'EMAIL_VERIFIED',
@@ -1116,12 +1281,54 @@ final class LTMS_Public_Auth_Handler {
         }
 
         // Rate limit: 3 reenvíos por hora.
+        // AUTH-08 (P2) AUDIT-AUTH FIX: migrar de get_transient+set_transient (NO
+        // atómico, TOCTOU) a INSERT...ON DUPLICATE KEY atómico (mismo patrón que
+        // login throttle líneas 254-264 y register throttle líneas 377-391).
+        // Antes, 50 requests concurrentes leían todas $attempts=0, todas ponían 1,
+        // el límite nunca se avanzaba — un atacante podía spamear reenvíos
+        // indefinidamente para inflar buckets de email y bombeo de tokens.
         $throttle_key = 'ltms_resend_attempts_' . $user_id;
-        $attempts = (int) get_transient( $throttle_key );
-        if ( $attempts >= 3 ) {
+        global $wpdb;
+        $option_name  = '_transient_' . $throttle_key;
+        $timeout_name = '_transient_timeout_' . $throttle_key;
+        $now          = time();
+        $expires      = $now + HOUR_IN_SECONDS;
+
+        // Verificar si el transient expiró para resetear el contador.
+        $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $timeout_name
+        ) );
+        if ( $timeout_val && $timeout_val < $now ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                $option_name
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $expires, $timeout_name
+            ) );
+        }
+
+        // Increment atómico.
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+            $option_name
+        ) );
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+            $timeout_name, $expires, $now, $expires
+        ) );
+        $attempts = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $option_name
+        ) );
+
+        if ( $attempts > 3 ) {
             wp_send_json_error( [ 'message' => __( 'Demasiados reenvíos. Intenta más tarde.', 'ltms' ) ], 429 );
         }
-        set_transient( $throttle_key, $attempts + 1, HOUR_IN_SECONDS );
 
         // Generar nuevo token.
         $verify_token = wp_generate_password( 32, false );
@@ -1165,13 +1372,50 @@ final class LTMS_Public_Auth_Handler {
         // Un atacante con sesión de vendor podía spamear este endpoint para
         // enumerar combinaciones de document_number/store_name válidas.
         // Limit: 5 intentos por IP cada 15 minutos (igual que register/login).
+        // AUTH-09 (P2) AUDIT-AUTH FIX: migrar a INSERT...ON DUPLICATE KEY atómico
+        // (igual que AUTH-08 arriba) — antes get_transient+set_transient permitía
+        // bypass under concurrent requests.
         $ip = LTMS_Core_Security::get_client_ip_safe();
         $throttle_key = 'ltms_complete_profile_attempts_' . md5( $ip );
-        $tries = (int) get_transient( $throttle_key );
-        if ( $tries >= 5 ) {
+        global $wpdb;
+        $option_name  = '_transient_' . $throttle_key;
+        $timeout_name = '_transient_timeout_' . $throttle_key;
+        $now          = time();
+        $expires      = $now + 15 * MINUTE_IN_SECONDS;
+
+        $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $timeout_name
+        ) );
+        if ( $timeout_val && $timeout_val < $now ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                $option_name
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $expires, $timeout_name
+            ) );
+        }
+
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+            $option_name
+        ) );
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+            $timeout_name, $expires, $now, $expires
+        ) );
+        $tries = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $option_name
+        ) );
+
+        if ( $tries > 5 ) {
             wp_send_json_error( [ 'message' => __( 'Demasiados intentos. Espera 15 minutos.', 'ltms' ) ], 429 );
         }
-        set_transient( $throttle_key, $tries + 1, 15 * MINUTE_IN_SECONDS );
 
         // Sanitizar y validar datos.
         $phone           = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) ); // phpcs:ignore
@@ -1273,9 +1517,15 @@ final class LTMS_Public_Auth_Handler {
             update_user_meta( $user_id, 'ltms_sagrilaft_accepted_at', LTMS_Utils::now_utc() );
         }
 
-        // v2.9.113 P3-17 FIX: mark email as verified (Google path already verified it).
-        update_user_meta( $user_id, 'ltms_email_verified', 1 );
-        update_user_meta( $user_id, 'ltms_email_verified_at', LTMS_Utils::now_utc() );
+        // AUTH-06 (P1) AUDIT-AUTH FIX: NO marcar email_verified=1 automáticamente aquí.
+        // Antes, ajax_complete_profile() forzaba ltms_email_verified=1 sin importar el
+        // origen. Esto es válido solo para Google OAuth path (donde Google YA verificó).
+        // Pero el flujo de complete_profile también era alcanzable por vendors
+        // registrados via email normal que NO habían click el link de verificación.
+        // El flag email_verified DEBE provenir exclusivamente del endpoint
+        // handle_email_verification() (link click en email). Las clases que crean
+        // vendors via Google OAuth (LTMS_Google_OAuth::login_or_register) ya ponen
+        // ltms_email_verified=1 en ese path. No debe sobre-escribirse aquí.
 
         // Marcar perfil como completo.
         delete_user_meta( $user_id, 'ltms_profile_incomplete' );
