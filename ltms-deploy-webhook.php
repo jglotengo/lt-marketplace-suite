@@ -63,3 +63,4 @@ echo implode("\n", $o2) . "\n";
 echo "Reset: " . ($r3 === 0 ? "OK" : "ERR({$r3})") . "\n";
 echo implode("\n", $o3) . "\n";
 echo "Deploy complete.\n";
+echo "Webhook version: v6.1-marker-deploytest-2026-07-30\n";
