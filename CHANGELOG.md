@@ -16,7 +16,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Backlog detectado (NO fixeado en este commit — fuera de alcance)
 - **AUDIT-FE-VS-JT-001 (P1)**: `vendor-store.php:602-633` sigue con un bloque `<script>` inline para el handler del botón "Ver políticas" (`data-pv-jump-tab`). Migrar ese handler al design system global `ltms-plaza-viva.js` es el siguiente paso para cerrar 100% CSP-compliance en `vendor-store.php`.
-- **PRE-EXISTING regression en working tree (NO introducida por este commit)**: el working tree al inicio de esta sesión tenía `class-ltms-dashboard-logic.php` y `view-kyc.php` con un refactor de ~1800 líneas eliminadas que removió también el fix `KYC-AUDIT2-01` (`$bank_account_to_store = $encrypted_acc;` — el cambio a guardar ciphertext en la tabla KYC). Consecuencia: el test pre-existente `KycAudit2FixTest::test_02a_submit_kyc_stores_ciphertext_in_table` está fallando (busca el comentario `KYC-AUDIT2-01` que ya no está en el archivo). **REQUIERE DECISIÓN DE PRODUCTO** sobre el destino de ese refactor previo (¿revertir? ¿completar? ¿dejar pendiente?). No se sabe si fue intencional o accidental porque no hay commit marcando el refactor — está solo en el working tree sin commitear.
+
+### Fixed — Restauración de refactor previo incompleto del working tree (PANEL-RESTORE)
+
+> Al inicio de la sesión de Fase 1.4, el working tree tenía un refactor PRE-EXISTING sin commitear ni documentar en `includes/frontend/class-ltms-dashboard-logic.php` (~1800 líneas eliminadas: 955 → difería de HEAD con 2624 líneas) y `includes/frontend/views/view-kyc.php` (~240 líneas). El inventario del diff reveló que el refactor había removido MASivamente handlers AJAX **registrados** en `init()` y que JS externos del plugin invocan:
+>
+> - 7 handlers PosGold (`ltms_save_posgold_credentials`, `ltms_save_posgold_categories`, `ltms_get_posgold_categories`, `ltms_save_posgold_rules`, `ltms_save_posgold_seo`, `ltms_test_posgold_connection`, `ltms_sync_posgold_products`) — invocados por `assets/js/ltms-posgold.js`. La vista PosGold del vendor quedó 100% rota: ningún botón (save creds, sync, categorías, reglas, SEO, test) tenía backend.
+> - 4 handlers del panel del vendor (`ltms_get_order_detail`, `ltms_update_order_status`, `ltms_track_banner_download`, `ltms_get_activity_feed`) — invocados por `assets/js/ltms-dashboard.js` y `assets/js/ltms-marketing.js`. El modal de detalle de pedido, el cambio de estado desde el panel, y el activity feed del home quedaron rotos.
+> - 6 handlers de UX/marketplace (`ltms_backorder_notify`, `ltms_review_helpful`, `ltms_save_push_subscription`, `ltms_submit_question`, `ltms_submit_return`, `ltms_get_invoices`) — invocados por `assets/js/ltms-ux-enhancements.js`. Suscripciones de backorder, voto útil en reseñas, push subscriptions, Q&A de producto, returns, e invoices del vendor — todas rotas.
+>
+> ADEMÁS, el refactor eliminó también el fix `KYC-AUDIT2-01` (línea 759: `$bank_account_to_store = $encrypted_acc;`) que guarda bank_account_number CIPHERTEXT en la tabla KYC (single-source-of-truth tras la migración v2.9.16). Restaurar el ciphertext-handling anterior habría devuelto PII bank en plaintext a `user_meta` → violación Ley 1581/2012 art. 11 en reposo + `decrypt(plaintext)` retornando false silenciosamente en payout-scheduler, commission-writer, view-wallet, view-settings. El test pre-existente `KycAudit2FixTest::test_02a_submit_kyc_stores_ciphertext_in_table` fallaba por este motivo.
+>
+> **Decisión de producto**: La pregunta al usuario resultó en "procede como mejor consideres para el proyecto". Dado que (1) el refactor no tenía commit message/documentación que indique intención clara, (2) rompía 17 funcionalidades de ventas del vendor en producción y (3) reabría una violación de cumplimiento Ley 1581 ya cerrada, se optó por la opción más segura: `git checkout HEAD --` de los dos archivos afectados para descartar el refactor previo entero.
+>
+> Resultado:
+> - Archivos alineados a HEAD (`class-ltms-dashboard-logic.php` vuelve a 2624 líneas, `view-kyc.php` vuelve a 344 líneas).
+> - 17/17 handlers AJAX restaurados y sus JS externos vuelven a tener backend que los atienda.
+> - Fix `KYC-AUDIT2-01` restaurado (PII bank en ciphertext en la tabla KYC).
+> - Test `KycAudit2FixTest::test_02a_submit_kyc_stores_ciphertext_in_table` vuelve a PASAR (test suite KYC-AUDIT2: 18/18 OK).
+> - Suite filtrada ampliada `KycAudit2 | AuthAuditFix | PanelAuditFix | ProductsAuditFix | VendorFollowers | PlazaVivaAddToCart | HomeQuickViewAttr | CheckoutAuditFix`: 93 tests OK (328 assertions, 0 failures) — sin regresiones.
+>
+> Como el `git checkout HEAD --` deja el working tree idéntico al index/HEAD, no produjo un diff que commitear; esta nota queda como trazabilidad documental de la acción tomada durante la sesión de Fase 1.4.
+>
+> Ver `LECCIONES_APRENDIDAS.md` #138 para la lección preventiva: "Refactors masivos en working tree sin commit + sin documentación son indistinguibles de WANs/hacks — todo refactor ≥100 líneas debe venir con commit message descriptivo y/o ticket de referencia, nunca en working tree 'invisible'".
 
 ## [Unreleased] — 2026-07-29
 ### Fixed - Ciclo de auditoria AUTH-AUDIT (auditoria full-stack autenticacion, registro, onboarding y 2FA)
