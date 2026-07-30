@@ -3,8 +3,8 @@
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
 > **Última actualización:** 2026-07-29
-> **Versión del plugin:** 2.9.293
-> **Total de lecciones:** 133 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293 + 1 del ciclo AUDIT-PANEL v2.9.294)
+> **Versión del plugin:** 2.9.305
+> **Total de lecciones:** 134 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293 + 1 del ciclo AUDIT-PANEL v2.9.294 + 1 del ciclo KYC-AUDIT2 v2.9.305)
 
 ---
 
@@ -1849,4 +1849,33 @@ Ambos mantienen la trazabilidad (AUDIT-ID + explicación) sin reproducir la cade
 2. **Considerar el ámbito sintáctico:** los tests de PHPUnit sobre contenido de archivo no distinguen código de comentario/string de documentación. Si el patrón solo puede aparecer en código ejecutable, una alternativa más estricta es extraer el archivo, quitar comentarios (regex `/\*.*?\*/` y `//[^\n]*`) y strings, y matchear sobre el resto. ParaLt simplicity, normalmente basta con rewording el comentario.
 3. **El test `ProductsAuditFixTest.php::test_h6_*` ya había resuelto lo mismo** con regex que distinguía la sentencia PHP de la mención en el comentario (`/set_weight\(\s*\$weight\s*\?\?\s*''\s*\)\s*;/` matcheaba la sentencia con punto y coma final, no la mención en el comentario del fix sin el `;`). Ese patrón puede reutilrizarse, pero solo aplica cuando el patrón peligroso tiene una signatura más específica que el comentario no reproduce. En casos donde la signatura es idéntica (como FN-09/FN-10), el rewording del comentario es la única opción.
 4. **Auto-re-auditar el test tras añadir el comentario del fix:** paso explícito del loop "fix → re-audit". Tras aplicar el fix + dejar el comentario trazable, correr la suite antes de commitear. Si el falso positivo aparece, ajustar el comentario o el test. Caso real: AUDIT-PANEL-FN-09 y AUDIT-PANEL-FN-10 detectaron sus propios falsos positivos en la primera corrida de `phpunit --group audit-panel` y se corrigieron antes del commit (no llegaron a main).
+
+---
+
+### Lección #134: Un fix que cambia el formato de un campo PII debe revisar TODOS los consumers del user_meta — no asumir que el cambio de diseño queda consistente
+
+**Ciclo:** KYC-AUDIT2 (re-auditoría módulo KYC, v2.9.305) — hallazgo K-A2-01 (P0).
+
+**Error检测ado:** El fix c54ac9f7 (v2.9.298) introdujo un cambio de diseño para resolver el overflow `VARCHAR(50)` del ciphertext AES-256-GCM (~65 chars):
+- Tabla `lt_vendor_kyc.bank_account_number` → guarda **plaintext** (sí cabe en VARCHAR(50)).
+- user_meta `ltms_kyc_bank_account_encrypted` → guarda el ciphertext (cumplimiento Ley 1581).
+
+PERO el handler `approve_kyc` seguía copiando el plaintext de la tabla → `ltms_bank_account_number` (user_meta). Y TODOS los consumers (`payout-scheduler`, `commission-writer`, `view-wallet`, `view-settings`) esperaban que `ltms_bank_account_number` estuviera **CIFRADA** e invocaban `LTMS_Core_Security::decrypt()` sobre ella. Resultado:
+1. PII bancaria en plaintext en user_meta (violación Ley 1581 art. 11 en reposo).
+2. `decrypt(plaintext)` retornaba false → app caía en fallbacks del estilo "mostrar raw value".
+3. El administrador no podía ver `****1234` en el modal `get_kyc_details` (siempre `****` constante — K-A2-02).
+
+**Causa raíz:** El fix c54ac9f7 aisló el problema en `dashboard-logic.php` (submit) pero NO actualizó:
+- `admin-payouts.php` `approve_kyc` (que copia tabla → user_meta).
+- `admin-payouts.php` `ajax_get_kyc_details` (que hace `decrypt()` sobre el valor de tabla).
+- Su propio comentario seguía diciendo "table stores the account ENCRYPTED" — contradictorio con el cambio real.
+
+**Fix aplicado (KYC-AUDIT2-01):** En vez de acceptar plaintext table, se restauró el single-source-of-truth original via `ALTER TABLE VARCHAR(80)` para permitir guardar ciphertext en la tabla. Migración v2.9.16 re-cifra todos los plaintext legacy y sincroniza el user_meta. Backfill script `bin/ltms-backfill-kyc-ciphertext.php` para ops que quieran correrlo fuera del activation hook.
+
+**Regla preventiva:** Cuando un fix cambia el **formato** o **representación** de un campo PII (plaintext ↔ ciphertext, entero ↔ string, formato de fecha, etc.):
+1. **Enumerar TODOS los consumers del campo** vía grep global. Un campo storeado en user_meta/DB tiene típicamente 3-5 readers: handler que lo escribe, handler que lo lee, vista que lo muestra, scheduler que lo consume, reporte que lo exporta.
+2. **Actualizar los readers al nuevo formato O revertir el writer al viejo formato.** Un cambio de formato unilateral en el writer rompe todos los readers en silencio (fallbacks tipo "si decrypt falla, mostrar raw value" enmascaran el bug).
+3. **Evitar duplicar datos sensibles.** El intento de `ltms_kyc_bank_account_encrypted` creó un segundo store PII obsoleto inmediatamente — a pesar de su intención de cumplimiento.
+4. **El comentario que dice "the X está cifrado" DEBE coincidir con el estado real del código.** Si un cambio de diseño rompe ese contrato, el comentario miente y engaña al próximo dev (humano o IA) que confíe en él.
+5. **Migración ALTER TABLE + backfill script** es siempre preferible a insertar formatos inconsistentes en la DB. Si el ciphertext es más grande que la columna, hacer migración (con downtime despreciable para columnas pequeñas); NUNCA degrade安全性 a compliance por evitar una migración.
 

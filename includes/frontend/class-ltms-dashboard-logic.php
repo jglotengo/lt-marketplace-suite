@@ -740,15 +740,24 @@ final class LTMS_Dashboard_Logic {
         // only to user_meta, causing ajax_approve_kyc() to read null values and skip bank sync.
         $kyc_notes = $name_mismatch_note ?: '';
 
-        // v2.9.298 FIX: El valor cifrado AES-256-GCM (~65 chars) excede VARCHAR(50)
-        // de la columna bank_account_number. Guardar el número SIN cifrar en la
-        // tabla KYC (la tabla es privada, solo accesible por admin con capability
-        // ltms_manage_kyc). La versión cifrada se guarda en user_meta.
-        $bank_account_to_store = $bank_account_number; // Sin cifrar para la tabla
+        // v2.9.298 FIX intentó resolver overflow VARCHAR(50) del ciphertext AES-256-GCM
+        // guardando plaintext en la tabla y el ciphertext en user_meta
+        // `ltms_kyc_bank_account_encrypted`. PERO eso rompió el contrato del handler
+        // `approve_kyc` (copia la tabla → `ltms_bank_account_number` user_meta) que
+        // TODOS los consumers esperan CIFrada. Resultado: PII en plaintext en user_meta
+        // (violación Ley 1581 art. 11) y `decrypt(plaintext)` fallando en silencio en
+        // payout-scheduler / commission-writer / view-wallet / view-settings.
+        //
+        // v2.9.316 FIX (KYC-AUDIT2-01): ALTER TABLE VARCHAR(80) permite guardar el
+        // ciphertext directamente en la tabla — single source of truth restaurado.
+        // El user_meta `ltms_kyc_bank_account_encrypted` queda obsoleto (mantenido
+        // para back-compat con cualquier script externo que lo lea).
+        $bank_account_to_store = $bank_account_number; // default: plaintext si encrypt no disponible
         if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
             $encrypted_acc = LTMS_Core_Security::encrypt( $bank_account_number );
             if ( $encrypted_acc ) {
-                // Guardar versión cifrada en user_meta (para cumplimiento Ley 1581)
+                $bank_account_to_store = $encrypted_acc; // ciphertext → tabla
+                // Mantener user_meta legacy por back-compat (sólo lectura externa).
                 update_user_meta( $vendor_id, 'ltms_kyc_bank_account_encrypted', $encrypted_acc );
             }
         }

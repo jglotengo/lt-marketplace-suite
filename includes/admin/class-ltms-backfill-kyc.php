@@ -230,6 +230,104 @@ class LTMS_KYC_Guard {
         add_filter( 'woocommerce_rest_pre_insert_product_object', [ __CLASS__, 'block_rest_publish_without_kyc' ], 10, 2 );
         // v2.9.65 P3-12: Cron de recordatorio de expiración KYC
         add_action( 'ltms_daily_cron',        [ __CLASS__, 'check_kyc_expiry_reminders' ] );
+        // v2.9.316 KYC-AUDIT2-05: transición approved→expired para KYCs caducados.
+        // Corre diariamente DESPUÉS del reminder cron para no re-enviar emails a
+        // vendors ya expirados. SARLAFT/Ley 526/1999 exige no operar con KYC caduco.
+        add_action( 'ltms_daily_cron',        [ __CLASS__, 'expire_overdue_kycs' ], 20 );
+    }
+
+    /**
+     * v2.9.316 KYC-AUDIT2-05: Pasa a status='expired' todos los KYCs aprobados
+     * cuyo expires_at < today. Antes de este fix, el status 'expired' estaba
+     * definido en la ENUM de `lt_vendor_kyc.status` PERO NINGÚN código lo
+     * seteaba — los KYCs caducados seguían 'approved' indefinidamente y el
+     * vendor podía seguir publicando y retirando (violación SARLAFT/Ley 526/1999).
+     *
+     * Acciones:
+     *   1. SELECT de KYCs approved con expires_at < today.
+     *   2. UPDATE status='expired' + user_meta 'ltms_kyc_status'='expired'.
+     *   3. Dispara action `ltms_vendor_kyc_expired` para que listeners
+     *      (payout-scheduler, vendor cleanup, etc.) reaccionen — p.ej. bloquear
+     *      próximos retiros hasta re-validación.
+     *   4. NOTifica al vendor via lt_notifications (si la tabla existe).
+     *
+     * Idempotente: solo actúa sobre status='approved' AND expires_at < today.
+     *
+     * @return void
+     */
+    public static function expire_overdue_kycs(): void {
+        global $wpdb;
+        $kyc_table = $wpdb->prefix . 'lt_vendor_kyc';
+
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $kyc_table ) ) !== $kyc_table ) {
+            return;
+        }
+
+        $today = gmdate( 'Y-m-d' );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $overdue = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, vendor_id, expires_at FROM `{$kyc_table}`
+                  WHERE status = 'approved'
+                    AND expires_at IS NOT NULL
+                    AND expires_at != ''
+                    AND expires_at < %s",
+                $today
+            )
+        );
+
+        if ( empty( $overdue ) ) {
+            return;
+        }
+
+        $notifications_table = $wpdb->prefix . 'lt_notifications';
+        $has_notifications = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $notifications_table ) ) === $notifications_table;
+
+        foreach ( $overdue as $row ) {
+            $kyc_id    = (int) $row->id;
+            $vendor_id = (int) $row->vendor_id;
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->update(
+                $kyc_table,
+                [
+                    'status'      => 'expired',
+                    'reviewed_at'  => LTMS_Utils::now_utc(),
+                ],
+                [ 'id' => $kyc_id ],
+                [ '%s', '%s' ],
+                [ '%d' ]
+            );
+
+            update_user_meta( $vendor_id, 'ltms_kyc_status', 'expired' );
+
+            // Disparar action para listeners (payout block, etc.).
+            do_action( 'ltms_vendor_kyc_expired', $vendor_id, $kyc_id );
+
+            // Notificar al vendor.
+            if ( $has_notifications ) {
+                $wpdb->insert(
+                    $notifications_table,
+                    [
+                        'user_id'    => $vendor_id,
+                        'type'       => 'kyc_expired',
+                        'title'      => __( 'Tu verificación KYC ha expirado', 'ltms' ),
+                        'message'    => __( 'Tu verificación de identidad expiró. Para seguir vendiendo y retirando, por favor reenvía tus documentos desde el panel.', 'ltms' ),
+                        'is_read'    => 0,
+                        'created_at' => LTMS_Utils::now_utc(),
+                    ],
+                    [ '%d', '%s', '%s', '%s', '%d', '%s' ]
+                );
+            }
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::security(
+                    'KYC_EXPIRED',
+                    sprintf( 'KYC #%d del vendedor #%d marcado como expirado (expires_at=%s).', $kyc_id, $vendor_id, $row->expires_at )
+                );
+            }
+        }
     }
 
     /**
@@ -246,8 +344,14 @@ class LTMS_KYC_Guard {
 
         // Buscar KYCs aprobados que expiran en los próximos 30 días.
         // expires_at puede ser NULL si no se configuró expiración.
-        $thirty_days_from_now = gmdate( 'Y-m-d H:i:s', time() + 30 * DAY_IN_SECONDS );
-        $now = gmdate( 'Y-m-d H:i:s' );
+        // v2.9.316 KYC-AUDIT2-03 FIX: comparar solo DATE (Y-m-d) no DATETIME.
+        // La columna `expires_at` es DATE (no DATETIME), así que compararla con
+        // DATETIME provocaba off-by-one: un KYC que expira en exactamente 30 días
+        // a las 23:00 NO recibía reminder porque '2026-08-29 00:00:00' (cast DATE
+        // → datetime) NO es > '2026-08-29 20:30:00' (el $thirty_days_from_now).
+        // Ahora ambos bounds son DATE → comparación correcta.
+        $thirty_days_from_now = gmdate( 'Y-m-d', strtotime( '+30 days' ) );
+        $now = gmdate( 'Y-m-d' );
 
         $expiring = $wpdb->get_results( $wpdb->prepare(
             "SELECT vendor_id, expires_at FROM `{$kyc_table}`

@@ -27,7 +27,7 @@ final class LTMS_DB_Migrations {
      * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
      * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.9.15';
+    private const CURRENT_VERSION = '2.9.16';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -109,6 +109,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.15', '<' ) ) {
             self::migrate_2_9_15_consumer_disputes_customs_tables();
+        }
+
+        if ( version_compare( $installed_version, '2.9.16', '<' ) ) {
+            self::migrate_2_9_16_kyc_bank_account_ciphertext();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3336,6 +3340,111 @@ final class LTMS_DB_Migrations {
             LTMS_Core_Logger::info(
                 'DB_MIGRATION',
                 'v2.9.15: lt_consumer_disputes + lt_customs_declarations formalizadas en migration canónica (antes se creaban lazy inline).'
+            );
+        }
+    }
+
+    /**
+     * Migración v2.9.16 — KYC-AUDIT2-01: restaura single-source-of-truth ciphertext
+     * para bank_account_number.
+     *
+     * Contexto: el fix c54ac9f7 (v2.9.298) introdujo un cambio de diseño para
+     * limitar el ciphertext AES-256-GCM (~65 chars) que excedía VARCHAR(50) de
+     * la columna `bank_account_number` de `lt_vendor_kyc`. La solución adoptada
+     * entonces fue guardar plaintext en la tabla y el ciphertext en user_meta
+     * `ltms_kyc_bank_account_encrypted`. PERO el handler `approve_kyc` copiaba
+     * el plaintext de la tabla → user_meta `ltms_bank_account_number` (que TODOS
+     * los consumers esperan CIFRADA e invocan `decrypt()` sobre ella). Resultado:
+     * PII bank en plaintext en user_meta (violación Ley 1581 art. 11) y
+     * `decrypt(plaintext)` fallando en silencio.
+     *
+     * Esta migration:
+     *   1. hace ALTER TABLE MODIFY bank_account_number VARCHAR(80) — permite
+     *      almacenar el ciphertext AES-256-GCM completo.
+     *   2. Re-cifra TODOS los plaintext existentes (cuyo value NO empieza con
+     *      'v2:' — prefijo del ciphertext de LTMS_Core_Security::encrypt()).
+     *   3. Sincroniza el user_meta `ltms_bank_account_number` con el ciphertext
+     *      recién guardado en la tabla, para que consumers (payout-scheduler,
+     *      commission-writer, view-wallet, view-settings) reciban ciphertext
+     *      consistente.
+     *
+     * Idempotente: si la columna ya es VARCHAR(80) y los valores ya empiezan
+     * con 'v2:', la migration es no-op.
+     *
+     * @return void
+     */
+    private static function migrate_2_9_16_kyc_bank_account_ciphertext(): void {
+        global $wpdb;
+        $k = $wpdb->prefix . 'lt_vendor_kyc';
+
+        // Verificar que la tabla existe.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $k ) ) !== $k ) {
+            return;
+        }
+
+        // 1. ALTER COLUMN a VARCHAR(80) si es menor.
+        $col_info = $wpdb->get_row(
+            $wpdb->prepare(
+                'SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                DB_NAME, $k, 'bank_account_number'
+            )
+        );
+        $current_max = (int) ( $col_info->CHARACTER_MAXIMUM_LENGTH ?? 0 );
+        if ( $current_max > 0 && $current_max < 80 ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( "ALTER TABLE `{$k}` MODIFY COLUMN `bank_account_number` VARCHAR(80) DEFAULT NULL COMMENT 'CLABE/cuenta cifrada AES-256-GCM'" );
+        }
+
+        // 2. Re-cifrar plaintext existentes (filas cuyo valor NO empieza con 'v2:').
+        //    El prefijo 'v2:' es la marca del ciphertext de LTMS_Core_Security::encrypt().
+        //    Si LTMS_Core_Security no está disponible (plugin cargando), saltar el
+        //    re-cifrado — los nuevos submits insertarán ciphertext via el handler.
+        //    El backfill script bin/ltms-backfill-kyc-ciphertext.php puede correrse
+        //    manualmente para re-cifrar legacy rows fuera del activation hook.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $wpdb->get_results(
+            "SELECT id, vendor_id, bank_account_number FROM `{$k}`
+              WHERE bank_account_number IS NOT NULL
+                AND bank_account_number != ''
+                AND bank_account_number NOT LIKE 'v2:%'"
+        );
+        $reencrypted = 0;
+        if ( $rows && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+            foreach ( $rows as $row ) {
+                $plain = (string) $row->bank_account_number;
+                try {
+                    $cipher = LTMS_Core_Security::encrypt( $plain );
+                    if ( ! $cipher ) {
+                        continue;
+                    }
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                    $wpdb->update(
+                        $k,
+                        [ 'bank_account_number' => $cipher ],
+                        [ 'id' => (int) $row->id ],
+                        [ '%s' ],
+                        [ '%d' ]
+                    );
+                    // Sincronizar el ciphertext a user_meta (source-of-truth de consumers).
+                    update_user_meta( (int) $row->vendor_id, 'ltms_bank_account_number', $cipher );
+                    $reencrypted++;
+                } catch ( \Throwable $e ) {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::error(
+                            'DB_MIGRATION_KYC_CIPHERTEXT_FAIL',
+                            sprintf( 'Re-cifrado falló para KYC #%d (vendor #%d): %s', $row->id, $row->vendor_id, $e->getMessage() )
+                        );
+                    }
+                }
+            }
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                sprintf( 'v2.9.16: lt_vendor_kyc.bank_account_number ALTER→VARCHAR(80) + %d rows re-cifradas (single-source-of-truth restored).', $reencrypted )
             );
         }
     }

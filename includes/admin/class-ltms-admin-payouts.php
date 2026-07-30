@@ -186,8 +186,13 @@ final class LTMS_Admin_Payouts {
             update_user_meta( $vendor_id, 'ltms_bank_name', $kyc['bank_name'] );
         }
         if ( ! empty( $kyc['bank_account_number'] ) ) {
-            // The KYC table stores the account ENCRYPTED; copy it through as-is so
-            // payout scheduler reads the same ciphertext. Decrypt only at display time.
+            // v2.9.316 KYC-AUDIT2-01 FIX: la tabla guarda el CIPHERTEXT AES-256-GCM
+            // (tras ALTER TABLE VARCHAR(80) de la migración v2.9.16). Copiamos el
+            // ciphertext tal cual a `ltms_bank_account_number` user_meta — es el
+            // valor que payout-scheduler / commission-writer / view-wallet /
+            // view-settings esperan y desencriptan via LTMS_Core_Security::decrypt().
+            // Antes (fix c54ac9f7) la tabla tenía plaintext → user_meta quedaba con
+            // plaintext → violación Ley 1581 art. 11 y decrypt() fallando en silencio.
             update_user_meta( $vendor_id, 'ltms_bank_account_number', $kyc['bank_account_number'] );
         }
         if ( ! empty( $kyc['bank_account_type'] ) ) {
@@ -665,15 +670,36 @@ final class LTMS_Admin_Payouts {
         $bank_acc_type_db = $kyc['bank_account_type']   ?? '';
         $bank_acc_num_db  = $kyc['bank_account_number'] ?? '';
         // Mask the account number for display (decrypt first if needed).
+        // v2.9.316 KYC-AUDIT2-02 FIX: tras la migración v2.9.16, el valor de la
+        // tabla es CIPHERTEXT AES-256-GCM → decrypt() funciona y se obtiene el
+        // plaintext para aplicar el mask `****1234`. ANTES de la migración,
+        // el valor era plaintext (fix c54ac9f7) → decrypt() retornaba false y
+        // el mask siempre era `****` constante (admin no podía validar coincidencia
+        // con el certificado bancario). Ahora: si decrypt() falla y el valor NO
+        // tiene el prefijo ciphertext `v2:`, asumir que es plaintext legacy
+        // (pre-v2.9.16) y aplicar el mask directamente.
         $bank_acc_masked = '****';
-        if ( ! empty( $bank_acc_num_db ) && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
-            try {
-                $plain = LTMS_Core_Security::decrypt( $bank_acc_num_db );
-                if ( $plain ) {
-                    $bank_acc_masked = str_repeat( '*', max( 0, strlen( $plain ) - 4 ) ) . substr( $plain, -4 );
+        if ( ! empty( $bank_acc_num_db ) ) {
+            $plain = null;
+            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
+                try {
+                    $decrypted = LTMS_Core_Security::decrypt( $bank_acc_num_db );
+                    if ( $decrypted ) {
+                        $plain = $decrypted;
+                    }
+                } catch ( \Throwable $e ) {
+                    $plain = null;
                 }
-            } catch ( \Throwable $e ) {
-                $bank_acc_masked = '****';
+            }
+            // Fallback: si decrypt() falla y el valor no parece ciphertext,
+            // asumir plaintext legacy (pre-v2.9.16) y aplicar mask directo.
+            if ( $plain === null && ! str_starts_with( $bank_acc_num_db, 'v2:' ) ) {
+                $plain = $bank_acc_num_db;
+            }
+            if ( $plain && strlen( $plain ) >= 4 ) {
+                $bank_acc_masked = str_repeat( '*', max( 0, strlen( $plain ) - 4 ) ) . substr( $plain, -4 );
+            } elseif ( $plain ) {
+                $bank_acc_masked = str_repeat( '*', strlen( $plain ) );
             }
         }
         $bank_rep_legal  = get_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal', true );

@@ -519,6 +519,11 @@ $files = [
     'includes/admin/views/settings/section-aveonline.php',
     'includes/admin/class-ltms-admin-settings.php',
     'includes/admin/class-ltms-admin-payouts.php',
+    // AUDIT-KYC2 v2.9.316: re-auditoría módulo KYC (ciphertext single-source-of-truth + status expired transition + DATE-format reminder cron)
+    'includes/admin/class-ltms-backfill-kyc.php',
+    'includes/core/migrations/class-ltms-db-migrations.php',
+    'includes/admin/class-ltms-commission-writer.php',
+    'includes/business/class-ltms-payout-scheduler.php',
     'includes/admin/class-ltms-admin-donations.php',
     'includes/admin/class-ltms-commission-writer.php',
     'includes/admin/class-ltms-bank-reconciler.php',
