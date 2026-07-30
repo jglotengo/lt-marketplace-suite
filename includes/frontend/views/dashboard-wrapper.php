@@ -483,14 +483,16 @@ if ( $_show_drivers ) {
         <?php endif; ?>
 
         <div class="ltms-view-section" id="ltms-view-analytics" style="display:none;">
-            <div class="ltms-view-section">
-                <div class="ltms-view-header">
-                    <h2><?php esc_html_e( 'Analytics Avanzados', 'ltms' ); ?></h2>
-                </div>
-                <div class="ltms-card">
-                    <div class="ltms-card-body">
-                        <div style="height:350px;"><canvas id="ltms-vendor-analytics-chart"></canvas></div>
-                    </div>
+            <?php // AUDIT-PANEL-FN-09 (re-auditoría): eliminado el div duplicado con la misma clase
+                  // de sección que el contenedor padre — el anidado rompía el selector global.hide()
+                  // de loadView() porque el hijo quedaba con display:none residual al re-show del padre.
+                  // Ahora el contenido es plano (header + card), sin wrapper duplicado. ?>
+            <div class="ltms-view-header">
+                <h2><?php esc_html_e( 'Analytics Avanzados', 'ltms' ); ?></h2>
+            </div>
+            <div class="ltms-card">
+                <div class="ltms-card-body">
+                    <div style="height:350px;"><canvas id="ltms-vendor-analytics-chart"></canvas></div>
                 </div>
             </div>
         </div>

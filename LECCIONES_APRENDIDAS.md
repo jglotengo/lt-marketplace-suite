@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-07-29
 > **Versión del plugin:** 2.9.293
-> **Total de lecciones:** 132 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293)
+> **Total de lecciones:** 133 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293 + 1 del ciclo AUDIT-PANEL v2.9.294)
 
 ---
 
@@ -1816,3 +1816,37 @@ Lo mismo puede ocurrir con `set_virtual`, `set_downloadable`, `set_sku`, `set_sh
 2. **La semántica de "vacío"** debe ser deliberada: el bloque original usa `!== null` (estricto, preserva el valor existente si el campo no viene seteado). El bloque nuevo copiado acarrea el `$x ?? ''` permisivo que convierte "no viene el campo" en "vaciar el campo".
 3. Si el método realimenta la entidad WC con un segundo `$product_refreshed = wc_get_product()` (antipatrón, ver H14), **debe persistirse solo lo nuevo** en el segundo save — no recargar campos ya persistidos en el primer save.
 4. **Re-auditar el método completo al terminar el fix**, no solo el bloque nuevo. El estilo "fix bug → re-audit → detectar nueva regression introducida por tu propio fix" es parte del loop de auditoría del AGENTS.md. Caso real: AUDIT-PROD-H6 fue detectada y fixeada en la misma iteración de re-auditoría que detectó AUDIT-PROD-H1-H5.
+
+---
+
+### Lección #133: Tests de "ausencia de patrón" vía regex deben distinguir código funcional de comentarios que documentan el fix
+
+**Error:** Durante el ciclo AUDIT-PANEL, el test `test_fn10_loadView_scopes_view_section_selector` validaba que en `ltms-dashboard.js` no quedara el patrón `$('.ltms-view-section').hide()` sin scope (lookbehind negativo `(?<!#ltms-dashboard-container )('\.ltms-view-section')\.hide\(\)`). El fix FN-10 había reemplazado la línea peligrosa por la versión scoped `$('#ltms-dashboard-container .ltms-view-section').hide();` — y MongoClient había añadido AL LADO un comentario explicativo:
+
+```javascript
+// AUDIT-PANEL-FN-10 (re-auditoría): scope el selector al contenedor del SPA en vez
+// del global. Antes $('.ltms-view-section').hide() cerraba TODOS los nodos con esa
+// clase — incluyendo cualquier markup externo al dashboard (otro plugin, theme)
+// que reusara la clase. También afectaba al nested duplicado (ver FN-09).
+$('#ltms-dashboard-container .ltms-view-section').hide();
+```
+
+El regex del test matchea **cualquier ocurrencia del patrón en el archivo**, sin distinguir si la ocurrencia es código JavaScript ejecutable o un comentario. El comentario de 4 líneas describía el fix y mencionaba textualmente `$('.ltms-view-section').hide()` para explicar "qué se cambió" → el test reportaba `matches=1` → assertion `assertSame(0, $matches)` fallaba, reportando "el fix no se aplicó" cuando sí estaba aplicado. **Falso positivo producido por el propio comentario del fix**.
+
+Mismo patrón ocurrió en paralelo con `test_fn09_wrapper_no_nested_view_section_in_analytics`: el comentario `// AUDIT-PANEL-FN-09 (re-auditoría): eliminado el <div class="ltms-view-section"> nested` en `dashboard-wrapper.php` mencionaba literalmente `<div class="ltms-view-section">` — y el test `assertStringNotContainsString('<div class="ltms-view-section">', $block)` fallaba asserting "does not contain" → de nuevo, falso positivo por auto-descripción del fix en comentarios.
+
+**Causa raíz:** Cuando un test valida "el patrón peligroso ya no está" (assertion negativa sobre contenido de archivo), cualquier comentario que **documente qué se eliminó** colisiona con el patrón buscado. La costumbre de dejar comentarios `// AUDIT-ID: antes X, ahora Y` (recomendada por el AGENTS.md para trazabilidad) entra en tensión directa con los tests que carecen de discriminación de ámbito sintáctico.
+
+**Fix aplicado:** Reescritos los comentarios in-source para que expliquen el fix **sin usar el patrón literal** del bug reemplazado:
+
+- En `dashboard-wrapper.php`: `eliminado el div duplicado con la misma clase de sección que el contenedor padre` (en vez de "eliminado el `<div class="ltms-view-section">` nested").
+- En `ltms-dashboard.js`: `La version anterior cerraba TODOS los nodos con la clase .ltms-view-section` (en vez de "`$('.ltms-view-section').hide()` cerraba TODOS los nodos").
+
+Ambos mantienen la trazabilidad (AUDIT-ID + explicación) sin reproducir la cadena exacta que el test busca negativamente.
+
+**Regla preventiva:** Para tests de "ausencia de patrón" en archivos fuente (regex o `assertStringNotContainsString`):
+1. **Nunca incluir el patrón literal en el comentario del fix** que documenta el cambio. Describir conceptualmente (e.g. "el div duplicado con la misma clase") en vez de pegar la cadena exacta reemplazada.
+2. **Considerar el ámbito sintáctico:** los tests de PHPUnit sobre contenido de archivo no distinguen código de comentario/string de documentación. Si el patrón solo puede aparecer en código ejecutable, una alternativa más estricta es extraer el archivo, quitar comentarios (regex `/\*.*?\*/` y `//[^\n]*`) y strings, y matchear sobre el resto. ParaLt simplicity, normalmente basta con rewording el comentario.
+3. **El test `ProductsAuditFixTest.php::test_h6_*` ya había resuelto lo mismo** con regex que distinguía la sentencia PHP de la mención en el comentario (`/set_weight\(\s*\$weight\s*\?\?\s*''\s*\)\s*;/` matcheaba la sentencia con punto y coma final, no la mención en el comentario del fix sin el `;`). Ese patrón puede reutilrizarse, pero solo aplica cuando el patrón peligroso tiene una signatura más específica que el comentario no reproduce. En casos donde la signatura es idéntica (como FN-09/FN-10), el rewording del comentario es la única opción.
+4. **Auto-re-auditar el test tras añadir el comentario del fix:** paso explícito del loop "fix → re-audit". Tras aplicar el fix + dejar el comentario trazable, correr la suite antes de commitear. Si el falso positivo aparece, ajustar el comentario o el test. Caso real: AUDIT-PANEL-FN-09 y AUDIT-PANEL-FN-10 detectaron sus propios falsos positivos en la primera corrida de `phpunit --group audit-panel` y se corrigieron antes del commit (no llegaron a main).
+

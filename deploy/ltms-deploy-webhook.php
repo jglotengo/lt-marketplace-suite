@@ -584,6 +584,9 @@ $files = [
     'assets/js/ltms-envios.min.js',
     'assets/js/ltms-settings.js',
     'assets/js/ltms-settings.min.js',
+    // AUDIT-PANEL v2.9.295 CSP migration: extracted ReDi + Incidents inline scripts + new ltms-redi.js
+    'assets/js/ltms-redi.js',
+    'assets/js/ltms-incidents.js',
     'assets/js/ltms-ordenes-compra.js',
     'assets/js/ltms-ordenes-compra.min.js',
     'assets/js/ltms-drivers.js',
@@ -608,6 +611,10 @@ $files = [
     'includes/core/class-ltms-gdpr-eraser.php',
     'includes/core/class-ltms-retention-cron.php',
     'includes/frontend/views/dashboard-wrapper.php',
+    // AUDIT-PANEL v2.9.295: panel SPA views touched by FN-03/FN-07/FN-09/FN-10
+    'includes/frontend/views/view-redi.php',
+    'includes/frontend/views/view-incidents.php',
+    'includes/frontend/views/view-settings.php',
     'patchwork.json',
     // DIAG temp
     'deploy/ltms-panel-diag.php',

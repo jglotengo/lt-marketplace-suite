@@ -210,8 +210,11 @@
         loadView(view, forceRefresh = false) {
             this.currentView = view;
 
-            // Ocultar todas las secciones
-            $('.ltms-view-section').hide();
+            // AUDIT-PANEL-FN-10 (re-auditoría): scope el selector al contenedor del SPA en vez
+            // del global. La version anterior cerraba TODOS los nodos con la clase .ltms-view-section
+            // — incluyendo cualquier markup externo al dashboard (otro plugin, theme) que reusara la
+            // clase. Tambien afectaba al nested duplicado (ver FN-09).
+            $('#ltms-dashboard-container .ltms-view-section').hide();
 
             // v2.9.110 FIX: Mostrar la secciÃ³n INMEDIATAMENTE antes del AJAX.
             // Esto garantiza que el contenido PHP renderizado sea visible incluso
@@ -558,6 +561,66 @@
                                     },
                                 },
                             },
+                        },
+                    });
+                },
+            });
+        },
+
+        /**
+         * AUDIT-PANEL-FN-09 (re-auditoría): cargador dedicado para la vista Analytics del nav.
+         * Antes el tab "Analytics" no tenía `loadAnalyticsView()` (el router solo hacía
+         * `showSection`), y `loadSalesChart()` buscaba el canvas del home 
+         * (`ltms-vendor-sales-chart`) — dejando el canvas `ltms-vendor-analytics-chart`
+         * en blanco para siempre. Este handler llama a `renderAnalyticsChart()` que
+         * renderiza sobre el canvas correcto de la vista analytics.
+         */
+        loadAnalyticsView(forceRefresh = false) {
+            this.renderAnalyticsChart();
+        },
+
+        /**
+         * AUDIT-PANEL-FN-09: renderiza el chart sobre el canvas de la vista Analytics.
+         * Mismo endpoint (`ltms_get_analytics_data`) y mismo dataset que `loadSalesChart`,
+         * pero sobre `<canvas id="ltms-vendor-analytics-chart">`. Reutiliza this.charts.analytics
+         * (en vez de this.charts.sales) para no destruir el chart del home al volver.
+         */
+        renderAnalyticsChart() {
+            const canvas = document.getElementById('ltms-vendor-analytics-chart');
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            // Destruir instancia anterior si existe.
+            if (this.charts.analytics) {
+                this.charts.analytics.destroy();
+            }
+            if (!this.charts) this.charts = {};
+
+            $.ajax({
+                url: ltmsDashboard.ajax_url,
+                method: 'POST',
+                data: {
+                    action: 'ltms_get_analytics_data',
+                    nonce: ltmsDashboard.nonce,
+                    period: 'month',
+                },
+                success: (response) => {
+                    if (!response.success) return;
+                    const d = response.data;
+
+                    this.charts.analytics = new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: d.labels,
+                            datasets: [
+                                {
+                                    label: 'Ventas',
+                                    data: d.sales,
+                                    borderColor: '#1a5276',
+                                    backgroundColor: 'rgba(26,82,118,0.08)',
+                                    tension: 0.4,
+                                    fill: true,
+                                },
+                            ],
                         },
                     });
                 },
@@ -956,7 +1019,8 @@
          * @param {string} selector Selector CSS de la secciÃ³n.
          */
         showSection(selector) {
-            $('.ltms-view-loader').hide();
+            // AUDIT-PANEL-FN-10: scope loader hide al contenedor del SPA (evita colisiones).
+            $('#ltms-dashboard-container .ltms-view-loader').hide();
             $(selector).show();
         },
 
@@ -964,11 +1028,12 @@
          * Muestra un loader mientras carga la vista.
          */
         showViewLoader() {
-            if ($('.ltms-view-loader').length === 0) {
+            // AUDIT-PANEL-FN-10: scoped al contenedor del SPA.
+            if ($('#ltms-dashboard-container .ltms-view-loader').length === 0) {
                 $('<div class="ltms-view-loader" style="text-align:center;padding:40px;color:#888;">Cargando...</div>')
                     .appendTo('#ltms-main-content');
             }
-            $('.ltms-view-loader').show();
+            $('#ltms-dashboard-container .ltms-view-loader').show();
         },
 
         /**
@@ -978,7 +1043,8 @@
          * @param {string} message  Mensaje de error.
          */
         showError(selector, message) {
-            $('.ltms-view-loader').hide();
+            // AUDIT-PANEL-FN-10: scoped al contenedor del SPA.
+            $('#ltms-dashboard-container .ltms-view-loader').hide();
             // M-123 FIX: message puede ser objeto cuando viene de wp_send_json_error
             const msg = (typeof message === 'string') ? message
                 : (message?.message || message?.data || ltmsDashboard?.i18n?.error || 'Error');
@@ -1148,6 +1214,23 @@
                 self.ordersState.dateFilter = $(this).val();
                 self.ordersState.page = 1;
                 self.fetchOrders();
+            });
+
+            // AUDIT-PANEL-FN-07 (re-auditoría): handler 'input' para el campo de búsqueda
+            // de pedidos. Antes el estado `ordersState.search` existía y se enviaba al server
+            // (línea 601 en fetchOrders), PERO ningún handler lo poblaba — escribir en
+            // #ltms-order-search no disparaba ninguna query AJAX. La única forma de poblarlo
+            // era via initGlobalSearch (líneas 2189-2212) que triggera un input event que nada
+            // escuchaba. Agregado handler con debounce 300ms que actualiza search + reset page.
+            let searchTimer = null;
+            $(document).on('input', '#ltms-order-search', function () {
+                if (searchTimer) clearTimeout(searchTimer);
+                const q = $(this).val().trim();
+                searchTimer = setTimeout(function () {
+                    self.ordersState.search = q;
+                    self.ordersState.page = 1;
+                    self.fetchOrders();
+                }, 300);
             });
 
             // PaginaciÃ³n

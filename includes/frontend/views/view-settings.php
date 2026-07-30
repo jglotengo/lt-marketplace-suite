@@ -505,93 +505,12 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
     </div>
 </div>
 
-<script>
-// v2.9.222: vendor invoicing settings UI (inline porque es específico de esta vista).
-(function(){
-    'use strict';
-    var $ = jQuery;
-    if (!$) return;
-
-    // Toggle fields según proveedor.
-    function toggleProviderFields() {
-        var provider = $('#ltms-invoice-provider').val();
-        $('#ltms-alegra-fields').toggle(provider === 'alegra');
-        $('#ltms-siigo-fields').toggle(provider === 'siigo');
-    }
-    $('#ltms-invoice-provider').on('change', toggleProviderFields);
-    toggleProviderFields();
-
-    function showNotice(msg, type) {
-        var $n = $('#ltms-invoicing-notice');
-        $n.text(msg).css('color', type === 'error' ? '#dc2626' : type === 'success' ? '#10b981' : '#6b7280').show();
-        setTimeout(function() { $n.fadeOut(); }, 4000);
-    }
-
-    // Guardar credenciales.
-    $('#ltms-save-invoicing-btn').on('click', function() {
-        var $btn = $(this);
-        var provider = $('#ltms-invoice-provider').val();
-        var data = {
-            action: 'ltms_vendor_save_invoicing_creds',
-            nonce: ltmsDashboard.nonce,
-            provider: provider,
-        };
-        if (provider === 'alegra') {
-            data.alegra_email = $('#ltms-alegra-email').val();
-            data.alegra_token = $('#ltms-alegra-token').val();
-            if (!data.alegra_email || !data.alegra_token) {
-                showNotice('Completa email y token de Alegra.', 'error');
-                return;
-            }
-        } else if (provider === 'siigo') {
-            data.siigo_username = $('#ltms-siigo-username').val();
-            data.siigo_key = $('#ltms-siigo-key').val();
-            if (!data.siigo_username || !data.siigo_key) {
-                showNotice('Completa username y access key de Siigo.', 'error');
-                return;
-            }
-        }
-        $btn.prop('disabled', true).html('⏳ Guardando...');
-        $.post(ltmsDashboard.ajaxUrl, data, function(resp) {
-            $btn.prop('disabled', false).html('💾 Guardar credenciales');
-            if (resp.success) {
-                showNotice('✅ ' + resp.data.message, 'success');
-            } else {
-                showNotice('❌ ' + (resp.data && resp.data.message ? resp.data.message : 'Error al guardar.'), 'error');
-            }
-        }).fail(function() {
-            $btn.prop('disabled', false).html('💾 Guardar credenciales');
-            showNotice('❌ Error de conexión.', 'error');
-        });
-    });
-
-    // Probar conexión.
-    $('#ltms-test-invoicing-btn').on('click', function() {
-        var $btn = $(this);
-        $btn.prop('disabled', true).html('⏳ Probando...');
-        $.post(ltmsDashboard.ajaxUrl, {
-            action: 'ltms_vendor_test_invoicing_connection',
-            nonce: ltmsDashboard.nonce,
-        }, function(resp) {
-            $btn.prop('disabled', false).html('🔌 Probar conexión');
-            if (resp.success) {
-                showNotice(resp.data.message, 'success');
-            } else {
-                showNotice(resp.data && resp.data.message ? resp.data.message : '❌ Error.', 'error');
-            }
-        }).fail(function() {
-            $btn.prop('disabled', false).html('🔌 Probar conexión');
-            showNotice('❌ Error de conexión.', 'error');
-        });
-    });
-})();
-</script>
-
 </div>
 
-
-
 <?php
-// FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-settings.js
+// AUDIT-PANEL-FN-03 (re-auditoría): vendor invoicing settings (Alegra/Siigo) inline <script>
+// moved to external assets/js/ltms-settings.js (appended al final del archivo existente).
+// FASE2B P0 FIX (CSP): el último inline <script> del panel — view-settings invoicing section.
+// El enqueue de ltms-settings.js cubre tanto settings generales como la sección invoicing nueva.
 wp_enqueue_script( 'ltms-settings', LTMS_ASSETS_URL . 'js/ltms-settings.js', [ 'jquery' ], LTMS_VERSION, true );
 ?>
