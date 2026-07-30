@@ -140,7 +140,13 @@ if ( $pv_type === 'variable' && method_exists( $product, 'get_available_variatio
  * 4. URLs de acción
  * ------------------------------------------------------------------------- */
 $pv_wishlist_url = add_query_arg( 'add_to_wishlist', $pv_pid, $pv_permalink );
-$pv_quick_view_attrs = sprintf( 'data-pv-quick-view="%1$d" data-pv-quickview="%1$d" data-product_id="%1$d"', esc_attr( $pv_pid ) );
+// AUDIT-FE-AP-002 FIX (Fase 1.5): estandarizar en `data-pv-quickview` (sin guion
+// interno). El JS ltms-plaza-viva.js:603 solo escucha `[data-pv-quickview]` y lee
+// `qv.getAttribute('data-pv-quickview') || qv.getAttribute('data-product_id')`.
+// El atributo `data-pv-quick-view` (con guion) era redundante y nunca leido por
+// JS — se eliminó para evitar confusión. `data-product_id` se conserva por si
+// alguna extension externa invoca el card sin acceso a `data-pv-quickview`.
+$pv_quick_view_attrs = sprintf( 'data-pv-quickview="%1$d" data-product_id="%1$d"', esc_attr( $pv_pid ) );
 $pv_atc_attrs = $pv_purchasable && $pv_in_stock
     ? sprintf( 'data-pv-add-to-cart="%d"', esc_attr( $pv_pid ) )
     : '';

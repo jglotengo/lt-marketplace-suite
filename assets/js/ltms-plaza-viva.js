@@ -607,15 +607,58 @@
       PV.quickView(pid);
       return;
     }
-    // Wishlist toggle
+    // AUDIT-FE-AP-001 FIX (Fase 1.5): wishlist toggle del card — persiste via
+    // PV.ajax('ltms_pv_toggle_wishlist', ...). Antes este handler hacia solo
+    // toggle visual (classList + aria-pressed) + dispatch del evento custom
+    // `wishlist-toggle` que nadie escucha (verificado: ningun listener en
+    // todo el design system para ese evento). El botón fav parecia funcionar
+    // al usuario (corazon se llenaba) pero el favorito NUNCA se guardaba en
+    // backend para guests (cookie ltms_wishlist) ni logged-in (tabla
+    // bkr_lt_wishlists). Mismo patron que el bug AUDIT-FE-SF-006 de
+    // follow-vendor (commit 43a2da5b) — ver LECCIONES_APRENDIDAS.md #137.
+    //
+    // Fix: invoca PV.ajax que manda PV.config.nonce (wp_create_nonce de
+    // 'ltms_plaza_viva', ver class-ltms-native-templates.php:325-327). El
+    // handler PHP LTMS_Wishlist::ajax_pv_toggle (registrado en init() de la
+    // misma clase) valida contra ese nonce global y persiste via
+    // LTMS_Wishlist::toggle() que ya soporta guest (cookie 30d) y logged-in
+    // (DB bkr_lt_wishlists). El toggle visual queda optimista (UX
+    // instantánea), pero en error se revierte para no engañar al usuario.
     var fav = e.target.closest('.pv-product-card__fav, [data-pv-fav]');
     if (fav) {
       e.preventDefault();
+      var wasFavActive = fav.classList.contains('is-active');
+      // Toggle optimista inmediato para UX instantánea.
       fav.classList.toggle('is-active');
       var active = fav.classList.contains('is-active');
       fav.setAttribute('aria-pressed', String(active));
-      if (active && fav.dataset.pvFav !== 'silent') PV.toast(PV.i18n.added_to_wishlist, { type: 'success', duration: 1800 });
-      dispatch('wishlist-toggle', { el: fav, active: active, productId: fav.getAttribute('data-product-id') });
+      var productId = fav.getAttribute('data-product-id') || fav.getAttribute('data-pv-wishlist-toggle');
+      if (!productId) return;
+      PV.ajax('ltms_pv_toggle_wishlist', { product_id: productId })
+        .then(function (res) {
+          if (res && res.success) {
+            var added = !!(res.data && res.data.added);
+            // Reconciliar état visual con la respuesta authoritative del backend.
+            if (added !== active) {
+              if (added) { fav.classList.add('is-active'); } else { fav.classList.remove('is-active'); }
+              fav.setAttribute('aria-pressed', String(added));
+            }
+            var msg = (res.data && res.data.message) || (added ? PV.i18n.added_to_wishlist : PV.i18n.removed_from_wishlist);
+            if (added && fav.dataset.pvFav !== 'silent') PV.toast(msg, { type: 'success', duration: 1800 });
+            dispatch('wishlist-toggle', { el: fav, active: added, productId: productId });
+          } else {
+            // Backend dijo no: revertir toggle optimista.
+            if (wasFavActive) { fav.classList.add('is-active'); } else { fav.classList.remove('is-active'); }
+            fav.setAttribute('aria-pressed', String(wasFavActive));
+            PV.toast((res && res.data && res.data.message) || 'Error', { type: 'error' });
+          }
+        })
+        .catch(function () {
+          // Error de red/CSP: revertir toggle optimista.
+          if (wasFavActive) { fav.classList.add('is-active'); } else { fav.classList.remove('is-active'); }
+          fav.setAttribute('aria-pressed', String(wasFavActive));
+          PV.toast('Error de conexión', { type: 'error' });
+        });
       return;
     }
     // Custom ATC with fly animation

@@ -30,6 +30,20 @@ class LTMS_Wishlist {
         // and returns 401, so guests could never use it. Keeping the registration caused
         // unnecessary 401 responses and confused security scanners.
 
+        // AUDIT-FE-AP-001 FIX (Fase 1.5): handler PV-friendly para los botones fav de los
+        // cards del design system Plaza Viva en todas las paginas publicas (home.php,
+        // vendor-store.php, content-product.php). El handler legacy ajax_toggle() valida
+        // contra un nonce por-producto (ltms_wishlist_{pid}) que el card nunca envia
+        // (PV.ajax siempre manda PV.config.nonce = wp_create_nonce('ltms_plaza_viva')),
+        // y requiere login (retorna 401 para guests). El handler nuevo valida contra el
+        // nonce global ltms_plaza_viva (paridad con ajax_quick_view,
+        // ajax_plaza_viva_add_to_cart, LTMS_Vendor_Followers::ajax_toggle_follow) y
+        // persiste via LTMS_Wishlist::toggle() que ya soporta guest (cookie + 30d) y
+        // logged-in (DB lt_wishlists). Ver LECCIONES_APRENDIDAS.md #137 (mismo patron
+        // que el follow-vendor AUDIT-FE-SF-006).
+        add_action( 'wp_ajax_ltms_pv_toggle_wishlist',        [ __CLASS__, 'ajax_pv_toggle' ] );
+        add_action( 'wp_ajax_nopriv_ltms_pv_toggle_wishlist', [ __CLASS__, 'ajax_pv_toggle' ] );
+
         // AJAX: get count.
         add_action( 'wp_ajax_ltms_wishlist_count', [ __CLASS__, 'ajax_count' ] );
         add_action( 'wp_ajax_nopriv_ltms_wishlist_count', [ __CLASS__, 'ajax_count' ] );
@@ -191,6 +205,46 @@ class LTMS_Wishlist {
             'added' => $added,
             'count' => count( self::get_wishlist_ids() ),
             'message' => $added ? __( 'Añadido a tu wishlist', 'ltms' ) : __( 'Quitado de tu wishlist', 'ltms' ),
+        ] );
+    }
+
+    /**
+     * AUDIT-FE-AP-001 (Fase 1.5): AJAX toggle wishlist para el design system Plaza Viva.
+     *
+     * Diferencias vs ajax_toggle() legacy:
+     *  - Valida contra el nonce global `ltms_plaza_viva` (no por-producto) porque el
+     *    helper JS PV.ajax siempre envia PV.config.nonce (wp_create_nonce de
+     *    'ltms_plaza_viva'). Ver class-ltms-native-templates.php:325-327.
+     *  - Acepta guests: delega en LTMS_Wishlist::toggle() que usa cookie para guests
+     *    y DB para logged-in. (ajax_toggle() retorna 401 para guests.)
+     *
+     * @return void Envia JSON success { added: bool, count: int, message: string }
+     *              o JSON error { message: string } en [400|403].
+     */
+    public static function ajax_pv_toggle(): void {
+        check_ajax_referer( 'ltms_plaza_viva', 'nonce' );
+
+        $product_id = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+        if ( ! $product_id ) {
+            wp_send_json_error( [ 'message' => __( 'ID de producto inválido', 'ltms' ) ], 400 );
+        }
+
+        // Verificar que el producto exista y sea publicable (defensiva: el card ya
+        // filtra por is_visible(), pero un guest puede enviar cualquier ID).
+        $product = wc_get_product( $product_id );
+        if ( ! $product instanceof WC_Product ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no encontrado', 'ltms' ) ], 404 );
+        }
+
+        $added = self::toggle( $product_id );
+
+        wp_send_json_success( [
+            'added'     => $added,
+            'count'     => count( self::get_wishlist_ids() ),
+            'is_guest'  => ! is_user_logged_in(),
+            'message'   => $added
+                ? __( 'Añadido a favoritos', 'ltms' )
+                : __( 'Quitado de favoritos', 'ltms' ),
         ] );
     }
 
