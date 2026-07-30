@@ -701,6 +701,34 @@
           PV.toast('Error de conexión', { type: 'error' });
         });
     }
+
+    // AUDIT-FE-VS-JT-001 FIX (Fase 1.4 backlog closure): jump-to-tab desde el
+    // botón "Ver políticas" del hero de vendor-store.php. Antes este handler
+    // vivía en un bloque <script> inline en vendor-store.php:602-625, lo que
+    // rompia CSP-compliance (la excepción restante tras AUDIT-FE-SF-006 que
+    // ya migro el follow). Migrado aqui al listener global delegado con el
+    // mismo patron closest('[data-pv-*]') de los demas handlers del design
+    // system. Cierra 100% CSP-compliance en vendor-store.php (ya NO queda
+    // ningun <script> inline en la plantilla).
+    //
+    // Behaviour: el boton [data-pv-jump-tab="X"] dispara un click programatico
+    // en #pv-vendor-tab-X (tab del panel de politicas) y hace scroll suave al
+    // contenedor #pv-vendor-panel-X. Si alguno no existe, no-op (no reviente).
+    var jumpBtn = e.target.closest('[data-pv-jump-tab]');
+    if (jumpBtn) {
+      var jumpTarget = jumpBtn.getAttribute('data-pv-jump-tab');
+      if (jumpTarget) {
+        var tabEl = document.querySelector('#pv-vendor-tab-' + jumpTarget);
+        if (tabEl) {
+          e.preventDefault();
+          tabEl.click();
+          var panelEl = document.getElementById('pv-vendor-panel-' + jumpTarget);
+          if (panelEl && typeof panelEl.scrollIntoView === 'function') {
+            panelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      }
+    }
   });
 
   /* =========================================================================

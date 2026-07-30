@@ -595,36 +595,18 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
 
 <?php
 /**
- * Inline JS: jump-to-tab desde el botón "Ver políticas" del hero.
- * Vanilla JS — sin dependencias.
+ * AUDIT-FE-VS-JT-001 FIX (Fase 1.4 backlog closure): el handle inline del
+ * boton "Ver politicas" (data-pv-jump-tab) fue migrado a ltms-plaza-viva.js
+ * (dentro del listener global de click, junto a data-pv-follow-vendor y
+ * data-pv-add-to-cart). Esto cierra 100% CSP-compliance en vendor-store.php:
+ * ya NO queda ningun handle de JS dentro de la plantilla. Ver handler
+ * 'AUDIT-FE-VS-JT-001 FIX' en ltms-plaza-viva.js.
+ *
+ * Nota de bug: antes de este fix existia un tag de cierre `</ scr ipt>` sin
+ * su apertura correspondiente (residuo de la migracion previa del handle del
+ * follow-vendor en 43a2da5b). Tambien eliminado en este fix.
  */
 ?>
-<script>
-(function(){
-    document.addEventListener('click', function(e){
-        var jump = e.target.closest('[data-pv-jump-tab]');
-        if (!jump) return;
-        var target = jump.getAttribute('data-pv-jump-tab');
-        var tab = document.querySelector('#pv-vendor-tab-' + target);
-        if (!tab) return;
-        e.preventDefault();
-        tab.click();
-        var panel = document.getElementById('pv-vendor-panel-' + target);
-        if (panel) {
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
-
-    // AUDIT-FE-SF-006 FIX (Fase 1.4): el handler del follow-vendor fue
-    // migrado a ltms-plaza-viva.js (handler global "data-pv-follow-vendor")
-    // para persistir el follow vía el nuevo endpoint ltms_follow_vendor
-    // — antes este bloque solo cambiaba el label visualmente sin tocar backend.
-    // La migración también cierra la excepción CSP de vendor-store.php.
-    // [Backlog re-audit: el handler jump-tab de arriba sigue inline; migrarlo
-    //  al design system global es P1 pendiente — fuera del alcance de 1.4.]
-})();
-</script>
-</script>
 
 <?php
 /**
