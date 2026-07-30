@@ -3,7 +3,41 @@
  * LTMS Deploy Webhook v5 — self-updating + QA mode
  */
 define('DEPLOY_TOKEN', 'ltms_deploy_2026_s3cur3_t0k3n_x9z');
-define('PLUGIN_PATH', __DIR__ . '/wp-content/plugins/lt-marketplace-suite');
+
+// DEPLOY-WH-PATH-001 FIX (2026-07-30): PLUGIN_PATH y WP_LOAD_PATH robustos,
+// compatibles con ambas ubicaciones posibles del webhook en el servidor:
+//
+//   (A) webroot: public_html/ltms-deploy-webhook.php  (ubicación histórica
+//       asumida por el webhook pre-fix; PLUGIN_PATH = __DIR__ . '/wp-content/
+//       plugins/lt-marketplace-suite' funciona, wp-load.php en __DIR__)
+//
+//   (B) plugin dir: public_html/wp-content/plugins/lt-marketplace-suite/deploy/
+//       ltms-deploy-webhook.php  (ubicación observada en producción al
+//       disparar el deploy 2026-07-30 13:31 UTC; derriba deploy con
+//       `Plugin: NO` + `wp-load.php not found` porque el path
+//       `__DIR__ . '/wp-content/plugins/...'` apunta a un subdirectorio
+//       inexistente dentro de deploy/, y __DIR__ . '/wp-load.php' no existe)
+//
+// Detección: si __DIR__ . '/wp-load.php' existe → caso (A). Si no → caso (B):
+// PLUGIN_PATH = dirname(__DIR__) (subir 1 nivel desde deploy/ al root del plugin),
+// WP_LOAD_PATH = dirname(__DIR__, 4) . '/wp-load.php' (subir 4 niveles desde
+// deploy/ hasta public_html/ donde reside wp-load.php + wp-config.php, mismo
+// cálculo ya usado en este archivo líneas 32-35 para @include_once wp-config).
+//
+// Backward-compat: si alguien tenía el webhook en webroot, todo sigue
+// funcionando. Solo corrige el caso (B) que antes rompía.
+if ( file_exists( __DIR__ . '/wp-load.php' ) ) {
+    // Caso (A): webhook en webroot public_html/
+    define( 'PLUGIN_PATH', __DIR__ . '/wp-content/plugins/lt-marketplace-suite' );
+    define( 'WP_LOAD_PATH', __DIR__ . '/wp-load.php' );
+} else {
+    // Caso (B): webhook en wp-content/plugins/lt-marketplace-suite/deploy/
+    // dirname(__DIR__) = .../wp-content/plugins/lt-marketplace-suite
+    define( 'PLUGIN_PATH', dirname( __DIR__ ) );
+    // dirname(__DIR__, 4) = .../public_html (donde vive wp-load.php)
+    // Misma lógica ya usada líneas 32-35 para wp-config.php (que funcionaba).
+    define( 'WP_LOAD_PATH', dirname( __DIR__, 4 ) . '/wp-load.php' );
+}
 define('GH_REPO', 'jglotengo/lt-marketplace-suite');
 
 header('Content-Type: text/plain; charset=utf-8');
@@ -63,7 +97,7 @@ Accept: application/vnd.github.v3+json
 
 // ── QA MODE ──────────────────────────────────────────────────────────────────
 if (isset($_GET['qa'])) {
-    $wp = __DIR__ . '/wp-load.php';
+    $wp = WP_LOAD_PATH;
     if (!file_exists($wp)) { echo "ERROR: wp-load.php not found
 "; exit(1); }
     require_once $wp;
@@ -192,7 +226,7 @@ if (isset($_GET['fix_sellers'])) {
 
     // 2. Load WP and check/fix DB
     echo "\n2. WORDPRESS DB CHECK:\n";
-    require_once __DIR__ . '/wp-load.php';
+    require_once WP_LOAD_PATH;
     global $wpdb;
     // Check all postmeta for the phrase
     $hits = $wpdb->get_results(
@@ -226,7 +260,7 @@ if (isset($_GET['fix_sellers'])) {
 
 // ── CAPS FIX MODE ────────────────────────────────────────────────────────────
 if (isset($_GET['caps'])) {
-    $wp = __DIR__ . '/wp-load.php';
+    $wp = WP_LOAD_PATH;
     if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
     define('SHORTINIT', true);
     require_once $wp;
@@ -281,7 +315,7 @@ if (isset($_GET['caps'])) {
 // Comprehensive diagnostic of all pending audit items.
 // Usage: ?token=...&report=1
 if (isset($_GET['report'])) {
-    $wp = __DIR__ . '/wp-load.php';
+    $wp = WP_LOAD_PATH;
     if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
     require_once $wp;
 
@@ -424,7 +458,7 @@ if (isset($_GET['report'])) {
 // Runs bin/ltms-backfill-audit-fixes.php in production.
 // Usage: ?token=...&backfill=1
 if (isset($_GET['backfill'])) {
-    $wp = __DIR__ . '/wp-load.php';
+    $wp = WP_LOAD_PATH;
     if (!file_exists($wp)) { echo "ERROR: wp-load.php not found\n"; exit(1); }
     require_once $wp;
 
@@ -701,8 +735,8 @@ echo "Done: {$ok} ok, {$err} err
 ";
 echo "opcache_reset: ".(function_exists('opcache_reset')&&opcache_reset()?'OK':'N/A')."\n";
 // Purge SiteGround cache
-if (file_exists(__DIR__ . '/wp-load.php')) {
-    @require_once __DIR__ . '/wp-load.php';
+if (file_exists(WP_LOAD_PATH)) {
+    @require_once WP_LOAD_PATH;
     if (function_exists('sg_cachepress_purge_cache')) { sg_cachepress_purge_cache(); echo "SG cache purged\n"; }
     if (function_exists('wp_cache_flush')) { wp_cache_flush(); echo "WP cache flushed\n"; }
 }
