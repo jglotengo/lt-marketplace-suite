@@ -610,6 +610,17 @@ get_header( 'shop' );
  * Wrapper del tema — woocommerce_after_main_content.
  */
 do_action( 'woocommerce_after_main_content' );
+
+// AUDIT-FE-CKO-001 FIX (Fase 1.7): restaurar el breadcrumb en el hook para
+// no afectar al resto del sitio. Paridad con single-product.php:722-725 y
+// cart.php (AUDIT-FE-CART-008). El remove_action anterior (línea ~101) sin
+// este add_action dejaba desenganchado el breadcrumb para cualquier caller
+// posterior del hook en el mismo request (SEO plugins, schema.org breadcrumbs
+// en footer, themes que esperan woocommerce_breadcrumb registrado en
+// woocommerce_before_main_content).
+if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
+    add_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+}
 ?>
 
 <?php
@@ -619,301 +630,32 @@ do_action( 'woocommerce_after_main_content' );
 ?>
 
 
-<script>
-(function(){
-    'use strict';
-    var scope = document.querySelector('.pv-scope.pv-checkout');
-    if (!scope) return;
-
-    /* --- 1. Stepper sync (marcar paso activo según scroll/visibility) -- */
-    var stepBlocks = Array.prototype.slice.call(scope.querySelectorAll('[data-step-block]'));
-    var stepperItems = Array.prototype.slice.call(scope.querySelectorAll('.pv-checkout__stepper-step[data-step]'));
-
-    function markActiveStep(stepNum){
-        stepperItems.forEach(function(item){
-            var n = parseInt(item.getAttribute('data-step'), 10);
-            item.classList.toggle('is-active', n === stepNum);
-            item.classList.toggle('is-done', n < stepNum);
-        });
-    }
-
-    if (stepBlocks.length && 'IntersectionObserver' in window){
-        var io = new IntersectionObserver(function(entries){
-            entries.forEach(function(entry){
-                if (entry.isIntersecting){
-                    var n = parseInt(entry.target.getAttribute('data-step-block'), 10);
-                    markActiveStep(n);
-                }
-            });
-        }, { rootMargin:'-40% 0px -55% 0px', threshold:0 });
-        stepBlocks.forEach(function(b){ io.observe(b); });
-    }
-
-    /* --- 2. Shipping radio cards (cambiar .is-selected) --------------- */
-    var shipRadios = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-shipping-radio]'));
-    shipRadios.forEach(function(radio){
-        radio.addEventListener('change', function(){
-            var wrap = radio.closest('.pv-shipping-options');
-            if (!wrap) return;
-            Array.prototype.slice.call(wrap.querySelectorAll('.pv-shipping-option')).forEach(function(li){
-                li.classList.remove('is-selected');
-            });
-            radio.closest('.pv-shipping-option').classList.add('is-selected');
-        });
-    });
-
-    /* --- 3. Payment radio cards (mostrar/ocultar fields) -------------- */
-    var payRadios = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-payment-radio]'));
-    var payFields = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-payment-fields]'));
-
-    function updatePaymentSelection(){
-        payRadios.forEach(function(radio){
-            var li = radio.closest('.pv-payment-option');
-            if (!li) return;
-            var isSelected = radio.checked;
-            li.classList.toggle('is-selected', isSelected);
-            var id = li.getAttribute('data-pv-payment-option');
-            payFields.forEach(function(field){
-                var fid = field.getAttribute('data-pv-payment-fields');
-                if (fid === id){
-                    field.hidden = !isSelected;
-                }
-            });
-        });
-    }
-    payRadios.forEach(function(radio){
-        radio.addEventListener('change', updatePaymentSelection);
-    });
-    updatePaymentSelection();
-
-    /* --- 4. ship_to_different_address toggle (mostrar shipping fields) */
-    var shipToggle = scope.querySelector('#ship_to_different_address');
-    var shipFieldsWrap = scope.querySelector('.woocommerce-shipping-fields');
-    if (shipToggle && shipFieldsWrap){
-        function syncShipFields(){
-            if (shipToggle.checked){
-                shipFieldsWrap.classList.add('shipping-fields--visible');
-                shipFieldsWrap.style.display = 'block';
-            } else {
-                shipFieldsWrap.classList.remove('shipping-fields--visible');
-                shipFieldsWrap.style.display = 'none';
-            }
-        }
-        shipToggle.addEventListener('change', syncShipFields);
-        syncShipFields();
-    }
-
-    /* --- 5. Submit loading state ------------------------------------- */
-    var submitBtn = scope.querySelector('.pv-checkout__submit');
-    var checkoutForm = scope.querySelector('form.woocommerce-checkout');
-    if (submitBtn && checkoutForm){
-        checkoutForm.addEventListener('submit', function(){
-            // Validación mínima: validar campos required visibles.
-            submitBtn.classList.add('is-loading');
-            submitBtn.setAttribute('disabled', 'disabled');
-        });
-    }
-
-    /* --- 6. v2.9.216: Fix field labels (bypass WOOCCM) ----------------- */
-    /* WOOCCM (WooCommerce Checkout Manager) reconstruye los labels desde
-     * su propia BD DESPUÉS de los filtros woocommerce_billing_fields y
-     * woocommerce_form_field. La única forma de override confiable es
-     * modificar el DOM via JS después de que WOOCCM termina.
-     *
-     * Labels corregidos:
-     *   CO: billing_state → 'Departamento', billing_city → 'Municipio'
-     *   MX: billing_state → 'Estado', billing_city → 'Municipio / Alcaldía'
-     *   Ambos: 'País / Región' → 'País', 'Dirección de la calle' → 'Dirección',
-     *          'Código postal / ZIP' → 'Código postal'
-     */
-    var ltmsCountry = '<?php echo esc_js( LTMS_Core_Config::get_country() ); ?>';
-    var labelMap = {};
-    if (ltmsCountry === 'CO') {
-        labelMap = {
-            'billing_state': 'Departamento',
-            'shipping_state': 'Departamento',
-            'billing_city': 'Municipio',
-            'shipping_city': 'Municipio',
-            'billing_country': 'País',
-            'shipping_country': 'País',
-            'billing_postcode': 'Código postal',
-            'shipping_postcode': 'Código postal',
-            'billing_address_1': 'Dirección',
-            'shipping_address_1': 'Dirección',
-            'billing_address_2': 'Apartamento, suite, etc. (opcional)',
-            'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
-        };
-    } else if (ltmsCountry === 'MX') {
-        labelMap = {
-            'billing_state': 'Estado',
-            'shipping_state': 'Estado',
-            'billing_city': 'Municipio / Alcaldía',
-            'shipping_city': 'Municipio / Alcaldía',
-            'billing_country': 'País',
-            'shipping_country': 'País',
-            'billing_postcode': 'Código postal',
-            'shipping_postcode': 'Código postal',
-            'billing_address_1': 'Dirección',
-            'shipping_address_1': 'Dirección',
-            'billing_address_2': 'Apartamento, suite, etc. (opcional)',
-            'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
-        };
-    }
-
-    function fixFieldLabels() {
-        Object.keys(labelMap).forEach(function(fieldKey) {
-            var newLabel = labelMap[fieldKey];
-            // Buscar el label por 'for' attribute.
-            var labelEl = scope.querySelector('label[for="' + fieldKey + '"]');
-            if (!labelEl) return;
-            // Preservar el <abbr class="required"> o <span class="optional"> si existe.
-            var abbr = labelEl.querySelector('abbr.required, abbr');
-            var optionalSpan = labelEl.querySelector('span.optional, .optional');
-            // Reconstruir el label.
-            labelEl.innerHTML = '';
-            labelEl.appendChild(document.createTextNode(newLabel));
-            if (abbr) {
-                labelEl.appendChild(document.createTextNode(' '));
-                labelEl.appendChild(abbr);
-            }
-            if (optionalSpan) {
-                labelEl.appendChild(document.createTextNode(' '));
-                labelEl.appendChild(optionalSpan);
-            }
-        });
-        // Ocultar campos duplicados:
-        // - billing_phone en step 2 (ya está en step 1 como 'Teléfono / WhatsApp')
-        // - billing_email en step 2 (ya está en step 1)
-        //
-        // FIX #10 (CHECKOUT-AUDIT): en vez de inspeccionar el texto del label
-        // (que este mismo filter reescribe), contamos cuántos <label for="...">
-        // existen para el mismo target. El primero se conserva, los demás
-        // (duplicados de WOOCCM) se ocultan.
-        var phoneEmailKeys = ['billing_phone','shipping_phone','billing_email','shipping_email'];
-        var occurrenceCount = {};
-        phoneEmailKeys.forEach(function(k){ occurrenceCount[k] = 0; });
-        phoneEmailKeys.forEach(function(fieldKey) {
-            scope.querySelectorAll('label[for="' + fieldKey + '"]').forEach(function(lbl) {
-                occurrenceCount[fieldKey]++;
-                if (occurrenceCount[fieldKey] < 2) return;
-                var fieldId = fieldKey + '_field';
-                var field = scope.querySelector('#' + fieldId);
-                if (field) field.style.display = 'none';
-            });
-        });
-
-        // Auto-seleccionar país: CO o MX según configuración.
-        var countrySelect = scope.querySelector('#billing_country, #shipping_country');
-        if (countrySelect && countrySelect.value !== ltmsCountry) {
-            countrySelect.value = ltmsCountry;
-            // Disparar change event para que WC actualice los estados.
-            countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    }
-
-    // Ejecutar inmediatamente y después de un delay (para WOOCCM JS que corre tarde).
-    fixFieldLabels();
-    setTimeout(fixFieldLabels, 500);
-    setTimeout(fixFieldLabels, 1500);
-    // También observar mutaciones del DOM (WOOCCM puede modificar dinámicamente).
-    if ('MutationObserver' in window) {
-        var observer = new MutationObserver(function(mutations) {
-            var shouldFix = false;
-            mutations.forEach(function(m) {
-                if (m.type === 'childList' || m.type === 'characterData') {
-                    shouldFix = true;
-                }
-            });
-            if (shouldFix) {
-                fixFieldLabels();
-            }
-        });
-        observer.observe(scope, { childList: true, subtree: true, characterData: true });
-        // Dejar de observar después de 5 segundos (para no matar el performance).
-        setTimeout(function() { observer.disconnect(); }, 5000);
-    }
-
-    /* --- 7. v2.9.218: Sync billing_state from billing_city (DANE municipio) ---- */
-    /* El select de billing_city usa códigos DANE (5 dígitos) donde los primeros
-     * 2 dígitos = departamento. Cuando el usuario selecciona un municipio,
-     * auto-poblamos billing_state con el departamento correspondiente para que
-     * WC pueda calcular el envío (WC requiere billing_state para calcular
-     * shipping rates).
-     *
-     * Estrategia: extraer el nombre del departamento del texto del option
-     * (formato: "Municipio — Departamento") y buscarlo en las opciones de
-     * billing_state por coincidencia de texto.
-     */
-    function syncStateFromCity() {
-        var citySelect = scope.querySelector('#billing_city, #ltms-municipality-select');
-        var stateSelect = scope.querySelector('#billing_state');
-        if (!citySelect || !stateSelect) return;
-        if (!citySelect.value || citySelect.value.length < 2) return;
-
-        // Obtener el texto del option seleccionado (formato: "Municipio — Departamento")
-        var selectedOption = citySelect.options[citySelect.selectedIndex];
-        if (!selectedOption) return;
-        var optionText = selectedOption.textContent || '';
-        // Extraer el departamento (después del " — ")
-        var deptName = '';
-        var dashIdx = optionText.indexOf('—');
-        if (dashIdx !== -1) {
-            deptName = optionText.substring(dashIdx + 1).trim();
-        } else if (optionText.indexOf('-') !== -1) {
-            deptName = optionText.substring(optionText.indexOf('-') + 1).trim();
-        }
-
-        if (!deptName) return;
-
-        // Buscar la opción en billing_state que coincida con el departamento.
-        // WC usa códigos como "CO-DC" para Bogotá D.C. pero el texto visible es
-        // "Bogotá D.C." — comparamos por texto.
-        var bestMatch = null;
-        var bestScore = 0;
-        for (var i = 0; i < stateSelect.options.length; i++) {
-            var opt = stateSelect.options[i];
-            var optText = (opt.textContent || '').trim();
-            // Normalizar: quitar acentos y minúsculas para comparación robusta.
-            var normOpt = optText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            var normDept = deptName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            if (normOpt === normDept) {
-                bestMatch = opt;
-                bestScore = 100;
-                break;
-            }
-            // Coincidencia parcial: si el departamento está contenido en el texto
-            if (normOpt.indexOf(normDept) !== -1 || normDept.indexOf(normOpt) !== -1) {
-                var score = Math.min(normOpt.length, normDept.length);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = opt;
-                }
-            }
-        }
-
-        if (bestMatch && bestScore > 0) {
-            stateSelect.value = bestMatch.value;
-            // Disparar change event para que WC recalcule shipping.
-            stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            // También disparar el evento 'update_checkout' de WC para forzar
-            // el recálculo de shipping methods.
-            if (typeof jQuery !== 'undefined') {
-                jQuery(document.body).trigger('update_checkout');
-            }
-        }
-    }
-
-    // Enganchar al change de billing_city.
-    var citySelectForSync = scope.querySelector('#billing_city, #ltms-municipality-select');
-    if (citySelectForSync) {
-        citySelectForSync.addEventListener('change', function() {
-            setTimeout(syncStateFromCity, 100); // Pequeño delay para que WOOCCM termine.
-        });
-        // También ejecutar al cargar si ya hay un municipio seleccionado.
-        setTimeout(syncStateFromCity, 800);
-    }
-})();
-</script>
-
 <?php
+/* AUDIT-FE-CKO-003 FIX (Fase 1.7): el bloque script-tag inline original
+ * (líneas 633-927 del source pre-fix, ~295 líneas — el bloque inline más
+ * grande del design system Plaza Viva) fue migrado al design system global
+ * assets/js/ltms-plaza-viva.js (scope CHECKOUT al final del archivo).
+ * Esta plantilla ya NO contiene lógica JS inline — paridad con cart.php
+ * (Fase 1.6 — AUDIT-FE-CART-001) y vendor-store.php (100% CSP-compliant
+ * tras AUDIT-FE-VS-JT-001).
+ *
+ * Los 7 behaviours migrados:
+ *   1. Stepper sync: marca el paso activo del header según IntersectionObserver.
+ *   2. Shipping radio cards: marca .is-selected al cambiar.
+ *   3. Payment radio cards: muestra/oculta fields del gateway seleccionado.
+ *   4. ship_to_different_address toggle: muestra/oculta shipping fields.
+ *   5. Submit loading state: deshabilita el botón mientras se procesa.
+ *   6. WOOCCM label override (Departamento/Municipio/Dirección etc.) con
+ *      MutationObserver para WOOCCM JS que corre tarde.
+ *   7. Sync billing_state from billing_city: extrae departamento del option
+ *      "Municipio — Departamento" y auto-puebla billing_state para WC shipping.
+ *
+ * AUDIT-FE-CKO-004 FIX (Fase 1.7): el valor ltmsCountry antes era inyectado
+ * por PHP via <?php echo esc_js()?> dentro del bloque script-tag inline
+ * (línea 740 original), lo que hacía imposible migrar el JS a un archivo
+ * externo (rompía la rule de CSP y de static-cacheability del JS). Ahora
+ * el país se expone via wp_localize_script en class-ltms-native-templates.php:329
+ * (campo 'country') y el JS lee PV.config.country.
+ */
+
 get_footer( 'shop' );

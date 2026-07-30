@@ -237,6 +237,14 @@ final class LTMS_Frontend_Checkout_Handler {
         // 'ltms_ux_nonce' (inexistente en el JS PV) a 'ltms_plaza_viva'].
         add_action( 'wp_ajax_ltms_plaza_viva_add_to_cart',        [ __CLASS__, 'ajax_plaza_viva_add_to_cart' ] );
         add_action( 'wp_ajax_nopriv_ltms_plaza_viva_add_to_cart', [ __CLASS__, 'ajax_plaza_viva_add_to_cart' ] );
+
+        // AUDIT-FE-CART-009 FIX (Fase 1.6): handler para vaciar el carrito completo
+        // desde el header del template cart.php. WC nativo no expone endpoint
+        // built-in para esto (solo item-por-item via wc_get_cart_remove_url).
+        // Mismo patrón que AUDIT-FE-AP-001: handler PV-friendly con nonce global
+        // ltms_plaza_viva, abierto a guest y logged-in (compra guest habilitada).
+        add_action( 'wp_ajax_ltms_pv_empty_cart',        [ __CLASS__, 'ajax_pv_empty_cart' ] );
+        add_action( 'wp_ajax_nopriv_ltms_pv_empty_cart', [ __CLASS__, 'ajax_pv_empty_cart' ] );
     }
 
     // =========================================================================
@@ -2457,6 +2465,75 @@ final class LTMS_Frontend_Checkout_Handler {
             'cart_count'  => $count_after,
             'count_delta'  => $count_after - $count_before,
             'cart_key'     => $result,
+        ] );
+    }
+
+    // -------------------------------------------------------------------------
+    // e2. ltms_pv_empty_cart (AUDIT-FE-CART-009 — Fase 1.6)
+    // -------------------------------------------------------------------------
+
+    /**
+     * AJAX: ltms_pv_empty_cart
+     *
+     * Vacía el carrito completo. Invocado desde el botón "Vaciar carrito"
+     * del header del template cart.php (data-pv-empty-cart). WC nativo no
+     * expone endpoint built-in para vaciar el carrito entero, solo expone
+     * item-por-item via wc_get_cart_remove_url(). Este handler cubre ese gap
+     * siguiendo el patrón PV-friendly establecido en AUDIT-FE-AP-001
+     * (wishlist toggle) y AUDIT-FE-SF-006 (follow vendor):
+     *   - Valida contra el nonce global `ltms_plaza_viva` (enviado por
+     *     PV.ajax como campo `nonce`).
+     *   - Acepta guest y logged-in (compra guest habilitada en WC).
+     *   - Llama WC()->cart->empty_cart() que internamente dispara los hooks
+     *     `woocommerce_before_cart_emptied` y `woocommerce_cart_emptied`,
+     *     preservando integraciones de terceros (insurance cancellation,
+     *     shipping cache invalidation, etc.).
+     *   - En success retorna cart_count=0 + redirect a la URL del carrito
+     *     (que WC muestra como empty-cart cuando is_empty()).
+     *
+     * Respuesta JSON:
+     *   success: { message, cart_count: 0, redirect }
+     *   error:   { message }
+     *
+     * @return void
+     */
+    public static function ajax_pv_empty_cart(): void {
+        // AUDIT-FE-CART-009 FIX (Fase 1.6): mismo nonce global que el resto
+        // de handlers PV-friendly (paridad con ajax_plaza_viva_add_to_cart,
+        // ajax_pv_toggle, ajax_toggle_follow).
+        check_ajax_referer( 'ltms_plaza_viva', 'nonce' );
+
+        if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+            wp_send_json_error( [ 'message' => __( 'Carrito no disponible', 'ltms' ) ], 503 );
+        }
+
+        // Defensiva: si el carrito ya está vacío, no hay nada que vaciar.
+        // Retornar success con cart_count=0 (estado consistente) en vez de
+        // error — el JS hace redirect a la empty-cart view, que es lo que
+        // el usuario espera ver tras "Vaciar carrito" en cualquier caso.
+        if ( WC()->cart->is_empty() ) {
+            wp_send_json_success( [
+                'message'    => __( 'El carrito ya está vacío', 'ltms' ),
+                'cart_count' => 0,
+                'redirect'   => wc_get_cart_url(),
+            ] );
+        }
+
+        // WC()->cart->empty_cart() acepta un flag $clear_persistent_cart
+        // (default true) y dispara los hooks estándar. NO pasamos false
+        // porque queremos que el session-cart se limpie también (guest
+        // depende de la sesión WC, no de la cookie ltms_wishlist).
+        WC()->cart->empty_cart();
+
+        // Tras empty_cart, recalcular counts y disparar recalculo de shipping.
+        if ( function_exists( 'wc_clear_cart_totals' ) ) {
+            wc_clear_cart_totals();
+        }
+
+        wp_send_json_success( [
+            'message'    => __( 'Carrito vaciado', 'ltms' ),
+            'cart_count'  => 0,
+            'redirect'    => wc_get_cart_url(),
         ] );
     }
 

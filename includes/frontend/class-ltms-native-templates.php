@@ -327,6 +327,13 @@ class LTMS_Native_Templates {
             'nonce'     => wp_create_nonce( 'ltms_plaza_viva' ),
             'cart_url'  => wc_get_cart_url(),
             'checkout_url' => wc_get_checkout_url(),
+            // AUDIT-FE-CKO-004 FIX (Fase 1.7): exponer el país al JS para que
+            // el scope CHECKOUT migrado a ltms-plaza-viva.js pueda accesarlo
+            // vía PV.config.country en vez de leer un valor PHP inyectado en
+            // el script-tag inline (rompía CSP-compliance del JS). Antes el
+            // template checkout.php:729 inyectaba el país con esc_js() DENTRO
+            // del bloque script inline.
+            'country'   => class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO',
             'i18n'      => [
                 'addedToCart'     => __( 'Producto añadido al carrito', 'ltms' ),
                 'cartError'       => __( 'Error al añadir al carrito', 'ltms' ),
@@ -335,6 +342,16 @@ class LTMS_Native_Templates {
                 'outOfStock'      => __( 'Agotado', 'ltms' ),
                 'onlyLeft'        => __( '¡Solo quedan %d!', 'ltms' ),
                 'peopleViewing'   => __( '%d personas viendo esto', 'ltms' ),
+                // AUDIT-FE-HC-005 FIX (Fase 1.9, RE-aplicación): los 3 strings
+                // del scope HELP (ltms-plaza-viva.js scope HELP, líneas 1664-
+                // 1665 + 1739) ya se declaran aquí. El fix previo PROMETÍA en
+                // su comment "ya están expuestos por wp_localize_script" PERO
+                // NO los declaraba — el JS caía al fallback `|| 'resultado'`
+                // hardcodedo en español, rompiendo i18n del plugin (strings
+                // que no pasaban por `__()`). Ver LECCIONES_APRENDIDAS #141.
+                'faq_result_singular' => _n( 'resultado', 'resultado', 1, 'ltms' ),
+                'faq_result_plural'   => _n( 'resultado', 'resultados', 2, 'ltms' ),
+                'chat_unavailable'    => __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ),
             ],
         ] );
     }

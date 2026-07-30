@@ -193,7 +193,13 @@ get_header( 'shop' );
     </nav>
 
     <!-- ===================================================================
-         HEADER: Título + count +Vaciar carrito
+         HEADER: Título + count + Vaciar carrito + Seguir comprando
+         AUDIT-FE-CART-009 FIX (Fase 1.6): botón "Vaciar carrito" añadido.
+         Antes el comment HTML mencionaba esta acción pero NO existía el
+         botón. Ahora se invoca via AJAX (ltms_pv_empty_cart handler) con
+         confirmación accesible (data-pv-empty-cart + JS delegado en
+         ltms-plaza-viva.js). El botón requiere confirmación antes de
+         vaciar para evitar click accidental (UX-hostil sin undo).
          =================================================================== -->
     <header class="pv-cart__header pv-section">
         <div class="pv-cart__header-inner">
@@ -207,6 +213,10 @@ get_header( 'shop' );
                 </span>
             </div>
             <div class="pv-cart__header-actions">
+                <button type="button" class="pv-btn pv-btn--ghost pv-btn--sm pv-btn--danger pv-cart__empty-btn" data-pv-empty-cart aria-label="<?php esc_attr_e( 'Vaciar todo el carrito', 'ltms' ); ?>">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5h6v2M7 7l1 13h8l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <?php esc_html_e( 'Vaciar carrito', 'ltms' ); ?>
+                </button>
                 <a href="<?php echo esc_url( get_permalink( wc_get_page_id( 'shop' ) ) ); ?>" class="pv-btn pv-btn--ghost pv-btn--sm">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <?php esc_html_e( 'Seguir comprando', 'ltms' ); ?>
@@ -330,7 +340,9 @@ get_header( 'shop' );
                                     $max_purchase    = (int) $_product->get_max_purchase_quantity();
                                     if ( $min_purchase < 1 ) { $min_purchase = 1; }
                                     if ( $max_purchase < 1 ) { $max_purchase = 99; }
-                                    $is_visible      = apply_filters( 'woocommerce_cart_item_visible', true, $cart_item, $cart_item_key );
+                                    // AUDIT-FE-CART-005 FIX: removido $is_visible (variable dead code
+                                    // — asignada con apply_filters pero nunca leída. La visibilidad ya
+                                    // se chequeó arriba con apply_filters('woocommerce_cart_item_visible').
                                     ?>
 
                                     <li class="pv-cart__item <?php echo esc_attr( apply_filters( 'woocommerce_cart_item_class', 'cart_item', $cart_item, $cart_item_key ) ); ?>" data-cart-item-key="<?php echo esc_attr( $cart_item_key ); ?>">
@@ -494,11 +506,11 @@ get_header( 'shop' );
                     <?php if ( ! empty( $coupons ) ) : ?>
                         <ul class="pv-cart__coupons-applied" role="list">
                             <?php foreach ( $coupons as $code => $coupon_obj ) :
-                                $coupon_remove_url = esc_url( add_query_arg( array( 'remove_coupon' => rawurlencode( $code ) ), wc_get_cart_url() ) );
+                                $coupon_remove_url = add_query_arg( array( 'remove_coupon' => rawurlencode( $code ) ), wc_get_cart_url() );
                                 ?>
                                 <li class="pv-cart__coupon-chip">
                                     <span class="pv-cart__coupon-chip-code"><?php echo esc_html( strtoupper( $code ) ); ?></span>
-                                    <a href="<?php echo $coupon_remove_url; ?>" class="pv-cart__coupon-chip-remove" aria-label="<?php echo esc_attr( sprintf( __( 'Quitar cupón %s', 'ltms' ), $code ) ); ?>">×</a>
+                                    <a href="<?php echo esc_url( $coupon_remove_url ); ?>" class="pv-cart__coupon-chip-remove" aria-label="<?php echo esc_attr( sprintf( __( 'Quitar cupón %s', 'ltms' ), $code ) ); ?>">×</a>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
@@ -637,6 +649,16 @@ get_header( 'shop' );
  * Wrapper del tema — woocommerce_after_main_content.
  */
 do_action( 'woocommerce_after_main_content' );
+
+// AUDIT-FE-CART-001 FIX (Fase 1.6): restaurar el breadcrumb en el hook para
+// no afectar al resto del sitio. Paridad con single-product.php:722-725. El
+// remove_action anterior (línea ~170) sin este add_action dejaba
+// desenganchado el breadcrumb para cualquier caller posterior del hook en el
+// mismo request (SEO plugins, schema.org breadcrumbs en footer, themes que
+// esperan woocommerce_breadcrumb registrado en woocommerce_before_main_content).
+if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
+    add_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+}
 ?>
 
 <style>
@@ -907,6 +929,27 @@ do_action( 'woocommerce_after_main_content' );
 .pv-scope.pv-cart .pv-cart__checkout-cta{height:56px;font-size:16px;font-weight:800;letter-spacing:.01em;}
 .pv-scope.pv-cart .pv-cart__continue-cta{height:46px;font-size:14px;font-weight:600;}
 
+/* AUDIT-FE-CART-009 FIX: botón "Vaciar carrito" en el header.
+ * Variante danger del ghost button (rojo sutil para indicar acción
+ * destructiva). Estados: hover refuerza brand-danger, is-loading
+ * deshabilita y muestra indicador. is-pending marca el botón update
+ * cuando cambian cantidades (del script migrado a ltms-plaza-viva.js). */
+.pv-scope.pv-cart .pv-btn--danger{color:var(--danger, #dc2626);border-color:rgba(220,38,38,0.3);}
+.pv-scope.pv-cart .pv-btn--danger:hover{background:rgba(220,38,38,0.08);border-color:var(--danger, #dc2626);}
+.pv-scope.pv-cart .pv-btn--danger:focus-visible{outline:2px solid var(--danger, #dc2626);outline-offset:2px;}
+.pv-scope.pv-cart .pv-btn--danger:disabled,
+.pv-scope.pv-cart .pv-btn--danger.is-loading{opacity:0.55;cursor:default;pointer-events:none;}
+.pv-scope.pv-cart .pv-btn--danger.is-loading{cursor:wait;}
+.pv-scope.pv-cart .pv-cart__update-btn.is-pending{
+    background:var(--primary-50, #eef6ff);border-color:var(--primary, #00867d);
+    color:var(--primary-700, #006b63);font-weight:700;
+    animation:pv-pulse-pending 1.4s ease-in-out infinite;
+}
+@keyframes pv-pulse-pending{
+    0%,100%{box-shadow:0 0 0 0 rgba(0,134,125,0);}
+    50%{box-shadow:0 0 0 4px rgba(0,134,125,0.18);}
+}
+
 /* Payment methods */
 .pv-scope.pv-cart .pv-cart__payment-methods{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--border);}
 .pv-scope.pv-cart .pv-cart__payment-label{font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
@@ -959,74 +1002,17 @@ do_action( 'woocommerce_after_main_content' );
 }
 </style>
 
-<script>
-(function(){
-    'use strict';
-    var scope = document.querySelector('.pv-scope.pv-cart');
-    if (!scope) return;
-
-    /* --- 1. Quantity stepper (botones +/- actualizan el input) -------- */
-    var qtyWraps = Array.prototype.slice.call(scope.querySelectorAll('.pv-cart__item-qty'));
-    qtyWraps.forEach(function(wrap){
-        var input = wrap.querySelector('.qty');
-        var minus = wrap.querySelector('.pv-qty__btn--minus');
-        var plus  = wrap.querySelector('.pv-qty__btn--plus');
-        var min   = parseInt(wrap.getAttribute('data-pv-qty-min') || (input && input.min) || 1, 10);
-        var max   = parseInt(wrap.getAttribute('data-pv-qty-max') || (input && input.max) || 99, 10);
-        if (!input) return;
-        if (minus){
-            minus.addEventListener('click', function(){
-                var v = parseInt(input.value || 0, 10);
-                if (isNaN(v)) v = min;
-                v = Math.max(min, v - 1);
-                input.value = v;
-                input.dispatchEvent(new Event('change', { bubbles:true }));
-            });
-        }
-        if (plus){
-            plus.addEventListener('click', function(){
-                var v = parseInt(input.value || 0, 10);
-                if (isNaN(v)) v = min;
-                v = Math.min(max, v + 1);
-                input.value = v;
-                input.dispatchEvent(new Event('change', { bubbles:true }));
-            });
-        }
-    });
-
-    /* --- 2. Coupon inline — sincroniza input visible con form WC ------ */
-    var couponInput = scope.querySelector('#pv-cart-coupon-code');
-    var couponForm  = scope.querySelector('#pv-cart-coupon-form');
-    var couponBtn   = scope.querySelector('[name="apply_coupon"]');
-    if (couponInput && couponForm && couponBtn){
-        couponBtn.addEventListener('click', function(e){
-            var hidden = couponForm.querySelector('input[name="coupon_code"]');
-            if (hidden){ hidden.value = couponInput.value; }
-            // Re-dirigimos el submit al form nativo de WC para que aplique.
-            e.preventDefault();
-            couponForm.submit();
-        });
-        // Permitir Enter para aplicar.
-        couponInput.addEventListener('keydown', function(e){
-            if (e.key === 'Enter'){
-                e.preventDefault();
-                couponBtn.click();
-            }
-        });
-    }
-
-    /* --- 3. Update cart highlight (cuando cambian cantidades) ---------- */
-    var qtyInputs = Array.prototype.slice.call(scope.querySelectorAll('.pv-cart__item-qty .qty'));
-    var updateBtn = scope.querySelector('.pv-cart__update-btn');
-    if (qtyInputs.length && updateBtn){
-        qtyInputs.forEach(function(input){
-            input.addEventListener('change', function(){
-                updateBtn.classList.add('is-pending');
-            });
-        });
-    }
-})();
-</script>
-
 <?php
+/* AUDIT-FE-CART-001 FIX (Fase 1.6): el bloque script-tag inline original
+ * (líneas 962-1029 del source pre-fix) fue migrado al design system global
+ * assets/js/ltms-plaza-viva.js (scope CART al final del archivo). Esta
+ * plantilla ya NO contiene lógica JS inline — paridad con vendor-store.php
+ * (100% CSP-compliant tras AUDIT-FE-VS-JT-001). Los 4 behaviours migrados:
+ *   1. Quantity stepper (botones +/- actualizan el input + dispatch 'change')
+ *   2. Coupon inline (sincroniza input visible con form WC oculto + Enter)
+ *   3. Update cart highlight (marca el botón 'Actualizar carrito' is-pending)
+ *   4. AUDIT-FE-CART-009: empty cart con confirmación + AJAX handler
+ *      (wp_ajax_ltms_pv_empty_cart registrado en class-ltms-frontend-checkout-handler.php)
+ */
+
 get_footer( 'shop' );

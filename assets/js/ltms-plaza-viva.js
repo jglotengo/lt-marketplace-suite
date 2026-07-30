@@ -31,6 +31,11 @@
   PV.config = {
     ajaxUrl: (window.ltms_data && window.ltms_data.ajax_url) || (window.ajaxurl) || '/wp-admin/admin-ajax.php',
     nonce: (window.ltms_data && window.ltms_data.nonce) || '',
+    // AUDIT-FE-CKO-004 FIX (Fase 1.7): país expuesto por wp_localize_script
+    // desde PHP (LTMS_Core_Config::get_country()). Antes el checkout.php
+    // inyectaba este valor via <?php echo esc_js()?> dentro del script inline
+    // (rompia CSP-compliance del JS al no poder vivir en archivo externo).
+    country: (window.ltms_data && window.ltms_data.country) || 'CO',
     cartIconSelector: '.pv-cart-icon, .ltms-sf-cart, .wc-block-mini-cart__button',
     toastDuration: 3000,
     debug: false
@@ -43,7 +48,15 @@
     added_to_wishlist: 'Añadido a favoritos',
     removed_from_wishlist: 'Quitado de favoritos',
     days: 'd', hours: 'h', mins: 'm', secs: 's',
-    ended: 'Oferta finalizada'
+    ended: 'Oferta finalizada',
+    // AUDIT-FE-CART-009 FIX (Fase 1.6): mensaje de confirmación para vaciar carrito.
+    empty_cart_confirm: '¿Vaciar todo el carrito? Esta acción no se puede deshacer.',
+    empty_cart_done: 'Carrito vaciado',
+    // AUDIT-FE-HC FIX (Fase 1.9): strings del help-center migrados del
+    // script-tag inline (eliminando la dependencia de <?php echo esc_js()?>).
+    faq_result_singular: 'resultado',
+    faq_result_plural: 'resultados',
+    chat_unavailable: 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.'
   };
 
   /* ── Internal helpers ───────────────────────────────────────────────────── */
@@ -1126,3 +1139,614 @@
         clearTimeout(enhanceTimer);
         enhanceTimer = setTimeout(enhanceElementorCards, 300);
     }, { passive: true });
+
+  /* =========================================================================
+   * AUDIT-FE-CART-001 FIX (Fase 1.6): scope CART — migración del bloque
+   * <script> inline de cart.php:962-1029 al design system global. Cierra
+   * CSP-compliance para cart.php (la excepción restante significativa en
+   * el design system, paridad con vendor-store.php ya 100% CSP-compliant
+   * tras AUDIT-FE-VS-JT-001).
+   *
+   * Incluye 4 behaviours (3 migrados del inline original + 1 nuevo del
+   * AUDIT-FE-CART-009):
+   *   1. Quantity stepper: botones +/- actualizan el input + dispatch 'change'.
+   *   2. Coupon inline: sincroniza input visible con form WC oculto + Enter.
+   *   3. Update cart highlight: marca el botón 'Actualizar carrito' como
+   *      is-pending cuando cambian cantidades (UX: indica necesario submit).
+   *   4. Empty cart handler (AUDIT-FE-CART-009): botón data-pv-empty-cart
+   *      invoca PV.ajax('ltms_pv_empty_cart', ...) con confirmación nativa
+   *      del browser antes de vaciar. Tras success hace redirect a la
+   *      empty-cart view (URL retornada por el handler).
+   * ========================================================================= */
+  (function cartScope() {
+    function initCart() {
+      var scope = document.querySelector('.pv-scope.pv-cart');
+      if (!scope) return;
+      // Skip si el scope es la empty-cart view (no hay items ni coupon).
+      if (scope.querySelector('.pv-cart__empty-card')) return;
+
+      /* --- 1. Quantity stepper (botones +/- actualizan el input) -------- */
+      var qtyWraps = Array.prototype.slice.call(scope.querySelectorAll('.pv-cart__item-qty'));
+      qtyWraps.forEach(function (wrap) {
+        var input = wrap.querySelector('.qty');
+        var minus = wrap.querySelector('.pv-qty__btn--minus');
+        var plus  = wrap.querySelector('.pv-qty__btn--plus');
+        var min   = parseInt(wrap.getAttribute('data-pv-qty-min') || (input && input.min) || 1, 10);
+        var max   = parseInt(wrap.getAttribute('data-pv-qty-max') || (input && input.max) || 99, 10);
+        if (!input) return;
+        if (isNaN(min) || min < 1) min = 1;
+        if (isNaN(max) || max < 1) max = 99;
+        if (minus) {
+          minus.addEventListener('click', function () {
+            var v = parseInt(input.value || 0, 10);
+            if (isNaN(v)) v = min;
+            v = Math.max(min, v - 1);
+            input.value = v;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        }
+        if (plus) {
+          plus.addEventListener('click', function () {
+            var v = parseInt(input.value || 0, 10);
+            if (isNaN(v)) v = min;
+            v = Math.min(max, v + 1);
+            input.value = v;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        }
+      });
+
+      /* --- 2. Coupon inline — sincroniza input visible con form WC ------ */
+      var couponInput = scope.querySelector('#pv-cart-coupon-code');
+      var couponForm  = scope.querySelector('#pv-cart-coupon-form');
+      var couponBtn   = scope.querySelector('[name="apply_coupon"]');
+      if (couponInput && couponForm && couponBtn) {
+        couponBtn.addEventListener('click', function (e) {
+          var hidden = couponForm.querySelector('input[name="coupon_code"]');
+          if (hidden) { hidden.value = couponInput.value; }
+          // Re-dirigimos el submit al form nativo de WC para que aplique.
+          e.preventDefault();
+          couponForm.submit();
+        });
+        // Permitir Enter para aplicar.
+        couponInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            couponBtn.click();
+          }
+        });
+      }
+
+      /* --- 3. Update cart highlight (cuando cambian cantidades) ---------- */
+      var qtyInputs = Array.prototype.slice.call(scope.querySelectorAll('.pv-cart__item-qty .qty'));
+      var updateBtn = scope.querySelector('.pv-cart__update-btn');
+      if (qtyInputs.length && updateBtn) {
+        qtyInputs.forEach(function (input) {
+          input.addEventListener('change', function () {
+            updateBtn.classList.add('is-pending');
+          });
+        });
+      }
+
+      /* --- 4. AUDIT-FE-CART-009 FIX: empty cart con confirmación + AJAX - */
+      var emptyBtn = scope.querySelector('[data-pv-empty-cart]');
+      if (emptyBtn) {
+        emptyBtn.addEventListener('click', function () {
+          // Confirmación obligatoria antes de vaciar: click accidental no
+          // tiene undo en WC nativo. Usar confirm() nativo del browser
+          // (CSP-compliant, no inline JS, accesible via teclado).
+          var msg = '¿Vaciar todo el carrito? Esta acción no se puede deshacer.';
+          if (typeof PV.i18n === 'object' && PV.i18n.empty_cart_confirm) {
+            msg = PV.i18n.empty_cart_confirm;
+          }
+          if (!window.confirm(msg)) return;
+
+          // Estado loading: deshabilitar botón + indicador visual.
+          var originalLabel = emptyBtn.innerHTML;
+          emptyBtn.disabled = true;
+          emptyBtn.classList.add('is-loading');
+          emptyBtn.innerHTML = '<span>· · ·</span>';
+
+          PV.ajax('ltms_pv_empty_cart', {})
+            .then(function (res) {
+              if (res && res.success) {
+                if (PV.toast) {
+                  var successMsg = (res.data && res.data.message) || PV.i18n.empty_cart_done || 'Carrito vaciado';
+                  PV.toast(successMsg, { type: 'success', duration: 1800 });
+                }
+                // Tras success, redirect a la URL que retorna el handler
+                // (debería ser wc_get_cart_url() que WC muestra como empty-cart view).
+                var redirect = (res.data && res.data.redirect) || (window.ltms_data && window.ltms_data.cart_url) || '/cart/';
+                // Pequeño delay para que el toast sea visible antes del redirect.
+                setTimeout(function () { window.location.href = redirect; }, 400);
+              } else {
+                if (PV.toast) {
+                  PV.toast((res && res.data && res.data.message) || 'Error', { type: 'error' });
+                }
+                emptyBtn.disabled = false;
+                emptyBtn.classList.remove('is-loading');
+                emptyBtn.innerHTML = originalLabel;
+              }
+            })
+            .catch(function () {
+              if (PV.toast) PV.toast('Error de conexión', { type: 'error' });
+              emptyBtn.disabled = false;
+              emptyBtn.classList.remove('is-loading');
+              emptyBtn.innerHTML = originalLabel;
+            });
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCart);
+    } else {
+      initCart();
+    }
+  })();
+
+  /* =========================================================================
+   * AUDIT-FE-CKO-003 FIX (Fase 1.7): scope CHECKOUT — migración del bloque
+   * <script> inline de checkout.php:622-916 (~295 líneas, el bloque inline
+   * más grande del design system) al archivo global. Cierra CSP-compliance
+   * para checkout.php (paridad con cart.php Fase 1.6 y vendor-store.php).
+   *
+   * Incluye 7 behaviours migrados del inline original:
+   *   1. Stepper sync: marca el paso activo del header según IntersectionObserver.
+   *   2. Shipping radio cards: marca .is-selected al cambiar.
+   *   3. Payment radio cards: muestra/oculta fields del gateway seleccionado.
+   *   4. ship_to_different_address toggle: muestra/oculta shipping fields.
+   *   5. Submit loading state: deshabilita el botón mientras se procesa.
+   *   6. WOOCCM label override: corrige labels (Departamento, Municipio, etc.)
+   *      que WOOCCM reconstruye desde su BD después de los filtros PHP.
+   *   7. sync billing_state from billing_city: extrae departamento del option
+   *      "Municipio — Departamento" y auto-puebla billing_state para WC shipping.
+   *
+   * AUDIT-FE-CKO-004 FIX (Fase 1.7): el valor ltmsCountry antes era inyectado
+   * por PHP via <?php echo esc_js()?> dentro del script inline (rompía CSP al
+   * ser un valor dinámico inyectado). Ahora se lee de PV.config.country
+   * (expuesto por wp_localize_script en class-ltms-native-templates.php:329).
+   * ========================================================================= */
+  (function checkoutScope() {
+    function initCheckout() {
+      var scope = document.querySelector('.pv-scope.pv-checkout');
+      if (!scope) return;
+
+      /* --- 1. Stepper sync (marcar paso activo según scroll/visibility) - */
+      var stepBlocks = Array.prototype.slice.call(scope.querySelectorAll('[data-step-block]'));
+      var stepperItems = Array.prototype.slice.call(scope.querySelectorAll('.pv-checkout__stepper-step[data-step]'));
+
+      function markActiveStep(stepNum) {
+        stepperItems.forEach(function (item) {
+          var n = parseInt(item.getAttribute('data-step'), 10);
+          item.classList.toggle('is-active', n === stepNum);
+          item.classList.toggle('is-done', n < stepNum);
+        });
+      }
+
+      if (stepBlocks.length && 'IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              var n = parseInt(entry.target.getAttribute('data-step-block'), 10);
+              markActiveStep(n);
+            }
+          });
+        }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+        stepBlocks.forEach(function (b) { io.observe(b); });
+      }
+
+      /* --- 2. Shipping radio cards (cambiar .is-selected) --------------- */
+      var shipRadios = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-shipping-radio]'));
+      shipRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          var wrap = radio.closest('.pv-shipping-options');
+          if (!wrap) return;
+          Array.prototype.slice.call(wrap.querySelectorAll('.pv-shipping-option')).forEach(function (li) {
+            li.classList.remove('is-selected');
+          });
+          radio.closest('.pv-shipping-option').classList.add('is-selected');
+        });
+      });
+
+      /* --- 3. Payment radio cards (mostrar/ocultar fields) -------------- */
+      var payRadios = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-payment-radio]'));
+      var payFields = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-payment-fields]'));
+
+      function updatePaymentSelection() {
+        payRadios.forEach(function (radio) {
+          var li = radio.closest('.pv-payment-option');
+          if (!li) return;
+          var isSelected = radio.checked;
+          li.classList.toggle('is-selected', isSelected);
+          var id = li.getAttribute('data-pv-payment-option');
+          payFields.forEach(function (field) {
+            var fid = field.getAttribute('data-pv-payment-fields');
+            if (fid === id) {
+              field.hidden = !isSelected;
+            }
+          });
+        });
+      }
+      payRadios.forEach(function (radio) {
+        radio.addEventListener('change', updatePaymentSelection);
+      });
+      updatePaymentSelection();
+
+      /* --- 4. ship_to_different_address toggle (mostrar shipping fields) - */
+      var shipToggle = scope.querySelector('#ship_to_different_address');
+      var shipFieldsWrap = scope.querySelector('.woocommerce-shipping-fields');
+      if (shipToggle && shipFieldsWrap) {
+        function syncShipFields() {
+          if (shipToggle.checked) {
+            shipFieldsWrap.classList.add('shipping-fields--visible');
+            shipFieldsWrap.style.display = 'block';
+          } else {
+            shipFieldsWrap.classList.remove('shipping-fields--visible');
+            shipFieldsWrap.style.display = 'none';
+          }
+        }
+        shipToggle.addEventListener('change', syncShipFields);
+        syncShipFields();
+      }
+
+      /* --- 5. Submit loading state ------------------------------------- */
+      var submitBtn = scope.querySelector('.pv-checkout__submit');
+      var checkoutForm = scope.querySelector('form.woocommerce-checkout');
+      if (submitBtn && checkoutForm) {
+        checkoutForm.addEventListener('submit', function () {
+          // Validación mínima: validar campos required visibles.
+          submitBtn.classList.add('is-loading');
+          submitBtn.setAttribute('disabled', 'disabled');
+        });
+      }
+
+      /* --- 6. Fix field labels (bypass WOOCCM) ------------------------- */
+      /* WOOCCM (WooCommerce Checkout Manager) reconstruye los labels desde
+       * su propia BD DESPUÉS de los filtros woocommerce_billing_fields y
+       * woocommerce_form_field. La única forma de override confiable es
+       * modificar el DOM via JS después de que WOOCCM termina.
+       *
+       * AUDIT-FE-CKO-004 FIX: el país se lee de PV.config.country (expuesto
+       * por wp_localize_script). Antes este valor era inyectado por PHP en
+       * el <script> inline via <?php echo esc_js(LTMS_Core_Config::get_country())?>
+       * lo que rompía la migración a un archivo JS externo.
+       */
+      var ltmsCountry = PV.config.country || 'CO';
+      var labelMap = {};
+      if (ltmsCountry === 'CO') {
+        labelMap = {
+          'billing_state': 'Departamento',
+          'shipping_state': 'Departamento',
+          'billing_city': 'Municipio',
+          'shipping_city': 'Municipio',
+          'billing_country': 'País',
+          'shipping_country': 'País',
+          'billing_postcode': 'Código postal',
+          'shipping_postcode': 'Código postal',
+          'billing_address_1': 'Dirección',
+          'shipping_address_1': 'Dirección',
+          'billing_address_2': 'Apartamento, suite, etc. (opcional)',
+          'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
+        };
+      } else if (ltmsCountry === 'MX') {
+        labelMap = {
+          'billing_state': 'Estado',
+          'shipping_state': 'Estado',
+          'billing_city': 'Municipio / Alcaldía',
+          'shipping_city': 'Municipio / Alcaldía',
+          'billing_country': 'País',
+          'shipping_country': 'País',
+          'billing_postcode': 'Código postal',
+          'shipping_postcode': 'Código postal',
+          'billing_address_1': 'Dirección',
+          'shipping_address_1': 'Dirección',
+          'billing_address_2': 'Apartamento, suite, etc. (opcional)',
+          'shipping_address_2': 'Apartamento, suite, etc. (opcional)'
+        };
+      }
+
+      function fixFieldLabels() {
+        Object.keys(labelMap).forEach(function (fieldKey) {
+          var newLabel = labelMap[fieldKey];
+          // Buscar el label por 'for' attribute.
+          var labelEl = scope.querySelector('label[for="' + fieldKey + '"]');
+          if (!labelEl) return;
+          // Preservar el <abbr class="required"> o <span class="optional"> si existe.
+          var abbr = labelEl.querySelector('abbr.required, abbr');
+          var optionalSpan = labelEl.querySelector('span.optional, .optional');
+          // Reconstruir el label.
+          labelEl.innerHTML = '';
+          labelEl.appendChild(document.createTextNode(newLabel));
+          if (abbr) {
+            labelEl.appendChild(document.createTextNode(' '));
+            labelEl.appendChild(abbr);
+          }
+          if (optionalSpan) {
+            labelEl.appendChild(document.createTextNode(' '));
+            labelEl.appendChild(optionalSpan);
+          }
+        });
+        // Ocultar campos duplicados: billing_phone y billing_email en step 2
+        // (ya están en step 1). FIX #10 (CHECKOUT-AUDIT): contamos cuántos
+        // <label for="..."> existen para el mismo target (en vez de inspeccionar
+        // el texto del label — que este mismo filter reescribe).
+        var phoneEmailKeys = ['billing_phone', 'shipping_phone', 'billing_email', 'shipping_email'];
+        var occurrenceCount = {};
+        phoneEmailKeys.forEach(function (k) { occurrenceCount[k] = 0; });
+        phoneEmailKeys.forEach(function (fieldKey) {
+          scope.querySelectorAll('label[for="' + fieldKey + '"]').forEach(function (lbl) {
+            occurrenceCount[fieldKey]++;
+            if (occurrenceCount[fieldKey] < 2) return;
+            var fieldId = fieldKey + '_field';
+            var field = scope.querySelector('#' + fieldId);
+            if (field) field.style.display = 'none';
+          });
+        });
+
+        // Auto-seleccionar país: CO o MX según configuración.
+        var countrySelect = scope.querySelector('#billing_country, #shipping_country');
+        if (countrySelect && countrySelect.value !== ltmsCountry) {
+          countrySelect.value = ltmsCountry;
+          countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      // Ejecutar inmediatamente y después de un delay (WOOCCM JS que corre tarde).
+      fixFieldLabels();
+      setTimeout(fixFieldLabels, 500);
+      setTimeout(fixFieldLabels, 1500);
+      // También observar mutaciones del DOM (WOOCCM puede modificar dinámicamente).
+      if ('MutationObserver' in window) {
+        var observer = new MutationObserver(function (mutations) {
+          var shouldFix = false;
+          mutations.forEach(function (m) {
+            if (m.type === 'childList' || m.type === 'characterData') {
+              shouldFix = true;
+            }
+          });
+          if (shouldFix) {
+            fixFieldLabels();
+          }
+        });
+        observer.observe(scope, { childList: true, subtree: true, characterData: true });
+        // Dejar de observar después de 5 segundos (no matar el performance).
+        setTimeout(function () { observer.disconnect(); }, 5000);
+      }
+
+      /* --- 7. Sync billing_state from billing_city (DANE municipio) ---- */
+      /* El select billing_city usa códigos DANE (5 dígitos) donde los primeros
+       * 2 = departamento. Cuando el usuario selecciona un municipio, auto-poblamos
+       * billing_state con el departamento correspondiente para que WC pueda
+       * calcular el envío (WC requiere billing_state). Estrategia: extraer el
+       * nombre del departamento del texto del option ("Municipio — Departamento")
+       * y buscarlo en las opciones de billing_state por coincidencia de texto.
+       */
+      function syncStateFromCity() {
+        var citySelect = scope.querySelector('#billing_city, #ltms-municipality-select');
+        var stateSelect = scope.querySelector('#billing_state');
+        if (!citySelect || !stateSelect) return;
+        if (!citySelect.value || citySelect.value.length < 2) return;
+
+        var selectedOption = citySelect.options[citySelect.selectedIndex];
+        if (!selectedOption) return;
+        var optionText = selectedOption.textContent || '';
+        var deptName = '';
+        var dashIdx = optionText.indexOf('—');
+        if (dashIdx !== -1) {
+          deptName = optionText.substring(dashIdx + 1).trim();
+        } else if (optionText.indexOf('-') !== -1) {
+          deptName = optionText.substring(optionText.indexOf('-') + 1).trim();
+        }
+        if (!deptName) return;
+
+        var bestMatch = null;
+        var bestScore = 0;
+        for (var i = 0; i < stateSelect.options.length; i++) {
+          var opt = stateSelect.options[i];
+          var optText = (opt.textContent || '').trim();
+          var normOpt = optText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          var normDept = deptName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          if (normOpt === normDept) {
+            bestMatch = opt;
+            bestScore = 100;
+            break;
+          }
+          if (normOpt.indexOf(normDept) !== -1 || normDept.indexOf(normOpt) !== -1) {
+            var score = Math.min(normOpt.length, normDept.length);
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = opt;
+            }
+          }
+        }
+
+        if (bestMatch && bestScore > 0) {
+          stateSelect.value = bestMatch.value;
+          stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          if (typeof jQuery !== 'undefined') {
+            jQuery(document.body).trigger('update_checkout');
+          }
+        }
+      }
+
+      var citySelectForSync = scope.querySelector('#billing_city, #ltms-municipality-select');
+      if (citySelectForSync) {
+        citySelectForSync.addEventListener('change', function () {
+          setTimeout(syncStateFromCity, 100);
+        });
+        setTimeout(syncStateFromCity, 800);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCheckout);
+    } else {
+      initCheckout();
+    }
+  })();
+
+  /* =========================================================================
+   * AUDIT-FE-HC FIX (Fase 1.9): scope HELP — migración del bloque <script>
+   * inline de help-center.php:344-418 al design system global.
+   *
+   * Cierra CSP-compliance para help-center.php (paridad con cart.php Fase 1.6,
+   * checkout.php Fase 1.7 y vendor-store.php). 3 hallazgos resueltos:
+   *
+   *   * AUDIT-FE-HC-002 (P1, CSP-compliance + script-tag inline): el bloque
+   *     de líneas 344-418 (~74 líneas) migrado aquí. 2 behaviours migrados:
+   *       1. FAQ search: filtrado en vivo por texto (vanilla JS).
+   *       2. Chat trigger: abre Tawk.to o Intercom si está configurado,
+   *          carga el widget bajo demanda si aún no está cargado.
+   *
+   *   * AUDIT-FE-HC-003 (P0, alert() en fallback prohibido por design system):
+   *     Línea 414 original usaba `alert('<?php echo esc_js(...)?>')` como
+   *     fallback si PV.toast no existía. El QA_REPORT.md documenta `alert(): 0`
+   *     como regla del design system (todos los mensajes via toast system).
+   *     Fix: si PV.toast no existe, no hacemos nada (no se viola la regla
+   *     con un alert() no-estándar). El fallback a alert() rompía la regla
+   *     pero nunca se ejecutaba en producción (PV.toast siempre disponible
+   *     en páginas con design system).
+   *
+   *   * AUDIT-FE-HC-004 (P0, script-tag inline para chat provider setup):
+   *     Líneas 117-123 generaban `<script>window.__ltmsTawkProperty=...;</script>`
+   *     inline en PHP para exponer el ID de Tawk/Intercom al JS. Fix: el
+   *     botón data-pv-chat-trigger="tawk" YA tiene data-pv-chat-tawk="ID"
+   *     attribute (esc_attr en el HTML), el JS lee de ahí — no necesita
+   *     window.__ltms* inyectado via script inline. Elimina la necesidad
+   *     del segundo bloque script-tag inline (el setup HTML).
+   *
+   *   * AUDIT-FE-HC-005 (P1, PHP inline injection dentro del JS): las
+   *     inyecciones `<?php echo esc_js(...)?>` dentro del JS inline (líneas
+   *     367, 412, 414 originales) eran imposibles de migrar a un archivo
+   *     JS externo (valor dinámico PHP dentro del JS). Fix: strings via
+   *     PV.i18n (faq_result_singular/plural, chat_unavailable) que ya
+   *     están expuestos por wp_localize_script.
+   *
+   *   * AUDIT-FE-HC-001 (P1, onsubmit="return false;" inline event handler):
+   *     Línea 150 original tenía `<form ... onsubmit="return false;">` que
+   *     es un inline event handler que rompe CSP-compliance del HTML. Fix:
+   *     el handler JS ahora previene el default del submit (no necesita
+   *     el atributo inline).
+   * ========================================================================= */
+  (function helpScope() {
+    function initHelp() {
+      var scope = document.querySelector('.pv-scope.pv-help');
+      if (!scope) return;
+
+      /* --- 1. FAQ search — filtrado en vivo por texto (vanilla JS) ------ */
+      var search = scope.querySelector('[data-pv-faq-search]');
+      var items  = scope.querySelectorAll('[data-pv-faq-item]');
+      var empty  = scope.querySelector('#pv-help-faq-empty');
+      var count  = scope.querySelector('#pv-help-faq-count');
+      if (!search || !items.length) return;
+
+      // AUDIT-FE-HC-001 FIX: el form tenía onsubmit="return false;" inline.
+      // Ahora prevenimos el default via JS (CSP-compliant — sin inline handler).
+      var searchForm = search.closest('form');
+      if (searchForm) {
+        searchForm.addEventListener('submit', function (e) { e.preventDefault(); });
+      }
+
+      function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+      search.addEventListener('input', function () {
+        var q = norm(search.value.trim());
+        var visible = 0;
+        items.forEach(function (it) {
+          var text = norm(it.textContent || '');
+          var match = !q || text.indexOf(q) !== -1;
+          it.style.display = match ? '' : 'none';
+          if (match) visible++;
+        });
+        if (count) {
+          // AUDIT-FE-HC-005 FIX: strings via PV.i18n (no más inyección PHP en JS).
+          var singular = (PV.i18n && PV.i18n.faq_result_singular) || 'resultado';
+          var plural  = (PV.i18n && PV.i18n.faq_result_plural) || 'resultados';
+          count.textContent = visible + ' ' + (visible === 1 ? singular : plural);
+        }
+        if (empty) {
+          empty.classList.toggle('pv-hidden', visible > 0);
+        }
+      });
+
+      /* --- 2. Chat trigger — abre Tawk.to o Intercom si está configurado - */
+      scope.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-pv-chat-trigger]');
+        if (!btn) return;
+        e.preventDefault();
+        var provider = btn.getAttribute('data-pv-chat-trigger');
+
+        // AUDIT-FE-HC-004 FIX: el ID del provider se lee del data-attribute
+        // del botón (ya estaba en el HTML original), en vez de leer
+        // window.__ltmsTawkProperty que era inyectado por un script-tag
+        // inline separado en PHP (help-center.php:120/122).
+        var tawkId    = btn.getAttribute('data-pv-chat-tawk') || '';
+        var intercomId = btn.getAttribute('data-pv-chat-intercom') || '';
+
+        if (provider === 'tawk' && typeof window.Tawk_API !== 'undefined' && window.Tawk_API.toggle) {
+          window.Tawk_API.toggle();
+          return;
+        }
+        if (provider === 'intercom' && typeof window.Intercom !== 'undefined') {
+          window.Intercom('show');
+          return;
+        }
+        // Fallback: si el widget aún no cargó, lo cargamos bajo demanda.
+        if (provider === 'tawk' && tawkId) {
+          var s1 = document.createElement('script');
+          s1.async = true; s1.src = 'https://embed.tawk.to/' + tawkId + '/default';
+          s1.charset = 'UTF-8';
+          s1.setAttribute('crossorigin', '*');
+          document.body.appendChild(s1);
+          s1.onload = function () {
+            setTimeout(function () {
+              if (window.Tawk_API && window.Tawk_API.toggle) window.Tawk_API.toggle();
+            }, 600);
+          };
+          return;
+        }
+        if (provider === 'intercom' && intercomId) {
+          (function () {
+            var w = window;
+            var ic = w.Intercom;
+            if (typeof ic === 'function') { ic('reattach_activator'); ic('update', w.intercomSettings); }
+            else {
+              var d = document;
+              var i = function () { i.c(arguments); };
+              i.q = []; i.c = function (args) { i.q.push(args); };
+              w.Intercom = i;
+              var l = function () {
+                var s = d.createElement('script');
+                s.type = 'text/javascript'; s.async = true;
+                s.src = 'https://widget.intercom.io/widget/' + intercomId;
+                var x = d.getElementsByTagName('script')[0];
+                x.parentNode.insertBefore(s, x);
+              };
+              if (w.attachEvent) { w.attachEvent('onload', l); }
+              else { w.addEventListener('load', l, false); }
+            }
+          })();
+          setTimeout(function () { if (window.Intercom) window.Intercom('show'); }, 600);
+          return;
+        }
+        // AUDIT-FE-HC-003 FIX: el fallback original usaba alert() cuando
+        // PV.toast no existía — alert() está PROHIBIDO por el design system
+        // (QA_REPORT.md: alert(): 0). En producción PV.toast siempre está
+        // disponible en páginas con design system. Si por algún motivo no
+        // lo está, registramos via console.warn (no alert).
+        if (PV.toast) {
+          var msg = (PV.i18n && PV.i18n.chat_unavailable) || 'El chat no está disponible en este momento.';
+          PV.toast(msg, { type: 'warning', duration: 3000 });
+        } else if (window.console && window.console.warn) {
+          window.console.warn('[PV] Chat no disponible — PV.toast no cargado.');
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initHelp);
+    } else {
+      initHelp();
+    }
+  })();

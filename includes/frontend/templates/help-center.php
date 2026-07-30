@@ -112,16 +112,23 @@ $pv_returns_url  = home_url( '/devoluciones/' );
 $pv_orders_url   = function_exists( 'wc_get_page_id' ) ? get_permalink( wc_get_page_id( 'myaccount' ) ) : home_url( '/mi-cuenta/' );
 
 /* ---------------------------------------------------------------------------
- * 4. Chat provider URL / setup
+ * 4. Chat provider setup
+ *
+ * AUDIT-FE-HC-004 FIX (Fase 1.9, RE-aplicación): el bloque original generaba
+ * `<script>window.__ltmsTawkProperty=...;</script>` inline para exponer el ID
+ * del provider al JS del design system. Eso rompía CSP-compliance del HTML
+ * (segundo bloque script-tag inline del template, además del bloque JS del
+ * scope HELP migrado en AUDIT-FE-HC-002). El fix previo (commit referenciado
+ * en el comment block de líneas 344-380) SOLO añadió documentación del fix
+ * PERO no eliminó físicamente el script-tag inline — el canario "fue
+ * eliminado" mentía (ver LECCIONES_APRENDIDAS #141 — canarios mentirosos en
+ * comment blocks). Esta RE-aplicación elimina físicamente:
+ *   (a) la variable `$pv_chat_setup_html` y su asignación condicional,
+ *   (b) el `echo $pv_chat_setup_html` en el footer del template.
+ * El botón `data-pv-chat-trigger="tawk"` YA lleva `data-pv-chat-tawk="ID"`
+ * (esc_attr en el HTML, líneas 234-236) — el JS del scope HELP lee de ahí
+ * (ltms-plaza-viva.js:1684), no necesita `window.__ltmsTawkProperty`.
  * ------------------------------------------------------------------------- */
-$pv_chat_setup_html = '';
-if ( $pv_chat_provider === 'tawk' ) {
-    // Tawk.to requiere encolar su script globalmente; aquí exponemos el ID.
-    $pv_chat_setup_html = '<script>window.__ltmsTawkProperty=' . wp_json_encode( $pv_tawk_property ) . ';</script>';
-} elseif ( $pv_chat_provider === 'intercom' ) {
-    $pv_chat_setup_html = '<script>window.__ltmsIntercomAppId=' . wp_json_encode( $pv_intercom_app_id ) . ';</script>';
-}
-
 get_header();
 
 /**
@@ -147,7 +154,7 @@ do_action( 'ltms_before_help_center_plazaviva' );
             <h1 id="pv-help-hero-title" class="pv-hero__title"><?php esc_html_e( '¿Cómo podemos ayudarte?', 'ltms' ); ?></h1>
             <p class="pv-hero__sub"><?php esc_html_e( 'Encuentra respuestas rápidas, rastrea tus pedidos o habla con nuestro equipo de soporte.', 'ltms' ); ?></p>
 
-            <form class="pv-hero__search pv-help__search" role="search" autocomplete="off" onsubmit="return false;">
+            <form class="pv-hero__search pv-help__search" role="search" autocomplete="off">
                 <label class="pv-visually-hidden" for="pv-help-faq-search"><?php esc_html_e( 'Buscar en preguntas frecuentes', 'ltms' ); ?></label>
                 <span class="pv-help__search-icon" aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -339,85 +346,47 @@ do_action( 'ltms_before_help_center_plazaviva' );
 
 </div><!-- /.pv-scope.pv-help -->
 
-<?php echo $pv_chat_setup_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-
-<script>
-(function(){
-    /* ====================================================================
-     * FAQ search — filtrado en vivo por texto (vanilla JS)
-     * ==================================================================== */
-    var search = document.querySelector('[data-pv-faq-search]');
-    var items  = document.querySelectorAll('[data-pv-faq-item]');
-    var empty  = document.getElementById('pv-help-faq-empty');
-    var count  = document.getElementById('pv-help-faq-count');
-    if (!search || !items.length) return;
-
-    function norm(s){ return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-
-    search.addEventListener('input', function(){
-        var q = norm(search.value.trim());
-        var visible = 0;
-        items.forEach(function(it){
-            var text = norm(it.textContent || '');
-            var match = !q || text.indexOf(q) !== -1;
-            it.style.display = match ? '' : 'none';
-            if (match) visible++;
-        });
-        if (count) {
-            count.textContent = visible + ' ' + (visible === 1 ? '<?php echo esc_js( __( 'resultado', 'ltms' ) ); ?>' : '<?php echo esc_js( __( 'resultados', 'ltms' ) ); ?>');
-        }
-        if (empty) {
-            empty.classList.toggle('pv-hidden', visible > 0);
-        }
-    });
-
-    /* ====================================================================
-     * Chat trigger — abre Tawk.to o Intercom si está configurado
-     * ==================================================================== */
-    document.addEventListener('click', function(e){
-        var btn = e.target.closest('[data-pv-chat-trigger]');
-        if (!btn) return;
-        e.preventDefault();
-        var provider = btn.getAttribute('data-pv-chat-trigger');
-
-        if (provider === 'tawk' && typeof window.Tawk_API !== 'undefined' && window.Tawk_API.toggle) {
-            window.Tawk_API.toggle();
-            return;
-        }
-        if (provider === 'intercom' && typeof window.Intercom !== 'undefined') {
-            window.Intercom('show');
-            return;
-        }
-        // Fallback: si el widget aún no cargó, intentamos cargar bajo demanda.
-        if (provider === 'tawk' && window.__ltmsTawkProperty) {
-            var s1 = document.createElement('script');
-            s1.async = true; s1.src = 'https://embed.tawk.to/' + window.__ltmsTawkProperty + '/default';
-            s1.charset = 'UTF-8';
-            s1.setAttribute('crossorigin', '*');
-            document.body.appendChild(s1);
-            s1.onload = function(){
-                setTimeout(function(){
-                    if (window.Tawk_API && window.Tawk_API.toggle) window.Tawk_API.toggle();
-                }, 600);
-            };
-            return;
-        }
-        if (provider === 'intercom' && window.__ltmsIntercomAppId) {
-            (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/' + w.__ltmsIntercomAppId;var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
-            setTimeout(function(){ if (window.Intercom) window.Intercom('show'); }, 600);
-            return;
-        }
-        // Último recurso: mensaje de ayuda.
-        if (window.PV && window.PV.toast) {
-            window.PV.toast('<?php echo esc_js( __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ) ); ?>', { type: 'warning', duration: 3000 });
-        } else {
-            alert('<?php echo esc_js( __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ) ); ?>');
-        }
-    });
-})();
-</script>
-
 <?php
+/* AUDIT-FE-HC FIX (Fase 1.9): el bloque script-tag inline original
+ * (líneas 344-418 del source pre-fix, ~74 líneas) fue migrado al design
+ * system global assets/js/ltms-plaza-viva.js (scope HELP al final del
+ * archivo). Esta plantilla ya NO contiene lógica JS inline — paridad con
+ * cart.php (Fase 1.6 — AUDIT-FE-CART-001), checkout.php (Fase 1.7 —
+ * AUDIT-FE-CKO-003) y vendor-store.php (100% CSP-compliant tras
+ * AUDIT-FE-VS-JT-001).
+ *
+ * Hallazgos resueltos en este fix:
+ *
+ *   * AUDIT-FE-HC-001 (P1, onsubmit inline): onsubmit="return false;" del
+ *     form de búsqueda FAQ eliminado — el handler JS migrado previene el
+ *     default del submit (CSP-compliant — sin inline handler).
+ *
+ *   * AUDIT-FE-HC-002 (P1, script-tag inline): las ~74 líneas migradas a
+ *     ltms-plaza-viva.js (scope HELP). 2 behaviours: FAQ search + chat trigger.
+ *
+ *   * AUDIT-FE-HC-003 (P0, alert() prohibido): el fallback `alert()` del
+ *     chat trigger cuando PV.toast no existía fue reemplazado por
+ *     console.warn (alert() está prohibido por el design system, ver
+ *     QA_REPORT.md "alert(): 0 ✅ Toast system").
+ *
+ *   * AUDIT-FE-HC-004 (P0, script-tag inline para chat setup): el bloque
+ *     `<script>window.__ltmsTawkProperty=...;</script>` generado por PHP
+ *     (líneas 117-123 originales) fue eliminado FÍSICAMENTE en esta
+ *     iteración (RE-aplicación — el fix previo solo añadió el comment
+ *     sin tocar el source). El botón data-pv-chat-trigger="tawk" YA trae
+ *     data-pv-chat-tawk="ID" attribute en el HTML (esc_attr) — el JS
+ *     lee de ahí, no necesita window.__ltms* inyectado via script-tag
+ *     inline. Elimina el segundo bloque script-tag inline del template.
+ *
+ *   * AUDIT-FE-HC-005 (P1, PHP inline injection): las inyecciones
+ *     `<?php echo esc_js(...)?>` dentro del JS inline (líneas 367, 412, 414
+ *     originales) fueron reemplazadas por strings via PV.i18n
+ *     (faq_result_singular/plural, chat_unavailable) — declarados EN ESTE
+ *     MISMO COMMIT en wp_localize_script('ltms-plaza-viva', 'ltms_data', ...)
+ *     (class-ltms-native-templates.php:337-348). El fix previo PROMETÍA que
+ *     "ya estaban expuestos" pero no era cierto (ver LECCIONES #141).
+ */
+
 /**
  * Hook: ltms_after_help_center_plazaviva
  */

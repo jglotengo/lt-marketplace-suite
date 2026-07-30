@@ -76,19 +76,16 @@ if ( ! $order ) {
         $access_granted = true;
     }
 
-    // Caso 2: order_key válida (enlaces_guest desde email).
+    // Caso 2: order_key válida (enlaces guest desde email). Comparación estricta
+    // contra el real order_key con hash_equals (timing-safe). Sin fallback truthy.
+    // AUDIT-FE-OT-001 FIX: Caso 3 previo aceptaba CUALQUIER string truthy en
+    // ?key= para órdenes guest → IDOR de todas las órdenes guest. Eliminado.
     if ( ! $access_granted && $pv_request_key ) {
-        // Comparación flexible: el key de WC puede venir con o sin prefijo.
-        $key_clean = str_replace( 'wc_order_', '', $pv_request_key );
+        $key_clean       = str_replace( 'wc_order_', '', $pv_request_key );
         $order_key_clean = str_replace( 'wc_order_', '', $order_key );
-        if ( ! empty( $pv_request_key ) && ( hash_equals( $order_key, $pv_request_key ) || hash_equals( $order_key_clean, $key_clean ) ) ) {
+        if ( hash_equals( $order_key, $pv_request_key ) || hash_equals( $order_key_clean, $key_clean ) ) {
             $access_granted = true;
         }
-    }
-
-    // Caso 3: guests sin key — solo si la orden pertenece a un guest (customer_id = 0).
-    if ( ! $access_granted && $order_customer_id === 0 && $current_user_id === 0 && $pv_request_key ) {
-        $access_granted = true;
     }
 
     /**
@@ -134,6 +131,17 @@ if ( $access_denied_reason ) {
 
 /* ---------------------------------------------------------------------------
  * 3. Datos de la orden y estados del timeline.
+ *
+ * AUDIT-FE-OT-002 FIX (Fase 1.8): el timeline previo leía metas
+ * _ltms_preparing_at/_ltms_shipped_at/_ltms_in_transit_at/_ltms_driver_* que
+ * NADIE escribía en el plugin → el timeline siempre quedaba pegado en step 0,
+ * repartidor siempre "Por asignar", ETA siempre "Por confirmar", engañando al
+ * usuario con UI cosmética estática. Las metas se conservan como OPCIONALES
+ * (si un módulo externo las llena, se usan), pero la fuente primaria pasa a
+ * ser el estado nativo de WC + metas reales que SÍ se escriben en el plugin
+ * (_ltms_shipping_delivered_at/_ltms_delivered_at escritos por Aveonline,
+ * Deprisa, Uber Direct, Own-Delivery y el Core cron manager) + el carrier
+ * tracking_number (escrito por Deprisa/Aveonline cuando generan guía).
  * ------------------------------------------------------------------------- */
 $order_id       = (int) $order->get_id();
 $order_number   = $order->get_order_number();
@@ -142,10 +150,21 @@ $order_total    = $order->get_total();
 $order_total_fm = wp_kses_post( wc_price( $order_total, array( 'currency' => $order->get_currency() ) ) );
 $order_date     = $order->get_date_created();
 $order_date_fm  = $order_date ? $order_date->date_i18n( __( 'j \d\e F, Y \a \l\a\s H:i', 'ltms' ) ) : '';
+$order_modified = $order->get_date_modified();
 
-// Tracking number y carrier.
+// Tracking number y carrier (escritos por Deprisa/Aveonline al generar guía).
 $tracking_number = (string) $order->get_meta( '_ltms_tracking_number' );
 $carrier         = (string) $order->get_meta( '_ltms_carrier' );
+
+// ¿La orden usa carrier externo o entrega propia/pickup?
+$shipping_methods = $order->get_shipping_methods();
+$uses_own_delivery = false;
+$uses_pickup       = false;
+foreach ( $shipping_methods as $sm ) {
+    $mid = $sm->get_method_id();
+    if ( 'ltms_own_delivery' === $mid ) { $uses_own_delivery = true; }
+    if ( 'ltms_pickup'        === $mid ) { $uses_pickup       = true; }
+}
 
 // Fechas de cada etapa del timeline.
 $date_confirmed   = $order->get_date_created();
@@ -155,7 +174,58 @@ $date_in_transit  = (int) $order->get_meta( '_ltms_in_transit_at' );
 $date_delivered   = $order->get_date_completed();
 $eta_ts           = (int) $order->get_meta( '_ltms_estimated_delivery' );
 
-// Repartidor.
+// AUDIT-FE-OT-002 fallbacks desde metas reales escritas por el plugin:
+// _ltms_delivered_at (Deprisa tracking-cron), _ltms_shipping_delivered_at
+// (Core cron manager TS-BUG-1) y _ltms_shipping_delivered_fired (idempotencia).
+$delivered_fired = (bool) $order->get_meta( '_ltms_shipping_delivered_fired' );
+$delivered_ts    = (int) $order->get_meta( '_ltms_shipping_delivered_at' );
+if ( ! $delivered_ts ) {
+    $raw = $order->get_meta( '_ltms_delivered_at' );
+    if ( $raw ) {
+        try {
+            $dt             = new WC_DateTime( $raw );
+            $delivered_ts   = (int) $dt->getTimestamp();
+        } catch ( Throwable $e ) {
+            $delivered_ts = 0;
+        }
+    }
+}
+if ( $delivered_ts > 0 ) {
+    $date_delivered = $date_delivered ?: new WC_DateTime( '@' . $delivered_ts );
+    $date_delivered_ts_for_meta = $delivered_ts;
+} else {
+    $date_delivered_ts_for_meta = $date_delivered ? $date_delivered->getTimestamp() : 0;
+}
+
+// Fallback de preparación: si status=processing y no hay meta, inferir desde
+// date_modified (cuando WC cambió a processing marca la preparación).
+if ( $date_preparing <= 0 && 'processing' === $order_status && $order_modified ) {
+    $date_preparing = (int) $order_modified->getTimestamp();
+}
+
+// Fallback de "shipped": si tracking_number set + status avanzado desde
+// processing, inferir desde date_modified de la última transición relevante.
+if ( $date_shipped <= 0 && $tracking_number && $order_modified && in_array( $order_status, array( 'completed', 'in_transit', 'shipped' ), true ) ) {
+    $date_shipped = (int) $order_modified->getTimestamp();
+}
+
+// Fallback de entregado: usar _ltms_shipping_delivered_at / _ltms_delivered_at
+// si existen (escritos por Deprisa/Aveonline/Uber Direct/Core cron), si no
+// date_completed nativa de WC.
+if ( $delivered_ts > 0 && ( ! $date_delivered || $delivered_ts > $date_delivered->getTimestamp() ) ) {
+    try {
+        $date_delivered = new WC_DateTime( '@' . $delivered_ts );
+    } catch ( Throwable $e ) {
+        // Mantener el date_delivered nativo si falla el cast.
+    }
+}
+
+// Indicador "delivered" claro para el paso 4: cualquiera de los tres.
+$is_actually_delivered = $delivered_fired || 'completed' === $order_status || $date_delivered_ts_for_meta > 0;
+
+// Repartidor — metas opcionales. Si la orden usa carrier externo sin
+// _ltms_driver_*, mostramos estado "Asignado por transportadora" (más
+// honesto que "Por asignar").
 $driver_name   = (string) $order->get_meta( '_ltms_driver_name' );
 $driver_phone  = (string) $order->get_meta( '_ltms_driver_phone' );
 $driver_rating = (float) $order->get_meta( '_ltms_driver_rating' );
@@ -209,10 +279,42 @@ $timeline_steps = apply_filters( 'ltms_tracking_timeline_steps', array(
 
 /* ---------------------------------------------------------------------------
  * 4. Calcular el paso actual y completados.
+ *
+ * AUDIT-FE-OT-002 FIX: la fuente de verdad primaria del paso actual es el
+ * status nativo de WC, con override hacia delante cuando hay tracking_number
+ * set / meta delivered fireada. Elimina el bug del timeline siempre en step 0
+ * cuando las metas _ltms_* (nunca escritas) no aportan nada.
  * ------------------------------------------------------------------------- */
 $current_step_idx = 0;
+
+// Snapshot de status nativos WC → step del timeline.
+$status_to_step = array(
+    'pending'    => 0,
+    'processing' => 1,
+    'on-hold'    => 0,
+    'completed'  => 4,
+);
+$current_step_idx = $status_to_step[ $order_status ] ?? 1; // Default 1 (preparación) si status custom/avanzado.
+
+// Avanzar a "shipped" si ya hay tracking_number + carrier set
+// (carrier externo escupe tracking_number al generar guía).
+if ( $tracking_number && $current_step_idx < 2 ) {
+    $current_step_idx = 2;
+}
+
+// Avanzar a "in_transit" si status nativo = 'shipped' (custom LTMS) o hay meta.
+if ( ( 'shipped' === $order_status || $date_in_transit > 0 ) && $current_step_idx < 3 ) {
+    $current_step_idx = 3;
+}
+
+// Avanzar a "delivered" con cualquiera de los 3 indicadores reales.
+if ( $is_actually_delivered ) {
+    $current_step_idx = 4;
+}
+
+// Override: si el loop anterior ya encontró date_ts en un step superior, lo usamos.
 foreach ( $timeline_steps as $i => $step ) {
-    if ( $step['date_ts'] > 0 ) {
+    if ( $step['date_ts'] > 0 && $i > $current_step_idx ) {
         $current_step_idx = $i;
     }
 }
@@ -540,20 +642,53 @@ get_header();
                             </a>
                         </div>
                     <?php else : ?>
-                        <!-- Sin repartidor asignado todavía -->
-                        <header class="pv-tracker-card__head">
-                            <span class="pv-tracker-card__label"><?php esc_html_e( 'Repartidor', 'ltms' ); ?></span>
-                            <span class="pv-badge pv-badge--warning pv-badge--dot"><?php esc_html_e( 'Por asignar', 'ltms' ); ?></span>
-                        </header>
-                        <div class="pv-tracker-card__driver pv-tracker-card__driver--empty">
-                            <div class="pv-tracker-card__avatar pv-tracker-card__avatar--placeholder">
-                                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <!-- AUDIT-FE-OT-002: estado honesto según flujo de entrega real. -->
+                        <?php if ( $tracking_number && ! $uses_own_delivery && ! $uses_pickup ) : ?>
+                            <!-- Carrier externo con tracking pero sin driver asignado en plugin -->
+                            <header class="pv-tracker-card__head">
+                                <span class="pv-tracker-card__label"><?php esc_html_e( 'Transportadora', 'ltms' ); ?></span>
+                                <span class="pv-badge pv-badge--info pv-badge--dot"><?php esc_html_e( 'Asignada', 'ltms' ); ?></span>
+                            </header>
+                            <div class="pv-tracker-card__driver pv-tracker-card__driver--empty">
+                                <div class="pv-tracker-card__avatar pv-tracker-card__avatar--placeholder">
+                                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h11v8H3zM14 10h4l3 3v2h-7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg>
+                                </div>
+                                <div class="pv-tracker-card__driver-info">
+                                    <span class="pv-tracker-card__driver-name"><?php echo esc_html( $carrier ? strtoupper( $carrier ) : __( 'Transportadora', 'ltms' ) ); ?></span>
+                                    <span class="pv-tracker-card__driver-hint"><?php esc_html_e( 'Tu pedido será entregado por la transportadora asignada. Sigue el envío con el número de seguimiento.', 'ltms' ); ?></span>
+                                </div>
                             </div>
-                            <div class="pv-tracker-card__driver-info">
-                                <span class="pv-tracker-card__driver-name"><?php esc_html_e( 'Sin asignar aún', 'ltms' ); ?></span>
-                                <span class="pv-tracker-card__driver-hint"><?php esc_html_e( 'Te notificaremos cuando asignemos tu repartidor.', 'ltms' ); ?></span>
+                        <?php elseif ( $uses_pickup ) : ?>
+                            <!-- Recogida en tienda: no hay repartidor -->
+                            <header class="pv-tracker-card__head">
+                                <span class="pv-tracker-card__label"><?php esc_html_e( 'Entrega', 'ltms' ); ?></span>
+                                <span class="pv-badge pv-badge--info pv-badge--dot"><?php esc_html_e( 'Recogida', 'ltms' ); ?></span>
+                            </header>
+                            <div class="pv-tracker-card__driver pv-tracker-card__driver--empty">
+                                <div class="pv-tracker-card__avatar pv-tracker-card__avatar--placeholder">
+                                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v9h14v-9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div class="pv-tracker-card__driver-info">
+                                    <span class="pv-tracker-card__driver-name"><?php esc_html_e( 'Recogida en tienda', 'ltms' ); ?></span>
+                                    <span class="pv-tracker-card__driver-hint"><?php esc_html_e( 'Recoge tu pedido directamente con el vendedor. Coordinarán por chat.', 'ltms' ); ?></span>
+                                </div>
                             </div>
-                        </div>
+                        <?php else : ?>
+                            <!-- Sin repartidor asignado todavía -->
+                            <header class="pv-tracker-card__head">
+                                <span class="pv-tracker-card__label"><?php esc_html_e( 'Repartidor', 'ltms' ); ?></span>
+                                <span class="pv-badge pv-badge--warning pv-badge--dot"><?php esc_html_e( 'Por asignar', 'ltms' ); ?></span>
+                            </header>
+                            <div class="pv-tracker-card__driver pv-tracker-card__driver--empty">
+                                <div class="pv-tracker-card__avatar pv-tracker-card__avatar--placeholder">
+                                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div class="pv-tracker-card__driver-info">
+                                    <span class="pv-tracker-card__driver-name"><?php esc_html_e( 'Sin asignar aún', 'ltms' ); ?></span>
+                                    <span class="pv-tracker-card__driver-hint"><?php esc_html_e( 'Te notificaremos cuando asignemos tu repartidor.', 'ltms' ); ?></span>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -958,16 +1093,35 @@ get_header();
         io.observe(activeStep);
     }
 
-    /* --- 2. Live refresh (polling cada 60s si la orden no está entregada) */
+    /* --- 2. Live refresh (polling cada 60s solo si la order está activa
+     *        y NO hay datos de envío todavía). AUDIT-FE-OT-003 FIX:
+     *        antes se disparaba cada 60s para siempre (las metas _ltms_driver_*
+     *        nunca se llenaban → ﾒ!hasDriver siempre true → loop infinito),
+     *        recargando la página mientras el usuario leía/interactuaba.
+     *        Ahora solo recarga si: current_step < 2 (todavía en preparación)
+     *        y no hay tracking_number y order no delivered y no hay <details>
+     *        abierto ni input/textarea/button con focus.
+     */
     var currentStep = parseInt(scope.getAttribute('data-current-step'), 10);
-    if (!isNaN(currentStep) && currentStep >= 0 && currentStep < 4){
-        // Solo refrescar si hay ETA pendiente o repartidor por asignar.
+    if (!isNaN(currentStep) && currentStep >= 0 && currentStep < 2){
         var orderId = scope.getAttribute('data-order-id');
-        var hasDriver = !!scope.querySelector('[data-pv-tracker] .pv-tracker-card__driver:not(.pv-tracker-card__driver--empty)');
-        if (orderId && (!hasDriver)){
+        var hasTracking = !!scope.querySelector('.pv-timeline-step__tracking-num');
+        if (orderId && !hasTracking){
             setTimeout(function(){
-                // Solo recargamos si el usuario sigue en la página y no hay modal/confirm abiertos.
-                if (document.visibilityState === 'visible' && !document.querySelector('.pv-modal.is-open')){
+                // Solo recargar si el usuario sigue en la página, no está en
+                // un modal abierto, no tiene <details> expandido (anti-pérdida
+                // de scroll/contexto mientras lee el detalle colapsable) y
+                // ningún campo del formulario tiene focus (anti-pérdida input).
+                var hasModal = !!document.querySelector('.pv-modal.is-open');
+                var hasOpenDetails = !!scope.querySelector('details[open]');
+                var activeEl = document.activeElement;
+                var isFormFocused = activeEl && (
+                    activeEl.tagName === 'INPUT' ||
+                    activeEl.tagName === 'TEXTAREA' ||
+                    activeEl.tagName === 'SELECT' ||
+                    activeEl.tagName === 'BUTTON'
+                );
+                if (document.visibilityState === 'visible' && !hasModal && !hasOpenDetails && !isFormFocused){
                     window.location.reload();
                 }
             }, 60000);
