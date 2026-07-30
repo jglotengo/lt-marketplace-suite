@@ -14,7 +14,26 @@ $t = $_GET['token'] ?? '';
 if (!hash_equals(DEPLOY_TOKEN, $t)) { http_response_code(403); echo "Forbidden
 "; exit; }
 
-$a='ghp_IgctVfky';$b='zEpwBpnJjz3E';$c='YVJhFLv6Zx0yC5AY'; $gh=$a.$b.$c;
+// SEC-2026-07-30: GitHub PAT hardcoded eliminado. Antes el token estaba
+// split en 3 strings concatenados ($a/$b/$c), commiteado en texto plano.
+// Tras la rotación del PAT expuesto, el token se resuelve en runtime desde,
+// en orden:
+//   1. getenv('LTMS_GH_TOKEN')  -> env del runtime del servidor web
+//   2. constante PHP LTMS_GH_TOKEN definida en wp-config.php
+// Si ninguno está definido, abortar CON MENSAJE en vez de intentar gh_get
+// anónimo (rate-limit GitHub = 60/hr sin auth, insuficiente para deploy).
+$gh = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh === '') {
+    http_response_code(500);
+    echo "ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";
+    exit;
+}
+$gh = preg_replace('/[^A-Za-z0-9_]/', '', $gh);
+if (strpos($gh, 'ghp_') !== 0) {
+    http_response_code(500);
+    echo "ERROR: LTMS_GH_TOKEN debe ser un classic PAT con prefijo 'ghp_'.\n";
+    exit;
+}
 
 function gh_get($rel, $tok) {
     $url = 'https://api.github.com/repos/'.GH_REPO.'/contents/'.$rel;

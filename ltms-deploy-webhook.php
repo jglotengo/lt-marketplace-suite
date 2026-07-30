@@ -25,10 +25,28 @@ if (!is_dir($plugin_dir . '/.git')) {
     exit(1);
 }
 
-$gh_tok_a = 'ghp_IgctVfy';
-$gh_tok_b = 'kyzEpwBpnJj';
-$gh_tok_c = 'z3EYVJhFLv6Zx0yC5AY';
-$gh_token = $gh_tok_a . $gh_tok_b . $gh_tok_c;
+// SEC-2026-07-30: GitHub PAT hardcoded eliminado. Antes el token estaba
+// split en 3 strings concatenados ($gh_tok_a/b/c), commiteado en texto
+// plano. Tras la rotación del PAT expuesto, el token se resuelve en
+// runtime desde, en orden:
+//   1. getenv('LTMS_GH_TOKEN')  -> env del runtime del servidor web
+//   2. constante PHP LTMS_GH_TOKEN definida en wp-config.php
+// Si ninguno está definido, abortar CON MENSAJE en vez de intentar
+// fetch anónimo (rate-limit GitHub = 60/hr sin auth, insuficiente para
+// deploy). Es preferible un deploy que falle ruidosamente a uno que
+// silenciosamente rate-limite.
+$gh_token = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh_token === '') {
+    http_response_code(500);
+    echo "ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";
+    exit(1);
+}
+$gh_token = preg_replace('/[^A-Za-z0-9_]/', '', $gh_token); // sanity sanitize
+if (strpos($gh_token, 'ghp_') !== 0) {
+    http_response_code(500);
+    echo "ERROR: LTMS_GH_TOKEN debe ser un classic PAT con prefijo 'ghp_'.\n";
+    exit(1);
+}
 $remote = "https://{$gh_token}@github.com/jglotengo/lt-marketplace-suite.git";
 
 putenv('GIT_TERMINAL_PROMPT=0');

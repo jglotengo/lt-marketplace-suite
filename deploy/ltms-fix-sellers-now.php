@@ -29,7 +29,23 @@ if (file_exists($plugin_file)) {
 
 // 2. Download fresh copy from GitHub and overwrite
 echo "\n2. FORCE DEPLOY FROM GITHUB:\n";
-$gh_token = 'ghp_IgctVfky' . 'zEpwBpnJjz3E' . 'YVJhFLv6Zx0yC5AY';
+// SEC-2026-07-30: GitHub PAT hardcoded eliminado. Antes el token estaba
+// split en 3 strings concatenados, commiteado en texto plano. Tras la
+// rotación del PAT expuesto, el token se resuelve en runtime desde, en
+// orden: getenv('LTMS_GH_TOKEN') > constante LTMS_GH_TOKEN definida en
+// wp-config.php. Si ninguno está definido, abortar CON MENSAJE.
+$gh_token = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh_token === '') {
+    http_response_code(500);
+    echo "   ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";
+    exit(1);
+}
+$gh_token = preg_replace('/[^A-Za-z0-9_]/', '', $gh_token);
+if (strpos($gh_token, 'ghp_') !== 0) {
+    http_response_code(500);
+    echo "   ERROR: LTMS_GH_TOKEN debe ser un classic PAT con prefijo 'ghp_'.\n";
+    exit(1);
+}
 $gh_url = 'https://api.github.com/repos/jglotengo/lt-marketplace-suite/contents/includes/frontend/views/view-sellers-landing.php';
 $ctx = stream_context_create(['http' => ['header' => "Authorization: token {$gh_token}\r\nUser-Agent: ltms\r\nAccept: application/vnd.github.v3+json\r\n", 'timeout' => 20]]);
 $resp = @file_get_contents($gh_url, false, $ctx);
