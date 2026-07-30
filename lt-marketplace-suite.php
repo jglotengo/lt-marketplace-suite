@@ -617,6 +617,7 @@ function ltms_load_autoloader(): void {
                 'ltms-branding-engine'                   => 'frontend/class-ltms-branding-engine.php',
                 'ltms-cart-drawer'                       => 'frontend/class-ltms-cart-drawer.php',
                 'ltms-wishlist'                          => 'frontend/class-ltms-wishlist.php',
+                'ltms-vendor-followers'                   => 'frontend/class-ltms-vendor-followers.php',
                 'ltms-quick-view'                        => 'frontend/class-ltms-quick-view.php',
                 'ltms-comparison-table'                  => 'frontend/class-ltms-comparison-table.php',
                 'ltms-product-tabs'                      => 'frontend/class-ltms-product-tabs.php',

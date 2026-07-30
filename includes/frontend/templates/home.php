@@ -245,6 +245,7 @@ function ltms_pv_render_trending_card( $pv_p ) {
                 <button type="button"
                         class="pv-product-card__quickview"
                         data-pv-quick-view="<?php echo esc_attr( $pv_pid ); ?>"
+                        data-pv-quickview="<?php echo esc_attr( $pv_pid ); ?>"
                         aria-label="<?php esc_attr_e( 'Vista rápida', 'ltms' ); ?>">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -354,7 +355,7 @@ do_action( 'ltms_before_home_plazaviva' );
                     <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Búsquedas populares', 'ltms' ); ?>">
                         <?php foreach ( $pv_popular_chips as $pv_chip ) : ?>
                             <li>
-                                <button type="button" class="pv-home-header__chip" data-pv-search-chip="<?php echo esc_attr( $pv_chip ); ?>">
+                                <button type="button" class="pv-home-header__chip" data-pv-search-chip="<?php echo esc_attr( $pv_chip ); ?>" data-pv-search-chip-value="<?php echo esc_attr( $pv_chip ); ?>">
                                     <?php echo esc_html( $pv_chip ); ?>
                                 </button>
                             </li>

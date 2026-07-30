@@ -350,7 +350,6 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
                     <button type="button"
                             class="pv-btn pv-btn--gold"
                             data-pv-follow-vendor="<?php echo esc_attr( $pv_vendor_id ); ?>"
-                            data-pv-follow-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_follow_vendor' ) ); ?>"
                             aria-pressed="false">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
                         <?php esc_html_e( 'Seguir', 'ltms' ); ?>
@@ -616,22 +615,15 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
         }
     });
 
-    /* Follow vendor — toggle visual state, AJAX best-effort. */
-    document.addEventListener('click', function(e){
-        var btn = e.target.closest('[data-pv-follow-vendor]');
-        if (!btn) return;
-        e.preventDefault();
-        var active = btn.getAttribute('aria-pressed') === 'true';
-        btn.setAttribute('aria-pressed', String(!active));
-        if (!active) {
-            btn.classList.add('is-following');
-            btn.innerHTML = btn.innerHTML.replace(/(<?php echo esc_js( __( 'Seguir', 'ltms' ) ); ?>)/, '<?php echo esc_js( __( 'Siguiendo', 'ltms' ) ); ?>');
-        } else {
-            btn.classList.remove('is-following');
-            btn.innerHTML = btn.innerHTML.replace(/(<?php echo esc_js( __( 'Siguiendo', 'ltms' ) ); ?>)/, '<?php echo esc_js( __( 'Seguir', 'ltms' ) ); ?>');
-        }
-    });
+    // AUDIT-FE-SF-006 FIX (Fase 1.4): el handler del follow-vendor fue
+    // migrado a ltms-plaza-viva.js (handler global "data-pv-follow-vendor")
+    // para persistir el follow vía el nuevo endpoint ltms_follow_vendor
+    // — antes este bloque solo cambiaba el label visualmente sin tocar backend.
+    // La migración también cierra la excepción CSP de vendor-store.php.
+    // [Backlog re-audit: el handler jump-tab de arriba sigue inline; migrarlo
+    //  al design system global es P1 pendiente — fuera del alcance de 1.4.]
 })();
+</script>
 </script>
 
 <?php

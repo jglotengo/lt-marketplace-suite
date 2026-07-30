@@ -573,6 +573,32 @@
    * Global delegation: add-to-cart, quick-view, wishlist, swatches auto-init
    * ========================================================================= */
   on(document, 'click', function (e) {
+    // AUDIT-FE-HOME-003 FIX: popular search chip — rellena el input del
+    // header search form y lo envía a /tienda/. Antes los chips de búsquedas
+    // populares ("Juegos de mesa", "Regalos", etc.) eran botones muertos.
+    var chip = e.target.closest('[data-pv-search-chip]');
+    if (chip) {
+      e.preventDefault();
+      var term = chip.getAttribute('data-pv-search-chip-value') || chip.getAttribute('data-pv-search-chip') || chip.textContent.trim();
+      var input = document.querySelector('.pv-home-header__search-input, input[name="s"]');
+      if (input) {
+        input.value = term;
+        var form = input.closest('form');
+        if (form) {
+          // Asegurar post_type=product (puede no estar si el form no es el del header).
+          var pt = form.querySelector('input[name="post_type"]');
+          if (!pt) {
+            pt = document.createElement('input');
+            pt.type = 'hidden';
+            pt.name = 'post_type';
+            pt.value = 'product';
+            form.appendChild(pt);
+          }
+          form.submit();
+        }
+      }
+      return;
+    }
     // Quick view trigger
     var qv = e.target.closest('[data-pv-quickview]');
     if (qv) {
@@ -611,6 +637,67 @@
         })
         .catch(function () {
           atc.classList.remove('pv-btn--loading');
+          PV.toast('Error de conexión', { type: 'error' });
+        });
+    }
+
+    // AUDIT-FE-SF-006 FIX (Fase 1.4): follow vendor — persiste el follow
+    // via el nuevo endpoint ltms_follow_vendor. Antes el handler inline de
+    // vendor-store.php solo cambiaba el label "Seguir"↔"Siguiendo" sin tocar
+    // backend (follow cosmético). Ahora invoca PV.ajax que manda el nonce
+    // global ltms_plaza_viva (nonce=PV.config.nonce) y el handler PHP
+    // LTMS_Vendor_Followers::ajax_toggle_follow valida contra ese mismo
+    // nonce (ver class-ltms-vendor-followers.php). El toggle visual state
+    // permanece (UX instantánea) pero ahora también se persiste en
+    // bkr_lt_vendor_followers; en caso de error se revierte el toggle visual
+    // para evitar engañar al usuario.
+    var followBtn = e.target.closest('[data-pv-follow-vendor]');
+    if (followBtn) {
+      e.preventDefault();
+      var vendorId = followBtn.getAttribute('data-pv-follow-vendor');
+      if (!vendorId) return;
+      var wasActive = followBtn.getAttribute('aria-pressed') === 'true';
+      var labelFollow = (PV.i18n && PV.i18n.followVendor) || 'Seguir';
+      var labelFollowing = (PV.i18n && PV.i18n.followingVendor) || 'Siguiendo';
+      // Toggle visual optimista.
+      followBtn.setAttribute('aria-pressed', String(!wasActive));
+      if (!wasActive) {
+        followBtn.classList.add('is-following');
+        followBtn.innerHTML = followBtn.innerHTML.replace(labelFollow, labelFollowing);
+      } else {
+        followBtn.classList.remove('is-following');
+        followBtn.innerHTML = followBtn.innerHTML.replace(labelFollowing, labelFollow);
+      }
+      var countEl = document.querySelector('[data-pv-followers-count]');
+      PV.ajax('ltms_follow_vendor', { vendor_id: vendorId })
+        .then(function (res) {
+          if (res && res.success && res.data) {
+            if (countEl && typeof res.data.followers_count === 'number') {
+              countEl.textContent = String(res.data.followers_count);
+            }
+          } else {
+            // Error lógico: revertir toggle visual.
+            followBtn.setAttribute('aria-pressed', String(wasActive));
+            if (wasActive) {
+              followBtn.classList.add('is-following');
+              followBtn.innerHTML = followBtn.innerHTML.replace(labelFollow, labelFollowing);
+            } else {
+              followBtn.classList.remove('is-following');
+              followBtn.innerHTML = followBtn.innerHTML.replace(labelFollowing, labelFollow);
+            }
+            PV.toast((res && res.data && res.data.message) || 'Error', { type: 'error' });
+          }
+        })
+        .catch(function () {
+          // Error de red: revertir toggle visual.
+          followBtn.setAttribute('aria-pressed', String(wasActive));
+          if (wasActive) {
+            followBtn.classList.add('is-following');
+            followBtn.innerHTML = followBtn.innerHTML.replace(labelFollow, labelFollowing);
+          } else {
+            followBtn.classList.remove('is-following');
+            followBtn.innerHTML = followBtn.innerHTML.replace(labelFollowing, labelFollow);
+          }
           PV.toast('Error de conexión', { type: 'error' });
         });
     }

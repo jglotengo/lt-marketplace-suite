@@ -1133,6 +1133,30 @@ final class LTMS_DB_Migrations {
             KEY `idx_created` (`created_at`)
         ) {$charset}";
 
+        // lt_vendor_followers — AUDIT-FE-SF-006 FIX (Fase 1.4 Opción B).
+        // Persiste la relación follower→vendor (seguidores de vendedor) que
+        // el botón "Seguir vendedor" del design system Plaza Viva dispara
+        // desde vendor-store.php:353 (data-pv-follow-vendor). Antes el follow
+        // era solo cosmético (JS inline cambiaba el label sin persistir).
+        //
+        // Tabla dedicada (no user_meta array) porque la vitrina PV mostrará
+        // el count de seguidores del vendor — COUNT(*) WHERE vendor_id=? es
+        // O(1) sobre índice y evita el N+1 de un user_meta serializado.
+        // follower_id=0 representa un visitante anónimo identificado por
+        // follower_ip_hash (hash SHA-256 de la IP + UA), para que el toggle
+        // "Siguiendo" se mantenga consistente entre sesiones de guest.
+        $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_vendor_followers` (
+            `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `vendor_id`       BIGINT UNSIGNED NOT NULL COMMENT 'El vendedor que es seguido',
+            `follower_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'ID de usuario WP del seguidor (0 = anónimo)',
+            `follower_ip_hash` CHAR(64) NOT NULL DEFAULT '' COMMENT 'SHA-256(IP+UA) si follower_id=0',
+            `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `udx_vendor_follower` (`vendor_id`, `follower_id`, `follower_ip_hash`),
+            KEY `idx_vendor` (`vendor_id`),
+            KEY `idx_follower` (`follower_id`)
+        ) {$charset}";
+
         foreach ( $sqls as $sql ) {
             dbDelta( $sql );
         }

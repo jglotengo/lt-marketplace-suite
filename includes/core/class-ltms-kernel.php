@@ -294,6 +294,11 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Wishlist' ) ) {
             LTMS_Wishlist::init();
         }
+        // AUDIT-FE-SF-006 FIX (Fase 1.4): persistencia real del follow vendor.
+        // La clase LTMS_Vendor_Followers registra wp_ajax(_nopriv)_ltms_follow_vendor.
+        if ( class_exists( 'LTMS_Vendor_Followers' ) ) {
+            LTMS_Vendor_Followers::init();
+        }
         if ( class_exists( 'LTMS_Product_Tabs' ) ) {
             LTMS_Product_Tabs::init();
         }

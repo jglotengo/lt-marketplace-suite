@@ -222,6 +222,21 @@ final class LTMS_Frontend_Checkout_Handler {
         // j. Search autocomplete (live product suggestions).
         add_action( 'wp_ajax_ltms_search_autocomplete',        [ __CLASS__, 'ajax_search_autocomplete' ] );
         add_action( 'wp_ajax_nopriv_ltms_search_autocomplete', [ __CLASS__, 'ajax_search_autocomplete' ] );
+
+        // k. Plaza Viva add-to-cart — AUDIT-FE-HOME-002 + AUDIT-FE-PROD-009 FIX.
+        // El design system "Plaza Viva" (ltms-plaza-viva.js) invoca esta acción
+        // desde los botones `data-pv-add-to-cart` de home.php, vendor-store.php,
+        // single-product.php (sticky ATC + bundle) y wc-parts/content-product.php.
+        // Antes no existía handler PHP — el JS recibía 400 `Unknown action` y
+        // mostraba "Error de conexión". Usa el nonce global `ltms_plaza_viva`
+        // (localizado como `ltms_data.nonce` / `PV.config.nonce` en TODAS las
+        // páginas públicas del design system — ver
+        // class-ltms-native-templates.php::enqueue_pv_assets). Disponible para
+        // guest y logueado (compra guest habilitada en WC).
+        // [AUDIT-FE-PV-001 re-audit Fase 1.4: el nonce fue corregido de
+        // 'ltms_ux_nonce' (inexistente en el JS PV) a 'ltms_plaza_viva'].
+        add_action( 'wp_ajax_ltms_plaza_viva_add_to_cart',        [ __CLASS__, 'ajax_plaza_viva_add_to_cart' ] );
+        add_action( 'wp_ajax_nopriv_ltms_plaza_viva_add_to_cart', [ __CLASS__, 'ajax_plaza_viva_add_to_cart' ] );
     }
 
     // =========================================================================
@@ -2349,6 +2364,99 @@ final class LTMS_Frontend_Checkout_Handler {
             'added'      => $added,
             'skipped'    => $skipped,
             'cart_count' => $cart_count,
+        ] );
+    }
+
+    // -------------------------------------------------------------------------
+    // k. ltms_plaza_viva_add_to_cart (AUDIT-FE-HOME-002 + AUDIT-FE-PROD-009)
+    // -------------------------------------------------------------------------
+
+    /**
+     * AJAX: ltms_plaza_viva_add_to_cart
+     *
+     * Add-to-cart de un único producto desde el design system "Plaza Viva".
+     * Lo invoca `ltms-plaza-viva.js` (línea 601) desde los botones
+     * `[data-pv-add-to-cart]` de home, vitrina, sticky ATC de single-product
+     * y wc-parts/content-product. También lo usa single-product.php:1034 para
+     * el bundle (aunque ese path es fetch directo al admin-ajax y el payload
+     * se construye inline; este handler da soporte a ambos).
+     *
+     * Devuelve `count_delta` (incremento del contador del carrito) que el JS
+     * usa en `PV.Shopping.increment(res.data.count_delta)` (línea 606).
+     *
+     * Respuesta JSON:
+     *   success: { cart_count, count_delta, cart_key }
+     *   error:   { message }
+     *
+     * @return void
+     */
+    public static function ajax_plaza_viva_add_to_cart(): void {
+        // AUDIT-FE-PV-001 FIX (re-auditoría Fase 1.4 P0): el helper JS PV.ajax
+        // siempre envía PV.config.nonce como campo `nonce` (ver
+        // class-ltms-native-templates.php:327 — wp_create_nonce('ltms_plaza_viva')
+        // localizado como ltms_data.nonce). Antes este handler validaba contra
+        // 'ltms_ux_nonce' — nonce inexistente en el JS de Plaza Viva — y 100%
+        // de las llamadas AJAX recibían 403. Cualquier vendor que tocara un
+        // botón "Agregar al carrito" del design system veía "Error de conexión"
+        // sin razón aparente. Alineado al nonce global `ltms_plaza_viva` para
+        // paridad con ajax_quick_view (class-ltms-native-templates.php:355) y
+        // ajax_toggle_follow (class-ltms-vendor-followers.php).
+        check_ajax_referer( 'ltms_plaza_viva', 'nonce' );
+
+        if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+            wp_send_json_error( [ 'message' => __( 'Carrito no disponible', 'ltms' ) ], 503 );
+        }
+
+        $product_id = absint( $_POST['product_id'] ?? 0 );
+        $quantity   = max( 1, (int) ( $_POST['quantity'] ?? 1 ) );
+
+        if ( ! $product_id ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no especificado', 'ltms' ) ], 400 );
+        }
+
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no encontrado', 'ltms' ) ], 404 );
+        }
+
+        // Productos variables / agrupados requieren variación — no se pueden
+        // añadir con un add_to_cart simple. Avisar al usuario en vez de fallar
+        // silenciosamente (antes el JS mostraba "Error de conexión" genérico).
+        if ( $product->is_type( 'variable' ) || $product->is_type( 'grouped' ) ) {
+            wp_send_json_error( [
+                'message' => __( 'Este producto tiene variantes. Ábrelo para elegir la tuya.', 'ltms' ),
+                'redirect' => $product->get_permalink(),
+            ], 422 );
+        }
+
+        $count_before = (int) WC()->cart->get_cart_contents_count();
+
+        $result = WC()->cart->add_to_cart( $product_id, $quantity );
+
+        if ( ! $result ) {
+            // WC add_to_cart devuelve false si falló la validación (out of stock,
+            // not purchasable, etc.). Recoger el último notice de WC para dar
+            // contexto al usuario en el toast.
+            $last_error = '';
+            if ( function_exists( 'wc_get_notices' ) ) {
+                $notices = wc_get_notices( 'error' );
+                if ( ! empty( $notices ) ) {
+                    $last = $notices[0];
+                    $last_error = is_array( $last ) && isset( $last['notice'] ) ? $last['notice'] : (string) $last;
+                }
+            }
+            wp_send_json_error( [
+                'message' => $last_error ?: __( 'No se pudo agregar al carrito', 'ltms' ),
+            ], 422 );
+        }
+
+        $count_after = (int) WC()->cart->get_cart_contents_count();
+
+        wp_send_json_success( [
+            'message'     => __( 'Producto agregado al carrito', 'ltms' ),
+            'cart_count'  => $count_after,
+            'count_delta'  => $count_after - $count_before,
+            'cart_key'     => $result,
         ] );
     }
 
