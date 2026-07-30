@@ -608,6 +608,9 @@ $files = [
     'includes/frontend/class-ltms-product-tabs.php',
     'includes/frontend/class-ltms-product-video.php',
     'includes/frontend/class-ltms-public-auth-handler.php',
+    // AUTH-AUDIT cycle: Google OAuth callback (AUTH-04 no auth cookie for incomplete
+    // profile + AUTH-05 sanitize $_COOKIE['ltms_ref'])
+    'includes/frontend/class-ltms-google-oauth.php',
     'includes/frontend/views/view-sellers-landing.php',
     // INTEGRATIONS-AUDIT v2.9.142: core security files
     'includes/core/class-ltms-firewall.php',
