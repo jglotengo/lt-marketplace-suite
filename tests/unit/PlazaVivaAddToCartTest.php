@@ -85,6 +85,21 @@ final class PlazaVivaAddToCartTest extends LTMS_Unit_Test_Case {
             static fn( string $action, string $query_arg = 'nonce' ): bool => false
         );
 
+        // CI fix (commit b9c55518 followup): el handler (class-ltms-frontend-
+        // checkout-handler.php:2406) evalúa `! function_exists( 'WC' ) || ! WC()->cart`
+        // para emitir un 503 cuando WooCommerce no está disponible. Brain\Monkey
+        // no resuelve `WC()` automágicamente si ningún test previo lo mockeó,
+        // y en CI Ubuntu el orden de tests hace que este test sea el primero
+        // en tocar el handler → "WC" is not defined nor mocked. Localmente
+        // pasaba porque otro test previo (con shared Monkey state) dejaba `WC`
+        // mockeado. Mockear explícitamente aquí elimina la dependencia de orden
+        // de tests y hace el test determinista. Devolvemos stdClass con
+        // `cart = null` para que el guard 503 se_ACTIVE y el handler llame
+        // wp_send_json_error — que es exactamente lo que el assertion espera.
+        $wc_stub      = new \stdClass();
+        $wc_stub->cart = null;
+        Monkey\Functions\when( 'WC' )->alias( static fn() => $wc_stub );
+
         $result = $this->capture_json_error(
             static fn() => \LTMS_Frontend_Checkout_Handler::ajax_plaza_viva_add_to_cart()
         );
@@ -108,6 +123,17 @@ final class PlazaVivaAddToCartTest extends LTMS_Unit_Test_Case {
 
         // Sin $_POST['product_id'].
         unset( $_POST['product_id'], $_POST['quantity'] );
+
+        // CI fix (commit b9c55518 followup): same reason as test_rejects_invalid_nonce.
+        // El handler llama `WC()->cart` en el guard 503 — mockear WC() evita
+        // que Brain\Monkey se queje. Aquí damos a WC()->cart un valor truthy
+        // (un stdClass) para que el guard 503 NO se_active, el handler continúe
+        // y llegue al guard `! $product_id` (línea 2413) que dispara el 400
+        // esperado por este test.
+        $wc_cart_stub  = new \stdClass();
+        $wc_stub       = new \stdClass();
+        $wc_stub->cart = $wc_cart_stub;
+        Monkey\Functions\when( 'WC' )->alias( static fn() => $wc_stub );
 
         // WC faux para cubrir el guard de "WC()->cart no disponible" —
         // queremos que el handler llegue al guard de product_id antes de tocar WC.
