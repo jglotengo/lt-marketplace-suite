@@ -22,18 +22,31 @@ if (!hash_equals(DEPLOY_TOKEN, $t)) { http_response_code(403); echo "Forbidden
 //   2. constante PHP LTMS_GH_TOKEN definida en wp-config.php
 // Si ninguno está definido, abortar CON MENSAJE en vez de intentar gh_get
 // anónimo (rate-limit GitHub = 60/hr sin auth, insuficiente para deploy).
-$gh = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
-if ($gh === '') {
+//
+// SEC-2026-07-30 v6.2 RE-FIX: este webhook corre STANDALONE, así que defined()
+// no ve constantes de wp-config.php aunque el usuario las haya definido ahí.
+// Fix: si getenv() y defined() ambos fallan, cargar wp-config.php (no
+// wp-load.php — suficiente para las constantes) y reintentar defined().
+$gh_token_env = getenv('LTMS_GH_TOKEN');
+$gh_token = $gh_token_env !== false ? $gh_token_env : (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh_token === '' && defined('ABSPATH') === false && file_exists(dirname(__DIR__, 4) . '/wp-config.php')) {
+    // Plugin path: .../public_html/wp-content/plugins/lt-marketplace-suite/deploy/
+    // wp-config.php: .../public_html/wp-config.php → subir 4 niveles.
+    @include_once dirname(__DIR__, 4) . '/wp-config.php';
+    $gh_token = defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '';
+}
+if ($gh_token === '') {
     http_response_code(500);
     echo "ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";
     exit;
 }
-$gh = preg_replace('/[^A-Za-z0-9_]/', '', $gh);
-if (strpos($gh, 'ghp_') !== 0) {
+$gh_token = preg_replace('/[^A-Za-z0-9_]/', '', $gh_token);
+if (strpos($gh_token, 'ghp_') !== 0) {
     http_response_code(500);
     echo "ERROR: LTMS_GH_TOKEN debe ser un classic PAT con prefijo 'ghp_'.\n";
     exit;
 }
+$gh = $gh_token;
 
 function gh_get($rel, $tok) {
     $url = 'https://api.github.com/repos/'.GH_REPO.'/contents/'.$rel;

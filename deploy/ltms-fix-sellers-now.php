@@ -34,7 +34,16 @@ echo "\n2. FORCE DEPLOY FROM GITHUB:\n";
 // rotación del PAT expuesto, el token se resuelve en runtime desde, en
 // orden: getenv('LTMS_GH_TOKEN') > constante LTMS_GH_TOKEN definida en
 // wp-config.php. Si ninguno está definido, abortar CON MENSAJE.
+//
+// SEC-2026-07-30 v6.2 RE-FIX: este script corre STANDALONE, así que
+// defined() no ve constantes de wp-config.php aunque estén declaradas ahí.
+// Fix: si getenv() y defined() ambos fallan, cargar wp-config.php (4
+// niveles arriba desde deploy/) y reintentar defined().
 $gh_token = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh_token === '' && defined('ABSPATH') === false && file_exists(dirname(__DIR__, 4) . '/wp-config.php')) {
+    @include_once dirname(__DIR__, 4) . '/wp-config.php';
+    $gh_token = defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '';
+}
 if ($gh_token === '') {
     http_response_code(500);
     echo "   ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";

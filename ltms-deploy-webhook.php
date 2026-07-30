@@ -35,7 +35,22 @@ if (!is_dir($plugin_dir . '/.git')) {
 // fetch anónimo (rate-limit GitHub = 60/hr sin auth, insuficiente para
 // deploy). Es preferible un deploy que falle ruidosamente a uno que
 // silenciosamente rate-limite.
+//
+// SEC-2026-07-30 v6.2 RE-FIX: este webhook corre STANDALONE (no carga
+// wp-load.php ni wp-config.php por sí mismo), así que defined() no ve
+// constantes de wp-config.php aunque el usuario las haya definido ahí.
+// Fix: si getenv() y defined() ambos fallan, hacer require_once del
+// wp-config.php del doc_root (si existe) y RE-intentar defined(). El
+// (@) suprime cualquier output accidental de WP que rompería el header
+// Content-Type del webhook.
 $gh_token = getenv('LTMS_GH_TOKEN') ?: (defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '');
+if ($gh_token === '' && file_exists($doc_root . '/wp-config.php')) {
+    // Cargar wp-config.php solo para que defined('LTMS_GH_TOKEN') resuelva.
+    // No usamos wp-load.php porque eso carga todo el framework WP; wp-config
+    // es lighter y suficiente para que las constantes estén disponibles.
+    @include_once $doc_root . '/wp-config.php';
+    $gh_token = defined('LTMS_GH_TOKEN') ? constant('LTMS_GH_TOKEN') : '';
+}
 if ($gh_token === '') {
     http_response_code(500);
     echo "ERROR: LTMS_GH_TOKEN no definido. Definir via env o en wp-config.php: define('LTMS_GH_TOKEN', '<NEW_PAT>');\n";
