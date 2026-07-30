@@ -754,12 +754,26 @@ final class LTMS_DB_Migrations {
         // lt_aveonline_cities — Catálogo de ciudades de Aveonline sincronizado desde
         // https://app.aveonline.co/assets/resources/public/listadociudades.json
         // nombre = formato "BOGOTA(CUNDINAMARCA)" usado en la API. codigodane = 8 dígitos Aveonline.
+        // AUDIT-DB-AVE-001 FIX: las 3 columnas `codigodane`, `departamento`, `nombremun`
+        // usaban `DEFAULT \'\'` (backslash escape espurio) — MySQL 8.4 rechaza el
+        // escape con backslash aquí (el string PHP ya está en comillas dobles, las
+        // comillas simples internas NO necesitan escape). El dbDelta de WP reportaba
+        // "WordPress database error You have an error in your SQL syntax; ... near ''
+        // at line 4 for query CREATE TABLE IF NOT EXISTS `bkr_lt_aveonline_cities`"
+        // en cada activate del plugin (confirmado en debug.log línea 2492, timestamp
+        // 30-Jul-2026 21:53:04 UTC — y desde 23-Jul-2026 línea 587). La tabla YA
+        // estaba creada en producción con DEFAULT '' correcto (probablemente por el
+        // path alternativo `run_v2_3_0()` línea 2184 que no tiene el bug), pero el
+        // dbDelta de create_tables() fallaba en cada recarga — ruido en el log.
+        // Fix: eliminar los backslashes espurios (3 ocurrencias). Verificado: solo
+        // estas 3 columnas en todo el plugin usaban `DEFAULT \'\'` — re-auditoría
+        // con `Select-String -SimpleMatch "\\'"` confirma confinado.
         $sqls[] = "CREATE TABLE IF NOT EXISTS `{$p}lt_aveonline_cities` (
             `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
             `nombre`       VARCHAR(160) NOT NULL,
-            `codigodane`   VARCHAR(12)  NOT NULL DEFAULT \'\',
-            `departamento` VARCHAR(80)  NOT NULL DEFAULT \'\',
-            `nombremun`    VARCHAR(120) NOT NULL DEFAULT \'\',
+            `codigodane`   VARCHAR(12)  NOT NULL DEFAULT '',
+            `departamento` VARCHAR(80)  NOT NULL DEFAULT '',
+            `nombremun`    VARCHAR(120) NOT NULL DEFAULT '',
             `synced_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             UNIQUE KEY `uk_nombre` (`nombre`),
