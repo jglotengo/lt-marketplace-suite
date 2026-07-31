@@ -718,6 +718,13 @@ $files = [
     'includes/frontend/views/view-products.php',
     'assets/js/ltms-booking-calendar.js',
     'assets/js/ltms-booking-calendar.min.js',
+    // ADMIN-KYC-APPROVE-AUDIT — bug "desconectado" al aprobar KYC.
+    // Antes faltaban estos 2 archivos en la whitelist → el fix de los filtros
+    // AC-7/FT-2/RT-2/HD-12 (que devuelven WP_Error con motivo específico) no
+    // habría llegado al server. class-ltms-authorities-compliance.php es
+    // CRÍTICO para el fix (contiene validate_rut_and_camara_comercio).
+    'includes/business/class-ltms-authorities-compliance.php',
+    'tests/unit/AdminKycApproveAuditTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
