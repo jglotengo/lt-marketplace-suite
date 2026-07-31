@@ -1191,6 +1191,33 @@
     display: inline-flex !important;
     align-items: center !important;
 }
+/* UX-AUDIT-FE-P0-01 FIX: clases para mini-badges + loop-vendor-badge antes
+ * con style="..." inline en class-ltms-trust-badges.php. Migradas a CSS usando
+ * tokens visuales PV (text-3, accent, primary) sin colores hardcodeados. */
+.ltms-mini-badges {
+    margin-top: 12px !important;
+    display: flex !important;
+    gap: 16px !important;
+    flex-wrap: wrap !important;
+    font-size: 12px !important;
+    color: var(--text-3, #6b7280) !important;
+}
+.ltms-mini-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.4;
+}
+.ltms-mini-badge--accent .ltms-mini-badge__dot { color: var(--accent, #16a34a); }
+.ltms-mini-badge--primary .ltms-mini-badge__dot { color: var(--primary, #2563eb); }
+.ltms-loop-vendor-badge {
+    font-size: 11px !important;
+    color: var(--primary, #2563eb) !important;
+    margin: 2px 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
 
 /* Fix: gift options */
 .ltms-gift-options {

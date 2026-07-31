@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Garantizar que WooCommerce está cargado y el carrito existe.
 if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
     get_header( 'shop' );
-    echo '<div class="pv-scope pv-cart"><main class="pv-section" style="padding:60px 22px;text-align:center"><p>' . esc_html__( 'WooCommerce no está activo o el carrito no está disponible.', 'ltms' ) . '</p></main></div>';
+    echo '<div class="pv-scope pv-cart"><main class="pv-section pv-fallback__section"><p class="pv-fallback__msg">' . esc_html__( 'WooCommerce no está activo o el carrito no está disponible.', 'ltms' ) . '</p></main></div>';
     get_footer( 'shop' );
     return;
 }
@@ -897,7 +897,7 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
     font-family:var(--display);font-weight:700;font-size:15px;color:var(--text);
 }
 .pv-scope.pv-cart .pv-cart__totals-total{
-    font-family:var(--display);font-weight:800;font-size:24px;color:#E80001;
+    font-family:var(--display);font-weight:800;font-size:24px;color:var(--brand);
     letter-spacing:-0.01em;
 }
 
@@ -915,17 +915,11 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
 /* CTA */
 .pv-scope.pv-cart .pv-cart__cta{display:flex;flex-direction:column;gap:10px;padding-top:6px;}
 .pv-scope.pv-cart .pv-cart__cta .checkout-button{display:none;} /* oculto el botón WC por defecto */
-/* v2.9.212: Brand color CTA (red #E80001) — consistente con product page y shop cards */
-.pv-scope.pv-cart .pv-btn--brand{
-    background:#E80001;color:#fff;border:1px solid #E80001;
-}
-.pv-scope.pv-cart .pv-btn--brand:hover{
-    background:#B80001;border-color:#B80001;
-    transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28);
-}
-.pv-scope.pv-cart .pv-btn--brand:active{
-    transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20);
-}
+/* UX-AUDIT-FE-P0-03 FIX: .pv-btn--brand ahora vive en el design system global
+ * (ltms-plaza-viva.css §3 COMPONENTS · BUTTONS) usando --brand token. Antes
+ * estaba definido solo aquí con #E80001 hardcodeado, no reusable跨 páginas.
+ * Eliminada la definición scoped — el selector global .pv-btn--brand ya
+ * aplica dentro de .pv-scope por el reset de PV. */
 .pv-scope.pv-cart .pv-cart__checkout-cta{height:56px;font-size:16px;font-weight:800;letter-spacing:.01em;}
 .pv-scope.pv-cart .pv-cart__continue-cta{height:46px;font-size:14px;font-weight:600;}
 

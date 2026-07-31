@@ -282,17 +282,11 @@
 /* CTA */
 .pv-scope.pv-checkout .pv-checkout__cta-wrap{display:flex;flex-direction:column;gap:10px;padding-top:4px;}
 
-/* v2.9.220: Brand color CTA (red #E80001) — consistente con cart y product page */
-.pv-scope.pv-checkout .pv-btn--brand{
-    background:#E80001;color:#fff;border:1px solid #E80001;
-}
-.pv-scope.pv-checkout .pv-btn--brand:hover{
-    background:#B80001;border-color:#B80001;
-    transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28);
-}
-.pv-scope.pv-checkout .pv-btn--brand:active{
-    transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20);
-}
+/* UX-AUDIT-FE-P0-03 FIX: .pv-btn--brand ahora vive en el design system global
+ * (ltms-plaza-viva.css §3 COMPONENTS · BUTTONS) usando --brand token. Antes
+ * estaba duplicado aquí con #E80001 hardcodeado. Eliminada la definición
+ * scoped — el selector global .pv-btn--brand ya aplica dentro de .pv-scope
+ * por el reset de PV. */
 
 .pv-scope.pv-checkout .pv-checkout__submit{
     height:60px;font-size:17px;font-weight:800;letter-spacing:.01em;

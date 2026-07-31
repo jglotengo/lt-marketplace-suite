@@ -12,6 +12,7 @@
   --gold:#D4A857; --gold-50:#FBF4E5; --gold-100:#F4E5C5;
   --danger:#E5484D; --danger-50:#FDECEC;
   --warn:#F5A623;
+  --brand:#E80001; --brand-600:#C70001; --brand-50:#FEEFF0; --brand-100:#FCD9DA;
   --surface:#FFFFFF; --bg:#F6F5F8; --bg-2:#EFEDF2;
   --text:#0F1111; --text-2:#565C66; --text-3:#8A909A;
   --border:#E7E5EC; --border-2:#D8D5DE;
@@ -124,6 +125,9 @@
 .pv-btn--gold:hover{background:#c29648;}
 .pv-btn--danger{background:var(--danger);color:#fff;}
 .pv-btn--danger:hover{background:#cf3a3f;}
+.pv-btn--brand{background:var(--brand);color:#fff;}
+.pv-btn--brand:hover{background:var(--brand-600);transform:translateY(-1px);box-shadow:var(--sh-2);}
+.pv-btn--brand:active{transform:translateY(0);box-shadow:var(--sh-1);}
 .pv-btn--sm{--pv-btn-h:38px;padding:0 14px;font-size:13px;border-radius:var(--r-sm);}
 .pv-btn--lg{--pv-btn-h:56px;padding:0 28px;font-size:16px;}
 .pv-btn--block{display:flex;width:100%;}
@@ -154,6 +158,93 @@
 .pv-card__title{font-family:var(--display);font-weight:700;font-size:17px;}
 .pv-card__body{font-size:14.5px;color:var(--text-2);}
 .pv-card__foot{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;}
+
+/* ── 3.1.1 INFO CARDS ──────────────────────────────────────────────────────────
+   UX-AUDIT-FE-P0-01 FIX: tarjetas de info contextuales reusables.
+   Reemplazan 4 bloques style="..." inline en single-product.php
+   (líneas 392/405/423/624) que usaban colores Tailwind (#f3f4f6,
+   #f0fdf4, #fff7ed, #f9fafb) sin mapear a tokens PV. Variantes:
+   --neutral (gris), --success (verde), --warning (naranja), --info (azul).
+   ─────────────────────────────────────────────────────────────────────────── */
+.pv-info-card{
+  display:flex;flex-direction:column;gap:8px;
+  padding:12px 14px;border-radius:var(--r-md);
+  border:1px solid var(--border);background:var(--bg);
+  font-size:13.5px;line-height:1.5;color:var(--text-2);
+  margin-bottom:12px;
+}
+.pv-info-card__title{
+  font-family:var(--display);font-weight:700;font-size:14px;color:var(--text);
+  display:flex;align-items:center;gap:6px;margin:0;
+}
+.pv-info-card__body{margin:0;font-size:13px;color:var(--text-2);}
+.pv-info-card__list{margin:0;padding-left:18px;font-size:13px;color:var(--text-3);}
+.pv-info-card__list li{margin-bottom:2px;}
+.pv-info-card__list li strong{color:var(--text-2);}
+.pv-info-card--neutral{background:var(--bg);border-color:var(--border);}
+.pv-info-card--success{background:var(--accent-50);border-color:var(--accent-100);}
+.pv-info-card--success .pv-info-card__title,
+.pv-info-card--success .pv-info-card__body{color:#0a7a58;}
+.pv-info-card--warning{background:var(--gold-50);border-color:var(--gold-100);}
+.pv-info-card--warning .pv-info-card__title,
+.pv-info-card--warning .pv-info-card__body{color:#8a6d20;}
+.pv-info-card--info{background:var(--primary-50);border-color:var(--primary-100);}
+.pv-info-card--info .pv-info-card__title,
+.pv-info-card--info .pv-info-card__body{color:var(--primary-700);}
+.pv-info-card--inline{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;
+  border-radius:var(--r-pill);font-size:12.5px;font-weight:600;margin-bottom:12px;
+}
+.pv-info-card--inline .pv-info-card__title{font-size:12.5px;font-weight:600;}
+
+/* ── 3.1.2 LEGAL BLOCK + CHECKBOX ─────────────────────────────────────────────
+   UX-AUDIT-FE-P0-02 FIX: bloque de términos/privacidad + checkbox reusables.
+   Reemplazan 8 style="..." inline en checkout.php (líneas 477-500) que
+   usaban #f9fafb, #e5e7eb, #374151, #E80001 hardcodeados. La variante
+   --brand del checkbox usa el nuevo token --brand (#E80001) para el
+   accent-color — consistencia con el CTA de checkout.
+   ─────────────────────────────────────────────────────────────────────────── */
+.pv-legal-block{
+  padding:16px;background:var(--bg);border:1.5px solid var(--border);
+  border-radius:var(--r-md);margin-top:12px;
+}
+.pv-checkbox{
+  display:flex;align-items:flex-start;gap:8px;cursor:pointer;
+  margin-bottom:10px;
+}
+.pv-checkbox:last-child{margin-bottom:0;}
+.pv-checkbox input[type="checkbox"]{
+  width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;
+  margin-top:2px;cursor:pointer;
+}
+.pv-checkbox input[type="checkbox"]:focus-visible{
+  outline:2px solid var(--brand);outline-offset:2px;border-radius:3px;
+}
+.pv-checkbox__label{font-size:14px;color:var(--text-2);line-height:1.5;}
+.pv-checkbox__label a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;}
+.pv-checkbox__label a:hover{color:var(--brand-600);}
+
+/* ── 3.1.3 EMPTY STATE MESSAGE ────────────────────────────────────────────────
+   UX-AUDIT-FE-P0-02 FIX: mensaje de "no hay envío calculado aún" reusables.
+   Reemplaza 2 style="..." inline en checkout.php (líneas 326-327 y 386-387)
+   con #1A1F2E y #565C66 hardcodeados (variantes ad-hoc de --text y --text-2).
+   ─────────────────────────────────────────────────────────────────────────── */
+.pv-empty-state__title{margin:0 0 6px;font-weight:600;color:var(--text);font-size:14px;}
+.pv-empty-state__sub{margin:0;color:var(--text-2);font-size:13px;line-height:1.45;}
+
+/* ── 3.1.4 FALLBACK STATE ─────────────────────────────────────────────────────
+   UX-AUDIT-FE-P0-04 FIX: bloque de fallback reusable para páginas públicas
+   sin dependencias WC o vendor inexistente. Reemplaza 6 ocurrencias de
+   style="padding:60px 22px;text-align:center" inline en 5 plantillas (cart,
+   checkout, home, order-tracking, vendor-store) + estilos extra en el caso
+   "Vendedor no encontrado" (vendor-store 49-52). Centraliza el espaciado y
+   alineación en .pv-fallback__section, títulos/sub-acciones con subclases.
+   ─────────────────────────────────────────────────────────────────────────── */
+.pv-fallback__section{padding:60px 22px;text-align:center;display:flex;flex-direction:column;
+  align-items:center;gap:14px;}
+.pv-fallback__title{margin:0;font-size:24px;font-family:var(--display);font-weight:700;color:var(--text);}
+.pv-fallback__sub{margin:0;color:var(--text-2);font-size:15px;line-height:1.5;max-width:480px;}
+.pv-fallback__msg{margin:0;color:var(--text-2);font-size:15px;line-height:1.5;}
+.pv-fallback__action{margin-top:4px;}
 
 /* ── 3.2 INPUTS ────────────────────────────────────────────────────────────── */
 .pv-input,.pv-select,.pv-textarea{

@@ -36,7 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Garantizar que WooCommerce está cargado.
 if ( ! function_exists( 'WC' ) || ! WC()->cart || ! WC()->checkout ) {
     get_header( 'shop' );
-    echo '<div class="pv-scope pv-checkout"><main class="pv-section" style="padding:60px 22px;text-align:center"><p>' . esc_html__( 'WooCommerce no está activo o el checkout no está disponible.', 'ltms' ) . '</p></main></div>';
+    echo '<div class="pv-scope pv-checkout"><main class="pv-section pv-fallback__section"><p class="pv-fallback__msg">' . esc_html__( 'WooCommerce no está activo o el checkout no está disponible.', 'ltms' ) . '</p></main></div>';
     get_footer( 'shop' );
     return;
 }
@@ -323,8 +323,8 @@ get_header( 'shop' );
                                     <div class="pv-checkout__no-shipping">
                                         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
                                         <div>
-                                            <p style="margin:0 0 6px;font-weight:600;color:#1A1F2E;font-size:14px;"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
-                                            <p style="margin:0;color:#565C66;font-size:13px;line-height:1.45;"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
+                                            <p class="pv-empty-state__title"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
+                                            <p class="pv-empty-state__sub"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
                                         </div>
                                     </div>
                                     <?php
@@ -383,8 +383,8 @@ get_header( 'shop' );
                                         <div class="pv-checkout__no-shipping">
                                             <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
                                             <div>
-                                                <p style="margin:0 0 6px;font-weight:600;color:#1A1F2E;font-size:14px;"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
-                                                <p style="margin:0;color:#565C66;font-size:13px;line-height:1.45;"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
+                                                <p class="pv-empty-state__title"><?php esc_html_e( 'Aún no calculamos el envío', 'ltms' ); ?></p>
+                                                <p class="pv-empty-state__sub"><?php esc_html_e( 'Completa tu dirección de envío arriba (departamento, municipio, dirección) y las opciones de envío aparecerán automáticamente aquí.', 'ltms' ); ?></p>
                                             </div>
                                         </div>
                                         <?php
@@ -473,14 +473,13 @@ get_header( 'shop' );
                                     </ul>
                                 <?php endif; ?>
 
-                                <!-- v2.9.292: Términos + Privacidad agrupados en un bloque -->
-                                <div class="pv-checkout__legal-block" style="padding:16px;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:10px;margin-top:12px;">
+                                <div class="pv-legal-block">
                                 <?php
                                 if ( function_exists( 'wc_terms_and_conditions_checkbox_enabled' ) && wc_terms_and_conditions_checkbox_enabled() ) :
                                     ?>
-                                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:10px;">
-                                        <input type="checkbox" name="terms" id="terms" value="1" style="width:18px;height:18px;accent-color:#E80001;flex-shrink:0;margin-top:2px;cursor:pointer;" <?php checked( apply_filters( 'woocommerce_terms_is_checked_default', isset( $_POST['terms'] ) ), true ); ?> />
-                                        <span style="font-size:14px;color:#374151;line-height:1.5;">
+                                    <label class="pv-checkbox" for="terms">
+                                        <input type="checkbox" name="terms" id="terms" value="1" <?php checked( apply_filters( 'woocommerce_terms_is_checked_default', isset( $_POST['terms'] ) ), true ); ?> />
+                                        <span class="pv-checkbox__label">
                                             <?php
                                             printf(
                                                 wp_kses_post( __( 'He leído y acepto los <a href="%s" target="_blank">Términos y condiciones</a>.', 'ltms' ) ),
@@ -495,9 +494,9 @@ get_header( 'shop' );
                                 // v2.9.292: Privacy consent renderizado AQUÍ junto al terms.
                                 $privacy_url = get_privacy_policy_url() ?: get_permalink( get_option( 'ltms_privacy_page_id' ) ) ?: '#';
                                 ?>
-                                <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-                                    <input type="checkbox" name="ltms_privacy_consent" id="ltms-privacy-consent" value="1" required style="width:18px;height:18px;accent-color:#E80001;flex-shrink:0;margin-top:2px;cursor:pointer;" />
-                                    <span style="font-size:14px;color:#374151;line-height:1.5;">
+                                <label class="pv-checkbox" for="ltms-privacy-consent">
+                                    <input type="checkbox" name="ltms_privacy_consent" id="ltms-privacy-consent" value="1" required />
+                                    <span class="pv-checkbox__label">
                                         <?php
                                         printf(
                                             wp_kses_post( __( 'He leído y acepto la <a href="%s" target="_blank">Política de Tratamiento de Datos Personales</a>. *', 'ltms' ) ),

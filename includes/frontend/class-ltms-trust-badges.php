@@ -39,7 +39,7 @@ class LTMS_Trust_Badges {
 
         if ( empty( $badges ) ) return;
         ?>
-        <div class="ltms-trust-badges" style="margin:16px 0;display:flex;flex-wrap:wrap;gap:8px;">
+        <div class="ltms-trust-badges">
             <?php foreach ( $badges as $badge ) : ?>
                 <div class="ltms-trust-badge ltms-trust-badge--<?php echo esc_attr( $badge['type'] ); ?>"
                      title="<?php echo esc_attr( $badge['tooltip'] ); ?>">
@@ -63,20 +63,20 @@ class LTMS_Trust_Badges {
         $kyc_approved = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) === 'approved';
         $sales_count = self::get_vendor_sales_count( $vendor_id );
         ?>
-        <div class="ltms-mini-badges" style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#6b7280;">
+        <div class="ltms-mini-badges">
             <?php if ( $is_protected ) : ?>
-                <span class="ltms-mini-badge" title="<?php esc_attr_e( 'Compra protegida por Lo Tengo — Ley 1480 / PROFECO', 'ltms' ); ?>">
-                    <span style="color:#16a34a;">&#x1F6E1;</span> <?php esc_html_e( 'Compra protegida', 'ltms' ); ?>
+                <span class="ltms-mini-badge ltms-mini-badge--accent" title="<?php esc_attr_e( 'Compra protegida por Lo Tengo — Ley 1480 / PROFECO', 'ltms' ); ?>">
+                    <span class="ltms-mini-badge__dot">&#x1F6E1;</span> <?php esc_html_e( 'Compra protegida', 'ltms' ); ?>
                 </span>
             <?php endif; ?>
             <?php if ( $kyc_approved ) : ?>
-                <span class="ltms-mini-badge" title="<?php esc_attr_e( 'Vendedor verificado (KYC aprobado)', 'ltms' ); ?>">
-                    <span style="color:#2563eb;">&#x2705;</span> <?php esc_html_e( 'Vendedor verificado', 'ltms' ); ?>
+                <span class="ltms-mini-badge ltms-mini-badge--primary" title="<?php esc_attr_e( 'Vendedor verificado (KYC aprobado)', 'ltms' ); ?>">
+                    <span class="ltms-mini-badge__dot">&#x2705;</span> <?php esc_html_e( 'Vendedor verificado', 'ltms' ); ?>
                 </span>
             <?php endif; ?>
             <?php if ( $sales_count > 0 ) : ?>
                 <span class="ltms-mini-badge" title="<?php esc_attr_e( 'Ventas realizadas por este vendedor', 'ltms' ); ?>">
-                    <span>&#x1F4C8;</span> <?php echo esc_html( sprintf( _n( '%d venta', '%d ventas', $sales_count, 'ltms' ), $sales_count ) ); ?>
+                    <span class="ltms-mini-badge__dot">&#x1F4C8;</span> <?php echo esc_html( sprintf( _n( '%d venta', '%d ventas', $sales_count, 'ltms' ), $sales_count ) ); ?>
                 </span>
             <?php endif; ?>
         </div>
@@ -94,7 +94,7 @@ class LTMS_Trust_Badges {
         $kyc_approved = get_user_meta( $vendor_id, 'ltms_kyc_status', true ) === 'approved';
         if ( ! $kyc_approved ) return;
         ?>
-        <div class="ltms-loop-vendor-badge" style="font-size:11px;color:#2563eb;margin:2px 0;">
+        <div class="ltms-loop-vendor-badge">
             &#x2705; <?php esc_html_e( 'Verificado', 'ltms' ); ?>
         </div>
         <?php
@@ -194,5 +194,36 @@ class LTMS_Trust_Badges {
 
         set_transient( $cache_key, $count, HOUR_IN_SECONDS );
         return $count;
+    }
+
+    /**
+     * Determina si un vendor es Star Seller.
+     *
+     * UX-AUDIT-FE-P0-05 FIX: criterio unificado y canónico. Antes había 2
+     * criterios divergentes en runtime:
+     *   - home.php + vendor-store.php:KYC approved + meta 'ltms_star_seller'='1'
+     *   - single-product.php:KYC approved + sales_count >= 50 (umbral onboarding
+     *     usado como criterio runtime — incorrecto: un vendor con flag activo
+     *     y 49 ventas se veía Star en home pero no en su propia ficha).
+     * El criterio canónico es el flag explícito `ltms_star_seller=1` asignado
+     * por el admin (vía KYC review + upgrade). El umbral sales>=50 es criterio
+     * de *upgrade* automático, no de display runtime.
+     *
+     * @param int $vendor_id ID del usuario vendor.
+     * @return bool True si es Star Seller, false en caso contrario.
+     */
+    public static function is_star_seller( int $vendor_id ): bool {
+        if ( $vendor_id <= 0 ) return false;
+
+        $cache_key = 'ltms_star_seller_' . $vendor_id;
+        $cached = get_transient( $cache_key );
+        if ( false !== $cached ) return (bool) $cached;
+
+        $kyc_status = get_user_meta( $vendor_id, 'ltms_kyc_status', true );
+        $star_flag = get_user_meta( $vendor_id, 'ltms_star_seller', true );
+        $is_star = ( $kyc_status === 'approved' ) && ( $star_flag === '1' || $star_flag === 1 || $star_flag === true );
+
+        set_transient( $cache_key, $is_star, HOUR_IN_SECONDS );
+        return $is_star;
     }
 }

@@ -46,10 +46,10 @@ $pv_vendor = $pv_vendor_id > 0 ? get_userdata( $pv_vendor_id ) : false;
 
 if ( ! $pv_vendor ) {
     get_header();
-    echo '<div class="pv-scope pv-vendor-store"><main class="pv-section" style="padding:60px 22px;text-align:center">';
-    echo '<h1 style="margin-bottom:10px">' . esc_html__( 'Vendedor no encontrado', 'ltms' ) . '</h1>';
-    echo '<p style="color:var(--text-2)">' . esc_html__( 'La tienda que buscas no existe o fue desactivada.', 'ltms' ) . '</p>';
-    echo '<p style="margin-top:18px"><a class="pv-btn" href="' . esc_url( home_url( '/' ) ) . '">' . esc_html__( 'Volver al inicio', 'ltms' ) . '</a></p>';
+    echo '<div class="pv-scope pv-vendor-store"><main class="pv-section pv-fallback__section">';
+    echo '<h1 class="pv-fallback__title">' . esc_html__( 'Vendedor no encontrado', 'ltms' ) . '</h1>';
+    echo '<p class="pv-fallback__sub">' . esc_html__( 'La tienda que buscas no existe o fue desactivada.', 'ltms' ) . '</p>';
+    echo '<p class="pv-fallback__action"><a class="pv-btn" href="' . esc_url( home_url( '/' ) ) . '">' . esc_html__( 'Volver al inicio', 'ltms' ) . '</a></p>';
     echo '</main></div>';
     get_footer();
     return;
@@ -60,8 +60,8 @@ if ( ! $pv_vendor ) {
  * ------------------------------------------------------------------------- */
 if ( ! function_exists( 'wc_get_products' ) || ! function_exists( 'wc_get_product' ) ) {
     get_header();
-    echo '<div class="pv-scope pv-vendor-store"><main class="pv-section" style="padding:60px 22px;text-align:center">';
-    echo '<p>' . esc_html__( 'WooCommerce no está activo. La tienda del vendedor requiere WooCommerce.', 'ltms' ) . '</p>';
+    echo '<div class="pv-scope pv-vendor-store"><main class="pv-section pv-fallback__section">';
+    echo '<p class="pv-fallback__msg">' . esc_html__( 'WooCommerce no está activo. La tienda del vendedor requiere WooCommerce.', 'ltms' ) . '</p>';
     echo '</main></div>';
     get_footer();
     return;
@@ -81,7 +81,9 @@ if ( '' === $pv_store_description ) {
     $pv_store_description = (string) get_user_meta( $pv_vendor_id, 'ltms_store_description', true );
 }
 $pv_kyc_status        = (string) get_user_meta( $pv_vendor_id, 'ltms_kyc_status', true );
-$pv_is_star_seller    = ( $pv_kyc_status === 'approved' ) && ( get_user_meta( $pv_vendor_id, 'ltms_star_seller', true ) === '1' );
+$pv_is_star_seller    = ( class_exists( 'LTMS_Trust_Badges' ) && method_exists( 'LTMS_Trust_Badges', 'is_star_seller' ) )
+    ? LTMS_Trust_Badges::is_star_seller( $pv_vendor_id )
+    : ( ( $pv_kyc_status === 'approved' ) && ( get_user_meta( $pv_vendor_id, 'ltms_star_seller', true ) === '1' ) );
 $pv_policies          = (string) get_user_meta( $pv_vendor_id, 'ltms_store_policies', true );
 
 // Avatar: si hay logo, usarlo; si no, generar avatar con iniciales.

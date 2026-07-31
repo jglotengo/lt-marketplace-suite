@@ -80,8 +80,13 @@ if ( class_exists( 'LTMS_Trust_Badges' ) && method_exists( 'LTMS_Trust_Badges', 
     $vendor_sales = (int) LTMS_Trust_Badges::get_vendor_sales_count( $vendor_id );
 }
 
-// Star Seller: KYC aprobado + al menos 50 ventas completadas.
-$star_seller = ( $kyc_approved && $vendor_sales >= 50 );
+// Star Seller: criterio canónico via LTMS_Trust_Badges::is_star_seller().
+// UX-AUDIT-FE-P0-05 FIX: antes recalculaba con umbral sales>=50 (onboarding
+// criteria) — divergía de home.php y vendor-store.php que usan el flag
+// explícito ltms_star_seller=1. Unificado en el helper estático.
+$star_seller = ( class_exists( 'LTMS_Trust_Badges' ) && method_exists( 'LTMS_Trust_Badges', 'is_star_seller' ) )
+    ? LTMS_Trust_Badges::is_star_seller( $vendor_id )
+    : ( $kyc_approved && $vendor_sales >= 50 );
 
 // Rating del vendor (meta opcional, fallback al rating del producto).
 $vendor_rating = 0.0;
@@ -389,9 +394,8 @@ do_action( 'woocommerce_before_main_content' );
                 if ( isset( $_type_labels[ $_ltms_type ] ) ) :
                     $_tl = $_type_labels[ $_ltms_type ];
                 ?>
-                <div class="pv-product-type-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f3f4f6;border-radius:20px;font-size:0.8rem;color:#374151;margin-bottom:12px;">
-                    <span><?php echo esc_html( $_tl['icon'] ); ?></span>
-                    <span><?php echo esc_html( $_tl['label'] ); ?></span>
+                <div class="pv-info-card pv-info-card--inline pv-info-card--neutral">
+                    <span class="pv-info-card__title"><?php echo esc_html( $_tl['icon'] ); ?> <?php echo esc_html( $_tl['label'] ); ?></span>
                 </div>
                 <?php endif; ?>
 
@@ -402,9 +406,9 @@ do_action( 'woocommerce_before_main_content' );
                     $_dl_limit = $product->get_download_limit();
                     $_dl_expiry = $product->get_download_expiry();
                 ?>
-                <div class="pv-digital-info" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:12px;">
-                    <p style="margin:0;font-size:0.85rem;color:#166534;">
-                        💾 <strong><?php esc_html_e( 'Descarga digital', 'ltms' ); ?></strong> —
+                <div class="pv-info-card pv-info-card--success">
+                    <p class="pv-info-card__title">💾 <?php esc_html_e( 'Descarga digital', 'ltms' ); ?></p>
+                    <p class="pv-info-card__body">
                         <?php echo esc_html( sprintf( _n( '%d archivo disponible', '%d archivos disponibles', count( $_downloads ), 'ltms' ), count( $_downloads ) ) ); ?>
                         <?php if ( $_dl_limit > 0 ) : ?> · <?php echo esc_html( sprintf( _n( 'máx. %d descarga', 'máx. %d descargas', $_dl_limit, 'ltms' ), $_dl_limit ) ); ?><?php endif; ?>
                         <?php if ( $_dl_expiry > 0 ) : ?> · <?php echo esc_html( sprintf( _n( 'expira en %d día', 'expira en %d días', $_dl_expiry, 'ltms' ), $_dl_expiry ) ); ?><?php endif; ?>
@@ -420,10 +424,8 @@ do_action( 'woocommerce_before_main_content' );
                         $_country = get_user_meta( $vendor_id, 'ltms_country', true ) ?: 'CO';
                         $_reg_label = $_country === 'MX' ? __( 'Aviso de funcionamiento COFEPRIS', 'ltms' ) : __( 'Registro sanitario INVIMA', 'ltms' );
                 ?>
-                <div class="pv-restaurant-info" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;margin-bottom:12px;">
-                    <p style="margin:0;font-size:0.85rem;color:#9a3412;">
-                        🍽️ <strong><?php echo esc_html( $_reg_label ); ?>:</strong> <?php echo esc_html( $_sanitary ); ?>
-                    </p>
+                <div class="pv-info-card pv-info-card--warning">
+                    <p class="pv-info-card__title">🍽️ <?php echo esc_html( $_reg_label ); ?>: <?php echo esc_html( $_sanitary ); ?></p>
                 </div>
                 <?php
                     endif;
@@ -621,17 +623,17 @@ do_action( 'woocommerce_before_main_content' );
                     $_shipping_class = $product->get_shipping_class();
                     if ( $_has_weight || $_has_dims || $_shipping_class ) :
                     ?>
-                    <div class="pv-shipping-info" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:16px;">
-                        <h4 style="margin:0 0 8px;font-size:0.9rem;color:#374151;">📦 Datos de envío</h4>
-                        <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#6b7280;">
+                    <div class="pv-info-card pv-info-card--neutral">
+                        <h4 class="pv-info-card__title">📦 <?php esc_html_e( 'Datos de envío', 'ltms' ); ?></h4>
+                        <ul class="pv-info-card__list">
                             <?php if ( $_has_weight ) : ?>
-                            <li><strong>Peso:</strong> <?php echo esc_html( wc_format_weight( $product->get_weight() ) ); ?></li>
+                            <li><strong><?php esc_html_e( 'Peso:', 'ltms' ); ?></strong> <?php echo esc_html( wc_format_weight( $product->get_weight() ) ); ?></li>
                             <?php endif; ?>
                             <?php if ( $_has_dims ) : ?>
-                            <li><strong>Dimensiones:</strong> <?php echo esc_html( wc_format_dimensions( $product->get_dimensions( false ) ) ); ?></li>
+                            <li><strong><?php esc_html_e( 'Dimensiones:', 'ltms' ); ?></strong> <?php echo esc_html( wc_format_dimensions( $product->get_dimensions( false ) ) ); ?></li>
                             <?php endif; ?>
                             <?php if ( $_shipping_class ) : ?>
-                            <li><strong>Clase de envío:</strong> <?php echo esc_html( $_shipping_class ); ?></li>
+                            <li><strong><?php esc_html_e( 'Clase de envío:', 'ltms' ); ?></strong> <?php echo esc_html( $_shipping_class ); ?></li>
                             <?php endif; ?>
                         </ul>
                     </div>
@@ -648,7 +650,13 @@ do_action( 'woocommerce_before_main_content' );
                         </p>
                     <?php endif; ?>
                     <p>
-                        <?php esc_html_e( 'Devoluciones aceptadas dentro del período de protección al consumidor (Ley 1480 / PROFECO).', 'ltms' ); ?>
+                        <?php
+                        $_country_ctx = LTMS_Core_Config::get_country();
+                        $_consumer_law = $_country_ctx === 'MX'
+                            ? __( 'Devoluciones aceptadas dentro del período de protección al consumidor (PROFECO).', 'ltms' )
+                            : __( 'Devoluciones aceptadas dentro del período de protección al consumidor (Ley 1480 de 2011).', 'ltms' );
+                        echo esc_html( $_consumer_law );
+                        ?>
                     </p>
                 <?php endif; ?>
             </div>

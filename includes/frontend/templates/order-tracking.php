@@ -41,7 +41,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Garantizar WooCommerce cargado.
 if ( ! function_exists( 'wc_get_order' ) ) {
     get_header();
-    echo '<div class="pv-scope pv-tracking"><main class="pv-section" style="padding:60px 22px;text-align:center"><p>' . esc_html__( 'WooCommerce no está activo. El seguimiento requiere WooCommerce.', 'ltms' ) . '</p></main></div>';
+    echo '<div class="pv-scope pv-tracking"><main class="pv-section pv-fallback__section"><p class="pv-fallback__msg">' . esc_html__( 'WooCommerce no está activo. El seguimiento requiere WooCommerce.', 'ltms' ) . '</p></main></div>';
     get_footer();
     return;
 }

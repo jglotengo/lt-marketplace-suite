@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! function_exists( 'wc_get_product' ) || ! function_exists( 'wc_get_page_id' ) ) {
     // Sin WC no tiene sentido renderizar la home del marketplace.
     get_header();
-    echo '<div class="pv-scope pv-home"><main class="pv-section" style="padding:60px 22px;text-align:center"><p>' . esc_html__( 'WooCommerce no está activo. La homepage del marketplace requiere WooCommerce.', 'ltms' ) . '</p></main></div>';
+    echo '<div class="pv-scope pv-home"><main class="pv-section pv-fallback__section"><p class="pv-fallback__msg">' . esc_html__( 'WooCommerce no está activo. La homepage del marketplace requiere WooCommerce.', 'ltms' ) . '</p></main></div>';
     get_footer();
     return;
 }
@@ -156,6 +156,15 @@ if ( empty( $pv_trending_ids ) ) {
  * 4. Vendedores destacados — Star Sellers
  *    Query users con ltms_kyc_status=approved AND ltms_star_seller=1.
  *    4 vendedores, ordenados por fecha de registro (más recientes primero).
+ *
+ *    UX-AUDIT-FE-P0-05 FIX: este query coincide 1:1 con el criterio canónico
+ *    LTMS_Trust_Badges::is_star_seller(). Antes single-product.php divergía
+ *    usando umbral sales>=50 — ya corregido. Si en algún momento el criterio
+ *    canónico cambia en el helper, debe cambiarse también este query para
+ *    mantener paridad (mejor: hacer que single-product + vendor-store llamen
+ *    al helper en runtime, como ahora; este query queda como filtrado
+ *    server-side para evitar N llamadas individuales en una vitrina con 4
+ *    vendors). Ver docblock de is_star_seller().
  * ------------------------------------------------------------------------- */
 $pv_star_vendors = get_users( array(
     'meta_query' => array(
