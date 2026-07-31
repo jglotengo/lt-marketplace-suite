@@ -712,6 +712,12 @@ $files = [
     // v2.9.184 — CSS fix for button height
     'assets/css/ltms-product-enhancements.css',
     'assets/css/ltms-product-enhancements.min.css',
+    // AUDIT-PROD-QA-001 — panel vendedor: paridad Edit/New del modal producto
+    // + booking-calendar minNights=1. Antes no estaban en la whitelist → el fix
+    // no habría llegado al server via webhook.
+    'includes/frontend/views/view-products.php',
+    'assets/js/ltms-booking-calendar.js',
+    'assets/js/ltms-booking-calendar.min.js',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
