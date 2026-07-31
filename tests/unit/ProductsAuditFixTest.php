@@ -534,4 +534,154 @@ class ProductsAuditFixTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( "implode( ',',", $body,
 			'get_product debe unir los names de tags con implode para enviarlos como CSV (AUDIT-PROD-H7).' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// AUDIT-PROD-QA-001 — ciclo de auditoría del panel vendedor / bookings.
+	//
+	// P1-A: Modal Edit NO tenía peso/dimensiones (regresión vs modal New).
+	//      Editing un producto físico dejaba el peso congelado sin poder
+	//      corregirlo — Deprisa/aveonline usaban datos stale.
+	// P2-A: Modal Edit mostraba el input Stock sin importar el tipo (service
+	//      y booking no usan stock). Inconsistencia vs modal New.
+	// P1-B: booking-calendar.js validaba minNights solo si `data.minNights > 1`
+	//      → cuando el vendor definía minNights=1 el cliente podía seleccionar
+	//      0 noches (checkin=checkout) y el precio mostraba COP 0.
+	//
+	// Tests estructurales sobre el código fuente (mismo patrón que el resto del
+	// archivo): validates presencia de campos/messages sin necesidad de WC
+	// mocks. Runtime behaviour se valida via E2E (TODO: escribir spec cypress
+	// de edición de producto físico + booking con minNights=1).
+	//
+	// @group audit-prod-qa1
+	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * P1-A: view-products.php debe definir el bloque `ltms-ep-physical-fields`
+	 * en el modal Edit, con los campos Peso/Largo/Ancho/Alto y Clase de envío.
+	 * Antes este bloque no existía en Edit, así que el JS nunca togglearlo.
+	 */
+	public function test_qa1a_edit_modal_has_physical_fields_block(): void {
+		$view_path = dirname( __DIR__, 2 ) . '/includes/frontend/views/view-products.php';
+		$this->assertFileExists( $view_path );
+		$src = file_get_contents( $view_path );
+
+		$this->assertStringContainsString( 'id="ltms-ep-physical-fields"', $src,
+			'Modal Edit debe definir el bloque #ltms-ep-physical-fields (AUDIT-PROD-QA-001 P1-A).' );
+		$this->assertStringContainsString( 'id="ltms-ep-weight"', $src,
+			'Modal Edit debe tener input #ltms-ep-weight dentro del bloque physical-fields.' );
+		$this->assertStringContainsString( 'id="ltms-ep-length"', $src,
+			'Modal Edit debe tener input #ltms-ep-length dentro del bloque physical-fields.' );
+		$this->assertStringContainsString( 'id="ltms-ep-width"', $src,
+			'Modal Edit debe tener input #ltms-ep-width dentro del bloque physical-fields.' );
+		$this->assertStringContainsString( 'id="ltms-ep-height"', $src,
+			'Modal Edit debe tener input #ltms-ep-height dentro del bloque physical-fields.' );
+	}
+
+	/**
+	 * P2-A: updateEditProductTypeFields() en ltms-products.js debe togglear
+	 * el bloque physical + el input stock según el tipo seleccionado (mismo
+	 * comportamiento que updateProductTypeFields del modal New).
+	 */
+	public function test_qa1b_js_update_edit_product_type_fields_toggles_physical_and_stock(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-products.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// La función debe ocultar/mostrar el bloque physical según el tipo.
+		$this->assertStringContainsString( "$('#ltms-ep-physical-fields').toggle(showPhysical)", $js,
+			'updateEditProductTypeFields debe togglear #ltms-ep-physical-fields (AUDIT-PROD-QA-001 P2-A).' );
+
+		// showPhysical debe ser true solo para physical/restaurant (no service/booking/digital/variable).
+		$this->assertStringContainsString( "var showPhysical = (tipo === 'physical' || tipo === 'restaurant')", $js,
+			'updateEditProductTypeFields debe definir showPhysical solo para physical/restaurant.' );
+
+		// El stock debe togglearse también (paridad con modal New).
+		$this->assertStringContainsString( "$('#ltms-ep-stock').closest('div').toggle(showStock)", $js,
+			'updateEditProductTypeFields debe togglear #ltms-ep-stock según el tipo (no mostrarlo siempre).' );
+	}
+
+	/**
+	 * P1-A: el handler de Edit en ltms-products.js debe poblar los inputs
+	 * weight/length/width/height desde la respuesta de get_product().
+	 */
+	public function test_qa1c_js_edit_handler_populates_weight_and_dimensions(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-products.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// Cada dimension debe ser poblada con un guard explícito para null/undefined/''.
+		$this->assertStringContainsString( "$('#ltms-ep-weight').val(d.weight)", $js,
+			'El handler Edit debe poblar #ltms-ep-weight desde d.weight.' );
+		$this->assertStringContainsString( "$('#ltms-ep-length').val(d.length)", $js,
+			'El handler Edit debe poblar #ltms-ep-length desde d.length.' );
+		$this->assertStringContainsString( "$('#ltms-ep-width').val(d.width)", $js,
+			'El handler Edit debe poblar #ltms-ep-width desde d.width.' );
+		$this->assertStringContainsString( "$('#ltms-ep-height').val(d.height)", $js,
+			'El handler Edit debe poblar #ltms-ep-height desde d.height.' );
+	}
+
+	/**
+	 * P1-A: el submit de Edit en ltms-products.js debe enviar weight/dim_*
+	 * al backend (paridad con el submit de New).
+	 */
+	public function test_qa1d_js_edit_submit_sends_weight_and_dimensions(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-products.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		$this->assertStringContainsString( "weight:           $('#ltms-ep-weight').val()", $js,
+			'El submit de Edit debe enviar weight al backend (AUDIT-PROD-QA-001 P1-A).' );
+		$this->assertStringContainsString( "dim_length:       $('#ltms-ep-length').val()", $js,
+			'El submit de Edit debe enviar dim_length al backend.' );
+		$this->assertStringContainsString( "dim_width:        $('#ltms-ep-width').val()", $js,
+			'El submit de Edit debe enviar dim_width al backend.' );
+		$this->assertStringContainsString( "dim_height:       $('#ltms-ep-height').val()", $js,
+			'El submit de Edit debe enviar dim_height al backend.' );
+	}
+
+	/**
+	 * P1-A regression-assert: get_product() en el backend ya devolvía
+	 * weight/length/width/height. El fix del JS lo hace visible, pero
+	 * garantizamos que el backend no pierde esas keys en una refactor futura.
+	 */
+	public function test_qa1e_get_product_returns_weight_and_dimensions(): void {
+		$this->load_products_ajax_class();
+		if ( ! class_exists( 'LTMS_Products_Ajax' ) ) {
+			$this->markTestSkipped( 'LTMS_Products_Ajax no disponible.' );
+		}
+
+		$reflection = new ReflectionClass( 'LTMS_Products_Ajax' );
+		$method     = $reflection->getMethod( 'get_product' );
+		$source     = $method->getFileName();
+		$start_line = $method->getStartLine();
+		$end_line   = $method->getEndLine();
+
+		$lines = file( $source );
+		$body  = implode( '', array_slice( $lines, $start_line - 1, $end_line - $start_line + 1 ) );
+
+		foreach ( [ "'weight'", "'length'", "'width'", "'height'" ] as $key ) {
+			$this->assertStringContainsString( $key, $body,
+				"get_product debe devolver la clave {$key} en su respuesta (AUDIT-PROD-QA-001 P1-A paridad backend)." );
+		}
+	}
+
+	/**
+	 * P1-B: ltms-booking-calendar.js debe validar minNights cuando
+	 * `data.minNights > 0` (no `> 1`). Antes el check era `> 1`, así que
+	 * minNights=1 se saltaba la validación → el cliente podía seleccionar
+	 * checkin=checkout (0 noches) sin error en el calendario.
+	 */
+	public function test_qa1f_booking_calendar_validates_minNights_for_min_equal_one(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-booking-calendar.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// El guard debe ser `data.minNights > 0` (incluye min=1).
+		$this->assertStringContainsString( 'if (data.minNights > 0)', $js,
+			'booking-calendar.js debe validar minNights cuando data.minNights > 0 (AUDIT-PROD-QA-001 P1-B).' );
+
+		// Y NO debe quedar la versión antigua `data.minNights > 1`.
+		$this->assertStringNotContainsString( 'if (data.minNights > 1)', $js,
+			'booking-calendar.js no debe conservar la validación antigua data.minNights > 1 (P1-B fix).' );
+	}
 }

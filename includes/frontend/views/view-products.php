@@ -477,8 +477,8 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
             <textarea id="ltms-ep-short-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;resize:vertical;" placeholder="<?php esc_attr_e( 'Resumen breve que aparece junto al precio (máx 200 caracteres)...', 'ltms' ); ?>"></textarea>
         </div>
 
-        <!-- SKU + Etiquetas + Shipping class (3 cols) -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+        <!-- SKU + Etiquetas (2 cols) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
             <div>
                 <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'SKU', 'ltms' ); ?></label>
                 <input type="text" id="ltms-ep-sku" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( 'Opcional', 'ltms' ); ?>">
@@ -487,8 +487,32 @@ wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ '
                 <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Etiquetas', 'ltms' ); ?></label>
                 <input type="text" id="ltms-ep-tags" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="<?php esc_attr_e( 'rojo, algodón, verano', 'ltms' ); ?>">
             </div>
+        </div>
+
+        <?php // AUDIT-PROD-QA-001 P1-A + P2-A: bloque physical-fields en modal Edit. ?>
+        <?php // Antes el modal Edit NO tenía Peso/Largo/Ancho/Alto/Clase de envío. ?>
+        <?php // Editar un producto físico dejaba el peso congelado sin poder corregir. ?>
+        <div id="ltms-ep-physical-fields" style="margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Peso (kg)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-weight" min="0" step="0.01" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Largo (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-length" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Ancho (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-width" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Alto (cm)', 'ltms' ); ?></label>
+                    <input type="number" id="ltms-ep-height" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;" placeholder="0">
+                </div>
+            </div>
             <div>
-                <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Clase de envío', 'ltms' ); ?></label>
+                <label style="display:block;font-size:0.8rem;font-weight:500;margin-bottom:4px;"><?php esc_html_e( 'Clase de envío', 'ltms' ); ?></label>
                 <select id="ltms-ep-shipping-class" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-size:0.85rem;">
                     <option value=""><?php esc_html_e( 'Sin clase', 'ltms' ); ?></option>
                     <?php

@@ -282,6 +282,13 @@
                 $('#ltms-ep-short-desc').val(d.short_description || '');
                 $('#ltms-ep-sku').val(d.sku || '');
                 if (d.shipping_class_id) { $('#ltms-ep-shipping-class').val(d.shipping_class_id); }
+                // AUDIT-PROD-QA-001 P1-A: poblar peso y dimensiones en modal Edit.
+                // get_product() ya devolvía weight/length/width/height pero el JS
+                // no los leía porque el modal Edit no tenía los campos. Ahora sí.
+                if (d.weight !== null && d.weight !== undefined && d.weight !== '') { $('#ltms-ep-weight').val(d.weight); } else { $('#ltms-ep-weight').val(''); }
+                if (d.length !== null && d.length !== undefined && d.length !== '') { $('#ltms-ep-length').val(d.length); } else { $('#ltms-ep-length').val(''); }
+                if (d.width  !== null && d.width  !== undefined && d.width  !== '') { $('#ltms-ep-width').val(d.width); } else { $('#ltms-ep-width').val(''); }
+                if (d.height !== null && d.height !== undefined && d.height !== '') { $('#ltms-ep-height').val(d.height); } else { $('#ltms-ep-height').val(''); }
                 // AUDIT-PROD-H7 (re-auditoría): poblar tags como CSV desde get_product().
                 // ANTES este input quedaba vacío siempre → update_product recibía `tags: ''`
                 // → wp_set_post_terms reemplazaba todos los tags existentes por []. Bug silencioso
@@ -378,6 +385,13 @@
                 sku:$('#ltms-ep-sku').val(),
                 tags:$('#ltms-ep-tags').val(),
                 shipping_class_id:$('#ltms-ep-shipping-class').val(),
+                // AUDIT-PROD-QA-001 P1-A: enviar peso/dims al backend (paridad con create_product).
+                // Antes el modal Edit no los enviaba → el peso del producto quedaba
+                // congelado sin poder corregirlo desde el panel del vendedor.
+                weight:           $('#ltms-ep-weight').val(),
+                dim_length:       $('#ltms-ep-length').val(),
+                dim_width:        $('#ltms-ep-width').val(),
+                dim_height:       $('#ltms-ep-height').val(),
                 category_id:$('#ltms-ep-category').val(),
                 status:$('#ltms-ep-status').val(),
                 image_id:$('#ltms-ep-image-id').val(),
@@ -512,12 +526,19 @@
 
     // AUDIT-PROD-044: campos condicionales para modal Edit (mismo patrón que New).
     // AUDIT-PROD-H1 (re-auditoría): también mostrar/ocultar el bloque digital.
+    // AUDIT-PROD-QA-001 P1-A + P2-A: paridad completa con updateProductTypeFields
+    //   del modal New — toggle de bloque physical, stock condicional por tipo.
+    //   Antes el Edit siempre mostraba el input stock sin importar el tipo y
+    //   nunca exponía peso/dims aunque existieran los campos.
     function updateEditProductTypeFields() {
         var tipo = $('input[name="ltms_ep_tipo"]:checked').val() || 'physical';
         var showPhysical = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-ep-physical-fields').toggle(showPhysical);
         $('#ltms-ep-digital-fields').toggle(tipo === 'digital');
         $('#ltms-ep-booking-fields').toggle(tipo === 'booking');
         $('#ltms-ep-variable-fields').toggle(tipo === 'variable');
+        var showStock = (tipo === 'physical' || tipo === 'restaurant');
+        $('#ltms-ep-stock').closest('div').toggle(showStock);
     }
 
     $(function() {

@@ -115,7 +115,12 @@
             var co = formatDate(selectedDates[1]);
 
             // Validate min nights.
-            if (data.minNights > 1) {
+            // AUDIT-PROD-QA-001 P1-B: validar siempre que minNights > 0 (no solo > 1).
+            // Antes el check `data.minNights > 1` saltaba la validación cuando el
+            // vendor definía minNights=1 → el cliente podía seleccionar check-in=
+            // checkout (0 noches) y el precio mostraba COP 0 sin error claro; el
+            // error real llegaba solo en checkout via `is_available()`.
+            if (data.minNights > 0) {
                 var nights = Math.round((selectedDates[1] - selectedDates[0]) / 86400000);
                 if (nights < data.minNights) {
                     showError(data.i18n.minNightsError);
