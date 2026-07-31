@@ -481,7 +481,7 @@ do_action( 'woocommerce_before_main_content' );
          */
         if ( $has_bundle ) :
         ?>
-            <section class="pv-bundle" id="pv-bundle" aria-labelledby="pv-bundle-title">
+            <section class="pv-bundle" id="pv-bundle" aria-labelledby="pv-bundle-title" data-pv-bundle-discount="<?php echo esc_attr( (int) $bundle_discount ); ?>">
                 <header class="pv-bundle__head">
                     <h2 id="pv-bundle-title" class="pv-bundle__title"><?php esc_html_e( 'Cómpralo junto y ahorra', 'ltms' ); ?></h2>
                     <p class="pv-bundle__sub">
@@ -872,182 +872,47 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 
 <?php
 /* ============================================================================
- * JS de página: sticky-nav active link, bundle recálculo y bundle add-to-cart.
- * Se emite al final del body (tras footer) para no bloquear el render.
- * Usa el objeto global `PV` del design system si está disponible.
+ * AUDIT-FE-SP-001 + AUDIT-FE-SP-002 FIX (Fase 1.10): el bloque <script>
+ * inline de esta plantilla (sticky-nav active link + bundle recálculo +
+ * bundle ATC) fue ELIMINADO y MIGRADO al design system global
+ * ltms-plaza-viva.js, scope PRODUCT (`productScope()`, líneas ~1775+).
+ * Esto cierra la última excepción CSP significativa del design system
+ * Plaza Viva junto con home.php.
+ *
+ *   SP-001 (3 behaviours migrados a ltms-plaza-viva.js):
+ *     1. Sticky nav: resaltar enlace activo con IntersectionObserver + 
+ *        smooth scroll al click (sin navegar — preventDefault + 
+ *        scrollIntoView + history.replaceState).
+ *     2. Bundle recompute: recalcula total al toggle checkboxes. Aplica
+ *        descuento si hay >= 2 items seleccionados. Updatea totalEl color
+ *        (var(--accent)) y saveEl hidden según corresponda.
+ *     3. Bundle add-to-cart: ANTES reimplementaba `fetch` directo con
+ *        URLSearchParams + action + nonce a mano (leía nonce/action del
+ *        window.ltms_data). AHORA usa PV.ajax que ya envuelve el nonce 
+ *        global 'ltms_plaza_viva' (paridad con todos los add-to-cart del
+ *        design system — AUDIT-FE-PV-001 Fase 1.4 garantea que el handler
+ *        PHP valida contra ese nonce).
+ *
+ *   SP-002 (config de moneda fuera del inline): la variable 
+ *     `window.ltms_pv_currency` (Injectada via `<?php echo wp_json_encode(
+ *     $pv_currency); ?>` DENTRO del script-tag inline) era Rejectada por 
+ *     CSP 'unsafe-inline'. AHORA se expone via wp_localize_script(
+ *     'ltms-plaza-viva', 'ltms_data', ...) en class-ltms-native-templates.php 
+ *     como `ltms_data.pv_currency`, accesible en JS via `PV.config.pvCurrency`
+ *     (mismo patrón que AUDIT-FE-CKO-004 Fase 1.7 exponiendo country).
+ *
+ *   El descuento por bundle (`$bundle_discount`, % entero) que antes se 
+ *   inyectaba con `<?php echo (int) $bundle_discount; ?>` dentro del JS, 
+ *   ahora se lee del data-attr `data-pv-bundle-discount` del <section 
+ *   class="pv-bundle"> (añadido a la tag de apertura del bundle). Esto evita
+ *   meter PHP dentro del JS y permite que el mismo scope PRODUCT sirva 
+ *   cualquier plantilla con bundle sin reescribir el JS por plantilla.
+ *
+ * Validado por tests/unit/HomeProductScopeAuditTest.php (suite estructural,
+ * strips PHP comments antes de validar nonces negativos — LECCIONES #141).
+ * single-product.php queda 100% CSP-compliant (cero <script> inline).
  * ========================================================================== */
 
-// Config de moneda desde WooCommerce para formatear el total del bundle en JS.
-$pv_currency = array(
-    'symbol'         => html_entity_decode( (string) get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' ),
-    'decimal'        => (string) get_option( 'woocommerce_price_decimal_sep', '.' ),
-    'thousand'       => (string) get_option( 'woocommerce_price_thousand_sep', ',' ),
-    'decimals'       => (int) get_option( 'woocommerce_price_num_decimals', 2 ),
-    'position'       => (string) get_option( 'woocommerce_currency_pos', 'left' ),
-    'price_format'   => get_woocommerce_price_format(),
-);
-?>
-<script>
-window.ltms_pv_currency = <?php echo wp_json_encode( $pv_currency ); ?>;
-(function(){
-    'use strict';
-    var scope = document.querySelector('.pv-scope.pv-product-page');
-    if (!scope) return;
-
-    /* --- 1. Sticky nav: resaltar enlace de sección activa --------------- */
-    var navLinks = Array.prototype.slice.call(scope.querySelectorAll('.pv-sticky-nav__link'));
-    var sections = [];
-    navLinks.forEach(function(link){
-        var hash = link.getAttribute('href') || '';
-        if (hash.charAt(0) === '#') {
-            var sec = document.getElementById(hash.slice(1));
-            if (sec) sections.push({ link: link, el: sec });
-        }
-    });
-
-    function setActive(id){
-        navLinks.forEach(function(l){ l.classList.remove('is-active'); l.removeAttribute('aria-current'); });
-        var match = sections.filter(function(s){ return s.el.id === id; })[0];
-        if (match){ match.link.classList.add('is-active'); match.link.setAttribute('aria-current','true'); }
-    }
-
-    if ('IntersectionObserver' in window && sections.length){
-        var io = new IntersectionObserver(function(entries){
-            entries.forEach(function(e){
-                if (e.isIntersecting){ setActive(e.target.id); }
-            });
-        }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
-        sections.forEach(function(s){ io.observe(s.el); });
-    }
-
-    // Smooth scroll al hacer click en los enlaces de ancla.
-    navLinks.forEach(function(link){
-        link.addEventListener('click', function(e){
-            var hash = link.getAttribute('href') || '';
-            if (hash.charAt(0) !== '#') return;
-            var target = document.getElementById(hash.slice(1));
-            if (!target) return;
-            e.preventDefault();
-            target.scrollIntoView({ behavior:'smooth', block:'start' });
-            if (history.replaceState){ history.replaceState(null,'',hash); }
-            setActive(target.id);
-        });
-    });
-
-    /* --- 2. Bundle: total dinámico ------------------------------------- */
-    var bundle = scope.querySelector('.pv-bundle');
-    if (bundle){
-        var items = Array.prototype.slice.call(bundle.querySelectorAll('[data-pv-bundle-item]'));
-        var totalEl = bundle.querySelector('[data-pv-bundle-total]');
-        var saveEl  = bundle.querySelector('[data-pv-bundle-save]');
-        var addBtn  = bundle.querySelector('[data-pv-bundle-add]');
-        var discountPct = <?php echo (int) $bundle_discount; ?>;
-
-        // Formatea un número según la configuración de moneda de WooCommerce.
-        function formatMoney(n){
-            var cfg = window.ltms_pv_currency || {};
-            var dec = (typeof cfg.decimals === 'number') ? cfg.decimals : 2;
-            var dsep = cfg.decimal || '.';
-            var tsep = cfg.thousand || ',';
-            var sym  = cfg.symbol || '$';
-            var pos  = cfg.position || 'left';
-            var neg = n < 0;
-            n = Math.abs(n);
-            var fixed = n.toFixed(dec);
-            var parts = fixed.split('.');
-            var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, tsep);
-            var numStr = (parts[1] && dec > 0) ? (intPart + dsep + parts[1]) : intPart;
-            var out;
-            switch (pos){
-                case 'right':        out = numStr + sym; break;
-                case 'left_space':   out = sym + ' ' + numStr; break;
-                case 'right_space':  out = numStr + ' ' + sym; break;
-                case 'left':
-                default:             out = sym + numStr; break;
-            }
-            return neg ? ('-' + out) : out;
-        }
-
-        function selectedItems(){
-            return items.filter(function(it){
-                var cb = it.querySelector('.pv-bundle__check');
-                return cb ? cb.checked : false;
-            });
-        }
-
-        function recompute(){
-            var sel = selectedItems();
-            var sum = sel.reduce(function(acc,it){ return acc + (parseFloat(it.getAttribute('data-pv-bundle-price'))||0); },0);
-            var applyDiscount = sel.length >= 2;
-            var save = applyDiscount ? sum * (discountPct/100) : 0;
-            var total = sum - save;
-            if (totalEl){
-                totalEl.textContent = formatMoney(total);
-                totalEl.style.color = applyDiscount ? 'var(--accent)' : '';
-            }
-            if (saveEl){
-                if (applyDiscount && save > 0){
-                    saveEl.hidden = false;
-                    saveEl.textContent = '- ' + formatMoney(save);
-                } else {
-                    saveEl.hidden = true;
-                }
-            }
-            if (addBtn){
-                addBtn.disabled = sel.length === 0;
-            }
-        }
-
-        items.forEach(function(it){
-            var cb = it.querySelector('.pv-bundle__check');
-            if (!cb) return;
-            it.classList.toggle('is-selected', cb.checked);
-            cb.addEventListener('change', function(){
-                it.classList.toggle('is-selected', cb.checked);
-                recompute();
-            });
-        });
-        recompute();
-
-        /* --- 3. Bundle add-to-cart (AJAX secuencial) ------------------- */
-        if (addBtn){
-            addBtn.addEventListener('click', function(){
-                var sel = selectedItems();
-                if (!sel.length) return;
-                var ajaxUrl = (window.ltms_data && ltms_data.ajax_url) || '/wp-admin/admin-ajax.php';
-                var nonce = (window.ltms_data && ltms_data.nonce) || '';
-                addBtn.classList.add('pv-btn--loading');
-                addBtn.disabled = true;
-
-                var queue = sel.slice();
-                function next(){
-                    if (!queue.length){
-                        addBtn.classList.remove('pv-btn--loading');
-                        addBtn.disabled = false;
-                        if (window.PV && PV.toast){ PV.toast((ltms_data.i18n && ltms_data.i18n.addedToCart) || 'Añadido al carrito', { type:'success' }); }
-                        if (window.PV && PV.Shopping){ try { PV.Shopping.refresh(); } catch(_){} }
-                        return;
-                    }
-                    var it = queue.shift();
-                    var pid = it.getAttribute('data-pv-bundle-id');
-                    var body = new URLSearchParams();
-                    body.append('action','ltms_plaza_viva_add_to_cart');
-                    body.append('nonce', nonce);
-                    body.append('product_id', pid);
-                    body.append('quantity','1');
-                    fetch(ajaxUrl, { method:'POST', credentials:'same-origin', body: body })
-                        .then(function(r){ return r.json(); })
-                        .then(function(){ next(); })
-                        .catch(function(){ next(); });
-                }
-                next();
-            });
-        }
-    }
-})();
-</script>
-
-<?php
 /**
  * Hook: ltms_single_product_plazaviva_footer
  * Punto de extensión final antes del footer de WC.

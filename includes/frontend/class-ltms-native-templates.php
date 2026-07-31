@@ -334,6 +334,24 @@ class LTMS_Native_Templates {
             // template checkout.php:729 inyectaba el país con esc_js() DENTRO
             // del bloque script inline.
             'country'   => class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO',
+            // AUDIT-FE-SP-002 FIX (Fase 1.10): exponer el config de moneda de
+            // WooCommerce al JS para que el scope PRODUCT migrado pueda
+            // formatear el total del bundle en el cliente. Antes el template
+            // single-product.php:880-891 declaraba `$pv_currency = array(...)`
+            // y lo inyectaba via `wp_json_encode($pv_currency)` DENTRO del
+            // script-tag inline (`window.ltms_pv_currency = ...;`) — rompía
+            // CSP-compliance de la plantilla. Mismo patrón que el country del
+            // AUDIT-FE-CKO-004:体外 al localize, NO inline. El JS lee
+            // PV.config.pvCurrency (mapeo ltms_data.pv_currency → pvCurrency
+            // se hace en el init de PV — ver bloque top de ltms-plaza-viva.js).
+            'pv_currency' => [
+                'symbol'       => html_entity_decode( (string) get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' ),
+                'decimal'      => (string) get_option( 'woocommerce_price_decimal_sep', '.' ),
+                'thousand'     => (string) get_option( 'woocommerce_price_thousand_sep', ',' ),
+                'decimals'     => (int) get_option( 'woocommerce_price_num_decimals', 2 ),
+                'position'     => (string) get_option( 'woocommerce_currency_pos', 'left' ),
+                'price_format' => get_woocommerce_price_format(),
+            ],
             'i18n'      => [
                 'addedToCart'     => __( 'Producto añadido al carrito', 'ltms' ),
                 'cartError'       => __( 'Error al añadir al carrito', 'ltms' ),

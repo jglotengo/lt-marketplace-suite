@@ -1000,56 +1000,28 @@ do_action( 'ltms_after_home_plazaviva' );
 
 <?php
 /* ============================================================================
- * JS de página: chips de búsqueda rellenan el input + header shadow on scroll.
- * Vanilla JS, sin jQuery. Mínimo — el resto de interacciones (add-to-cart,
- * quick view, wishlist) las maneja el design system global ltms-plaza-viva.js
- * vía data-pv-* attributes.
+ * AUDIT-FE-HOME-001 FIX (Fase 1.10): el bloque <script> inline de chips de
+ * búsqueda + header shadow fue ELIMINADO. Su lógica era código muerto:
+ *   1. Chips de búsqueda: el handler global del design system 
+ *      ltms-plaza-viva.js (líneas 588-614, AUDIT-FE-HOME-003 FIX, commit
+ *      9882789b) ya rellena el input + hace form.submit() al click en
+ *      [data-pv-search-chip]. Como ese handler global se registra primero
+ *      y dispara navegación síncrona (form.submit()), el listener inline
+ *      registrado después al cargar el footer NUNCA tenía oportunidad de
+ *      correr visible — Bulldozer code duplicado que rompía CSP sin aportar.
+ *   2. Header shadow: toggle de clase `.is-scrolled` en `.pv-home-header`
+ *      según window.scrollY > 8. PERO la clase `.is-scrolled` NO está 
+ *      definida en ningún CSS (verificado: grep en ltms-plaza-viva.css,
+ *      ltms-homepage-fixes.css, ltms-frontend.css = 0 matches). Behaviour 
+ *      cosmético sin efecto — mismo patrón que LECCIONES #139 y OT-002
+ *      (UI que lee/escribe datos que nadie usa). NO se migra: si en el 
+ *      futuro se quiere sombra de header on-scroll, se añadirá clase CSS
+ *      nueva + este scope, pero sólo cuando exista CSS que la consuma.
+ * El scope HOME en ltms-plaza-viva.js (ver bloque `homeScope()` líneas 
+ * ~1753+) se mantiene como válvula de extensión IIFE para futuros 
+ * behaviours específicos de la home. home.php queda 100% CSP-compliant
+ * (cero <script> inline).
  * ========================================================================== */
 ?>
-<script>
-(function(){
-    'use strict';
-    var scope = document.querySelector('.pv-scope.pv-home');
-    if (!scope) return;
-
-    /* --- 1. Chips de búsqueda: rellenan el input y enfocan ------------- */
-    var searchInput = scope.querySelector('#pv-home-search');
-    var chips = Array.prototype.slice.call(scope.querySelectorAll('[data-pv-search-chip]'));
-    if (searchInput && chips.length){
-        chips.forEach(function(chip){
-            chip.addEventListener('click', function(){
-                var val = chip.getAttribute('data-pv-search-chip') || '';
-                searchInput.value = val;
-                searchInput.focus();
-                // Scroll suave al input en móvil.
-                if (window.innerWidth < 981){
-                    searchInput.scrollIntoView({ behavior:'smooth', block:'center' });
-                }
-            });
-        });
-    }
-
-    /* --- 2. Header: sombra reforzada al hacer scroll ------------------- */
-    var header = scope.querySelector('.pv-home-header');
-    if (header){
-        var ticking = false;
-        function onScroll(){
-            if (ticking) return;
-            ticking = true;
-            window.requestAnimationFrame(function(){
-                if (window.scrollY > 8){
-                    header.classList.add('is-scrolled');
-                } else {
-                    header.classList.remove('is-scrolled');
-                }
-                ticking = false;
-            });
-        }
-        window.addEventListener('scroll', onScroll, { passive:true });
-        onScroll();
-    }
-})();
-</script>
-
 <?php
 get_footer();

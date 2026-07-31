@@ -36,6 +36,15 @@
     // inyectaba este valor via <?php echo esc_js()?> dentro del script inline
     // (rompia CSP-compliance del JS al no poder vivir en archivo externo).
     country: (window.ltms_data && window.ltms_data.country) || 'CO',
+    // AUDIT-FE-SP-002 FIX (Fase 1.10): config de moneda WC expuesto por
+    // wp_localize_script desde PHP. Antes el single-product.php declaraba
+    // el array PHP de currency y lo inyectaba via wp_json_encode() DENTRO
+    // del script-tag inline (asignándolo a un global JS).
+    // Mismo patrón que country:体外 al localize, NO inline. El scope PRODUCT
+    // (productScope) lee PV.config.pvCurrency para formatear el total del
+    // bundle en el cliente — cae al objeto pojo-default vacío si wp_localize
+    // no se invoca (página sin enqueue del design system).
+    pvCurrency: (window.ltms_data && window.ltms_data.pv_currency) || {},
     cartIconSelector: '.pv-cart-icon, .ltms-sf-cart, .wc-block-mini-cart__button',
     toastDuration: 3000,
     debug: false
@@ -1748,5 +1757,241 @@
       document.addEventListener('DOMContentLoaded', initHelp);
     } else {
       initHelp();
+    }
+  })();
+
+  /* =========================================================================
+   * AUDIT-FE-HOME-001 FIX (Fase 1.10): scope HOME — migración del bloque
+   * <script> inline de home.php:1009-1052 al design system global. Cierra
+   * CSP-compliance para home.php (la última excepción significativa junto
+   * con single-product.php — SP-001 a continuación).
+   *
+   * Análisis del bloque inline original (2 behaviours):
+   *   1. Chips de búsqueda: registraba un click listener en
+   *      [data-pv-search-chip] para rellenar el input + focus + (mobile)
+   *      scrollIntoView. PERO este handler YA existía en el delegado global
+   *      `on(document, 'click', ...)` líneas 588-614 (AUDIT-FE-HOME-003
+   *      FIX, commit 9882789b) que rellena + hace `form.submit()`. Como el
+   *      handler global se registró primero y dispara navegación SÍNCRONA,
+   *      el listener inline (que se registraba después al cargar el footer)
+   *      NUNCA tenía oportunidad de correr visible — era código muerto
+   *      duplicado que rompía CSP sin aportar nada. NO se migra.
+   *   2. Header sticky shadow: toggle `.is-scrolled` en `.pv-home-header`
+   *      según `window.scrollY > 8`. PERO la clase `.is-scrolled` NO está
+   *      definida en ningún CSS (verificado: grep en ltms-plaza-viva.css,
+   *      ltms-homepage-fixes.css, ltms-frontend.css = 0 matches). El
+   *      behaviour era cosmético sin efecto. NO se migra (UI muerta —
+   *      mismo patrón que LECCIONES #139, OT-002: leer/escribir datos que
+   *      nadie usa). Si en el futuro se quiere añadir sombra al header al
+   *      hacer scroll, será un clase CSS nueva + este scope — pero sólo
+   *      cuando exista CSS que la consuma (no antes).
+   * ========================================================================= */
+  (function homeScope() {
+    function initHome() {
+      var scope = document.querySelector('.pv-scope.pv-home');
+      if (!scope) return;
+      // No hay behaviours a (re)inicializar en este momento — el handler
+      // global AUDIT-FE-HOME-003 cubre los chips, y la clase is-scrolled
+      // no tiene CSS. Mantenemos el IIFE como válvula de extensión para
+      // futuros behaviours específicos de la home (ver comentario arriba).
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initHome);
+    } else {
+      initHome();
+    }
+  })();
+
+  /* =========================================================================
+   * AUDIT-FE-SP-001 FIX (Fase 1.10): scope PRODUCT — migración del bloque
+   * <script> inline de single-product.php:890-1048 al design system global.
+   * Cierra CSP-compliance para single-product.php (3.0.0 sufría la última
+   * excepción CSP significativa del design system, junto con home.php).
+   *
+   * Behaviours migrados (5):
+   *   1. Sticky nav: resaltar enlace activo via IntersectionObserver +
+   *      smooth scroll al click (sin navegar — previene default y usa
+   *      scrollIntoView). Preserva el histórico via history.replaceState.
+   *   2. Bundle recompute: recalcula total al toggle checkboxes. Aplica
+   *      descuento si hay >= 2 items seleccionados. Updatea totalEl color
+   *      (var(--accent)) y saveEl hidden según corresponda.
+   *   3. Bundle add-to-cart: ANTES reimplementaba `fetch` directo con
+   *      URLSearchParams + action + nonce a mano. AHORA usa PV.ajax que
+   *      ya envuelve el nonce global 'ltms_plaza_viva' (paridad con todos
+   *      los add-to-cart del design system — AUDIT-FE-PV-001 Fase 1.4).
+   *   4. Toast de éxito tras bundle add-to-cart: usa PV.toast con i18n
+   *      'addedToCart' (de wp_localize_script) o fallback.
+   *   5. Shopping.refresh tras bundle add-to-cart: refresca el contador
+   *      del carrito del design system (ya existía en el inline original).
+   *
+   * AUDIT-FE-SP-002 FIX (Fase 1.10): el config de moneda WC para formatear
+   * el total del bundle en JS (currency symbol, decimal, thousand, position)
+   * y el `bundle_discount` (entero de % descuento) eran inyectados inline en
+   * el JS del template via PHP echo dentro del script-tag. Ahora se exponen
+   * via wp_localize_script('ltms_plaza_viva', 'ltms_data', ...) en
+   * class-ltms-native-templates.php como `ltms_data.pv_currency` y el
+   * descuento se lee del data-attr `data-pv-bundle-discount` del contenedor
+   * `.pv-bundle` (evita PHP dentro del JS). El currency config ya no necesita
+   * inline script — JS lee `PV.config.pvCurrency` (mapeo en el init de
+   * PV.config al inicio de este archivo).
+   * ========================================================================= */
+  (function productScope() {
+    function initProduct() {
+      var scope = document.querySelector('.pv-scope.pv-product-page');
+      if (!scope) return;
+
+      /* --- 1. Sticky nav: resaltar enlace de sección activa --------------- */
+      var navLinks = Array.prototype.slice.call(scope.querySelectorAll('.pv-sticky-nav__link'));
+      var sections = [];
+      navLinks.forEach(function (link) {
+        var hash = link.getAttribute('href') || '';
+        if (hash.charAt(0) === '#') {
+          var sec = document.getElementById(hash.slice(1));
+          if (sec) sections.push({ link: link, el: sec });
+        }
+      });
+
+      function setActive(id) {
+        navLinks.forEach(function (l) { l.classList.remove('is-active'); l.removeAttribute('aria-current'); });
+        var match = sections.filter(function (s) { return s.el.id === id; })[0];
+        if (match) { match.link.classList.add('is-active'); match.link.setAttribute('aria-current', 'true'); }
+      }
+
+      if ('IntersectionObserver' in window && sections.length) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) { if (e.isIntersecting) setActive(e.target.id); });
+        }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+        sections.forEach(function (s) { io.observe(s.el); });
+      }
+
+      // Smooth scroll al click en los enlaces de ancla.
+      navLinks.forEach(function (link) {
+        link.addEventListener('click', function (e) {
+          var hash = link.getAttribute('href') || '';
+          if (hash.charAt(0) !== '#') return;
+          var target = document.getElementById(hash.slice(1));
+          if (!target) return;
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (history.replaceState) history.replaceState(null, '', hash);
+          setActive(target.id);
+        });
+      });
+
+      /* --- 2. Bundle: total dinámico ------------------------------------- */
+      var bundle = scope.querySelector('.pv-bundle');
+      if (!bundle) return;
+
+      var items = Array.prototype.slice.call(bundle.querySelectorAll('[data-pv-bundle-item]'));
+      var totalEl = bundle.querySelector('[data-pv-bundle-total]');
+      var saveEl  = bundle.querySelector('[data-pv-bundle-save]');
+      var addBtn  = bundle.querySelector('[data-pv-bundle-add]');
+      var discountPct = parseInt(bundle.getAttribute('data-pv-bundle-discount') || '0', 10);
+      if (isNaN(discountPct) || discountPct < 0) discountPct = 0;
+
+      // AUDIT-FE-SP-002 FIX: formato de moneda leído de PV.config.pvCurrency
+      // (expuesto via wp_localize_script en class-ltms-native-templates.php),
+      // no desde un global inline inyectado dentro del script-tag del template.
+      function formatMoney(n) {
+        var cfg = (PV.config && PV.config.pvCurrency) || {};
+        var dec = (typeof cfg.decimals === 'number') ? cfg.decimals : 2;
+        var dsep = cfg.decimal || '.';
+        var tsep = cfg.thousand || ',';
+        var sym  = cfg.symbol || '$';
+        var pos  = cfg.position || 'left';
+        var neg = n < 0;
+        n = Math.abs(n);
+        var fixed = n.toFixed(dec);
+        var parts = fixed.split('.');
+        var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, tsep);
+        var numStr = (parts[1] && dec > 0) ? (intPart + dsep + parts[1]) : intPart;
+        var out;
+        switch (pos) {
+          case 'right':        out = numStr + sym; break;
+          case 'left_space':   out = sym + ' ' + numStr; break;
+          case 'right_space':  out = numStr + ' ' + sym; break;
+          case 'left':
+          default:             out = sym + numStr; break;
+        }
+        return neg ? ('-' + out) : out;
+      }
+
+      function selectedItems() {
+        return items.filter(function (it) {
+          var cb = it.querySelector('.pv-bundle__check');
+          return cb ? cb.checked : false;
+        });
+      }
+
+      function recompute() {
+        var sel = selectedItems();
+        var sum = sel.reduce(function (acc, it) { return acc + (parseFloat(it.getAttribute('data-pv-bundle-price')) || 0); }, 0);
+        var applyDiscount = sel.length >= 2;
+        var save = applyDiscount ? sum * (discountPct / 100) : 0;
+        var total = sum - save;
+        if (totalEl) {
+          totalEl.textContent = formatMoney(total);
+          totalEl.style.color = applyDiscount ? 'var(--accent)' : '';
+        }
+        if (saveEl) {
+          if (applyDiscount && save > 0) {
+            saveEl.hidden = false;
+            saveEl.textContent = '- ' + formatMoney(save);
+          } else {
+            saveEl.hidden = true;
+          }
+        }
+        if (addBtn) addBtn.disabled = sel.length === 0;
+      }
+
+      items.forEach(function (it) {
+        var cb = it.querySelector('.pv-bundle__check');
+        if (!cb) return;
+        it.classList.toggle('is-selected', cb.checked);
+        cb.addEventListener('change', function () {
+          it.classList.toggle('is-selected', cb.checked);
+          recompute();
+        });
+      });
+      recompute();
+
+      /* --- 3. Bundle add-to-cart (AJAX secuencial via PV.ajax) ----------- */
+      if (addBtn) {
+        addBtn.addEventListener('click', function () {
+          var sel = selectedItems();
+          if (!sel.length) return;
+          addBtn.classList.add('pv-btn--loading');
+          addBtn.disabled = true;
+
+          // AUDIT-FE-SP-001 FIX: cada item del bundle se add-to-cartea via
+          // PV.ajax (no fetch manual con nonce/action). PV.ajax manda el
+          // nonce global 'ltms_plaza_viva' automáticamente (paridad con
+          // el resto del design system — AUDIT-FE-PV-001 Fase 1.4 garantea
+          // que el handler PHP valida contra ese nonce).
+          var queue = sel.slice();
+          function next() {
+            if (!queue.length) {
+              addBtn.classList.remove('pv-btn--loading');
+              addBtn.disabled = false;
+              if (PV.toast) { PV.toast((PV.i18n && PV.i18n.addedToCart) || 'Añadido al carrito', { type: 'success' }); }
+              if (PV.Shopping) { try { PV.Shopping.refresh(); } catch (_) { /* noop */ } }
+              return;
+            }
+            var it = queue.shift();
+            var pid = it.getAttribute('data-pv-bundle-id');
+            PV.ajax('ltms_plaza_viva_add_to_cart', { product_id: pid, quantity: '1' })
+              .then(function () { next(); })
+              .catch(function () { next(); }); // continuar la cola en error
+          }
+          next();
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initProduct);
+    } else {
+      initProduct();
     }
   })();
