@@ -905,11 +905,19 @@ class LTMS_Authorities_Compliance {
      *
      * Decreto 2150/1995 + EOSF art. 102 (CO).
      *
-     * @param bool $approved Estado de aprobación.
+     * @param bool|\WP_Error $approved Estado de aprobación (bool) o WP_Error con motivo específico.
      * @param int  $vendor_id ID del vendor.
-     * @return bool False si RUT o Cámara de Comercio inválidos.
+     * @return bool|\WP_Error False/WP_Error si RUT o Cámara de Comercio inválidos.
+     *                         WP_Error transmite el motivo al admin (UITLS-ADMIN-KYCELE-01).
      */
-    public static function validate_rut_and_camara_comercio( bool $approved, int $vendor_id ): bool {
+    public static function validate_rut_and_camara_comercio( $approved, int $vendor_id ) {
+        // v2.9.188 ADMIN-KYC-APPROVE- AUDIT FIX: devolver WP_Error CON motivo específico
+        // en vez de `false` mudo. Antes, al faltar la Cámara de Comercio el handler
+        // devolvía 403 genérico "Aprobación bloqueada por política de cumplimiento"
+        // y jQuery lo mostraba como "Error de conexión" — parece que el server está
+        // caído pero en realidad era un bloqueo de compliance con dato faltante.
+        // Ver LECCIONES_APRENDIDAS.md #120.
+        if ( $approved instanceof \WP_Error ) return $approved;
         if ( ! $approved ) return false;
 
         $country = LTMS_Core_Config::get_country();
@@ -931,7 +939,11 @@ class LTMS_Authorities_Compliance {
                             sprintf( 'Vendor #%d — NIT %s no válido en DIAN (Decreto 2150/1995).', $vendor_id, $tax_id )
                         );
                     }
-                    return false;
+                    return new \WP_Error( 'ac_rut_dian_invalid', sprintf(
+                        /* translators: %s: NIT */
+                        __( 'NIT %s no válido en DIAN. Verifica el dígito de verificación y reenvía el KYC con el RUT corregido (Decreto 2150/1995).', 'ltms' ),
+                        $tax_id
+                    ) );
                 }
             }
 
@@ -943,7 +955,11 @@ class LTMS_Authorities_Compliance {
                         sprintf( 'Vendor #%d — sin matrícula Cámara de Comercio (Decreto 2150/1995).', $vendor_id )
                     );
                 }
-                return false;
+                return new \WP_Error( 'ac_cc_missing', sprintf(
+                    /* translators: %d: vendor id */
+                    __( 'Falta el número de matrícula de Cámara de Comercio (Decreto 2150/1995). El vendedor #%d debe completar este campo en su panel y reenviar el KYC.', 'ltms' ),
+                    $vendor_id
+                ) );
             }
             if ( ! empty( $cc_expires ) && strtotime( $cc_expires ) < time() ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
@@ -952,14 +968,24 @@ class LTMS_Authorities_Compliance {
                         sprintf( 'Vendor #%d — matrícula Cámara de Comercio vencida el %s.', $vendor_id, $cc_expires )
                     );
                 }
-                return false;
+                return new \WP_Error( 'ac_cc_expired', sprintf(
+                    /* translators: %s: expiry date */
+                    __( 'Matrícula de Cámara de Comercio vencida el %s. El vendedor debe renovarla y reenviar el KYC.', 'ltms' ),
+                    $cc_expires
+                ) );
             }
         }
 
         // MX: validar RFC + padrón SAT.
         if ( $country === 'MX' ) {
             $rfc = get_user_meta( $vendor_id, 'ltms_tax_id', true );
-            if ( empty( $rfc ) ) return false;
+            if ( empty( $rfc ) ) {
+                return new \WP_Error( 'ac_rfc_missing', sprintf(
+                    /* translators: %d: vendor id */
+                    __( 'Falta el RFC del vendedor #%d (LISR art. 27). Debe completarlo en su panel y reenviar el KYC.', 'ltms' ),
+                    $vendor_id
+                ) );
+            }
 
             $sat_token = LTMS_Core_Config::get( 'ltms_sat_api_token', '' );
             if ( ! empty( $sat_token ) ) {
@@ -971,7 +997,11 @@ class LTMS_Authorities_Compliance {
                             sprintf( 'Vendor #%d — RFC %s no válido en padrón SAT.', $vendor_id, $rfc )
                         );
                     }
-                    return false;
+                    return new \WP_Error( 'ac_rfc_sat_invalid', sprintf(
+                        /* translators: %s: RFC */
+                        __( 'RFC %s no válido en el padrón SAT. Verifica el formato y reenvía el KYC con el RFC corregido.', 'ltms' ),
+                        $rfc
+                    ) );
                 }
             }
         }

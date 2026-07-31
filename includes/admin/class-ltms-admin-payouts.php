@@ -143,15 +143,30 @@ final class LTMS_Admin_Payouts {
         // puedan BLOQUEAR la aprobación si el vendor está en listas restrictivas o
         // no cumple requisitos sanitarios. Antes de este fix, FT-2 y RT-2 eran
         // silent dead code desde v2.9.14/16. Recibe (true, $vendor_id); retornar false bloquea.
-        $country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
-        $allow   = (bool) apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        //
+        // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: los filters ahora pueden devolver
+        // WP_Error con motivo específico (UITLS-ADMIN-KYCELE-01). Antes, al bloquearse,
+        // el handler devolvía 403 "Aprobación bloqueada por política de cumplimiento"
+        // — mensaje genérico que jQuery .fail() mostraba como "Error de conexión"
+        // dando falsa sensación de server caído. Ahora extraemos el mensaje real
+        // del WP_Error y lo enviamos al admin.
+        $country    = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+        $allow       = apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        $block_msg   = '';
+        $block_code  = '';
+        if ( $allow instanceof \WP_Error ) {
+            $block_msg  = $allow->get_error_message();
+            $block_code = $allow->get_error_code();
+            $allow      = false;
+        }
         if ( ! $allow ) {
+            $final_msg = $block_msg ?: __( 'Aprobación bloqueada por política de cumplimiento (screening listas restrictivas o registro sanitario). Revisar logs.', 'ltms' );
             LTMS_Core_Logger::warning(
                 'KYC_APPROVE_BLOCKED_BY_FILTER',
-                sprintf( 'KYC del vendedor #%d bloqueado por filter ltms_kyc_pre_approve (sanctions screening / sanitary reg / otros).', $vendor_id ),
-                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id(), 'country' => $country ]
+                sprintf( 'KYC del vendedor #%d bloqueado por filter ltms_kyc_pre_approve: [%s] %s', $vendor_id, (string) $block_code, $final_msg ),
+                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id(), 'country' => $country, 'block_code' => (string) $block_code ]
             );
-            wp_send_json_error( __( 'Aprobación bloqueada por política de cumplimiento (screening listas restrictivas o registro sanitario). Revisar logs.', 'ltms' ), 403 );
+            wp_send_json_error( [ 'message' => $final_msg, 'block_code' => (string) $block_code ], 403 );
         }
 
         // v2.9.114 KYC-AUDIT P1-8 FIX: set expires_at (1 year from approval).
@@ -281,14 +296,24 @@ final class LTMS_Admin_Payouts {
         // screening as normal approve. Before, this endpoint bypassed ltms_kyc_pre_approve,
         // so a vendor on the OFAC sanctions list or with missing sanitary registration
         // could be approved via the "quick" path.
-        $allow = (bool) apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        //
+        // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: extraer WP_Error con motivo específico.
+        $allow       = apply_filters( 'ltms_kyc_pre_approve', true, $vendor_id );
+        $block_msg   = '';
+        $block_code   = '';
+        if ( $allow instanceof \WP_Error ) {
+            $block_msg = $allow->get_error_message();
+            $block_code = $allow->get_error_code();
+            $allow      = false;
+        }
         if ( ! $allow ) {
+            $final_msg = $block_msg ?: __( 'Aprobación bloqueada por política de cumplimiento. Revisar logs.', 'ltms' );
             LTMS_Core_Logger::warning(
                 'KYC_QUICK_APPROVE_BLOCKED_BY_FILTER',
-                sprintf( 'Quick-approve del vendedor #%d bloqueado por filter ltms_kyc_pre_approve.', $vendor_id ),
-                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id() ]
+                sprintf( 'Quick-approve del vendedor #%d bloqueado por filter ltms_kyc_pre_approve: [%s] %s', $vendor_id, (string) $block_code, $final_msg ),
+                [ 'vendor_id' => $vendor_id, 'admin_id' => get_current_user_id(), 'block_code' => (string) $block_code ]
             );
-            wp_send_json_error( __( 'Aprobación bloqueada por política de cumplimiento. Revisar logs.', 'ltms' ), 403 );
+            wp_send_json_error( [ 'message' => $final_msg, 'block_code' => (string) $block_code ], 403 );
         }
 
         update_user_meta( $vendor_id, 'ltms_kyc_status', 'approved' );

@@ -1002,11 +1002,22 @@ class LTMS_Data_Protection_Compliance {
 
     /**
      * Verifica autorización de representante legal antes de aprobar KYC.
+     *
+     * @param bool|\WP_Error $approved True si está aprobado.
+     * @param int            $vendor_id ID del vendor.
+     * @return bool|\WP_Error False/WP_Error si falta autorización.
+     *                        WP_Error transmite el motivo (UITLS-ADMIN-KYCELE-01).
      */
-    public static function verify_minor_authorization( bool $approved, int $vendor_id ): bool {
+    public static function verify_minor_authorization( $approved, int $vendor_id ) {
+        // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: devolver WP_Error con motivo.
+        if ( $approved instanceof \WP_Error ) return $approved;
         if ( ! $approved ) return false;
         if ( get_user_meta( $vendor_id, '_ltms_minor_blocked', true ) === 'yes' ) {
-            return false; // Bloqueo COPPA.
+            return new \WP_Error( 'hd_minor_blocked', sprintf(
+                /* translators: %d: vendor id */
+                __( 'Vendedor #%d bloqueado por COPPA (menor de 13 años). No se puede aprobar el KYC hasta que cumpla la edad mínima.', 'ltms' ),
+                $vendor_id
+            ) );
         }
         if ( get_user_meta( $vendor_id, '_ltms_minor_requires_authorization', true ) === 'yes' ) {
             $auth_doc = get_user_meta( $vendor_id, '_ltms_minor_authorization_doc', true );
@@ -1017,7 +1028,11 @@ class LTMS_Data_Protection_Compliance {
                         sprintf( 'Vendor #%d — menor sin documento de autorización de representante legal.', $vendor_id )
                     );
                 }
-                return false;
+                return new \WP_Error( 'hd_minor_auth_missing', sprintf(
+                    /* translators: %d: vendor id */
+                    __( 'Vendedor #%d (menor 13-17) sin documento de autorización del representante legal (Decreto 886/2014 / COPPA). Debe subirlo en su panel y reenviar el KYC.', 'ltms' ),
+                    $vendor_id
+                ) );
             }
         }
         return $approved;

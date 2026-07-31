@@ -453,11 +453,17 @@ class LTMS_Fintech_Compliance {
     /**
      * Verifica un vendor contra listas restrictivas antes de aprobar KYC.
      *
-     * @param bool $approved Estado actual de aprobación.
+     * @param bool|\WP_Error $approved Estado actual de aprobación.
      * @param int  $vendor_id ID del vendor.
-     * @return bool False si match en lista restrictiva.
+     * @return bool|\WP_Error False/WP_Error si match en lista restrictiva.
+     *                        WP_Error transmite el motivo (UITLS-ADMIN-KYCELE-01).
      */
-    public static function screen_against_sanctions_lists( bool $approved, int $vendor_id ): bool {
+    public static function screen_against_sanctions_lists( $approved, int $vendor_id ) {
+        // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: propagar WP_Error con motivo.
+        // Antes, si la lista OFAC/UN no se descargaba, el handler devolvía 403
+        // genérico y el admin veía "Error de conexión". Ahora recibe mensaje
+        // específico indicando que es fail-closed SARLAFT y que reintente.
+        if ( $approved instanceof \WP_Error ) return $approved;
         if ( ! $approved ) return false;
 
         $vendor = get_userdata( $vendor_id );
@@ -487,7 +493,12 @@ class LTMS_Fintech_Compliance {
                         );
                     }
                     update_user_meta( $vendor_id, '_ltms_sanctions_list_unavailable', $list_key );
-                    return false; // FAIL-CLOSED
+                    return new \WP_Error( 'ft_sanctions_list_unavailable', sprintf(
+                        /* translators: 1: list key, 2: country */
+                        __( 'Lista restrictiva %1$s no disponible temporalmente (fail-closed SARLAFT Ley 526/1999). El KYC queda bloqueado hasta reintentar. Reintenta en unos minutos; si persiste, contacta al oficial de cumplimiento (%2$s).', 'ltms' ),
+                        $list_key,
+                        $list_cfg['country']
+                    ) );
                 }
                 $cached_list = wp_remote_retrieve_body( $response );
                 set_transient( "ltms_sanctions_list_{$list_key}", $cached_list, DAY_IN_SECONDS );
@@ -544,7 +555,12 @@ class LTMS_Fintech_Compliance {
                         );
                     }
                 }
-                return false;
+                return new \WP_Error( 'ft_sanctions_match', sprintf(
+                    /* translators: 1: vendor name, 2: list key */
+                    __( 'Coincidencia en lista restrictiva %2$s detectada para "%1$s" — KYC bloqueado. Oficial de cumplimiento notificado. Revisar manualmente antes de cualquier aprobación.', 'ltms' ),
+                    $name,
+                    $list_key
+                ) );
             }
         }
 

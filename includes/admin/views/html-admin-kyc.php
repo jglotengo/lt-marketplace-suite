@@ -347,9 +347,9 @@ $total_kyc = array_sum( $count_map );
                 } );
             }
             ltmsRenderKycDocs( docs );
-        } ).fail( function() {
+        } ).fail( function( jqXHR ) {
             $btn.prop( 'disabled', false );
-            $( '#ltms-kyc-modal-content' ).html( '<p style="color:#dc2626;">Error de conexión. Intente nuevamente.</p>' );
+            $( '#ltms-kyc-modal-content' ).html( '<p style="color:#dc2626;">' + ltmsHttpFailReason( jqXHR ) + '</p>' );
         } );
     } );
     $( '#ltms-kyc-modal-close, #ltms-kyc-modal' ).on( 'click', function( e ) {
@@ -366,6 +366,50 @@ $total_kyc = array_sum( $count_map );
     // v2.9.114 KYC-AUDIT P2-4 FIX: replace native confirm() with modern modal dialog.
     // The native confirm() is blocked by some browsers (notably iOS Safari in some
     // configurations) and violates the UIUX-AUDIT-001 rule of no native dialogs.
+    //
+    // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: distinguishing real HTTP/network errors
+    // from compliance-blocked responses (403 + JSON body). Before, jQuery .fail()
+    // ran unconditionally on any non-2xx HTTP status — including WP 403 responses
+    // with a valid `wp_send_json_error` body. The admin saw "Error de conexión"
+    // (giving false alarm that the server was down) when in fact the KYC was
+    // blocked by a compliance filter (AC-7 / FT-2 / RT-2 / HD-12) returning the
+    // real reason in JSON. Now we parse the response body on 403/500 and surface
+    // the server's message; only true network failures (status 0, timeout, parse
+    // error) show "Error de conexión". See LECCIONES_APRENDIDAS.md #120.
+    function ltmsHttpFailReason( jqXHR ) {
+        if ( ! jqXHR ) return 'Error de conexión.';
+        // Status 0 / timeout / abort → network error.
+        if ( jqXHR.status === 0 || jqXHR.readyState === 0 ) {
+            return 'Error de conexión. Verifica tu red e inténtalo de nuevo.';
+        }
+        // 401/403 with HTML body + login form → session expired (admin-ajax returns
+        // auth page when cookies died). Inspect content-type.
+        var ct = ( jqXHR.getResponseHeader('content-type') || '' ).toLowerCase();
+        if ( jqXHR.status === 401 || ( jqXHR.status === 403 && ct.indexOf('text/html') !== -1 ) ) {
+            return 'Tu sesión expiró. Recarga la página e inicia sesión de nuevo.';
+        }
+        // Try to extract WP JSON `{ success: false, data: { message: ... } }`
+        // from the response body (works whether wp_send_json was used).
+        var body = jqXHR.responseText || '';
+        if ( body && ct.indexOf('application/json') !== -1 ) {
+            try {
+                var parsed = JSON.parse( body );
+                if ( parsed && parsed.data && parsed.data.message ) {
+                    return parsed.data.message;
+                }
+                if ( parsed && typeof parsed.message === 'string' ) {
+                    return parsed.message;
+                }
+            } catch ( e ) { /* fall through to generic */ }
+        }
+        // 500/server error with HTML → generic.
+        if ( jqXHR.status >= 500 ) {
+            return 'Error del servidor (HTTP ' + jqXHR.status + '). Revisa el error_log o inténtalo de nuevo.';
+        }
+        // Fallback.
+        return 'Error de conexión (HTTP ' + jqXHR.status + ').';
+    }
+
     function ltmsConfirmKycApprove( kycId, nonce, $btn ) {
         var $modal = $( '#ltms-kyc-confirm-modal' );
         $modal.find( '.ltms-confirm-message' ).text( '<?php echo esc_js( __( "Aprobar este KYC?", "ltms" ) ); ?>' );
@@ -378,8 +422,11 @@ $total_kyc = array_sum( $count_map );
                 nonce:  nonce
             }, function( res ) {
                 if ( res.success ) { window.location.reload(); }
-                else { ltmsShowKycError( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
-            } ).fail( function() { $btn.prop( 'disabled', false ); ltmsShowKycError( 'Error de conexión.' ); } );
+                else { ltmsShowKycError( res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
+            } ).fail( function( jqXHR ) {
+                $btn.prop( 'disabled', false );
+                ltmsShowKycError( ltmsHttpFailReason( jqXHR ) );
+            } );
         } );
         $modal.find( '.ltms-confirm-no' ).off( 'click' ).on( 'click', function() { $modal.hide(); });
         $modal.show();
@@ -415,8 +462,11 @@ $total_kyc = array_sum( $count_map );
                 nonce:  nonce
             }, function( res ) {
                 if ( res.success ) { window.location.reload(); }
-                else { ltmsShowKycError( res.data || '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
-            } ).fail( function() { $btn.prop( 'disabled', false ); ltmsShowKycError( 'Error de conexión.' ); } );
+                else { ltmsShowKycError( res.data && res.data.message ? res.data.message : '<?php echo esc_js( __( "Error.", "ltms" ) ); ?>' ); $btn.prop( 'disabled', false ); }
+            } ).fail( function( jqXHR ) {
+                $btn.prop( 'disabled', false );
+                ltmsShowKycError( ltmsHttpFailReason( jqXHR ) );
+            } );
         } );
         $modal.find( '.ltms-reject-cancel' ).off( 'click' ).on( 'click', function() { $modal.hide(); });
         $modal.show();

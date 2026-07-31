@@ -358,11 +358,16 @@ class LTMS_Restaurant_Compliance {
     /**
      * Valida el registro sanitario antes de aprobar KYC.
      *
-     * @param bool   $approved True si está aprobado.
+     * @param bool|\WP_Error $approved True si está aprobado.
      * @param int    $vendor_id ID del vendor.
-     * @return bool False si no cumple.
+     * @return bool|\WP_Error False/WP_Error si no cumple.
+     *                        WP_Error transmite el motivo (UITLS-ADMIN-KYCELE-01).
      */
-    public static function validate_sanitary_registration( bool $approved, int $vendor_id ): bool {
+    public static function validate_sanitary_registration( $approved, int $vendor_id ) {
+        // v2.9.188 ADMIN-KYC-APPROVE-AUDIT FIX: devolver WP_Error con motivo
+        // específico para que el admin vea qué dato sanitario falta en vez de
+        // recibir "Error de conexión" genérico.
+        if ( $approved instanceof \WP_Error ) return $approved;
         if ( get_user_meta( $vendor_id, 'ltms_is_restaurant', true ) !== 'yes' ) {
             return $approved;
         }
@@ -376,10 +381,18 @@ class LTMS_Restaurant_Compliance {
                     sprintf( 'Vendor #%d: registro sanitario INVIMA/COFEPRIS faltante.', $vendor_id )
                 );
             }
-            return false;
+            return new \WP_Error( 'kyc_sanitary_reg_missing', sprintf(
+                /* translators: %d: vendor id */
+                __( 'Falta el registro sanitario INVIMA/COFEPRIS del vendedor #%d (restaurante). Debe completarlo en su panel y reenviar el KYC.', 'ltms' ),
+                $vendor_id
+            ) );
         }
         if ( empty( $exp ) ) {
-            return false;
+            return new \WP_Error( 'kyc_sanitary_reg_expiry_missing', sprintf(
+                /* translators: %d: vendor id */
+                __( 'El vendedor #%d tiene registro sanitario pero no registró la fecha de vencimiento. Debe completarla y reenviar el KYC.', 'ltms' ),
+                $vendor_id
+            ) );
         }
         // Verificar que no esté vencido.
         $exp_ts   = strtotime( $exp );
@@ -391,7 +404,11 @@ class LTMS_Restaurant_Compliance {
                     sprintf( 'Vendor #%d: registro sanitario vencido el %s.', $vendor_id, $exp )
                 );
             }
-            return false;
+            return new \WP_Error( 'kyc_sanitary_reg_expired', sprintf(
+                /* translators: %s: expiry date */
+                __( 'Registro sanitario vencido el %s. El vendedor debe renovarlo ante INVIMA/COFEPRIS y reenviar el KYC.', 'ltms' ),
+                $exp
+            ) );
         }
         if ( $exp_ts < $warn_ts ) {
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
