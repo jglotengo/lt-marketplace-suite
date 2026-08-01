@@ -194,6 +194,20 @@ if ( $export_csv ) {
     // 3. Helper — número para CSV fiscal (punto decimal, sin sep. miles)
     $fn = fn($v) => number_format( (float)($v ?? 0), 2, '.', '' );
 
+    // AUDIT-PANEL-CSV-001: proteccion CSV formula injection para fputcsv.
+    // fputcsv escapa comillas dobles (RFC 4180) pero NO previene formula
+    // injection en valores que empiezan con = + - @ \t \r. Datos fiscales
+    // exportados (RFC cliente, CFDI folio, user-meta del vendor) son
+    // alcanzables via registro / onboarding del vendor; un valor malicioso
+    // podria ejecutar comandos al abrir el CSV en Excel/Sheets.
+    $csv_field = static function ( $v ): string {
+        $v = (string) ( $v ?? '' );
+        if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+            $v = "'" . $v;
+        }
+        return $v;
+    };
+
     // 4. Construir el CSV en memoria para evitar salida prematura
     $csv_buffer = fopen( 'php://temp', 'r+' );
 
@@ -228,18 +242,18 @@ if ( $export_csv ) {
     foreach ( $exp_frac1 as $r ) {
         fputcsv( $csv_buffer, [
             'I',
-            $r['id'],
-            $r['order_id'],
-            $r['country_code'],
-            $r['created_at'],
-            $r['service_type'],
-            $r['rfc_cliente'],
+            $csv_field( $r['id'] ),
+            $csv_field( $r['order_id'] ),
+            $csv_field( $r['country_code'] ),
+            $csv_field( $r['created_at'] ),
+            $csv_field( $r['service_type'] ),
+            $csv_field( $r['rfc_cliente'] ),
             $fn( $r['gross_amount'] ),
             $fn( $r['iva_amount'] ),
             $fn( $r['total_con_iva'] ),
-            $r['cfdi_folio'],
-            $r['metodo_pago_adquiriente'],
-            $r['vendor_id'],
+            $csv_field( $r['cfdi_folio'] ),
+            $csv_field( $r['metodo_pago_adquiriente'] ),
+            $csv_field( $r['vendor_id'] ),
         ] );
     }
     fputcsv( $csv_buffer, [] );
@@ -275,31 +289,31 @@ if ( $export_csv ) {
     foreach ( $exp_frac2 as $r ) {
         fputcsv( $csv_buffer, [
             'II',
-            $r['vendor_id'],
-            $r['email'],
-            $r['nombre'],
-            $r['rfc_nif'],
-            $r['curp'],
-            $r['domicilio_fiscal'],
-            $r['pais_residencia'],
-            $r['banco_institucion'],
-            $r['clabe_cuenta'],
+            $csv_field( $r['vendor_id'] ),
+            $csv_field( $r['email'] ),
+            $csv_field( $r['nombre'] ),
+            $csv_field( $r['rfc_nif'] ),
+            $csv_field( $r['curp'] ),
+            $csv_field( $r['domicilio_fiscal'] ),
+            $csv_field( $r['pais_residencia'] ),
+            $csv_field( $r['banco_institucion'] ),
+            $csv_field( $r['clabe_cuenta'] ),
             $fn( $r['monto_isr'] ),
             $fn( $r['monto_iva'] ),
             $fn( $r['monto_ieps'] ),
-            $r['metodo_pago_adquiriente'],
-            $r['metodo_pago_oferente'],
-            $r['metodo_pago_plataforma'],
+            $csv_field( $r['metodo_pago_adquiriente'] ),
+            $csv_field( $r['metodo_pago_oferente'] ),
+            $csv_field( $r['metodo_pago_plataforma'] ),
             $fn( $r['isr_retenido'] ),
             $fn( $r['iva_retenido'] ),
             $fn( $r['ieps_retenido'] ),
             $r['ops_hospedaje'],
-            $r['hospedaje_direccion'] ?? '',
+            $csv_field( $r['hospedaje_direccion'] ?? '' ),
             $r['ops_importacion'],
             $fn( $r['aranceles'] ),
             $r['total_ops'],
-            $r['primera_op'],
-            $r['ultima_op'],
+            $csv_field( $r['primera_op'] ),
+            $csv_field( $r['ultima_op'] ),
         ] );
     }
     fputcsv( $csv_buffer, [] );
@@ -316,8 +330,14 @@ if ( $export_csv ) {
         foreach ( $exp_large as $r ) {
             fputcsv( $csv_buffer, [
                 'SAGRILAFT',
-                $r['id'], $r['vendor_id'], $r['display_name'], $r['user_email'],
-                $fn( $r['amount'] ), $r['currency'], $r['status'], $r['created_at'],
+                $csv_field( $r['id'] ),
+                $csv_field( $r['vendor_id'] ),
+                $csv_field( $r['display_name'] ),
+                $csv_field( $r['user_email'] ),
+                $fn( $r['amount'] ),
+                $csv_field( $r['currency'] ),
+                $csv_field( $r['status'] ),
+                $csv_field( $r['created_at'] ),
             ] );
         }
     }
