@@ -59,15 +59,41 @@ class LTMS_Admin_Redi {
         $rows = $wpdb->get_results( // phpcs:ignore
             "SELECT * FROM `{$wpdb->prefix}lt_redi_commissions` ORDER BY created_at DESC LIMIT 1000"
         );
-        // Build CSV
-        $csv = "ID,Pedido,Origen,Revendedor,Bruto,Fee,Comision,NetoOrigen,Retencion,Estado,Fecha\n";
+
+        // AUDIT-PANEL-CSV-001: proteccion CSV formula injection + RFC 4180 escape.
+        // Mismo patron que admin-payouts/cross-border/donations/bookings: cualquier
+        // valor que empiece con = + - @ \t \r se le antepone una comilla simple
+        // para que Excel/Sheets lo trate como texto, no como formula. Sin esto un
+        // vendor malicioso podria inyectar '=cmd|/c calc!A1' en campos alcanzables
+        // (order_id, status, etc.) y ejecutar comandos al abrir el CSV en Excel.
+        $csv_field = static function ( $v ): string {
+            $v = (string) $v;
+            $v = str_replace( '"', '""', $v );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
+        // AUDIT-PANEL-CSV-001: BOM UTF-8 para que Excel reconozca la codificacion.
+        $csv  = "\xEF\xBB\xBF";
+        $csv .= "ID,Pedido,Origen,Revendedor,Bruto,Fee,Comision,NetoOrigen,Retencion,Estado,Fecha\n";
         foreach ( $rows as $r ) {
-            $csv .= implode( ',', [
-                $r->id, $r->order_id, $r->origin_vendor_id, $r->reseller_vendor_id,
-                $r->gross_amount, $r->platform_fee, $r->reseller_commission,
-                $r->origin_vendor_net, $r->tax_withholding, $r->status, $r->created_at
-            ] ) . "\n";
+            $csv .= sprintf(
+                '"%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s"' . "\n",
+                $csv_field( $r->id ),
+                $csv_field( $r->order_id ),
+                $csv_field( $r->origin_vendor_id ),
+                $csv_field( $r->reseller_vendor_id ),
+                $csv_field( $r->gross_amount ),
+                $csv_field( $r->platform_fee ),
+                $csv_field( $r->reseller_commission ),
+                $csv_field( $r->origin_vendor_net ),
+                $csv_field( $r->tax_withholding ),
+                $csv_field( $r->status ),
+                $csv_field( $r->created_at )
+            );
         }
-        wp_send_json_success( [ 'csv' => $csv ] );
+        wp_send_json_success( [ 'csv' => base64_encode( $csv ), 'count' => count( $rows ) ] ); // phpcs:ignore
     }
 }
