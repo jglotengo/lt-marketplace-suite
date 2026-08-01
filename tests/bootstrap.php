@@ -413,20 +413,32 @@ if ( $ltms_unit_only ) {
     defined( 'DB_PASSWORD' )       || define( 'DB_PASSWORD',       '' );
 
     // ── Stub $wpdb global ──────────────────────────────────────────────────────
+    // FIX CI-RED-BASELINE: exponer un constructor de mock $wpdb limpio para que
+    // LTMS_Unit_Test_Case::setUp pueda resetear $GLOBALS['wpdb'] entre tests.
+    // Sin esto, tests que setean $GLOBALS['wpdb'] con mocks custom sin tearDown
+    // (ej. AdminKycApproveAuditTest) dejan un mock "sucio" que tests siguientes
+    // heredan vía global — causando 48 errors + 25 failures falsos en la suite
+    // completa (TaxEngine, BookingManager, MediaGuard, PaymentOrchestrator, etc.
+    // leían get_var() contaminado y devolvían 1.0 en vez de las tasas reales).
+    if ( ! function_exists( 'ltms_tests_make_clean_wpdb' ) ) {
+        function ltms_tests_make_clean_wpdb(): object {
+            return new class {
+                public string $prefix = 'wp_';
+                public function get_var( mixed $query = null ): mixed { return null; }
+                public function get_results( mixed $query = null, string $output = 'OBJECT' ): array { return []; }
+                public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed { return null; }
+                public function prepare( string $query, mixed ...$args ): string { return $query; }
+                public function query( string $query ): int|bool { return false; }
+                public function insert( string $table, array $data, mixed $format = null ): int|bool { return false; }
+                public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|bool { return false; }
+                public function delete( string $table, array $where, mixed $where_format = null ): int|bool { return false; }
+                public function esc_like( string $text ): string { return addcslashes( $text, '_%\\' ); }
+                public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'; }
+            };
+        }
+    }
     if ( ! isset( $GLOBALS['wpdb'] ) ) {
-        $GLOBALS['wpdb'] = new class {
-            public string $prefix = 'wp_';
-            public function get_var( mixed $query = null ): mixed { return null; }
-            public function get_results( mixed $query = null, string $output = 'OBJECT' ): array { return []; }
-            public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed { return null; }
-            public function prepare( string $query, mixed ...$args ): string { return $query; }
-            public function query( string $query ): int|bool { return false; }
-            public function insert( string $table, array $data, mixed $format = null ): int|bool { return false; }
-            public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|bool { return false; }
-            public function delete( string $table, array $where, mixed $where_format = null ): int|bool { return false; }
-            public function esc_like( string $text ): string { return addcslashes( $text, '_%\\' ); }
-            public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'; }
-        };
+        $GLOBALS['wpdb'] = ltms_tests_make_clean_wpdb();
     }
 
     // ── Stub WP_Error ──────────────────────────────────────────────────────────

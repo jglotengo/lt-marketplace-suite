@@ -13,6 +13,27 @@
 
 class KYCComplianceTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
+    /**
+     * setUp — garantizar que la clase REAL LTMS_Legal_Compliance esté cargada
+     * antes de los tests. El archivo includes/business/class-ltms-legal-compliance.php
+     * NO lo carga el bootstrap ni el autoloader del plugin en modo UNIT_ONLY, así
+     * que otros tests (ej. AdminKycApproveAuditTest) pueden haber definido antes un
+     * stub eval('final class LTMS_Legal_Compliance ...') sin las constantes
+     * VAULT_OP_* ni el parámetro $document — ese stub "gana" porque PHP no permite
+     * redefinir clases. Forzamos require_once del archivo real aquí, antes de cada
+     * test, así si la clase no está cargada se carga la versión correcta; si ya lo
+     * está (eval stub), el require_once cargará el archivo pero PHP descartará la
+     * redefinición silenciosamente — en cuyo caso los tests documentan que el stub
+     * ganó (escenario de test isolation roto a investigar aparte).
+     */
+    protected function setUp(): void {
+        parent::setUp();
+        $file = dirname( __DIR__, 2 ) . '/includes/business/class-ltms-legal-compliance.php';
+        if ( file_exists( $file ) && ! class_exists( 'LTMS_Legal_Compliance', false ) ) {
+            require_once $file;
+        }
+    }
+
     // ── K-02: VAULT_OP_* constants exist ─────────────────────────────────────
 
     /** @test */

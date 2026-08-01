@@ -37,6 +37,19 @@ abstract class LTMS_Unit_Test_Case extends TestCase {
                 parent::setUp();
                 Monkey\setUp();
 
+                // FIX CI-RED-BASELINE: resetear $GLOBALS['wpdb'] a un mock limpio
+                // antes de cada test. Sin esto, tests que setean $GLOBALS['wpdb']
+                // con mocks custom sin tearDown apropiado (ej. AdminKycApproveAuditTest
+                // dejaba get_var()=1) contaminan los tests siguientes que leen
+                // $wpdb vía global — provocando 48 errors + 25 failures falsos en
+                // la suite completa (TaxEngine leía IEPS=1.0 en vez de 0.08,
+                // MediaGuard leía "uploader_id" sobre un array, etc.).
+                // Los tests que necesitan un mock específico lo sobreescriben en su
+                // propio setUp() o en el cuerpo del test, después de parent::setUp().
+                if ( function_exists( 'ltms_tests_make_clean_wpdb' ) ) {
+                        $GLOBALS['wpdb'] = ltms_tests_make_clean_wpdb();
+                }
+
                 // FIX: limpiar cache estático de LTMS_Core_Config antes de cada test.
                 // Composer carga la clase REAL via classmap. Su $settings_loaded es
                 // static y persiste entre tests. Sin este flush, el segundo test que

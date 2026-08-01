@@ -252,6 +252,10 @@ class AdminKycApproveAuditTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 				return [ 'id' => 1, 'status' => 'pending', 'bank_name' => '', 'bank_account_number' => '' ];
 			}
 			public function update( string $t, array $d, array $w, mixed $f = null, mixed $wf = null ): int { return 0; }
+			// FIX CI-RED-BASELINE: insert() requerido porque ahora se carga la clase
+			// REAL LTMS_Legal_Compliance (no el eval stub), y log_vault_access() en el
+			// happy path llama $wpdb->insert() sobre lt_vault_access_log.
+			public function insert( string $t, array $d, mixed $f = null ): int|bool { return 1; }
 		};
 
 		// apply_filters devuelve `true` (sin bloqueo).
@@ -294,7 +298,18 @@ class AdminKycApproveAuditTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 			eval( 'final class LTMS_Utils { public static function now_utc(): string { return date( "Y-m-d H:i:s" ); } }' );
 		}
 		if ( ! class_exists( 'LTMS_Legal_Compliance', false ) ) {
-			eval( 'final class LTMS_Legal_Compliance { public static function log_vault_access( int $vid, int $aid, string $t, string $a, string $s ): void {} }' );
+			// FIX CI-RED-BASELINE: cargar la clase REAL en lugar de un eval() stub.
+			// El stub anterior definía `log_vault_access( $vid, $aid, $t, $a, $s )`
+			// (3er parámetro $t en vez de $document) y SIN las constantes
+			// VAULT_OP_*. Como PHP no permite redefinir clases, ese stub "ganaba"
+			// y contaminaba KYCComplianceTest (7 tests falsos en rojo).
+			$legal_compliance_file = dirname( __DIR__, 2 ) . '/includes/business/class-ltms-legal-compliance.php';
+			if ( file_exists( $legal_compliance_file ) ) {
+				require_once $legal_compliance_file;
+			} else {
+				// Fallback solo si el archivo real no existe (no debería pasar).
+				eval( 'final class LTMS_Legal_Compliance { public static function log_vault_access( int $vid, int $aid, string $document, string $a, string $s ): void {} }' );
+			}
 		}
 
 		// Capture success to short-circuit before the handler emails.
