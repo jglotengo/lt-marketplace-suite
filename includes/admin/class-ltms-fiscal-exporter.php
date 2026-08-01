@@ -53,6 +53,22 @@ class LTMS_Fiscal_Exporter {
 
         fwrite( $fp, "\xEF\xBB\xBF" );
 
+        // AUDIT-PANEL-CSV-001: proteccion CSV formula injection para fputcsv.
+        // fputcsv escapa comillas dobles (RFC 4180) pero NO previene formula
+        // injection: un valor que empiece con = + - @ \t \r se interpreta como
+        // formula al abrir en Excel/Sheets. Los datos fiscales exportados
+        // (RFC, CURP, domicilio fiscal, CLABE, banco) provienen de user-meta
+        // alcanzable via registro de vendor, asi que un vendor malicioso podria
+        // inyectar '=cmd|/c calc!A1' en su RFC/CURP y ejecutar comandos al abrir
+        // el reporte fiscal Art. 30-B CFF / E.T. 437-2 CO en Excel.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         $plataforma = get_bloginfo('url');
         $generado   = current_time('Y-m-d H:i:s');
         $usuario    = wp_get_current_user()->display_name ?: 'sistema';
@@ -77,11 +93,11 @@ class LTMS_Fiscal_Exporter {
             $gross     = (float) $r['gross_amount'];
             $iva_trasl = (float) $r['iva_amount'];
             $sin_iva   = $gross - $iva_trasl;
-            fputcsv( $fp, [ 'I', $r['id'], $r['order_id'], $r['country_code'], $r['created_at'],
-                $r['service_type'] ?: '', $r['rfc_cliente'] ?: '',
+            fputcsv( $fp, [ 'I', $csv_field( $r['id'] ), $csv_field( $r['order_id'] ), $csv_field( $r['country_code'] ), $csv_field( $r['created_at'] ),
+                $csv_field( $r['service_type'] ?: '' ), $csv_field( $r['rfc_cliente'] ?: '' ),
                 number_format($sin_iva,2,'.',''),(number_format($iva_trasl,2,'.','')),
-                number_format($gross,2,'.',''),(($r['cfdi_folio'] ?: '')),
-                $r['payment_method_buyer'] ?: '', $r['vendor_id'] ] );
+                number_format($gross,2,'.',''),($csv_field( $r['cfdi_folio'] ?: '' )),
+                $csv_field( $r['payment_method_buyer'] ?: '' ), $csv_field( $r['vendor_id'] ) ] );
         }
 
         fputcsv( $fp, [] );
@@ -129,15 +145,15 @@ class LTMS_Fiscal_Exporter {
         }
 
         foreach ( $vendors as $v ) {
-            fputcsv( $fp, [ 'II',$v['vendor_id'],$v['email'],$v['nombre'],$v['rfc'],$v['curp'],
-                $v['domicilio'],$v['pais'],$v['banco'],$v['clabe'],
+            fputcsv( $fp, [ 'II',$csv_field( $v['vendor_id'] ),$csv_field( $v['email'] ),$csv_field( $v['nombre'] ),$csv_field( $v['rfc'] ),$csv_field( $v['curp'] ),
+                $csv_field( $v['domicilio'] ),$csv_field( $v['pais'] ),$csv_field( $v['banco'] ),$csv_field( $v['clabe'] ),
                 number_format($v['isr'],2,'.',''),(number_format($v['iva'],2,'.','')),
-                number_format($v['ieps'],2,'.',''),(implode('|',array_unique($v['pm_a']))),
-                implode('|',array_unique($v['pm_o'])),(implode('|',array_unique($v['pm_p']))),
+                number_format($v['ieps'],2,'.',''),($csv_field( implode('|',array_unique($v['pm_a'])) )),
+                $csv_field( implode('|',array_unique($v['pm_o'])) ),($csv_field( implode('|',array_unique($v['pm_p'])) )),
                 number_format($v['isr_ret'],2,'.',''),(number_format($v['iva_ret'],2,'.','')),
                 number_format($v['ieps_ret'],2,'.',''),(($v['hosp_ops'])),
-                $v['hosp_dir'],$v['imp_ops'],(number_format($v['aranceles'],2,'.','')),
-                $v['total'],$v['primera'],$v['ultima'] ] );
+                $csv_field( $v['hosp_dir'] ),$v['imp_ops'],(number_format($v['aranceles'],2,'.','')),
+                $v['total'],$csv_field( $v['primera'] ),$csv_field( $v['ultima'] ) ] );
         }
 
         fputcsv( $fp, [] );
@@ -148,7 +164,7 @@ class LTMS_Fiscal_Exporter {
             fputcsv( $fp, [ '# Sin retiros de alto valor en el período.' ] );
         } else {
             fputcsv( $fp, [ 'ID','VENDOR_ID','MONTO','FECHA' ] );
-            foreach ( $alto_valor as $r ) fputcsv( $fp, [$r['id'],$r['vendor_id'],$r['gross_amount'],$r['created_at']] );
+            foreach ( $alto_valor as $r ) fputcsv( $fp, [$csv_field( $r['id'] ), $csv_field( $r['vendor_id'] ), $csv_field( $r['gross_amount'] ), $csv_field( $r['created_at'] )] );
         }
 
         fclose( $fp );
