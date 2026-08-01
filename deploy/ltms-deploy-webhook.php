@@ -725,6 +725,10 @@ $files = [
     // CRÍTICO para el fix (contiene validate_rut_and_camara_comercio).
     'includes/business/class-ltms-authorities-compliance.php',
     'tests/unit/AdminKycApproveAuditTest.php',
+    // ADMIN-PAYOUT-AUDIT-RE — re-audit cycle (extiende el fix "desconectado"
+    // KYC hacia el modulo de retiros). Los 2 archivos PHP modificados ya
+    // estaban en la whitelist (líneas 570 + 587); sólo falta el nuevo test.
+    'tests/unit/AdminPayoutAuditReTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

@@ -47,6 +47,19 @@ final class LTMS_Admin_Payouts {
     /**
      * AJAX: Aprobar solicitud de retiro.
      *
+     * v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: antes se usaba `wp_send_json( $result )` que
+     * empaquetaba el array `{success: bool, message: string}` del scheduler dentro del
+     * canal `success` de la respuesta AJAX. Aunque el scheduler ya indicaba fallo con
+     * `success=false`, jQuery `.done()` parseaba el body como exitoso y la UI mostraba
+     * "✓ Aprobado" (cambiando el badge a verde) sobre un retiro que en realidad no se
+     * aprobó — dando al admin la falsa sensación de que el pago se había ejecutado cuando
+     * el scheduler lo había bloqueado (KYC revocado, límites operativos, double-claim).
+     * Es el espejo del bug "desconectado" arreglado en ADMIN-KYC-APPROVE-AUDIT pero
+     * opuesto: aquí el admin recibe falsa sensación de éxito, allá falsa alarma de
+     * desconexión. Ahora delegamos en normalize_payout_result() que enruta al canal
+     * correcto (`wp_send_json_success` si `success=true`, `wp_send_json_error` con
+     * `{message, block_code}` si `success=false`) — JS ya puede distinguirlos.
+     *
      * @return void
      */
     public function ajax_approve_payout(): void {
@@ -62,11 +75,14 @@ final class LTMS_Admin_Payouts {
         }
 
         $result = LTMS_Payout_Scheduler::approve( $payout_id, get_current_user_id() );
-        wp_send_json( $result );
+        $this->normalize_payout_result( $result, 'PAYOUT_APPROVE' );
     }
 
     /**
      * AJAX: Rechazar solicitud de retiro.
+     *
+     * v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: normalize_payout_result() en lugar de
+     * wp_send_json( $result ) — ver docblock de ajax_approve_payout para el motivo.
      *
      * @return void
      */
@@ -85,7 +101,57 @@ final class LTMS_Admin_Payouts {
         }
 
         $result = LTMS_Payout_Scheduler::reject( $payout_id, $reason, get_current_user_id() );
-        wp_send_json( $result );
+        $this->normalize_payout_result( $result, 'PAYOUT_REJECT' );
+    }
+
+    /**
+     * Normaliza el resultado del scheduler (array `{success, message, ...}`) al
+     * canal AJAX correcto. Antes el handler usaba `wp_send_json( $result )` que
+     * empaquetaba ambos caminos (éxito y fallo de compliance/doble-claim) en el
+     * canal `success`, causando que jQuery `.done()` interpretara bloqueos como
+     * aprobados. Ahora: success=true → wp_send_json_success; success=false →
+     * wp_send_json_error({message, block_code}) con 422 (Unprocessable Entity,
+     * semánticamente "la entidad es válida pero el proceso fue rechazado por
+     * reglas de negocio") para que el JS distinga "bloqueo lógico" (handler
+     * envió mensaje real) de "error técnico HTTP" (servidor/session).
+     *
+     * El scheduler devuelve un mensaje ya traducido y específico (KYC revocado,
+     * límites operativos, ya-procesada, etc.) que el admin verá en lugar de
+     * "Error al aprobar." sin contexto. Mantiene el formato `{message, block_code}`
+     * para paridad con el fix ADMIN-KYC-APPROVE-AUDIT de KYC approve.
+     *
+     * @param array  $result Resultado del scheduler.
+     * @param string $log_context Prefijo para el log.
+     * @return void
+     */
+    private function normalize_payout_result( array $result, string $log_context ): void {
+        if ( is_array( $result ) && ! empty( $result['success'] ) ) {
+            $payload = $result;
+            unset( $payload['success'] );
+            wp_send_json_success( $payload );
+        }
+
+        $message = ( is_array( $result ) && ! empty( $result['message'] ) )
+            ? (string) $result['message']
+            : __( 'No se pudo procesar la solicitud de retiro.', 'ltms' );
+
+        // block_code opcional para futura paridad con el JS del admin KYC.
+        $block_code = ( is_array( $result ) && ! empty( $result['block_code'] ) )
+            ? (string) $result['block_code']
+            : ( is_array( $result ) && ! empty( $result['error_code'] ) ? (string) $result['error_code'] : '' );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::warning(
+                $log_context . '_BLOCKED',
+                $message,
+                [ 'block_code' => $block_code, 'admin_id' => get_current_user_id() ]
+            );
+        }
+
+        wp_send_json_error(
+            [ 'message' => $message, 'block_code' => $block_code ],
+            422
+        );
     }
 
     /**

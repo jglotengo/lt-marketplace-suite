@@ -236,6 +236,38 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
 </div>
 
 <script>
+// v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: distinguir compliance-block (422 + JSON) de
+// sesión expirada / server 500 / red real. Antes los 3 .fail() decían "Error de
+// conexión." mudo — mismo bug que ADMIN-KYC-APPROVE-AUDIT arregló en html-admin-kyc.php.
+// Duplicate definition guard: si ambas views (kyc + payouts) se cargan en la misma
+// página, la segunda no redefine la función.
+if ( typeof window.ltmsHttpFailReason !== 'function' ) {
+    window.ltmsHttpFailReason = function( jqXHR ) {
+        if ( ! jqXHR ) return 'Error de conexión.';
+        if ( jqXHR.status === 0 || jqXHR.readyState === 0 ) {
+            return 'Error de conexión. Verifica tu red e inténtalo de nuevo.';
+        }
+        var ct = ( jqXHR.getResponseHeader('content-type') || '' ).toLowerCase();
+        if ( jqXHR.status === 401 || ( jqXHR.status === 403 && ct.indexOf('text/html') !== -1 ) ) {
+            return 'Tu sesión expiró. Recarga la página e inicia sesión de nuevo.';
+        }
+        var body = jqXHR.responseText || '';
+        if ( body && ct.indexOf('application/json') !== -1 ) {
+            try {
+                var parsed = JSON.parse( body );
+                if ( parsed && parsed.data && parsed.data.message ) return parsed.data.message;
+                if ( parsed && typeof parsed.message === 'string' ) return parsed.message;
+            } catch ( e ) { /* fall through */ }
+        }
+        if ( jqXHR.status === 422 ) {
+            return 'No se pudo procesar el retiro por una regla de cumplimiento. Revisa los logs.';
+        }
+        if ( jqXHR.status >= 500 ) {
+            return 'Error del servidor (HTTP ' + jqXHR.status + '). Revisa el error_log o inténtalo de nuevo.';
+        }
+        return 'Error de conexión (HTTP ' + jqXHR.status + ').';
+    };
+}
 (function($){
     'use strict';
 
@@ -295,13 +327,16 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
                 }
                 ltmsNotify('success', 'Retiro #' + payoutId + ' aprobado correctamente.');
             } else {
-                ltmsNotify('error', res.data || 'Error al aprobar.');
+                // v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: mostrar mensaje real del scheduler
+                // (res.message o res.data.message) en lugar de "Error al aprobar." sin contexto.
+                var msg = ( res && res.message ) ? res.message : ( res && res.data && res.data.message ? res.data.message : 'Error al aprobar.' );
+                ltmsNotify('error', msg);
             }
         })
-        .fail(function(){
+        .fail(function(jqXHR){
             $('#ltms-approve-modal').hide();
             $btn.prop('disabled', false).text('Confirmar Aprobación');
-            ltmsNotify('error', 'Error de conexión.');
+            ltmsNotify('error', window.ltmsHttpFailReason( jqXHR ) );
         });
     });
 
@@ -365,12 +400,14 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
                 ltmsNotify('success', 'Retiro #' + payoutId + ' rechazado. Vendedor notificado.');
             } else {
                 $btn.prop('disabled', false).text('Confirmar Rechazo');
-                $('#ltms-reject-error').text(res.data || 'Error al rechazar.').show();
+                // v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: mensaje real del scheduler.
+                var msg = ( res && res.message ) ? res.message : ( res && res.data && res.data.message ? res.data.message : 'Error al rechazar.' );
+                $('#ltms-reject-error').text(msg).show();
             }
         })
-        .fail(function(){
+        .fail(function(jqXHR){
             $btn.prop('disabled', false).text('Confirmar Rechazo');
-            $('#ltms-reject-error').text('Error de conexión.').show();
+            $('#ltms-reject-error').text(window.ltmsHttpFailReason( jqXHR )).show();
         });
     });
 
@@ -401,11 +438,13 @@ $nonce = wp_create_nonce( 'ltms_admin_nonce' );
                 URL.revokeObjectURL(url);
                 ltmsNotify('success', res.data.count + ' retiros exportados.');
             } else {
-                ltmsNotify('error', res.data || 'Error al exportar.');
+                // v2.9.188 ADMIN-PAYOUT-AUDIT-RE FIX: mensaje real si scheduler devuelve error.
+                var msg = ( res && res.data && res.data.message ) ? res.data.message : ( res && res.message ? res.message : 'Error al exportar.' );
+                ltmsNotify('error', msg);
             }
         })
-        .fail(function(){
-            ltmsNotify('error', 'Error de conexión al exportar.');
+        .fail(function(jqXHR){
+            ltmsNotify('error', window.ltmsHttpFailReason( jqXHR ) );
         })
         .always(function(){
             $btn.prop('disabled', false).text('📥 Exportar CSV');
