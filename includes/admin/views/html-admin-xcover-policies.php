@@ -84,7 +84,21 @@ if ( isset( $_GET['export_csv'] ) && $table_exists ) { // phpcs:ignore
     if ( $all ) {
         echo implode( ',', array_keys( $all[0] ) ) . "\n";
         foreach ( $all as $row ) {
-            echo implode( ',', array_map( function( $v ) { return '"' . str_replace( '"', '""', $v ) . '"'; }, $row ) ) . "\n";
+            // AUDIT-PANEL-CSV-001: proteccion CSV formula injection + RFC 4180.
+            // Mismo patron que admin-payouts/cross-border/donations/redi/etc:
+            // antepone una comilla simple a valores que empiezan con = + - @
+            // \t \r para que Excel/Sheets los trate como texto, no como formula.
+            // Sin esto un vendor malicioso podria inyectar '=cmd|/c calc!A1'
+            // en campos alcanzables (status, reference, policy_number, etc.)
+            // y ejecutar comandos al abrir el CSV en Excel.
+            echo implode( ',', array_map( function( $v ) {
+                $v = (string) ( $v ?? '' );
+                $v = str_replace( '"', '""', $v );
+                if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                    $v = "'" . $v;
+                }
+                return '"' . $v . '"';
+            }, $row ) ) . "\n";
         }
     }
     exit;
