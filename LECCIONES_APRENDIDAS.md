@@ -2149,5 +2149,52 @@ Fecha: 2026-07-30 (AUDIT-FE Fase 1.10 — cierre CSP-compliance de home.php + si
 
 6. **Trazabilidad.** CI-RED-BASELINE: tras los 4 fixes, suite `--testsuite=unit` completa = **3491 tests, 0 errors, 0 failures, 3 skipped** (de 48+25=73 en rojo a 0 —suite verde por primera vez en ≥3 commits). `php -l` OK en los 5 archivos PHP modificados (`tests/bootstrap.php`, `tests/unit/class-ltms-unit-test-case.php`, `tests/unit/KYCComplianceTest.php`, `tests/unit/AdminKycApproveAuditTest.php`, `tests/unit/TaxEngineTest.php` — este último solo para quitar el debug fwrite STDERR). Grupos afectados en verde: `--group admin-kyc-approve-audit` = 17/17 OK, `--group kyc` = 17/17 OK, `--group admin-payout-audit-re` = 7/7 OK. Los módulos de producción afectados indirectamente (`class-ltms-tax-strategy-mexico.php`, `class-ltms-media-guard.php`, `class-ltms-booking-manager.php`, `class-ltms-payment-orchestrator.php`, `class-ltms-legal-compliance.php`) **NO fueron modificados** — su lógica era correcta, el bug era de aislamiento de tests.
 
+### Lección #149: el inventario de un loop de auditoría CSV debe extenderse a `business/` y `gateway/` — grep por `fputcsv(` + `wp_mail(` en todo el árbol, no grep por `view-*.php` + `class-ltms-admin-*-export.php`
+
+1. **Síntoma.** El ciclo AUDIT-PANEL-CSV-001 (commits `8205d24e`→`8bc2a21d`, CSV-01 a CSV-05) declaró stop implícito tras fixear 5 exportadores en `admin/views/` (`view-auditor-dashboard.php`, `html-admin-xcover-policies.php`) y `admin/` (`class-ltms-admin-redi.php`, `class-ltms-fiscal-exporter.php`, `class-ltms-auditor-export.php`). Se consideró "módulo CSV completa" cerrado. La re-auditoría del paso 5 del loop (AGENTS.md "Loop de auditoría autónoma") reveló que el inventario estaba **incompleto**: 6 exportadores adicionales en `includes/business/` (`class-ltms-authorities-compliance.php` RAEE+INVIMA, `class-ltms-cross-border-compliance.php` FX Forma 4, `class-ltms-fintech-compliance.php` SOS+CRS, `class-ltms-foundation-compliance.php` DIAN 1737) compartían el MISMO anti-patrón (`fputcsv()` con datos vendor-provided sin protección de formula injection) y NUNCA habían sido inventariados. Los 6 tocaban autoridades regulatorias (ANLA/SEMARNAT, INVIMA/COFEPRIS, DIAN/Banxico, UIAF/SHCP, OECD MCAA, DIAN) — canal de distribución de máximo impacto.
+
+2. **Causa raíz del inventario parcial.** El inventario se construyó con grep por `view-*.php` (lógica visual admin) y por `class-ltms-admin-*-export.php` (clases admin explícitamente nominate como "export"). Esta heurística:
+   - **Atrapó** los 5 casos del ciclo CSV-001 porque todos vivían en el namespace admin (handlers `admin_post_*/wp_ajax_*` invocados desde views admin, con `$_GET['export_csv']` o `$_GET['export'] === 'csv'`).
+   - **No atrapó** los 6 exportadores regulatorios porque viven en `includes/business/`, son invocados desde hook `ltms_yearly_cron` / `ltms_monthly_cron` (NO desde evento admin), y NO tienen la palabra "export" en el nombre del método (`generate_raee_annual_report()`, `generate_invima_annual_report()`, `generate_fx_forma4_csv()`, `generate_sos_csv_uiaf()`, `generate_crs_fatca_report()`, `generate_dian_annual_report()`).
+   - La falsa hipótesis fue: "los exportadores CSV son bienes admin, viven en admin/". La realidad: los exportadores regulatorios son **bienes de compliance**, viven en `business/` porque son invocados por cron, no por evento admin.
+
+3. **Fix.** El stop-check no converge, se abre ciclo derivado **AUDIT-PANEL-CSV-002**:
+   - Mismo fix-pattern del CSV-001 aplicado a 6 métodos en 4 archivos (`class-ltms-authorities-compliance.php`, `class-ltms-cross-border-compliance.php`, `class-ltms-fintech-compliance.php`, `class-ltms-foundation-compliance.php`): closure `$csv_field` inline (`(string)($v ?? '')` + prefix `'` para `[= + - @ \t \r]`) antes del `fputcsv()`, numéricos preservados.
+   - 6 nuevas suites estructurales de test (mismo patrón que `XcoverPoliciesCsvInjectionTest`): `AuthoritiesRaeeCsvInjectionTest.php` (11 t/14 a), `AuthoritiesInvimaCsvInjectionTest.php` (10 t/12 a), `CrossBorderFxCsvInjectionTest.php` (12 t/16 a), `FintechSosCsvInjectionTest.php` (14 t/20 a), `FintechCrsFatcaCsvInjectionTest.php` (15 t/19 a), `FoundationDian1737CsvInjectionTest.php` (11 t/15 a). Total +73 tests / 96 assertions. Suite completa: 3624 tests, 0 errors, 0 failures, 3 skipped (era 3551, +73, cero regresiones).
+
+4. **2 falsos positivos descartados en el stop-check.** `class-ltms-admin-bookings.php:226` `export_csv()` (línea 238) y `class-ltms-frontend-booking-handler.php:301` (línea 305) aparecieron en el grep de `fputcsv(` como casos vulnerables, pero la re-auditoría visual confirmó que ya tenían la protección formula-injection (closure con `preg_match('/^[=+\-@]/', $val)`). Tercer falso positivo: `class-ltms-admin-donations.php:458` `ajax_export_csv()` (línea 491-499) ya tenía el helper `$csv_field` con escape RFC 4180 + BOM UTF-8 (commits ADMIN-BUG-6/7/8 previos). Los 3 falsos positivos NO son bugs; son casos donde el grep atrapa código correctamente ya fixeado y la verificación humana es necesaria para descartarlos.
+
+5. **Regla preventiva.** La heurística correcta para el inventario de un loop de auditoría CSV/formula-injection en un plugin WordPress es:
+    ```bash
+    # Encontrar TODOS los exportadores CSV del arbol, sin filtrar por namespace:
+    grep -rn "fputcsv(" --include="*.php" includes/ | grep -v vendor/ | grep -v tests/
+    grep -rn "text/csv" --include="*.php" includes/ | grep -v vendor/ | grep -v tests/
+    grep -rn "Content-Disposition.*\.csv" --include="*.php" includes/ | grep -v vendor/
+    grep -rn "fopen.*\.csv" --include="*.php" includes/ | grep -v vendor/
+    grep -rn "fwrite.*\\\\xEF\\\\xBB\\\\xBF" --include="*.php" includes/   # BOM UTF-8
+    grep -rn "array_map.*str_replace.*\"\"" --include="*.php" includes/   # inline closures
+
+    # Coronar con wp_mail (exportadores regulatorios para autoridad):
+    grep -rn "wp_mail(" --include="*.php" includes/business/ | while read line; do
+      file=$(echo $line | cut -d: -f1)
+      grep -l "fputcsv\|\.csv" $file && echo "POSIBLE EXPORTADOR CSV+EMAIL"
+    done
+    ```
+   - **NO limitarse a `admin/`**: el grep DEBE extenderse a `business/`, `gateway/`, `core/`, y cualquier subdirectorio de `includes/`. Los exportadores regulatorios (RAEE, INVIMA, FX, SOS, CRS, DIAN) viven en `business/` porque son invocados por cron, no por evento admin.
+   - **NO limitarse a `view-*.php`**: las views admin son un subconjembro pequeño de los exportadores. Los que viven en clases (métodos `generate_*_report()`) son invisibles a un grep por directorio de views.
+   - **NO limitarse a `class-ltms-admin-*-export.php`**: el nombre del método NO tiene que incluir "export". `generate_raee_annual_report()`, `generate_fx_forma4_csv()`, `generate_dian_annual_report()` son todos exportadores aunque la palabra "export" no aparezca.
+   - **Coronar con `wp_mail(`**: si el archivo tiene `fputcsv(` Y `wp_mail(`, es candidato prioritario a audit — son reportes que se envían a una autoridad (canal de máximo impacto regulatorio).
+   - **Cron no es contención**: aunque un reporte se genere anualmente (`ltms_yearly_cron`), el LINK entre el vendor (input) y el oficial regulatorio (output) se materializa en cada disparo del cron. La frecuencia no reduce el riesgo.
+
+6. **Relación con lecciones previas.**
+    - LECCIONES **#141** (canarios mentirosos en comment blocks): espejo. Aquí el "canario mentiroso" es la declaración implícita "el ciclo CSV-001 cerró el módulo CSV" — el commentario del CHANGELOG no describía el alcance del inventario y dejaba la impresión de cierre total. La re-auditoría física (paso 5) reveló que faltaba el 54% de los exportadores (6 de 11).
+    - LECCIONES **#130** (silent fallback JS becomes only path): relación tangencial. El anti-patrón de los 6 exportadores es "fputcsv escapa comillas pero previene formula injection NO" — el fallback silencioso de `fputcsv()` (preservar el valor raw) se convierte en el único path cuando no se añade el `$csv_field` wrapper. Misma lección sobre suposiciones implícitas: una primitiva de la stdlib (`fputcsv`) que hace lo correcto para RFC 4180 (escapar comillas) NO hace lo correcto para formula injection (prefix `'`).
+    - LECCIONES **#143** (mismo anti-patrón en múltiples vistas): mismo patrón de cobertura insuficiente, distinto vector. #143 trataba sobre tests de no-contención que fallaban al ser replicados a múltiples vistas; aquí es fixes que no fueron replicados a múltiples métodos (de `admin/` a `business/`) por no extender el inventario.
+    - LECCIONES **#148** (contaminación wpdb entre tests): absolutamente no relacionada pero surge del mismo principio — la "cobertera declarada" no siempre coincide con la "cobertura real". Aquí el coverage declarado del módulo CSV era "5 exportadores cerrados"; la cobertura real era "5 de 11 exportadores cerrados, 6 invisibles al inventario".
+
+7. **Trazabilidad.** AUDIT-PANEL-CSV-002 cerrado en esta iteración. Los 6 fixes aplicados a 4 archivos (`class-ltms-authorities-compliance.php` x2, `class-ltms-cross-border-compliance.php`, `class-ltms-fintech-compliance.php` x2, `class-ltms-foundation-compliance.php`) + 6 suites de test estructurales nuevas (+73 tests / 96 assertions). Suite completa `--testsuite=unit`: **3624 tests, 0 errors, 0 failures, 3 skipped** (vs 3551/0/0/3 baseline — +73 tests, cero regresiones). `php -l` OK en los 4 archivos modificados + 6 archivos de test. Stop-check de AUDIT-PANEL-CSV-002 pendiente en próxima iteración (verificar que no aparezcan nuevos exportadores CSV en `business/` por grep global).
+
+
+
 
 

@@ -589,15 +589,31 @@ class LTMS_Cross_Border_Compliance {
         $dir = self::ensure_dir( 'ltms-fx' );
         $path = $dir . '/forma4_' . gmdate( 'Ym' ) . '_' . wp_generate_password( 6, false ) . '.csv';
         $fp = fopen( $path, 'w' );
+
+        // AUDIT-PANEL-CSV-001 CSV2-03: proteccion CSV formula injection para fputcsv.
+        // displayName (get_userdata()->display_name), ltms_tax_id y
+        // ltms_document_number (user_meta) son controlables por el vendor durante
+        // el onboarding. La Forma 4 se envia a la DIAN (CO) y el aviso Banxico
+        // (gemelo XML, no afecto) al Banco de Mexico — un vendor con ventas > $10k
+        // USD podria setear su razon social a '=cmd|/c calc!A1' y el oficial de
+        // cumplimiento al abrir el CSV en Excel ejecutaria la formula.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         fputcsv( $fp, [ 'TIPO_DECLARACION', 'PERIODO', 'IDENTIFICACION', 'NOMBRE', 'MONEDA', 'MONTO_TOTAL', 'MONTO_USD', 'NUM_TRANSACCIONES' ] );
         foreach ( $declarations as $d ) {
             $vendor = get_userdata( $d['vendor_id'] );
             fputcsv( $fp, [
                 'FORMA_4',
-                $d['month'],
-                get_user_meta( $d['vendor_id'], 'ltms_tax_id', true ) ?: get_user_meta( $d['vendor_id'], 'ltms_document_number', true ),
-                $vendor ? $vendor->display_name : '',
-                $d['currency'],
+                $csv_field( $d['month'] ),
+                $csv_field( get_user_meta( $d['vendor_id'], 'ltms_tax_id', true ) ?: get_user_meta( $d['vendor_id'], 'ltms_document_number', true ) ),
+                $csv_field( $vendor ? $vendor->display_name : '' ),
+                $csv_field( $d['currency'] ),
                 $d['total'],
                 $d['total_usd'],
                 $d['tx_count'],

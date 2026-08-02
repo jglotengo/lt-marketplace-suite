@@ -818,9 +818,26 @@ class LTMS_Authorities_Compliance {
         $dir = self::ensure_dir( 'ltms-raee' );
         $path = $dir . '/raee_report_' . $year . '_' . wp_generate_password( 6, false ) . '.csv';
         $fp = fopen( $path, 'w' );
+
+        // AUDIT-PANEL-CSV-001 CSV2-01: proteccion CSV formula injection para fputcsv.
+        // fputcsv escapa comillas dobles (RFC 4180) pero NO previene formula
+        // injection: un valor que empiece con = + - @ \t \r se interpreta como
+        // formula al abrir en Excel/Sheets. product_name proviene de get_the_title()
+        // y raee_category de post_meta, ambos editables por el vendor al crear el
+        // producto — un vendor malicioso podria inyectar '=cmd|/c calc!A1' en el
+        // titulo y ejecutar comandos al abrir el reporte RAEE enviado a ANLA /
+        // SEMARNAT (Ley 1672/2013 CO / LGPGIR MX) en Excel/LibreOffice.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         fputcsv( $fp, [ 'PRODUCT_ID', 'PRODUCT_NAME', 'RAEE_CATEGORY', 'UNITS_SOLD', 'YEAR' ] );
         foreach ( $report as $r ) {
-            fputcsv( $fp, [ $r['product_id'], $r['product_name'], $r['raee_category'], $r['units_sold'], $year ] );
+            fputcsv( $fp, [ $csv_field( $r['product_id'] ), $csv_field( $r['product_name'] ), $csv_field( $r['raee_category'] ), $r['units_sold'], $year ] );
         }
         fclose( $fp );
 
@@ -1110,9 +1127,24 @@ class LTMS_Authorities_Compliance {
         $dir = self::ensure_dir( 'ltms-invima' );
         $path = $dir . '/invima_report_' . $year . '_' . wp_generate_password( 6, false ) . '.csv';
         $fp = fopen( $path, 'w' );
+
+        // AUDIT-PANEL-CSV-001 CSV2-02: proteccion CSV formula injection para fputcsv.
+        // Mismo patron que CSV2-01: product_name (get_the_title), category
+        // (taxonomia del producto) e invima_cert (post_meta _ltms_cert_invima_registro)
+        // son todos controlables por el vendor. El reporte se envia por email a
+        // INVIMA (CO) o COFEPRIS (MX) — si el oficial abre el CSV en Excel, una
+        // celda con '=HYPERLINK(...)' o '=cmd|/c calc!A1' se ejecuta.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         fputcsv( $fp, [ 'PRODUCT_ID', 'PRODUCT_NAME', 'CATEGORY', 'INVIMA_CERT', 'UNITS_SOLD', 'YEAR' ] );
         foreach ( $report as $r ) {
-            fputcsv( $fp, [ $r['product_id'], $r['product_name'], $r['category'], $r['invima_cert'], $r['units_sold'], $year ] );
+            fputcsv( $fp, [ $csv_field( $r['product_id'] ), $csv_field( $r['product_name'] ), $csv_field( $r['category'] ), $csv_field( $r['invima_cert'] ), $r['units_sold'], $year ] );
         }
         fclose( $fp );
 

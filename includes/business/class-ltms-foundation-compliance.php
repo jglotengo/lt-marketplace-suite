@@ -319,15 +319,31 @@ class LTMS_Foundation_Compliance {
             'TIPO_DONACION', 'DETERMINACION_CUANTIA'
         ] );
 
+        // AUDIT-PANEL-CSV-001 CSV2-06: proteccion CSV formula injection para fputcsv.
+        // El reporte DIAN 1737 (Formato 1737 v.9 CO, donaciones deducibles) se
+        // envia a la DIAN. Campos atacables: donor_nit (ltms_tax_id user_meta)
+        // y display_name (nombre del donante en WP), ambos seteables por el
+        // usuario al registrarse / editar su perfil. Una carga como
+        // display_name='=cmd|/c calc!A1' forzaria al auditor de la DIAN a
+        // ejecutar la formula al abrir el CSV en Excel. Numericos
+        // (total_donation) se preservan sin prefix para que DIAN los parseé.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         foreach ( $donations as $d ) {
             fputcsv( $fp, [
                 ! empty( $d['donor_nit'] ) ? 'NIT' : 'CC',
-                $d['donor_nit'] ?: '',
-                $d['display_name'],
+                $csv_field( $d['donor_nit'] ?: '' ),
+                $csv_field( $d['display_name'] ),
                 'Donación marketplace Lo Tengo',
                 $d['total_donation'],
-                $d['currency'],
-                $d['created_at'],
+                $csv_field( $d['currency'] ),
+                $csv_field( $d['created_at'] ),
                 'Transferencia electrónica',
                 'Efectivo',
                 'Determinable',

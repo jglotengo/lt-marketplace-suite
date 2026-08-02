@@ -338,6 +338,21 @@ class LTMS_Fintech_Compliance {
         $path     = $dir . '/' . $filename;
         $fp       = fopen( $path, 'w' );
 
+        // AUDIT-PANEL-CSV-001 CSV2-04: proteccion CSV formula injection para fputcsv.
+        // El reporte SOS (UIAF Anexo 1 CO / SHCP Anexo 1 MX) se envia al oficial
+        // de cumplimiento. Campos atacables: ltms_document_number (user_meta),
+        // display_name (vendor) y $a['reason'] (cadena construida en detect_sos
+        // con datos de la wallet del vendor). Un vendor con comportamiento SOS
+        // que haya seteado display_name='=HYPERLINK(...)' forzaria al oficial a
+        // ejecutar la formula al abrir el CSV en Excel/LibreOffice.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         // Header UIAF Anexo 1.
         fputcsv( $fp, [
             'TIPO_REPORTE', 'PERIODO', 'IDENTIFICACION', 'NOMBRE',
@@ -350,14 +365,14 @@ class LTMS_Fintech_Compliance {
             $doc       = get_user_meta( $a['vendor_id'], 'ltms_document_number', true );
             fputcsv( $fp, [
                 'SOS',
-                gmdate( 'Ym' ),
-                $doc ?: 'DESCONOCIDO',
-                $vendor ? $vendor->display_name : "Vendor #{$a['vendor_id']}",
+                $csv_field( gmdate( 'Ym' ) ),
+                $csv_field( $doc ?: 'DESCONOCIDO' ),
+                $csv_field( $vendor ? $vendor->display_name : "Vendor #{$a['vendor_id']}" ),
                 'TRANSFERENCIA',
                 $a['total'],
-                $a['currency'],
-                gmdate( 'Y-m-d' ),
-                $a['reason'],
+                $csv_field( $a['currency'] ),
+                $csv_field( gmdate( 'Y-m-d' ) ),
+                $csv_field( $a['reason'] ),
                 'WALLET_LTMS',
             ] );
         }
@@ -1058,18 +1073,36 @@ class LTMS_Fintech_Compliance {
             'ACCOUNT_BALANCE', 'ANNUAL_INCOME', 'CURRENCY',
         ] );
 
+        // AUDIT-PANEL-CSV-001 CSV2-05: proteccion CSV formula injection para fputcsv.
+        // El reporte CRS/FATCA (MCAA OECD + IGA CO-US Decreto 2219/2016 + IGA
+        // MX-US 2014) se entrega a la autoridad tributaria del pais (DIAN / SAT).
+        // Campos atacables: name (display_name), address (ltms_address user_meta),
+        // tin_reporting (ltms_tax_id), tin_foreign (ltms_tin_foreign) y
+        // birth_date (ltms_birth_date) — todos seteables por el vendor durante el
+        // KYC. Una carga maliciosa como nombre='=cmd|/c calc!A1' obligaria al
+        // auditor fiscal a ejecutar la formula al abrir el CSV en Excel. Numericos
+        // (balance_total, annual_income) se pasan al closure como string para
+        // normalizacion pero rara vez empiezan con caracteres peligrosos.
+        $csv_field = static function ( $v ): string {
+            $v = (string) ( $v ?? '' );
+            if ( '' !== $v && in_array( $v[0], [ '=', '+', '-', '@', "\t", "\r" ], true ) ) {
+                $v = "'" . $v;
+            }
+            return $v;
+        };
+
         foreach ( $foreign_vendors as $v ) {
             fputcsv( $fp, [
-                get_user_meta( $v['vendor_id'], 'ltms_tax_id', true ),
-                $v['name'],
-                get_user_meta( $v['vendor_id'], 'ltms_address', true ),
-                $v['residence_country'],
-                $v['tin'],
-                get_user_meta( $v['vendor_id'], 'ltms_birth_date', true ),
-                'LTMS-WALLET-' . $v['vendor_id'],
+                $csv_field( get_user_meta( $v['vendor_id'], 'ltms_tax_id', true ) ),
+                $csv_field( $v['name'] ),
+                $csv_field( get_user_meta( $v['vendor_id'], 'ltms_address', true ) ),
+                $csv_field( $v['residence_country'] ),
+                $csv_field( $v['tin'] ),
+                $csv_field( get_user_meta( $v['vendor_id'], 'ltms_birth_date', true ) ),
+                $csv_field( 'LTMS-WALLET-' . $v['vendor_id'] ),
                 $v['balance_total'],
                 $v['annual_income'],
-                LTMS_Core_Config::get_currency(),
+                $csv_field( LTMS_Core_Config::get_currency()),
             ] );
         }
 
