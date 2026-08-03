@@ -51,9 +51,9 @@ require_once __DIR__ . '/class-ltms-unit-test-case.php';
  * @covers \LTMS_Api_Openpay
  * @covers \LTMS_Api_Siigo
  * @covers \LTMS_Api_Stripe
- * @covers \LTMS_Api_Tptc
+ * @covers \LTMS_Api_TPTC
  * @covers \LTMS_Api_Uber
- * @covers \LTMS_Api_Xcover
+ * @covers \LTMS_Api_XCover
  * @covers \LTMS_Api_Zapsign
  * @covers \LTMS_Api_Gateways
  */

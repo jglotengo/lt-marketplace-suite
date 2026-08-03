@@ -1,6 +1,6 @@
 <?php
 /**
- * TptcApiTest — Tests unitarios para LTMS_Api_Tptc
+ * TptcApiTest — Tests unitarios para LTMS_Api_TPTC
  *
  * Cubre:
  *   1. Constructor — URL sandbox/live, api_key descifrada, program_id
@@ -19,52 +19,27 @@ declare(strict_types=1);
 
 namespace LTMS\Tests\Unit;
 
-use Brain\Monkey;
 use Brain\Monkey\Functions;
-use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 
+require_once __DIR__ . '/class-ltms-unit-test-case.php';
+
 /**
- * @covers LTMS_Api_Tptc
+ * @covers LTMS_Api_TPTC
  */
-class TptcApiTest extends TestCase
+class TptcApiTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        Monkey\setUp();
-
-        Functions\stubs([
-            'sanitize_text_field' => static fn(string $s): string => $s,
-            'get_option'          => static fn(string $k, mixed $d = false): mixed => $d,
-            'update_option'       => static fn(): bool => true,
-            'get_transient'       => static fn(): mixed => false,
-            'set_transient'       => static fn(): bool => true,
-            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
-            'esc_html'            => static fn(string $s): string => $s,
-        ]);
-
-        \LTMS_Core_Config::flush_cache();
-    }
-
-    protected function tearDown(): void
-    {
-        \LTMS_Core_Config::flush_cache();
-        Monkey\tearDown();
-        parent::tearDown();
-    }
-
     private function set_credentials(): void
     {
         \LTMS_Core_Config::set('ltms_tptc_api_key',    \LTMS_Core_Security::encrypt('tptc_key_test'));
         \LTMS_Core_Config::set('ltms_tptc_program_id', 'PROG-001');
     }
 
-    private function make_client(): \LTMS_Api_Tptc
+    private function make_client(): \LTMS_Api_TPTC
     {
         $this->set_credentials();
-        return new \LTMS_Api_Tptc();
+        return new \LTMS_Api_TPTC();
     }
 
     private function stub_response(mixed $body, int $code = 200): void
@@ -124,7 +99,7 @@ class TptcApiTest extends TestCase
     public function test_default_headers_include_api_key(): void
     {
         $client  = $this->make_client();
-        $ref     = new ReflectionMethod(\LTMS_Api_Tptc::class, 'get_default_headers');
+        $ref     = new ReflectionMethod(\LTMS_Api_TPTC::class, 'get_default_headers');
         $ref->setAccessible(true);
         $headers = $ref->invoke($client);
 
@@ -300,7 +275,7 @@ class TptcApiTest extends TestCase
      */
     public function test_class_is_final(): void
     {
-        $this->assertFalse((new ReflectionClass(\LTMS_Api_Tptc::class))->isFinal());
+        $this->assertFalse((new ReflectionClass(\LTMS_Api_TPTC::class))->isFinal());
     }
 }
 

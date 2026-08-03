@@ -1,6 +1,6 @@
 <?php
 /**
- * XcoverApiTest — Tests unitarios para LTMS_Api_Xcover
+ * XcoverApiTest — Tests unitarios para LTMS_Api_XCover
  *
  * Cubre:
  *   1. Constructor — URL sandbox, partner_code, api_key descifrada
@@ -19,51 +19,27 @@ declare(strict_types=1);
 
 namespace LTMS\Tests\Unit;
 
-use Brain\Monkey;
 use Brain\Monkey\Functions;
-use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 
+require_once __DIR__ . '/class-ltms-unit-test-case.php';
+
 /**
- * @covers LTMS_Api_Xcover
+ * @covers LTMS_Api_XCover
  */
-class XcoverApiTest extends TestCase
+class XcoverApiTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Functions\stubs([
-            'sanitize_text_field' => static fn(string $s): string => $s,
-            'get_option'          => static fn(string $k, mixed $d = false): mixed => $d,
-            'update_option'       => static fn(): bool => true,
-            'get_transient'       => static fn(): mixed => false,
-            'set_transient'       => static fn(): bool => true,
-            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
-            'esc_html'            => static fn(string $s): string => $s,
-        ]);
-
-        \LTMS_Core_Config::flush_cache();
-    }
-
-    protected function tearDown(): void
-    {
-        \LTMS_Core_Config::flush_cache();
-        Monkey\tearDown();
-        parent::tearDown();
-    }
-
     private function set_credentials(): void
     {
         \LTMS_Core_Config::set('ltms_xcover_partner_code', 'LTMS-PARTNER');
         \LTMS_Core_Config::set('ltms_xcover_api_key',      \LTMS_Core_Security::encrypt('xcover_key_test'));
     }
 
-    private function make_client(): \LTMS_Api_Xcover
+    private function make_client(): \LTMS_Api_XCover
     {
         $this->set_credentials();
-        return new \LTMS_Api_Xcover();
+        return new \LTMS_Api_XCover();
     }
 
     private function stub_response(mixed $body, int $code = 200): void
@@ -112,7 +88,7 @@ class XcoverApiTest extends TestCase
     public function test_default_headers_include_apikey_authorization(): void
     {
         $client  = $this->make_client();
-        $ref     = new ReflectionMethod(\LTMS_Api_Xcover::class, 'get_default_headers');
+        $ref     = new ReflectionMethod(\LTMS_Api_XCover::class, 'get_default_headers');
         $ref->setAccessible(true);
         $headers = $ref->invoke($client);
 
@@ -274,7 +250,7 @@ class XcoverApiTest extends TestCase
      */
     public function test_class_is_final(): void
     {
-        $this->assertFalse((new ReflectionClass(\LTMS_Api_Xcover::class))->isFinal());
+        $this->assertFalse((new ReflectionClass(\LTMS_Api_XCover::class))->isFinal());
     }
 }
 
