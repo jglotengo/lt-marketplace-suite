@@ -145,7 +145,7 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'code' => $e->getDeclineCode(), 'currency' => $currency ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Stripe\Exception\ApiErrorException $e ) {
             LTMS_Core_Logger::error(
@@ -153,11 +153,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'type' => $e->getError()->type ?? 'unknown', 'currency' => $currency ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -183,11 +183,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'payment_intent_id' => $payment_intent_id ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -253,11 +253,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'payment_intent_id' => $payment_intent_id, 'amount' => $amount ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -292,11 +292,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'email' => $data['email'] ?? 'unknown' ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -321,11 +321,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'payment_intent_id' => $payment_intent_id ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -366,11 +366,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'email' => $vendor_data['email'] ?? 'unknown' ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -442,11 +442,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                     'currency'    => $currency,
                 ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -474,11 +474,11 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $e->getMessage(),
                 [ 'account_id' => $account_id ]
             );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
 
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_UNEXPECTED_ERROR', $e->getMessage() );
-            return [ 'success' => false, 'error' => $e->getMessage() ];
+            return [ 'success' => false, 'error' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
@@ -495,7 +495,8 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
             return [ 'status' => 'ok', 'message' => 'Conectado', 'latency_ms' => $latency ];
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'STRIPE_HEALTH_CHECK_FAILED', $e->getMessage() );
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
+            // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1): escapar message — health_check se muestra en admin via jQuery .text() o .html()
+            return [ 'status' => 'error', 'message' => esc_html( $e->getMessage() ) ];
         }
     }
 

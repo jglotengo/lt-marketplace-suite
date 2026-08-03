@@ -369,7 +369,7 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             $this->authenticate();
             return [ 'status' => 'ok', 'message' => 'Siigo autenticado correctamente' ];
         } catch ( \Throwable $e ) {
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
+            return [ 'status' => 'error', 'message' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 

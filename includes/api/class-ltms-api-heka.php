@@ -205,7 +205,7 @@ class LTMS_Api_Heka extends LTMS_Abstract_API_Client {
         } catch ( \Throwable $e ) {
             return [
                 'status'  => 'error',
-                'message' => $e->getMessage(),
+                'message' => esc_html( $e->getMessage() ), // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
             ];
         }
     }

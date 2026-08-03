@@ -190,7 +190,7 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
                 'message' => $token ? 'Addi auth OK' : 'No se pudo obtener token',
             ];
         } catch ( \Throwable $e ) {
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
+            return [ 'status' => 'error', 'message' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 

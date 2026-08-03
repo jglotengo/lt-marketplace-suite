@@ -347,7 +347,7 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
             ];
 
         } catch ( \Throwable $e ) {
-            wc_add_notice( $e->getMessage(), 'error' );
+            wc_add_notice( esc_html( $e->getMessage() ), 'error' ); // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P0)
             return [ 'result' => 'failure', 'redirect' => '' ];
         }
     }
@@ -373,7 +373,7 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
             $client->refund( $txn_id, (float) $amount, $reason );
             return true;
         } catch ( \Throwable $e ) {
-            return new WP_Error( 'refund_failed', $e->getMessage() );
+            return new WP_Error( 'refund_failed', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 }
@@ -513,7 +513,7 @@ class LTMS_Api_Gateway_Addi extends WC_Payment_Gateway {
             ];
 
         } catch ( \Throwable $e ) {
-            wc_add_notice( $e->getMessage(), 'error' );
+            wc_add_notice( esc_html( $e->getMessage() ), 'error' ); // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P0)
             return [ 'result' => 'failure', 'redirect' => '' ];
         }
     }
@@ -717,7 +717,7 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
             ];
 
         } catch ( \Throwable $e ) {
-            wc_add_notice( $e->getMessage(), 'error' );
+            wc_add_notice( esc_html( $e->getMessage() ), 'error' ); // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P0)
             return [ 'result' => 'failure', 'redirect' => '' ];
         }
     }

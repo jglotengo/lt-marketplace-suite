@@ -702,7 +702,7 @@ class LTMS_Api_Aveonline extends LTMS_Abstract_API_Client {
                 'message' => $token ? 'Aveonline API conectado' : 'Token vacío tras autenticación',
             ];
         } catch ( \Throwable $e ) {
-            return [ 'status' => 'error', 'message' => $e->getMessage() ];
+            return [ 'status' => 'error', 'message' => esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)
         }
     }
 
