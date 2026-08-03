@@ -452,7 +452,7 @@ class LTMS_Business_Tourism_Compliance {
             self::save_rnt( $vendor_id, $data );
             wp_send_json_success( __( 'Información guardada. Pendiente de verificación por el administrador.', 'ltms' ) );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
     }
 }

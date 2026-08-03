@@ -429,7 +429,7 @@ class LTMS_Settings_Deprisa {
 				wp_send_json_error( [ 'message' => "API respondió con errores: {$err}" ] );
 			}
 		} catch ( LTMS_Deprisa_Exception $e ) {
-			wp_send_json_error( [ 'message' => 'Excepción: ' . $e->getMessage() . ' (HTTP ' . $e->getCode() . ')' ] );
+			wp_send_json_error( [ 'message' => esc_html( 'Excepción: ' . $e->getMessage() . ' (HTTP ' . $e->getCode() . ')' ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-SET-001, P1)
 		}
 	}
 }

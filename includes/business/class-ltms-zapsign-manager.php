@@ -392,7 +392,7 @@ final class LTMS_ZapSign_Manager {
                 wp_send_json_error( $result['error'] ?? __( 'No se pudo enviar el contrato.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
     }
 
@@ -423,7 +423,7 @@ final class LTMS_ZapSign_Manager {
                 wp_send_json_error( $result['error'] ?? __( 'Error enviando contrato.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
     }
 
@@ -470,7 +470,7 @@ final class LTMS_ZapSign_Manager {
             }
             return [ 'verified' => true, 'reason' => 'match' ];
         } catch ( \Throwable $e ) {
-            return [ 'verified' => false, 'reason' => 'exception: ' . $e->getMessage() ];
+            return [ 'verified' => false, 'reason' => 'exception: ' . esc_html( $e->getMessage() ) ]; // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
     }
 
@@ -548,7 +548,7 @@ final class LTMS_ZapSign_Manager {
                 'status'   => $cached_status ?: 'unknown',
                 'sent'     => true,
                 'sign_url' => get_user_meta( $vendor_id, 'ltms_contract_sign_url', true ),
-                'error'    => $e->getMessage(),
+                'error'    => esc_html( $e->getMessage() ), // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
             ];
         }
     }

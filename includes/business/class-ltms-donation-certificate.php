@@ -136,7 +136,7 @@ final class LTMS_Donation_Certificate {
             );
             return new \WP_Error(
                 'cert_generation_failed',
-                sprintf( __( 'Error generando certificado: %s', 'ltms' ), $e->getMessage() )
+                sprintf( __( 'Error generando certificado: %s', 'ltms' ), esc_html( $e->getMessage() ) ) // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
             );
         }
     }

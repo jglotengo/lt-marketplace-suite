@@ -224,7 +224,7 @@ class LTMS_Booking_Manager {
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' );
             self::log_warning_static( 'booking', 'create_booking exception: ' . $e->getMessage() );
-            return new \WP_Error( 'booking_exception', $e->getMessage() );
+            return new \WP_Error( 'booking_exception', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BOOK-001, P1)
         }
     }
 
@@ -383,7 +383,7 @@ class LTMS_Booking_Manager {
         } catch ( \Throwable $e ) {
             $wpdb->query( 'ROLLBACK' );
             self::log_warning_static( 'booking', 'cancel_booking exception: ' . $e->getMessage() );
-            return new \WP_Error( 'cancel_exception', $e->getMessage() );
+            return new \WP_Error( 'cancel_exception', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BOOK-001, P1)
         }
     }
 

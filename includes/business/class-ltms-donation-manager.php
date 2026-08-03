@@ -260,7 +260,7 @@ final class LTMS_Donation_Manager {
             // Mark donation as failed but keep record for forensic audit.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->update( $donations_table, [ 'status' => 'failed' ], [ 'id' => $donation_id ] );
-            return new WP_Error( 'donation_wallet_credit_failed', $e->getMessage() );
+            return new WP_Error( 'donation_wallet_credit_failed', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
 
         // Mark donation as credited.
@@ -647,7 +647,7 @@ final class LTMS_Donation_Manager {
             // would pollute the admin UI and statistics forever.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->delete( $payouts_tbl, [ 'id' => $batch_id ] );
-            return new WP_Error( 'donation_payout_wallet_failed', $e->getMessage() );
+            return new WP_Error( 'donation_payout_wallet_failed', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
         }
 
         // MGR-BUG-2: Mark batch as 'paid' (Admin UI expects 'paid', not 'transferred').
