@@ -13,7 +13,7 @@
  *
  * @package    LTMS
  * @subpackage LTMS/includes/business
- * @version    5.0 Ultra-Blindado v2.9.24
+ * @version    6.0 Ultra-Blindado v2.9.308
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -27,8 +27,8 @@ class LTMS_Contract_PDF_Generator {
 
         use LTMS_Logger_Aware;
 
-        const CONTRACT_VERSION = '5.0 Ultra-Blindado v2.9.24';
-        const CONTRACT_DATE    = '03 de julio de 2026';
+         const CONTRACT_VERSION = '6.0 Ultra-Blindado v2.9.308';
+         const CONTRACT_DATE    = '03 de agosto de 2026';
         const OPERATOR         = [
                 'name'      => 'GRUPO LO TENGO S.A.S.',
                 'nit'       => '901.981.692-3',
@@ -187,7 +187,7 @@ class LTMS_Contract_PDF_Generator {
                         'fecha_generacion'  => gmdate( 'd/m/Y' ),
                         'fecha_contrato'    => $fecha_contrato,
                         'year'              => gmdate( 'Y' ),
-                        'sagrilaft_uvt'     => '450 UVT (~$23.7M COP ' . gmdate( 'Y' ) . ')',
+                        'sagrilaft_uvt'     => 'COP 470.65M anuales (SAGRILAFT Res. 314/2021)',
                 ];
         }
 
@@ -300,7 +300,7 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
 </div>
 
 <div class="main-title">Contrato de Vinculación de Vendedor<br>al Marketplace Lo Tengo Colombia</div>
-<div class="sub-title">Versión <?php echo esc_html( $version ); ?> — Jurisprudencia SIC 2019-2024 + Ley 2439/2024 + Ley 2300/2023 + 12 sentencias marketplace + GDPR + ISO 27001 + FATF Rec. 8</div>
+<div class="sub-title">Versión <?php echo esc_html( $version ); ?> — Jurisprudencia SIC 2019-2024 + Ley 2439/2024 + Ley 2300/2023 + 12 sentencias marketplace + GDPR + ISO 27001 + NIST SP 800-53/57 + FATF Rec. 8 + FATCA/CRS + 130+ normas cubiertas</div>
 <div class="sub-meta">Fecha de generación: <?php echo esc_html( $v['fecha_generacion'] ); ?> | Este documento tiene validez jurídica como contrato de adhesión (art. 37, Ley 1480/2011)</div>
 
 <div class="notice-box">
@@ -377,7 +377,7 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
   <tr><td>IEPS (MX)</td><td>8%-160% según categoría: tabaco, alcohol, bebidas azucaradas (LIEPS art. 2)</td></tr>
   <tr><td>ISH (MX)</td><td>3% hospedaje por estado (impuesto local)</td></tr>
   <tr><td>ICE (CO)</td><td>35% alcohol, 75%+cuota tabaco (ET art. 468-469)</td></tr>
-  <tr><td>GMF 4x1000 (CO)</td><td>0.4% sobre retiros bancarios, exención 350 UVT mensual (ET art. 871)</td></tr>
+  <tr><td>GMF 4x1000 (CO)</td><td>0.4% sobre retiros bancarios, exención 1.000 UVT mensual (ET art. 871, vigente 2024)</td></tr>
   <tr><td>Período mínimo de hold</td><td>5 días hábiles desde entrega (CO, Ley 1480 art. 47) / 10 días naturales (MX, LFPCE art. 92)</td></tr>
   <tr><td>SAGRILAFT — umbral</td><td>Transacciones ≥ <?php echo esc_html( $v['sagrilaft_uvt'] ); ?> sujetas a monitoreo UIAF</td></tr>
   <tr><td>Screening OFAC/ONU/UE</td><td>Verificación automática pre-KYC + re-screen mensual (FT-2)</td></tr>
@@ -389,7 +389,7 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
   <tr><td>Retención IVA no residentes</td><td>100% del IVA si vendor país ≠ país operativo (CB-6)</td></tr>
   <tr><td>IOSS UE</td><td>IVA país destino para ventas < €150 (CB-3)</td></tr>
   <tr><td>Incoterms 2020</td><td>11 reglas ICC soportadas: EXW, FCA, FAS, FOB, CFR, CIF, CPT, CIP, DAP, DPU, DDP (CB-2)</td></tr>
-  <tr><td>Carta Porte CFDI 4.0</td><td>Complemento obligatorio para transporte terrestre MX (LT-1)</td></tr>
+  <tr><td>Carta Porte 3.0</td><td>Complemento CFDI 4.0 obligatorio para transporte terrestre MX (RMF 2026 Anexo 20, LT-1)</td></tr>
   <tr><td>Nutri-Score / NOM-051</td><td>Obligatorio para productos alimenticios (JU-7, PROFECO 2024)</td></tr>
 </table>
 
@@ -437,8 +437,8 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
 
 <div class="clause-title">Cláusula Décima Tercera — Protección de Datos Personales y Habeas Data</div>
 <p class="clause-body">El tratamiento de datos personales se rige por la Política de Privacidad de Lo Tengo Colombia, la Ley 1581/2012 (Habeas Data CO), el Decreto 1377/2013, el Decreto 1727/2024 (Registro SIC como Responsable de Tratamiento CO), la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP MX) y sus Lineamientos del Aviso de Privacidad (INAI 2017), y el Reglamento General de Protección de Datos (GDPR, UE). El OPERADOR tiene designado Encargado de Protección de Datos (DPO) contacto disponible en el pie de página del sitio web. Para México, el OPERADOR mantiene aviso de privacidad simplificado (LFPDPPP art. 17) e integral (art. 16) diferenciados.</p>
-<p class="clause-body">El VENDEDOR autoriza expresamente el tratamiento de sus datos para: ejecución del contrato; cumplimiento de obligaciones tributarias y SAGRILAFT; comunicaciones comerciales; transferencias internacionales a aliados tecnológicos (Openpay MX, ZapSign BR, Stripe US, AWS US, Backblaze US, Uber Direct US, XCover AU) bajo Cláusulas Contractuales Tipo UE art. 46, Ley 1581/2012 art. 26 y LFPDPPP art. 37. Los datos sensibles (documento de identidad, cuenta bancaria, NIT/RUT) se cifran con AES-256-GCM.</p>
-<p class="clause-body">El VENDEDOR conoce y acepta sus derechos ARCO (Acceso, Rectificación, Cancelación, Oposición) ejercibles vía endpoint REST <code>/wp-json/ltms/v1/arco/access</code>. El OPERADOR mantiene bitácora de acceso a datos personales (Ley 1581/2012 art. 15) consultable por el titular. Las brechas de seguridad se notificarán a la SIC y a los afectados dentro de las 72 horas siguientes (GDPR art. 33-34, Ley 1581/2012 art. 22, LFPDPPP art. 20).</p>
+<p class="clause-body">El VENDEDOR autoriza expresamente el tratamiento de sus datos para: ejecución del contrato; cumplimiento de obligaciones tributarias y SAGRILAFT; comunicaciones comerciales; <strong>transferencias internacionales a aliados tecnológicos</strong> (Amazon AWS US, Backblaze US — almacenamiento de documentos KYC y respaldo del PDF firmado, Openpay MX, Stripe US, ZapSign BR — firma electrónica del presente contrato, Addi CO/MX, Uber Direct US — logística de última milla, XCover AU — seguros de producto, Google OAuth US — autenticación) bajo Cláusulas Contractuales Tipo UE art. 46, Ley 1581/2012 art. 26 y LFPDPPP art. 37. Los datos sensibles se cifran con AES-256-GCM en las 8 claves PII siguientes: número de documento de identidad, número de cuenta bancaria, NIT/RUT, número de teléfono, dirección, fecha de nacimiento, titular de cuenta bancaria y dirección IP de registro (ISO 27001 A.10.1.1, NIST SP 800-53 SC-28).</p>
+<p class="clause-body">El VENDEDOR conoce y acepta sus derechos ARCO (Acceso, Rectificación, Cancelación, Oposición) ejercibles vía los endpoints REST <code>/wp-json/ltms/v1/arco/access</code> (acceso), <code>/wp-json/ltms/v1/arco/rectify</code> (rectificación), <code>/wp-json/ltms/v1/arco/cancel</code> (cancelación/anonimización con invalidación de sesiones activas) y <code>/wp-json/ltms/v1/arco/oppose</code> (oposición a marketing/profiling/data sharing). El OPERADOR mantiene bitácora de acceso a datos personales (Ley 1581/2012 art. 15) consultable por el titular. El OPERADOR permite el acceso de auditoría a los datos del VENDEDOR exclusivamente al rol <strong>Oficial de Cumplimiento</strong> (<code>ltms_compliance_officer</code>) — responsable SAGRILAFT — y a <strong>Auditores Externos</strong> independientes (<code>ltms_external_auditor</code>) con acceso de solo lectura sobre datos comerciales enmascarados automáticamente (email/teléfono/dirección), registrando cada acceso en la bitácora de eventos de seguridad. Las brechas de seguridad se notificarán a la SIC y a los afectados dentro de las 72 horas siguientes (GDPR art. 33-34, Ley 1581/2012 art. 22, LFPDPPP art. 20). El derecho de cancelación se ejerce mediante anonimización irreversible de los datos personales del VENDEDOR e invalidación simultánea de todas las sesiones activas del VENDEDOR (Ley 1581/2012 art. 8 lit. e); los registros estrictamente fiscales necesarios para cumplimiento tributario y SAGRILAFT se retienen conforme a los plazos del literal 17.B.1 de este contrato.</p>
 
 <div class="clause-title">Cláusula Décima Cuarta — Ley Aplicable y Resolución de Controversias</div>
 <table class="data-table">
@@ -457,16 +457,21 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
 <p class="clause-body">El VENDEDOR declara bajo la gravedad del juramento: que tiene plena capacidad legal para contratar; que es mayor de 18 años (COPPA + Decreto 886/2014 CO; LFPDPPP art. 17 MX); que la información suministrada en el proceso de KYC y en este contrato es verídica y completa; que los productos que comercializará son de lícita procedencia; que cumple todas sus obligaciones tributarias ante la DIAN (Colombia) y el SAT (México); que su RUT (CO) o RFC (MX) se encuentra activo y vigente; que no se encuentra en listas de riesgo OFAC, ONU, UIAF (CO), SHCP (MX) ni Fiscalía General de la Nación; que ha leído y acepta íntegramente este contrato, la Política de Privacidad, los Términos y Condiciones y el Manual del Vendedor; que para México acepta la jurisdicción de PROFECO y COFECE, y que su información ante el padrón SAT es correcta y actualizada.</p>
 
 <div class="clause-title">Cláusula Décima Sexta — Cumplimiento AML/CTF y SARLAFT</div>
-<p class="clause-body">El OPERADOR cumple la Ley 526/1999 (SARLAFT), la FATF Recomendación 8 (sector NPO), y la Ley Fintech art. 87 (México). El OPERADOR realiza screening de todos los VENDEDORES contra las listas restrictivas OFAC SDN (USA), UN Consolidated (ONU) y EU Restrictive Measures (UE) antes de aprobar el KYC. Los VENDEDORES que aparezcan en dichas listas serán bloqueados y reportados a las autoridades competentes. El OPERADOR aplica límites operativos diarios (USD $5,000) y mensuales (USD $20,000) por VENDEDOR, y Travel Rule para transferencias ≥ USD $1,000 (FATF Rec. 16, Banxico Anexo 25, Circular SFC 029/2014).</p>
+<p class="clause-body">El OPERADOR cumple la Ley 526/1999 (SARLAFT), la FATF Recomendación 8 (sector NPO), y la Ley Fintech art. 87 (México). El OPERADOR realiza screening de todos los VENDEDORES contra las listas restrictivas OFAC SDN (USA), UN Consolidated (ONU) y EU Restrictive Measures (UE) antes de aprobar el KYC. Los VENDEDORES que aparezcan en dichas listas serán bloqueados y reportados a las autoridades competentes. El OPERADOR aplica límites operativos diarios (USD $5,000) y mensuales (USD $20,000) por VENDEDOR, y Travel Rule para transferencias ≥ USD $1,000 (FATF Rec. 16, Banxico Anexo 25, Circular SFC 029/2014). El OPERADOR cumple los umbrales de reporte LFPIDRPI México (Regla 10/11 Anexo 1 SHCP): operaciones en efectivo ≥ 5.610 UMA y operaciones electrónicas ≥ 10.140 UMA. El OPERADOR cumple FATCA (Foreign Account Tax Compliance Act US): IGA MX-US 2014 — reporte anual SAT a IRS; Decreto 2219/2016 (FATCA CO-US) — reporte anual a DIAN. El OPERADOR cumple OECD CRS / MCAA (Common Reporting Standard) — intercambio automático de información financiera entre jurisdicciones participantes.</p>
 
 <div class="clause-title">Cláusula Décima Séptima — Cumplimiento Fintech y PCI DSS</div>
 <p class="clause-body">El OPERADOR cumple el estándar PCI DSS v4.0 SAQ-A (tokenización vía Openpay/Stripe, PAN nunca almacena en servidores LTMS). El OPERADOR mantiene declaración formal SAQ-A con firma anual. Los datos de tarjetas se tokenizan en el cliente (browser) antes de ser enviados a los servidores. El OPERADOR cumple la Ley Fintech art. 95 (México) sobre controles de seguridad (2FA obligatorio para VENDEDORES con payouts activos). El OPERADOR reporta anualmente a DIAN (Forma 4, operaciones FX > USD $10,000) y a SAT (Aviso Banxico, México).</p>
+
+<div class="clause-title">Cláusula Décima Séptima B — Conservación de Evidencia y Respaldo del Contrato Firmado</div>
+<p class="clause-body"><strong>17.B.1 Conservación KYC</strong>: Los datos y documentos del proceso KYC (cédula, RUT, Cámara de Comercio, fotografías) se conservan por <strong>10 años</strong> contados desde la finalización de la relación comercial con el VENDEDOR, conforme a la Resolución SAGRILAFT 314/2021 de la Superintendencia de Sociedades de Colombia y a los plazos mínimos de la UIAF. La bitácora de consentimientos y la bitácora de accesos a datos personales (Ley 1581/2012 art. 15) se conservan por plazos análogos para auditoría regulatoria.</p>
+<p class="clause-body"><strong>17.B.2 Respaldo del contrato firmado</strong>: El OPERADOR respalda automáticamente el PDF del presente contrato una vez firmado electrónicamente vía ZapSign en almacenamiento resiliente de Backblaze B2 (US), bucket <code>lotengo-contratos</code>. Cada PDF firmado se acompaña de un hash criptográfico SHA-256 (<code>ltms_contract_pdf_hash</code>) almacenado en los metadatos del VENDEDOR para detección de sustitución o manipulación posterior (evidencia de integridad).</p>
+<p class="clause-body"><strong>17.B.3 Re-verificación contratual</strong>: El OPERADOR re-verifica el estado de firma del contrato directamente con ZapSign cada 24 horas, invalidando el caché local de estado para garantizar que el estado mostrado al VENDEDOR y al OPERADOR refleje el estado real en ZapSign. Esta re-verificación no afecta la validez jurídica del contrato ya firmado.</p>
 
 <div class="clause-title">Cláusula Décima Octava — Comercio Cross-Border</div>
 <p class="clause-body">Para operaciones cross-border (origen ≠ destino), el OPERADOR cumple: Res. DIAN 000070/2020 (país de origen + DVA), Ley de Comercio Exterior art. 31 (MX), Reglamento (UE) 1169/2011 art. 9 (país de origen), US 15 CFR 740 + 19 CFR 30.1 (AES/EEI exports > $2,500 USD). El OPERADOR aplica automáticamente aranceles preferenciales TLC (ACE 65 CAN-MX, T-MEC, TPA CO-US, Acuerdo CO-UE). Los VENDEDORES no residentes están sujetos a retención del 100% del IVA generado (ET art. 437-3 CO, LIVA art. 3 fr. III MX). Para ventas a UE < €150 se aplica IOSS (Reglamento UE 2017/2455) con IVA del país destino.</p>
 
 <div class="clause-title">Cláusula Décima Novena — Cumplimiento Logístico y Transporte</div>
-<p class="clause-body">El OPERADOR verifica el RNT del carrier (Res. 4146/2016 Mintransporte CO) y el permiso SCT (Ley de Caminos art. 5 MX) del operador logístico contratado. Para transporte terrestre en México se emite complemento Carta Porte CFDI 4.0 (RMF 2026 Anexo 20). El OPERADOR valida pesos y dimensiones máximas (NOM-012-SCT-2/2014 MX, Res. 4100/2004 CO). El OPERADOR exige póliza RC transportista (Res. 4146/2016 art. 18 CO, Ley de Caminos art. 66 MX). Para carga de alto valor se exige GPS satelital (Ley de Caminos art. 47-A MX). Para contenedores cross-border se exigen sellos ISO/PAS 17712.</p>
+<p class="clause-body">El OPERADOR verifica el RNT del carrier (Res. 4146/2016 Mintransporte CO) y el permiso SCT (Ley de Caminos art. 5 MX) del operador logístico contratado. Para transporte terrestre en México se emite complemento Carta Porte 3.0 (RMF 2026 Anexo 20). El OPERADOR valida pesos y dimensiones máximas (NOM-012-SCT-2/2014 MX, Res. 4100/2004 CO). El OPERADOR exige póliza RC transportista (Res. 4146/2016 art. 18 CO, Ley de Caminos art. 66 MX). Para carga de alto valor se exige GPS satelital (Ley de Caminos art. 47-A MX). Para contenedores cross-border se exigen sellos ISO/PAS 17712.</p>
 
 <div class="clause-title">Cláusula Vigésima — Seguridad de la Información</div>
 <p class="clause-body">El OPERADOR implementa controles de seguridad conforme a ISO 27001 (A.7.2.2 concientización, A.10.1.1 cifrado, A.10.1.2 gestión de claves, A.12.4.1 logging, A.14.2.5 desarrollo seguro, A.16 gestión de incidentes) y NIST SP 800-53 SC-28 (cifrado at rest) + SP 800-57 (gestión de claves). Los headers de seguridad incluyen: Content-Security-Policy (OWASP A05:2021), HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. Las claves criptográficas se rotan anualmente. El OPERADOR mantiene Content-Security-Policy estricta para prevenir XSS.</p>
@@ -489,7 +494,7 @@ p.clause-body { font-size:8.5pt; margin-bottom:6px; }
   <div class="footer-note"><strong>■</strong> Este contrato se firma digitalmente vía ZapSign. El token de firma tiene validez legal (Ley 527/1999, art. 7). La firma electrónica equivale a firma manuscrita (Corte Constitucional, C-662/2000).</div>
 </div>
 
-<div class="page-footer">Documento generado automáticamente por GRUPO LO TENGO S.A.S. · NIT 901.981.692-3 · Versión <?php echo esc_html( $version ); ?> · <?php echo esc_html( $date ); ?> · 120+ normas cubiertas · 12 sentencias marketplace · 17 módulos de compliance</div>
+<div class="page-footer">Documento generado automáticamente por GRUPO LO TENGO S.A.S. · NIT 901.981.692-3 · Versión <?php echo esc_html( $version ); ?> · <?php echo esc_html( $date ); ?> · 130+ normas cubiertas · 12 sentencias marketplace · 17 módulos de compliance + 3 sub-cláusulas de conservación/respaldo/re-verificación</div>
 
 </body>
 </html>
