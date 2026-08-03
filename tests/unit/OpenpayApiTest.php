@@ -43,6 +43,8 @@ class OpenpayApiTest extends TestCase
             'update_option'       => static fn(): bool => true,
             'get_transient'       => static fn(): mixed => false,
             'set_transient'       => static fn(): bool => true,
+            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
+            'esc_html'            => static fn(string $s): string => $s,
         ]);
 
         \LTMS_Core_Config::flush_cache();

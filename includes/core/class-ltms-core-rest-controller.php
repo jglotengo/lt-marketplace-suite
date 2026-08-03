@@ -187,7 +187,7 @@ class LTMS_Core_REST_Controller {
                 ] );
                 return new WP_REST_Response( $quote, 200 );
             } catch ( \Throwable $e ) {
-                return new WP_REST_Response( [ 'error' => $e->getMessage() ], 500 );
+                return new WP_REST_Response( [ 'error' => esc_html( $e->getMessage() ) ], 500 ); // EXCMSG-FIX (AUDIT-EXCMSG-REST-001, P1)
             }
         }
 

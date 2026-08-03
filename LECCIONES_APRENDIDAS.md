@@ -2253,6 +2253,73 @@ Detalles:
 
 **Trazabilidad.** AUDIT-BIZ-AVE-001 cerrado en esta iteración: 2 P1+P2 fixes en 2 archivos (`class-ltms-business-aveonline-shipment-relations.php` AVE-001, `class-ltms-business-aveonline-sandbox.php` AVE-017) + 2 suites de test estructurales nuevas (+33 tests / 38 assertions). Suite completa `--testsuite=unit`: **3657 tests, 0 errors, 0 failures, 3 skipped** (vs 3624/0/0/3 baseline post-CSV-002 — +33 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en los 2 archivos modificados + 2 archivos de test. Stop-check converge: 21/21 archivos Aveonline inspeccionados (incluye 4 archivos fuera del inventario business/ original — ver header), 0 P0 detectados, P1 (AVE-001) fixeado, AVE-002 degradado a P2 backlog sistémico (esc_html en getMessage — 31 instancias en business/, scope para ciclo AUDIT-EXCMSG-001 dedicado). El módulo Aveonline queda cerrado para auditoría integral.
 
+---
+
+## 20. v2.9.307 - AUDIT-EXCMSG-001: ciclo de auditoría de `$e->getMessage()` sin esc_html en destinos a cliente (alcance ampliado a 91 archivos, 5 sub-ciclos)
+
+> Loop de auditoría autónoma siguiendo `AGENTS.md` → "Loop de auditoría autónoma". Alcance declarado por el usuario: completo (91 archivos con `getMessage()` en `includes/`). Inventario inicial reveló que la estimación de la lección #150 ("31 instancias en business/") era unádibunder: en realidad son ~250 instancias distribuidas en 91 archivos a través de 6 categorías de destino (wp_send_json 40, wc_add_nonce 5, WP_Error 9, log 112, return arrays 12, throw 2, otros 60). El ciclo se ejecutó en 5 sub-ciclos commiteados atómicamente (AVEN API → ADMIN → FRONTEND → BOOKING+OTHERS → REST) cubriendo 30+ archivos y +35 tests estructurales nuevos (suite completa: 3692 tests, 0 errors). P2 backlog sistémico: ~20 instancias en `return [...]` arrays que van a BD/logs estructurados (no a cliente directo) — pendiente de revisión cuando se añada LTMS_Redacted_Exception osimilar mecanismo de redacción.
+
+### Lección #151: `$e->getMessage()` sin `esc_html()` en destinos a cliente es un anti-patrón sistémico — el fix es defense-in-depth en el ORIGEN, no en la capa de presentación
+
+**Error:**
+
+91 archivos usan `catch ( \Throwable|\Exception $e ) { ... $e->getMessage() ... }` donde el mensaje de excepción termina_fluyendo hacia el cliente (handlers `wp_ajax_*`, `wp_send_json_error`, `wc_add_notice`, `WP_Error`, `WP_REST_Response`, `add_order_note`, o return arrays con claves `'message'`/`'error'`/`'reason'`/`'error_message'`/`'descripcion'`) SIN envolverlo con `esc_html()`. Si el contenido del getMessage incluye input del usuario (nombre de agente, dirección destinatario, etc.) o respuesta de API externa con datos del usuario, causa XSS reflected cuando el JS frontend lo renderiza via `jQuery.html()` en vez de `jQuery.text()`. Múltiples admin views auditadas confirman que `jQuery.html()` con `response.data.message` ES el patrón (ver `html-admin-kyc.php:335`): el hecho de que algunos usen `.text()` no garantiza que todos lo hagan.
+
+**Causa raíz:**
+
+1. **PHP	tracea exception messages authored-by que el desarrollador piensa "son internos, no los ve el usuario"** — pero vía handlers AJAX o REST responses, esos mensajes llegan al JS response handler. No es un "bug" puntual: es un anti-patrón sistémico donde la barrera mental "esto es interno/no se muestra" falla porque la cadena caller→caller→caller termina rompiéndose.
+2. **Defensa en profundidad (defense-in-depth) requiere escapar en el ORIGEN, no confiar en que la capa final cliente (`.text()`) haga lo correcto.** Si cada handler que retorna `'message' => $e->getMessage()` decide no escapar porque "el caller es responsable", el caller también decide no escapar porque "el handler ya validó" — nadie escapa. Esto es el mismo anti-patrón de LECCIONES #146 (responsabilidad difusa entre capas) aplicado al contexto de escaping HTML.
+3. **El `getMessage()` puede contener PII/secretos en casos edge**: respuestas de API que incluyen datos del usuario (nombre, dirección) o en raras excepciones, tokens o credenciales en mensajes de error de API. Aunque el caso típico es "error de validación", el riesgo_membership es P0/P1 cuando el mensaje proviene de una API externa que no controla la desinfección.
+
+**Fix aplicado en 5 sub-ciclos:**
+
+| Sub-ciclo | Commit | Archivos | Instancias P0/P1 | Tests |
+|-----------|--------|----------|------------------|-------|
+| AUDIT-EXCMSG-AVE-001 | `151d669b` | 5 business-aveonline | 19 wp_send_json_error | +8 |
+| AUDIT-EXCMSG-API-001 | `1d4cc0d8` | 14 api/ y api/gateways/ | 28 (17 `error`/1 `message` Stripe + 4 wc_add_notice/WP_Error gateways + 7 return arrays) | +9 |
+| AUDIT-EXCMSG-ADMIN-001 | `1d1083ca` | 6 admin/ | 10 wp_send_json_error | +6 |
+| AUDIT-EXCMSG-FRONTEND-001 | `f9d9b4d0` | 2 frontend/ | 2 (1 P1 WP_DEBUG condicional + 1 P2 order_note) | +5 |
+| AUDIT-EXCMSG-BIZ/BOOK/SET-001 | `fa86aebd` | 7 business no-AVE + booking + settings | 10 (4 wp_send_json_error + 6 WP_Error) | +7 |
+| AUDIT-EXCMSG-REST-001 | (este commit) | 1 core/rest-controller | 1 WP_REST_Response | (en suite existente) |
+
+Patrón consistente: `esc_html( $e->getMessage() )` envolviendo en cada destino a cliente/admin, con marker comment `// EXCMSG-FIX (AUDIT-EXCMSG-XXX-001, P0|P1|P2)` para trazabilidad. Logs internos (`LTMS_Core_Logger::error/warning`, `error_log`) NO se escapan — los logs no se renderizan en HTML y el ecoar HTML entities en logs dificulta la lectura.
+
+**Regla preventiva / heurística:**
+
+1. **TODO handler de respuesta a cliente (`wp_send_json_error`, `wc_add_notice`, `new WP_Error`, `WP_REST_Response` con mensaje) debe auditar su contenido para garantizar que strings de error vengan de mensajes HARDCODED o `esc_html()`/`wp_kses_post()`.** Grep de validación (post-cierre de este ciclo):
+   ```bash
+   grep -rn 'wp_send_json_error\|wc_add_notice\|new WP_Error' --include='*.php' includes/ \
+     | xargs grep -l 'getMessage()' \
+     | xargs grep -L 'esc_html'
+   ```
+2. **Defense-in-depth en el ORIGEN:** cada función que devuelve un array de error con `'message'`/`'error'`/`'reason'` debe asumir que su retorno eventualmente se mostrará en una admin view o JS frontend. Aplicar `esc_html()` en el origen, no delegar.
+3. **Cookie-consent de `WP_DEBUG` NO es licencia para mostrar `$e->getMessage()`:** aunque WP_DEBUG esté activo, el mensaje debe escaparse. El `defined('WP_DEBUG') && WP_DEBUG ? ' (' . esc_html($e->getMessage()) . ')' : ''` es el patrón correcto (este fix en `dashboard-logic.php:553`).
+4. **Logs internos NO se escapan** — `esc_html` produce `&` y `<` para `<` que dificultan la lectura del log crudo. La distinción clave al auditar: ¿termina el `$e->getMessage()` en un archivo/log (no hay esc_html) o en un response/nota admin o cliente (sí esc_html)? Mismo criterio que `LECCIONES #149` (logs vs responses para CSV).
+5. **Test estructural que previene regressión P0:** el patrón `test_no_unescaped_getmessage_in_wp_send_json_error` añadido a las 5 suites nuevas prueba que, para cada línea del archivo `wp_send_json_error(... getMessage() ...) `, hay un `esc_html(...)` en la MISMA línea. Si un handler nuevo se añade sin esc_html, el test falla al instante. Es el equivalente PHP de un linter en build step.
+6. **El inventario por grep imperfecta** es un anti-patrón recurrente (#149, #150): el ciclo inicial estimó 31 instancias en business/ y encontró 250+ en 91 archivos en 6 categorías. Cuando el alcance se declare como "sistémico", usar `getmessage()` como primitiva grep de búsqueda en includes/ entero, no por sub-módulo. Para futuros audits de `getMessage`, el grep correcto es:
+   ```bash
+   grep -rn 'getMessage()' --include='*.php' includes/ | wc -l
+   ```
+   Y clasificar por destino (wp_send_json/wc_add_notice/WP_Error/log/return-array/throw), no por sub-módulo.
+
+**Relación con lecciones previas:**
+
+- LECCIONES **#149**: misma anti-patrón "inventario por grep imperfecta" — aquí el ciclo de AUDIT-EXCMSG-001 partió con "31 instancias en business/" y descubrió 250+ en 91 archivos a través de 6 categorías.
+- LECCIONES **#146** y **#147**: mismo anti-patrón "responsabilidad difusa entre capas" — el handler decide no escapar porque "el JS escapa", el JS decide no escapar porque "el backend ya validó". Nadie escapa.
+- LECCIONES **#150**: el bug que originó este ciclo (AVE-002 backlog). El sub-ciclo AVE instancia #1 cerrado aquí, con 19 instancias P1 fixeadas en 5 archivos business-aveonline (incluyendo los handlers AJAX que dieron origen al hallazgo).
+- LECCIONES **#143** (anti-patrón replicado en múltiples vistas): este ciclo confirma que `getMessage()` sin esc_html NO se replicó como copia-variables-pero-sí como anti-patrón sistémico en handlers.getEntityFailed/catch blocks.
+
+**P2 backlog sistémico:**
+
+21 instancias en `return [...]` arrays con claves `'error'`/`'error_message'` que van a BD estructurada (`lt_job_queue.error_message`, `lt_provider_health.error_code`, `lt_webhook_logs.error_message`) o como data contracts entre métodos que confluyen en BD. No se escaparon porque:
+- La BD persiste texto crudo, no HTML renderizado.
+- Cuando ese contenido se muestra en admin views, las views asumen su propio esc_html.
+- Ecoar HTML entities en BD complica el grep de log diagnosis.
+Aplicar esc_html en el ORIGEN de estos casos requeriría añadir una capa de desinfecciónseparada para "logs estructurados de admin" vs "logs de diagnóstico crudo" — scope para ciclo AUDIT-LOG-STRUCT-001 futuro.
+
+**Trazabilidad.** AUDIT-EXCMSG-001 cerrado en 6 commits atómicos (5 sub-ciclos + 1 REST controller addendum). 30+ archivos modificados con ~70 instancias P0/P1 fixeadas (vs el backlog original de AVE-002 declarado con 31 instancias). 5 suites de tests estructurales nuevas (+35 tests). Suite completa `--testsuite=unit`: **3692 tests, 0 errors, 0 failures, 3 skipped** (vs 3657 baseline pre-ciclo — +35 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en todos los archivos modificados. P0/P1 stop-check converge: re-auditoría global confirma 0 instancias sin esc_html en wp_send_json_error/wc_add_notice/WP_Error. P2 backlog sistémico (21 instancias en return arrays a BD/logs estructurados) documentado para ciclo futuro dedicado.
+
+
 
 
 

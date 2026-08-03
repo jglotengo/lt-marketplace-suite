@@ -43,6 +43,8 @@ class BackblazeApiTest extends TestCase
             'get_transient' => static fn(): mixed => false,
             'set_transient' => static fn(): bool => true,
             'wp_parse_url'  => 'parse_url',
+            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
+            'esc_html'      => static fn(string $s): string => $s,
         ]);
 
         // Reset LTMS_Core_Config overrides between tests

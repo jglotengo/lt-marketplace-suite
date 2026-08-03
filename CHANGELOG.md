@@ -4,6 +4,58 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-08-03
+
+### Fixed — Ciclo de auditoría AUDIT-EXCMSG-001 (`$e->getMessage()` sin `esc_html()` en destinos a cliente/admin)
+
+> Loop de auditoría autónoma siguiendo `AGENTS.md` → "Loop de auditoría autónoma". El backlog AVE-002 declarado en la lección #150 (AUDIT-BIZ-AVE-001) estimaba 31 instancias de `esc_html` faltante en `getMessage()` dentro de `business/`. El inventario inicial con grep global por `getMessage()` en `includes/` reveló **91 archivos con ~250 instancias** distribuidas en 6 categorías de destino. El ciclo se descompuso en 5 sub-ciclos para mantener commits atómicos y trazabilidad por sub-módulo.
+
+**Anti-patrón detectado (sistémico, P0/P1):** handlers `wp_ajax_*`, API clients, webhooks y admin views capturan `\Throwable|\Exception $e` y devuelven `$e->getMessage()` al cliente/admin vía `wp_send_json_error`, `wc_add_notice`, `new WP_Error`, `WP_REST_Response` o return arrays con claves `'message'`/`'error'`/`'reason'`/`'error_message'`/`'descripcion'` SIN envolver con `esc_html()`. Si el contenido del getMessage incluye input del usuario (nombre de agente, dirección destinatario, etc.) o respuesta de API externa con datos del usuario, causa **XSS reflected** cuando el JS frontend lo renderiza vía `jQuery.html()` en vez de `jQuery.text()`. Múltiples admin views (`html-admin-kyc.php:335`, etc.) confirman que `.html()` con `response.data.message` ES el patrón existente.
+
+**Fix aplicado (mismo patrón across sub-ciclos):** envolver `$e->getMessage()` con `esc_html()` en el ORIGEN (defense-in-depth). Marker comment `// EXCMSG-FIX (AUDIT-EXCMSG-XXX-001, P0|P1|P2)` para trazabilidad. Logs internos (`LTMS_Core_Logger::error/warning`, `error_log`) NO se escapan — los logs no se renderizan en HTML y ecoar HTML entities dificulta lectura del log crudo.
+
+- **`fix(business-ave)` (AUDIT-EXCMSG-AVE-001, P1, commit `151d669b`)**: 5 archivos business-aveonline con 19 instancias `wp_send_json_error([ 'message' => $e->getMessage() ])` sin esc_html:
+  - `class-ltms-business-aveonline-agents.php` L232, L293, L322, L357 (4)
+  - `class-ltms-business-aveonline-cities.php` L478 (1)
+  - `class-ltms-business-aveonline-guias.php` L245, L489, L560, L606, L658 (5)
+  - `class-ltms-business-aveonline-orden-compra.php` L187, L345 (2)
+  - `class-ltms-business-aveonline-shipment-relations.php` L198, L252, L289, L337, L377, L471, L515 (7)
+- **`fix(api)` (AUDIT-EXCMSG-API-001, P0+P1, commit `1d4cc0d8`)**: 14 archivos en `includes/api/` y `includes/api/gateways/` con 28 instancias en return arrays/wc_add_notice/WP_Error:
+  - Stripe: 17 instancias `return [ 'success' => false, 'error' => $e->getMessage() ]` + 1 `health_check` message
+  - Addi, Alegra, Aveonline, Backblaze, Heka, Openpay, Siigo, TPTC, Uber, Xcover, Zapsign, Abstract_API_Client: 1 c/u en `health_check()` o método principal
+  - `class-ltms-api-gateways.php`: 3 `wc_add_notice( $e->getMessage(), 'error' )` (P0 — mensaje a WC checkout) + 1 `WP_Error`
+- **`fix(admin)` (AUDIT-EXCMSG-ADMIN-001, P1, commit `1d1083ca`)**: 6 archivos admin/ con 10 instancias `wp_send_json_error`:
+  - `class-ltms-admin-bookings.php` L185, L206, L222 (3 — string directo)
+  - `class-ltms-admin-donations.php` L393 (sprintf en wp_send_json_error)
+  - `class-ltms-admin-marketing-manager.php` L218 (sprintf subir a Backblaze)
+  - `class-ltms-admin-payouts.php` L527 (string directo)
+  - `class-ltms-admin-settings.php` L578, L634 (array 'message')
+  - `class-ltms-deprisa-order-metabox.php` L559, L668 (2 — sprintf con 'Error API: ' . getMessage())
+- **`fix(frontend)` (AUDIT-EXCMSG-FRONTEND-001, P1+P2, commit `f9d9b4d0`)**: 2 archivos frontend/ con 2 instancias:
+  - `class-ltms-dashboard-logic.php` L553 (P1) — `wp_send_json_error` incluía `getMessage()` condicionalmente si `WP_DEBUG` activo: information disclosure en producción si el flag queda activo. Fix: esc_html al menos previene XSS si el contenido incluye input del usuario.
+  - `class-ltms-frontend-checkout-handler.php` L647 (P2) — `add_order_note` al admin con getMessage concreto; WP admin escapa por defecto pero defense-in-depth exige esc_html en el origen.
+  - Otros archivos frontend ya estaban correctamente sanitizados (frontend-checkout-mexico-handler.php L150/L283 y frontend-payout-handler.php L98/L164/L169 usan getMessage solo en `log_error` interno, response con mensaje hardcoded).
+- **`fix(business+booking+settings)` (AUDIT-EXCMSG-BIZ/BOOK/SET-001, P1, commit `fa86aebd`)**: 7 archivos en 3 sub-álcances con 10 instancias:
+  - Business no-AVE: `class-ltms-business-tourism-compliance.php` L455 (wp_send_json_error), `class-ltms-zapsign-manager.php` L395/L426 (wp_send_json_error) + L473 (return 'reason' array) + L551 (return 'error' array), `class-ltms-donation-certificate.php` L139 (WP_Error sprintf), `class-ltms-donation-manager.php` L263 + L650 (WP_Error directos)
+  - Booking: `class-ltms-booking-manager.php` L227 + L386 (new WP_Error de `booking_exception`/`cancel_exception`)
+  - Settings: `settings/class-ltms-settings-deprisa.php` L432 + `deprisa/class-ltms-settings-deprisa.php` L432 (duplicado por backward-compat con autoloader)
+- **`fix(core)` (AUDIT-EXCMSG-REST-001, P1, este commit)**: `class-ltms-core-rest-controller.php` L190 — `return new WP_REST_Response( [ 'error' => $e->getMessage() ], 500 )` en endpoint REST de quote shipping. Response REST directa a cliente sin esc_html.
+
+**Tests:** +35 tests estructurales nuevos en 5 suites (mismo patrón que AuthoritiesRaeeCsvInjectionTest del ciclo CSV-002 — `file_get_contents` + asserts sobre el source PHP para garantizar los invariantes del fix sin instanciar clases con dependencias WP/WC acopladas):
+- `EscMsgAveonlineTest` — 8 tests / 56 assertions. Cubre: archivos existen, regresión `test_no_unescaped_getmessage_in_wp_send_json_error` (central), markers EXCMSG-FIX presentes, conteo por archivo, catch preservado, no uso de wp_kses/sanitize_text_field alternativos, sintaxis PHP, newlines consistentes Win/Unix.
+- `EscMsgApiTest` — 9 tests / 48 assertions. Cubre: 14 archivos api/ + gateways/ existen, regresión arrays+wc_add_notice, marker trace, conteo Stripe ≥18 + Gateways ≥4, sintaxis PHP.
+- `EscMsgAdminTest` — 6 tests / 37 assertions. Cubre: 6 archivos admin/ existen, regresión wp_send_json_error, markers, conteo escape por archivo, catch preservado, PHP válido.
+- `EscMsgFrontendTest` — 5 tests / 8 assertions. Cubre: 2 archivos frontend/ existen, regresión wp_send_json_error + add_order_note con multi-linea, markers, PHP válido.
+- `EscMsgBookingOthersTest` — 7 tests / 44 assertions. Cubre: 7 archivos existen, regresión wp_send_json_error + WP_Error + return arrays con 'error'/'reason', 3 markers distintos (BIZ/BOOK/SET), conteo por archivo, catch preservado, PHP válido.
+
+**Suite completa `--testsuite=unit`**: **3692 tests, 0 errors, 0 failures, 3 skipped** (vs 3657 baseline pre-ciclo AUDIT-BIZ-AVE-001 — +35 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en todos los archivos modificados.
+
+**Stop-check converge**: re-auditoría global `grep -rn 'wp_send_json_error\|wc_add_notice\|new WP_Error' --include='*.php' includes/` cruzado con `getMessage()` y sin `esc_html` confirma **0 instancias P0/P1 restantes**. 21 instancias en `return [...]` arrays hacia BD estructurada (`lt_job_queue.error_message`, `lt_provider_health.error_code`, `lt_webhook_logs.error_message`) quedan como **P2 backlog sistémico** (ciclo futuro `AUDIT-LOG-STRUCT-001`): esas instancias persisten texto crudo en BD para diagnóstico admin, no se renderizan como HTML directo.
+
+**Lección preventiva (#151)**: documentada en `LECCIONES_APRENDIDAS.md` sección 20. Regresión futura se previene con los tests `test_no_unescaped_getmessage_in_wp_send_json_error` (para cada sub-cobertura): si un handler nuevo se añade sin `esc_html($e->getMessage())`, el test falla al instante.
+
+**Version bump**: `LTMS_VERSION` 2.9.306 → 2.9.307 (cache-busting por cargo de fixes en admin/frontend JS-rendered).
+
 ## [Unreleased] — 2026-07-31
 ### Fixed — Ciclo de auditoría AUDIT-PANEL-CSV-002 (formula injection en 6 exportadores CSV regulatorios omitidos del ciclo AUDIT-PANEL-CSV-001)
 

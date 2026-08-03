@@ -47,6 +47,8 @@ class ZapsignApiTest extends TestCase
             'sanitize_email'      => static fn(string $s): string => $s,
             'wp_strip_all_tags'   => static fn(string $s): string => strip_tags($s),
             'wp_parse_url'        => 'parse_url',
+            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
+            'esc_html'            => static fn(string $s): string => $s,
         ]);
 
         \LTMS_Core_Config::flush_cache();

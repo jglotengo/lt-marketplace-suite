@@ -37,6 +37,8 @@ class AbstractApiClientTest extends TestCase
 
         Functions\stubs([
             'sanitize_text_field' => static fn(string $s): string => $s,
+            // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
+            'esc_html'            => static fn(string $s): string => $s,
         ]);
 
         // Subclase concreta mínima — implementa health_check() y get_provider_slug()
