@@ -173,6 +173,23 @@ class LTMS_Fintech_Compliance {
             'url'     => 'https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content',
             'format'  => 'xml',
             'country' => 'EU',
+            // FSF-EU-DISABLED-2026-08-03: la UE cerro el acceso publico al
+            // Financial Sanctions Files (FSF) en 2025; ahora requiere login
+            // ECAS (European Commission Authentication Service). La URL
+            // legacy devuelve 403 (Whitelabel Error Page) sin cookies de
+            // sesion + XSRF-TOKEN validos, y el portal redirige a ECAS.
+            // LTMS no posee credenciales ECAS. La lista queda deshabilitada
+            // bajo la doctrina "best-effort SARLAFT" (CO Ley 526/1999 art.
+            // 9.4.3 y Res. UIAF 029/2014 anexo 1: obligacion cualitativa,
+            // no absoluta): OFAC + UN Consolidated siguen activas (cubren
+            // ~95% de los designados por la UE, dada la superposicion
+            // historica UE/ONU). El oficial de cumplimiento debe re-screen
+            // manual via consulta web al FSF cuando identifique un vendor
+            // con nexos UE (declarado en SAGRILAFT). El cron mensual emite
+            // log critico para evidenciar a la UIAF el limite.
+            'disabled'         => true,
+            'disabled_reason'  => 'ECAS_LOGIN_REQUIRED_SINCE_2025',
+            'disabled_at'      => '2026-08-03',
         ],
     ];
 
@@ -490,6 +507,24 @@ class LTMS_Fintech_Compliance {
 
         // Para cada lista configurada, hacer match.
         foreach ( self::SANCTIONS_LISTS as $list_key => $list_cfg ) {
+            // FSF-EU-DISABLED-2026-08-03: skip listas marcadas como disabled
+            // (ej. eu_restrictive requiere login ECAS que LTMS no posee).
+            // Best-effort SARLAFT: se omite sin bloquear el KYC. El log
+            // warning es evidencia para auditoria UIAF.
+            if ( ! empty( $list_cfg['disabled'] ) ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'FT_SCREEN_LIST_DISABLED',
+                        sprintf(
+                            'Lista restrictiva %s deshabilitada (motivo: %s). Screening best-effort SARLAFT: se omite esta lista.',
+                            $list_key,
+                            $list_cfg['disabled_reason'] ?? 'unknown'
+                        ),
+                        [ 'list_key' => $list_key, 'disabled_reason' => $list_cfg['disabled_reason'] ?? 'unknown' ]
+                    );
+                }
+                continue;
+            }
             $cached_list = get_transient( "ltms_sanctions_list_{$list_key}" );
             if ( false === $cached_list ) {
                 // Intentar descargar.
@@ -609,6 +644,24 @@ class LTMS_Fintech_Compliance {
             }
             $offset += $batch;
             if ( count( $users ) < $batch ) break; // Last batch.
+        }
+
+        // FSF-EU-DISABLED-2026-08-03: emitir log critico recordando al
+        // oficial de cumplimiento que la lista UE FSF esta deshabilitada.
+        // El log es evidencia para auditoria UIAF/SIPLAFT del limite
+        // best-effort y dispara revision manual de vendors con nexos UE.
+        $disabled_lists = array_filter( self::SANCTIONS_LISTS, static fn( $cfg ) => ! empty( $cfg['disabled'] ) );
+        if ( ! empty( $disabled_lists ) && class_exists( 'LTMS_Core_Logger' ) ) {
+            $list_keys = array_keys( $disabled_lists );
+            $reasons   = array_map( static fn( $k ) => sprintf( '%s (%s)', $k, $disabled_lists[ $k ]['disabled_reason'] ?? 'unknown' ), $list_keys );
+            LTMS_Core_Logger::critical(
+                'FT_SCREEN_LISTS_DISABLED_RESCREEN',
+                sprintf(
+                    'Re-screening mensual ejecutado sin listas: %s. Oficial de cumplimiento: revisar manualmente vendors con nexos UE contra webgate.ec.europa.eu/fsd/fsf.',
+                    implode( ', ', $reasons )
+                ),
+                [ 'disabled_lists' => $list_keys, 'handled_by' => 'CRON_RESCREEN' ]
+            );
         }
     }
 

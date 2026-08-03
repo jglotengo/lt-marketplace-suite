@@ -2319,6 +2319,38 @@ Aplicar esc_html en el ORIGEN de estos casos requeriría añadir una capa de des
 
 **Trazabilidad.** AUDIT-EXCMSG-001 cerrado en 6 commits atómicos (5 sub-ciclos + 1 REST controller addendum). 30+ archivos modificados con ~70 instancias P0/P1 fixeadas (vs el backlog original de AVE-002 declarado con 31 instancias). 5 suites de tests estructurales nuevas (+35 tests). Suite completa `--testsuite=unit`: **3692 tests, 0 errors, 0 failures, 3 skipped** (vs 3657 baseline pre-ciclo — +35 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en todos los archivos modificados. P0/P1 stop-check converge: re-auditoría global confirma 0 instancias sin esc_html en wp_send_json_error/wc_add_notice/WP_Error. P2 backlog sistémico (21 instancias en return arrays a BD/logs estructurados) documentado para ciclo futuro dedicado.
 
+### Lección #152: Fuente de datos legal/regulatoria externa que se vuelve no-pública — el código la sigue intentando y rompe el flujo de negocio en modo fail-closed
+
+**Error:**
+
+`LTMS_Fintech_Compliance::SANCTIONS_LISTS['eu_restrictive']` apuntaba a `https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content`. Esta URL fue pública durante años (2020-2024) y la doctrina SARLAFT la consideraba fuente estándar. En 2025 la UE migró el Financial Sanctions Files tras login **ECAS** (European Commission Authentication Service); la URL legacy ahora devuelve **403 Whitelabel Error Page** sin cookies de sesión + XSRF-TOKEN válidas, y el portal redirige a `ecas.ec.europa.eu/cas/login`.
+
+El código LTMS (post-fix FASE4 P0 SARLAFT) entró en modo **fail-closed**: si una lista restrictiva no se puede descargar, el KYC queda bloqueado. Resultado: cualquier aprobación KYC que llegara a iterar hasta `eu_restrictive` (tercera lista, después de OFAC y UN) paralizaba el onboarding de vendors. El transient fallado tampoco se cacheaba, así que cada reintento volvía a descargar y fallar en bucle. **Bug P0 de cumplimiento que parece "_umbral correcto" — fail-closed doctrinal correcto, pero aplicado a una lista que ya no existe públicamente**.
+
+**Causa raíz:**
+
+1. **Asumir permanencia de fuentes externas públicas cuando la política de publicación del editor puede cambiar sin previo aviso.** La UE no anuncío el cierre del FSF público: simplemente dejó de responder 200 y empezó a responder 403. No hay webhook, no hay deprecation notice, no hay header `Sunset`. Solo el síntoma:KYC paralizado en producción sin error funcional aparente (el log decía "FT_SCREEN_LIST_UNAVAILABLE — fail-closed SARLAFT" pero parecía "correcto" porque el código interpretaba 403 como indisponibilidad temporal).
+2. **Fail-closed + no-caching de fallos = amplificación temporal del incidente.** Cada request reintentaba la descarga en lugar de cachear el 403 por 1h/día. Con vendors monthly re-screening (paginate batches of 200), miles de requests fallidos bombardearon el webgate sin mejorar la situación.
+3. **Mirror OpenSanctions con licencia CC BY-NC 4.0** confirma que no existe una "fuente pública equivalente" sin restricciones — la UE es eficazmente la única fuente autoritativa, y cuando la cierra, FONT(opensource mirror) comercial exige licencia. La opción real es deshabilitar la lista y documentar el límite como best-effort compliance.
+
+**Fix aplicado:**
+
+- `SANCTIONS_LISTS['eu_restrictive']` ahora incluye `disabled=true`, `disabled_reason='ECAS_LOGIN_REQUIRED_SINCE_2025'`, `disabled_at='2026-08-03'`. NO se elimina del array — se conserva la URL legacy y los campos descriptivos para trazabilidad histórica (la URL funcionó durante años y auditoría UIAF puede preguntar "¿por qué dejaron de screenear UE?").
+- `screen_against_sanctions_lists()` ahora hace `continue` al inicio del `foreach` si `disabled=true`, con log `FT_SCREEN_LIST_DISABLED` (warning) para evidencia de auditoría.
+- `rescreen_active_vendors()` emite log `FT_SCREEN_LISTS_DISABLED_RESCREEN` (critical) al final del cron mensual recordando al oficial de cumplimiento que la lista UE está fuera de servicio — evidencia documental del cumplimiento best-effort SARLAFT art. 9.4.3.
+- 3 tests nuevos en `FintechComplianceTest` cubren los invariantes: skip de EU, KYC aprobado cuando OFAC+UN 200 sin match, log crítico emitido.
+- ID tarea: `FSF-EU-DISABLED-2026-08-03`. Versión bump: 2.9.307 → 2.9.308.
+
+**Regla preventiva:**
+
+Toda fuente de datos externa (sanctions lists, FX rates, APIs regulatorias, etc.) referenciada en constantes de clase DEBE tener un campo `disabled`+`disabled_reason` interpretable por el código consumidor. La regla:
+
+1. **Nunca `unset` o eliminar del array** una fuente que se vuelve no-pública — preservar URL y razón para evidencia de auditoría futura (UIAF/SFC/SHCP pueden preguntar "¿por qué dejaron de screenear X?").
+2. **El skip DEBE emitir un log warning/critical** por cada iteración que lo saltea — ese log es la evidencia documental de que el cumplimiento es best-effort, no omisión negligente.
+3. **Para fail-closed stricto sensu** (cuando la doctrina legal lo exija y no exista best-effort doctrine), agregar un flag `disabled_block_kyc => true` separado del `disabled` de skip+log. El fail-closed es decisión de negocio, no técnica por defecto.
+4. **Cache de fallos**: si una URL devuelve 403/500, cachear el fallo por 1h-1d para no bombardear el endpoint externo con reintentos sin valor (caso real: miles de vendors re-screened × 1 URL UE caída = DoS accidental propio contra la infraestructura europea).
+5. **Para fuentes umbrella regulatorias** (OFAC, UN, EU FSF, UIAF listas locales): revisar anualmente que las URLs sigan públicas. Un endpoint que devuelve 403 en una auditoría SSH al cron PQRS **rompe el negocio silenciosamente durante meses** antes de que nadie lo note — los logs deben tener alerts visibles en panel admin cuando el screening falla sostenidamente (no solo `WP_Error` en state).
+
 
 
 

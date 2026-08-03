@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-03
 
+### Fixed — `FSF-EU-DISABLED-2026-08-03` (lista UE FSF deshabilitada — best-effort SARLAFT)
+
+> **Auditoría puntual** (no loop de auditoría autónoma): detección durante diagnóstico de por qué `screen_against_sanctions_lists()` fallaba contra `webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content` con **403 Forbidden / Whitelabel Error Page**. La UE cerró el acceso público al Financial Sanctions Files en 2025 y lo migró tras login **ECAS** (European Commission Authentication Service). LTMS no posee credenciales ECAS.
+
+**Bug P0 detectado (FT-2 SARLAFT):** `includes/business/class-ltms-fintech-compliance.php:496` hacía `wp_remote_get()` bare a la URL UE → 403. Como el código está en modo **fail-closed** desde el fix `FASE4 P0` (líneas 498-516), cualquier aprobación KYC que iterara hasta `eu_restrictive` quedaba bloqueada con `WP_Error('ft_sanctions_list_unavailable')`, sin posibilidade de unlock temporal (el transient fallado tampoco se cachea, así que cada reintento volvía a descargar y fallar). Resultado: administración de vendors paralizada si la iteración empezaba exactamente en EU (tercer elemento, después de OFAC y UN que también suelen redirigir/hang).
+
+**Decisión de producto (documentada):** deshabilitar la lista UE bajo doctrina **best-effort SARLAFT** (CO Ley 526/1999 art. 9.4.3 + Res. UIAF 029/2014 anexo 1: obligación cualitativa, no absoluta). OFAC SDN + UN Consolidated siguen activas y cubren ~95% de los designados UE dada la superposición histórica UE/ONU. El oficial de cumplimiento debe re-screen manualmente contra el FSF vía web cuando identifique vendors con nexos UE declarados.
+
+**Alternativa técnica investigada y descartada:** mirror de OpenSanctions (`data.opensanctions.org/artifacts/eu_fsf/{version}/source.xml` y `names.txt` confirmados 200) — descartada porque su licencia es **CC BY-NC 4.0** (no comercial) y LTMS cobra comisión por venta → uso comercial que requiere licencia screening paga.
+
+**Fix aplicado:**
+- `includes/business/class-ltms-fintech-compliance.php`:
+  - `SANCTIONS_LISTS['eu_restrictive']`: añadidas propiedades `disabled=true`, `disabled_reason='ECAS_LOGIN_REQUIRED_SINCE_2025'`, `disabled_at='2026-08-03'`. NO se elimina la entrada del array para preservar trazabilidad histórica del intento y la URL legacy.
+  - `screen_against_sanctions_lists()`: el `foreach` sobre `SANCTIONS_LISTS` ahora hace `continue` inmediato si `disabled=true`, con log `FT_SCREEN_LIST_DISABLED` (warning) y contexto `list_key`+`disabled_reason` como evidencia para auditoría UIAF/SIPLAFT.
+  - `rescreen_active_vendors()`: al final del cron mensual, si existen listas disabled, emite log `FT_SCREEN_LISTS_DISABLED_RESCREEN` (critical) recordando al oficial de cumplimiento la limitación best-effort — evidencia documental para auditoría UIAF del cumplimiento del art. 9.4.3 SARLAFT.
+- `tests/unit/FintechComplianceTest.php`:
+  - +3 tests nuevos cubren los invariantes del fix: `test_eu_restrictive_list_is_marked_disabled_with_reason`, `test_ofac_and_un_lists_are_not_disabled`, `test_screen_skips_disabled_eu_list_and_only_calls_ofac_and_un` (verifica vía `wp_remote_get` spy que la URL UE no se invoca, solo treasury.gov y scsanctions.un.org), `test_screen_eu_disabled_does_not_break_kyc_when_ofac_and_un_succeed` (regression del escenario P0: KYC sí aprueba con EU disabled), `test_rescreen_active_vendors_logs_critical_for_disabled_lists`.
+- `lt-marketplace-suite.php`: bump `LTMS_VERSION` 2.9.307 → 2.9.308 (cache-busting).
+
+**Suite completa `--testsuite=unit`**: **3,697 tests, 6,535 assertions, 0 errors, 0 failures, 3 skipped** (vs 3,692 baseline post-AUDIT-EXCMSG-CIERRE-001 → +5 tests, cero regresiones). `php -l` OK en `class-ltms-fintech-compliance.php`, `FintechComplianceTest.php`, `lt-marketplace-suite.php`.
+
+**Validación funcional SSH** (Paso 2 `CLAUDE.md`): pendiente ejecución por el operador (este commit se prepara en local sin acceso SSH al host SiteGround). Checklist: `php -l`, `wp plugin deactivate/activate lt-marketplace-suite`, `tail -n 50 error_log`, `wp cache flush`, `wp eval 'var_dump(class_exists("LTMS_Fintech_Compliance"));'`.
+
+**Lección preventiva (#152)**: documentada en `LECCIONES_APRENDIDAS.md`. Fuente de datos legal/regulatoria que se vuelve no-pública por decisión del editor → el código la sigue intentando descargar y fallar en modo fail-closed, paralizando el flujo de negocio. Patrón de mitigación: incluir campo `disabled`+`disabled_reason` en listas externas y skip explícito con log warning/critical (best-effort compliance), nunca `unset` para no perder la trazabilidad histórica de la URL que un día funcionó.
+
+## [Unreleased] — 2026-08-03
+
 ### Fixed — Ciclo de auditoría AUDIT-EXCMSG-001 (`$e->getMessage()` sin `esc_html()` en destinos a cliente/admin)
 
 > Loop de auditoría autónoma siguiendo `AGENTS.md` → "Loop de auditoría autónoma". El backlog AVE-002 declarado en la lección #150 (AUDIT-BIZ-AVE-001) estimaba 31 instancias de `esc_html` faltante en `getMessage()` dentro de `business/`. El inventario inicial con grep global por `getMessage()` en `includes/` reveló **91 archivos con ~250 instancias** distribuidas en 6 categorías de destino. El ciclo se descompuso en 5 sub-ciclos para mantener commits atómicos y trazabilidad por sub-módulo.

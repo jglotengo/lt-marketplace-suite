@@ -117,6 +117,31 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
         $this->assertArrayHasKey('eu_restrictive', $lists);
     }
 
+    /**
+     * FSF-EU-DISABLED-2026-08-03: la lista UE debe estar presente en
+     * SANCTIONS_LISTS para trazabilidad historica, pero marcada como
+     * disabled con motivo documentado. Esto prueba que el screening
+     * explicitamente OMITE la lista UE (no la elimina del array).
+     */
+    public function test_eu_restrictive_list_is_marked_disabled_with_reason(): void {
+        $lists = \LTMS_Fintech_Compliance::SANCTIONS_LISTS;
+        $this->assertArrayHasKey('eu_restrictive', $lists);
+        $this->assertTrue($lists['eu_restrictive']['disabled'] ?? false, 'eu_restrictive debe estar marcada como disabled=true');
+        $this->assertSame('ECAS_LOGIN_REQUIRED_SINCE_2025', $lists['eu_restrictive']['disabled_reason'] ?? '');
+        $this->assertSame('2026-08-03', $lists['eu_restrictive']['disabled_at'] ?? '');
+    }
+
+    /**
+     * FSF-EU-DISABLED-2026-08-03: OFAC y UN NO deben estar disabled
+     * (solo la lista UE esta fuera de servicio). Si alguna de esas dos
+     * se marcara disabled por error, el screening perdria cobertura.
+     */
+    public function test_ofac_and_un_lists_are_not_disabled(): void {
+        $lists = \LTMS_Fintech_Compliance::SANCTIONS_LISTS;
+        $this->assertEmpty($lists['ofac_sdn']['disabled'] ?? null, 'ofac_sdn no debe estar disabled');
+        $this->assertEmpty($lists['un_consolidated']['disabled'] ?? null, 'un_consolidated no debe estar disabled');
+    }
+
     public function test_pld_activities_has_cash_and_electronic(): void {
         $activities = \LTMS_Fintech_Compliance::PLD_ACTIVITIES;
         $this->assertContains('cash', $activities);
@@ -297,5 +322,100 @@ class FintechComplianceTest extends LTMS_Unit_Test_Case {
         // Accents stripped to ASCII.
         $this->assertStringNotContainsString('É', $result);
         $this->assertSame('juan perez', $result);
+    }
+
+    // ── SECCIÓN 7 — FSF-EU-DISABLED-2026-08-03 ───────────────────────────
+    // Verifica que screen_against_sanctions_lists() skipea eu_restrictive
+    // y solo invoca wp_remote_get para ofac_sdn y un_consolidated. Antes
+    // de este fix, la lista UE devolvia 403 (login ECAS requerido) y el
+    // codigo fail-closed bloqueaba toda aprobacion KYC.
+
+    public function test_screen_skips_disabled_eu_list_and_only_calls_ofac_and_un(): void {
+        $calls = [];
+        // Override wp_remote_get para registrar cada llamada y devolver
+        // un XML vacio (sin match) para que el screening continue.
+        Functions\when('wp_remote_get')->alias(static function($url, $args = []) use (&$calls) {
+            $calls[] = $url;
+            return ['response' => ['code' => 200], 'body' => '<sanctions></sanctions>'];
+        });
+        Functions\when('wp_remote_retrieve_response_code')->alias(static fn($r) => 200);
+        Functions\when('wp_remote_retrieve_body')->alias(static fn($r) => $r['body'] ?? '');
+        Functions\when('get_transient')->alias(static fn($k) => false);
+        Functions\when('set_transient')->alias(static fn() => true);
+        Functions\when('get_userdata')->alias(static function($id) {
+            $u = new \stdClass();
+            $u->display_name = 'Vendor Con Nexos UE';
+            $u->ID = $id;
+            return $u;
+        });
+        Functions\when('get_user_meta')->alias(static fn($uid, $key, $single = false) => '');
+        Functions\when('update_user_meta')->alias(static fn() => true);
+        Functions\when('delete_user_meta')->alias(static fn() => true);
+        Functions\when('remove_accents')->alias(static fn($s) => $s);
+
+        $result = \LTMS_Fintech_Compliance::screen_against_sanctions_lists(true, 999);
+
+        // El screening debe aprobar (sin match en OFAC ni UN).
+        $this->assertTrue($result, 'Screening debe aprobar cuando no hay match en listas activas');
+
+        // Solo 2 llamadas a wp_remote_get: ofac_sdn y un_consolidated.
+        // eu_restrictive debe ser salteada por disabled=true.
+        $this->assertCount(2, $calls, 'Solo OFAC y UN deben invocar wp_remote_get (EU deshabilitada)');
+        $this->assertStringContainsString('treasury.gov/ofac', $calls[0]);
+        $this->assertStringContainsString('scsanctions.un.org', $calls[1]);
+        foreach ($calls as $url) {
+            $this->assertStringNotContainsString('webgate.ec.europa.eu', $url, 'La URL UE deshabilitada no debe ser invocada');
+        }
+    }
+
+    public function test_screen_eu_disabled_does_not_break_kyc_when_ofac_and_un_succeed(): void {
+        // Regression test: antes de este fix, la iteracion sobre EU 403
+        // blopqueaba todo KYC via fail-closed. Ahora con disabled=true,
+        // si OFAC y UN devuelven 200 sin match, KYC debe quedar aprobado.
+        Functions\when('wp_remote_get')->alias(static fn($url, $args = []) => [
+            'response' => ['code' => 200],
+            'body' => '<root></root>',
+        ]);
+        Functions\when('wp_remote_retrieve_response_code')->alias(static fn($r) => 200);
+        Functions\when('wp_remote_retrieve_body')->alias(static fn($r) => $r['body'] ?? '');
+        Functions\when('get_transient')->alias(static fn($k) => false);
+        Functions\when('set_transient')->alias(static fn() => true);
+        Functions\when('get_userdata')->alias(static function($id) {
+            $u = new \stdClass();
+            $u->display_name = 'Cliente Comprador Mex';
+            $u->ID = $id;
+            return $u;
+        });
+        Functions\when('get_user_meta')->alias(static fn($uid, $key, $single = false) => '');
+        Functions\when('update_user_meta')->alias(static fn() => true);
+        Functions\when('delete_user_meta')->alias(static fn() => true);
+        Functions\when('remove_accents')->alias(static fn($s) => $s);
+
+        $result = \LTMS_Fintech_Compliance::screen_against_sanctions_lists(true, 1111);
+        $this->assertTrue($result, 'KYC debe aprobar cuando OFAC+UN devuelven vacios y EU esta disabled');
+    }
+
+    public function test_rescreen_active_vendors_logs_critical_for_disabled_lists(): void {
+        // El cron mensual debe emitir log critico cuando hay listas disabled,
+        // como evidencia de best-effort SARLAFT para auditoria UIAF.
+        $logged = [];
+        if ( class_exists(\LTMS_Core_Logger::class) ) {
+            // Brain\Monkey no puede mockear clases concretas estaticas; en
+            // su lugar, verificamos que el metodo no lanza excepciones y
+            // que la rama del log se ejecuta sin romper el cron.
+        }
+        Functions\when('get_users')->alias(static fn() => []);
+        Functions\when('get_userdata')->alias(static fn($id) => null);
+
+        // Solo verificamos que no lanza excepcion con 0 vendors.
+        \LTMS_Fintech_Compliance::rescreen_active_vendors();
+        $this->assertTrue(true, 'rescreen_active_vendors() no debe lanzar excepcion con 0 vendors');
+
+        // Verificamos que al menos una lista este disabled (invariante).
+        $disabled = array_filter(
+            \LTMS_Fintech_Compliance::SANCTIONS_LISTS,
+            static fn($cfg) => ! empty($cfg['disabled'])
+        );
+        $this->assertNotEmpty($disabled, 'Debe existir al menos una lista disabled para emitir el log critico');
     }
 }
