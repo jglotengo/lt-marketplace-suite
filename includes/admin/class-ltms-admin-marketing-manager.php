@@ -215,7 +215,7 @@ class LTMS_Admin_Marketing_Manager {
             ] );
 
         } catch ( \Throwable $e ) {
-            wp_send_json_error( sprintf( __( 'Error al subir a Backblaze: %s', 'ltms' ), $e->getMessage() ) );
+            wp_send_json_error( sprintf( __( 'Error al subir a Backblaze: %s', 'ltms' ), esc_html( $e->getMessage() ) ) ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 

@@ -524,7 +524,7 @@ final class LTMS_Admin_Payouts {
                 ),
             ]);
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 

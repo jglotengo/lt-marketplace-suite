@@ -182,7 +182,7 @@ class LTMS_Admin_Bookings {
 
             wp_send_json_success( $events );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 
@@ -203,7 +203,7 @@ class LTMS_Admin_Bookings {
                 wp_send_json_error( __( 'Acción no reconocida.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 
@@ -219,7 +219,7 @@ class LTMS_Admin_Bookings {
                 wp_send_json_success( $approved ? __( 'RNT aprobado.', 'ltms' ) : __( 'RNT rechazado.', 'ltms' ) );
             }
         } catch ( \Throwable $e ) {
-            wp_send_json_error( $e->getMessage() );
+            wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 

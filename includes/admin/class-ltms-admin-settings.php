@@ -575,7 +575,7 @@ final class LTMS_Admin_Settings {
                 'token_preview' => substr( $token, 0, 12 ) . '…',
             ] );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
 
@@ -631,7 +631,7 @@ final class LTMS_Admin_Settings {
                 'rows' => $result['data'] ?? [],
             ] );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
         }
     }
     /**

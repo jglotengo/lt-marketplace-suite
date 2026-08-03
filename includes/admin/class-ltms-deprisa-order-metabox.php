@@ -556,7 +556,7 @@ class LTMS_Deprisa_Order_Metabox {
 				wp_send_json_error( [ 'message' => 'Deprisa no devolvió PDF para esta guía.' ] );
 			}
 		} catch ( LTMS_Deprisa_Exception $e ) {
-			wp_send_json_error( [ 'message' => 'Error API: ' . $e->getMessage() ] );
+			wp_send_json_error( [ 'message' => esc_html( 'Error API: ' . $e->getMessage() ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
 		}
 	}
 
@@ -665,7 +665,7 @@ class LTMS_Deprisa_Order_Metabox {
 				wp_send_json_error( [ 'message' => $errs ?: 'Error al cancelar recogida.' ] );
 			}
 		} catch ( LTMS_Deprisa_Exception $e ) {
-			wp_send_json_error( [ 'message' => 'Error API: ' . $e->getMessage() ] );
+			wp_send_json_error( [ 'message' => esc_html( 'Error API: ' . $e->getMessage() ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
 		}
 	}
 

@@ -390,7 +390,7 @@ final class LTMS_Admin_Donations {
                     [ 'batch_id' => $batch_id ]
                 );
                 wp_send_json_error(
-                    sprintf( __( 'Error en transferencia: %s', 'ltms' ), $e->getMessage() )
+                    sprintf( __( 'Error en transferencia: %s', 'ltms' ), esc_html( $e->getMessage() ) ) // EXCMSG-FIX (AUDIT-EXCMSG-ADMIN-001, P1)
                 );
             }
         } else {
