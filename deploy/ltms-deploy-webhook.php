@@ -729,6 +729,15 @@ $files = [
     // KYC hacia el modulo de retiros). Los 2 archivos PHP modificados ya
     // estaban en la whitelist (líneas 570 + 587); sólo falta el nuevo test.
     'tests/unit/AdminPayoutAuditReTest.php',
+    // AUDIT-AUTOLOADER-001 — XcoverApiTest/TptcApiTest antes pre-rotos en
+    // baseline ("Class not found" por casing LTMS_Api_XCover/LTMS_Api_TPTC
+    // vs LTMS_Api_Xcover/LTMS_Api_Tptc + bypass de LTMS_Unit_Test_Case).
+    // EscMsgApiTest también tocado por mismo motivo en @covers. Sin sync
+    // al servidor, el test en server seguiría roto si alguien corre la
+    // suite ahí (vía wp eval o tests/integration).
+    'tests/unit/XcoverApiTest.php',
+    'tests/unit/TptcApiTest.php',
+    'tests/unit/EscMsgApiTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
