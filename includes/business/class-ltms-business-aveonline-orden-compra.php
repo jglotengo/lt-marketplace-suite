@@ -184,7 +184,9 @@ class LTMS_Business_Aveonline_OrdenCompra {
             wp_send_json_success( [ 'proveedores' => $proveedores ] );
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 
@@ -342,7 +344,9 @@ class LTMS_Business_Aveonline_OrdenCompra {
             }
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 

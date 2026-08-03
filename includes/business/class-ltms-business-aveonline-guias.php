@@ -242,7 +242,9 @@ class LTMS_Business_Aveonline_Guias {
             wp_send_json_success( [ 'cotizaciones' => $cotizaciones ] );
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 
@@ -486,7 +488,7 @@ class LTMS_Business_Aveonline_Guias {
             if ( isset( $lock_key ) ) {
                 delete_transient( $lock_key );
             }
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] ); // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir XSS reflected.
         }
     }
 
@@ -557,7 +559,9 @@ class LTMS_Business_Aveonline_Guias {
             wp_send_json_success( $result );
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 
@@ -603,7 +607,9 @@ class LTMS_Business_Aveonline_Guias {
             wp_send_json_success( $result );
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 
@@ -655,7 +661,9 @@ class LTMS_Business_Aveonline_Guias {
             wp_send_json_success( $result );
 
         } catch ( \Exception $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
     }
 }

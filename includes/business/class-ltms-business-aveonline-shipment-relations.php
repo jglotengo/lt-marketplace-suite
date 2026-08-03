@@ -195,7 +195,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->create_shipment_relation( $transportadora, $guias_str );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
 
         if ( ! $result['success'] ) {
@@ -249,7 +252,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->list_shipment_relations( $numero_relacion, $fecha_inicial, $fecha_final, $numero_guia );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
 
         if ( ! $result['success'] ) {
@@ -286,7 +292,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->delete_shipment_relation( $relacionenvio );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
 
         if ( ! $result['success'] ) {
@@ -334,7 +343,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->list_shipment_relations( $relacionenvio );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
         }
 
         if ( ! $result['success'] || empty( $result['registros'] ) ) {
@@ -374,7 +386,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->create_shipment_relation( $transportadora, $guias_raw );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
             return;
         }
 
@@ -468,7 +483,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->delete_shipment_relation( $numero_relacion );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
             return;
         }
 
@@ -512,7 +530,10 @@ class LTMS_Business_Aveonline_ShipmentRelations {
             $api    = new LTMS_Api_Aveonline();
             $result = $api->search_recipients( $param );
         } catch ( \Throwable $e ) {
-            wp_send_json_error( [ 'message' => $e->getMessage() ] );
+            // EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+            // XSS reflected si el mensaje contiene input del usuario o respuesta de
+            // API externa. wp_send_json_error devolverá el string al cliente JS.
+            wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
             return;
         }
 

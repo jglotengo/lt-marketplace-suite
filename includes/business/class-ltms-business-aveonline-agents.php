@@ -229,7 +229,10 @@ final class LTMS_Business_Aveonline_Agents {
 			$agents = $api->list_agents();
 			wp_send_json_success( [ 'agentes' => $agents ] );
 		} catch ( \Throwable $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+			// EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+			// XSS reflected si el mensaje contiene input del usuario o respuesta de
+			// API externa. wp_send_json_error devolverá el string al cliente JS.
+			wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
 		}
 	}
 
@@ -290,7 +293,10 @@ final class LTMS_Business_Aveonline_Agents {
 
 			wp_send_json_success( $result );
 		} catch ( \Throwable $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+			// EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+			// XSS reflected si el mensaje contiene input del usuario o respuesta de
+			// API externa. wp_send_json_error devolverá el string al cliente JS.
+			wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
 		}
 	}
 
@@ -319,7 +325,10 @@ final class LTMS_Business_Aveonline_Agents {
 			$result = $api->update_agent_status( $agent_nit, $estado );
 			wp_send_json_success( $result );
 		} catch ( \Throwable $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+			// EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+			// XSS reflected si el mensaje contiene input del usuario o respuesta de
+			// API externa. wp_send_json_error devolverá el string al cliente JS.
+			wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
 		}
 	}
 
@@ -354,7 +363,10 @@ final class LTMS_Business_Aveonline_Agents {
 			$result = $api->create_agent_user( $data );
 			wp_send_json_success( $result );
 		} catch ( \Throwable $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+			// EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+			// XSS reflected si el mensaje contiene input del usuario o respuesta de
+			// API externa. wp_send_json_error devolverá el string al cliente JS.
+			wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
 		}
 	}
 }

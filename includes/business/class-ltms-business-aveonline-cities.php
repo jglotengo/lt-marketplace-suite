@@ -475,7 +475,9 @@ final class LTMS_Business_Aveonline_Cities {
 			$results = $api->search_cities( $query, $registros ?: 10 );
 			wp_send_json_success( [ 'ciudades' => $results, 'source' => 'api' ] );
 		} catch ( \Throwable $e ) {
-			wp_send_json_error( [ 'message' => $e->getMessage() ] );
+			// EXCMSG-FIX (AUDIT-EXCMSG-AVE-001, P1): escapar getMessage para prevenir
+			// XSS reflected. wp_send_json_error devuelve el string al cliente JS.
+			wp_send_json_error( [ 'message' => esc_html( $e->getMessage() ) ] );
 		}
 	}
 
