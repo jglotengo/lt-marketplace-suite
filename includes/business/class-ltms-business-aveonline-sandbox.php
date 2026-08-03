@@ -52,6 +52,21 @@ class LTMS_Business_Aveonline_Sandbox {
             wp_send_json_error( [ 'message' => __( 'Token e ID son obligatorios.', 'ltms' ) ] );
         }
 
+        // AVE-017 FIX (AUDIT-BIZ-AVE-001, P2): validar que el id de empresa
+        // está en la lista blanca de sandbox, igual que ajax_avanzar_estado
+        // (línea 93). Sin este check, un admin podría enviar id=1, id=2,... y
+        // enumerar otros IDs de sandbox accessible vía obtenerEstadoAuth.
+        // Aunque sandbox no procesa producción, la validación previene
+        // information disclosure y mantiene consistencia entre los 2 handlers
+        // del módulo sandbox.
+        if ( ! in_array( $id, self::ALLOWED_IDS, true ) ) {
+            wp_send_json_error( [ 'message' => sprintf(
+                /* translators: %s: IDs permitidos */
+                __( 'ID de empresa no autorizado. Sólo se permiten: %s', 'ltms' ),
+                implode( ', ', self::ALLOWED_IDS )
+            ) ] );
+        }
+
         $result = self::request( [
             'tipo'       => 'obtenerEstadoAuth',
             'token'      => $token,

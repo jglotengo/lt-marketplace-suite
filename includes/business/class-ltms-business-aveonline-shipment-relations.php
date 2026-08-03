@@ -486,8 +486,21 @@ class LTMS_Business_Aveonline_ShipmentRelations {
     public static function ajax_search_recipients(): void {
         check_ajax_referer( 'ltms_vendor_nonce', 'nonce' );
 
+        // AVE-001 FIX (AUDIT-BIZ-AVE-001, P1): el check solo exigía
+        // is_user_logged_in(), lo que permitía a cualquier cliente (incluido
+        // 'subscriber') con sesión acceder al autocomplete de destinatarios
+        // de Aveonline y exponer PII (nombre, telefono, direccion) de
+        // destinatarios previos. Misma cadena de capability check que los
+        // demás handlers vendor_* (líneas 361, 417, 443): is_ltms_vendor() ||
+        // manage_options. La búsqueda devuelve destinatarios asociados a
+        // envíos del propio vendor, no hay escenario legitimo donde un
+        // cliente sin rol vendor deba consultar este endpoint.
         if ( ! is_user_logged_in() ) {
-            wp_send_json_error( [ 'message' => 'Sin permisos.' ] );
+            wp_send_json_error( [ 'message' => 'Sin permisos.' ], 401 );
+        }
+        $is_vendor = class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor();
+        if ( ! $is_vendor && ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Sin permisos.' ], 403 );
         }
 
         $param = sanitize_text_field( wp_unslash( $_GET['param'] ?? '' ) );

@@ -2194,6 +2194,66 @@ Fecha: 2026-07-30 (AUDIT-FE Fase 1.10 — cierre CSP-compliance de home.php + si
 
 7. **Trazabilidad.** AUDIT-PANEL-CSV-002 cerrado en esta iteración. Los 6 fixes aplicados a 4 archivos (`class-ltms-authorities-compliance.php` x2, `class-ltms-cross-border-compliance.php`, `class-ltms-fintech-compliance.php` x2, `class-ltms-foundation-compliance.php`) + 6 suites de test estructurales nuevas (+73 tests / 96 assertions). Suite completa `--testsuite=unit`: **3624 tests, 0 errors, 0 failures, 3 skipped** (vs 3551/0/0/3 baseline — +73 tests, cero regresiones). `php -l` OK en los 4 archivos modificados + 6 archivos de test. Stop-check de AUDIT-PANEL-CSV-002 pendiente en próxima iteración (verificar que no aparezcan nuevos exportadores CSV en `business/` por grep global).
 
+---
+
+## 19. v2.9.306 - AUDIT-BIZ-AVE-001: ciclo de auditoría del módulo Aveonline business (1 lección nueva)
+
+> Loop de auditoría autónoma siguiendo `AGENTS.md` → "Loop de auditoría autónoma". Alcance: 21 archivos del módulo Aveonline (`includes/business/class-ltms-business-aveonline-*.php` x11, `includes/business/listeners/class-ltms-aveonline-hub-listener.php`, `includes/business/class-ltms-aveonline-onboarding-{trigger,ajax}.php` x2, `includes/api/class-ltms-api-aveonline{,-hub,-onboarding}.php` x3, `includes/api/webhooks/class-ltms-aveonline-webhook-handler.php`, `includes/shipping/class-ltms-shipping-method-aveonline.php`, `includes/frontend/class-ltms-frontend-checkout-aveonline-office.php`, `includes/admin/views/html-admin-aveonline-hub.php`, `includes/admin/views/settings/section-aveonline.php`, `includes/frontend/views/view-aveonline-onboarding.php`). Los 4 archivos en `api/` y `frontend/` fuera del inventario original de business/ fueron inspeccionados en stop-check: son API clients invocados por los handlers (no exponen endpoints AJAX propios) o vistas admin con `manage_woocommerce` ya requerido — 0 hallazgos P0/P1. El módulo Aveonline NUNCA había tenido un ciclo de auditoría dedicado; los toques previos fueron side-effects (regression Plaza Viva, IDOR P0 v2.9.118, schema DB bug AUDIT-DB-AVE-001) sin sweep completo. Audit choice vindicada: los hallazgos P1 sí aparecieron ahí donde no se buscaba.
+
+### Lección #150: un handler `wp_ajax_*` que use `is_user_logged_in()` como única capability check NO protege nada — el rol `subscriber` (cliente WC) lo pasa; el fix es `is_ltms_vendor() || manage_options` con código HTTP correcto (401 vs 403)
+
+**Error:**
+
+`LTMS_Business_Aveonline_ShipmentRelations::ajax_search_recipients()` (línea 486 pre-fix) verificaba solo `if ( ! is_user_logged_in() )`, igual que los otros 3 handlers vendor_* del mismo archivo (`ajax_vendor_create/list/delete`) ANTES de que v2.9.100 SEC-9 / AO-BUG-6 los migrara a `check_vendor_nonce()` con `LTMS_Utils::is_ltms_vendor()`. La migración se quedó a mitad: el handler `_search_recipients` (registrado como `wp_ajax_ltms_aveonline_search_recipients`, sin prefijo `vendor_`) quedó fuera del inventario de la pasada SEC-9 porque su nombre no calza con el grep `wp_ajax_ltms_vendor_*`. Resultado: 4 años de ventana donde cualquier cliente logueado (rol `subscriber`, el default de WC customer) podía invocar el autocomplete de destinatarios de Aveonline y exponer PII (nombre, teléfono, dirección) de destinatarios previos.
+
+**Causa raíz (doble):**
+
+1. **`is_user_logged_in()` no es capability check.** Verifica sesión WP, no rol. Cualquier usuario autenticado —incluyendo el rol mínimo `subscriber` (cliente WC), atacantes registrados, o filctraciones de sesión— pasa el check. AGENTS.md §"Seguridad por defecto" exige validar rol/permiso explícito en TODO handler AJAX, no solo login. La primitiva WP `is_user_logged_in()` debería tratarse como un "predicates de contexto" (¿hay sesión?), nunca como "predicates de capability" (¿puede realizar esta acción?).
+2. **Inventario de fixes previos basado en grep por prefijo de action `wp_ajax_ltms_vendor_*`.** La pasada SEC-9 / AO-BUG-6 (v2.9.100) migró los 4 handlers con prefijo `ltms_vendor_` a `check_vendor_nonce()` con `is_ltms_vendor()`, pero dejó fuera del sweep:
+   - `wp_ajax_ltms_aveonline_search_recipients` (este bug, sin prefijo `vendor_`).
+   - `wp_ajax_ltms_aveonline_create_relation/list_relations/delete_relation/print_relation` (handlers admin, legítimamente usan `manage_woocommerce` — no afectados).
+   El inventario por grep de prefijo "vendor_" fue una heurística imperfecta; el inventario correcto era grep por `wp_ajax_ltms_` + `is_user_logged_in` sin `is_ltms_vendor` cercano. Mismo patrón de LECCIONES **#149** (inventario por grep incompleto) y **#143** (mismo anti-patrón se replica en múltiples vistas/handlers).
+
+**Fix:**
+
+Replicar el patrón consistente de los demás handlers vendor_* del archivo:
+```php
+if ( ! is_user_logged_in() ) {
+    wp_send_json_error( [ 'message' => 'Sin permisos.' ], 401 );
+}
+$is_vendor = class_exists( 'LTMS_Utils' ) && LTMS_Utils::is_ltms_vendor();
+if ( ! $is_vendor && ! current_user_can( 'manage_options' ) ) {
+    wp_send_json_error( [ 'message' => 'Sin permisos.' ], 403 );
+}
+```
+
+Detalles:
+- 401 = no autenticado (no hay sesión) ≠ 403 = autenticado pero sin rol suficiente. Mezclarlos en un solo código confunde al JS frontend entre "la sesión expiró, redirige a login" vs "tu rol no tiene permiso, no reintentes". Mismo patrón que LECCIONES **#146** (distinguir 401 compliance-blocked de 403).
+- `manage_options` fallback como en `guias.php::check_vendor_nonce()` (línea 95-98) — admin puede gestionar envíos de cualquier vendor.
+- `class_exists('LTMS_Utils')` defensivo por si la clase utilitaria no carga en algún contexto edge-case (tests unit sin bootstrap completo). Si la clase falta, incluso un admin real no pasaría — fail-closed.
+
+**Regla preventiva / heurística:**
+
+1. **TODO handler `wp_ajax_*` registrado por el plugin debe auditarse con grep por `is_user_logged_in()` sin pareja `is_ltms_vendor()` o `current_user_can(...)` cercana.** Grep:
+   ```bash
+   grep -rn "wp_ajax_" --include="*.php" includes/ | awk -F: '{print $1":"$2}' | sort -u
+   grep -n "is_user_logged_in" includes/business/*.php includes/frontend/*.php
+   ```
+   Y cruzar manualmente: cada handler con `is_user_logged_in()` debe tener un segundo check de capability dentro de las siguientes 5 líneas. Si no, es caso P1.
+2. **`is_user_logged_in()` solo es válido como ÚNICO check de capability en handlers que devuelven datos *del propio usuario logueado* y sin filtrar por rol** (ej: `wp_ajax_get_my_orders`, donde el propio user_id del request ya acota los datos). En handlers que consultan datos de terceros (destinatarios, vendors, ids externos), `is_user_logged_in()` no acota nada; debe acompañarse de capability check.
+3. **Fixes de auditoría por grep de prefijo** (`wp_ajax_ltms_vendor_*`) son heurísticas, no exhaustivas. Repasar también por sufijo funcional (`_search`, `_autocomplete`, `_lookup`, `_get_*`) — los handlers de autocomplete son especialmente sensibles a este patrón porque se diseñan como "utility handlers" y a menudo comparten el nonce del panel pero no el capability check del panel.
+4. **Refactor 1-shot de "todos los handlers a `check_vendor_nonce()`"** es antifrágil si hay handlers con nombres que no calzan el patrón del grep. Alternativa robusta: un helper centralizado `LTMS_Ajax_Guard::require_vendor_or_admin()` invocado al inicio de cada handler, no cada handler reimplementando el check inline — elimina la oportunidad de olvidar uno. Esta es la `ltms_http_fail_reason` de LECCIONES #146 generalizada a capability checks.
+
+**Relación con lecciones previas:**
+
+- LECCIONES **#149** (inventario CSV por grep de prefijo): mismo anti-patrón de "heurística de inventario imperfecta". Aquí el grep SEC-9 buscó `ltms_vendor_*` y dejó fuera `ltms_aveonline_search_recipients`. La regla conjunta: inventarios por grep siempre deben validarse cruzando con grep por **primitivas sospechosas** (`fputcsv`, `is_user_logged_in`, `wp_remote_get`) no por **nombres de action**.
+- LECCIONES **#146** (403 con mensaje genérico vs 401 sesión expirada): este fix aplica la distinción 401 vs 403 desde el inicio.
+- LECCIONES **#143** (mismo anti-patrón en múltiples vistas): aquí el anti-patrón "is_user_logged_in como único check" no se replicó — solo estuvo en 1 handler porque los 3 vendor_* ya habían sido migrados a SEC-9. Es decir, la migración SEC-9 corrigió *la mayoría* pero no *todos*. Leave-one-out falla silenciosamente.
+- LECCIONES **#138** (refactors invisibles en working tree,养成 "doesn't exist"): esta lección surge de auditar en working tree *sin commit intermedio*. Cada fix del ciclo AUDIT-BIZ-AVE-001 commiteado atómicamente al final, no en working tree invisible — evita el riesgo #138.
+
+**Trazabilidad.** AUDIT-BIZ-AVE-001 cerrado en esta iteración: 2 P1+P2 fixes en 2 archivos (`class-ltms-business-aveonline-shipment-relations.php` AVE-001, `class-ltms-business-aveonline-sandbox.php` AVE-017) + 2 suites de test estructurales nuevas (+33 tests / 38 assertions). Suite completa `--testsuite=unit`: **3657 tests, 0 errors, 0 failures, 3 skipped** (vs 3624/0/0/3 baseline post-CSV-002 — +33 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en los 2 archivos modificados + 2 archivos de test. Stop-check converge: 21/21 archivos Aveonline inspeccionados (incluye 4 archivos fuera del inventario business/ original — ver header), 0 P0 detectados, P1 (AVE-001) fixeado, AVE-002 degradado a P2 backlog sistémico (esc_html en getMessage — 31 instancias en business/, scope para ciclo AUDIT-EXCMSG-001 dedicado). El módulo Aveonline queda cerrado para auditoría integral.
+
+
 
 
 
