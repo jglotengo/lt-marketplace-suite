@@ -644,7 +644,7 @@ final class LTMS_Frontend_Checkout_Handler {
             ] );
 
             $order->add_order_note(
-                sprintf( __( 'Error en checkout LTMS: %s', 'ltms' ), $e->getMessage() )
+                sprintf( __( 'Error en checkout LTMS: %s', 'ltms' ), esc_html( $e->getMessage() ) ) // EXCMSG-FIX (AUDIT-EXCMSG-FRONTEND-001, P2) — order note mostrado en admin
             );
 
             wp_send_json_error( __( 'Error interno. Por favor intenta de nuevo o contacta soporte.', 'ltms' ) );

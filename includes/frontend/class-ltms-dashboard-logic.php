@@ -550,7 +550,7 @@ final class LTMS_Dashboard_Logic {
             );
             wp_send_json_error(
                 __( 'Error al almacenar el documento. Por favor intenta de nuevo.', 'ltms' ) .
-                ( defined( 'WP_DEBUG' ) && WP_DEBUG ? ' (' . $e->getMessage() . ')' : '' )
+                ( defined( 'WP_DEBUG' ) && WP_DEBUG ? ' (' . esc_html( $e->getMessage() ) . ')' : '' ) // EXCMSG-FIX (AUDIT-EXCMSG-FRONTEND-001, P1)
             );
         }
     }
