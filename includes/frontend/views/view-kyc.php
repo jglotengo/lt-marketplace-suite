@@ -201,6 +201,44 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
                 <input type="hidden" id="ltms-kyc-path-camara" value="">
             </div>
 
+            <?php
+            // KYC-CAMARA-PN-EXEMPT-2026-08-03: datos de matrícula Cámara de
+            // Comercio (número + vencimiento) solo para persona jurídica (NIT).
+            // El backend (class-ltms-authorities-compliance.php:968+) los exige
+            // exclusivamente para document_type='nit'. Persona natural (CC/CE/PAS)
+            // está exenta bajo Código de Comercio art. 10 (comerciantes matriculados).
+            // El div contenedor se muestra/oculta vía JS (ltms-kyc.js) según el
+            // value de #ltms-kyc-doc-type. Antes estos campos NO existían en el
+            // form pero el backend los exigía a todos — era el bug que bloqueaba
+            // a Maria Orlinda Giraldo Gomez #208 (CC) con ac_cc_missing.
+            if ( ! $is_mx ) :
+                $cc_number_prefill  = (string) ( $kyc->camara_comercio_number ?? get_user_meta( $user_id, 'ltms_camara_comercio_number', true ) ?? '' );
+                $cc_expires_prefill = (string) ( $kyc->camara_comercio_expires ?? get_user_meta( $user_id, 'ltms_camara_comercio_expires', true ) ?? '' );
+                $doc_type_prefill   = (string) ( $kyc->document_type ?? get_user_meta( $user_id, 'ltms_document_type', true ) ?? '' );
+                $show_cc_fields     = ( 'nit' === strtolower( $doc_type_prefill ) );
+            ?>
+            <div id="ltms-kyc-camara-fields" class="ltms-form-group" style="<?php echo $show_cc_fields ? '' : 'display:none;'; ?>background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:14px;margin-bottom:16px;">
+                <p style="font-size:.8rem;color:#92400e;margin:0 0 12px;">
+                    <strong>🏢 Datos de matrícula mercantil (obligatorio para persona jurídica)</strong><br>
+                    Decreto 2150/1995 art. 1 — todo comerciante debe inscribirse en el registro mercantil.
+                </p>
+                <div class="ltms-form-group" style="margin-bottom:12px;">
+                    <label style="font-size:.875rem;"><?php esc_html_e( 'Número de matrícula Cámara de Comercio', 'ltms' ); ?> <span style="color:#dc2626;">*</span></label>
+                    <input type="text" id="ltms-kyc-camara-number" class="ltms-form-control"
+                           value="<?php echo esc_attr( $cc_number_prefill ); ?>"
+                           placeholder="<?php esc_attr_e( 'Ej: 1263517-16', 'ltms' ); ?>"
+                           inputmode="numeric"
+                           maxlength="20">
+                </div>
+                <div class="ltms-form-group" style="margin-bottom:0;">
+                    <label style="font-size:.875rem;"><?php esc_html_e( 'Fecha de vencimiento de la matrícula', 'ltms' ); ?></label>
+                    <input type="date" id="ltms-kyc-camara-expires" class="ltms-form-control"
+                           value="<?php echo esc_attr( $cc_expires_prefill ); ?>">
+                    <span class="ltms-field-hint"><?php esc_html_e( 'Opcional — si el certificado no tiene fecha de vencimiento, déjalo en blanco.', 'ltms' ); ?></span>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- ============================================================
                  CERTIFICACIÓN BANCARIA
                  CO: Circular SFC 029/2014 — cuenta a nombre del rep. legal

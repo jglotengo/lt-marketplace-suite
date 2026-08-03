@@ -583,6 +583,15 @@ final class LTMS_Dashboard_Logic {
         $file_path_camara = sanitize_text_field( wp_unslash( $_POST['file_path_camara'] ?? '' ) ); // phpcs:ignore
         $file_path_banco  = sanitize_text_field( wp_unslash( $_POST['file_path_banco']  ?? '' ) ); // phpcs:ignore
 
+        // KYC-CAMARA-PN-EXEMPT-2026-08-03: número + vencimiento matrícula
+        // Cámara de Comercio. Solo para persona jurídica (NIT). La UI
+        // (view-kyc.php) solo los envía si document_type='nit'.
+        $camara_comercio_number  = sanitize_text_field( wp_unslash( $_POST['camara_comercio_number']  ?? '' ) ); // phpcs:ignore
+        $camara_comercio_expires = sanitize_text_field( wp_unslash( $_POST['camara_comercio_expires'] ?? '' ) ); // phpcs:ignore
+        if ( ! empty( $camara_comercio_expires ) ) {
+            $camara_comercio_expires = gmdate( 'Y-m-d', strtotime( $camara_comercio_expires ) );
+        }
+
         // v2.9.114 KYC-AUDIT P0-7: cédula/ID file_path is mandatory.
         // Before, the JS only blocked submit if banco (bank cert) was missing. The PHP
         // handler did not check $file_path at all, so a vendor could submit KYC without
@@ -878,6 +887,24 @@ final class LTMS_Dashboard_Logic {
         // RUT, Cámara, Banco ya fueron leídos arriba (lines 582-583, 588).
         if ( $file_path_rut )    update_user_meta( $vendor_id, 'ltms_kyc_file_rut',    $file_path_rut );
         if ( $file_path_camara ) update_user_meta( $vendor_id, 'ltms_kyc_file_camara', $file_path_camara );
+
+        // KYC-CAMARA-PN-EXEMPT-2026-08-03: persistir número + vencimiento
+        // matrícula Cámara de Comercio (solo persona jurídica NIT). Antes
+        // el backend los exigía en validate_rut_and_camara_comercio() pero
+        // el handler nunca los escribía → la matrícula siempre quedaba vacía
+        // y todo KYC de persona jurídica se bloqueaba con ac_cc_missing.
+        if ( 'nit' === strtolower( (string) $document_type ) ) {
+            update_user_meta( $vendor_id, 'ltms_camara_comercio_number',  $camara_comercio_number );
+            update_user_meta( $vendor_id, 'ltms_camara_comercio_expires', $camara_comercio_expires );
+        } else {
+            // Persona natural: limpiar por si acaso quedó de un cambio
+            // de document_type posterior (ej. vendor que antes era NIT
+            // y cambió a CC). El backend no los exige pero no dejamos
+            // datos residuales obsoletos.
+            delete_user_meta( $vendor_id, 'ltms_camara_comercio_number' );
+            delete_user_meta( $vendor_id, 'ltms_camara_comercio_expires' );
+        }
+
         if ( $file_path_banco )     update_user_meta( $vendor_id, 'ltms_kyc_file_banco',         $file_path_banco );
         if ( $bank_rep_legal_name ) update_user_meta( $vendor_id, 'ltms_kyc_bank_rep_legal',     $bank_rep_legal_name );
         if ( $bank_name )           update_user_meta( $vendor_id, 'ltms_kyc_bank_name',          $bank_name );

@@ -2351,6 +2351,44 @@ Toda fuente de datos externa (sanctions lists, FX rates, APIs regulatorias, etc.
 4. **Cache de fallos**: si una URL devuelve 403/500, cachear el fallo por 1h-1d para no bombardear el endpoint externo con reintentos sin valor (caso real: miles de vendors re-screened × 1 URL UE caída = DoS accidental propio contra la infraestructura europea).
 5. **Para fuentes umbrella regulatorias** (OFAC, UN, EU FSF, UIAF listas locales): revisar anualmente que las URLs sigan públicas. Un endpoint que devuelve 403 en una auditoría SSH al cron PQRS **rompe el negocio silenciosamente durante meses** antes de que nadie lo note — los logs deben tener alerts visibles en panel admin cuando el screening falla sostenidamente (no solo `WP_Error` en state).
 
+### Lección #153: UI label "solo personas jurídicas" + backend exige a TODOS → brecha silenciosa que se manifiesta solo cuando el validador bloquea en fail-closed
+
+**Error:**
+
+Tres gaps encadenados en el flujo KYC de Maria Orlinda Giraldo Gomez #208 (persona natural CC, vendedora):
+
+1. **GAP-A — backend exigía a todos**: `LTMS_Authorities_Compliance::validate_rut_and_camara_comercio()` leía `ltms_camara_comercio_number` sin distinguir `document_type` — bloqueaba a TODOS los vendors CO con `ac_cc_missing` si no habían seteado el user_meta, aunque fueran persona natural (CC/CE/PAS) quienes, según Código de Comercio art. 10, no son "comerciante matriculado" obligatoriamente. La UI ya labelaba el campo Cámara como "solo personas jurídicas", pero el backend no respetaba ese contrato.
+2. **GAP-B — UI pedía el archivo, no el número**: `view-kyc.php` solo incluía input `<input type="file" id="ltms-kyc-file-camara">` para subir el PDF del certificado, pero nunca un campo de texto para `ltms_camara_comercio_number` ni un `<input type="date">` para `ltms_camara_comercio_expires`. Aunque el validador pasara, esos metas quedaban siempre vacíos.
+3. **GAP-C — handler nunca persistía los metas**: `class-ltms-dashboard-logic.php:ltms_submit_kyc()` leía `$_POST['file_path_camara']` y persistía `ltms_kyc_file_camara` (el path del PDF), pero no había lectura ni escritura de `ltms_camara_comercio_number` / `ltms_camara_comercio_expires`. El campo ni siquiera existía en el POST — el handler no podía inventarlo.
+
+Resultado: cualquier vendedor NIT jamás podía aprobar KYC (aunque subiera el PDF correcto), y cualquier vendedor CC/CE/PAS quedaba bloqueado por un requisito que la UI misma le decía que no aplicaba. Bug silencioso porque:
+- El error se manifiesta solo en el endpoint admin `wp_ajax_approve_kyc`, no en front.
+- El mensaje "Falta el número de matrícula de Cámara de Comercio" suena razonable e imprescindible, desincentivando la pregunta "¿debería aplicarle a este vendor?".
+- Solo emerges cuando un admin intenta aprobar a un vendor específico — y el admin asume que el vendor hizo algo mal.
+
+**Causa raíz:**
+
+1. **Contracto UI ↔ backend NO verificado end-to-end.** El backend declaró un contrato ("exijo número de matrícula Cámara") pero la UI nunca se actualizó para cumplirlo. Cuando se añadió la validación `validate_rut_and_camara_comercio` (v2.9.16), el form KYC ya tenía el input file del PDF Cámara — el dev asumió que era suficiente, sin notar que el validador leía user_meta distinto al que el form escribía.
+2. **Doctrina legal mal interpretada como "estricto" sin matices.** El Decreto 2150/1995 sí obliga a matrícula mercantil, pero el Código de Comercio acota esa obligación a "comerente" (art. 10) — persona natural vendedora ocasional no es comerciante. Codificar "a todos" como fail-closed SARLAFT parecía correcto doctrinalmente, pero ignoraba la doctrina best-effort UIAF que permite graduar requisitos por tipo de persona.
+3. **Label UI y código sin sincronizar.** La frase "solo personas jurídicas" en `view-kyc.php` L162 y L195 es una pista clara: el dev de UI sabía que la regla no era universal. Pero el dev del backend no vio esa label, o la vio y no la respetó. Sin un test que cruce UI↔backend ("si la label dice 'solo PJ', el backend no debe exigirlo a PN"), la discrepancia se cuela.
+
+**Fix aplicado:**
+
+- Backend: `validate_rut_and_camara_comercio()` ahora lee `ltms_document_type` y solo exige `ltms_camara_comercio_number` + `ltms_camara_comercio_expires` cuando `document_type='nit'`. Persona natural → skip con log `AC_CC_PERSONA_NATURAL_EXEMPT` (info, no warning) como evidencia de auditoría UIAF del criterio aplicado.
+- UI `view-kyc.php`: añadido `<div id="ltms-kyc-camara-fields">` con 2 inputs (número + fecha de vencimiento), visible solo si `document_type='nit'` (PHP prefill + JS toggle en `assets/js/ltms-kyc.js`). Se prefilla desde `$kyc->camara_comercio_number` o `get_user_meta` para que un NIT que reenvía KYC no tenga que reingresar los datos.
+- Handler `class-ltms-dashboard-logic.php`: leídos los 2 nuevos POST `camara_comercio_number` y `camara_comercio_expires` (sanitize + date normalize), `update_user_meta` solo si `document_type='nit'`; `delete_user_meta` para persona natural (limpiar residuo si el vendor antes era NIT).
+- JS `ltms-kyc.js` + `.min.js`: toggle visual, validación front para NIT (exige número antes del submit), envío de los 2 campos en POST.
+- Tests `KyccCamaraPnExemptTest`: +10 tests cubren 4 escenarios persona natural/4 persona jurídica + 1 case-insensitive NIT + 1 MX no ejecuta rama CO.
+- Versión bump: 2.9.308 → 2.9.309.
+
+**Regla preventiva:**
+
+1. **Todavalidación backend que exija user_meta DEBE existir un campo UI correspondiente que lo persista.** Esta invariante no se cumple por inspección humana; requiere un test de integración que cubra: submit form → handler persiste el campo → validador lo lee. Si solo hay tests estructurales ("el código contiene `new WP_Error('ac_cc_missing')`"), el bug se cuela porque el código sí contiene el `WP_Error` — solo que la rama nunca se ejercita correctamente.
+2. **Contracto UI label ↔ backend debe ser consistente.** Si la UI label habla de "solo aplica a X subconjunto", el backend DEBE verificar `subset === X` antes de aplicar el requisito. Mismas palabras, mismo código — nunca asumir "el usuario entendió que es opcional porque la label lo dice".
+3. **Doctrina legal regulatory requiring "todo comerciante" o "toda persona" debe interpretarse con sus propias leyes de scope** (Código de Comercio art. 10 define comerciante). Codificar "todo X" sin el scope detail abre false positives que bloquean personas legítimas. Auditoría UIAF acepta best-effort con criterio documentado en log/info.
+4. **Addición de validador backend SIN sincronizar UI handler → siempre bug latente.** El orden correcto: añadir UI → añadir handler que persiste → añadir validador. Inverso funciona hasta el primer vendor que golpea la validación.
+5. **Tests de behaviour con `get_user_meta` mock por key** son la única forma de cubrir este caso sin integración completa. Ver `KyccCamaraPnExemptTest::invoke()` como patrón: stub de `get_user_meta` que retorna valor distinto según el key, invocar el método privado via ReflectionClass, assert sobre `true` vs `WP_Error::class`.
+
 
 
 

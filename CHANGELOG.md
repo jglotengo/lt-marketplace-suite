@@ -6,6 +6,62 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-03
 
+### Fixed — `KYC-CAMARA-PN-EXEMPT-2026-08-03` (matrícula Cámara de Comercio solo para persona jurídica NIT; Maria Orlinda Giraldo Gomez #208 deja de bloquearse)
+
+> **Bug puntual detectado durante deploy** del fix anterior `FSF-EU-DISABLED-2026-08-03`. Al probar la aprobación de María (vendor #208, CC) el flujo avanzó hasta la siguiente validación de compliance y se detuvo con `WP_Error('ac_cc_missing')` exigiendo "número de matrícula de Cámara de Comercio" — pero María es persona natural (CC) y la UI ya labela el campo como "solo personas jurídicas". Tres gaps encadenados:
+
+**Bug P1 detectado (multi-capa UI vs backend):**
+
+1. **GAP-A**: Backend `LTMS_Authorities_Compliance::validate_rut_and_camara_comercio()` exigía `ltms_camara_comercio_number` a TODOS los vendors CO sin distinguir persona natural (CC/CE/PAS) de persona jurídica (NIT). Bloqueaba toda aprobación de persona natural con `ac_cc_missing` aunque la UI les indicaba estar exentos.
+2. **GAP-B**: La UI (`view-kyc.php`) sólo pedía el **archivo PDF** del Certificado de Cámara de Comercio, NO pedía el **número de matrícula** ni la **fecha de vencimiento** — los user_meta exigidos por el backend. Aunque el validador pasara, el meta siempre quedaba vacío.
+3. **GAP-C**: El handler AJAX (`class-ltms-dashboard-logic.php:580-880`) persistía el path del PDF (`ltms_kyc_file_camara`) pero NUNCA escribía `ltms_camara_comercio_number` ni `ltms_camara_comercio_expires` — los campos simplemente no existían en el form POST.
+
+**Decisión de producto (documentada):** eximir matrícula Cámara de Comercio para persona natural (CC/CE/PAS). El Decreto 2150/1995 art. 1 obliga a "todo comerciante" a matricularse en el registro mercantil — Código de Comercio art. 10 define "comerciante" como quien ejecuta actos de comercio profesionalmente. La interpretación literal exigiría a toda persona natural vendedora; la interpretación pragmática (Ley 1014/2006 art. 35 + doctrina SIC) permite eximir profesionales independientes y vendedores ocasionales no comerciantes. La UI ya decía "solo personas jurídicas" → la decisión de negocio alinea backend con UI y reduce fricción onboarding de persona natural.
+
+Para persona jurídica (NIT) la matrícula sigue obligatoria.
+
+**Fix aplicado:**
+
+- `includes/business/class-ltms-authorities-compliance.php` (`validate_rut_and_camara_comercio`):
+  - Lee `ltms_document_type` del vendor y computa `$is_juridica = ('nit' === document_type)`.
+  - Persona natural (CC/CE/PAS/otro): skip del bloque Cámara con log `AC_CC_PERSONA_NATURAL_EXEMPT` (info, NO warning) como evidencia para auditoría UIAF/SIPLAFT del criterio best-effort aplicado.
+  - Persona jurídica NIT sin número: bloquea con `ac_cc_missing` (mensaje original preservado).
+  - Persona jurídica NIT con número pero matrícula vencida: bloquea con `ac_cc_expired` (mensaje original preservado).
+  - Persona jurídica NIT con número sin fecha de vencimiento: pasa (vencimiento sigue siendo opcional como antes).
+- `includes/frontend/views/view-kyc.php`:
+  - Añadido bloque `<div id="ltms-kyc-camara-fields">` con 2 inputs **número de matrícula** (texto, required si visible) y **fecha de vencimiento** (date, opcional), visible solo si `document_type='nit'` (PHP prefill + JS toggle).
+  - Bloque condicional solo para CO (`!$is_mx`); MX no toca la lógica CO de Cámara.
+  - Prefill desde `$kyc->camara_comercio_number` / `$kyc->camara_comercio_expires` o fallback user_meta, para que vendedores NIT que reenvían KYC vean sus datos previos.
+- `includes/frontend/class-ltms-dashboard-logic.php` (handler `ltms_submit_kyc`):
+  - Lee 2 nuevos inputs POST `camara_comercio_number` y `camara_comercio_expires` (sanitize + date normalize to `Y-m-d`).
+  - Si `document_type='nit'` → `update_user_meta` de ambos campos.
+  - Si `document_type != 'nit'` → `delete_user_meta` de ambos (limpiar residuo de vendors que antes eran NIT y cambiaron a CC — evita datos stale).
+- `assets/js/ltms-kyc.js` + `assets/js/ltms-kyc.min.js`:
+  - Toggle visual del bloque `#ltms-kyc-camara-fields` en `change` de `#ltms-kyc-doc-type` (show si NIT, hide si otro).
+  - Validación front: si `docType.toLowerCase() === 'nit'` y `camaraNumber` vacío → showNotice y return antes del POST (ahorra round-trip y evita frustración).
+  - Envío de `camara_comercio_number` + `camara_comercio_expires` en el `data` del POST a `ltms_submit_kyc`.
+  - `ltms-kyc.min.js` regenerado con `terser` (ver `node_modules/.bin/terser`).
+
+**Tests:** +10 tests nuevos en `KyccCamaraPnExemptTest` cubren los invariantes del fix:
+- Persona natural CC/CE/PAS sin matrícula → aprueba (cubre caso Maria Orlinda Giraldo Gomez #208).
+- Persona natural CC con matrícula residual → también aprueba (no penaliza datos residuales).
+- Persona jurídica NIT sin número → bloquea con `ac_cc_missing`.
+- Persona jurídica NIT con matrícula vencida → bloquea con `ac_cc_expired`.
+- Persona jurídica NIT con matrícula vigente → aprueba.
+- Persona jurídica NIT con número y sin vencimiento → aprueba (vencimiento opcional).
+- NIT en mayúsculas (`'NIT'`) → case-insensitive matching.
+- MX no ejecuta validación Cámara CO (no regresa `ac_cc_*`).
+
+Se preservaron tests estructurales existentes: `AdminKycApproveAuditTest::test_ac7_filter_returns_wp_error_on_cc_missing` sigue verde — los `WP_Error` codes `ac_cc_missing`, `ac_cc_expired`, `ac_rut_dian_invalid` siguen presentes en el método (solo inhibidos para persona natural vía `elseif`).
+
+**Suite completa `--testsuite=unit`**: **3,707 tests, 6,548 assertions, 0 errors, 0 failures, 3 skipped** (vs 3,697 baseline post-FSF-EU-DISABLED-2026-08-03 → +10 tests, cero regresiones, verificado localmente con `LTMS_UNIT_ONLY=true`). `php -l` OK en los 4 archivos PHP tocados.
+
+**Version bump**: `LTMS_VERSION` 2.9.308 → 2.9.309 (cache-busting del JS toggle).
+
+**Lección preventiva (#153)**: documentada en `LECCIONES_APRENDIDAS.md`. Cuando UI label "solo personas jurídicas" pero backend exige a todos → brecha silenciosa que se manifiesta cuando el validador bloquea en modo fail-closed. La doctrina SARLAFT/SIPLAFT permite best-effort por tipo de persona — alinear UI + backend reduce fricción onboarding sin abrir brecha compliance.
+
+## [Unreleased] — 2026-08-03
+
 ### Fixed — `FSF-EU-DISABLED-2026-08-03` (lista UE FSF deshabilitada — best-effort SARLAFT)
 
 > **Auditoría puntual** (no loop de auditoría autónoma): detección durante diagnóstico de por qué `screen_against_sanctions_lists()` fallaba contra `webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content` con **403 Forbidden / Whitelabel Error Page**. La UE cerró el acceso público al Financial Sanctions Files en 2025 y lo migró tras login **ECAS** (European Commission Authentication Service). LTMS no posee credenciales ECAS.

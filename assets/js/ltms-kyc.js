@@ -49,6 +49,17 @@
         });
     }
 
+    // KYC-CAMARA-PN-EXEMPT-2026-08-03: toggle + validación front de los datos
+    // de matrícula Cámara de Comercio. Solo exigidos para persona jurídica
+    // (document_type='nit'). El backend (validate_rut_and_camara_comercio)
+    // los exige exclusivamente para NIT — ver tests/unit/KyccCamaraPnExemptTest.
+    function toggleCamaraJuridicaFields() {
+        var isNit = ($('#ltms-kyc-doc-type').val() || '').toLowerCase() === 'nit';
+        $('#ltms-kyc-camara-fields').toggle(isNit);
+    }
+    $(function () { toggleCamaraJuridicaFields(); });
+    $('#ltms-kyc-doc-type').on('change', toggleCamaraJuridicaFields);
+
     $('#ltms-kyc-submit-btn').on('click', function () {
         var fullName = $.trim($('#ltms-kyc-full-name').val());
         var docType = $('#ltms-kyc-doc-type').val();
@@ -69,6 +80,18 @@
         var fiscalRegimeMx = $.trim($('#ltms-kyc-fiscal-regime-mx').val() || '');
         var domicilioFiscalMx = $.trim($('#ltms-kyc-domicilio-fiscal-mx').val() || '');
 
+        // KYC-CAMARA-PN-EXEMPT-2026-08-03: matrícula Cámara de Comercio
+        // obligatoria solo para persona jurídica (NIT). El backend también
+        // lo valida en validate_rut_and_camara_comercio, pero validar front
+        // ahorra un round-trip y evita frustración del usuario.
+        var isJuridica = (docType || '').toLowerCase() === 'nit';
+        var camaraNumber = $.trim($('#ltms-kyc-camara-number').val() || '');
+        var camaraExpires = $.trim($('#ltms-kyc-camara-expires').val() || '');
+        if (isJuridica && !camaraNumber) {
+            showNotice('El número de matrícula de Cámara de Comercio es obligatorio para persona jurídica (NIT).', 'error');
+            return;
+        }
+
         var $btn = $(this).prop('disabled', true).text('Procesando...');
         uploadDocument(function (cedulaPath, rutPath, camaraPath, bancoPath) {
             if (!cedulaPath && !$('#ltms-kyc-file-path').val()) { $btn.prop('disabled', false).text('Enviar para Verificación'); showNotice('Error al subir el documento de identidad.', 'error'); return; }
@@ -82,7 +105,8 @@
                     bank_rep_legal_name: repLegalName, bank_name: bankName, bank_account_number: accountNumber, bank_account_type: accountType,
                     privacy_consent: '1', consent_ts: new Date().toISOString(),
                     sanitary_registration: sanitaryReg, sanitary_registration_expires: sanitaryExpires,
-                    fiscal_regime_mx: fiscalRegimeMx, domicilio_fiscal_mx: domicilioFiscalMx
+                    fiscal_regime_mx: fiscalRegimeMx, domicilio_fiscal_mx: domicilioFiscalMx,
+                    camara_comercio_number: camaraNumber, camara_comercio_expires: camaraExpires
                 },
                 success: function (r) {
                     $btn.prop('disabled', false).text('Enviar para Verificación');

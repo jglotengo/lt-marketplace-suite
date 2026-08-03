@@ -965,7 +965,35 @@ class LTMS_Authorities_Compliance {
             }
 
             // Verificar Cámara de Comercio vigente.
-            if ( empty( $cc_number ) ) {
+            // KYC-CAMARA-PN-EXEMPT-2026-08-03: solo exigir matrícula Cámara de
+            // Comercio a personas jurídicas (NIT). Persona natural (CC/CE/PAS)
+            // queda exenta — Código de Comercio art. 10 habla de comerciantes
+            // matriculados (típicamente NIT), y la UI ya etiqueta el campo
+            // Cámara como "solo personas jurídicas". Antes, el backend exigía
+            // el user_meta ltms_camara_comercio_number a TODOS los vendors CO
+            // sin distinguir tipo de persona, lo que bloqueaba a vendedores
+            // persona natural (como Maria Orlinda Giraldo Gomez #208, CC)
+            // con ac_cc_missing aunque la UI les decía "solo personas jurídicas".
+            $document_type = get_user_meta( $vendor_id, 'ltms_document_type', true );
+            $is_juridica   = ( 'nit' === strtolower( (string) $document_type ) );
+
+            if ( ! $is_juridica ) {
+                // Persona natural: eximir matrícula Cámara de Comercio.
+                // Log info como evidencia para auditoría UIAF de la decisión
+                // best-effort (Decreto 2150/1995 solo obliga a comerciantes
+                // matriculados, que típicamente son persona jurídica NIT).
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::info(
+                        'AC_CC_PERSONA_NATURAL_EXEMPT',
+                        sprintf(
+                            'Vendor #%d (document_type=%s) — persona natural exenta de matrícula Cámara de Comercio (Decreto 2150/1995 art. 10).',
+                            $vendor_id,
+                            $document_type ?: 'unknown'
+                        ),
+                        [ 'vendor_id' => $vendor_id, 'document_type' => $document_type ]
+                    );
+                }
+            } elseif ( empty( $cc_number ) ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::warning(
                         'AC_CC_NUMBER_MISSING',
@@ -977,8 +1005,7 @@ class LTMS_Authorities_Compliance {
                     __( 'Falta el número de matrícula de Cámara de Comercio (Decreto 2150/1995). El vendedor #%d debe completar este campo en su panel y reenviar el KYC.', 'ltms' ),
                     $vendor_id
                 ) );
-            }
-            if ( ! empty( $cc_expires ) && strtotime( $cc_expires ) < time() ) {
+            } elseif ( ! empty( $cc_expires ) && strtotime( $cc_expires ) < time() ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::warning(
                         'AC_CC_EXPIRED',
