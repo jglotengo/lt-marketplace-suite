@@ -48,6 +48,12 @@ final class LTMS_Public_Auth_Handler {
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
         // v2.9.60 MISSING-08: Endpoint para reenviar email de verificación.
         add_action( 'wp_ajax_ltms_resend_verification',    [ $instance, 'ajax_resend_verification' ] );
+        // REG-AUDIT-002 F3: variante nopriv — permite reenviar el email a un
+        // usuario NO logueado (su email aún no está verificado, no puede entrar
+        // al panel). Identifica al usuario por su email/username POST. Rate
+        // limit por IP (no por user_id) — mismo patrón que login/register.
+        add_action( 'wp_ajax_nopriv_ltms_resend_verification', [ $instance, 'ajax_resend_verification_public' ] );
+        add_action( 'wp_ajax_ltms_resend_verification_public', [ $instance, 'ajax_resend_verification_public' ] );
         // v2.9.61 DEEP-AUDIT-002 UX-06: Endpoint para completar perfil (Google OAuth path).
         add_action( 'wp_ajax_ltms_complete_profile',       [ $instance, 'ajax_complete_profile' ] );
 
@@ -64,6 +70,11 @@ final class LTMS_Public_Auth_Handler {
 
         // Filtrar login de WP para vendors (redirigir a dashboard)
         add_filter( 'login_redirect', [ $instance, 'vendor_login_redirect' ], 10, 3 );
+        // REG-AUDIT-002 F4: WooCommerce /mi-cuenta/ login — redirigir vendors al
+        // panel en vez de my-account. Antes un vendor que se logueaba por la URL
+        // estándar de WC terminaba en /mi-cuenta/ (vista de cliente) en vez de
+        // /panel-vendedor/.
+        add_filter( 'woocommerce_login_redirect', [ $instance, 'vendor_login_redirect' ], 10, 3 );
     }
 
     /**
@@ -554,8 +565,10 @@ final class LTMS_Public_Auth_Handler {
             }
             // Return the same success shape as a real registration so the
             // attacker can't distinguish "created" from "already existed".
+            // v2.9.310 UX-REG-11: mensaje claro al usuario legítimo que intenta
+            // registrarse con email que ya tiene cuenta — antes era ambiguo.
             wp_send_json_success([
-                'message'  => __( 'Revisa tu email para completar el registro.', 'ltms' ),
+                'message'  => __( 'Ya existe una cuenta con este email. Te enviamos un correo con el enlace de inicio de sesión. Revisa tu bandeja de entrada (y spam). Si tú no creaste esta cuenta, contacta a soporte respondiendo a ese correo.', 'ltms' ),
                 'redirect' => '',
             ]);
         }
@@ -800,7 +813,7 @@ final class LTMS_Public_Auth_Handler {
             // UX-REG-07: agregar ?registered=1 para que el login page muestre
             // un mensaje claro de "verifica tu email" en vez de solo el form.
             $redirect = add_query_arg( 'registered', '1', $login_url );
-            $message  = __( 'Registration successful. Please check your email to verify your account.', 'ltms' );
+            $message  = __( '¡Registro exitoso! Te enviamos un correo de verificación. Revisa tu bandeja de entrada (y la carpeta de spam) y haz clic en el enlace del correo para verificar tu cuenta y acceder a tu panel de vendedor.', 'ltms' );
         } else {
             // Email verification is optional — auto-login (legacy behavior).
             wp_set_current_user( $user_id );
@@ -858,6 +871,55 @@ final class LTMS_Public_Auth_Handler {
         $redirect = $login_id ? get_permalink( $login_id ) : home_url();
 
         wp_send_json_success( [ 'redirect' => $redirect ] );
+    }
+
+    /**
+     * Renderiza una página HTML amigable para errores de verificación de email.
+     *
+     * Reemplaza los wp_die slab pelados que mandaban al usuario a "su panel"
+     * sin poder acceder (chicken-and-egg: no puede ver el panel sin email
+     * verificado). Esta página muestra un CTA al formulario de login del
+     * vendedor, donde existe la opción "Reenviar email de verificación".
+     *
+     * @param string $title   Título de la página.
+     * @param string $message  Mensaje principal (ya escapado vía esc_html()).
+     * @param int    $http_code Código HTTP de respuesta (default 400).
+     * @return void Termina la ejecución vía wp_die().
+     */
+    private function render_email_verify_error_page( string $title, string $message, int $http_code = 400 ): void {
+        $pages    = get_option( 'ltms_installed_pages', [] );
+        $login_id = $pages['ltms-login'] ?? 0;
+        $login_url = $login_id ? get_permalink( $login_id ) : home_url( '/login-vendedor/' );
+        $login_url = add_query_arg( 'resend', '1', $login_url );
+
+        $site_name = get_bloginfo( 'name' );
+        $html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+              . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+              . '<title>' . esc_html( $title ) . '</title>'
+              . '<style>'
+              . 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f4f7f9;margin:0;padding:40px 20px;color:#374151;}'
+              . '.wrap{max-width:520px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);}'
+              . '.header{background:linear-gradient(135deg,#1a5276 0%,#2980b9 100%);padding:32px;text-align:center;color:#fff;}'
+              . '.header .icon{font-size:48px;display:block;margin-bottom:12px;}'
+              . '.header h1{margin:0;font-size:22px;font-weight:800;}'
+              . '.body{padding:28px 32px;}'
+              . '.body p{font-size:15px;line-height:1.6;margin:0 0 16px;}'
+              . '.cta{display:block;width:fit-content;margin:20px auto 4px;background:#1a5276;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;}'
+              . '.cta:hover{background:#154360;}'
+              . '.hint{font-size:13px;color:#6b7280;text-align:center;margin-top:12px;}'
+              . '.footer{background:#f9fafb;padding:16px 32px;text-align:center;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;}'
+              . '</style></head><body>'
+              . '<div class="wrap">'
+              . '<div class="header"><span class="icon">⚠️</span><h1>' . esc_html( $title ) . '</h1></div>'
+              . '<div class="body">'
+              . '<p>' . $message . '</p>'
+              . '<a href="' . esc_url( $login_url ) . '" class="cta">↩ Volver a iniciar sesión</a>'
+              . '<p class="hint">Desde el formulario de login puedes solicitar reenviar el email de verificación.</p>'
+              . '</div>'
+              . '<div class="footer">' . esc_html( $site_name ) . '</div>'
+              . '</div></body></html>';
+
+        wp_die( $html, $title, [ 'response' => $http_code ] );
     }
 
     /**
@@ -932,10 +994,10 @@ final class LTMS_Public_Auth_Handler {
         ) );
 
         if ( $verify_tries > 10 ) {
-            wp_die(
-                esc_html__( 'Demasiados intentos de verificación. Espera 15 minutos.', 'ltms' ),
-                esc_html__( 'Verificación de email', 'ltms' ),
-                [ 'response' => 429, 'back_link' => true ]
+            $this->render_email_verify_error_page(
+                __( 'Demasiados intentos', 'ltms' ),
+                __( 'Has realizado demasiados intentos de verificación. Por favor espera 15 minutos antes de intentar nuevamente.', 'ltms' ),
+                429
             );
         }
 
@@ -943,10 +1005,10 @@ final class LTMS_Public_Auth_Handler {
         $expires = (int) get_user_meta( $user_id, 'ltms_email_verify_expires', true );
 
         if ( ! $stored || ! hash_equals( $stored, $token ) ) {
-            wp_die(
-                esc_html__( 'Token de verificación inválido.', 'ltms' ),
-                esc_html__( 'Verificación de email', 'ltms' ),
-                [ 'response' => 400, 'back_link' => true ]
+            $this->render_email_verify_error_page(
+                __( 'Enlace inválido', 'ltms' ),
+                __( 'El enlace de verificación no es válido. Es posible que ya hayas verificado tu cuenta anteriormente, o que el enlace haya sido reemplazado por uno más reciente. Intenta iniciar sesión; si aún no estás verificado, solicitud un enlace nuevo desde el formulario.', 'ltms' ),
+                400
             );
         }
 
@@ -954,10 +1016,10 @@ final class LTMS_Public_Auth_Handler {
             // Token expirado — eliminarlo para prevenir futuros intentos con token muerto.
             delete_user_meta( $user_id, 'ltms_email_verify_token' );
             delete_user_meta( $user_id, 'ltms_email_verify_expires' );
-            wp_die(
-                esc_html__( 'El link de verificación expiró. Solicita uno nuevo desde tu panel.', 'ltms' ),
-                esc_html__( 'Verificación de email', 'ltms' ),
-                [ 'response' => 410, 'back_link' => true ]
+            $this->render_email_verify_error_page(
+                __( 'Enlace expirado', 'ltms' ),
+                __( 'El enlace de verificación expiró. Los enlaces son válidos por 48 horas por seguridad. Solicita uno nuevo: ve al formulario de inicio de sesión y usa la opción "Reenviar email de verificación".', 'ltms' ),
+                410
             );
         }
 
@@ -980,6 +1042,28 @@ final class LTMS_Public_Auth_Handler {
             sprintf( 'Email verificado para vendedor #%d', $user_id ),
             [ 'user_id' => $user_id ]
         );
+
+        // UX-EMAIL-AUTOLOGIN: Autenticar al usuario tras verificar el email para
+        // que llegue al panel SIN tener que escribir la contraseña de nuevo. El
+        // link del email actúa como bearer token de un solo uso (32 chars de
+        // entropía, expira a las 48h, se consume en la línea 972 de arriba). Tras
+        // consumir el token, es seguro autenticar — el usuario ya demostró
+        // posesión del email. Antes, el redirect llevaba al panel SIN sesión y
+        // el dashboard mostraba "Acceso restringido, inicia sesión", lo que
+        // confundía al vendedor recién registrado. Ver auditoría
+        // REG-AUDIT-002 / LECCIONES_APRENDIDAS.
+        $user_obj = get_userdata( $user_id );
+        if ( $user_obj ) {
+            wp_set_current_user( $user_id );
+            wp_set_auth_cookie( $user_id, true );
+            do_action( 'wp_login', $user_obj->user_login, $user_obj );
+
+            // L-5 FIX: Registrar acceso de autenticación para trazabilidad
+            // (Ley 1581/2012 — el titular puede solicitar historial de accesos).
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_oauth_access( $user_id, 'email_verification' );
+            }
+        }
 
         $pages        = get_option( 'ltms_installed_pages', [] );
         $dashboard_id = $pages['ltms-dashboard'] ?? 0;
@@ -1344,6 +1428,104 @@ final class LTMS_Public_Auth_Handler {
         );
 
         wp_send_json_success( [ 'message' => __( 'Email de verificación reenviado. Revisa tu bandeja de entrada.', 'ltms' ) ] );
+    }
+
+    /**
+     * REG-AUDIT-002 F3: Reenvía email de verificación a un usuario NO logueado.
+     *
+     * Endpoint: wp_ajax_nopriv_ltms_resend_verification (no requiere sesión).
+     * Caso: el vendedor se registró pero su email no está verificado; al intentar
+     * login el AUTH-01 lo rechaza con redirect ?resend_verification=1. El form
+     * de login le muestra el mini-form de reenvío → este endpoint identifica al
+     * vendor por su email o username POST y le reenvía el link de verificación.
+     *
+     * Rate limit por IP (no por user_id — el usuario no está logueado). 3/hora.
+     * No revela si el email existe (user enumeration): siempre responde success
+     * genérico. Solo envía el email si el usuario existe Y ltms_email_verified=0.
+     */
+    public function ajax_resend_verification_public(): void {
+        check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
+
+        $ip           = LTMS_Utils::get_ip();
+        $throttle_key = 'ltms_resend_pub_attempts_' . md5( $ip );
+
+        // Mismo patrón atómico INSERT...ON DUPLICATE KEY que ajax_resend_verification
+        // y los throttle de login/register. Evita TOCTOU bypass.
+        global $wpdb;
+        $option_name  = '_transient_' . $throttle_key;
+        $timeout_name = '_transient_timeout_' . $throttle_key;
+        $now          = time();
+        $expires      = $now + HOUR_IN_SECONDS;
+
+        $timeout_val = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $timeout_name
+        ) );
+        if ( $timeout_val && $timeout_val < $now ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = %s",
+                $option_name
+            ) );
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %d WHERE option_name = %s",
+                $expires, $timeout_name
+            ) );
+        }
+
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')
+             ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1",
+            $option_name
+        ) );
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %d, 'no')
+             ON DUPLICATE KEY UPDATE option_value = IF(option_value < %d, %d, option_value)",
+            $timeout_name, $expires, $now, $expires
+        ) );
+        $attempts = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            $option_name
+        ) );
+
+        if ( $attempts > 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiados reenvíos. Intenta más tarde.', 'ltms' ) ], 429 );
+        }
+
+        $identifier = sanitize_text_field( wp_unslash( $_POST['email'] ?? '' ) ); // phpcs:ignore
+        if ( empty( $identifier ) ) {
+            wp_send_json_error( [ 'message' => __( 'Ingresa tu email o usuario.', 'ltms' ) ] );
+        }
+
+        // Resolver usuario: por email primero, por login como fallback.
+        $user = get_user_by( 'email', $identifier );
+        if ( ! $user ) {
+            $user = get_user_by( 'login', $identifier );
+        }
+
+        // Anti-enumeration: SIEMPRE responder success genérico, aunque el user no
+        // exista. Solo enviar el email si el user existe, es vendor, y su email no
+        // está verificado — pero el HTTP response es el mismo en todos los casos.
+        if ( $user
+             && ( in_array( 'ltms_vendor', (array) $user->roles, true )
+                  || in_array( 'ltms_vendor_premium', (array) $user->roles, true ) )
+             && ! get_user_meta( $user->ID, 'ltms_email_verified', true ) ) {
+
+            $verify_token = wp_generate_password( 32, false );
+            update_user_meta( $user->ID, 'ltms_email_verify_token', $verify_token );
+            update_user_meta( $user->ID, 'ltms_email_verify_expires', time() + ( 48 * HOUR_IN_SECONDS ) );
+
+            $this->send_welcome_email( $user->ID, $verify_token );
+
+            LTMS_Core_Logger::info(
+                'VERIFICATION_RESENT_PUBLIC',
+                sprintf( 'Email de verificación reenviado (public) a uid=%d', $user->ID )
+            );
+        }
+
+        // Mensaje genérico (no confirma ni niega la existencia del usuario).
+        wp_send_json_success( [
+            'message' => __( 'Si tu email está registrado y sin verificar, te enviamos un nuevo enlace de verificación. Revisa tu bandeja de entrada y spam.', 'ltms' ),
+        ] );
     }
 
     /**

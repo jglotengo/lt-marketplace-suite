@@ -133,9 +133,13 @@ class KycAudit2FixTest extends LTMS_Unit_Test_Case {
 	public function test_01e_current_version_bumped_to_2_9_16(): void {
 		$file = $this->plugin_path( 'includes/core/migrations/class-ltms-db-migrations.php' );
 		$src  = file_get_contents( $file );
-		// La const CURRENT_VERSION debe ser '2.9.16' (string PHP).
-		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.16'", $src,
-			'CURRENT_VERSION debe bumparse a 2.9.16 para que la migración corra en sites ya activados.' );
+		// v2.9.310: CURRENT_VERSION bumped to 2.9.17 to dispatch the new
+		// migrate_2_9_17_kyc_rejection_source migration. The contract under
+		// test is "CURRENT_VERSION must be bumped to the latest migration's
+		// version so existing installs run it". The literal value follows
+		// the latest migration added.
+		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.17'", $src,
+			'CURRENT_VERSION debe bumparse a 2.9.17 para que la migracion v2.9.17 corra en sites ya activados.' );
 	}
 
 	public function test_01f_migration_dispatched_in_run(): void {

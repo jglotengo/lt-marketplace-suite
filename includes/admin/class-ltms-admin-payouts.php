@@ -418,6 +418,9 @@ final class LTMS_Admin_Payouts {
 
         $kyc_id    = (int) ( $_POST['kyc_id'] ?? 0 ); // phpcs:ignore
         $reason    = sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) ); // phpcs:ignore
+        // v2.9.310: source manual/auto_dian/auto_sat/auto_other — default 'manual'.
+        $raw_source = sanitize_key( wp_unslash( $_POST['source'] ?? 'manual' ) ); // phpcs:ignore
+        $source    = in_array( $raw_source, [ 'manual', 'auto_dian', 'auto_sat', 'auto_other' ], true ) ? $raw_source : 'manual';
         $vendor_id = $this->get_vendor_id_by_kyc( $kyc_id );
 
         if ( ! $kyc_id || ! $reason || ! $vendor_id ) {
@@ -450,13 +453,14 @@ final class LTMS_Admin_Payouts {
         $wpdb->update(
             $table,
             [
-                'status'       => 'rejected',
-                'notes'        => $new_notes,
-                'reviewed_by'  => get_current_user_id(),
-                'reviewed_at'  => LTMS_Utils::now_utc(),
+                'status'           => 'rejected',
+                'notes'            => $new_notes,
+                'rejection_source' => $source,
+                'reviewed_by'      => get_current_user_id(),
+                'reviewed_at'      => LTMS_Utils::now_utc(),
             ],
             [ 'id' => $kyc_id ],
-            [ '%s', '%s', '%d', '%s' ],
+            [ '%s', '%s', '%s', '%d', '%s' ],
             [ '%d' ]
         );
 

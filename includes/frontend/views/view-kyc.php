@@ -39,7 +39,7 @@ if ( 'rejected' === $status && empty( $kyc->reviewed_by ) ) {
     }
 }
 $status_labels = [
-    'none'     => '—',
+    'none'     => 'No iniciado',
     'pending'  => 'En revisión',
     'approved' => 'Aprobado ✓',
     'rejected' => 'Rechazado',

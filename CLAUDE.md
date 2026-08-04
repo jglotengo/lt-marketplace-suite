@@ -154,6 +154,8 @@ ls -la /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-mark
 
 > **📝 Nota sobre OPcache en SiteGround (CRÍTICA — ver también sección ZapSign):** El hosting compartido puede retener versiones compiladas de archivos PHP, y **el pool PHP-FPM que atiende peticiones HTTP es un proceso distinto del que usa WP-CLI**. `wp cache flush` solo limpia el object cache de WordPress; `opcache_reset()` ejecutado vía `wp eval` opera en el pool CLI, no en el pool web. Si un cambio no se refleja tras `git pull` en peticiones HTTP reales (webhooks, REST API), usa el endpoint HTTP dedicado `deploy/ltms-opcache-flush.php?token=ltms_opcache_2026` (ya existe en el repo) en lugar de solo `wp cache flush`.
 
+> **📝 Nota sobre PHPUnit en SiteGround (`zend.assertions = -1` — CRÍTICA):** Si al correr `./vendor/bin/phpunit` en SSH obtienes `PHP Fatal error: Call to undefined function assert() in vendor/sebastian/cli-parser/src/Parser.php:68`, **no es un bug del plugin**. El PHP-CLI del hosting tiene `zend.assertions = -1` (modo producción que descarta las sentencias `assert`), pero `sebastian/cli-parser` declara `use function assert;` forzando resolución como función global inexistente. Solución: invocar phpunit con override de la directiva — ver sección "Tests" abajo para el comando exacto.
+
 ---
 
 ### Paso 3 — Commit en Git
@@ -232,6 +234,19 @@ El proyecto usa PHPUnit 9.6 (`phpunit.xml`), con Brain Monkey/Mockery para mocki
 ./vendor/bin/phpunit --filter CommissionStrategyTest
 ./vendor/bin/phpunit --filter AveonlineApiTest
 ```
+
+> **⚠️ Nota CRÍTICA sobre `zend.assertions` en SiteGround (PHP-CLI):**
+> El PHP-CLI del hosting compartido tiene `zend.assertions = -1` (modo producción, que **descarta** las sentencias `assert(...)`), mientras que la dependencia
+> `sebastian/cli-parser` (`vendor/sebastian/cli-parser/src/Parser.php`) declara `use function assert;` y luego llama `assert(...)` en sus métodos. En modo `-1`
+> el constructo del lenguaje se desactiva, y al existir el `use function assert;` PHP lo resuelve como **función global** inexistente →
+> `PHP Fatal error: Call to undefined function assert()`.
+>
+> **Workaround obligatorio en SiteGround** — invocar phpunit con override de la directiva:
+> ```bash
+> php -d zend.assertions=1 -d assert.active=1 ./vendor/bin/phpunit --configuration phpunit.xml --testsuite all
+> ```
+> Sin esos flags, la suite ni siquiera arranca. Esto **no es un bug del plugin** — es configuración del hosting. Localmente (entornos dev con `zend.assertions=1`)
+> el comando sin flags funciona normalmente. El flag `-d zend.assertions=1` solo afecta al proceso CLI invocado, no modifica el php.ini global del servidor.
 
 También hay scripts de QA "manuales" fuera de PHPUnit en `tests/` (`tests/qa-*.php`, ejecutados vía WP-CLI o browser, no vía `phpunit`) y en `bin/` (decenas de `ltms-qa-*.php`, `ltms-diag-*.php` — ver sección Deploy/Bin abajo).
 

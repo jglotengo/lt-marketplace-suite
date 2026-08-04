@@ -227,8 +227,18 @@ class AuthAuditFixTest extends LTMS_Unit_Test_Case {
 			'handle_email_verification debe usar ventana de 15 minutos para el rate limit.' );
 
 		// Response 429.
-		$this->assertStringContainsString( "'response' => 429", $body,
-			'handle_email_verification debe retornar 429 en rate limit.' );
+		// v2.9.310: el handler fue refactorizado para usar el helper
+		// render_email_verify_error_page( $title, $message, $http_code ),
+		// en vez del wp_die() inline con '[ 'response' => 429, ... ]'.
+		// El contrato bajo test sigue siendo "el rate-limit debe retornar 429",
+		// pero ahora se expresa como el tercer argumento de la llamada al helper.
+		$this->assertStringContainsString( 'render_email_verify_error_page', $body,
+			'handle_email_verification debe invocar render_email_verify_error_page() en el rate limit.' );
+		// Localiza la llamada al helper y verifica que el rate-limit usa 429.
+		$helper_pos = strpos( $body, 'render_email_verify_error_page' );
+		$helper_call = substr( $body, $helper_pos, 500 );
+		$this->assertStringContainsString( '429', $helper_call,
+			'handle_email_verification debe pasar 429 como código HTTP al helper de página de error.' );
 	}
 
 	/**

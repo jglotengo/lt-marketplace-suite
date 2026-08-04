@@ -1129,10 +1129,25 @@ final class LTMS_Dashboard_Logic {
 
         $has_products = (bool) count_user_posts( $vendor_id, 'product', true );
 
-        // v2.9.71 P3-1: Verificar si la tienda está configurada (logo o descripción).
+        // v2.9.71 P3-1: Verificar si la tienda esta configurada (nombre + descripcion).
         $store_name = get_user_meta( $vendor_id, 'ltms_store_name', true );
         $store_desc = get_user_meta( $vendor_id, 'ltms_store_description', true );
         $store_configured = ! empty( $store_name ) && ! empty( $store_desc );
+
+        // v2.9.310 UX-STORE-DRIFT FIX: sincronizar el meta ltms_store_configured
+        // con el calculo en runtime. Antes, este metodo recalculaba $store_configured
+        // en runtime pero el meta inicializado en 0 (auth-handler.php:699) jamas se
+        // actualizaba aqui. Otros modulos que leen el meta directamente veian 0
+        // aunque el checklist mostrara "Tienda configurada" — generando estado
+        // inconsistente para el vendor. Ahora, si el runtime dice configurado y el
+        // meta dice 0, lo sincronizamos. Si el runtime dice no-configurado pero el
+        // meta dice 1 (por ejemplo, el vendor borro la descripcion), tambien lo
+        // corregimos. Convergencia en cada llamada al checklist.
+        $meta_store_configured = (int) get_user_meta( $vendor_id, 'ltms_store_configured', true );
+        $runtime_int = $store_configured ? 1 : 0;
+        if ( $meta_store_configured !== $runtime_int ) {
+            update_user_meta( $vendor_id, 'ltms_store_configured', $runtime_int );
+        }
 
         $pages   = get_option( 'ltms_installed_pages', [] );
         $kyc_url = ! empty( $pages['ltms-kyc'] )
@@ -1142,6 +1157,17 @@ final class LTMS_Dashboard_Logic {
         // v2.9.71 P3-1: all_done ahora incluye store_configured.
         $all_done = $email_verified && 'approved' === $kyc_status && $store_configured && $has_products;
 
+        // REG-AUDIT-002 F5: URLs para los CTA del checklist de onboarding. Cada
+        // paso del checklist en view-home debe tener su botón "Empezar" apuntando
+        // a la sección correcta del panel.
+        $store_settings_url = ! empty( $pages['ltms-dashboard'] )
+            ? add_query_arg( 'ltms_section', 'settings', get_permalink( $pages['ltms-dashboard'] ) )
+            : home_url( '/panel-vendedor/?ltms_section=settings' );
+        $add_product_url    = admin_url( 'post-new.php?post_type=product' );
+        $wallet_url         = ! empty( $pages['ltms-dashboard'] )
+            ? add_query_arg( 'ltms_section', 'wallet', get_permalink( $pages['ltms-dashboard'] ) )
+            : home_url( '/panel-vendedor/?ltms_section=wallet' );
+
         return [
             'email_verified'   => $email_verified,
             'kyc_status'       => $kyc_status,
@@ -1149,6 +1175,9 @@ final class LTMS_Dashboard_Logic {
             'has_products'     => $has_products,
             'store_configured' => $store_configured,
             'all_done'         => $all_done,
+            'store_settings_url' => $store_settings_url,
+            'add_product_url'    => $add_product_url,
+            'wallet_url'         => $wallet_url,
         ];
     }
 

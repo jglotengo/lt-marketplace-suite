@@ -13,7 +13,11 @@
   ```
 - Correr TODA la suite de tests:
   ```bash
+  # Local (entorno dev con zend.assertions=1):
   ./vendor/bin/phpunit --configuration phpunit.xml
+  # SiteGround SSH (zend.assertions=-1 por defecto — requiere override o falla con
+  # "Call to undefined function assert()" en sebastian/cli-parser):
+  php -d zend.assertions=1 -d assert.active=1 ./vendor/bin/phpunit --configuration phpunit.xml
   ```
 - Correr un solo grupo de tests:
   ```bash
@@ -21,6 +25,7 @@
   ./vendor/bin/phpunit --group commissions
   ./vendor/bin/phpunit --group aveonline
   ```
+  > En SiteGround SSH, anteponer `php -d zend.assertions=1 -d assert.active=1` a cada invocación de phpunit (ver nota arriba).
 - Lint / typecheck (sintaxis PHP):
   ```bash
   php -l /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/<archivo>.php

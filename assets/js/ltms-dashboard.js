@@ -414,10 +414,10 @@
 
             const kycLabels = {
                 none: { text: t('kyc_none', 'Pendiente de iniciar'), color: '#9ca3af' },
-                pending: { text: t('kyc_pending', 'En revisiÃ³n'), color: '#f59e0b' },
+                pending: { text: t('kyc_pending', 'En revisión'), color: '#f59e0b' },
                 approved: { text: t('kyc_approved', 'Aprobado'), color: '#10b981' },
-                rejected: { text: t('kyc_rejected', 'Rechazado â€” corrige y reenvÃ­a'), color: '#ef4444' },
-                expired: { text: t('kyc_expired', 'Expirado â€” renueva'), color: '#6b7280' },
+                rejected: { text: t('kyc_rejected', 'Rechazado — corrige y reenvía'), color: '#ef4444' },
+                expired: { text: t('kyc_expired', 'Expirado — renueva'), color: '#6b7280' },
             };
             const kyc = kycLabels[ob.kyc_status] || kycLabels.none;
             const kycDone = ob.kyc_status === 'approved';
@@ -425,37 +425,37 @@
             const steps = [
                 {
                     done: !!ob.email_verified,
-                    icon: 'âœ‰ï¸',
+                    icon: '✉️',
                     title: t('ob_email_title', 'Verifica tu email'),
                     detail: ob.email_verified ? t('ob_email_done', 'Verificado') : t('ob_email_pending', 'Revisa tu bandeja de entrada (y spam) para confirmar tu cuenta.'),
                     action: null,
                 },
                 {
                     done: kycDone,
-                    icon: 'ðŸªª',
-                    title: t('ob_kyc_title', 'Completa tu verificaciÃ³n de identidad (KYC)'),
+                    icon: '🪪',
+                    title: t('ob_kyc_title', 'Completa tu verificación de identidad (KYC)'),
                     detail: kyc.text,
                     action: kycDone ? null : { label: t('ob_kyc_action', 'Completar KYC'), url: ob.kyc_url },
                 },
                 {
                     done: !!ob.store_configured,
-                    icon: 'ðŸª',
+                    icon: '🏪',
                     title: t('ob_store_title', 'Configura tu tienda'),
-                    detail: ob.store_configured ? t('ob_store_done', 'Tienda configurada') : t('ob_store_pending', 'AÃ±ade logo, descripciÃ³n y banner a tu tienda.'),
+                    detail: ob.store_configured ? t('ob_store_done', 'Tienda configurada') : t('ob_store_pending', 'Añade nombre y descripción a tu tienda (opcional: logo y banner).'),
                     action: ob.store_configured ? null : { label: t('ob_store_action', 'Configurar tienda'), view: 'settings' },
                 },
                 {
                     done: !!ob.has_products,
-                    icon: 'ðŸ›ï¸',
+                    icon: '🛍️',
                     title: t('ob_product_title', 'Publica tu primer producto'),
-                    detail: ob.has_products ? t('ob_product_done', 'Ya tienes productos publicados') : t('ob_product_pending', 'Tu tienda aÃºn no tiene productos visibles.'),
+                    detail: ob.has_products ? t('ob_product_done', 'Ya tienes productos publicados') : t('ob_product_pending', 'Tu tienda aún no tiene productos visibles.'),
                     action: ob.has_products ? null : { label: t('ob_product_action', 'Agregar producto'), view: 'products' },
                 },
             ];
 
             const stepsHtml = steps.map((s, i) => `
                 <div style="display:flex;align-items:center;gap:12px;padding:10px 0;${i < steps.length - 1 ? 'border-bottom:1px solid #e5e7eb;' : ''}">
-                    <span style="font-size:1.3rem;flex-shrink:0;">${s.done ? 'âœ…' : s.icon}</span>
+                    <span style="font-size:1.3rem;flex-shrink:0;">${s.done ? '✅' : s.icon}</span>
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:600;font-size:.9rem;color:#111827;${s.done ? 'text-decoration:line-through;color:#9ca3af;' : ''}">${s.title}</div>
                         <div style="font-size:.8rem;color:#6b7280;">${s.detail}</div>
@@ -467,17 +467,17 @@
             $banner.html(`
                 <div class="ltms-card" style="padding:24px;border-left:4px solid #2563eb;background:#fff;">
                     <div style="font-weight:800;font-size:1.15rem;color:#111827;margin-bottom:6px;">
-                        ðŸ‘‹ ${t('ob_welcome', 'Â¡Bienvenido a Lo Tengo!')}
+                        👋 ${t('ob_welcome', '¡Bienvenido a Lo Tengo!')}
                     </div>
                     <div style="font-size:.9rem;color:#374151;margin-bottom:16px;line-height:1.5;">
-                        ${t('ob_subtitle', 'Para habilitar tu tienda y empezar a vender, completa estos 4 pasos en orden. Cada paso desbloquea el siguiente.')}
+                        ${t('ob_subtitle', 'Completa estos 4 pasos para tener tu tienda 100% lista y empezar a vender. Puedes hacerlos en el orden que prefieras.')}
                     </div>
                     <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;font-weight:600;">
-                        â³ Tiempo estimado: 10-15 minutos Â· Si tienes dudas, contacta soporte@lo-tengo.com.co
+                        ⏳ ${t('ob_time', 'Tiempo estimado: 10-15 minutos · Si tienes dudas, contacta soporte@lo-tengo.com.co')}
                     </div>
                     ${stepsHtml}
                     <div style="margin-top:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;font-size:.8rem;color:#6b7280;line-height:1.5;">
-                        <strong>Â¿QuÃ© pasa despuÃ©s?</strong> Una vez completados los 4 pasos, nuestro equipo revisa tu informaciÃ³n (1-2 dÃ­as hÃ¡biles). RecibirÃ¡s un email cuando tu tienda estÃ© 100% habilitada para vender.
+                        <strong>${t('ob_after_title', '¿Qué pasa después?')}</strong> ${t('ob_after_desc', 'Una vez completes los 4 pasos, nuestro equipo revisa tu información (1-2 días hábiles). Recibirás un email cuando tu tienda esté 100% habilitada para vender.')}
                     </div>
                 </div>
             `).show();

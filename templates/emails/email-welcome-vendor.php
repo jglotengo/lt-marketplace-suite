@@ -107,8 +107,11 @@ $country = $data['country'] ?? 'CO';
         <?php endif; ?>
 
         <a href="<?php echo esc_url( $data['dashboard_url'] ?? '#' ); ?>" class="cta-primary">
-            🚀 <?php esc_html_e( 'Ir a mi Panel', 'ltms' ); ?>
+            ✅ <?php esc_html_e( 'Verificar mi email e ir a mi Panel', 'ltms' ); ?>
         </a>
+        <p style="text-align:center;font-size:12px;color:#9ca3af;margin:4px 0 24px;">
+            <?php esc_html_e( 'Al hacer clic en este botón, verificamos tu correo y te llevamos a tu panel de vendedor.', 'ltms' ); ?>
+        </p>
 
         <?php if ( ! empty( $data['kyc_url'] ) ) : ?>
         <a href="<?php echo esc_url( $data['kyc_url'] ); ?>" class="cta-secondary">
@@ -120,7 +123,7 @@ $country = $data['country'] ?? 'CO';
 
     <div class="footer">
         <p><?php echo esc_html( $data['site_name'] ?? get_bloginfo( 'name' ) ); ?> · <?php echo esc_html( home_url() ); ?></p>
-        <p><?php esc_html_e( 'Si no creaste esta cuenta, ignora este mensaje.', 'ltms' ); ?></p>
+        <p><?php esc_html_e( 'Recibes este correo porque te registraste como vendedor. Si reconoces este registro, haz clic en el botón de arriba. Si no fuiste tú, ignora este mensaje y la cuenta no será verificada.', 'ltms' ); ?></p>
     </div>
 </div>
 </div>

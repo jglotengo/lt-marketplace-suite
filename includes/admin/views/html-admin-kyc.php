@@ -245,10 +245,18 @@ $total_kyc = array_sum( $count_map );
 </div>
 
 <!-- v2.9.114 P2-4: modern reject modal (replaces native prompt) -->
+<!-- v2.9.310: anadido select de origen del rechazo (manual/auto_dian/auto_sat/auto_other) -->
 <div id="ltms-kyc-reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;">
         <h3 style="margin:0 0 12px;"><?php esc_html_e( 'Motivo del rechazo', 'ltms' ); ?></h3>
         <p style="color:#6b7280;font-size:.85rem;margin:0 0 8px;"><?php esc_html_e( 'El motivo será notificado al vendedor por correo.', 'ltms' ); ?></p>
+        <label for="ltms-reject-source" style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin:12px 0 4px;"><?php esc_html_e( 'Origen del rechazo', 'ltms' ); ?></label>
+        <select id="ltms-reject-source" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:13px;margin-bottom:8px;">
+            <option value="manual"><?php esc_html_e( 'Revisión manual del equipo', 'ltms' ); ?></option>
+            <option value="auto_dian"><?php esc_html_e( 'Validación automática — DIAN (RUT)', 'ltms' ); ?></option>
+            <option value="auto_sat"><?php esc_html_e( 'Validación automática — SAT (RFC)', 'ltms' ); ?></option>
+            <option value="auto_other"><?php esc_html_e( 'Otra validación automática', 'ltms' ); ?></option>
+        </select>
         <textarea rows="4" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px;font-size:13px;resize:vertical;" placeholder="<?php esc_attr_e( 'Ej: La cédula no es legible. Sube una foto más clara…', 'ltms' ); ?>"></textarea>
         <p class="ltms-reject-error" style="display:none;color:#dc2626;font-size:.85rem;margin:8px 0 0;"></p>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -444,21 +452,25 @@ $total_kyc = array_sum( $count_map );
 
     // Rechazar
     // v2.9.114 P2-4 FIX: replace native prompt() with modal containing a textarea.
+    // v2.9.310: also send rejection_source (manual/auto_dian/auto_sat/auto_other).
     function ltmsPromptKycReject( kycId, nonce, $btn ) {
         var $modal = $( '#ltms-kyc-reject-modal' );
         $modal.find( 'textarea' ).val( '' );
+        $modal.find( '#ltms-reject-source' ).val( 'manual' );
         $modal.find( '.ltms-reject-submit' ).off( 'click' ).on( 'click', function() {
             var reason = $.trim( $modal.find( 'textarea' ).val() );
             if ( ! reason ) {
                 $modal.find( '.ltms-reject-error' ).text( '<?php echo esc_js( __( "El motivo es obligatorio.", "ltms" ) ); ?>' ).show();
                 return;
             }
+            var source = $modal.find( '#ltms-reject-source' ).val() || 'manual';
             $modal.hide();
             $btn.prop( 'disabled', true );
             $.post( ajaxurl, {
                 action: 'ltms_reject_kyc',
                 kyc_id: kycId,
                 reason: reason,
+                source: source,
                 nonce:  nonce
             }, function( res ) {
                 if ( res.success ) { window.location.reload(); }

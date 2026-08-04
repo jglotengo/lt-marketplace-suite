@@ -177,13 +177,16 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                 ?>
                 <div id="ltms-btype-notice-restaurant" class="ltms-notice ltms-notice-info" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;font-size:0.82rem;">
                     <strong>🍽️ Requisito adicional:</strong> Como restaurante, necesitarás tu
-                    <strong>registro sanitario INVIMA</strong> (Colombia) o <strong>COFEPRIS</strong> (México)
-                    para completar la verificación KYC. Tenlo listo.
+                    <strong>registro sanitario INVIMA</strong> (Colombia) o <strong>COFEPRIS</strong> (México).
+                    No lo necesitas para registrarte ahora, pero sí para la verificación de identidad (KYC)
+                    que harás en tu panel después. Tenlo listo antes de iniciar el KYC.
                 </div>
                 <div id="ltms-btype-notice-tourism" class="ltms-notice ltms-notice-info" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;font-size:0.82rem;">
                     <strong>🏨 Requisito adicional:</strong> Como turismo/alojamiento, necesitarás tu
                     <strong>Registro Nacional de Turismo (RNT)</strong> (Colombia, FONTUR) o
-                    <strong>folio SECTUR</strong> (México) para publicar alojamientos. Tenlo listo.
+                    <strong>folio SECTUR</strong> (México).
+                    No lo necesitas para registrarte ahora, pero sí para la verificación de identidad (KYC)
+                    que harás en tu panel después. Tenlo listo antes de iniciar el KYC.
                 </div>
             </div>
 
@@ -271,6 +274,7 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                     <div class="ltms-strength-bar"></div>
                     <span class="ltms-strength-label"></span>
                 </div>
+                <small class="ltms-field-hint"><?php esc_html_e( 'Mínimo 8 caracteres, incluye al menos una mayúscula y un número.', 'ltms' ); ?></small>
             </div>
 
             <div class="ltms-form-group">

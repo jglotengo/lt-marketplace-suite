@@ -30,6 +30,35 @@ if ( ! $user_id ) {
          renderOnboardingBanner() en ltms-dashboard.js si quedan pasos pendientes. -->
     <div id="ltms-onboarding-banner" style="display:none;margin-bottom:24px;"></div>
 
+    <?php
+    // REG-AUDIT-002 F2: banner server-side de "email verificado" que se muestra
+    // INMEDIATAMENTE al llegar al dashboard tras clic en el link de verificación
+    // (?email_verified=1). Refuerza al vendedor "ya estás dentro, ahora sigue el
+    // checklist de onboarding". El banner AJAX de abajo (#ltms-onboarding-banner)
+    // aparece tras la llamada ajax_get_dashboard_data — este banner estático
+    // aparece antes para no dejar al usuario mirando una pantalla en blanco.
+    if ( isset( $_GET['email_verified'] ) && $_GET['email_verified'] === '1' ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        ?>
+        <div id="ltms-email-verified-banner" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:1px solid #16a34a;border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
+            <div style="font-size:2.5rem;flex-shrink:0;">✅</div>
+            <div style="flex:1;">
+                <h3 style="margin:0 0 4px;color:#14532d;font-size:1.15rem;font-weight:800;">¡Email verificado! Ya estás dentro de tu panel</h3>
+                <p style="margin:0;color:#166534;font-size:0.9rem;line-height:1.5;">
+                    Tu cuenta está activa. Para empezar a vender, completa los <strong>4 pasos</strong> del checklist de bienvenida que aparece debajo. Empieza por <strong>verificar tu identidad (KYC)</strong> — sin eso no podemos aprobar tus pagos.
+                </p>
+            </div>
+        </div>
+        <script>
+        // Auto-ocultar tras 8 segundos (no molesta al vendor una vez leyó el checklist)
+        setTimeout(function(){
+            var b = document.getElementById('ltms-email-verified-banner');
+            if (b) { b.style.transition='opacity .4s'; b.style.opacity='0'; setTimeout(function(){ b.style.display='none'; }, 400); }
+        }, 8000);
+        </script>
+        <?php
+    }
+    ?>
+
     <!-- AUDIT-REDI-UX-GAPS GAP-2 FIX: banner de onboarding ReDi.
          Se muestra si ReDi está habilitado globalmente y el vendor no
          tiene productos ReDi origin ni adopciones como reseller. -->

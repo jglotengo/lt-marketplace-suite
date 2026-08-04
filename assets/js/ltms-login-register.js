@@ -221,6 +221,9 @@
                 if (field.value.length < 8) {
                     errors.push('La contraseña debe tener al menos 8 caracteres');
                     field.setAttribute('aria-invalid', 'true');
+                } else if (!/[A-Z]/.test(field.value) || !/[0-9]/.test(field.value)) {
+                    errors.push('La contraseña debe incluir al menos una mayúscula y un número');
+                    field.setAttribute('aria-invalid', 'true');
                 }
             } else if (field.type === 'password' && field.name === 'password_confirm') {
                 var pwd = document.getElementById('ltms-reg-password');
@@ -365,13 +368,26 @@
                 } else if (data.data && data.data.email_verification_required) {
                     // Email verification required — NO auto-login. Show clear message
                     // and redirect to login page so user knows to check inbox.
-                    showNotice('<strong>¡Cuenta creada!</strong> Te enviamos un email de verificación. Revisa tu bandeja de entrada (y spam) y haz clic en el enlace para activar tu cuenta.', 'success');
-                    // Redirect to login after 4s (give user time to read)
+                    // REG-AUDIT-002 F6: enumerar los 3 pasos siguientes para que el
+                    // vendedor sepa EXACTAMENTE qué hacer. Antes el mensaje era solo
+                    // "Revisa tu email" sin pasos, lo que generaba el reporte "me
+                    // registré pero no sé qué hacer".
+                    showNotice(
+                        '<strong>¡Cuenta creada!</strong> Para acceder a tu panel de vendedor, sigue estos 3 pasos:' +
+                        '<div style="text-align:left;margin-top:10px;padding:10px 14px;background:#f9fafb;border-radius:8px;font-size:0.88rem;line-height:1.7;">' +
+                        '<div><strong>1.</strong> Revisa tu email <strong>(y carpeta de spam)</strong> — te enviamos un correo de verificación.</div>' +
+                        '<div><strong>2.</strong> Haz clic en el enlace del email para verificar tu cuenta.</div>' +
+                        '<div><strong>3.</strong> Serás llevado automáticamente a tu panel de vendedor, donde verás los pasos siguientes (KYC, configurar tienda, subir producto).</div>' +
+                        '</div>' +
+                        '<div style="margin-top:10px;font-size:0.82rem;color:#6b7280;">¿No recibiste el correo en 5 minutos? Revisa spam. Si no llega, en el formulario de login abajo verás la opción <em>Reenviar email</em>.</div>',
+                        'success'
+                    );
+                    // Redirect to login after 6s (give user time to read the 3 steps).
                     setTimeout(function () {
                         if (data.data.redirect) {
                             window.location.href = data.data.redirect;
                         }
-                    }, 4000);
+                    }, 6000);
                 } else if (data.data && data.data.redirect) {
                     // Auto-login — redirect to dashboard
                     showNotice('<strong>¡Cuenta creada!</strong> Redirigiendo a tu panel…', 'success');

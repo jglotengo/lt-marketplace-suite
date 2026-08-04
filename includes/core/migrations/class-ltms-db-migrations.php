@@ -27,7 +27,7 @@ final class LTMS_DB_Migrations {
      * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
      * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.9.16';
+    private const CURRENT_VERSION = '2.9.17';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -113,6 +113,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.16', '<' ) ) {
             self::migrate_2_9_16_kyc_bank_account_ciphertext();
+        }
+
+        if ( version_compare( $installed_version, '2.9.17', '<' ) ) {
+            self::migrate_2_9_17_kyc_rejection_source();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -308,6 +312,8 @@ final class LTMS_DB_Migrations {
         ) {$charset}";
 
         // lt_vendor_kyc
+        // v2.9.310: rejection_source_added to distinguish manual admin rejections
+        // from automated API rejections (DIAN RUT validator, SAT RFC validator, etc).
         $sqls[] = "CREATE TABLE `{$p}lt_vendor_kyc` (
             `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `vendor_id`        BIGINT UNSIGNED NOT NULL,
@@ -320,6 +326,7 @@ final class LTMS_DB_Migrations {
             `reviewed_by`      BIGINT UNSIGNED DEFAULT NULL,
             `reviewed_at`      DATETIME DEFAULT NULL,
             `notes`            VARCHAR(500) DEFAULT NULL,
+            `rejection_source` ENUM('manual','auto_dian','auto_sat','auto_other') DEFAULT NULL,
             `submitted_at`     DATETIME DEFAULT CURRENT_TIMESTAMP,
             `expires_at`       DATE DEFAULT NULL,
             `country_code`     CHAR(2) NOT NULL DEFAULT 'CO',
@@ -3483,6 +3490,56 @@ final class LTMS_DB_Migrations {
             LTMS_Core_Logger::info(
                 'DB_MIGRATION',
                 sprintf( 'v2.9.16: lt_vendor_kyc.bank_account_number ALTER→VARCHAR(80) + %d rows re-cifradas (single-source-of-truth restored).', $reencrypted )
+            );
+        }
+    }
+
+    /**
+     * Migracion v2.9.17: agrega columna rejection_source a lt_vendor_kyc.
+     *
+     * Permite distinguir rechazos manuales (admin) de automaticos (validacion
+     * API DIAN/SAT). El email KYC rechazado muestra el origen correcto al
+     * vendedor para que sepa si corregir el documento o esperar revision humana.
+     */
+    private static function migrate_2_9_17_kyc_rejection_source(): void {
+        global $wpdb;
+        $k = $wpdb->prefix . 'lt_vendor_kyc';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $k ) ) !== $k ) {
+            return;
+        }
+
+        // Verificar si la columna ya existe.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $col_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+                DB_NAME, $k, 'rejection_source'
+            )
+        );
+        if ( $col_exists > 0 ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query(
+            "ALTER TABLE `{$k}` ADD COLUMN `rejection_source` ENUM('manual','auto_dian','auto_sat','auto_other') DEFAULT NULL AFTER `notes`"
+        );
+
+        // Backfill: todas las filas existentes con status='rejected' se marcan
+        // como 'manual' (no podemos inferir retrospectivamente si fue auto o
+        // manual, y 'manual' es el caso mas comun).
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $backfilled = (int) $wpdb->query(
+            "UPDATE `{$k}` SET `rejection_source` = 'manual' WHERE `status` = 'rejected' AND `rejection_source` IS NULL"
+        );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                sprintf( 'v2.9.17: lt_vendor_kyc.rejection_source column added; %d existing rejected rows backfilled as manual.', $backfilled )
             );
         }
     }

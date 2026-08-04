@@ -276,7 +276,7 @@ if ( $_show_drivers ) {
             // no interactivos que mejoran la navegación.
             $nav_sections = [
                 'Vender'      => [ 'home', 'orders', 'products' ],
-                'Logística'   => [ 'envios', 'shipping-statement', 'drivers', 'ordi', 'incidents', 'kitchen', 'ordenes-compra', 'redi' ],
+                'Logística'   => [ 'envios', 'shipping-statement', 'drivers', 'incidents', 'kitchen', 'ordenes-compra', 'redi' ],
                 'Finanzas'    => [ 'wallet', 'insurance', 'donations' ],
                 'Herramientas' => [ 'bookings', 'marketing', 'posgold', 'analytics', 'security' ],
                 'Cuenta'      => [ 'settings' ],
