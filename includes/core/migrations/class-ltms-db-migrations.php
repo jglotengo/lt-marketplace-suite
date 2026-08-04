@@ -213,7 +213,7 @@ final class LTMS_DB_Migrations {
             `status`            ENUM('pending','approved','paid','reversed','disputed') NOT NULL DEFAULT 'pending',
             `paid_at`           DATETIME DEFAULT NULL,
             `strategy_applied`  VARCHAR(100) DEFAULT NULL,
-            `notes`             TEXT DEFAULT NULL COMMENT 'Notas internas; ej: vendor_id:123 para referidos',
+            `notes`             TEXT DEFAULT NULL COMMENT 'Notas internas, ej: vendor_id:123 para referidos',
             `metadata`          LONGTEXT DEFAULT NULL,
             `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

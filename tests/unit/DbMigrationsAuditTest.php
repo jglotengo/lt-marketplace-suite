@@ -249,4 +249,89 @@ final class DbMigrationsAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-DB-AVE-001 regla preventiva: el código (sin comments) de class-ltms-db-migrations.php NO debe contener NINGÚN patrón \\\\\' (backslash escapando comilla simple dentro de string PHP con comillas dobles). Encontradas ' . $count . ' ocurrencias.'
 		);
 	}
+
+	/**
+	 * AUDIT-DB-COMMISSIONS-001 FIX (P1, ; dentro de COMMENT rompe dbDelta):
+	 * la columna `notes` de lt_commissions usaba un COMMENT con `;`:
+	 *   `notes` TEXT DEFAULT NULL COMMENT 'Notas internas; ej: vendor_id:123 para referidos',
+	 * dbDelta de WordPress NO es un parser SQL completo — tokenizea por líneas
+	 * y el `;` dentro del COMMENT lo confunde como fin de statement. Síntoma
+	 * observado en debug.log del server (04-Aug-2026 12:16:49 UTC):
+	 *   - "ALTER TABLE bkr_lt_commissions CHANGE COLUMN `strategy_applied`
+	 *      `strategy_applied` VARCHAR(100"  ← truncado en el `(100`, falta `)`
+	 *   - "'ej: vendor_id:123 para referidos', `metadata` LONGTEXT DEFAULT"  ←
+	 *     el COMMENT se parseó como DDL y se mezcló con la línea siguiente.
+	 *
+	 * Fix: reemplazar `;` por `,` dentro del COMMENT. Semántica preservada,
+	 * dbDelta recibe SQL válido, no hay truncamiento.
+	 *
+	 * Regresión: si alguien reintroduce un `;` dentro de un COMMENT en
+	 * cualquier tabla del archivo, este test falla inmediatamente.
+	 */
+	public function test_007_audir_db_commissions_001_no_semicolon_in_comment(): void {
+		$this->assertFileExists( $this->migrations_path );
+		$src = file_get_contents( $this->migrations_path );
+
+		// Strip comments PHP como en test_001/test_006.
+		$src_no_block    = preg_replace( '/\/\*.*?\*\//s', '', $src );
+		$src_no_comments = preg_replace( '#(^|[^\:])//(?!\:).*?$#m', '$1', $src_no_block );
+
+		// Buscar patrón COMMENT '...;...' (punto y coma dentro del comentario).
+		// El regex captura COMMENT seguido de '...;...' (con `;` dentro).
+		preg_match_all( "/COMMENT\s+'[^']*;[^']*'/", $src_no_comments, $matches );
+		$this->assertSame(
+			[],
+			$matches[0] ?? [],
+			'AUDIT-DB-COMMISSIONS-001 regla preventiva: ninguna columna debe usar `COMMENT \'<texto con ;>\'` — el `;` interno rompe el tokenizer de dbDelta que WP usa para ALTER TABLE. Ocurrencias malas: ' . implode( '; ', $matches[0] ?? [] )
+		);
+	}
+
+	/**
+	 * AUDIT-DB-COMMISSIONS-001 FIX (continuación): la columna `notes` de
+	 * lt_commissions ahora usa `,` en vez de `;` en el COMMENT. Assert positivo.
+	 *
+	 * Regresión: si alguien revierte el fix, este test falla.
+	 */
+	public function test_008_audir_db_commissions_001_comma_used_in_notes_comment(): void {
+		$this->assertFileExists( $this->migrations_path );
+		$src = file_get_contents( $this->migrations_path );
+
+		// La línea debe contener el COMMENT con `,` (no `;`).
+		$this->assertStringContainsString(
+			"COMMENT 'Notas internas, ej: vendor_id:123 para referidos'",
+			$src,
+			'AUDIT-DB-COMMISSIONS-001 fix: la columna `notes` de lt_commissions debe usar `,` en el COMMENT (no `;` — el `;` rompe dbDelta).'
+		);
+
+		// Y NO debe contener el COMMENT viejo con `;`.
+		$this->assertStringNotContainsString(
+			"COMMENT 'Notas internas; ej: vendor_id:123 para referidos'",
+			$src,
+			'AUDIT-DB-COMMISSIONS-001 fix: el COMMENT viejo con `;` no debe existir.'
+		);
+	}
+
+	/**
+	 * AUDIT-DB-COMMISSIONS-001 FIX (continuación): la columna `strategy_applied`
+	 * de lt_commissions preserva su VARCHAR(100) completo y cerrado con `)`.
+	 * El bug del server log mostraba `VARCHAR(100` SIN `)` — dbDelta truncaba
+	 * la query ALTER porque el `;` del COMMENT de la línea siguiente leía
+	 * como fin de statement. Tras el fix, dbDelta recibe SQL válida y la
+	 * columna se crea/modifica con su tipo completo.
+	 *
+	 * Regresión: si alguien corrompe el schema de `strategy_applied` (lo
+	 * truncara, le quitara el `)`, o moviera el COMMENT a una posición que
+	 * dbDelta no pueda parsear), este test falla.
+	 */
+	public function test_009_audir_db_commissions_001_strategy_applied_varchar_intact(): void {
+		$this->assertFileExists( $this->migrations_path );
+		$src = file_get_contents( $this->migrations_path );
+
+		// La columna strategy_applied debe tener VARCHAR(100) CERRADO con `)`.
+		$this->assertMatchesRegularExpression(
+			'/`strategy_applied`\s+VARCHAR\(100\)\s+DEFAULT NULL/',
+			$src,
+			'AUDIT-DB-COMMISSIONS-001 fix: la columna strategy_applied debe ser VARCHAR(100) completa con `)` — dbDelta truncaba en VARCHAR(100 cuando el `;` del COMMENT de la línea siguiente rompía el tokenizer.'
+		);
+	}
 }
