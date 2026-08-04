@@ -26,6 +26,7 @@
     },
     "require-dev": {
         "brain/monkey": "^2.6",
+        "cweagans/composer-patches": "^1.7",
         "doctrine/instantiator": "1.5",
         "mockery/mockery": "^1.6",
         "phpcompatibility/php-compatibility": "^9.3",
@@ -65,11 +66,20 @@
         "classmap-authoritative": false,
         "sort-packages": true,
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "cweagans/composer-patches": true
         }
     },
     "extra": {
-        "installer-name": "lt-marketplace-suite"
+        "installer-name": "lt-marketplace-suite",
+        "patches": {
+            "sebastian/cli-parser": {
+                "SiteGround: assert() in disable_functions workaround": "patches/sebastian-cli-parser-no-assert.patch"
+            },
+            "phpunit/phpunit": {
+                "SiteGround: assert() in disable_functions workaround": "patches/phpunit-phpunit-no-assert.patch"
+            }
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true

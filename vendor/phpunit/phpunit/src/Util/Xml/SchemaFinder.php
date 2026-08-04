@@ -36,7 +36,9 @@ final class SchemaFinder
 
             $version = $file->getBasename('.xsd');
 
-            assert(!empty($version));
+            if (empty($version)) {
+                throw new \AssertionError('assert(!empty($version)) failed');
+            }
 
             $result[] = $version;
         }

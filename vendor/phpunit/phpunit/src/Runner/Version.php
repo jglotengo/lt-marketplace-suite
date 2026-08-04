@@ -46,7 +46,9 @@ final class Version
         if (self::$version === '') {
             self::$version = (new VersionId('9.6.34', dirname(__DIR__, 2)))->getVersion();
 
-            assert(!empty(self::$version));
+            if (empty(self::$version)) {
+                throw new \AssertionError('assert(!empty(self::$version)) failed');
+            }
         }
 
         return self::$version;

@@ -1,0 +1,45 @@
+diff --git a/src/Parser.php b/src/Parser.php
+index 67d8909f..ec7d0985 100755
+--- a/src/Parser.php
++++ b/src/Parser.php
+@@ -13,7 +13,6 @@ use function array_map;
+ use function array_merge;
+ use function array_shift;
+ use function array_slice;
+-use function assert;
+ use function count;
+ use function current;
+ use function explode;
+@@ -65,7 +64,9 @@ final class Parser
+         while (false !== $arg = current($argv)) {
+             $i = key($argv);
+ 
+-            assert(is_int($i));
++            if (!is_int($i)) {
++                throw new \AssertionError('assert(is_int($i)) failed');
++            }
+ 
+             next($argv);
+ 
+@@ -120,7 +121,9 @@ final class Parser
+                 throw new UnknownOptionException('-' . $option);
+             }
+ 
+-            assert(is_string($spec));
++            if (!is_string($spec)) {
++                throw new \AssertionError('assert(is_string($spec)) failed');
++            }
+ 
+             if (strlen($spec) > 1 && $spec[1] === ':') {
+                 if ($i + 1 < $argLength) {
+@@ -136,7 +139,9 @@ final class Parser
+                         throw new RequiredOptionArgumentMissingException('-' . $option);
+                     }
+ 
+-                    assert(is_string($optionArgument));
++                    if (!is_string($optionArgument)) {
++                        throw new \AssertionError('assert(is_string($optionArgument)) failed');
++                    }
+ 
+                     next($args);
+                 }

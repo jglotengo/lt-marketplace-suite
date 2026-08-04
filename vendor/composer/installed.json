@@ -188,6 +188,57 @@
             "install-path": "../brick/math"
         },
         {
+            "name": "cweagans/composer-patches",
+            "version": "1.7.3",
+            "version_normalized": "1.7.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/cweagans/composer-patches.git",
+                "reference": "e190d4466fe2b103a55467dfa83fc2fecfcaf2db"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/cweagans/composer-patches/zipball/e190d4466fe2b103a55467dfa83fc2fecfcaf2db",
+                "reference": "e190d4466fe2b103a55467dfa83fc2fecfcaf2db",
+                "shasum": ""
+            },
+            "require": {
+                "composer-plugin-api": "^1.0 || ^2.0",
+                "php": ">=5.3.0"
+            },
+            "require-dev": {
+                "composer/composer": "~1.0 || ~2.0",
+                "phpunit/phpunit": "~4.6"
+            },
+            "time": "2022-12-20T22:53:13+00:00",
+            "type": "composer-plugin",
+            "extra": {
+                "class": "cweagans\\Composer\\Patches"
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "cweagans\\Composer\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "authors": [
+                {
+                    "name": "Cameron Eagans",
+                    "email": "me@cweagans.net"
+                }
+            ],
+            "description": "Provides a way to patch Composer packages.",
+            "support": {
+                "issues": "https://github.com/cweagans/composer-patches/issues",
+                "source": "https://github.com/cweagans/composer-patches/tree/1.7.3"
+            },
+            "install-path": "../cweagans/composer-patches"
+        },
+        {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
             "version": "v1.2.0",
             "version_normalized": "1.2.0.0",
@@ -1740,6 +1791,9 @@
             "extra": {
                 "branch-alias": {
                     "dev-master": "9.6-dev"
+                },
+                "patches_applied": {
+                    "SiteGround: assert() in disable_functions workaround": "patches/phpunit-phpunit-no-assert.patch"
                 }
             },
             "installation-source": "dist",
@@ -2053,6 +2107,9 @@
             "extra": {
                 "branch-alias": {
                     "dev-master": "1.0-dev"
+                },
+                "patches_applied": {
+                    "SiteGround: assert() in disable_functions workaround": "patches/sebastian-cli-parser-no-assert.patch"
                 }
             },
             "installation-source": "dist",
@@ -3423,6 +3480,7 @@
     "dev-package-names": [
         "antecedent/patchwork",
         "brain/monkey",
+        "cweagans/composer-patches",
         "dealerdirect/phpcodesniffer-composer-installer",
         "doctrine/instantiator",
         "hamcrest/hamcrest-php",

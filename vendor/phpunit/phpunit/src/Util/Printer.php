@@ -93,7 +93,9 @@ class Printer
     public function write(string $buffer): void
     {
         if ($this->stream) {
-            assert(is_resource($this->stream));
+            if (!is_resource($this->stream)) {
+                throw new \AssertionError('assert(is_resource($this->stream)) failed');
+            }
 
             fwrite($this->stream, $buffer);
         } else {
@@ -108,7 +110,9 @@ class Printer
     public function flush(): void
     {
         if ($this->stream && $this->isPhpStream) {
-            assert(is_resource($this->stream));
+            if (!is_resource($this->stream)) {
+                throw new \AssertionError('assert(is_resource($this->stream)) failed');
+            }
 
             fclose($this->stream);
         }

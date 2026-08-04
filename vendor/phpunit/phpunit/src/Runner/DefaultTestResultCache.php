@@ -122,8 +122,12 @@ final class DefaultTestResultCache implements TestResultCache
             return;
         }
 
-        assert(isset($data['defects']) && is_array($data['defects']));
-        assert(isset($data['times']) && is_array($data['times']));
+        if (!isset($data['defects']) || !is_array($data['defects'])) {
+            throw new \AssertionError('assert(isset($data[\'defects\']) && is_array($data[\'defects\'])) failed');
+        }
+        if (!isset($data['times']) || !is_array($data['times'])) {
+            throw new \AssertionError('assert(isset($data[\'times\']) && is_array($data[\'times\'])) failed');
+        }
 
         $this->defects = $data['defects'];
         $this->times   = $data['times'];

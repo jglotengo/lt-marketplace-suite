@@ -54,7 +54,9 @@ final class Factory
             $iterator       = $class->newInstance($iterator, $args, $suite);
         }
 
-        assert($iterator instanceof FilterIterator);
+        if (!$iterator instanceof FilterIterator) {
+            throw new \AssertionError('assert($iterator instanceof FilterIterator) failed');
+        }
 
         return $iterator;
     }

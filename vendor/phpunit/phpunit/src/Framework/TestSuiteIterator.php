@@ -73,7 +73,9 @@ final class TestSuiteIterator implements RecursiveIterator
 
         $current = $this->current();
 
-        assert($current instanceof TestSuite);
+        if (!$current instanceof TestSuite) {
+            throw new \AssertionError('assert($current instanceof TestSuite) failed');
+        }
 
         return new self($current);
     }

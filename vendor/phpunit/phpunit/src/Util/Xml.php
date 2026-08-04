@@ -119,7 +119,9 @@ final class Xml
                     }
 
                     try {
-                        assert(class_exists($className));
+                        if (!class_exists($className)) {
+                            throw new \AssertionError('assert(class_exists($className)) failed');
+                        }
 
                         $variable = (new ReflectionClass($className))->newInstanceArgs($constructorArgs);
                         // @codeCoverageIgnoreStart

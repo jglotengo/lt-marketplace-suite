@@ -216,7 +216,9 @@ final class Loader
         $text        = null;
 
         foreach ($xpath->query('logging/log') as $log) {
-            assert($log instanceof DOMElement);
+            if (!$log instanceof DOMElement) {
+                throw new \AssertionError('assert($log instanceof DOMElement) failed');
+            }
 
             $type   = (string) $log->getAttribute('type');
             $target = (string) $log->getAttribute('target');
@@ -287,7 +289,9 @@ final class Loader
         $extensions = [];
 
         foreach ($xpath->query('extensions/extension') as $extension) {
-            assert($extension instanceof DOMElement);
+            if (!$extension instanceof DOMElement) {
+                throw new \AssertionError('assert($extension instanceof DOMElement) failed');
+            }
 
             $extensions[] = $this->getElementConfigurationParameters($filename, $extension);
         }
@@ -610,7 +614,9 @@ final class Loader
         $xml       = null;
 
         foreach ($xpath->query('logging/log') as $log) {
-            assert($log instanceof DOMElement);
+            if (!$log instanceof DOMElement) {
+                throw new \AssertionError('assert($log instanceof DOMElement) failed');
+            }
 
             $type   = (string) $log->getAttribute('type');
             $target = (string) $log->getAttribute('target');
@@ -727,7 +733,9 @@ final class Loader
         $directories = [];
 
         foreach ($xpath->query($query) as $directoryNode) {
-            assert($directoryNode instanceof DOMElement);
+            if (!$directoryNode instanceof DOMElement) {
+                throw new \AssertionError('assert($directoryNode instanceof DOMElement) failed');
+            }
 
             $directoryPath = (string) $directoryNode->textContent;
 
@@ -751,7 +759,9 @@ final class Loader
         $files = [];
 
         foreach ($xpath->query($query) as $file) {
-            assert($file instanceof DOMNode);
+            if (!$file instanceof DOMNode) {
+                throw new \AssertionError('assert($file instanceof DOMNode) failed');
+            }
 
             $filePath = (string) $file->textContent;
 
@@ -779,13 +789,17 @@ final class Loader
         $exclude = [];
 
         foreach ($xpath->query($root . '/include/group') as $group) {
-            assert($group instanceof DOMNode);
+            if (!$group instanceof DOMNode) {
+                throw new \AssertionError('assert($group instanceof DOMNode) failed');
+            }
 
             $include[] = new Group((string) $group->textContent);
         }
 
         foreach ($xpath->query($root . '/exclude/group') as $group) {
-            assert($group instanceof DOMNode);
+            if (!$group instanceof DOMNode) {
+                throw new \AssertionError('assert($group instanceof DOMNode) failed');
+            }
 
             $exclude[] = new Group((string) $group->textContent);
         }
@@ -801,7 +815,9 @@ final class Loader
         $listeners = [];
 
         foreach ($xpath->query('listeners/listener') as $listener) {
-            assert($listener instanceof DOMElement);
+            if (!$listener instanceof DOMElement) {
+                throw new \AssertionError('assert($listener instanceof DOMElement) failed');
+            }
 
             $listeners[] = $this->getElementConfigurationParameters($filename, $listener);
         }
@@ -856,7 +872,9 @@ final class Loader
         $includePaths = [];
 
         foreach ($xpath->query('php/includePath') as $includePath) {
-            assert($includePath instanceof DOMNode);
+            if (!$includePath instanceof DOMNode) {
+                throw new \AssertionError('assert($includePath instanceof DOMNode) failed');
+            }
 
             $path = (string) $includePath->textContent;
 
@@ -868,7 +886,9 @@ final class Loader
         $iniSettings = [];
 
         foreach ($xpath->query('php/ini') as $ini) {
-            assert($ini instanceof DOMElement);
+            if (!$ini instanceof DOMElement) {
+                throw new \AssertionError('assert($ini instanceof DOMElement) failed');
+            }
 
             $iniSettings[] = new IniSetting(
                 (string) $ini->getAttribute('name'),
@@ -879,7 +899,9 @@ final class Loader
         $constants = [];
 
         foreach ($xpath->query('php/const') as $const) {
-            assert($const instanceof DOMElement);
+            if (!$const instanceof DOMElement) {
+                throw new \AssertionError('assert($const instanceof DOMElement) failed');
+            }
 
             $value = (string) $const->getAttribute('value');
 
@@ -902,7 +924,9 @@ final class Loader
 
         foreach (['var', 'env', 'post', 'get', 'cookie', 'server', 'files', 'request'] as $array) {
             foreach ($xpath->query('php/' . $array) as $var) {
-                assert($var instanceof DOMElement);
+                if (!$var instanceof DOMElement) {
+                    throw new \AssertionError('assert($var instanceof DOMElement) failed');
+                }
 
                 $name     = (string) $var->getAttribute('name');
                 $value    = (string) $var->getAttribute('value');
@@ -1144,7 +1168,9 @@ final class Loader
             $directories = [];
 
             foreach ($element->getElementsByTagName('directory') as $directoryNode) {
-                assert($directoryNode instanceof DOMElement);
+                if (!$directoryNode instanceof DOMElement) {
+                    throw new \AssertionError('assert($directoryNode instanceof DOMElement) failed');
+                }
 
                 $directory = (string) $directoryNode->textContent;
 
@@ -1188,7 +1214,9 @@ final class Loader
             $files = [];
 
             foreach ($element->getElementsByTagName('file') as $fileNode) {
-                assert($fileNode instanceof DOMElement);
+                if (!$fileNode instanceof DOMElement) {
+                    throw new \AssertionError('assert($fileNode instanceof DOMElement) failed');
+                }
 
                 $file = (string) $fileNode->textContent;
 
@@ -1243,12 +1271,16 @@ final class Loader
         if ($testSuiteNodes->length === 1) {
             $element = $testSuiteNodes->item(0);
 
-            assert($element instanceof DOMElement);
+            if (!$element instanceof DOMElement) {
+                throw new \AssertionError('assert($element instanceof DOMElement) failed');
+            }
 
             $elements[] = $element;
         } else {
             foreach ($testSuiteNodes as $testSuiteNode) {
-                assert($testSuiteNode instanceof DOMElement);
+                if (!$testSuiteNode instanceof DOMElement) {
+                    throw new \AssertionError('assert($testSuiteNode instanceof DOMElement) failed');
+                }
 
                 $elements[] = $testSuiteNode;
             }
@@ -1264,7 +1296,9 @@ final class Loader
         if ($nodes->length === 1) {
             $node = $nodes->item(0);
 
-            assert($node instanceof DOMElement);
+            if (!$node instanceof DOMElement) {
+                throw new \AssertionError('assert($node instanceof DOMElement) failed');
+            }
 
             return $node;
         }

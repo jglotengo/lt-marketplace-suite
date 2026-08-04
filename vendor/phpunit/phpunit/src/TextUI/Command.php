@@ -224,7 +224,9 @@ class Command
             $this->exitWithErrorMessage($e->getMessage());
         }
 
-        assert(isset($arguments) && $arguments instanceof Configuration);
+        if (!isset($arguments) || !$arguments instanceof Configuration) {
+            throw new \AssertionError('assert(isset($arguments) && $arguments instanceof Configuration) failed');
+        }
 
         if ($arguments->hasGenerateConfiguration() && $arguments->generateConfiguration()) {
             $this->generateConfiguration();
@@ -463,7 +465,9 @@ class Command
             if ($class->implementsInterface(TestSuiteLoader::class) && $class->isInstantiable()) {
                 $object = $class->newInstance();
 
-                assert($object instanceof TestSuiteLoader);
+                if (!$object instanceof TestSuiteLoader) {
+                    throw new \AssertionError('assert($object instanceof TestSuiteLoader) failed');
+                }
 
                 return $object;
             }

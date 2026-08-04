@@ -125,7 +125,9 @@ final class Matcher
                 throw new MatchBuilderNotFoundException($this->afterMatchBuilderId);
             }
 
-            assert($matcher instanceof self);
+            if (!$matcher instanceof self) {
+                throw new \AssertionError('assert($matcher instanceof self) failed');
+            }
 
             if ($matcher->invocationRule->hasBeenInvoked()) {
                 $this->afterMatchBuilderIsInvoked = true;
@@ -175,7 +177,9 @@ final class Matcher
                 throw new MatchBuilderNotFoundException($this->afterMatchBuilderId);
             }
 
-            assert($matcher instanceof self);
+            if (!$matcher instanceof self) {
+                throw new \AssertionError('assert($matcher instanceof self) failed');
+            }
 
             if (!$matcher->invocationRule->hasBeenInvoked()) {
                 return false;

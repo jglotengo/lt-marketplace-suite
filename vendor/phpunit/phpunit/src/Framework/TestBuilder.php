@@ -162,7 +162,9 @@ final class TestBuilder
             foreach ($data as $_dataName => $_data) {
                 $_test = new $className($methodName, $_data, $_dataName);
 
-                assert($_test instanceof TestCase);
+                if (!$_test instanceof TestCase) {
+                    throw new \AssertionError('assert($_test instanceof TestCase) failed');
+                }
 
                 $this->configureTestCase(
                     $_test,

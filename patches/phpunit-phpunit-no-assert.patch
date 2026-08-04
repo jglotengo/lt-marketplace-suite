@@ -1,0 +1,443 @@
+diff --git a/src/Framework/MockObject/Matcher.php b/src/Framework/MockObject/Matcher.php
+index cc8be058..19cb1bdc 100755
+--- a/src/Framework/MockObject/Matcher.php
++++ b/src/Framework/MockObject/Matcher.php
+@@ -125,7 +125,9 @@ final class Matcher
+                 throw new MatchBuilderNotFoundException($this->afterMatchBuilderId);
+             }
+ 
+-            assert($matcher instanceof self);
++            if (!$matcher instanceof self) {
++                throw new \AssertionError('assert($matcher instanceof self) failed');
++            }
+ 
+             if ($matcher->invocationRule->hasBeenInvoked()) {
+                 $this->afterMatchBuilderIsInvoked = true;
+@@ -175,7 +177,9 @@ final class Matcher
+                 throw new MatchBuilderNotFoundException($this->afterMatchBuilderId);
+             }
+ 
+-            assert($matcher instanceof self);
++            if (!$matcher instanceof self) {
++                throw new \AssertionError('assert($matcher instanceof self) failed');
++            }
+ 
+             if (!$matcher->invocationRule->hasBeenInvoked()) {
+                 return false;
+diff --git a/src/Framework/TestBuilder.php b/src/Framework/TestBuilder.php
+index 77404df0..a549ced4 100755
+--- a/src/Framework/TestBuilder.php
++++ b/src/Framework/TestBuilder.php
+@@ -162,7 +162,9 @@ final class TestBuilder
+             foreach ($data as $_dataName => $_data) {
+                 $_test = new $className($methodName, $_data, $_dataName);
+ 
+-                assert($_test instanceof TestCase);
++                if (!$_test instanceof TestCase) {
++                    throw new \AssertionError('assert($_test instanceof TestCase) failed');
++                }
+ 
+                 $this->configureTestCase(
+                     $_test,
+diff --git a/src/Framework/TestSuiteIterator.php b/src/Framework/TestSuiteIterator.php
+index 27c9d8b4..eaff85bd 100755
+--- a/src/Framework/TestSuiteIterator.php
++++ b/src/Framework/TestSuiteIterator.php
+@@ -73,7 +73,9 @@ final class TestSuiteIterator implements RecursiveIterator
+ 
+         $current = $this->current();
+ 
+-        assert($current instanceof TestSuite);
++        if (!$current instanceof TestSuite) {
++            throw new \AssertionError('assert($current instanceof TestSuite) failed');
++        }
+ 
+         return new self($current);
+     }
+diff --git a/src/Runner/DefaultTestResultCache.php b/src/Runner/DefaultTestResultCache.php
+index f9d8a90d..71a2738c 100755
+--- a/src/Runner/DefaultTestResultCache.php
++++ b/src/Runner/DefaultTestResultCache.php
+@@ -122,8 +122,12 @@ final class DefaultTestResultCache implements TestResultCache
+             return;
+         }
+ 
+-        assert(isset($data['defects']) && is_array($data['defects']));
+-        assert(isset($data['times']) && is_array($data['times']));
++        if (!isset($data['defects']) || !is_array($data['defects'])) {
++            throw new \AssertionError('assert(isset($data[\'defects\']) && is_array($data[\'defects\'])) failed');
++        }
++        if (!isset($data['times']) || !is_array($data['times'])) {
++            throw new \AssertionError('assert(isset($data[\'times\']) && is_array($data[\'times\'])) failed');
++        }
+ 
+         $this->defects = $data['defects'];
+         $this->times   = $data['times'];
+diff --git a/src/Runner/Filter/Factory.php b/src/Runner/Filter/Factory.php
+index 4880470e..27c7dc5a 100755
+--- a/src/Runner/Filter/Factory.php
++++ b/src/Runner/Filter/Factory.php
+@@ -54,7 +54,9 @@ final class Factory
+             $iterator       = $class->newInstance($iterator, $args, $suite);
+         }
+ 
+-        assert($iterator instanceof FilterIterator);
++        if (!$iterator instanceof FilterIterator) {
++            throw new \AssertionError('assert($iterator instanceof FilterIterator) failed');
++        }
+ 
+         return $iterator;
+     }
+diff --git a/src/Runner/Version.php b/src/Runner/Version.php
+index d80a0729..c1dc9b3c 100755
+--- a/src/Runner/Version.php
++++ b/src/Runner/Version.php
+@@ -46,7 +46,9 @@ final class Version
+         if (self::$version === '') {
+             self::$version = (new VersionId('9.6.34', dirname(__DIR__, 2)))->getVersion();
+ 
+-            assert(!empty(self::$version));
++            if (empty(self::$version)) {
++                throw new \AssertionError('assert(!empty(self::$version)) failed');
++            }
+         }
+ 
+         return self::$version;
+diff --git a/src/TextUI/Command.php b/src/TextUI/Command.php
+index 7b963f0a..7cbe07cb 100755
+--- a/src/TextUI/Command.php
++++ b/src/TextUI/Command.php
+@@ -224,7 +224,9 @@ class Command
+             $this->exitWithErrorMessage($e->getMessage());
+         }
+ 
+-        assert(isset($arguments) && $arguments instanceof Configuration);
++        if (!isset($arguments) || !$arguments instanceof Configuration) {
++            throw new \AssertionError('assert(isset($arguments) && $arguments instanceof Configuration) failed');
++        }
+ 
+         if ($arguments->hasGenerateConfiguration() && $arguments->generateConfiguration()) {
+             $this->generateConfiguration();
+@@ -463,7 +465,9 @@ class Command
+             if ($class->implementsInterface(TestSuiteLoader::class) && $class->isInstantiable()) {
+                 $object = $class->newInstance();
+ 
+-                assert($object instanceof TestSuiteLoader);
++                if (!$object instanceof TestSuiteLoader) {
++                    throw new \AssertionError('assert($object instanceof TestSuiteLoader) failed');
++                }
+ 
+                 return $object;
+             }
+diff --git a/src/TextUI/TestRunner.php b/src/TextUI/TestRunner.php
+index 1b23a3dc..e64becb1 100755
+--- a/src/TextUI/TestRunner.php
++++ b/src/TextUI/TestRunner.php
+@@ -176,7 +176,9 @@ final class TestRunner extends BaseTestRunner
+         if ($arguments['cacheResult']) {
+             if (!isset($arguments['cacheResultFile'])) {
+                 if (isset($arguments['configurationObject'])) {
+-                    assert($arguments['configurationObject'] instanceof Configuration);
++                    if (!$arguments['configurationObject'] instanceof Configuration) {
++                        throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
++                    }
+ 
+                     $cacheLocation = $arguments['configurationObject']->filename();
+                 } else {
+@@ -318,7 +320,9 @@ final class TestRunner extends BaseTestRunner
+         }
+ 
+         if (isset($originalExecutionOrder) && $this->printer instanceof CliTestDoxPrinter) {
+-            assert($this->printer instanceof CliTestDoxPrinter);
++            if (!$this->printer instanceof CliTestDoxPrinter) {
++                throw new \AssertionError('assert($this->printer instanceof CliTestDoxPrinter) failed');
++            }
+ 
+             $this->printer->setOriginalExecutionOrder($originalExecutionOrder);
+             $this->printer->setShowProgressAnimation(!$arguments['noInteraction']);
+@@ -423,7 +427,9 @@ final class TestRunner extends BaseTestRunner
+             }
+ 
+             if (isset($arguments['configurationObject'])) {
+-                assert($arguments['configurationObject'] instanceof Configuration);
++                if (!$arguments['configurationObject'] instanceof Configuration) {
++                    throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
++                }
+ 
+                 $codeCoverageConfiguration = $arguments['configurationObject']->codeCoverage();
+ 
+@@ -528,7 +534,9 @@ final class TestRunner extends BaseTestRunner
+             }
+ 
+             if (isset($arguments['configurationObject'])) {
+-                assert($arguments['configurationObject'] instanceof Configuration);
++                if (!$arguments['configurationObject'] instanceof Configuration) {
++                    throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
++                }
+ 
+                 $this->writeMessage(
+                     'Configuration',
+@@ -578,7 +586,9 @@ final class TestRunner extends BaseTestRunner
+         }
+ 
+         if (isset($arguments['configurationObject'])) {
+-            assert($arguments['configurationObject'] instanceof Configuration);
++            if (!$arguments['configurationObject'] instanceof Configuration) {
++                throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
++            }
+ 
+             if ($arguments['configurationObject']->hasValidationErrors()) {
+                 if ((new SchemaDetector)->detect($arguments['configurationObject']->filename())->detected()) {
+@@ -1222,7 +1232,9 @@ final class TestRunner extends BaseTestRunner
+             $arguments['reverseList'],
+         );
+ 
+-        assert($object instanceof ResultPrinter);
++        if (!$object instanceof ResultPrinter) {
++            throw new \AssertionError('assert($object instanceof ResultPrinter) failed');
++        }
+ 
+         return $object;
+     }
+diff --git a/src/TextUI/XmlConfiguration/Loader.php b/src/TextUI/XmlConfiguration/Loader.php
+index fa677212..c6f3fb28 100755
+--- a/src/TextUI/XmlConfiguration/Loader.php
++++ b/src/TextUI/XmlConfiguration/Loader.php
+@@ -216,7 +216,9 @@ final class Loader
+         $text        = null;
+ 
+         foreach ($xpath->query('logging/log') as $log) {
+-            assert($log instanceof DOMElement);
++            if (!$log instanceof DOMElement) {
++                throw new \AssertionError('assert($log instanceof DOMElement) failed');
++            }
+ 
+             $type   = (string) $log->getAttribute('type');
+             $target = (string) $log->getAttribute('target');
+@@ -287,7 +289,9 @@ final class Loader
+         $extensions = [];
+ 
+         foreach ($xpath->query('extensions/extension') as $extension) {
+-            assert($extension instanceof DOMElement);
++            if (!$extension instanceof DOMElement) {
++                throw new \AssertionError('assert($extension instanceof DOMElement) failed');
++            }
+ 
+             $extensions[] = $this->getElementConfigurationParameters($filename, $extension);
+         }
+@@ -610,7 +614,9 @@ final class Loader
+         $xml       = null;
+ 
+         foreach ($xpath->query('logging/log') as $log) {
+-            assert($log instanceof DOMElement);
++            if (!$log instanceof DOMElement) {
++                throw new \AssertionError('assert($log instanceof DOMElement) failed');
++            }
+ 
+             $type   = (string) $log->getAttribute('type');
+             $target = (string) $log->getAttribute('target');
+@@ -727,7 +733,9 @@ final class Loader
+         $directories = [];
+ 
+         foreach ($xpath->query($query) as $directoryNode) {
+-            assert($directoryNode instanceof DOMElement);
++            if (!$directoryNode instanceof DOMElement) {
++                throw new \AssertionError('assert($directoryNode instanceof DOMElement) failed');
++            }
+ 
+             $directoryPath = (string) $directoryNode->textContent;
+ 
+@@ -751,7 +759,9 @@ final class Loader
+         $files = [];
+ 
+         foreach ($xpath->query($query) as $file) {
+-            assert($file instanceof DOMNode);
++            if (!$file instanceof DOMNode) {
++                throw new \AssertionError('assert($file instanceof DOMNode) failed');
++            }
+ 
+             $filePath = (string) $file->textContent;
+ 
+@@ -779,13 +789,17 @@ final class Loader
+         $exclude = [];
+ 
+         foreach ($xpath->query($root . '/include/group') as $group) {
+-            assert($group instanceof DOMNode);
++            if (!$group instanceof DOMNode) {
++                throw new \AssertionError('assert($group instanceof DOMNode) failed');
++            }
+ 
+             $include[] = new Group((string) $group->textContent);
+         }
+ 
+         foreach ($xpath->query($root . '/exclude/group') as $group) {
+-            assert($group instanceof DOMNode);
++            if (!$group instanceof DOMNode) {
++                throw new \AssertionError('assert($group instanceof DOMNode) failed');
++            }
+ 
+             $exclude[] = new Group((string) $group->textContent);
+         }
+@@ -801,7 +815,9 @@ final class Loader
+         $listeners = [];
+ 
+         foreach ($xpath->query('listeners/listener') as $listener) {
+-            assert($listener instanceof DOMElement);
++            if (!$listener instanceof DOMElement) {
++                throw new \AssertionError('assert($listener instanceof DOMElement) failed');
++            }
+ 
+             $listeners[] = $this->getElementConfigurationParameters($filename, $listener);
+         }
+@@ -856,7 +872,9 @@ final class Loader
+         $includePaths = [];
+ 
+         foreach ($xpath->query('php/includePath') as $includePath) {
+-            assert($includePath instanceof DOMNode);
++            if (!$includePath instanceof DOMNode) {
++                throw new \AssertionError('assert($includePath instanceof DOMNode) failed');
++            }
+ 
+             $path = (string) $includePath->textContent;
+ 
+@@ -868,7 +886,9 @@ final class Loader
+         $iniSettings = [];
+ 
+         foreach ($xpath->query('php/ini') as $ini) {
+-            assert($ini instanceof DOMElement);
++            if (!$ini instanceof DOMElement) {
++                throw new \AssertionError('assert($ini instanceof DOMElement) failed');
++            }
+ 
+             $iniSettings[] = new IniSetting(
+                 (string) $ini->getAttribute('name'),
+@@ -879,7 +899,9 @@ final class Loader
+         $constants = [];
+ 
+         foreach ($xpath->query('php/const') as $const) {
+-            assert($const instanceof DOMElement);
++            if (!$const instanceof DOMElement) {
++                throw new \AssertionError('assert($const instanceof DOMElement) failed');
++            }
+ 
+             $value = (string) $const->getAttribute('value');
+ 
+@@ -902,7 +924,9 @@ final class Loader
+ 
+         foreach (['var', 'env', 'post', 'get', 'cookie', 'server', 'files', 'request'] as $array) {
+             foreach ($xpath->query('php/' . $array) as $var) {
+-                assert($var instanceof DOMElement);
++                if (!$var instanceof DOMElement) {
++                    throw new \AssertionError('assert($var instanceof DOMElement) failed');
++                }
+ 
+                 $name     = (string) $var->getAttribute('name');
+                 $value    = (string) $var->getAttribute('value');
+@@ -1144,7 +1168,9 @@ final class Loader
+             $directories = [];
+ 
+             foreach ($element->getElementsByTagName('directory') as $directoryNode) {
+-                assert($directoryNode instanceof DOMElement);
++                if (!$directoryNode instanceof DOMElement) {
++                    throw new \AssertionError('assert($directoryNode instanceof DOMElement) failed');
++                }
+ 
+                 $directory = (string) $directoryNode->textContent;
+ 
+@@ -1188,7 +1214,9 @@ final class Loader
+             $files = [];
+ 
+             foreach ($element->getElementsByTagName('file') as $fileNode) {
+-                assert($fileNode instanceof DOMElement);
++                if (!$fileNode instanceof DOMElement) {
++                    throw new \AssertionError('assert($fileNode instanceof DOMElement) failed');
++                }
+ 
+                 $file = (string) $fileNode->textContent;
+ 
+@@ -1243,12 +1271,16 @@ final class Loader
+         if ($testSuiteNodes->length === 1) {
+             $element = $testSuiteNodes->item(0);
+ 
+-            assert($element instanceof DOMElement);
++            if (!$element instanceof DOMElement) {
++                throw new \AssertionError('assert($element instanceof DOMElement) failed');
++            }
+ 
+             $elements[] = $element;
+         } else {
+             foreach ($testSuiteNodes as $testSuiteNode) {
+-                assert($testSuiteNode instanceof DOMElement);
++                if (!$testSuiteNode instanceof DOMElement) {
++                    throw new \AssertionError('assert($testSuiteNode instanceof DOMElement) failed');
++                }
+ 
+                 $elements[] = $testSuiteNode;
+             }
+@@ -1264,7 +1296,9 @@ final class Loader
+         if ($nodes->length === 1) {
+             $node = $nodes->item(0);
+ 
+-            assert($node instanceof DOMElement);
++            if (!$node instanceof DOMElement) {
++                throw new \AssertionError('assert($node instanceof DOMElement) failed');
++            }
+ 
+             return $node;
+         }
+diff --git a/src/Util/Printer.php b/src/Util/Printer.php
+index 311d4943..c89e0f38 100755
+--- a/src/Util/Printer.php
++++ b/src/Util/Printer.php
+@@ -93,7 +93,9 @@ class Printer
+     public function write(string $buffer): void
+     {
+         if ($this->stream) {
+-            assert(is_resource($this->stream));
++            if (!is_resource($this->stream)) {
++                throw new \AssertionError('assert(is_resource($this->stream)) failed');
++            }
+ 
+             fwrite($this->stream, $buffer);
+         } else {
+@@ -108,7 +110,9 @@ class Printer
+     public function flush(): void
+     {
+         if ($this->stream && $this->isPhpStream) {
+-            assert(is_resource($this->stream));
++            if (!is_resource($this->stream)) {
++                throw new \AssertionError('assert(is_resource($this->stream)) failed');
++            }
+ 
+             fclose($this->stream);
+         }
+diff --git a/src/Util/Xml.php b/src/Util/Xml.php
+index efdd56ef..4a3ba923 100755
+--- a/src/Util/Xml.php
++++ b/src/Util/Xml.php
+@@ -119,7 +119,9 @@ final class Xml
+                     }
+ 
+                     try {
+-                        assert(class_exists($className));
++                        if (!class_exists($className)) {
++                            throw new \AssertionError('assert(class_exists($className)) failed');
++                        }
+ 
+                         $variable = (new ReflectionClass($className))->newInstanceArgs($constructorArgs);
+                         // @codeCoverageIgnoreStart
+diff --git a/src/Util/Xml/SchemaFinder.php b/src/Util/Xml/SchemaFinder.php
+index eb5f4f15..5c15b7f6 100755
+--- a/src/Util/Xml/SchemaFinder.php
++++ b/src/Util/Xml/SchemaFinder.php
+@@ -36,7 +36,9 @@ final class SchemaFinder
+ 
+             $version = $file->getBasename('.xsd');
+ 
+-            assert(!empty($version));
++            if (empty($version)) {
++                throw new \AssertionError('assert(!empty($version)) failed');
++            }
+ 
+             $result[] = $version;
+         }

@@ -176,7 +176,9 @@ final class TestRunner extends BaseTestRunner
         if ($arguments['cacheResult']) {
             if (!isset($arguments['cacheResultFile'])) {
                 if (isset($arguments['configurationObject'])) {
-                    assert($arguments['configurationObject'] instanceof Configuration);
+                    if (!$arguments['configurationObject'] instanceof Configuration) {
+                        throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
+                    }
 
                     $cacheLocation = $arguments['configurationObject']->filename();
                 } else {
@@ -318,7 +320,9 @@ final class TestRunner extends BaseTestRunner
         }
 
         if (isset($originalExecutionOrder) && $this->printer instanceof CliTestDoxPrinter) {
-            assert($this->printer instanceof CliTestDoxPrinter);
+            if (!$this->printer instanceof CliTestDoxPrinter) {
+                throw new \AssertionError('assert($this->printer instanceof CliTestDoxPrinter) failed');
+            }
 
             $this->printer->setOriginalExecutionOrder($originalExecutionOrder);
             $this->printer->setShowProgressAnimation(!$arguments['noInteraction']);
@@ -423,7 +427,9 @@ final class TestRunner extends BaseTestRunner
             }
 
             if (isset($arguments['configurationObject'])) {
-                assert($arguments['configurationObject'] instanceof Configuration);
+                if (!$arguments['configurationObject'] instanceof Configuration) {
+                    throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
+                }
 
                 $codeCoverageConfiguration = $arguments['configurationObject']->codeCoverage();
 
@@ -528,7 +534,9 @@ final class TestRunner extends BaseTestRunner
             }
 
             if (isset($arguments['configurationObject'])) {
-                assert($arguments['configurationObject'] instanceof Configuration);
+                if (!$arguments['configurationObject'] instanceof Configuration) {
+                    throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
+                }
 
                 $this->writeMessage(
                     'Configuration',
@@ -578,7 +586,9 @@ final class TestRunner extends BaseTestRunner
         }
 
         if (isset($arguments['configurationObject'])) {
-            assert($arguments['configurationObject'] instanceof Configuration);
+            if (!$arguments['configurationObject'] instanceof Configuration) {
+                throw new \AssertionError('assert($arguments[\'configurationObject\'] instanceof Configuration) failed');
+            }
 
             if ($arguments['configurationObject']->hasValidationErrors()) {
                 if ((new SchemaDetector)->detect($arguments['configurationObject']->filename())->detected()) {
@@ -1222,7 +1232,9 @@ final class TestRunner extends BaseTestRunner
             $arguments['reverseList'],
         );
 
-        assert($object instanceof ResultPrinter);
+        if (!$object instanceof ResultPrinter) {
+            throw new \AssertionError('assert($object instanceof ResultPrinter) failed');
+        }
 
         return $object;
     }
