@@ -162,13 +162,35 @@ class LTMS_TPTC_Listener {
             return;
         }
 
-        // Idempotencia: no revertir dos veces el mismo pedido.
-        if ( $order->get_meta( '_ltms_tptc_reversed' ) ) {
-            return;
+        // AUDIT-LISTENERS-001 P1-3 FIX (Ciclo 1.5): atomic SQL claim para
+        // _ltms_tptc_reversed. Antes, get_meta() + update_meta_data() era
+        // no atómico — dos procesos concurrentes (wp-cli refund + admin
+        // UI refund, o cron retry de reembolsos pendientes) podían ambos
+        // leer 'false', ambos pasar el guard, ambos llamar reverse_sale.
+        // El API client de TPTC (según se conoce) no dedup por idempotency
+        // key en reverse_sale → doble reversión contable (puntos quitados
+        // dos veces al vendor en TPTC). Mismo patrón que H-4/H-5 FIX.
+        global $wpdb;
+        add_post_meta( $order_id, '_ltms_tptc_reversed', '0', true );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $reversal_claimed = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$wpdb->postmeta} SET meta_value = '1' WHERE post_id = %d AND meta_key = %s AND (meta_value IS NULL OR meta_value != '1')",
+            $order_id, '_ltms_tptc_reversed'
+        ) );
+        if ( ! $reversal_claimed ) {
+            return; // Already reversed by another process
         }
 
         // Solo revertir si la venta fue previamente sincronizada con TPTC.
         if ( ! $order->get_meta( '_ltms_tptc_synced' ) ) {
+            // AUDIT-LISTENERS-001 P1-3 FIX (cont.): si no estaba synced,
+            // resetear el claim para permitir undo si el pedido se_sync
+            // más tarde (escenario raro pero defense-in-depth).
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
+                $order_id, '_ltms_tptc_reversed'
+            ) );
             return;
         }
 
@@ -192,12 +214,31 @@ class LTMS_TPTC_Listener {
                 'reversal_date' => gmdate( 'c' ),
             ] );
 
-            $order->update_meta_data( '_ltms_tptc_reversed', 1 );
+            // AUDIT-LISTENERS-001 P1-3 FIX (cont.): limpiar flag de fallo
+            // previo (si hubo retries fallidos anteriores) para que el
+            // pedido no quede marcado como fallido tras un éxito.
+            $order->delete_meta_data( '_ltms_tptc_reversal_failed' );
+            $order->delete_meta_data( '_ltms_tptc_reversal_last_error' );
             $order->save();
 
             self::log_info_static( 'TPTC_REVERSED', "Pedido #{$order_id} revertido en TPTC (refund #{$refund_id})." );
 
         } catch ( \Throwable $e ) {
+            // AUDIT-LISTENERS-001 P1-3 FIX (Ciclo 1.5): ante fallo,
+            // resetear el atomic claim (permitir retry) + marcar
+            // _tptc_reversal_failed meta para diagnóstico/monitoreo.
+            // Antes, el catch solo logueaba — no había forma de distinguir
+            // en admin un pedido con reversión pendiente de uno revertido,
+            // ni había path de retry (claim quedaba en '1' permanentemente).
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
+                $order_id, '_ltms_tptc_reversed'
+            ) );
+            $order->update_meta_data( '_ltms_tptc_reversal_failed', 1 );
+            $order->update_meta_data( '_ltms_tptc_reversal_last_error', $e->getMessage() );
+            $order->update_meta_data( '_ltms_tptc_reversal_last_refund_id', $refund_id );
+            $order->save();
             self::log_error_static( 'TPTC_REVERSAL_FAILED', "Pedido #{$order_id}: " . $e->getMessage() );
         }
     }

@@ -57,6 +57,36 @@ class LTMS_Redi_Order_Listener {
         // H-5 FIX: removed update_post_meta( $order_id, '_ltms_redi_processed', true )
         // here — the atomic claim above already marked the order as processed.
 
+        LTMS_Business_Redi_Order_Split::process( $order, $redi_items );
+        LTMS_Business_Redi_Manager::deduct_origin_stock( $order );
+
+        // AUDIT-LISTENERS-001 P0-2 FIX (Ciclo 1.5): envolver procesamiento
+        // crítico en try/catch y resetear el flag _ltms_redi_processed en
+        // caso de fallo, siguiendo el mismo patrón que LTMS_TPTC_Listener::on_order_paid
+        // (H-5 FIX). Antes, si Redi_Order_Split::process o deduct_origin_stock
+        // lanzaban excepción (DB timeout, stock insufficient, etc.), el flag
+        // _ltms_redi_processed='1' YA estaba seteado por el atomic claim H-5
+        // → la próxima ejecución del handler salía por el early-return sin
+        // re-procesar → fallo silencioso sin stock deduct, sin notificación
+        // a vendors, sin comisión acreditada, sin retry path.
+        try {
+            LTMS_Business_Redi_Order_Split::process( $order, $redi_items );
+            LTMS_Business_Redi_Manager::deduct_origin_stock( $order );
+        } catch ( \Throwable $e ) {
+            // Resetear el flag para permitir retry tras fallo transitorio.
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
+                $order_id, '_ltms_redi_processed'
+            ) );
+            LTMS_Core_Logger::error(
+                'REDI_PROCESS_FAILED',
+                sprintf( 'ReDi processing failed for order #%d: %s', $order_id, $e->getMessage() ),
+                [ 'order_id' => $order_id, 'exception' => get_class( $e ) ]
+            );
+            return; // No continuar con notificaciones si el split falló.
+        }
+
         // AUDIT-REDI-UX-GAPS GAP-7 FIX: persistir _ltms_redi_origin_vendor_id
         // en el ORDER meta para que get_vendor_orders() lo retorne.
         $first_origin_id = 0;
@@ -67,9 +97,6 @@ class LTMS_Redi_Order_Listener {
         if ( $first_origin_id ) {
             update_post_meta( $order_id, '_ltms_redi_origin_vendor_id', $first_origin_id );
         }
-
-        LTMS_Business_Redi_Order_Split::process( $order, $redi_items );
-        LTMS_Business_Redi_Manager::deduct_origin_stock( $order );
 
         // AUDIT-REDI-UX-GAPS GAP-5 FIX: notificar al origin vendor + reseller.
         // El origin vendor necesita saber que debe enviar el producto al cliente.
@@ -174,28 +201,58 @@ class LTMS_Redi_Order_Listener {
 
         foreach ( $commissions as $commission ) {
             try {
+                // AUDIT-LISTENERS-001 P0-1 FIX (Ciclo 1.5): Wallet::debit SIN
+                // idempotency_key → doble débito al origin vendor en retry.
+                // ANTES: si el primer debit (origin) tenía éxito pero el
+                // segundo (reseller) fallaba, el catch capturaba pero el
+                // primer débito YA estaba aplicado y el status de la comisión
+                // NO se actualizaba a 'reversed' (el UPDATE estaba fuera del
+                // try) → re-ejecución del handler lee status='paid' y
+                // re-debita al origin vendor por segunda vez.
+                // 
+                // Fix: añadir idempotency_key + currency + mover el UPDATE
+                // de status='reversed' DENTRO del try (después de ambos
+                // debits exitosos). idempotency_key único por comisión+purpose
+                // permite retry seguro — el wallet dedup por referencia.
+                $origin_id   = (int) $commission->origin_vendor_id;
+                $reseller_id = (int) $commission->reseller_vendor_id;
+                $order_currency = strtolower( $order->get_currency() ?: 'COP' );
+
                 LTMS_Business_Wallet::debit(
-                    (int) $commission->origin_vendor_id,
+                    $origin_id,
                     (float) $commission->origin_vendor_net,
                     sprintf( __( 'Reversión ReDi pedido #%s', 'ltms' ), $order->get_order_number() ),
                     [ 'type' => 'reversal', 'order_id' => $order_id, 'redi_commission_id' => $commission->id ],
-                    $order_id
+                    $order_id,
+                    $order_currency,
+                    sprintf( 'redi_reversal_origin_o%d_c%d', $order_id, $commission->id )
                 );
                 LTMS_Business_Wallet::debit(
-                    (int) $commission->reseller_vendor_id,
+                    $reseller_id,
                     (float) $commission->reseller_commission,
                     sprintf( __( 'Reversión ReDi pedido #%s (revendedor)', 'ltms' ), $order->get_order_number() ),
-                    [ 'type' => 'reversal', 'order_id' => $order_id ],
-                    $order_id
+                    [ 'type' => 'reversal', 'order_id' => $order_id, 'redi_commission_id' => $commission->id ],
+                    $order_id,
+                    $order_currency,
+                    sprintf( 'redi_reversal_reseller_o%d_c%d', $order_id, $commission->id )
+                );
+
+                // Mover el UPDATE dentro del try: solo marcar 'reversed' si
+                // AMBOS debits exitosos. Si cualquiera lanza, el status
+                // sigue 'paid' → retry re-intenta (los debits son idempotentes
+                // ahora, no hay doble débito).
+                $wpdb->update(
+                    $wpdb->prefix . 'lt_redi_commissions',
+                    [ 'status' => 'reversed' ],
+                    [ 'id' => $commission->id ],
+                    [ '%s' ], [ '%d' ]
                 );
             } catch ( \Throwable $e ) {
                 LTMS_Core_Logger::error( 'REDI_REVERSAL_FAILED', $e->getMessage() );
+                continue; // Pasar a la siguiente comisión sin notificar (no hubo reversal exitoso).
             }
 
             // AUDIT-REDI-UX-GAPS GAP-6 FIX: notificar a AMBOS vendors.
-            $origin_id   = (int) $commission->origin_vendor_id;
-            $reseller_id = (int) $commission->reseller_vendor_id;
-
             self::create_notification(
                 $origin_id, 'redi_order_cancelled',
                 sprintf( __( 'Pedido ReDi #%s cancelado — suspende envío', 'ltms' ), $order->get_order_number() ),
@@ -217,15 +274,7 @@ class LTMS_Redi_Order_Listener {
             self::send_redi_email( $reseller_id, 'redi_order_cancelled',
                 sprintf( '[%s] ⚠️ Pedido ReDi #%s cancelado — comisión reversada', get_bloginfo( 'name' ), $order->get_order_number() ),
                 __( 'El pedido fue cancelado. Tu comisión fue reversada.', 'ltms' ),
-                $order, [], '', false, 'reseller'
-            );
-
-            $wpdb->update(
-                $wpdb->prefix . 'lt_redi_commissions',
-                [ 'status' => 'reversed' ],
-                [ 'id' => $commission->id ],
-                [ '%s' ], [ '%d' ]
-            );
+                $order, [], '', false, 'reseller' );
         }
 
         // Restore origin stock

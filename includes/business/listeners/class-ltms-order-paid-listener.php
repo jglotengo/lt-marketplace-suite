@@ -232,23 +232,59 @@ final class LTMS_Order_Paid_Listener {
             $vendor_id = (int) $order->get_meta( '_ltms_vendor_id' );
             if ( ! $vendor_id ) return;
 
-            $already = $order->get_meta( '_ltms_shipping_debited' );
-            if ( $already ) return;
+            // AUDIT-LISTENERS-001 P1-1 FIX (Ciclo 1.5): race condition en
+            // _ltms_shipping_debited. Antes, get_meta() + update_meta_data()
+            // era no atómico — dos procesos concurrentes (ej. webhook +
+            // woocommerce_order_status_completed, o cron retry) pueden ambos
+            // leer 'false', ambos pasar el guard, ambos debitar al vendor.
+            // Ahora: add_post_meta(unique=true) asegura la fila existe, y
+            // un UPDATE condicional atomiza el claim (mismo patrón que el
+            // H-4 FIX de on_order_paid arriba).
+            global $wpdb;
+            add_post_meta( $order->get_id(), '_ltms_shipping_debited', '0', true );
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $shipping_claimed = $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '1' WHERE post_id = %d AND meta_key = %s AND (meta_value IS NULL OR meta_value != '1')",
+                $order->get_id(), '_ltms_shipping_debited'
+            ) );
+            if ( ! $shipping_claimed ) {
+                return; // Already debited by another process
+            }
 
             if ( class_exists( 'LTMS_Business_Wallet' ) ) {
-                // M-103: firma correcta = debit(vendor_id, amount, description:string, metadata:array, order_id:int)
+                // AUDIT-LISTENERS-001 P1-1 FIX (Ciclo 1.5): añadir
+                // $currency + $idempotency_key (faltantes en M-103). Sin
+                // idempotency_key, Wallet::execute_transaction() NO dedup
+                // por referencia — re-ejecuciones del handler (post-meta
+                // reset por retry, race ganada por procesoAlternativo, etc.)
+                // generan débitos duplicados al vendor. La firma completa
+                // es debit(vendor_id, amount, description, metadata,
+                // order_id, currency, idempotency_key) — ver
+                // includes/business/class-ltms-wallet.php:160.
+                $order_currency = strtolower( $order->get_currency() ?: 'COP' );
                 LTMS_Business_Wallet::debit(
                     $vendor_id,
                     $cost,
                     sprintf( __( 'Envío absorbido — Pedido #%d', 'ltms' ), $order->get_id() ),
                     [ 'type' => 'shipping_absorbed', 'order_id' => $order->get_id() ],
-                    $order->get_id()
+                    $order->get_id(),
+                    $order_currency,
+                    sprintf( 'shipping_absorbed_o%d', $order->get_id() )
                 );
             }
-
-            $order->update_meta_data( '_ltms_shipping_debited', 1 );
-            $order->save();
         } catch ( \Throwable $e ) {
+            // AUDIT-LISTENERS-001 P1-1 FIX (Ciclo 1.5): si el débito falla
+            // tras el atomic claim, resetear el flag a '0' para permitir
+            // retry en la próxima ejecución del handler. Sin este reset,
+            // el flag quedaba en '1' permanentemente → no había path de
+            // retry ante fallo transitorio (saldo insuficiente temporal,
+            // DB timeout, etc.).
+            global $wpdb;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
+                $order->get_id(), '_ltms_shipping_debited'
+            ) );
             LTMS_Core_Logger::warning( 'SHIPPING_DEBIT_FAILED', 'debit_absorbed_shipping order #' . $order->get_id() . ': ' . $e->getMessage() );
         }
     }

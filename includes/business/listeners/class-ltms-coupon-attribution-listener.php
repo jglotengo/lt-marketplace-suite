@@ -15,8 +15,16 @@ class LTMS_Coupon_Attribution_Listener {
         // Al crear el pedido, guardar la atribución
         add_action( 'woocommerce_checkout_order_created', [ __CLASS__, 'save_attribution' ] );
 
-        // Al pagar, acreditar al referidor si aplica
-        add_action( 'woocommerce_payment_complete', [ __CLASS__, 'credit_referrer' ], 30 );
+        // AUDIT-LISTENERS-001 P1-2 FIX (Ciclo 1.5): enganchar también
+        // woocommerce_order_status_completed. Antes, pedidos marcados como
+        // Completed manualmente desde admin (offline, COD, transferencia
+        // bancaria, contraentrega) NO disparaban credit_referrer() porque
+        // woocommerce_payment_complete no se gatilla para esos métodos.
+        // Solo pasaban por ahí pedidos pagados online (PSE, card, etc.).
+        // Resultado: comisiones de referido perdidas para órdenes offline.
+        if ( ! has_action( 'woocommerce_order_status_completed', [ __CLASS__, 'credit_referrer' ] ) ) {
+            add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'credit_referrer' ], 30 );
+        }
     }
 
     /**
@@ -72,68 +80,101 @@ class LTMS_Coupon_Attribution_Listener {
      * @return void
      */
     public static function credit_referrer( int $order_id ): void {
-        // Prevenir doble procesamiento
-        if ( get_post_meta( $order_id, '_ltms_referral_credited', true ) ) {
-            return;
+        // AUDIT-LISTENERS-001 P1-2 FIX (Ciclo 1.5): try/catch + atomic
+        // claim. Antes, get_post_meta() + update_post_meta() era no
+        // atómico — dos procesos concurrentes (woocommerce_payment_complete
+        // + woocommerce_order_status_completed si ambos se gatillan en
+        // secuencia, o cron retry) podían ambos leer 'false', ambos
+        // pasar el guard, ambos llamar Wallet::credit. La idempotency_key
+        // del wallet (P0-3 FIX v2.9.122) ya evita el doble crédito real,
+        // pero el atomic claim previene también clientes en la cola de
+        // notificaciones y el ruido de logs/DB. Mismo patrón que H-4 FIX
+        // del Order_Paid_Listener.
+        global $wpdb;
+        add_post_meta( $order_id, '_ltms_referral_credited', '0', true );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $claimed = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$wpdb->postmeta} SET meta_value = '1' WHERE post_id = %d AND meta_key = %s AND (meta_value IS NULL OR meta_value != '1')",
+            $order_id, '_ltms_referral_credited'
+        ) );
+        if ( ! $claimed ) {
+            return; // Already claimed by another process
         }
 
-        $order    = wc_get_order( $order_id );
-        $ref_code = $order ? $order->get_meta( '_ltms_referral_code' ) : '';
+        try {
+            $order    = wc_get_order( $order_id );
+            $ref_code = $order ? $order->get_meta( '_ltms_referral_code' ) : '';
 
-        if ( ! $ref_code ) {
-            return;
-        }
+            if ( ! $ref_code ) {
+                return;
+            }
 
-        // Buscar el vendedor dueño del código de referido
-        $referrer_id = (int) self::get_user_by_referral_code( $ref_code );
-        if ( ! $referrer_id ) {
-            return;
-        }
+            // Buscar el vendedor dueño del código de referido
+            $referrer_id = (int) self::get_user_by_referral_code( $ref_code );
+            if ( ! $referrer_id ) {
+                return;
+            }
 
-        // v2.9.122 AFFILIATE-AUDIT P1-1 FIX: verify referrer is a vendor.
-        // Before, any user with a referral code (including customers) could
-        // receive wallet commissions. Now checks LTMS_Utils::is_ltms_vendor().
-        if ( class_exists( 'LTMS_Utils' ) && ! LTMS_Utils::is_ltms_vendor( $referrer_id ) ) {
+            // v2.9.122 AFFILIATE-AUDIT P1-1 FIX: verify referrer is a vendor.
+            // Before, any user with a referral code (including customers) could
+            // receive wallet commissions. Now checks LTMS_Utils::is_ltms_vendor().
+            if ( class_exists( 'LTMS_Utils' ) && ! LTMS_Utils::is_ltms_vendor( $referrer_id ) ) {
+                self::log_warning_static(
+                    'REFERRAL_CREDIT_NON_VENDOR',
+                    sprintf( 'Referrer #%d is not a vendor — commission skipped for order #%d', $referrer_id, $order_id ),
+                    [ 'referrer_id' => $referrer_id, 'order_id' => $order_id ]
+                );
+                return;
+            }
+
+            // Calcular comisión de referido
+            $rate       = (float) LTMS_Core_Config::get( 'ltms_mlm_referral_rate', 0.02 );
+            // v2.9.122 P0-2 FIX: bound commission to configurable max.
+            // Before, a $1,000,000 order would generate $20,000 commission (2%).
+            // Now capped at 500,000 (configurable via ltms_max_referral_commission).
+            $max_commission = (float) LTMS_Core_Config::get( 'ltms_max_referral_commission', 500000 );
+            $commission = min( (float) $order->get_total() * $rate, $max_commission );
+
+            if ( $commission > 0 && class_exists( 'LTMS_Business_Wallet' ) ) {
+                // v2.9.122 P0-3 FIX: add idempotency key to prevent double credit.
+                // Before, if credit_referrer was called twice (race between
+                // woocommerce_payment_complete hooks), the meta guard might not be
+                // set yet → double wallet credit. Now uses idempotency key.
+                $idempotency_key = 'referral_credit_o' . $order_id;
+
+                // M-107: firma correcta = credit(vendor, amount, description:string, metadata:array, order_id:int)
+                LTMS_Business_Wallet::credit(
+                    $referrer_id,
+                    $commission,
+                    sprintf( __( 'Comisión de referido — Pedido #%d', 'ltms' ), $order_id ),
+                    [ 'type' => 'referral_commission', 'order_id' => $order_id ],
+                    $order_id,
+                    '',
+                    $idempotency_key
+                );
+
+                update_post_meta( $order_id, '_ltms_referrer_id', $referrer_id );
+
+                self::log_info_static(
+                    'REFERRAL_CREDITED',
+                    sprintf( 'Comisión %.2f acreditada al referidor #%d por pedido #%d', $commission, $referrer_id, $order_id )
+                );
+            }
+        } catch ( \Throwable $e ) {
+            // AUDIT-LISTENERS-001 P1-2 FIX (Ciclo 1.5): resetear el flag
+            // ante fallo transitorio para permitir retry. Sin este reset,
+            // si Wallet::credit lanzaba (DB timeout, vendor nonexistent),
+            // el flag quedaba en '1' y no había path de retry.
+            global $wpdb;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
+                $order_id, '_ltms_referral_credited'
+            ) );
             self::log_warning_static(
-                'REFERRAL_CREDIT_NON_VENDOR',
-                sprintf( 'Referrer #%d is not a vendor — commission skipped for order #%d', $referrer_id, $order_id ),
-                [ 'referrer_id' => $referrer_id, 'order_id' => $order_id ]
-            );
-            return;
-        }
-
-        // Calcular comisión de referido
-        $rate       = (float) LTMS_Core_Config::get( 'ltms_mlm_referral_rate', 0.02 );
-        // v2.9.122 P0-2 FIX: bound commission to configurable max.
-        // Before, a $1,000,000 order would generate $20,000 commission (2%).
-        // Now capped at 500,000 (configurable via ltms_max_referral_commission).
-        $max_commission = (float) LTMS_Core_Config::get( 'ltms_max_referral_commission', 500000 );
-        $commission = min( (float) $order->get_total() * $rate, $max_commission );
-
-        if ( $commission > 0 && class_exists( 'LTMS_Business_Wallet' ) ) {
-            // v2.9.122 P0-3 FIX: add idempotency key to prevent double credit.
-            // Before, if credit_referrer was called twice (race between
-            // woocommerce_payment_complete hooks), the meta guard might not be
-            // set yet → double wallet credit. Now uses idempotency key.
-            $idempotency_key = 'referral_credit_o' . $order_id;
-
-            // M-107: firma correcta = credit(vendor, amount, description:string, metadata:array, order_id:int)
-            LTMS_Business_Wallet::credit(
-                $referrer_id,
-                $commission,
-                sprintf( __( 'Comisión de referido — Pedido #%d', 'ltms' ), $order_id ),
-                [ 'type' => 'referral_commission', 'order_id' => $order_id ],
-                $order_id,
-                '',
-                $idempotency_key
-            );
-
-            update_post_meta( $order_id, '_ltms_referral_credited', 1 );
-            update_post_meta( $order_id, '_ltms_referrer_id', $referrer_id );
-
-            self::log_info_static(
-                'REFERRAL_CREDITED',
-                sprintf( 'Comisión %.2f acreditada al referidor #%d por pedido #%d', $commission, $referrer_id, $order_id )
+                'REFERRAL_CREDIT_FAILED',
+                sprintf( 'credit_referrer order #%d: %s', $order_id, $e->getMessage() ),
+                [ 'order_id' => $order_id, 'exception' => get_class( $e ) ]
             );
         }
     }
