@@ -540,7 +540,20 @@ if ( $ltms_unit_only ) {
         function home_url( string $path = '' ): string { return 'http://localhost' . $path; }
     }
     if ( ! function_exists( 'get_current_user_id' ) ) {
-        function get_current_user_id(): int { return 0; }
+        /**
+         * Stub de get_current_user_id. Retorna 0 por defecto, pero si un test
+         * setea $GLOBALS['__ltms_current_uid'] (int), se usa ese valor —
+         * permite testear handlers que dependen del caller ID sin poder
+         * re-stubear la función (Patchwork ya está cargado).
+         *
+         * Aditivo: los tests existentes que no usan el global siguen
+         * obteniendo 0 (comportamiento legacy).
+         */
+        function get_current_user_id(): int {
+            return isset( $GLOBALS['__ltms_current_uid'] ) && is_int( $GLOBALS['__ltms_current_uid'] )
+                ? $GLOBALS['__ltms_current_uid']
+                : 0;
+        }
     }
     if ( ! function_exists( 'wp_mkdir_p' ) ) {
         function wp_mkdir_p( string $dir ): bool { return is_dir( $dir ) || mkdir( $dir, 0755, true ); }

@@ -261,7 +261,7 @@ class LTMS_Fiscal_Annual_Close {
             __( "Hola %s,\n\nTu certificado de retenciones del año %d está disponible en tu panel de vendedor.\n\nResumen:\n- Total operaciones: %d\n- Ingreso bruto: $%.2f\n- Ingreso neto: $%.2f\n\nPuedes descargarlo desde: Panel → Billetera → Certificado de Retenciones\n\nEste documento es válido para tu declaración de %s.\n\n— Equipo Lo Tengo", 'ltms' ),
             $user->display_name,
             $year,
-            $cert['total_operazioni'] ?? $cert['total_operaciones'],
+            $cert['total_operaciones'],
             $cert['total_bruto'],
             $cert['total_neto'],
             $country === 'MX' ? 'ISR anual' : 'renta'
@@ -285,14 +285,41 @@ class LTMS_Fiscal_Annual_Close {
 
     /**
      * AJAX: descargar certificado de un vendor.
+     *
+     * AUDIT-CICLO1.3 P1-2 FIX: previene IDOR autenticado. Antes solo se validaba
+     * el nonce admin — cualquier usuario autenticado que consiguiera el nonce
+     * podía descargar certificados fiscales (NIT, retenciones, ingresos brutos)
+     * de cualquier vendor_id. Ahora:
+     *   - Un admin con capability `ltms_manage_platform_settings` puede descargar
+     *     el cert de cualquier vendor.
+     *   - Un vendor solo puede descargar su propio cert.
+     *   - Sin capability ni ownership → 403 (fail-closed).
      */
     public static function ajax_download_cert(): void {
         check_ajax_referer( 'ltms_admin_nonce', 'nonce' );
         $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 );
-        $year = (int) ( $_POST['year'] ?? 0 );
+        $year      = (int) ( $_POST['year'] ?? 0 );
 
         if ( ! $vendor_id || ! $year ) {
             wp_send_json_error( [ 'message' => 'Faltan parámetros' ] );
+        }
+
+        // Authorization check: admin with platform-settings capability OR own vendor cert.
+        $can_manage = current_user_can( 'ltms_manage_platform_settings' );
+        $is_owner   = is_user_logged_in() && get_current_user_id() === $vendor_id;
+        if ( ! $can_manage && ! $is_owner ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::security(
+                    'AUDIT_DOWNLOAD_CERT_BLOCKED',
+                    sprintf(
+                        'Usuario #%d intentó descargar certificado fiscal del vendor #%d sin permiso.',
+                        get_current_user_id(),
+                        $vendor_id
+                    ),
+                    [ 'caller_id' => get_current_user_id(), 'target_vendor_id' => $vendor_id, 'year' => $year ]
+                );
+            }
+            wp_send_json_error( [ 'message' => __( 'Sin permisos para descargar este certificado.', 'ltms' ) ], 403 );
         }
 
         $cert = get_user_meta( $vendor_id, '_ltms_withholding_cert_' . $year, true );
