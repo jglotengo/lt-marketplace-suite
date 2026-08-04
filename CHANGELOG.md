@@ -1,10 +1,108 @@
-# Changelog — LT Marketplace Suite
+﻿# Changelog — LT Marketplace Suite
 
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-08-03
+## [Unreleased] — 2026-08-04
+
+### Fixed — `SITEGROUND-NO-ASSERT-2026-08-04` (PHPUnit usable en SiteGround a pesar de `assert()` en `disable_functions`)
+
+> **Bloqueo de producción crítico resuelto.** SiteGround tiene `assert()` en `disable_functions`, y el flag NO es overrideable por CLI (`-d zend.assertions=1 -d assert.active=1` no reenable la función — verificado con `function_exists('assert')` → `false`). Esto rompía PHPUnit (`Call to undefined function assert()` en `vendor/sebastian/cli-parser/src/Parser.php:68`) y, peor, rompía también al propio Composer.phar global de SG (`Composer\Repository\ComposerRepository.php:175` usa `assert()`), haciendo que `composer install` no pudiera ni siquiera arrancar — *inutilizando cualquier approach `cweagans/composer-patches` autoaplicado en el server*.
+
+**Fix dump-and-serve (no depende de Composer para aplicarse):**
+
+- Patches generados desde `git diff` de vendor/ modificado (paths relativos al package para `patch -p1`):
+  - `patches/sebastian-cli-parser-no-assert.patch` (1,473 bytes) — reemplaza 3 llamadas `assert()` por `throw new \AssertionError(...)` en `vendor/sebastian/cli-parser/src/Parser.php`.
+  - `patches/phpunit-phpunit-no-assert.patch` (18,528 bytes) — reemplaza 25 llamadas `assert()` distribuidas en 12 archivos de `vendor/phpunit/phpunit/src/` (`Framework/MockObject/Matcher.php`, `Framework/TestBuilder.php`, `Framework/TestSuiteIterator.php`, `Runner/DefaultTestResultCache.php`, `Runner/Filter/Factory.php`, `Runner/Version.php`, `TextUI/Command.php`, `TextUI/TestRunner.php`, `TextUI/XmlConfiguration/Loader.php` — 11 asserts en un solo archivo), `Util/Printer.php`, `Util/Xml.php`, `Util/Xml/SchemaFinder.php`).
+- 5 `assert()` restantes intencionalmente NO parcheados: `Framework/Assert.php:2388` y `:2955` (`assertSelect` DOM tests, `step['object'] instanceof TestCase`), `Util/PHP/AbstractPhpProcess.php:332` (`$childResult instanceof TestResult` en separate-process tests), `Migration/Migrations/MoveWhitelistExcludesToCoverage.php:55` y `RemoveLogTypes.php:31` (solo se ejecutan en `--migrate-configuration`). Ninguno en el path caliente de `--group kyc`/`--testsuite=unit` runtime.
+- **vendor/ commiteado al repo ya parcheado** (commit `034dfaa1`, 22 archivos):	el `git pull origin main` en SG trae los archivos con `assert()` reemplazados directamente — no depende de `composer install`. Los patches files viajan en `patches/` como documentación del cambio aplicado (y备用 si未来 SG relaja `disable_functions` y se quiere reaplicar vía composer-patches sin recurrir al git-pull-del-vendor).
+- `composer.json`: añadido `cweagans/composer-patches ^1.7` a `require-dev` + `extra.patches` declarando los 2 patch files + plugin `cweagans/composer-patches` en `config.allow-plugins`. Útil en workstations locales (Windows con `patch.exe` en PATH = `"C:\Program Files\Git\usr\bin"`), inerte en SG (composer global muere antes de aplicarlos).
+- `composer.lock`: regenerado por `composer install` local con `cweagans/composer-patches` activado.
+
+**Resolución end-to-end en SG SSH (transcript completa:**
+
+1. `git fetch origin` (sin cambios locales pendientes)
+2. `git pull origin main` → fast-forward `f9946dd..034dfaa`, 44 archivos, trae `patches/` y vendor/ ya parcheado.
+3. `patch -p1 -d vendor/sebastian/cli-parser < patches/sebastian-cli-parser-no-assert.patch` → "Reversed (or previously applied) patch detected!" — confirma que el archivo ya estaba parcheado en disco desde el `git pull`.
+4. `php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --group kyc` → *sigue rompiendo* con `Fatal: Call to undefined function assert() in Parser.php:68`. Hipótesis: OPcache staleness.
+5. `php -r 'echo ini_get("opcache.validate_timestamps")." / ".ini_get("opcache.revalidate_freq");'` → `0 / 60`. Confirmado: SG tiene `validate_timestamps=0`; `touch` no tiene efecto, hay que vaciar el dir de cache.
+6. `find ~/.opcache -type f -delete 2>/dev/null` + `find /tmp/php-opcache-* -type f -delete 2>/dev/null` → resetea OPcache.
+7. `php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --group kyc` sin `LTMS_UNIT_ONLY` → `❌ ERROR: WP Test Suite no encontrada` (PHPUnit ahora arranca correctamente, no muere por `assert()`).
+8. `LTMS_UNIT_ONLY=true ... vendor/bin/phpunit --group kyc` (sin `--testsuite=unit`) → `Class LTMS\Tests\Integration\LTMS_Integration_Test_Case not found in tests/integration/CapsRolesIntegrationTest.php:20` — PHPUnit default-carga todos los testsuites sin `--testsuite`.
+9. **Comando canónico definitivo:**
+   ```bash
+   LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit --group kyc
+   ```
+   → OK (17 tests, 67 assertions).
+10. Suite completa:
+    ```bash
+    LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit
+    ```
+    → **OK, Tests: 3,707, Assertions: 6,549, Skipped: 3** (6:15.381, 68 MB). Idéntico al local.
+
+**Lecciones preventivas (3 nuevas en `LECCIONES_APRENDIDAS.md` #21.1/21.2/21.3):**
+
+1. `disable_functions` de PHP no es overrideable por CLI flags — la función `assert()` queda eliminada del runtime en compile-time; construir una solución que dependa de "patchear composer a runtime" es circular cuando el Composer.phar también la usa.
+2. `opcache.validate_timestamps=0` en SG exige reset manual del dir de cache (`~/.opcache`) tras cualquier edición de PHP en el server; `touch` no sirve, `revalidate_freq=60` se ignora.
+3. En SG, `LTMS_UNIT_ONLY=true` (saltea WP test bootstrap) Y `--testsuite=unit` (restringe discovery a tests/unit/) son co-dependientes — falta uno, rompe el otro.
+
+**Version bump**: aplica sobre `LTMS_VERSION` 2.9.310 (commit v2.9.310 KYC-REJECTION-SOURCE — corrige infra para que el feature sea testeable en producción). No requiere nuevo bump — el cambio en vendor/ no es visible a runtime del plugin, solo a PHPUnit.
+
+**Commits:**
+- `034dfaa1 chore(infra): SITEGROUND-NO-ASSERT-2026-08-04 — composer-patches para eliminar assert() de phpunit/cli-parser` (22 archivos, 795 insertions, 68 deletions)
+
+---
+
+### Fixed — `v2.9.310 KYC-REJECTION-SOURCE` (rechazos KYC manuales vs automáticos DIAN/SAT distinguibles en admin y email)
+
+> **Feature preexistente al ciclo SITEGROUND-NO-ASSERT** — estaba completa en working tree local, se incluyó en el commit de feature para validar commit-tipo-feature). Sin la infra `SITEGROUND-NO-ASSERT` no era testeable en producción; por eso  commits se interrelacionaron.
+
+**GAP de UX detectado:** al rechazar un KYC, el backend no distinguía `manual` (admin humano revisó y rechazó) de `auto_dian` / `auto_sat` / `auto_other` (validaciones automáticas desde APIs tributarias). El email al vendor siempre decía "nuestro equipo revisó" aunque el rechazo fuera automático. El vendor no tenía forma de saber si era un rechazo de compliance automático (reenvío KYC con corrección) vs manual (reclamar con soporte).
+
+**Fix aplicado:**
+
+- **Migración DB v2.9.17** (`includes/core/migrations/class-ltms-db-migrations.php`): `CURRENT_VERSION` 2.9.16 → 2.9.17. Nueva migración `migrate_2_9_17_kyc_rejection_source()` — `ALTER TABLE lt_vendor_kyc ADD COLUMN rejection_source ENUM('manual','auto_dian','auto_sat','auto_other') NOT NULL DEFAULT 'manual'`. Hace `backfill` de `'manual'` a filas `rejected` preexistentes (todas las anteriores son manuales — nunca existió origen automático antes de este cambio).
+- **Admin handler** (`includes/admin/class-ltms-admin-payouts.php` `ltms_reject_kyc`): leído `$_POST['source']` (default `'manual'`), sanitize con `sanitize_key()`, validación `in_array($raw_source, ['manual','auto_dian','auto_sat','auto_other'], true)` (whitelist estricto + strict comparison), persistencia en `lt_vendor_kyc.rejection_source`.
+- **Admin UI** (`includes/admin/views/html-admin-kyc.php`): nuevo `<select>` en el modal de rechazo con 4 orígenes. JS actualizado para enviar `source` junto con `reason` en el `$.post`.
+- **Email al vendor** (`templates/emails/email-kyc-rejected.php`): nuevo bloque `source-box` con label legible según origen ("nuestro equipo de compliance" / "DIAN (validación automática RUT)" / "SAT (validación automática RFC)" / "validación automática de compliance").
+- **Refactor auth handler** (`includes/frontend/class-ltms-public-auth-handler.php`): nuevo helper privado `render_email_verify_error_page(string $title, string $message, int $http_code = 400): void` que encapsula `wp_die($html, $title, ['response' => $http_code])` — reemplaza los `wp_die` inline con `[ 'response' => 429, 'back_link' => true ]` que el handler de rate-limit usaba antes. Rate limit ahora pasa `429` como `$http_code` al helper (mismo contrato semántico, peor encapsulado).
+- **UI login** (`includes/frontend/views/vendor-parts/form-login.php`): notices GET `ltms_error` y `resend_verification`; CTA UI "reenviar email de verificación" si el email no está verificado.
+- **UI register** (`includes/frontend/views/vendor-parts/form-register.php`): hints de password + clarificación copy "registro vs verificación KYC posterior" (venían confundiendo a nuevos vendors).
+- **UI home** (`includes/frontend/views/view-home.php`): banner server-side "email verificado" si `ltms_email_verified=1`.
+- **UI KYC** (`includes/frontend/views/view-kyc.php`): label "No iniciado" en lugar de "—" para estado limpio.
+- **Dashboard wrapper** (`includes/frontend/views/dashboard-wrapper.php`): removida sección inactiva `'ordi'` de la lista de secciones de Logística (limpieza de nav).
+- **Dashboard logic** (`includes/frontend/class-ltms-dashboard-logic.php`): ajustes de rate-limit de reenvío de verification (15 min ventana idéntica al handler auth).
+- **Email welcome vendor** (`templates/emails/email-welcome-vendor.php`): CTA clarifica verificación de email (antes genérico).
+- **Assets JS:**
+  - `assets/js/ltms-login-register.js` + `.min.js`: soporte UI "reenviar verificación" (modal + AJAX).
+  - `assets/js/ltms-dashboard.js` + `.min.js` + `assets/js/ltms-kyc.min.js`: bump de cache-busting sincronizado con `LTMS_VERSION`.
+- **Docs:** `AGENTS.md` y `CLAUDE.md` actualizados con notas del patrón de verificación de email (CTA + helper).
+- `lt-marketplace-suite.php`: `LTMS_VERSION` 2.9.309 → 2.9.310 (cache-busting de assets).
+
+**Tests (regla "no orphan tests" AGENTS.md §119):**
+
+- `tests/unit/KycAudit2FixTest`: actualizado para validar migración a `CURRENT_VERSION=2.9.17`.
+- `tests/unit/AuthAuditFixTest::test_02b_handle_email_verification_has_rate_limit`: test huérfano por refactor del handler. Buscaba el literal string `'response' => 429` en `class-ltms-public-auth-handler.php`, pero ese patrón ya no existe — el rate-limit ahora pasa `429` como `$http_code` al helper `render_email_verify_error_page()`. El contrato bajo test ("el rate limit debe retornar 429") sigue siendo verdadero semánticamente, pero el patrón literal cambió. Actualizado a:
+  ```php
+  $this->assertStringContainsString('render_email_verify_error_page', $body, '...');
+  $helper_pos = strpos($body, 'render_email_verify_error_page');
+  $helper_call = substr($body, $helper_pos, 200);
+  $this->assertStringContainsString('429', $helper_call, '...');
+  ```
+  Basado en `strpos` + `substr(200)` para capturar el arg aunque esté multi-line (regex `PCRE` con flag `/s` no funcionó porque el substring capturado por el primer grupo excedía 200 chars y se cortaba).
+
+**Verificación de suite completa:**
+- PHPUnit unit local: `OK, Tests: 3,707, Assertions: 6,549, Skipped: 3` (commit previo a infra no-assert — dependía de entorno con `assert()` disponible).
+- PHPUnit unit SG (post-infra no-assert + reset OPcache): **`OK, Tests: 3,707, Assertions: 6,549, Skipped: 3`** — regresión cero, idéntico al local. Cumple el umbral no-negociable ≥ 3,283 tests en verde de AGENTS.md.
+- `php -l` OK en todos los archivos PHP tocados.
+
+**Lección preventiva (entrada nueva en `LECCIONES_APRENDIDAS.md` #21):** cuando un refactor encapsula una lógica (helper nuevo con `$http_code` parametrado), cualquier test estructural que matchee el literal viejo (`'response' => 429`) queda huérfano de patrón — el contrato semántico se preserva pero la sintaxis no. Actualizar el test en el MISMO commit del refactor (regla AGENTS.md §119: "test huérfano no falla de inmediato, pero rompe suite completa en commit futuro no relacionado").
+
+**Commits:**
+- `71cc8608 feat(kyc): v2.9.310 KYC-REJECTION-SOURCE — distinguir rechazos manuales vs automaticos (DIAN/SAT)` (22 archivos, 551 insertions, 63 deletions)
+
+---
 
 ### Fixed — `KYC-CAMARA-PN-EXEMPT-2026-08-03` (matrícula Cámara de Comercio solo para persona jurídica NIT; Maria Orlinda Giraldo Gomez #208 deja de bloquearse)
 

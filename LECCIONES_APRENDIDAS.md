@@ -1,4 +1,4 @@
-# Lecciones Aprendidas — LT Marketplace Suite
+﻿# Lecciones Aprendidas — LT Marketplace Suite
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
@@ -2388,6 +2388,117 @@ Resultado: cualquier vendedor NIT jamás podía aprobar KYC (aunque subiera el P
 3. **Doctrina legal regulatory requiring "todo comerciante" o "toda persona" debe interpretarse con sus propias leyes de scope** (Código de Comercio art. 10 define comerciante). Codificar "todo X" sin el scope detail abre false positives que bloquean personas legítimas. Auditoría UIAF acepta best-effort con criterio documentado en log/info.
 4. **Addición de validador backend SIN sincronizar UI handler → siempre bug latente.** El orden correcto: añadir UI → añadir handler que persiste → añadir validador. Inverso funciona hasta el primer vendor que golpea la validación.
 5. **Tests de behaviour con `get_user_meta` mock por key** son la única forma de cubrir este caso sin integración completa. Ver `KyccCamaraPnExemptTest::invoke()` como patrón: stub de `get_user_meta` que retorna valor distinto según el key, invocar el método privado via ReflectionClass, assert sobre `true` vs `WP_Error::class`.
+
+
+
+## 21. v2.9.310 - SITEGROUND-NO-ASSERT: `assert()` en `disable_functions` + OPcache `validate_timestamps=0` (3 lecciones nuevas)
+
+> Auditoría end-to-end del despliegue v2.9.310 a SiteGround. PHPUnit moría con `Call to undefined function assert()` en runtime, patches no aplicaban, Composer.phar global de SG también roto por `assert()`. Resolución requirió: (a) commitear vendor/ ya parcheado al repo, (b) resetear OPcache manualmente, (c) usar `LTMS_UNIT_ONLY=true` + `--testsuite=unit` para evitar dependencia WP. Suite final verde (3,707 tests / 6,549 assertions / 3 skipped), idéntica al local.
+
+### Lección 21.1 — `assert()` en `disable_functions` de SiteGround invalida PHPUnit + Composer global
+
+**Contexto:**
+
+Al correr `php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --group kyc` en SSH de SiteGround, PHP moría con `Fatal error: Uncaught Error: Call to undefined function assert() in vendor/sebastian/cli-parser/src/Parser.php:68`. La línea 68 NO contenía `assert(` (ya estaba parcheada a `throw new \AssertionError('assert(is_int($i)) failed')`). El stack trace estaba desalineado respecto al código en disco.
+
+**Causa raíz:**
+
+1. **`assert()` está en `disable_functions` de SiteGround y NO es overrideable vía CLI flags.** Verificado con `php -r 'echo function_exists("assert") ? "OK" : "MISSING"'` → `MISSING`, tanto con `-d zend.assertions=1 -d assert.active=1` como sin ellos. La función es eliminada del runtime en compile-time por SG (likely vía `disable_functions` en php.ini), no deshabilitada condicionalmente. Los flags `zend.assertions` y `assert.active` controlan *si los asserts del código se evalúan*, no *si la función `assert()` está disponible*.
+
+2. **Composer.phar global de SG también usa `assert()` internamente** (`src/Composer/Repository/ComposerRepository.php:175`). Cualquier `composer install` en SG muere con `Fatal error: Call to undefined function Composer\Repository\assert()` antes de que pueda siquiera resolver dependencias, sin llegar a correr `cweagans/composer-patches`. La solución de "aplicar patches vía composer-patches" es **circularmente break** en SG — el proceso que aplicaría los patches necesita él mismo el `assert()` parcheado.
+
+3. **El fatal reportaba `Parser.php:68` pero la traza real venía de `Command.php:101`.** PHP reporta el punto de *captura* del error, no el punto de *invocación*. Cuando la traza muestra `Parser.php:68` pero en disco no hay `assert(` allí, hay que mirar la traza `Next ...` completa — el "Next" apunta al handler de nivel superior que volvió a lanzar (`Command.php:101`), que era donde efectivamente se invocaba `assert()`. Confiarse solo en la primera traza lleva a parchear el archivo incorrecto o buscar fantasmas.
+
+**Fix aplicado:**
+
+- **Commitear `vendor/` ya parcheado al repo** (commit `034dfaa1`). Como `vendor/` está trackeado en este proyecto (inusual para un plugin WP pero válido), un `git pull` trae los archivos con `assert()` reemplazados por `throw new \AssertionError(...)` directamente — sin necesidad de correr `composer install`. Los .patch files viajan en `patches/` solo como documentación del cambio aplicado (y por si en el futuro SG cambia de política de `disable_functions`).
+- Patches generados desde git diff de vendor modificado:
+  - `patches/sebastian-cli-parser-no-assert.patch` (1,473 bytes, 4 hunks — reemplaza 3 llamadas `assert()` por `throw new \AssertionError(...)` en `Parser.php`).
+  - `patches/phpunit-phpunit-no-assert.patch` (18,528 bytes, 27 hunks — reemplaza 25 llamadas `assert()` distribuidas en 12 archivos de phpunit).
+  - 5 `assert()` intencionalmente NO parcheados: `Framework/Assert.php:2388` y `:2955` (solo se ejecutan en `assertSelect`.DOM tests y step tests), `Util/PHP/AbstractPhpProcess.php:332` (solo en separate-process tests), `Migration/Migrations/MoveWhitelistExcludesToCoverage.php:55` y `RemoveLogTypes.php:31` (solo en `--migrate-configuration`). Todos en paths no-calientes del runtime phpunit.
+- Validado en server: `grep -rn "^[[:space:]]*assert(" vendor/phpunit/phpunit/src/` devuelve exactamente esos 5, todos en paths fuera del flujo `--group kyc`/`--testsuite=unit` estándar.
+
+**Regla preventiva:**
+
+1. **`disable_functions` de PHP no es overrideable por CLI flags.** `php -d disable_functions=` no remueve funciones — las flags solo cambian .ini values para valores que admiten override; `disable_functions` es `PHP_INI_SYSTEM` y se fija al arrancar PHP. Si una función del core (`assert`, `exec`, `shell_exec`, `system`, `passthru`, `mail`, etc.) está bloqueada, NO hay override de CLI posible — hay que evitar el código que la llama o mover ese runtime a un servidor sin la restricción.
+
+2. **Cuando una restricción del runtime bloquea la herramienta que la parchearía, el flujo es circular.** No intentar resolverlo encadenando versiones más nuevas del Composer.phar (random composer releases también usan `assert()`). La salida es aplicar el parche por otra vía que no dependa del runtime bloqueado — en este caso, commitear los archivos parcheados al repo y servirlos vía `git pull`, no `composer install`.
+
+3. **El stack trace de PHP reporta el capturador, no el invocador.** Cuando un fatal dice `in file.php:LINE` y esa línea no contiene la función supuestamente inválida, mirar TODA la traza — especialmente el bloque `Next ...` que es el handler superior. No gastar tiempo parcheando archivo que la traza apunta si grep confirma que no contiene el pattern problemático; buscar el invocador real en la traza #0..#N.
+
+### Lección 21.2 — `opcache.validate_timestamps=0` en SiteGround requiere reset manual tras editar vendor/
+
+**Contexto:**
+
+Tras aplicar los patches vía `git pull` (con vendor/ ya parcheado en el repo), `phpunit --group kyc` seguía rompiendo con el MISMO `Fatal: Call to undefined function assert() in Parser.php:68`, aunque `grep` y `php -r 'echo file_get_contents(...)'` confirmaban que `Parser.php` en disco ya tenía `throw new \AssertionError(...)` en lugar de `assert()`.
+
+**Causa raíz:**
+
+- **SiteGround tiene `opcache.validate_timestamps=0` y `opcache.revalidate_freq=60`.** Verificado con `php -r 'echo ini_get("opcache.validate_timestamps") . " / " . ini_get("opcache.revalidate_freq");'` → `0 / 60`. Con `validate_timestamps=0`, OPcache **nunca revalida** los archivos tocados/modificados — el bytecode queda cacheado hasta que se vacía explícitamente el dir de cache o se reinicia PHP-FPM.
+- `touch vendor/sebastian/cli-parser vendor/phpunit/phpunit -name "*.php" -exec touch {} +` **NO fue suficiente** — el `touch` solo actualiza mtime, pero OPcache con `validate_timestamps=0` ignora mtime. PHP siguió sirviendo el bytecode antiguo (con `assert(is_int($i))`) en lugar del nuevo (`throw new \AssertionError(...)`).
+- Esto generó una contradicción aparente: el archivo en disco estaba parcheado (`grep` lo confirma), pero el runtime ejecutaba el código antiguo. PHP informó el fatal en la línea que el bytecode cacheado apuntaba, no la línea que el archivo tenía.
+
+**Fix aplicado:**
+
+```bash
+find ~/.opcache -type f -delete 2>/dev/null
+find /tmp/php-opcache-* -type f -delete 2>/dev/null
+```
+
+Tras esos dos deletes, `phpunit --group kyc` arrancó correctamente (fatal de `assert()` desapareció). El OPcache se rehidrató desde los archivos en disco (ya parcheados) y se ejecutó el código correcto. **No hubo que reiniciar PHP-FPM** (probablemente "orgánico" en shared hosting, no permitido).
+
+**Regla preventiva:**
+
+1. **`opcache.validate_timestamps=0` implica que TODO cambio a vendor/ o includes/ en SG requiere reset del dir de cache.** No sirve `touch`, no sirve esperar 60 segundos de `revalidate_freq` (ese flag es ignorado cuando validate_timestamps=0). El comando a correr tras cualquier edición de PHP en el servidor:
+   ```bash
+   find ~/.opcache -type f -delete 2>/dev/null
+   find /tmp/php-opcache-* -type f -delete 2>/dev/null
+   ```
+2. **Considerar abrir ticket de SiteGround** pidiendo `opcache.validate_timestamps=1` para la cuenta — root causal de bleed de cache tras deploys. En shared hosting rara vez lo cambian, pero el ticket es evidencia de cliente.
+3. **Symptom único para diferenciar OPcache staleness de bug real**: un PHP fatal que apunta a línea que grep confirma está limpia en disco = casi siempre OPcache cacheado. Confirmar con `php -r 'echo file_get_contents($f);'` (que bypassa OPcache porque leeArchivo directo) vs. la traza del fatal. Si difieren, es OPcache.
+4. **Para tests SSH en SG, siempre correr LTMS con cache flush pre-test.** El comando estándar en SG debe ser:
+   ```bash
+   find ~/.opcache -type f -delete 2>/dev/null
+   LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit --group kyc
+   ```
+
+### Lección 21.3 — `--testsuite=unit` requerido en SG, sin WP test suite disponible
+
+**Contexto:**
+
+Tras corregir OPcache, `phpunit --group kyc` siguió fallando con `❌ ERROR: WP Test Suite no encontrada. Ejecuta primero: bash bin/install-wp-tests.sh wordpress_test root root 127.0.0.1 latest`. Al agregar `LTMS_UNIT_ONLY=true` (usado exitosamente en local), PHPUnit empezó a parsear tests y morir con `Class "LTMS\Tests\Integration\LTMS_Integration_Test_Case" not found in tests/integration/CapsRolesIntegrationTest.php:20`.
+
+**Causa raíz:**
+
+1. **`LTMS_UNIT_ONLY=true` solo saltea la carga de WordPress test suite**, NO restringe qué testsuite de phpunit se ejecuta. Sin `--testsuite=unit`, PHPUnit mapea **TODOS** los testsuites definidos en `phpunit.xml` (`unit`, `integration`, `all`) como un único `TestSuite` y `addTestFile()` cada archivo, incluyendo `tests/integration/CapsRolesIntegrationTest.php` que hace `extends LTMS_Integration_Test_Case`. En modo UNIT_ONLY esa clase base no está cargada (solo se carga cuando WP test suite inicializa), ergo fatal.
+
+2. **`phpunit.xml` define los 3 testsuites separados:**
+   ```xml
+   <testsuite name="unit"><directory suffix="Test.php">tests/unit</directory></testsuite>
+   <testsuite name="integration"><directory suffix="Test.php">tests/integration</directory></testsuite>
+   <testsuite name="all"><directory suffix="Test.php">tests/unit</directory><directory suffix="Test.php">tests/integration</directory></testsuite>
+   ```
+   Pero sin `--testsuite=N`, PHPUnit default es ejecutarlos todos unificados — aunque solo le pidas un `--group`.
+
+3. **Localmente no se vio porque las costumbres del dev eran siempre `--testsuite=unit --group X`**, no `--group X` solo. Al llevarlo a SG con menos confianza, se probó sin `--testsuite=` y saltó el agujero de cargar tests/integration/ en modo UNIT_ONLY.
+
+**Fix aplicado:**
+
+- Comando estándar SG para correr tests (documentado en CLAUDE.md):
+  ```bash
+  LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit --group kyc
+  ```
+- Para suite completa:
+  ```bash
+  LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit
+  ```
+- NO correr `phpunit --group X` (sin `--testsuite=unit`) en modo UNIT_ONLY — siempre fallará al toparse con tests/integration.
+
+**Regla preventiva:**
+
+1. `LTMS_UNIT_ONLY=true` y `--testsuite=unit` son **co-dependientes** en SG. Solo el primero restringe el bootstrap (no carga WP); solo el segundo restringe el descubrimiento de tests (no evalúa tests/integration/). Faltar cualquiera rompe en SG.
+2. **`phpunit.xml` con múltiples testsuites + `--group` sin `--testsuite` es footgun.** PHPUnit starts todos los testsuites y luego filtra por grupo, forzando el load de todos los archivos (incluyendo tests de integración que pueden tener dependencias no disponibles). Siempre usar ambos flags juntos en hosts restrictivos.
+3. **Documentar el comando canónico en CLAUDE.md** para que futuros sessiones no redescubran el combo correcto por trial/error. Ver entrada nueva en `CLAUDE.md → Operación en SiteGround SSH`.
 
 
 

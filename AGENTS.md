@@ -15,21 +15,44 @@
   ```bash
   # Local (entorno dev con zend.assertions=1):
   ./vendor/bin/phpunit --configuration phpunit.xml
-  # SiteGround SSH (zend.assertions=-1 por defecto — requiere override o falla con
-  # "Call to undefined function assert()" en sebastian/cli-parser):
-  php -d zend.assertions=1 -d assert.active=1 ./vendor/bin/phpunit --configuration phpunit.xml
+  # SiteGround SSH (assert() deshabilitado en disable_functions + WP test suite no
+  # disponible + opcache.validate_timestamps=0 — ver CLAUDE.md "Operación en SG"):
+  # 1) Reset OPcache si tocaste vendor/ o includes/ tras el último pull:
+  find ~/.opcache -type f -delete 2>/dev/null
+  find /tmp/php-opcache-* -type f -delete 2>/dev/null
+  # 2) Suite completa (3,707 tests, ~6 min):
+  LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit \
+    --configuration phpunit.xml --testsuite=unit
   ```
 - Correr un solo grupo de tests:
   ```bash
-  ./vendor/bin/phpunit --group kyc
-  ./vendor/bin/phpunit --group commissions
-  ./vendor/bin/phpunit --group aveonline
+  # Local:
+  ./vendor/bin/phpunit --testsuite=unit --group kyc
+  ./vendor/bin/phpunit --testsuite=unit --group commissions
+  ./vendor/bin/phpunit --testsuite=unit --group aveonline
+  # SiteGround SSH:
+  LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit \
+    --configuration phpunit.xml --testsuite=unit --group kyc
   ```
-  > En SiteGround SSH, anteponer `php -d zend.assertions=1 -d assert.active=1` a cada invocación de phpunit (ver nota arriba).
+  > ⚠️ **En SG: `LTMS_UNIT_ONLY=true` y `--testsuite=unit` son co-dependientes** — falta
+  > uno y rompe el otro. Sin `LTMS_UNIT_ONLY`, PHPUnit muere buscando WP test suite. Sin
+  > `--testsuite=unit`, PHPUnit default-carga `tests/integration/` que requiere
+  > `LTMS_Integration_Test_Case` (clase no disponible en modo UNIT_ONLY) y muere con
+  > `Class not found`. Ver `LECCIONES_APRENDIDAS.md` #21.3. No correr `phpunit --group X`
+  > sin `--testsuite=unit` — default-carga TODOS los testsuites y filtra después.
 - Lint / typecheck (sintaxis PHP):
   ```bash
   php -l /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/<archivo>.php
   ```
+
+> **Nota sobre composer install en SG**: `assert()` está en `disable_functions` y también
+> rompe el Composer.phar global de SG (`Composer\Repository\ComposerRepository.php:175`
+> usa `assert()`). Cualquier `composer install` en SG muere antes de resolver dependencias
+> — no se puede confiar en `cweagans/composer-patches` para aplicar patches en el server.
+> Los archivos parcheados viajan commiteados a `vendor/` (que está trackeado en este repo)
+> y el `git pull` los entrega ya parchados. Los patch files en `patches/` sirven como
+> documentación del cambio y para entornos locales (Windows con `patch.exe` en PATH),
+> no para auto-aplicación en SG.
 
 ## Flujo de trabajo obligatorio: Explorar → Planificar → Ejecutar → Revisar
 No saltes directo a editar código, ni siquiera en tareas que parezcan simples.

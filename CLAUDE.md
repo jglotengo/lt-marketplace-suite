@@ -448,6 +448,78 @@ SiteGround WAF bloquea `/wp-admin/admin-ajax.php` con HTTP 403 cuando la request
 
 ---
 
+## Operación en SiteGround SSH (notas v2.9.310+)
+
+> Restricciones de runtime de SiteGround que afectan desarrollo y operación del plugin.
+
+### `assert()` en `disable_functions` — no overrideable por CLI
+
+SiteGround elimina `assert()` del runtime de PHP en compile-time. `php -d zend.assertions=1 -d assert.active=1` NO re-enable la función — `function_exists('assert')` devuelve `false` pase lo que pase. Esto rompía PHPUnit y Composer.phar global.
+
+**Mitigación:** los archivos `vendor/phpunit/phpunit/src/**` y `vendor/sebastian/cli-parser/src/Parser.php` están commiteados al repo ya parcheados (`throw new \AssertionError(...)` en lugar de `assert(...)`). Un `git pull` los trae directamente — no se depende de `composer install` para aplicar los patches en el server. Ver commits `034dfaa1` y `patches/*.patch`.
+
+### OPcache con `validate_timestamps=0` — reset manual tras editar PHP
+
+SiteGround tiene `opcache.validate_timestamps=0` y `revalidate_freq=60`. Esto significa que editar archivos PHP en el server NO se refleja en runtime hasta que se vacía el dir de cache de OPcache. `touch` no sirve — hay que borrar los archivos de cache directamente:
+
+```bash
+find ~/.opcache -type f -delete 2>/dev/null
+find /tmp/php-opcache-* -type f -delete 2>/dev/null
+```
+
+Correr esto **antes de cada sesión de tests SSH** en SG, especialmente tras `git pull` que haya modificado archivos `vendor/` o `includes/`.
+
+Considerar abrir ticket a Site Tools pidiendo `opcache.validate_timestamps=1` para la cuenta — probador root causal del bleed de cache tras deploys. En shared hosting rara vez lo cambian, pero el ticket es evidencia de cliente.
+
+### PHPUnit en SG — comando canónico
+
+SiteGround NO tiene WordPress test suite instalada (a diferencia del entorno local con `bin/install-wp-tests.sh`). Para correr tests unit en SG:
+
+```bash
+# Setup necesario: LTMS_UNIT_ONLY=true (saltea bootstrap WP) + --testsuite=unit (restringe discovery)
+LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit --group kyc
+```
+
+**Ambos flags son co-dependientes.** `LTMS_UNIT_ONLY=true` solo saltea el bootstrap de WP, pero PHPUnit default-carga TODOS los testsuites definidos en `phpunit.xml` (`unit`, `integration`, `all`); si falta `--testsuite=unit`, intentará `addTestFile()` archivos de `tests/integration/` que heredan `LTMS_Integration_Test_Case` — clase no disponible en modo UNIT_ONLY — y morirá con `Class not found`. Viceversa, `--testsuite=unit` solo sin `LTMS_UNIT_ONLY=true` morirá buscando `WP_Test_Suite`.
+
+Para suite completa unit en SG:
+```bash
+LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit
+```
+
+Resultado baseline v2.9.310: `OK, Tests: 3,707, Assertions: 6,549, Skipped: 3` (~6 min, 68 MB).
+
+### Secuencia canónica de verificación post-deploy en SG SSH
+
+Tras un commit que toque `vendor/`, `includes/`, o archivos PHP del plugin:
+
+```bash
+cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
+git fetch origin
+git pull origin main
+find ~/.opcache -type f -delete 2>/dev/null
+find /tmp/php-opcache-* -type f -delete 2>/dev/null
+LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit
+```
+
+Si el último comando dice `OK, Tests: ≥3,283, Assertions: ...` — deploying validado.
+
+**Smoke test rápido (`--group kyc`, 17 tests, ~3s):**
+```bash
+LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit --configuration phpunit.xml --testsuite=unit --group kyc
+```
+
+### Limpieza de archivos basura creados por pegado de texto en bash
+
+Si durante SSH pegas output de chat con newlines y espacios, bash puede interpretar palabras como comandos y crear archivos con nombres extraños (`=5`, `tatus`, `pecialmente ...`). Limpieza:
+
+```bash
+find . -maxdepth 1 -type f \( -name '=5' -o -name 'tatus' -o -name 'pecialmente*' \) -delete
+git status --short
+```
+
+---
+
 ## Notas de auditoría abiertas (a validar, no confirmadas en producción)
 
 - `ltms-caps-fix.php` (parche de capabilities de administrador) — el propio Claude no puede verificar en runtime porque todo el tráfico HTTP saliente hacia `lo-tengo.com.co` desde este entorno devuelve 403; Active Soy debe confirmar desde su navegador o SSH.
