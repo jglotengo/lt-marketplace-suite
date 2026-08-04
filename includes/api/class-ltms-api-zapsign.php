@@ -198,13 +198,13 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return array{status: string, signers: array}
      */
     public function get_document_status( string $doc_token ): array {
-        // INTEGRATIONS-AUDIT P1 FIX: validate doc_token format (UUID-shaped).
-        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $doc_token ) ) {
-            return [
-                'status'  => 'error',
-                'signers' => [],
-                'error'   => '[zapsign] doc_token inválido.',
-            ];
+        // INTEGRATIONS-AUDIT P1 FIX + AUDIT-API-ZAPSIGN-001 (Ciclo 1.4 P1):
+        // validación de doc_token extraída a helper reutilizable. Antes sólo
+        // este método validaba; download_signed_document y delete_document
+        // omitían el check → path traversal potencial en URLs ZapSign.
+        $token_check = $this->validate_doc_token( $doc_token );
+        if ( $token_check !== null ) {
+            return $token_check;
         }
         $response = $this->perform_request( 'GET', '/docs/' . $doc_token . '/' );
 
@@ -234,6 +234,13 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return string Base64 del PDF firmado.
      */
     public function download_signed_document( string $doc_token ): string {
+        // AUDIT-API-ZAPSIGN-001 (Ciclo 1.4 P1): validar doc_token antes de
+        // construir el path (igual que get_document_status). Antes este método
+        // omitía el check → URL arbitraria potencial via /docs/{token}/download/.
+        $token_check = $this->validate_doc_token( $doc_token );
+        if ( $token_check !== null ) {
+            return '';
+        }
         $response = $this->perform_request( 'GET', '/docs/' . $doc_token . '/download/' );
         return $response['base64_pdf'] ?? '';
     }
@@ -245,6 +252,13 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
      * @return bool
      */
     public function delete_document( string $doc_token ): bool {
+        // AUDIT-API-ZAPSIGN-001 (Ciclo 1.4 P1): validar doc_token antes de
+        // construir el path DELETE. Antes omitía el check → DELETE a path
+        // arbitrario potencial via /docs/{token}/.
+        $token_check = $this->validate_doc_token( $doc_token );
+        if ( $token_check !== null ) {
+            return false;
+        }
         $response = $this->perform_request( 'DELETE', '/docs/' . $doc_token . '/' );
         return empty( $response ) || isset( $response['deleted'] );
     }
@@ -530,5 +544,31 @@ final class LTMS_Api_Zapsign extends LTMS_Abstract_API_Client {
             ];
         }
         return $out;
+    }
+
+    /**
+     * Valida el formato de un doc_token de ZapSign.
+     *
+     * AUDIT-API-ZAPSIGN-001 (Ciclo 1.4 P1): centraliza la validación de
+     * doc_token que antes era inline sólo en get_document_status(), y la
+     * extiende a download_signed_document() y delete_document().
+     *
+     * El formato aceptado es `[A-Za-z0-9_-]{1,128}` (UUID-shaped u otros
+     * tokens alfanuméricos seguros para paths URL). Rechaza slashes, dots,
+     * CRLF y cualquier char que permita path traversal.
+     *
+     * @param string $doc_token Token a validar.
+     * @return array|null Array de error si inválido (con misma forma que
+     *                    get_document_status devuelve), o null si válido.
+     */
+    private function validate_doc_token( string $doc_token ): ?array {
+        if ( ! preg_match( '/^[A-Za-z0-9_-]{1,128}$/', $doc_token ) ) {
+            return [
+                'status'  => 'error',
+                'signers' => [],
+                'error'   => '[zapsign] doc_token inválido.',
+            ];
+        }
+        return null;
     }
 }

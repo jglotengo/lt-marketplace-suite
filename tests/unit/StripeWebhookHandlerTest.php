@@ -443,6 +443,86 @@ class StripeWebhookHandlerTest extends TestCase
         $this->assertNull( $result );
     }
 
+    // ------------------------------------------------------------------ //
+    //  AUDIT-GATEWAY-STRIPE-002 (Ciclo 1.4 P0-3): webhook respeta flag
+    //  _ltms_stripe_payment_captured='yes' seteado por process_payment.
+    //  En ese caso NO debe llamarse payment_complete() ni add_order_note().
+    // ------------------------------------------------------------------ //
+
+    public function test_handle_payment_intent_succeeded_skips_when_already_captured(): void {
+        // Simula un pedido ya marcado por process_payment (race condition path).
+        $order = new class extends \WC_Order {
+            public function is_paid(): bool { return false; }
+            public function get_meta( string $key, bool $single = true ): mixed {
+                if ( $key === '_ltms_stripe_payment_captured' ) {
+                    return 'yes';
+                }
+                return '';
+            }
+            public function get_id(): int { return 42; }
+            // Sentinelas para detectar si el webhook intenta capturar de nuevo.
+            public bool $payment_complete_called = false;
+            public bool $add_order_note_called  = false;
+            public function payment_complete( $transaction_id = '' ): bool {
+                $this->payment_complete_called = true;
+                return true;
+            }
+            public function add_order_note( string $note, int $is_customer = 0 ): int {
+                $this->add_order_note_called = true;
+                return 1;
+            }
+        };
+
+        // Stub find_order_by_payment_intent para devolver nuestro order.
+        \Brain\Monkey\Functions\stubs( [ 'wc_get_orders' => static fn() => [ $order ] ] );
+
+        // Capturar si LTMS_Core_Logger::info es invocado (es lo que esperamos
+        // en lugar de payment_complete). Como LTMS_Core_Logger es clase statica,
+        // usamos reflection en el handler directamente.
+        $ref = new \ReflectionMethod( \LTMS_Stripe_Webhook_Handler::class, 'handle_payment_intent_succeeded' );
+        $ref->setAccessible( true );
+        $ref->invoke( null, [ 'id' => 'pi_test_already_captured' ] );
+
+        $this->assertFalse(
+            $order->payment_complete_called,
+            'AUDIT-GATEWAY-STRIPE-002: payment_complete() NO debe llamarse cuando _ltms_stripe_payment_captured=yes'
+        );
+        $this->assertFalse(
+            $order->add_order_note_called,
+            'AUDIT-GATEWAY-STRIPE-002: add_order_note() NO debe llamarse cuando ya capturado'
+        );
+    }
+
+    public function test_handle_payment_intent_succeeded_captures_when_not_already_captured(): void {
+        // Path inverso: meta vacío → webhook procede normalmente.
+        $order = new class extends \WC_Order {
+            public function is_paid(): bool { return false; }
+            public function get_meta( string $key, bool $single = true ): mixed {
+                return ''; // No capturado todavía
+            }
+            public function get_id(): int { return 43; }
+            public bool $payment_complete_called = false;
+            public function payment_complete( $transaction_id = '' ): bool {
+                $this->payment_complete_called = true;
+                return true;
+            }
+            public function add_order_note( string $note, int $is_customer = 0 ): int {
+                return 1;
+            }
+        };
+
+        \Brain\Monkey\Functions\stubs( [ 'wc_get_orders' => static fn() => [ $order ] ] );
+
+        $ref = new \ReflectionMethod( \LTMS_Stripe_Webhook_Handler::class, 'handle_payment_intent_succeeded' );
+        $ref->setAccessible( true );
+        $ref->invoke( null, [ 'id' => 'pi_test_not_captured' ] );
+
+        $this->assertTrue(
+            $order->payment_complete_called,
+            'Path happy: payment_complete() SÍ debe llamarse cuando meta está vacío'
+        );
+    }
+
     // ── display_amount: full currency suite ───────────────────────────────
 
     /** @dataProvider displayAmountFullProvider */

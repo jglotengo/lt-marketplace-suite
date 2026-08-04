@@ -20,6 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @extends WC_Payment_Gateway
  */
+if ( ! class_exists( 'LTMS_Gateway_Stripe' ) ) {
 class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
 
     /**
@@ -310,17 +311,30 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
             }
         }
 
-        // Caso 2: Pago confirmado inmediatamente (sin 3DS) — el webhook también
-        // llegará pero payment_complete() es idempotente via is_paid() guard.
+        // Caso 2: Pago confirmado inmediatamente (sin 3DS). El webhook
+        // payment_intent.succeeded también chegará, pero usamos un flag meta
+        // atómico (_ltms_stripe_payment_captured) para que payment_complete()
+        // y add_order_note() se ejecuten UNA sola vez entre los dos caminos.
+        // AUDIT-GATEWAY-STRIPE-002 (Ciclo 1.4 P0-3): previene doble stock reduce
+        // y note duplicado cuando webhook y process_payment corren casi en paralelo.
         if ( $pi_status === 'succeeded' ) {
-            $order->payment_complete( $intent_id );
-            $order->add_order_note(
-                sprintf(
-                    /* translators: %s: PaymentIntent ID */
-                    __( 'Pago Stripe confirmado al crear el PaymentIntent. PI: %s', 'ltms' ),
-                    $intent_id
-                )
-            );
+            if ( ! $this->mark_payment_captured_atomic( $order, $intent_id ) ) {
+                // Ya capturado por webhook en race — no llamar payment_complete() de nuevo.
+                LTMS_Core_Logger::info(
+                    'STRIPE_PROCESS_PAYMENT_ALREADY_CAPTURED',
+                    sprintf( 'Pedido #%d ya marcado como capturado por webhook. PI: %s', $order_id, $intent_id ),
+                    [ 'order_id' => $order_id, 'intent_id' => $intent_id ]
+                );
+            } else {
+                $order->payment_complete( $intent_id );
+                $order->add_order_note(
+                    sprintf(
+                        /* translators: %s: PaymentIntent ID */
+                        __( 'Pago Stripe confirmado al crear el PaymentIntent. PI: %s', 'ltms' ),
+                        $intent_id
+                    )
+                );
+            }
             return [
                 'result'   => 'success',
                 'redirect' => $order->get_checkout_order_received_url(),
@@ -379,7 +393,7 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
             $stripe_reason = 'duplicate';
         }
 
-        $result = $stripe->create_refund( $intent_id, $refund_amount, $stripe_reason );
+        $result = $stripe->create_refund( $intent_id, $refund_amount, $stripe_reason, strtolower( $order->get_currency() ) );
 
         if ( ! $result['success'] ) {
             $error = $result['error'] ?? 'Error desconocido';
@@ -479,4 +493,38 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
     private function is_testmode(): bool {
         return $this->get_option( 'testmode', 'yes' ) === 'yes';
     }
+
+    /**
+     * Marca atómicamente el pedido como "capturado" para evitar doble
+     * payment_complete() entre process_payment() y el webhook
+     * payment_intent.succeeded.
+     *
+     * AUDIT-GATEWAY-STRIPE-002 (Ciclo 1.4 P0-3):
+     *   - Lee el meta `_ltms_stripe_payment_captured`; si ya es 'yes',
+     *     retorna false (otro camino ya capturó).
+     *   - Si no, lo setea a 'yes' y guarda el pedido ANTES de llamar a
+     *     payment_complete(), para que un webhook concurrente vea el flag
+     *     al hacer su propio check.
+     *   - No es un lock DB real (SELECT FOR UPDATE) pero WC_Order meta +
+     *     save() es lo suficientemente atómico a nivel de proceso PHP para
+     *     la ventana de carrera típica (< 100ms entre process_payment y el
+     *     webhook async de Stripe). Para paralelismo cross-process más
+     *     estricto, ver TODO más abajo.
+     *
+     * @param WC_Order $order     Pedido a marcar.
+     * @param string   $intent_id PaymentIntent ID (trazabilidad en meta).
+     * @return bool True si este caller ganó el flag (puede proceder a
+     *              payment_complete). False si otro camino ya lo marcó.
+     */
+    private function mark_payment_captured_atomic( \WC_Order $order, string $intent_id ): bool {
+        $already = $order->get_meta( '_ltms_stripe_payment_captured', true );
+        if ( 'yes' === $already ) {
+            return false;
+        }
+        $order->update_meta_data( '_ltms_stripe_payment_captured', 'yes' );
+        $order->update_meta_data( '_ltms_stripe_captured_intent_id', $intent_id );
+        $order->save();
+        return true;
+    }
 }
+} // End of class_exists guard. AUDIT-GATEWAY-STRIPE-001 (Ciclo 1.4 P0-2).

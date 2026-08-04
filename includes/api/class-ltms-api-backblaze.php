@@ -138,12 +138,9 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         // INTEGRATIONS-AUDIT P0 FIX (path traversal + Sig V4 mismatch):
         // Validate bucket name and object key, then URI-encode the key path
         // segments so the wire URL matches the AWS Sig V4 canonical URI.
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
-        }
-        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
-        }
+        // AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1): validación extraída a helper
+        // reutilizable validate_bucket_and_key() — antes era inline.
+        $this->validate_bucket_and_key( $bucket, $key );
         $encoded_key = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
         $path        = '/' . $bucket . '/' . $encoded_key;
 
@@ -215,12 +212,17 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
 
         $etag = trim( wp_remote_retrieve_header( $response, 'etag' ), '"' );
 
+        // AUDIT-API-BACKBLAZE-001 (Ciclo 1.4 P1): la key 'Location' estaba
+        // duplicada en el array (L220 encoded + L223 sin encode). PHP silencia
+        // la segunda sobre la primera, así que el caller recibía la URL NO
+        // encoded (con espacios/acentos rotos). Ahora hay una sola clave
+        // 'Location' con la URL canonical encoded (`$path` ya tiene el
+        // `$encoded_key` con rawurlencode por segmento).
         return [
             'ETag'     => $etag,
             'Location' => $this->api_url . $path,
             'Bucket'   => $bucket,
             'Key'      => $key,
-            'Location' => $this->api_url . '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' ),
         ];
     }
 
@@ -236,7 +238,16 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @return string URL pre-firmada lista para usar.
      */
     public function get_signed_url( string $bucket, string $key, int $ttl = 3600 ): string {
-        $path   = '/' . trim( $bucket, '/' ) . '/' . ltrim( $key, '/' );
+        // AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1): validación de bucket/key con
+        // las mismas regex que upload_file/download_file/delete_file/list_files.
+        // Antes se construía el path con `trim`/`ltrim` directo → un key con
+        // `..` producía path traversal en la canonical request y la URL firmada
+        // apuntaba a otro objeto del bucket. Las URLs pre-firmadas se comparten
+        // con usuarios finales (descarga de contratos), así que el impacto es
+        // leak de archivos ajenos.
+        $this->validate_bucket_and_key( $bucket, $key );
+        $encoded_key = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
+        $path         = '/' . $bucket . '/' . $encoded_key;
         $now    = new \DateTimeImmutable( 'now', new \DateTimeZone( 'UTC' ) );
         $date   = $now->format( 'Ymd' );
         $amzdate = $now->format( 'Ymd\THis\Z' );
@@ -301,12 +312,8 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException Si la descarga falla.
      */
     public function download_file( string $bucket, string $key ): string {
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
-        }
-        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
-        }
+        // AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1): validación unificada via helper.
+        $this->validate_bucket_and_key( $bucket, $key );
         $encoded_key = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
         $path        = '/' . $bucket . '/' . $encoded_key;
 
@@ -340,13 +347,9 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
     }
 
     public function delete_file( string $bucket, string $key ): bool {
-        // INTEGRATIONS-AUDIT P0 FIX: validate bucket + key (same as upload_file).
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
-        }
-        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
-        }
+        // INTEGRATIONS-AUDIT P0 FIX + AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1):
+        // validación de bucket + key extraída a helper reutilizable.
+        $this->validate_bucket_and_key( $bucket, $key );
         $encoded_key    = implode( '/', array_map( 'rawurlencode', explode( '/', $key ) ) );
         $path           = '/' . $bucket . '/' . $encoded_key;
         $signed_headers = $this->sign_request( 'DELETE', $path, [], '' );
@@ -381,10 +384,10 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
      * @throws \RuntimeException Si el listado falla.
      */
     public function list_files( string $bucket, string $prefix = '' ): array {
-        // INTEGRATIONS-AUDIT P0 FIX: validate bucket name.
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
-            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
-        }
+        // INTEGRATIONS-AUDIT P0 FIX + AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1):
+        // validación de bucket extraída a helper. Aquí no hay key (sólo prefix)
+        // pero el bucket debe validarse igualmente.
+        $this->validate_bucket( $bucket );
         $endpoint = '/' . $bucket . '?list-type=2&prefix=' . rawurlencode( $prefix );
         $path     = '/' . $bucket;
         $qs       = 'list-type=2&prefix=' . rawurlencode( $prefix );
@@ -537,6 +540,51 @@ class LTMS_Api_Backblaze extends LTMS_Abstract_API_Client {
         $final_headers['x-amz-content-sha256']   = $payload_hash;
 
         return $final_headers;
+    }
+
+    /**
+     * Valida bucket name contra regex B2 naming.
+     *
+     * AUDIT-API-BACKBLAZE-002 (Ciclo 1.4 P1): extrae la validación de bucket
+     * repetida en 5 métodos (upload/download/delete/list/get_signed_url) en
+     * un único helper para garantizar consistencia. Antes get_signed_url NO
+     * validaba → URLs pre-firmadas path-traversal.
+     *
+     * @param string $bucket Nombre del bucket.
+     * @throws \InvalidArgumentException Si bucket es inválido.
+     * @return void
+     */
+    private function validate_bucket( string $bucket ): void {
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/i', $bucket ) ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid bucket name: ' . $bucket );
+        }
+    }
+
+    /**
+     * Valida object key contra path traversal y CRLF injection.
+     *
+     * @param string $key Clave (ruta) del objeto.
+     * @throws \InvalidArgumentException Si key es inválida.
+     * @return void
+     */
+    private function validate_object_key( string $key ): void {
+        if ( '' === $key || preg_match( '#/\.\.(/|$)|^\.\./#', $key ) || strpbrk( $key, "\r\n" ) !== false ) {
+            throw new \InvalidArgumentException( '[backblaze] Invalid object key' );
+        }
+    }
+
+    /**
+     * Valida bucket + key juntos (conveniencia para métodos que operan sobre
+     * un objeto específico: upload/download/delete/get_signed_url).
+     *
+     * @param string $bucket Nombre del bucket.
+     * @param string $key    Clave (ruta) del objeto.
+     * @throws \InvalidArgumentException Si bucket o key son inválidos.
+     * @return void
+     */
+    private function validate_bucket_and_key( string $bucket, string $key ): void {
+        $this->validate_bucket( $bucket );
+        $this->validate_object_key( $key );
     }
 
     /**

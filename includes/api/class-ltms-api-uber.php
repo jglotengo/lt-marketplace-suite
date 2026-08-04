@@ -229,10 +229,22 @@ class LTMS_Api_Uber extends LTMS_Abstract_API_Client {
      * reintenta la petición UNA vez. Si el refresh o el reintento falla, se
      * propaga la excepción original al caller.
      *
-     * @param string $method    Método HTTP (GET, POST, PUT, DELETE, PATCH).
+     * AUDIT-API-UBER-001 (Ciclo 1.4 P1): nota técnica sobre idempotencia.
+     * El retry tras 401 reenvía el MISMO `Idempotency-Key` (porque `$headers`
+     * se pasa idéntico a la segunda llamada `parent::perform_request`). Esto
+     * es CORRECTO por diseño: si el primer request fue procesado por Uber y
+     * el 401 vino por race de token al validar, Uber dedupla el retry con la
+     * misma key y devuelve el resultado previo en vez de procesar de nuevo.
+     * Si Uber respondiera 409 'duplicate' tras el retry (caso marginal), el
+     * caller debe manejarlo recuperando la entidad via get_delivery( $id ) —
+     * TODAVÍA NO IMPLEMENTADO, ver backlog P2 AUDIT-API-UBER-001-backlog.
+     * NO modificar el Idempotency-Key en el retry sin antes entender qué
+     * efectos tendría en la dedup correcta de Uber.
+     *
+     * @param string $method    Method HTTP (GET, POST, PUT, DELETE, PATCH).
      * @param string $endpoint  Endpoint relativo.
      * @param array  $data      Datos del body.
-     * @param array  $headers   Headers adicionales.
+     * @param array  $headers   Headers adicionales (incluye Idempotency-Key).
      * @param bool   $retry     Si se deben reintentar errores de red.
      * @return array
      * @throws \RuntimeException En errores de red o HTTP no-2xx.

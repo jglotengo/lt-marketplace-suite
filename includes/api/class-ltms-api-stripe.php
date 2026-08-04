@@ -197,12 +197,17 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
      * @param string $payment_intent_id ID del PaymentIntent original.
      * @param float  $amount            Monto a reembolsar (en moneda local del PI).
      * @param string $reason            Motivo: 'duplicate'|'fraudulent'|'requested_by_customer'.
+     * @param string $currency          Moneda del PI original ('cop' o 'mxn'). Default:
+     *                                  LTMS_Core_Config::get_currency() — debe ser
+     *                                  pasada por el caller si la moneda del pedido
+     *                                  difiere de la moneda del país configurado.
      * @return array{success: bool, data?: array, error?: string}
      */
     public function create_refund(
         string $payment_intent_id,
         float  $amount,
-        string $reason = 'requested_by_customer'
+        string $reason = 'requested_by_customer',
+        string $currency = ''
     ): array {
         try {
             // INTEGRATIONS-AUDIT P1 FIX: validate amount + reason before any API call.
@@ -220,8 +225,17 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 return [ 'success' => false, 'error' => '[stripe] payment_intent_id inválido.' ];
             }
 
-            // Caller must pass the currency of the original PI. Default to COP for CO.
-            $currency = 'cop';
+            // AUDIT-API-STRIPE-001 (Ciclo 1.4 P1): antes el currency estaba
+            // hardcodeado a 'cop', rompiendo los reembolsos de pedidos MXN
+            // (Stripe cobra comisión ×100 al interpretar MXN como zero-decimal).
+            // Ahora el caller puede pasar la currency del PI; si no lo hace,
+            // se usa la currency configurada del país (CO→cop, MX→mxn).
+            // No se hace PaymentIntent::retrieve() para preservar el TOCTOU guard.
+            if ( '' === $currency ) {
+                $currency = strtolower( LTMS_Core_Config::get_currency() );
+            } else {
+                $currency = strtolower( $currency );
+            }
 
             $refund_params = [
                 'payment_intent' => $payment_intent_id,
@@ -232,12 +246,18 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 $refund_params['amount'] = $this->convert_amount_to_stripe_units( $amount, $currency );
             }
 
-            // INTEGRATIONS-AUDIT P0 FIX: idempotency_key on refund prevents
-            // double refunds on SDK retry or caller retry. Keyed by PI + amount.
+            // INTEGRATIONS-AUDIT P0 FIX + AUDIT-API-STRIPE-002 (Ciclo 1.4 P1):
+            // idempotency_key on refund prevents double refunds on SDK retry.
+            // ANTES: '(string) $amount' producía colisión entre 1234.5 y 1234.50
+            // (PHP normaliza el formato), y reembolsos parciales sucesivos no se
+            // deduplicaban. AHORA: sprintf('%.2f', $amount) serializa el monto
+            // con 2 decimales fijos → key determinista independientemente del
+            // formato de entrada.
+            $amount_token = $amount > 0 ? sprintf( '%.2f', $amount ) : 'full';
             $refund = \Stripe\Refund::create(
                 $refund_params,
                 [
-                    'idempotency_key' => 'ltms_refund_' . $payment_intent_id . '_' . ( $amount > 0 ? (string) $amount : 'full' ),
+                    'idempotency_key' => 'ltms_refund_' . $payment_intent_id . '_' . $amount_token,
                     'api_key'         => $this->secret_key,
                 ]
             );

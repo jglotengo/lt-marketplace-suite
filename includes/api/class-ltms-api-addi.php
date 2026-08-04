@@ -63,7 +63,13 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
      */
     public function __construct() {
         $this->country       = LTMS_Core_Config::get_country();
-        $environment         = LTMS_ENVIRONMENT === 'production' ? 'live' : 'sandbox';
+        // AUDIT-API-ADDI-001 (Ciclo 1.4 P1): usar LTMS_Core_Config::is_production()
+        // para consistencia con el resto del codebase (Openpay, Stripe, etc.). Antes
+        // usaba la constante global LTMS_ENVIRONMENT directo — funcionaba porque el
+        // plugin la define siempre en lt-marketplace-suite.php:98 y tests/bootstrap.php
+        // provee fallback, pero rompia el patron uniforme de acceso a configuracion
+        // y haria morir al cliente Addi si un tercer caller lo carga fuera del bootstrap.
+        $environment         = LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
         $this->api_url       = self::API_URLS[ $this->country ][ $environment ] ?? self::API_URLS['CO']['sandbox'];
         $this->client_id     = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_id', '' ) );
         $this->client_secret = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_secret', '' ) );

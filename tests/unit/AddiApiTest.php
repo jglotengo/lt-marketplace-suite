@@ -497,5 +497,72 @@ class AddiApiTest extends TestCase
         $this->assertArrayHasKey('live', $urls['CO']);
         $this->assertArrayHasKey('sandbox', $urls['CO']);
     }
+
+    // ── Section 9: AUDIT-API-ADDI-001 (Ciclo 1.4 P1): is_production() refactor ─
+
+    /**
+     * @test
+     * AUDIT-API-ADDI-001 (P1 refactor): el constructor debe usar
+     * LTMS_Core_Config::is_production() para decidir entorno, NO la constante
+     * global LTMS_ENVIRONMENT directo. Verificamos que cuando is_production=true,
+     * la api_url apunta a live; cuando false, a sandbox.
+     */
+    public function test_constructor_uses_is_production_false_for_sandbox(): void
+    {
+        // Default test env: is_production() = false → sandbox URL.
+        $client = $this->make_client();
+        $ref    = new ReflectionClass($client);
+        $prop   = $ref->getParentClass()->getProperty('api_url');
+        $prop->setAccessible(true);
+        $url = $prop->getValue($client);
+
+        $this->assertStringContainsString('sandbox', $url, 'En test env, URL debe ser sandbox');
+        $this->assertStringNotContainsString('api.addi.com.mx', $url, 'Default country CO no MX');
+    }
+
+    /**
+     * @test
+     * AUDIT-API-ADDI-001: cuando LTMS_Core_Config::is_production() retorna true,
+     * la api_url debe apuntar a la URL live (sin 'sandbox' en el host).
+     */
+    public function test_constructor_uses_live_url_when_is_production_true(): void
+    {
+        // Forzar is_production=true via config override.
+        \LTMS_Core_Config::set('LTMS_ENVIRONMENT', 'production');
+        $this->assertTrue(\LTMS_Core_Config::is_production(), 'Sanity check: is_production=true');
+
+        $client = $this->make_client();
+        $ref    = new ReflectionClass($client);
+        $prop   = $ref->getParentClass()->getProperty('api_url');
+        $prop->setAccessible(true);
+        $url = $prop->getValue($client);
+
+        $this->assertStringContainsString('api.addi.com', $url, 'Live URL contiene api.addi.com');
+        $this->assertStringNotContainsString('sandbox', $url, 'Live URL NO contiene sandbox');
+
+        // Cleanup.
+        \LTMS_Core_Config::flush_cache();
+    }
+
+    /**
+     * @test
+     * AUDIT-API-ADDI-001: cuando country=MX + is_production=true, usa URL live MX.
+     */
+    public function test_constructor_uses_mx_live_url_when_country_mx_and_production(): void
+    {
+        \LTMS_Core_Config::set('LTMS_COUNTRY', 'MX');
+        \LTMS_Core_Config::set('LTMS_ENVIRONMENT', 'production');
+
+        $client = $this->make_client();
+        $ref    = new ReflectionClass($client);
+        $prop   = $ref->getParentClass()->getProperty('api_url');
+        $prop->setAccessible(true);
+        $url = $prop->getValue($client);
+
+        $this->assertStringContainsString('api.addi.com.mx', $url, 'MX live URL contiene api.addi.com.mx');
+        $this->assertStringNotContainsString('sandbox', $url);
+
+        \LTMS_Core_Config::flush_cache();
+    }
 }
 

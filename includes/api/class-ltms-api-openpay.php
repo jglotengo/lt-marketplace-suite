@@ -51,6 +51,24 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
         $this->provider_slug = 'openpay';
         $this->country       = $country_override
                              ?? LTMS_Core_Config::get_country();
+
+        // AUDIT-API-OPENPAY-001 (Ciclo 1.4 P1): validar country_override contra
+        // allowlist ['CO','MX']. Antes se aceptaba cualquier string — 'US' o ''
+        // caía al else (Colombia) pero $this->country quedaba 'US' y rompía
+        // lasAssertions internas (format_amount, currency, etc.). Lanzar
+        // excepción temprano con mensaje accionable.
+        $allowed_countries = [ 'CO', 'MX' ];
+        if ( ! in_array( strtoupper( $this->country ), $allowed_countries, true ) ) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    '[openpay] País no soportado: %s. Países válidos: %s.',
+                    $this->country,
+                    implode( ', ', $allowed_countries )
+                )
+            );
+        }
+        $this->country = strtoupper( $this->country );
+
         $this->timeout       = 45; // Openpay puede tomar hasta 30s
 
         $environment = LTMS_Core_Config::is_production() ? 'live' : 'sandbox';

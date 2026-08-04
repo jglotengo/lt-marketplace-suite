@@ -429,5 +429,111 @@ class GatewayStripeTest extends TestCase
         $ref = new ReflectionMethod(\LTMS_Gateway_Stripe::class, 'get_stripe_client');
         $this->assertTrue($ref->isPrivate());
     }
+
+    // ── Section 8: AUDIT-GATEWAY-STRIPE-001 (Ciclo 1.4 P0-2): class_exists guard ─
+
+    /**
+     * @test
+     * AUDIT-GATEWAY-STRIPE-001 (P0-2): la declaración de la clase está envuelta
+     * en `if ( ! class_exists( 'LTMS_Gateway_Stripe' ) )` para evitar fatal error
+     * de redeclaración si el autoloader la carga antes que el archivo literal.
+     *
+     * Verificamos que NUEVAS cargas del archivo (after class ya declarada) sean
+     * un no-op silencioso en vez de fatal.
+     */
+    public function test_class_exists_guard_prevents_redeclaration_fatal(): void
+    {
+        $this->assertTrue(
+            class_exists( \LTMS_Gateway_Stripe::class ),
+            'LTMS_Gateway_Stripe debe estar declarada después del require del archivo'
+        );
+
+        // Cargar el archivo de nuevo debe ser no-op gracias al guard.
+        $file = dirname( __DIR__, 2 ) . '/includes/gateway/class-ltms-gateway-stripe.php';
+
+        // Deshabilitar temporalmente el display de errors fatales para esta
+        //Assertion: si el guard NO existiera, require_once lanzaría Fatal error.
+        // Con require_once no se recarga, pero el guard es para require (no _once).
+        // Verificamos leyendo el source: el guard `if ( ! class_exists(...) )`
+        // debe estar presente antes de la declaración de la clase.
+        $source = file_get_contents( $file );
+        $this->assertStringContainsString(
+            "if ( ! class_exists( 'LTMS_Gateway_Stripe' ) )",
+            $source,
+            'AUDIT-GATEWAY-STRIPE-001: la clase debe estar envuelta en class_exists guard'
+        );
+    }
+
+    // ── Section 9: AUDIT-GATEWAY-STRIPE-002 (Ciclo 1.4 P0-3): mark_payment_captured_atomic ─
+
+    /**
+     * @test
+     * AUDIT-GATEWAY-STRIPE-002 (P0-3): mark_payment_captured_atomic() debe
+     * retornar true la PRIMERA vez (ganó el flag) y false la SEGUNDA vez
+     * (otro camino ya capturó). Verifica el lock anti-doble payment_complete().
+     */
+    public function test_mark_payment_captured_atomic_first_call_returns_true(): void
+    {
+        $gateway = $this->make_gateway();
+
+        $order = new class extends \WC_Order {
+            private array $meta = [];
+            public function get_meta( string $key, bool $single = true ): mixed {
+                return $this->meta[ $key ] ?? '';
+            }
+            public function update_meta_data( string $key, $value ): void {
+                $this->meta[ $key ] = $value;
+            }
+            public function save(): int { return 1; }
+        };
+
+        $ref = new \ReflectionMethod( $gateway, 'mark_payment_captured_atomic' );
+        $ref->setAccessible( true );
+
+        $result = $ref->invoke( $gateway, $order, 'pi_test_123' );
+
+        $this->assertTrue( $result, 'Primera llamada debe retornar true (ganó el flag)' );
+        $this->assertSame( 'yes', $order->get_meta( '_ltms_stripe_payment_captured' ) );
+        $this->assertSame( 'pi_test_123', $order->get_meta( '_ltms_stripe_captured_intent_id' ) );
+    }
+
+    /**
+     * @test
+     * AUDIT-GATEWAY-STRIPE-002 (P0-3): segunda llamada retorna false si el meta
+     * ya está en 'yes' — segundo camino_SYNC o webhook async no debe volver a
+     * llamar payment_complete().
+     */
+    public function test_mark_payment_captured_atomic_second_call_returns_false(): void
+    {
+        $gateway = $this->make_gateway();
+
+        $order = new class extends \WC_Order {
+            private array $meta = [ '_ltms_stripe_payment_captured' => 'yes' ];
+            public function get_meta( string $key, bool $single = true ): mixed {
+                return $this->meta[ $key ] ?? '';
+            }
+            public function update_meta_data( string $key, $value ): void {
+                $this->meta[ $key ] = $value;
+            }
+            public function save(): int { return 1; }
+        };
+
+        $ref = new \ReflectionMethod( $gateway, 'mark_payment_captured_atomic' );
+        $ref->setAccessible( true );
+
+        $result = $ref->invoke( $gateway, $order, 'pi_test_456' );
+
+        $this->assertFalse( $result, 'Segunda llamada debe retornar false (ya capturado)' );
+    }
+
+    /**
+     * @test
+     * AUDIT-GATEWAY-STRIPE-002 (P0-3): mark_payment_captured_atomic es private.
+     */
+    public function test_mark_payment_captured_atomic_is_private(): void
+    {
+        $ref = new \ReflectionMethod( \LTMS_Gateway_Stripe::class, 'mark_payment_captured_atomic' );
+        $this->assertTrue( $ref->isPrivate() );
+    }
 }
 

@@ -213,14 +213,26 @@ class LTMS_Stripe_Webhook_Handler {
         }
 
         if ( ! $order->is_paid() ) {
-            $order->payment_complete( $pi_id );
-            $order->add_order_note(
-                sprintf(
-                    /* translators: %s: PaymentIntent ID */
-                    __( 'Pago confirmado por Stripe webhook. PaymentIntent: %s', 'ltms' ),
-                    $pi_id
-                )
-            );
+            // AUDIT-GATEWAY-STRIPE-002 (Ciclo 1.4 P0-3): respetar el flag meta
+            // _ltms_stripe_payment_captured escrito por process_payment() cuando
+            // el PI se confirmó sincrónicamente (sin 3DS). Si process_payment ya
+            // llamó payment_complete(), este webhook solo registra log de confirmación.
+            $already_captured = $order->get_meta( '_ltms_stripe_payment_captured', true );
+            if ( 'yes' === $already_captured ) {
+                LTMS_Core_Logger::info(
+                    'STRIPE_WEBHOOK_ALREADY_CAPTURED',
+                    sprintf( 'Pedido #%d ya capturado por process_payment. PI: %s', $order->get_id(), $pi_id )
+                );
+            } else {
+                $order->payment_complete( $pi_id );
+                $order->add_order_note(
+                    sprintf(
+                        /* translators: %s: PaymentIntent ID */
+                        __( 'Pago confirmado por Stripe webhook. PaymentIntent: %s', 'ltms' ),
+                        $pi_id
+                    )
+                );
+            }
         }
 
         LTMS_Core_Logger::info(

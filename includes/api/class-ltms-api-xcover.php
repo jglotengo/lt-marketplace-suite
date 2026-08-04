@@ -67,13 +67,22 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
         if ( ! preg_match( '/^[A-Za-z0-9_-]{1,64}$/', $this->partner_code ) ) {
             return [];
         }
+        // AUDIT-API-XCOVER-001 (Ciclo 1.4 P1): validar price numérico positivo
+        // antes de construir el payload. Antes el cast (float) silenciaba un
+        // string como "1e308" o un valor negativo → cotización con valor
+        // absurdo en checkout. Si product_data['price'] falta o es inválido,
+        // retornar [] para no propagar la cotización inválida al caller.
+        $price = $product_data['price'] ?? null;
+        if ( ! is_numeric( $price ) || (float) $price < 0 || ! is_finite( (float) $price ) ) {
+            return [];
+        }
         $payload = [
             'partner_code' => $this->partner_code,
             'request'      => [[
                 'policyType'     => $product_data['insurance_type'] ?? 'product_protection',
                 'productName'    => $product_data['name'] ?? '',
                 'productPrice'   => [
-                    'amount'   => (float) $product_data['price'],
+                    'amount'   => (float) $price,
                     'currency' => $product_data['currency'] ?? 'COP',
                 ],
                 'productCategory' => $product_data['category'] ?? 'general',
