@@ -239,13 +239,25 @@ class LTMS_Admin_SAT_Report {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_sat_online_access';
 
+        // AUDIT-ADMIN-SAT-001 FIX (Ciclo 2 P1): auditor_name desde
+        // wp_get_current_user(), no desde headers HTTP controlables por
+        // el cliente. Antes, un atacante con `ltms_access_dashboard` podía
+        // falsificar `X-Auditor-Name: Pedro Pérez` para que el log de
+        // acceso fiscal (que sirve para auditoría SAT/DIAN real) muestre
+        // que "Pedro Pérez" realizó la consulta — la bitácora perdía valor
+        // probatorio. La auditor fiscal debe ligarse al user autenticado
+        // por WP, no a una cabecera cliente-controlable.
+        $current_user   = wp_get_current_user();
+        $auditor_name   = $current_user->exists() ? $current_user->display_name : __( '(unknown)', 'ltms' );
+        $auditor_rfc    = $current_user->exists() ? (string) get_user_meta( $current_user->ID, 'ltms_auditor_rfc', true ) : '';
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert(
             $table,
             [
                 'session_token' => hash( 'sha256', ( $_COOKIE['ltms_sat_session'] ?? '' ) . wp_salt() ),
-                'auditor_name'  => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_NAME'] ?? '' ),
-                'auditor_rfc'   => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_RFC'] ?? '' ),
+                'auditor_name'  => $auditor_name,
+                'auditor_rfc'   => $auditor_rfc,
                 'access_type'   => $access_type,
                 'filter_from'   => $context['filter_from'] ?? null,
                 'filter_to'     => $context['filter_to'] ?? null,
@@ -475,13 +487,20 @@ class LTMS_Admin_SAT_Report {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_dian_online_access';
 
+        // AUDIT-ADMIN-SAT-001 FIX (Ciclo 2 P1): mismo fix que
+        // log_sat_access — auditor_name/nit desde wp_get_current_user(),
+        // no desde headers HTTP X-Auditor-* controlables por el cliente.
+        $current_user   = wp_get_current_user();
+        $auditor_name   = $current_user->exists() ? $current_user->display_name : __( '(unknown)', 'ltms' );
+        $auditor_nit    = $current_user->exists() ? (string) get_user_meta( $current_user->ID, 'ltms_auditor_nit', true ) : '';
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert(
             $table,
             [
                 'session_token' => hash( 'sha256', ( $_COOKIE['ltms_dian_session'] ?? '' ) . wp_salt() ),
-                'auditor_name'  => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_NAME'] ?? '' ),
-                'auditor_nit'   => sanitize_text_field( $_SERVER['HTTP_X_AUDITOR_NIT'] ?? '' ),
+                'auditor_name'  => $auditor_name,
+                'auditor_nit'   => $auditor_nit,
                 'access_type'   => $access_type,
                 'filter_from'   => $context['filter_from'] ?? null,
                 'filter_to'     => $context['filter_to'] ?? null,

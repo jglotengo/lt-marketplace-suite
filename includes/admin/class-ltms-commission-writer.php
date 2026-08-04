@@ -120,101 +120,161 @@ class LTMS_Commission_Writer {
         $payment_method_platform = self::PLATFORM_METHOD;
 
         // ── 4. Por cada ítem de orden, localizar la comisión y actualizar ────
-        foreach ( $order->get_items() as $item_id => $item ) {
-            $product    = $item->get_product();
-            $vendor_id  = $this->get_vendor_for_item( $item, $order );
+        // AUDIT-ADMIN-002-004 FIX (Ciclo 2 P0): atomicidad por-orden, no
+        // por-ítem. Antes, START TRANSACTION + COMMIT estaban DENTRO del
+        // foreach → cada ítem tenía su propia transacción. Si el 2° ítem
+        // fallaba (INSERT/UPDATE con error), el 1° ya estaba commiteado y
+        // el 3° no se procesaba → el reporte Art. 30-B CFF quedaba parcial
+        // (infracción fiscal: comisión reportada para ítem A pero no para B).
+        // Adicionalmente, no había ROLLBACK explícito en ningún path de
+        // error — si $wpdb->update/insert devolvía false sin lanzar, el
+        // log_fiscal_write línea 217 registraba "FISCAL_FIELDS_WRITTEN"
+        // mintiendo (la comisión NO se escribió).
+        //
+        // Fix: mover START TRANSACTION antes del foreach, COMMIT/ROLLBACK
+        // después. Verificar retornos de $wpdb->update/insert → ROLLBACK +
+        // throw si son false. Loguear FISCAL_FIELDS_WRITE_FAILED con
+        // $wpdb->last_error para diagnóstico.
+        $use_transaction = ! ( $wpdb instanceof \stdClass )
+            && ! str_starts_with( get_class( $wpdb ), 'class@anonymous' );
+        if ( $use_transaction ) {
+            $wpdb->query( 'START TRANSACTION' );
+        }
+        try {
+            foreach ( $order->get_items() as $item_id => $item ) {
+                $product    = $item->get_product();
+                $vendor_id  = $this->get_vendor_for_item( $item, $order );
 
-            if ( ! $vendor_id ) continue;
+                if ( ! $vendor_id ) continue;
 
-            // Método de pago del oferente (vendedor) — cómo Lo-Tengo le paga
-            $payment_method_vendor = $this->get_vendor_payout_method( $vendor_id );
+                // Método de pago del oferente (vendedor) — cómo Lo-Tengo le paga
+                $payment_method_vendor = $this->get_vendor_payout_method( $vendor_id );
 
-            // Cálculos fiscales por ítem
-            $gross         = (float) $item->get_subtotal();
-            $iva           = $country_code === 'MX'
-                             ? (float) $item->get_subtotal_tax()
-                             : round( $gross * self::IVA_CO, 2 );
-            $isr_retenido  = $country_code === 'MX' ? round( $gross * self::ISR_MX_RATE, 2 ) : 0.00;
-            $reteiva       = $country_code === 'CO' ? round( $iva * self::RETEIVA_CO_RATE, 2 )  : 0.00;
+                // Cálculos fiscales por ítem
+                $gross         = (float) $item->get_subtotal();
+                $iva           = $country_code === 'MX'
+                                 ? (float) $item->get_subtotal_tax()
+                                 : round( $gross * self::IVA_CO, 2 );
+                $isr_retenido  = $country_code === 'MX' ? round( $gross * self::ISR_MX_RATE, 2 ) : 0.00;
+                $reteiva       = $country_code === 'CO' ? round( $iva * self::RETEIVA_CO_RATE, 2 )  : 0.00;
 
-            // service_type específico por ítem si hay override en product meta
-            $item_service_type = get_post_meta( $item->get_product_id(), '_ltms_service_type', true )
-                                 ?: $service_type;
+                // service_type específico por ítem si hay override en product meta
+                $item_service_type = get_post_meta( $item->get_product_id(), '_ltms_service_type', true )
+                                     ?: $service_type;
 
-            // ── Buscar fila existente en {prefix}lt_commissions ────────────
-            // FASE4 P0 FIX (TOCTOU): use SELECT ... FOR UPDATE inside a transaction
-            // to prevent two concurrent hooks from both passing the SELECT and both
-            // INSERTing duplicate commission rows for the same (order_id, vendor_id).
-            // Defensive: skip transaction in test environments where $wpdb is mocked
-            // (anonymous class without real DB connection). The SELECT without FOR UPDATE
-            // is still correct in single-threaded test context.
-            $use_transaction = ! ( $wpdb instanceof \stdClass )
-                && ! str_starts_with( get_class( $wpdb ), 'class@anonymous' );
-            if ( $use_transaction ) {
-                $wpdb->query( 'START TRANSACTION' );
+                // ── Buscar fila existente en {prefix}lt_commissions ────────────
+                // FASE4 P0 FIX (TOCTOU): use SELECT ... FOR UPDATE inside a transaction
+                // to prevent two concurrent hooks from both passing the SELECT and both
+                // INSERTing duplicate commission rows for the same (order_id, vendor_id).
+                // Defensive: skip transaction in test environments where $wpdb is mocked
+                // (anonymous class without real DB connection). The SELECT without FOR UPDATE
+                // is still correct in single-threaded test context.
+                $row = $wpdb->get_row( $wpdb->prepare(
+                    "SELECT id FROM `" . self::table() . "`
+                      WHERE order_id = %d AND vendor_id = %d
+                      LIMIT 1" . ( $use_transaction ? ' FOR UPDATE' : '' ),
+                    $order_id, $vendor_id
+                ) );
+
+                $data = [
+                    'service_type'            => $item_service_type,
+                    'payment_method'          => $payment_method_buyer,
+                    'payment_method_buyer'    => $payment_method_buyer,
+                    'payment_method_vendor'   => $payment_method_vendor,
+                    'payment_method_platform' => $payment_method_platform,
+                    'rfc_cliente'             => $rfc_cliente,
+                    'cfdi_folio'              => $cfdi_folio,
+                    'isr_amount'              => $isr_retenido,
+                    'reteiva_amount'          => $reteiva,
+                    'country_code'            => $country_code,
+                    'updated_at'              => current_time( 'mysql' ),
+                ];
+
+                $formats = [
+                    '%s', '%s', '%s', '%s', '%s',
+                    '%s', '%s',
+                    '%f', '%f',
+                    '%s', '%s',
+                ];
+
+                if ( $row ) {
+                    // Actualizar fila existente
+                    $updated_rows = $wpdb->update(
+                        self::table(),
+                        $data,
+                        [ 'id' => $row->id ],
+                        $formats,
+                        [ '%d' ]
+                    );
+                    // AUDIT-ADMIN-002-006 FIX (Ciclo 2 P1): verificar el
+                    // retorno de $wpdb->update. Si === false, el UPDATE
+                    // falló (constraint, length, timeout) — ROLLBACK y
+                    // abortar antes de loguear "FISCAL_FIELDS_WRITTEN"
+                    // mintiendo. Antes el log mientía sobre el resultado.
+                    if ( $updated_rows === false ) {
+                        throw new \RuntimeException(
+                            'FISCAL_FIELDS_UPDATE_FAILED: ' . ( $wpdb->last_error ?? '(no error detail)' )
+                        );
+                    }
+                } else {
+                    // Insertar nueva comisión si no existe (fallback)
+                    $data = array_merge( [
+                        'order_id'          => $order_id,
+                        'vendor_id'         => $vendor_id,
+                        'gross_amount'      => $gross,
+                        'iva_amount'        => $iva,
+                        'commission_rate'   => 0.0,
+                        'commission_amount' => 0.0,
+                        'vendor_amount'     => $gross - $isr_retenido - $reteiva,
+                        'tax_withholding'   => $isr_retenido + $reteiva,
+                        'currency'          => $country_code === 'MX' ? 'MXN' : 'COP',
+                        'status'            => 'pending',
+                        'type'              => 'commission',
+                        'created_at'        => current_time( 'mysql' ),
+                    ], $data );
+
+                    $insert_id = $wpdb->insert( self::table(), $data );
+                    // AUDIT-ADMIN-002-006 FIX (Ciclo 2 P1): verificar el
+                    // retorno de $wpdb->insert. Si === false, la comisión
+                    // fiscal NO se registró pero el log diría "WRITTEN".
+                    // Casos: constraint violation, RFC/clabe length, etc.
+                    // Manifest: el reporte Art. 30-B CFF omitiría órdenes
+                    // reales → infracción fiscal silenciosa.
+                    if ( $insert_id === false ) {
+                        throw new \RuntimeException(
+                            'FISCAL_FIELDS_INSERT_FAILED: ' . ( $wpdb->last_error ?? '(no error detail)' )
+                        );
+                    }
+                }
+
+                // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
+                $this->log_fiscal_write( $order_id, $vendor_id, $data );
             }
-            $row = $wpdb->get_row( $wpdb->prepare(
-                "SELECT id FROM `" . self::table() . "`
-                  WHERE order_id = %d AND vendor_id = %d
-                  LIMIT 1" . ( $use_transaction ? ' FOR UPDATE' : '' ),
-                $order_id, $vendor_id
-            ) );
 
-            $data = [
-                'service_type'            => $item_service_type,
-                'payment_method'          => $payment_method_buyer,
-                'payment_method_buyer'    => $payment_method_buyer,
-                'payment_method_vendor'   => $payment_method_vendor,
-                'payment_method_platform' => $payment_method_platform,
-                'rfc_cliente'             => $rfc_cliente,
-                'cfdi_folio'              => $cfdi_folio,
-                'isr_amount'              => $isr_retenido,
-                'reteiva_amount'          => $reteiva,
-                'country_code'            => $country_code,
-                'updated_at'              => current_time( 'mysql' ),
-            ];
-
-            $formats = [
-                '%s', '%s', '%s', '%s', '%s',
-                '%s', '%s',
-                '%f', '%f',
-                '%s', '%s',
-            ];
-
-            if ( $row ) {
-                // Actualizar fila existente
-                $wpdb->update(
-                    self::table(),
-                    $data,
-                    [ 'id' => $row->id ],
-                    $formats,
-                    [ '%d' ]
-                );
-            } else {
-                // Insertar nueva comisión si no existe (fallback)
-                $data = array_merge( [
-                    'order_id'          => $order_id,
-                    'vendor_id'         => $vendor_id,
-                    'gross_amount'      => $gross,
-                    'iva_amount'        => $iva,
-                    'commission_rate'   => 0.0,
-                    'commission_amount' => 0.0,
-                    'vendor_amount'     => $gross - $isr_retenido - $reteiva,
-                    'tax_withholding'   => $isr_retenido + $reteiva,
-                    'currency'          => $country_code === 'MX' ? 'MXN' : 'COP',
-                    'status'            => 'pending',
-                    'type'              => 'commission',
-                    'created_at'        => current_time( 'mysql' ),
-                ], $data );
-
-                $wpdb->insert( self::table(), $data );
-            }
+            // AUDIT-ADMIN-002-004 FIX (cont.): COMMIT al final del loop,
+            // no después de cada ítem. Atomicidad por-orden garantiza que
+            // o TODAS las comisiones de la orden se escriben o NINGUNA.
             if ( $use_transaction ) {
                 $wpdb->query( 'COMMIT' );
             }
-
-            // Log forense vía LTMS_Core_Logger (bkr_lt_audit_logs)
-            $this->log_fiscal_write( $order_id, $vendor_id, $data );
+        } catch ( \Throwable $e ) {
+            // AUDIT-ADMIN-002-004 FIX (cont.): ROLLBACK explícito ante
+            // cualquier fallo. Antes no había — la transacción quedaba
+            // abierta y el siguiente request heredaba locks en
+            // lt_commissions bloqueando checkouts en producción.
+            if ( $use_transaction ) {
+                $wpdb->query( 'ROLLBACK' );
+            }
+            // Log diagnóstico con el error real de $wpdb->last_error.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'FISCAL_FIELDS_WRITE_FAILED',
+                    sprintf( 'Order #%d: %s', $order_id, $e->getMessage() ),
+                    [ 'order_id' => $order_id, 'last_error' => $wpdb->last_error ?? '' ]
+                );
+            }
+            // Re-throw para que el caller (hook) decida si propagar.
+            throw $e;
         }
     }
 

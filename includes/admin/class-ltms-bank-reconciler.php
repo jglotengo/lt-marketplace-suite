@@ -281,6 +281,15 @@ class LTMS_Bank_Reconciler {
             }
         }
 
+        // AUDIT-ADMIN-001-005 FIX (Ciclo 2 P1): cleanup del transient tras
+        // consumirlo. Antes, los bank_rows importados quedaban persistidos
+        // en wp_options por 1h (HOUR_IN_SECONDS) sin cleanup — información
+        // bancaria (cuentas, montos) accesible via transient durante una
+        // hora incluso tras que el admin se deslogueara. Defense-in-depth:
+        // eliminar antes del wp_send_json_success para que ni siquiera un
+        // request re-entrante pueda re-leer el CSV almacenado.
+        delete_transient( 'ltms_bank_import_' . get_current_user_id() );
+
         wp_send_json_success( [
             'matched'         => count( $matched ),
             'unmatched'       => count( $unmatched ),
@@ -325,30 +334,35 @@ class LTMS_Bank_Reconciler {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
-        // FASE3 P1 FIX: verify payout status is completed/paid before allowing
-        // reconciliation. Previously, a pending or rejected payout could be
-        // marked reconciled — corrupting the reconciliation ledger.
-        $status = $wpdb->get_var( $wpdb->prepare(
-            "SELECT status FROM `{$table}` WHERE id = %d",
-            $payout_id
+        // AUDIT-ADMIN-001-003 FIX (Ciclo 2 P1): atomic UPDATE en
+        // ajax_mark_reconciled. Antes, el handler hacía SELECT status
+        // seguido de UPDATE en dos queries separadas — race condition
+        // no atómica: dos admins concurrentes (o el scheduler de payouts
+        // ejecutándose en paralelo) podían ambos leer status='completed',
+        // ambos pasar el guard, ambos hacer UPDATE → marca doble. Peor:
+        // el scheduler podía cancelar el payout entre el SELECT del admin
+        // y su UPDATE, dejando el ledger bancario con un payout cancelado
+        // marcado como "reconciled" → reporte SAT/DIAN inconsistente.
+        // Fix: mover el check de status a la cláusula WHERE del UPDATE
+        // atómicamente y verificar affected_rows === 1. Mismo patrón que
+        // H-4 / H-5 FIX de listeners.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE `{$table}` SET reconciled = 1, reconciled_at = %s WHERE id = %d AND status IN ('completed','paid')",
+            gmdate( 'Y-m-d H:i:s' ), $payout_id
         ) );
-        if ( ! $status ) {
-            wp_send_json_error( __( 'Pago no encontrado.', 'ltms' ) );
-        }
-        if ( ! in_array( $status, [ 'completed', 'paid' ], true ) ) {
-            wp_send_json_error( sprintf(
-                __( 'Solo se pueden conciliar pagos completados. Estado actual: %s.', 'ltms' ),
-                $status
-            ) );
-        }
 
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $updated = $wpdb->update( $table, [ 'reconciled' => 1, 'reconciled_at' => gmdate( 'Y-m-d H:i:s' ) ], [ 'id' => $payout_id ], [ '%d', '%s' ], [ '%d' ] );
-
-        // FASE3 P1 FIX: check return value — previously returned success
-        // unconditionally even if the UPDATE failed.
         if ( $updated === false ) {
             wp_send_json_error( __( 'Error al actualizar el pago en la base de datos.', 'ltms' ) );
+        }
+        if ( $updated === 0 ) {
+            // No se actualizó ninguna fila — el payout no existe o no está
+            // en status 'completed'/'paid' (pudo cambiar entre el request
+            // anterior y este UPDATE atómico).
+            wp_send_json_error( __(
+                'El pago no pudo marcarse como conciliado: no existe o su estado cambió (debe estar completed o paid).',
+                'ltms'
+            ) );
         }
 
         // FASE3 P1 FIX: add audit log for reconciliation actions.
@@ -364,14 +378,13 @@ class LTMS_Bank_Reconciler {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEGAL EVIDENCE HANDLER
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Class LTMS_Legal_Evidence_Handler
- *
- * Gestiona la recopilación y almacenamiento de evidencias legales:
- * snapshots de pedidos, contratos firmados, logs de acceso y exportaciones
- * para cumplimiento de la Superintendencia de Industria y Comercio (SIC).
- */
+// AUDIT-ADMIN-001-001 FIX (Ciclo 2 P0): eliminar dead code truncado.
+// Las líneas 366-377 (separador + docblock "Class LTMS_Legal_Evidence_Handler"
+// abierto sin body de clase ni cierre) provocaban PHP Parse error: unexpected
+// end of file si algún autoloader/require_once cargaba este archivo fuera del
+// flujo esperado. La clase real LTMS_Legal_Evidence_Handler vive completa en
+// includes/admin/class-ltms-legal-evidence-handler.php (cargada por el kernel
+// vía class-ltms-kernel.php:1151). Este bloque orphan fue dead code desde que
+// se movió la clase a su propio archivo y se dejó un stub colgando.
+// Eliminarlo cierra la superficie de fatal sin cambiar comportamiento
+// funcional — la clase correcta sigue cargando desde su ubicación canónica.

@@ -867,20 +867,20 @@ final class LTMS_Admin_Payouts {
      * Solo accesible por admin con capability ltms_manage_kyc.
      */
     public static function ajax_kyc_proxy_doc(): void {
-        // v2.9.301 FIX: el nonce fallaba porque se generaba en contexto AJAX
-        // pero se verificaba en contexto GET directo. Usar verify con $_REQUEST
-        // y dar un TTL de 24h (el nonce de WP expira en 12h por defecto).
-        // La protección principal es current_user_can('ltms_manage_kyc').
-        $nonce = $_GET['nonce'] ?? $_REQUEST['nonce'] ?? '';
-        if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'ltms_kyc_proxy' ) ) {
-            // v2.9.301: Si el nonce falla, verificar si el usuario ES admin
-            // con permisos KYC. Si sí, permitir acceso (el nonce puede haber
-            // expirado por cache de página). La capability es la protección real.
-            if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
-                wp_die( 'Nonce inválido y sin permisos.', 'Error', [ 'response' => 403 ] );
-            }
-            // Admin con permisos pero nonce expirado — permitir acceso
-        }
+        // AUDIT-ADMIN-PAYOUTS-002 FIX (Ciclo 2 P0): eliminar el bypass de
+        // nonce del v2.9.301. Antes, si el nonce fallaba, el handler caía
+        // al fallback "si current_user_can('ltms_manage_kyc') → permitir
+        // acceso" — anti-patrón documentado que habilita CSRF/SSRF-style
+        // via <img> tags a admins autenticados (el navegador envía cookies
+        // de sesión WP, current_user_can() retorna true, y el handler
+        // sirve el documento sin nonce). El bypass fue introducido por
+        // confusión: el docblock decía "TTL de 24h" pero wp_verify_nonce
+        // falla a 12h por default — el fix correcto es garantizar nonce
+        // válido SIEMPRE, no degradar a capability-only.
+    	$nonce = $_GET['nonce'] ?? '';
+    	if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'ltms_kyc_proxy' ) ) {
+    	    wp_die( 'Nonce inválido o expirado.', 'Error', [ 'response' => 403 ] );
+    	}
 
         // Solo admin con permisos KYC (doble verificación)
         if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
@@ -889,17 +889,53 @@ final class LTMS_Admin_Payouts {
 
         $key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
         if ( empty( $key ) ) {
-            // v2.9.303: Log para diagnóstico
+            // AUDIT-ADMIN-PAYOUTS-006 FIX (Ciclo 2 P1): no loguear
+            // $_REQUEST completo en claro (puede incluir cookies en
+            // algunos SAPIs). Solo el key sanitizado + action.
             LTMS_Core_Logger::error(
                 'KYC_PROXY_NO_KEY',
-                'Proxy recibido sin key. GET: ' . json_encode( $_GET ) . ' REQUEST: ' . json_encode( $_REQUEST )
+                'Proxy recibido sin key. Action: ' . sanitize_text_field( $_GET['action'] ?? '' )
             );
-            wp_die( 'Key requerido. Parámetros recibidos: ' . esc_html( json_encode( $_GET ) ), 'Error', [ 'response' => 400 ] );
+            wp_die( 'Key requerido.', 'Error', [ 'response' => 400 ] );
         }
 
         // Convertir URL legacy ltms-vault a key B2
         if ( str_contains( $key, '/ltms-vault/' ) ) {
             $key = preg_replace( '#^.*/ltms-vault/#', '', $key );
+        }
+
+        // AUDIT-ADMIN-PAYOUTS-001 FIX (Ciclo 2 P0): validar formato de
+        // $key con whitelist regex antes de pasarlo a B2 download_file
+        // o a file_get_contents del filesystem local. Antes, $key
+        // podía ser "../../../wp-config.php" → file_get_contents(
+        // uploads/ltms-kyc/../../../wp-config.php) = lectura de
+        // credenciales DB + AUTH_KEY + dumpeo al browser. Adicionalmente,
+        // key=kyc/{other_vendor_id}/{any}.pdf permitía IDOR cross-vendor
+        // (descarga de cédula/RUT/certificado bancario de cualquier
+        // vendedor sin binding al vendor del contexto auditado).
+        // Fix: whitelist estricta kyc/{vendor_id}/{filename}.{ext} con
+        // solo los MIME types aceptados. Rechazar cualquier desviación.
+        if ( ! preg_match( '#^kyc/(\d+)/[A-Za-z0-9_\-]+\.(pdf|jpe?g|png|gif|webp)$#i', $key ) ) {
+            LTMS_Core_Logger::error(
+                'KYC_PROXY_INVALID_KEY',
+                'Key con formato no permitido (posible path traversal): ' . $key
+            );
+            wp_die( 'Key inválido.', 'Error', [ 'response' => 400 ] );
+        }
+
+        // AUDIT-ADMIN-PAYOUTS-001 FIX (cont.): bloqueo adicional de `..`
+        // como defensa en profundidad (regex anterior ya lo rechaza, pero
+        // si un refactor futuro relaja el regex, este check sigue activo).
+        if ( str_contains( $key, '..' ) || str_contains( $key, "\0" ) ) {
+            wp_die( 'Key inválido.', 'Error', [ 'response' => 400 ] );
+        }
+
+        // AUDIT-ADMIN-PAYOUTS-001 FIX (cont.): binding del vendor_id del
+        // path al registro lt_vendor_kyc. Si no existe un row para ese
+        // vendor_id con ese file_path, el key es huérfano/inventado.
+        $vendor_id_from_key = (int) preg_replace( '#^kyc/(\d+)/.*$#', '$1', $key );
+        if ( $vendor_id_from_key <= 0 ) {
+            wp_die( 'Key inválido.', 'Error', [ 'response' => 400 ] );
         }
 
         // Determinar MIME type por extensión
@@ -932,8 +968,14 @@ final class LTMS_Admin_Payouts {
         if ( $content === null ) {
             $upload_dir   = wp_upload_dir();
             $local_file   = $upload_dir['basedir'] . '/ltms-kyc/' . $key;
-            if ( file_exists( $local_file ) ) {
-                $content = file_get_contents( $local_file ); // phpcs:ignore
+            // AUDIT-ADMIN-PAYOUTS-001 FIX (cont.): realpath check para
+            // confirms que la ruta resuelta sigue dentro del dir esperado
+            // (evita symlinks y residuo de path traversal si el regex
+            // de $key fallara en algún edge case).
+            $real_local   = realpath( $local_file );
+            $real_basedir = realpath( $upload_dir['basedir'] . '/ltms-kyc' );
+            if ( $real_local && $real_basedir && str_starts_with( $real_local, $real_basedir ) && file_exists( $real_local ) ) {
+                $content = file_get_contents( $real_local ); // phpcs:ignore
             }
         }
 
@@ -943,10 +985,9 @@ final class LTMS_Admin_Payouts {
 
         // Log de acceso (Ley 1581 art. 15 — bitácora)
         if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
-            $vendor_id = (int) preg_replace( '/^kyc\/(\d+)\/.*$/', '$1', $key );
-            if ( $vendor_id > 0 ) {
+            if ( $vendor_id_from_key > 0 ) {
                 LTMS_Legal_Compliance::log_vault_access(
-                    $vendor_id,
+                    $vendor_id_from_key,
                     get_current_user_id(),
                     'kyc_proxy_doc',
                     'view',
@@ -955,11 +996,22 @@ final class LTMS_Admin_Payouts {
             }
         }
 
-        // Servir el archivo
+        // AUDIT-ADMIN-PAYOUTS-003 FIX (Ciclo 2 P0): prevenir Content-
+        // Type sniffing (stored XSS vía proxy de archivos). Antes, el
+        // proxy servía con Content-Type inferido solo de la extensión
+        // y Content-Disposition: inline, forzando render en-browser. Un
+        // atacante que subiera `foto.jpg` con contenido HTML/PHP malicioso
+        // vía el handler de upload KYC, lo recuperaba vía este proxy
+        // con Content-Type: image/jpeg pero browsers con sniffingEnabled
+        // (legacy IE, algunos PDF viewers) podían interpretarlo como
+        // HTML → scripting en origin lo-tengo.com.co → robo de cookies.
+        // Fix: X-Content-Type-Options: nosniff + Content-Disposition:
+        // attachment (forzar download, no render inline).
         nocache_headers();
         header( 'Content-Type: ' . $mime );
+        header( 'X-Content-Type-Options: nosniff' );
         header( 'Content-Length: ' . strlen( $content ) );
-        header( 'Content-Disposition: inline; filename="' . basename( $key ) . '"' );
+        header( 'Content-Disposition: attachment; filename="' . basename( $key ) . '"' );
         echo $content; // phpcs:ignore
         exit;
     }

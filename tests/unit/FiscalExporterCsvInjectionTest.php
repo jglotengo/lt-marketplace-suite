@@ -38,6 +38,10 @@ class FiscalExporterCsvInjectionTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Cas
             'wp_upload_dir'        => static fn() => [ 'basedir' => sys_get_temp_dir(), 'baseurl' => 'http://example.com' ],
             'wp_get_current_user'  => static fn() => (object) [ 'display_name' => 'auditor-test' ],
             'sanitize_file_name'   => static fn( string $name ): string => preg_replace( '/[^a-zA-Z0-9_\-\.]/', '_', $name ),
+            // AUDIT-ADMIN-003-001 FIX (Ciclo 2 P1): el cap check defensivo
+            // añadido en generate_csv exige current_user_can stub. Casual users
+            // admin en tests = true (igual que el caller real auditor-panel).
+            'current_user_can'     => static fn( string $cap ): bool => $cap === 'ltms_export_reports' || $cap === 'manage_options',
         ] );
 
         $this->require_class( 'LTMS_Fiscal_Exporter' );

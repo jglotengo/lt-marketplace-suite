@@ -10,14 +10,41 @@ class LTMS_Fiscal_Exporter {
     public static function generate_csv( array $args ): array {
         global $wpdb;
 
+        // AUDIT-ADMIN-003-001 FIX (Ciclo 2 P1): capability check defensivo
+        // en el método público. Antes, generate_csv() delegaba la
+        // autorización al caller (el wrapper auditor-panel.php:108 sí
+        // hace check_ajax_referer + current_user_can('ltms_export_reports'
+        // || manage_options')), pero cualquier caller futuro (addon,
+        // otro handler AJAX) que invoque generate_csv() con $args crafted
+        // podría generar el CSV sin auth. Defense-in-depth: validar aquí
+        // también. Sin Reports, CSV no se escribe en disco.
+        // NOTA: TESTS UNIT_ONLY deben stubear `current_user_can` (ver
+        // FiscalExporterCsvInjectionTest setUp añade stub), o saltarse
+        // este test. En producción WP siempre define la función.
+        if ( ! current_user_can( 'ltms_export_reports' ) && ! current_user_can( 'manage_options' ) ) {
+            return [ 'error' => __( 'Permisos insuficientes para exportar reporte fiscal.', 'ltms' ) ];
+        }
+
         $date_from = $args['date_from'] ?? '2000-01-01';
         $date_to   = $args['date_to']   ?? date('Y-m-d');
         $country   = $args['country']   ?? '';
-        $limit     = intval( $args['limit'] ?? 500 );
+        // AUDIT-ADMIN-003-002 FIX (Ciclo 2 P1): `absint` en vez de `intval`
+        // para forzar no-negativo + LIMIT como placeholder. Antes, $limit
+        // se interpolaba directo en el SQL string ("LIMIT $limit"), y
+        // aunque `intval` lo hacía safe (siempre un integer), un refactor
+        // que quitara el `intval` abría SQLi. Cambiar a placeholder `%d`
+        // + `absint` cierra el riesgo futuro (WordPress Coding Standards
+        // WordPress.DB.PreparedSQL.NotPrepared).
+        $limit     = absint( $args['limit'] ?? 500 );
+        if ( $limit === 0 ) {
+            $limit = 500; // Default seguro si absint(0) o negativo.
+        }
 
         $where  = "WHERE c.status != 'sandbox' AND c.created_at BETWEEN %s AND %s";
         $params = [ $date_from . ' 00:00:00', $date_to . ' 23:59:59' ];
         if ( $country ) { $where .= " AND c.country_code = %s"; $params[] = $country; }
+        // AUDIT-ADMIN-003-002 FIX (cont.): $limit como placeholder en $params.
+        $params[] = $limit;
 
         $rows = $wpdb->get_results(
             $wpdb->prepare(
@@ -38,7 +65,7 @@ class LTMS_Fiscal_Exporter {
                  LEFT JOIN {$wpdb->usermeta} um_pais  ON um_pais.user_id  = c.vendor_id AND um_pais.meta_key  = 'ltms_vendor_pais'
                  LEFT JOIN {$wpdb->usermeta} um_banco ON um_banco.user_id = c.vendor_id AND um_banco.meta_key = 'ltms_vendor_banco'
                  LEFT JOIN {$wpdb->usermeta} um_clabe ON um_clabe.user_id = c.vendor_id AND um_clabe.meta_key = 'ltms_vendor_clabe'
-                 $where ORDER BY c.id DESC LIMIT $limit",
+                 $where ORDER BY c.id DESC LIMIT %d",
                 ...$params
             ),
             ARRAY_A
