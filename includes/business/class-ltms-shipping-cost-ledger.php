@@ -420,8 +420,24 @@ class LTMS_Shipping_Cost_Ledger {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_shipping_cost_ledger';
 
+        // CICLO6-P0-SHLEDGER-001 FIX: el UPDATE a status='delivered' no se
+        // verificaba. Si fallaba silenciosamente (=== false por error DB, o
+        // === 0 si no habia entries en status shipped/quoted - p.ej. el
+        // webhook llego antes que on_shipment_created creara el entry, o el
+        // entry ya estaba delivered), se logueaba SHIPPING_LEDGER_DELIVERED
+        // como info mintiendo sobre el estado real. El sistema downstream
+        // (consumer-protection hold release, wallet release, alegra sync)
+        // podia actuar asumiendo delivered cuando el ledger seguia en
+        // shipped/quoted - liberacion prematura del hold del vendor,
+        // payout sin haber recibido el comprador, o asiento Alegra de
+        // comision sin entrega confirmada.
+        // Fix: capturar $delivered_rows + verificar === false o === 0.
+        // En === false (error DB), log critico SHLEDGER_DELIVERED_UPDATE_FAILED
+        // para monitoreo. En === 0 (no rows matched), log info
+        // SHLEDGER_DELIVERED_NO_MATCH (no es error - puede ser timing o
+        // idempotency, pero el admin debe verlo para reconciliacion).
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->query( $wpdb->prepare(
+        $delivered_rows = $wpdb->query( $wpdb->prepare(
             "UPDATE `{$table}` SET
                 status = %s,
                 delivered_at = %s,
@@ -435,9 +451,36 @@ class LTMS_Shipping_Cost_Ledger {
             self::STATUS_QUOTED
         ) );
 
+        if ( false === $delivered_rows ) {
+            LTMS_Core_Logger::critical(
+                'SHLEDGER_DELIVERED_UPDATE_FAILED',
+                sprintf(
+                    'Order #%d: UPDATE a status=delivered fallo (last_error=%s). El ledger puede seguir en shipped/quoted - verificar antes de liberar hold/payout.',
+                    $order_id,
+                    $wpdb->last_error ?: '(no error)'
+                ),
+                [ 'order_id' => $order_id, 'carrier' => $carrier, 'last_error' => $wpdb->last_error ]
+            );
+            return;
+        }
+
+        if ( 0 === (int) $delivered_rows ) {
+            LTMS_Core_Logger::info(
+                'SHLEDGER_DELIVERED_NO_MATCH',
+                sprintf(
+                    'Order #%d: UPDATE a delivered no afecto filas (entries en estado distinto a shipped/quoted, o ya delivered, o no existen aun). carrier=%s.',
+                    $order_id,
+                    $carrier
+                ),
+                [ 'order_id' => $order_id, 'carrier' => $carrier, 'rows_affected' => $delivered_rows ]
+            );
+            return;
+        }
+
         LTMS_Core_Logger::info(
             'SHIPPING_LEDGER_DELIVERED',
-            sprintf( 'Order #%d marcada como delivered en ledger (carrier=%s).', $order_id, $carrier )
+            sprintf( 'Order #%d marcada como delivered en ledger (carrier=%s, rows=%d).', $order_id, $carrier, $delivered_rows ),
+            [ 'order_id' => $order_id, 'carrier' => $carrier, 'rows_affected' => $delivered_rows ]
         );
     }
 
@@ -453,9 +496,26 @@ class LTMS_Shipping_Cost_Ledger {
         $table = $wpdb->prefix . 'lt_shipping_cost_ledger';
 
         // No cambiamos status a 'failed' (no existe en el ENUM). Marcamos como 'disputed'
-        // automáticamente para que el equipo lo revise y abra disputa formal si aplica.
+        // automaticamente para que el equipo lo revise y abra disputa formal si aplica.
+        // CICLO6-P0-SHLEDGER-002 FIX: el UPDATE a status='disputed' no se
+        // verificaba. Si fallaba silenciosamente (=== false por error DB,
+        // o === 0 si no habia entries en status quoted/shipped/delivered),
+        // se logueaba SHIPPING_LEDGER_FAILED avisando 'posible disputa'
+        // mintiendo sobre el estado real. Peor: la seccion
+        // delivered-now-disputed (linea 483-495 mas abajo) cuenta entries
+        // con metadata LIKE '%failure_carrier%' - si el UPDATE fallo, no
+        // hay metadata JSON_SET, la cuenta es 0, y la alerta critica
+        // SHIPPING_LEDGER_DELIVERED_NOW_DISPUTED (que es la que avisa
+        // que un entry fue delivered y ahora requiere clawback manual)
+        // nunca se dispara aunque deberia. El admin queda sin aviso de que
+        // un entry delivered quedara en delivered statt disputed, y el
+        // vendor ya tiene el dinero liberado (hold release) - irrecoverable.
+        // Fix: capturar $failed_rows + verificar. En === false, log critico
+        // SHLEDGER_FAILED_UPDATE_FAILED. En === 0, log info
+        // SHLEDGER_FAILED_NO_MATCH (no es error pero el admin debe verlo).
+        // En exito, proceder al check delivered-now-disputed.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->query( $wpdb->prepare(
+        $failed_rows = $wpdb->query( $wpdb->prepare(
             "UPDATE `{$table}` SET
                 status = %s,
                 updated_at = %s,
@@ -471,14 +531,44 @@ class LTMS_Shipping_Cost_Ledger {
             self::STATUS_DELIVERED
         ) );
 
+        if ( false === $failed_rows ) {
+            LTMS_Core_Logger::critical(
+                'SHLEDGER_FAILED_UPDATE_FAILED',
+                sprintf(
+                    'Order #%d: UPDATE a status=disputed (carrier failed) fallo (last_error=%s). El ledger puede seguir en quoted/shipped/delivered - la alerta delivered-now-disputed NO se evaluara (no hay metadata). Verificar entries del order y abrir disputas manualmente si aplica.',
+                    $order_id,
+                    $wpdb->last_error ?: '(no error)'
+                ),
+                [ 'order_id' => $order_id, 'carrier' => $carrier, 'last_error' => $wpdb->last_error ]
+            );
+            return;
+        }
+
+        if ( 0 === (int) $failed_rows ) {
+            LTMS_Core_Logger::info(
+                'SHLEDGER_FAILED_NO_MATCH',
+                sprintf(
+                    'Order #%d: UPDATE a disputed (carrier failed) no afecto filas (entries en estado distinto a quoted/shipped/delivered, o no existen aun). carrier=%s.',
+                    $order_id,
+                    $carrier
+                ),
+                [ 'order_id' => $order_id, 'carrier' => $carrier, 'rows_affected' => $failed_rows ]
+            );
+            return;
+        }
+
         LTMS_Core_Logger::warning(
             'SHIPPING_LEDGER_FAILED',
-            sprintf( 'Order #%d marcada para revisión (carrier=%s failed). Posible disputa.', $order_id, $carrier )
+            sprintf( 'Order #%d marcada para revision (carrier=%s failed, rows=%d). Posible disputa.', $order_id, $carrier, $failed_rows ),
+            [ 'order_id' => $order_id, 'carrier' => $carrier, 'rows_affected' => $failed_rows ]
         );
 
         // RE-AUDIT P1 FIX: if entries were DELIVERED, the consumer protection
         // hold may have already been released (vendor has the money). Log a
         // critical alert so the team can attempt manual clawback if needed.
+        // CICLO6-P0-SHLEDGER-002 (parte 2): la queryCount solo es valida
+        // despues de confirmar que el UPDATE persistio. Antes, si el UPDATE
+        // fallaba, esta cuenta era 0 (no metadata) y la alerta se perdia.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $delivered_count = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT COUNT(*) FROM `{$table}` WHERE order_id = %d AND status = %s AND metadata LIKE '%s'",
@@ -578,8 +668,22 @@ class LTMS_Shipping_Cost_Ledger {
             }
 
             // Insertar factura.
+            // CICLO6-P1-SHLEDGER-005 FIX (parte 1): el INSERT de la factura
+            // no se verificaba. Si fallaba (=== false por error DB,
+            // constraint violation), $wpdb->insert_id quedaba en 0 y el
+            // codigo procedia a insertar las lineas con invoice_id=0 (FK
+            // violation sin FK -> lineas huerfanas en lt_carrier_invoice_lines
+            // con invoice_id=0 para siempre). Adicionalmente, si una linea
+            // fallaba al insertar en medio del foreach (linea 618), las N-1
+            // primeras lineas quedaban persistidas sin poder revertir -> la
+            // factura quedaba parcialmente importada, el stats era
+            // inconsistente (lines_count != filas reales en tabla).
+            // Fix: abrir transaccion, verificar INSERT de factura, abortar
+            // si falla (return con errors + rollback). Verificar INSERT de
+            // cada linea, abortar el foreach si una falla (rollback + log).
+            $wpdb->query( 'START TRANSACTION' );
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert( $inv_table, [
+            $inv_inserted = $wpdb->insert( $inv_table, [
                 'carrier'         => $carrier,
                 'invoice_number'  => $invoice_number,
                 'invoice_date'    => $invoice_date,
@@ -595,10 +699,30 @@ class LTMS_Shipping_Cost_Ledger {
                 'imported_by'     => $imported_by,
                 'imported_at'     => current_time( 'mysql', true ),
             ] );
+
+            if ( false === $inv_inserted ) {
+                $wpdb->query( 'ROLLBACK' );
+                $result['errors'][] = sprintf(
+                    'INSERT factura fallo: %s',
+                    $wpdb->last_error ?: '(no error)'
+                );
+                LTMS_Core_Logger::critical(
+                    'SHLEDGER_INVOICE_INSERT_FAILED',
+                    sprintf(
+                        'Carrier=%s Invoice=%s: INSERT en lt_carrier_invoices fallo (last_error=%s). Import abortado - ninguna linea fue insertada.',
+                        $carrier,
+                        $invoice_number,
+                        $wpdb->last_error ?: '(no error)'
+                    ),
+                    [ 'carrier' => $carrier, 'invoice_number' => $invoice_number, 'last_error' => $wpdb->last_error ]
+                );
+                return $result;
+            }
+
             $invoice_id = (int) $wpdb->insert_id;
             $result['invoice_id'] = $invoice_id;
 
-            // Insertar líneas + auto-match.
+            // Insertar lineas + auto-match.
             $line_number = 1;
             $matched_count = 0;
             $unmatched_count = 0;
@@ -614,8 +738,11 @@ class LTMS_Shipping_Cost_Ledger {
                 $line_tax = (float) ( $line['tax_amount'] ?? 0 );
                 $total    = (float) ( $line['total_amount'] ?? ( $billed + $line_tax ) );
 
+                // CICLO6-P1-SHLEDGER-005 FIX (parte 2): verificar INSERT de
+                // cada linea. Si falla, rollback + abort (no perder mas
+                // lineas - el import queda abortado).
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $wpdb->insert( $line_table, [
+                $line_inserted = $wpdb->insert( $line_table, [
                     'invoice_id'       => $invoice_id,
                     'line_number'      => $line_number,
                     'tracking_number'  => $tracking ?: null,
@@ -630,6 +757,34 @@ class LTMS_Shipping_Cost_Ledger {
                     'currency'         => sanitize_text_field( $line['currency'] ?? $currency ),
                     'match_status'     => 'pending',
                 ] );
+
+                if ( false === $line_inserted ) {
+                    $wpdb->query( 'ROLLBACK' );
+                    $result['errors'][] = sprintf(
+                        'INSERT linea %d fallo: %s',
+                        $line_number,
+                        $wpdb->last_error ?: '(no error)'
+                    );
+                    LTMS_Core_Logger::critical(
+                        'SHLEDGER_INVOICE_LINE_INSERT_FAILED',
+                        sprintf(
+                            'Carrier=%s Invoice=%s linea %d: INSERT fallo (last_error=%s). Import abortado con rollback - factura y lineas previas revertidas.',
+                            $carrier,
+                            $invoice_number,
+                            $line_number,
+                            $wpdb->last_error ?: '(no error)'
+                        ),
+                        [
+                            'carrier'       => $carrier,
+                            'invoice_number' => $invoice_number,
+                            'line_number'   => $line_number,
+                            'last_error'    => $wpdb->last_error,
+                        ]
+                    );
+                    $result['invoice_id'] = 0;
+                    return $result;
+                }
+
                 $line_id = (int) $wpdb->insert_id;
 
                 // Auto-match.
@@ -676,7 +831,7 @@ class LTMS_Shipping_Cost_Ledger {
             // Actualizar totales de la factura.
             $status = ( $unmatched_count === 0 ) ? 'matched' : ( ( $matched_count > 0 ) ? 'partial' : 'imported' );
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update( $inv_table, [
+            $totals_updated = $wpdb->update( $inv_table, [
                 'lines_matched'    => $matched_count,
                 'lines_unmatched'  => $unmatched_count,
                 'matched_amount'   => $matched_amount,
@@ -684,6 +839,33 @@ class LTMS_Shipping_Cost_Ledger {
                 'variance_total'   => $variance_total,
                 'status'           => $status,
             ], [ 'id' => $invoice_id ] );
+
+            // CICLO6-P1-SHLEDGER-005 FIX (parte 3): COMMIT solo si el UPDATE
+            // de totales tambien persistio. Si falla, rollback - la factura
+            // y todas las lineas quedan revertidas (consistencia atomic).
+            if ( false === $totals_updated ) {
+                $wpdb->query( 'ROLLBACK' );
+                $result['errors'][] = sprintf(
+                    'UPDATE totales factura #%d fallo: %s',
+                    $invoice_id,
+                    $wpdb->last_error ?: '(no error)'
+                );
+                LTMS_Core_Logger::critical(
+                    'SHLEDGER_INVOICE_TOTALS_UPDATE_FAILED',
+                    sprintf(
+                        'Carrier=%s Invoice=%s #%d: UPDATE totales fallo (last_error=%s). Rollback - factura y lineas revertidas.',
+                        $carrier,
+                        $invoice_number,
+                        $invoice_id,
+                        $wpdb->last_error ?: '(no error)'
+                    ),
+                    [ 'carrier' => $carrier, 'invoice_number' => $invoice_number, 'invoice_id' => $invoice_id, 'last_error' => $wpdb->last_error ]
+                );
+                $result['invoice_id'] = 0;
+                return $result;
+            }
+
+            $wpdb->query( 'COMMIT' );
 
             $result['lines_count']     = count( $lines );
             $result['lines_matched']   = $matched_count;
@@ -700,7 +882,16 @@ class LTMS_Shipping_Cost_Ledger {
             );
 
         } catch ( \Throwable $e ) {
+            // CICLO6-P1-SHLEDGER-005 FIX (parte 4): si la excepcion salta
+            // despues del START_TRANSACTION pero antes del COMMIT (p.ej. en
+            // match_invoice_line_to_ledger o set_real_cost_from_invoice_line
+            // dentro del foreach), la transaccion queda abierta → la factura
+            // y las lineas insertadas (que violarian el UNIQUENESS en retry)
+            // quedan persistidas en una transaccion colgante. Rollback
+            // defensivo: si no hay transaccion activa, ROLLBACK es no-op.
+            $wpdb->query( 'ROLLBACK' );
             $result['errors'][] = $e->getMessage();
+            $result['invoice_id'] = 0;
             LTMS_Core_Logger::error(
                 'SHIPPING_INVOICE_IMPORT_FAILED',
                 sprintf( 'Carrier=%s: %s', $carrier, $e->getMessage() )
@@ -711,12 +902,12 @@ class LTMS_Shipping_Cost_Ledger {
     }
 
     /**
-     * Match de una línea de factura a un entry del ledger.
+     * Match de una linea de factura a un entry del ledger.
      *
      * Estrategia (en orden):
-     *  1. Por tracking_number (más exacto).
+     *  1. Por tracking_number (mas exacto).
      *  2. Por order_ref (numero de pedido).
-     *  3. Sin match → phantom charge ( línea unmatched ).
+     *  3. Sin match -> phantom charge ( linea unmatched ).
      *
      * @param string $tracking
      * @param string $order_ref
@@ -911,16 +1102,52 @@ class LTMS_Shipping_Cost_Ledger {
         $dispute_id = (int) $wpdb->insert_id;
 
         // Marcar el ledger entry como disputed.
+        // CICLO6-P1-SHLEDGER-006 FIX: el UPDATE que marca el ledger entry
+        // como disputed no se verificaba. Si fallaba, el dispute_id existia
+        // en lt_shipping_disputes PERO el ledger entry no tenia dispute_id
+        // ni status='disputed' -> disputa huerfana (mismo patron que
+        // SHLEDGER-004 pero en el path automatico, disparado por
+        // set_real_cost_from_invoice_line cuando la varianza > tolerance).
+        // El admin veia la disputa en la tabla pero el ledger entry segnia
+        // en status anterior (invoiced) -> run_daily_alerts podia
+        // re-procesar el entry, abrir otra disputa (race loser con el
+        // idempotency check), o peor: reconcile_vendor_charge podia
+        // ejecutarse de nuevo sobre un entry con status='invoiced' en lugar
+        // de 'disputed' -> doble ajuste de wallet. Fix identico al
+        // SHLEDGER-004: capturar + verificar + log critico
+        // SHLEDGER_AUTO_DISPUTE_LINK_FAILED si falla.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
+        $auto_link_updated = $wpdb->update(
             $wpdb->prefix . 'lt_shipping_cost_ledger',
             [ 'dispute_id' => $dispute_id, 'status' => self::STATUS_DISPUTED, 'updated_at' => current_time( 'mysql', true ) ],
             [ 'id' => $ledger_id ]
         );
 
+        if ( $auto_link_updated === false || $auto_link_updated === 0 ) {
+            LTMS_Core_Logger::critical(
+                'SHLEDGER_AUTO_DISPUTE_LINK_FAILED',
+                sprintf(
+                    'Disputa #%d abierta automaticamente PERO el UPDATE del ledger entry #%d fallo (updated=%s, last_error=%s). Disputa huerfana - reconciliacion manual: UPDATE lt_shipping_cost_ledger SET dispute_id=%d, status=\'disputed\' WHERE id=%d.',
+                    $dispute_id,
+                    $ledger_id,
+                    var_export( $auto_link_updated, true ),
+                    $wpdb->last_error ?: '(no error)',
+                    $dispute_id,
+                    $ledger_id
+                ),
+                [
+                    'dispute_id' => $dispute_id,
+                    'ledger_id'  => $ledger_id,
+                    'updated'    => $auto_link_updated,
+                    'last_error' => $wpdb->last_error,
+                ]
+            );
+        }
+
         LTMS_Core_Logger::warning(
             'SHIPPING_DISPUTE_AUTO_OPENED',
-            sprintf( 'Disputa #%d abierta automáticamente para ledger #%d (varianza=%.2f%%).', $dispute_id, $ledger_id, $variance_pct )
+            sprintf( 'Disputa #%d abierta automaticamente para ledger #%d (varianza=%.2f%%).', $dispute_id, $ledger_id, $variance_pct ),
+            [ 'dispute_id' => $dispute_id, 'ledger_id' => $ledger_id, 'variance_pct' => $variance_pct ]
         );
     }
 
@@ -1257,8 +1484,20 @@ class LTMS_Shipping_Cost_Ledger {
             return $existing_dispute;
         }
 
+        // CICLO6-P1-SHLEDGER-003 FIX: el INSERT en lt_shipping_disputes
+        // no se verificaba. Si fallaba (=== false por error DB, constraint
+        // violation, o tabla inexistente), $wpdb->insert_id quedaba en 0 y
+        // el bloque if ( $dispute_id ) abajo no entraba - pero tampoco se
+        // logueaba el fallo. Disputa silenciosamente perdida: el admin
+        // veia 'exito' (return $dispute_id = 0) pero la disputa nunca
+        // existio. El idempotency check previo (existing_dispute > 0)
+        // retornaba el ID previo, asi que el unico path donde 0 === fallo
+        // era este INSERT.
+        // Fix: capturar $inserted + verificar === false. En fallo, log
+        // critico SHLEDGER_DISPUTE_INSERT_FAILED + return 0 (segnal clara
+        // de fallo, distinta de $existing_dispute_id > 0 que retorna el ID).
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert( $table, [
+        $inserted = $wpdb->insert( $table, [
             'ledger_id'        => $ledger_id,
             'invoice_id'       => (int) ( $data['invoice_id'] ?? 0 ) ?: null,
             'invoice_line_id'  => (int) ( $data['invoice_line_id'] ?? 0 ) ?: null,
@@ -1273,16 +1512,64 @@ class LTMS_Shipping_Cost_Ledger {
             'sla_due_at'       => gmdate( 'Y-m-d H:i:s', time() + ( $sla_days * DAY_IN_SECONDS ) ),
         ] );
 
+        if ( false === $inserted ) {
+            LTMS_Core_Logger::critical(
+                'SHLEDGER_DISPUTE_INSERT_FAILED',
+                sprintf(
+                    'Ledger #%d: INSERT en lt_shipping_disputes fallo (last_error=%s). Disputa no creada - revisar manualmente.',
+                    $ledger_id,
+                    $wpdb->last_error ?: '(no error)'
+                ),
+                [ 'ledger_id' => $ledger_id, 'data' => $data, 'last_error' => $wpdb->last_error ]
+            );
+            return 0;
+        }
+
         $dispute_id = (int) $wpdb->insert_id;
 
         if ( $dispute_id ) {
             // Marcar el ledger entry como disputed.
+            // CICLO6-P1-SHLEDGER-004 FIX: el UPDATE que marca el ledger entry
+            // como disputed no se verificaba. Si fallaba, el dispute_id
+            // existia en lt_shipping_disputes PERO el ledger entry no tenia
+            // dispute_id ni status='disputed' -> disputa huerfana. El admin
+            // veia la disputa en la tabla de disputas pero al abrir el
+            // ledger entry no veia el link -> imposible conciliar, y peor:
+            // el entry podia ser procesado por otras logicas (set_real_cost,
+            // run_daily_alerts) como si no tuviera disputa abierta -> doble
+            // procesamiento. Mismo patron que SHLEDGER-006 (auto_open_dispute),
+            // pero en el path manual.
+            // Fix: capturar $ledger_link_updated + verificar === false o ===
+            // 0. En fallo, log critico SHLEDGER_DISPUTE_LINK_FAILED con el
+            // dispute_id para reconciliacion manual (UPDATE manual del
+            // ledger entry con dispute_id).
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update(
+            $ledger_link_updated = $wpdb->update(
                 $wpdb->prefix . 'lt_shipping_cost_ledger',
                 [ 'dispute_id' => $dispute_id, 'status' => self::STATUS_DISPUTED, 'updated_at' => current_time( 'mysql', true ) ],
                 [ 'id' => $ledger_id ]
             );
+
+            if ( $ledger_link_updated === false || $ledger_link_updated === 0 ) {
+                LTMS_Core_Logger::critical(
+                    'SHLEDGER_DISPUTE_LINK_FAILED',
+                    sprintf(
+                        'Disputa #%d creada PERO el UPDATE del ledger entry #%d fallo (updated=%s, last_error=%s). Disputa huerfana - reconciliacion manual: UPDATE lt_shipping_cost_ledger SET dispute_id=%d, status=\'disputed\' WHERE id=%d.',
+                        $dispute_id,
+                        $ledger_id,
+                        var_export( $ledger_link_updated, true ),
+                        $wpdb->last_error ?: '(no error)',
+                        $dispute_id,
+                        $ledger_id
+                    ),
+                    [
+                        'dispute_id'    => $dispute_id,
+                        'ledger_id'     => $ledger_id,
+                        'updated'       => $ledger_link_updated,
+                        'last_error'    => $wpdb->last_error,
+                    ]
+                );
+            }
         }
 
         return $dispute_id;
