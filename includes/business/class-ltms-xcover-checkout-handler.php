@@ -146,11 +146,17 @@ class LTMS_XCover_Checkout_Handler {
     }
 
     public function save_insurance_selection( \WC_Order $order ): void {
-        $selected = sanitize_key( $_POST['ltms_insurance_selected'] ?? 'no' ); // phpcs:ignore
+        // CICLO4-P2-XCOVER-001 FIX: aplicar wp_unslash a $_POST antes de
+        // sanitize para cumplir con el patron de seguridad de WordPress
+        // (sanitize_text_field no quita slashes; wp_magic_quotes() añade
+        // slashes a superglobals en contextos WP estándar, pero en custom
+        // endpoints/AJAX puede no estar activo). Patrón: wp_unslash primero,
+        // luego sanitize.
+        $selected = sanitize_key( wp_unslash( $_POST['ltms_insurance_selected'] ?? 'no' ) ); // phpcs:ignore
         if ( $selected !== 'yes' ) return;
 
-        $quote_id = sanitize_text_field( $_POST['ltms_insurance_quote_id'] ?? '' ); // phpcs:ignore
-        $type     = sanitize_key( $_POST['ltms_insurance_type'] ?? '' ); // phpcs:ignore
+        $quote_id = sanitize_text_field( wp_unslash( $_POST['ltms_insurance_quote_id'] ?? '' ) ); // phpcs:ignore
+        $type     = sanitize_key( wp_unslash( $_POST['ltms_insurance_type'] ?? '' ) ); // phpcs:ignore
 
         // XC-1 FIX: validate quote_id format — XCover quote IDs are opaque
         // alphanumeric tokens (typically UUIDs or short hashes). Reject anything

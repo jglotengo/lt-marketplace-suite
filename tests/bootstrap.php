@@ -424,6 +424,7 @@ if ( $ltms_unit_only ) {
         function ltms_tests_make_clean_wpdb(): object {
             return new class {
                 public string $prefix = 'wp_';
+                public string $last_error = '';
                 public function get_var( mixed $query = null ): mixed { return null; }
                 public function get_results( mixed $query = null, string $output = 'OBJECT' ): array { return []; }
                 public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed { return null; }

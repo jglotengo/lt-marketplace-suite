@@ -295,6 +295,32 @@ final class LTMS_Deposit {
                 throw new \RuntimeException( 'LTMS Deposit: Error al actualizar estado del depósito.' );
             }
 
+            // CICLO4-P0-DEPOSIT-001 FIX: detectar $updated === 0 explicitamente.
+            // $updated === 0 significa que ninguna fila fue modificada — el
+            // deposito fue borrado entre el atomic claim y este UPDATE, o el
+            // id del deposit row no existe (race muy raro pero teoricamente
+            // posible). En este punto, el credito de wallet YA se aplico
+            // (linea 263, idempotency_key='deposit_credit_N') — el vendor
+            // TIENE el saldo en su wallet. Lanzar excepcion provoca que el
+            // catch (linea 319) revierta el atomic claim a 'pending'
+            // (linea 321-327), lo cual significa que el admin ve el
+            // deposito como 'pending' aunque la wallet ya acredita. La
+            // idempotency_key del credito previene doble credito si el admin
+            // reintenta approve(). Sin embargo, este desync
+            // (wallet-ya-acreditado / status-revertido) debe ser logueado
+            // criticamente para que el admin lo sepa y reconcilie a mano si
+            // hace falta. El idem_key se incluye en el log para auditoria.
+            if ( $updated === 0 ) {
+                throw new \RuntimeException(
+                    sprintf(
+                        'LTMS Deposit: UPDATE a approved afecto 0 filas — deposit #%d desaparecido. El credito de wallet ya se aplico (idem_key=%s, tx_id=%d). El catch revertira el atomic claim a pending pero la wallet tiene el saldo. Reconciliar a mano si es necesario.',
+                        $deposit_id,
+                        $idem_key,
+                        $tx_id
+                    )
+                );
+            }
+
             LTMS_Core_Logger::info(
                 'DEPOSIT_APPROVED',
                 sprintf( 'Depósito #%d APROBADO por admin #%d — Wallet tx #%d — Monto: %s',
@@ -318,13 +344,40 @@ final class LTMS_Deposit {
 
         } catch ( \Throwable $e ) {
             // Revertir el atomic claim: volver a 'pending' para que se pueda reintentar.
-            $wpdb->update(
+            $rollback_updated = $wpdb->update(
                 self::table(),
                 [ 'status' => self::STATUS_PENDING, 'updated_at' => LTMS_Utils::now_utc() ],
                 [ 'id' => $deposit_id, 'status' => 'processing' ],
                 [ '%s', '%s' ],
                 [ '%d', '%s' ]
             );
+
+            // CICLO4-P1-DEPOSIT-002 FIX: verificar el rollback del atomic claim.
+            // Si este UPDATE falla (=== false, error DB) o afecta 0 filas (el
+            // deposit row desaparecio o el status ya cambio concurrentemente),
+            // el deposito quedara stuck en 'processing' para siempre — el admin
+            // no puede approve() (status!=pending) ni reject() (acepta pending O
+            // processing, pero el reject pondria 'rejected' saltandose el
+            // credito). Log critico para deteccion manual — sin este log, el
+            // deposito stuck es invisible hasta que el vendor reclame.
+            if ( $rollback_updated === false || $rollback_updated === 0 ) {
+                LTMS_Core_Logger::error(
+                    'DEPOSIT_ATOMIC_CLAIM_ROLLBACK_FAILED',
+                    sprintf(
+                        'Deposito #%d: fallo el rollback del atomic claim tras error en approve() — updated=%s, last_error=%s. Deposito quedara stuck en processing. Reconciliar manualmente.',
+                        $deposit_id,
+                        $rollback_updated === false ? 'false' : '0',
+                        $wpdb->last_error
+                    ),
+                    [
+                        'deposit_id'  => $deposit_id,
+                        'admin_id'    => $admin_id,
+                        'updated'     => $rollback_updated,
+                        'last_error'  => $wpdb->last_error,
+                        'orig_error'  => $e->getMessage(),
+                    ]
+                );
+            }
 
             LTMS_Core_Logger::error(
                 'DEPOSIT_APPROVE_FAILED',

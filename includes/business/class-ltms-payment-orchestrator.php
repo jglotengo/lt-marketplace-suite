@@ -241,7 +241,7 @@ final class LTMS_Payment_Orchestrator {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$wpdb->insert(
+		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'lt_provider_health',
 			[
 				'provider'   => sanitize_text_field( $provider ),
@@ -252,6 +252,34 @@ final class LTMS_Payment_Orchestrator {
 			],
 			[ '%s', '%s', '%d', '%s', '%s' ]
 		);
+
+		// CICLO4-P1-ORCH-001 FIX: verificar el retorno del INSERT. Si falla
+		// silenciosamente (=== false), los eventos del proveedor no se
+		// registran en lt_provider_health → maybe_trip_circuit_breaker()
+		// nunca ve los 3 errores necesarios para activar el circuit breaker
+		// → un gateway caido sigue recibiendo tráfico indefinidamente. El
+		// usuario final ve timeouts lentos en lugar de un fallback rapido.
+		// Log critico para monitoreo (no lanzamos excepcion: este metodo se
+		// llama desde catch blocks donde una excepcion adicional podria
+		// enmascarar el error original del gateway).
+		if ( $inserted === false ) {
+			LTMS_Core_Logger::error(
+				'PROVIDER_HEALTH_INSERT_FAILED',
+				sprintf(
+					'No se pudo registrar evento de proveedor %s (status=%s, latency=%dms) en lt_provider_health — last_error=%s. Circuit breaker puede no activarse.',
+					$provider,
+					$status,
+					$latency_ms,
+					$wpdb->last_error
+				),
+				[
+					'provider'   => $provider,
+					'status'     => $status,
+					'latency_ms' => $latency_ms,
+					'last_error' => $wpdb->last_error,
+				]
+			);
+		}
 	}
 
 	/**
