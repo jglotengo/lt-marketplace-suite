@@ -73,8 +73,42 @@ final class LTMS_Order_Paid_Listener {
             "UPDATE {$wpdb->postmeta} SET meta_value = '1' WHERE post_id = %d AND meta_key = %s AND (meta_value IS NULL OR meta_value != '1')",
             $order_id, '_ltms_commissions_processed'
         ) );
-        if ( ! $claimed ) {
-            return; // Already claimed by another process
+        // CICLO17-P1-OP-046 FIX: el check `if ( ! $claimed )` original
+        // no distinguia entre 0 (filas afectadas = ya reclamado por otro
+        // proceso, OK) y false (error DB con last_error). Si $wpdb->query
+        // retorna false (DB timeout, deadlock, replica lag, etc.), se
+        // hacia return silencioso -> el pedido NUNCA se procesa (no
+        // comisiones, no Siigo, no notif al vendor, no shipping, no
+        // ledger) y el admin no se entera del fallo transitorio -> el
+        // pedido queda en limbo sin facturacion electronica DIAN/SAT
+        // (requisito regulatorio) ni acreditacion al vendor (dinero
+        // perdido). Patron recurrente Ciclos 5-16.
+        // Fix: distinguir false (error DB -> log critico + return) de
+        // 0 (ya reclamado -> return silencioso, OK). Log critico
+        // ORDER_PAID_ATOMIC_CLAIM_DB_FAILED con SQL de reconciliacion
+        // manual para que el admin pueda reintentar el pedido a mano.
+        if ( false === $claimed ) {
+            LTMS_Core_Logger::critical(
+                'ORDER_PAID_ATOMIC_CLAIM_DB_FAILED',
+                sprintf(
+                    'Order #%d: atomic claim UPDATE failed (DB error). last_error=%s. El pedido NO se procesa -> sin comisiones, sin Siigo, sin notif, sin shipping, sin ledger. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_commissions_processed\' (reset flag) + disparar on_order_paid(%d) via wp-cli: wp eval "do_action(woocommerce_payment_complete, %d);".',
+                    $order_id,
+                    $wpdb->last_error ?: '(no error)',
+                    $wpdb->prefix,
+                    $order_id,
+                    $order_id,
+                    $order_id
+                ),
+                [
+                    'order_id'   => $order_id,
+                    'last_error' => $wpdb->last_error ?: '(no error)',
+                    'claimed'    => var_export( $claimed, true ),
+                ]
+            );
+            return; // No procesar - error DB, retry manual necesario
+        }
+        if ( 0 === (int) $claimed ) {
+            return; // Already claimed by another process (0 filas afectadas)
         }
 
         // Disparar en orden secuencial, manejando errores individualmente
@@ -142,17 +176,48 @@ final class LTMS_Order_Paid_Listener {
             );
         } else {
             // Fallback: agregar a la cola propia de LTMS
+            // CICLO17-P1-OP-049 FIX: el INSERT en lt_job_queue NO se
+            // verificaba. Si fallaba silenciosamente (false = error DB
+            // con last_error), no se agendaba la factura Siigo Y no se
+            // logueaba critico -> el admin no se entera de que falló la
+            // sync -> la factura electronica (requisito regulatorio
+            // DIAN/SAT - Art. 30-B CFF / E.T. 437-2 CO, Res. DIAN
+            // 167/2023 - PU) no se emite -> sancion regulatoria +
+            // reproceso manual tardío en cierre contable. Patron
+            // recurrente Ciclos 5-16. Fix: capturar $inserted_queue +
+            // log critico SIIGO_INVOICE_QUEUE_INSERT_FAILED con SQL de
+            // reconciliacion manual.
             global $wpdb;
             $table = $wpdb->prefix . 'lt_job_queue';
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert( $table, [
+            $inserted_queue = $wpdb->insert( $table, [
                 'hook'         => 'ltms_sync_siigo_invoice',
                 'args'         => wp_json_encode( [ 'order_id' => $order->get_id() ] ),
                 'priority'     => 10,
                 'status'       => 'pending',
                 'scheduled_at' => gmdate( 'Y-m-d H:i:s', time() + 30 ),
                 'created_at'   => LTMS_Utils::now_utc(),
-            ], [ '%s', '%s', '%d', '%s', '%s', '%s' ]);
+            ], [ '%s', '%s', '%d', '%s', '%s', '%s' ] );
+
+            if ( false === $inserted_queue && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'SIIGO_INVOICE_QUEUE_INSERT_FAILED',
+                    sprintf(
+                        'Order #%d: failed to insert into lt_job_queue (fallback path, ActionScheduler no disponible). last_error=%s. La factura electronica Siigo NO se agendo -> posible omision regulatoria DIAN/SAT (Art. 30-B CFF / E.T. 437-2). Reconciliacion manual: INSERT INTO %slt_job_queue (hook, args, priority, status, scheduled_at, created_at) VALUES (\'ltms_sync_siigo_invoice\', %s, 10, \'pending\', \'%s\', UTC_TIMESTAMP()) + disparar el hook via wp-cli: wp eval "do_action(\'ltms_sync_siigo_invoice\', %d);".',
+                        $order->get_id(),
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        wp_json_encode( [ 'order_id' => $order->get_id() ] ),
+                        gmdate( 'Y-m-d H:i:s', time() + 30 ),
+                        $order->get_id()
+                    ),
+                    [
+                        'order_id'   => $order->get_id(),
+                        'last_error' => $wpdb->last_error ?: '(no error)',
+                        'inserted'   => var_export( $inserted_queue, true ),
+                    ]
+                );
+            }
         }
     }
 
@@ -247,7 +312,43 @@ final class LTMS_Order_Paid_Listener {
                 "UPDATE {$wpdb->postmeta} SET meta_value = '1' WHERE post_id = %d AND meta_key = %s AND (meta_value IS NULL OR meta_value != '1')",
                 $order->get_id(), '_ltms_shipping_debited'
             ) );
-            if ( ! $shipping_claimed ) {
+            // CICLO17-P1-OP-047 FIX: mismo patron que P1-OP-046.
+            // `if ( ! $shipping_claimed )` no distinguia 0 (ya
+            // debited por otro proceso, OK) de false (error DB). Si
+            // false, se hacia return silencioso -> no hay debito al
+            // vendor Y no hay log critico -> el admin no se entera
+            // del fallo transitorio (DB timeout, deadlock). Ademas
+            // el flag NO se flipea a '1' (sigue en '0') -> en la
+            // proxima ejecucion reintentara, pero si el error DB
+            // persiste, ciclo infinito silencioso (warning nunca
+            // se loguea porque no se alcanza el path de error, solo
+            // el path de "ya reclamado"). Patron recurrente Ciclos
+            // 5-16.
+            // Fix: distinguir false (error DB -> log critico +
+            // return, NO procesar el debito) de 0 (ya reclamado ->
+            // return silencioso, OK). Log critico
+            // SHIPPING_DEBIT_ATOMIC_CLAIM_DB_FAILED.
+            if ( false === $shipping_claimed ) {
+                LTMS_Core_Logger::critical(
+                    'SHIPPING_DEBIT_ATOMIC_CLAIM_DB_FAILED',
+                    sprintf(
+                        'Order #%d: atomic claim UPDATE for shipping_debited failed (DB error). last_error=%s. No se debita el shipping absorb al vendor #%d. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_shipping_debited\' + disparar debit_absorbed_shipping via wp-cli.',
+                        $order->get_id(),
+                        $wpdb->last_error ?: '(no error)',
+                        $vendor_id,
+                        $wpdb->prefix,
+                        $order->get_id()
+                    ),
+                    [
+                        'order_id'   => $order->get_id(),
+                        'vendor_id'  => $vendor_id,
+                        'last_error' => $wpdb->last_error ?: '(no error)',
+                        'claimed'    => var_export( $shipping_claimed, true ),
+                    ]
+                );
+                return; // No debitar - error DB, no continuar
+            }
+            if ( 0 === (int) $shipping_claimed ) {
                 return; // Already debited by another process
             }
 
@@ -280,11 +381,41 @@ final class LTMS_Order_Paid_Listener {
             // retry ante fallo transitorio (saldo insuficiente temporal,
             // DB timeout, etc.).
             global $wpdb;
+            // CICLO17-P1-OP-048 FIX: el reset del flag NO se verificaba.
+            // Si $wpdb->query retorna false (error DB secundario dentro
+            // del catch de un error primario), el flag queda en '1' ->
+            // no hay retry path: la proxima ejecucion del handler lee
+            // '1' y baila -> el vendor absorb nunca se debita (dinero
+            // perdido para la plataforma que absorbe el flete
+            // silenciosamente). Patron recurrente Ciclos 5-16.
+            // Fix: capturar $reset + check false === + log critico
+            // SHIPPING_DEBIT_FLAG_RESET_FAILED (en vez de warning) con
+            // SQL de reconciliacion manual para que el admin pueda
+            // resetear el flag a mano.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query( $wpdb->prepare(
+            $reset = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order->get_id(), '_ltms_shipping_debited'
             ) );
+            if ( false === $reset && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'SHIPPING_DEBIT_FLAG_RESET_FAILED',
+                    sprintf(
+                        'Order #%d: reset flag _ltms_shipping_debited=0 failed (DB error secundario en catch). last_error=%s. El flag sigue en \'1\' -> no hay retry path para debitar el shipping absorb al vendor #%d. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_shipping_debited\' + disparar debit_absorbed_shipping via wp-cli.',
+                        $order->get_id(),
+                        $wpdb->last_error ?: '(no error)',
+                        $order->get_meta( '_ltms_vendor_id' ) ?: 0,
+                        $wpdb->prefix,
+                        $order->get_id()
+                    ),
+                    [
+                        'order_id'   => $order->get_id(),
+                        'vendor_id'  => $order->get_meta( '_ltms_vendor_id' ) ?: 0,
+                        'last_error' => $wpdb->last_error ?: '(no error)',
+                        'reset'      => var_export( $reset, true ),
+                    ]
+                );
+            }
             LTMS_Core_Logger::warning( 'SHIPPING_DEBIT_FAILED', 'debit_absorbed_shipping order #' . $order->get_id() . ': ' . $e->getMessage() );
         }
     }
@@ -596,7 +727,24 @@ final class LTMS_Order_Paid_Listener {
             $table = $wpdb->prefix . 'lt_notifications';
 
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert( $table, [
+            // CICLO17-P1-OP-050 FIX: el INSERT en lt_notifications NO
+            // se verificaba explicitamente (solo estaba envuelto en
+            // try/catch general). Si el INSERT fallaba, el catch lo
+            // logueaba como NOTIFICATION_FAILED (warning) PERO: 
+            // (a) no distinguiaba entre INSERT fallido vs wp_mail
+            // fallido (ambos terminaban en el mismo catch -> diagnostico
+            // impreciso); (b) no habia SQL de reconciliacion para
+            // reinsertar la notif in-app manualmente. El email (canal
+            // secundario) si se enviaba abajo, pero el registro in-app
+            // desaparecia -> el vendor que mira la plataforma sin
+            // checkear email no se entera del pedido nuevo. Patron
+            // recurrente Ciclos 5-16. Fix: capturar $inserted_notif
+            // + check false === + log critico especifico
+            // VENDOR_NOTIF_INAPP_INSERT_FAILED (distinguido de
+            // NOTIFICATION_FAILED generico del catch) con SQL de
+            // reconciliacion manual. No se aborta el notify (email
+            // canal secundario sigue abajo) - solo loguea critico.
+            $inserted_notif = $wpdb->insert( $table, [
                 'user_id'    => $vendor_id,
                 'type'       => 'order_new',
                 'channel'    => 'inapp',
@@ -614,7 +762,29 @@ final class LTMS_Order_Paid_Listener {
                 ]),
                 'is_read'    => 0,
                 'created_at' => LTMS_Utils::now_utc(),
-            ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]);
+            ], [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ] );
+
+            if ( false === $inserted_notif && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'VENDOR_NOTIF_INAPP_INSERT_FAILED',
+                    sprintf(
+                        'Order #%d: failed to insert lt_notifications (order_new inapp) for vendor #%d. last_error=%s. El vendor no recibira alerta in-app del pedido nuevo (email canal secundario se enviara abajo si ltms_email_new_order=yes). Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'order_new\', \'inapp\', \'Nuevo Pedido\', %s, %s, 0, UTC_TIMESTAMP()).',
+                        $order->get_id(),
+                        $vendor_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $vendor_id,
+                        var_export( sprintf( 'Tienes un nuevo pedido #%s por %s', $order->get_order_number(), LTMS_Utils::format_money( (float) $order->get_total() ) ), true ),
+                        wp_json_encode( [ 'order_id' => $order->get_id(), 'order_number' => $order->get_order_number(), 'amount' => $order->get_total() ] )
+                    ),
+                    [
+                        'order_id'   => $order->get_id(),
+                        'vendor_id'  => $vendor_id,
+                        'last_error' => $wpdb->last_error ?: '(no error)',
+                        'inserted'   => var_export( $inserted_notif, true ),
+                    ]
+                );
+            }
 
             // E-11 FIX: respetar el flag ltms_email_new_order para notificación por email al vendedor.
             if ( get_option( 'ltms_email_new_order', 'yes' ) === 'yes' ) {
