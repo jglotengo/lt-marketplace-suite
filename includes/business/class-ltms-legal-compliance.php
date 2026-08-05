@@ -81,7 +81,21 @@ class LTMS_Legal_Compliance {
     ): void {
         global $wpdb;
 
-        $wpdb->insert(
+        // CICLO9-P1-LC-015 FIX: el INSERT en lt_vault_access_log no se
+        // verificaba. Es log de auditoria regulatorio (Ley 1581/2012
+        // art. 8 lit. d - registro de acceso a datos sensibles del vault
+        // KYC). Si el INSERT falla silenciosamente, un acceso al vault
+        // ocurre sin evidencia legal - compromete auditorias UIAF/SAGRILAFT
+        // y el deber de demostrar cumplimiento (principio de
+        // responsabilidad demostrada RGPD art. 5.2). Los reguladores
+        // piden este registro en inspecciones.
+        // Fix: verificacion explicita false === $result (error DB con
+        // last_error) de 0 === (int) $result (no rows - teorico de tabla
+        // corrupta o schema drift). Log critico (no warning) con
+        // var_export($result, true) y last_error para distinguir el caso.
+        // Mismo patron verificado que los fixes de los Ciclos 5/6/7/8
+        // (alegra-sync, shipping-ledger, order-split, consumer-protection).
+        $result = $wpdb->insert(
             $wpdb->prefix . 'lt_vault_access_log',
             [
                 'user_id'     => $user_id,
@@ -95,6 +109,41 @@ class LTMS_Legal_Compliance {
             ],
             [ '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' ]
         );
+
+        if ( false === $result || 0 === (int) $result ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'VAULT_ACCESS_LOG_INSERT_FAILED',
+                    sprintf(
+                        'Vault access NO registrado en lt_vault_access_log (Ley 1581/2012 art. 8 lit. d - auditoria regulatoria). user_id=%d accessor_id=%d document=%s action=%s result=%s last_error=%s. Reconciliacion manual: INSERT INTO %slt_vault_access_log (user_id, accessor_id, document, action, ip_address, user_agent, context, created_at) VALUES (%d, %d, \'%s\', \'%s\', \'%s\', \'%s\', \'%s\', \'%s\').',
+                        $user_id,
+                        $accessor_id,
+                        sanitize_text_field( $document ),
+                        $action,
+                        var_export( $result, true ),
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $user_id,
+                        $accessor_id,
+                        sanitize_text_field( $document ),
+                        $action,
+                        self::get_client_ip(),
+                        substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255 ),
+                        sanitize_text_field( $context ),
+                        current_time( 'mysql', true )
+                    ),
+                    [
+                        'user_id'     => $user_id,
+                        'accessor_id' => $accessor_id,
+                        'document'    => $document,
+                        'action'      => $action,
+                        'context'     => $context,
+                        'result'      => var_export( $result, true ),
+                        'last_error'  => $wpdb->last_error ?: '(no error)',
+                    ]
+                );
+            }
+        }
     }
 
     // ── L-2: Consent Log ────────────────────────────────────────────────────────
@@ -117,7 +166,20 @@ class LTMS_Legal_Compliance {
     ): void {
         global $wpdb;
 
-        $wpdb->insert(
+        // CICLO9-P1-LC-016 FIX: el INSERT en lt_consent_log no se
+        // verificaba. Es la evidencia legal de consentimiento (Ley
+        // 1581/2012 art. 9 - consentimiento libre, previo, expreso,
+        // informado; RGPD art. 7 - condicion para el tratamiento).
+        // Si el INSERT falla silenciosamente, el consentimiento se "dio"
+        // pero no hay evidencia - el contrato jurídicamente se debilita.
+        // A diferencia de log_vault_access, este se llama en el flujo
+        // critico de KYC/registro/checkout. Fallo silencioso -> el
+        // usuario piensa que consintio, el sistema cree que consintio,
+        // pero no hay evidencia forense cuando el regulador la pide.
+        // Fix: verificacion explicita false === $result (error DB) de
+        // 0 === (int) $result (no rows). Log critico con var_export y
+        // last_error. Mismo patron verificado que los Ciclos 5/6/7/8.
+        $result = $wpdb->insert(
             $wpdb->prefix . 'lt_consent_log',
             [
                 'user_id'      => $user_id,
@@ -131,6 +193,42 @@ class LTMS_Legal_Compliance {
             ],
             [ '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ]
         );
+
+        if ( false === $result || 0 === (int) $result ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'CONSENT_LOG_INSERT_FAILED',
+                    sprintf(
+                        'Consent NO registrado en lt_consent_log (Ley 1581/2012 art. 9 + RGPD art. 7 - evidencia legal del consentimiento). user_id=%d consent_type=%s accepted=%d version=%s channel=%s result=%s last_error=%s. Reconciliacion manual: INSERT INTO %slt_consent_log (user_id, consent_type, accepted, ip_address, user_agent, version, channel, created_at) VALUES (%d, \'%s\', %d, \'%s\', \'%s\', \'%s\', \'%s\', \'%s\').',
+                        $user_id,
+                        sanitize_key( $consent_type ),
+                        $accepted ? 1 : 0,
+                        sanitize_text_field( $version ),
+                        sanitize_text_field( $channel ),
+                        var_export( $result, true ),
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $user_id,
+                        sanitize_key( $consent_type ),
+                        $accepted ? 1 : 0,
+                        self::get_client_ip(),
+                        substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255 ),
+                        sanitize_text_field( $version ),
+                        sanitize_text_field( $channel ),
+                        current_time( 'mysql', true )
+                    ),
+                    [
+                        'user_id'      => $user_id,
+                        'consent_type' => $consent_type,
+                        'accepted'     => $accepted,
+                        'version'      => $version,
+                        'channel'      => $channel,
+                        'result'       => var_export( $result, true ),
+                        'last_error'   => $wpdb->last_error ?: '(no error)',
+                    ]
+                );
+            }
+        }
     }
 
     /**
@@ -283,8 +381,20 @@ class LTMS_Legal_Compliance {
         } else {
             // LC-1: Guest checkout — log con user_id=0 + context con order_id
             // para mantener trazabilidad del consentimiento asociado al pedido.
+            // CICLO9-P1-LC-017 FIX: el INSERT en lt_consent_log con
+            // consent_type='checkout_guest' no se verificaba. Es el
+            // consentimiento legal del guest checkout (Ley 1480/2011
+            // art. 3 + Ley 1581/2012 art. 9). Si falla, no se loguea
+            // PERO el pedido procede ($order->save() ya ocurrio antes)
+            // - el guest compra sin evidencia de consentimiento. En una
+            // auditoria, el regulador pide la evidencia del consentimiento
+            // asociado al pedido - sin este INSERT, no hay defensa legal.
+            // Fix: verificacion explicita false === $result (error DB) de
+            // 0 === (int) $result (no rows). Log critico con var_export y
+            // last_error + order_id en contexto para reconciliacion manual.
+            // Mismo patron verificado que los fixes de los Ciclos 5/6/7/8.
             global $wpdb;
-            $wpdb->insert(
+            $result = $wpdb->insert(
                 $wpdb->prefix . 'lt_consent_log',
                 [
                     'user_id'      => 0,
@@ -298,6 +408,39 @@ class LTMS_Legal_Compliance {
                 ],
                 [ '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s' ]
             );
+
+            if ( false === $result || 0 === (int) $result ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'GUEST_CHECKOUT_CONSENT_LOG_INSERT_FAILED',
+                        sprintf(
+                            'Guest checkout consent NO registrado en lt_consent_log (Ley 1480/2011 art. 3 + Ley 1581/2012 art. 9). order_id=%d accepted=%d ip=%s version=%s result=%s last_error=%s. El pedido #%d ya fue creado (order->save() ya ocurrio) - el guest compra sin evidencia de consentimiento. Reconciliacion manual: INSERT INTO %slt_consent_log (user_id, consent_type, accepted, ip_address, user_agent, version, channel, created_at) VALUES (0, \'checkout_guest\', %d, \'%s\', \'%s\', \'%s\', \'web_guest_o%d\', \'%s\').',
+                            $order_id,
+                            $accepted ? 1 : 0,
+                            $ip,
+                            self::PRIVACY_VERSION,
+                            var_export( $result, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $order_id,
+                            $wpdb->prefix,
+                            $accepted ? 1 : 0,
+                            $ip,
+                            substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255 ),
+                            self::PRIVACY_VERSION,
+                            $order_id,
+                            $accepted_at
+                        ),
+                        [
+                            'order_id'    => $order_id,
+                            'accepted'    => $accepted,
+                            'ip'          => $ip,
+                            'version'      => self::PRIVACY_VERSION,
+                            'result'      => var_export( $result, true ),
+                            'last_error'  => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
         }
     }
 
