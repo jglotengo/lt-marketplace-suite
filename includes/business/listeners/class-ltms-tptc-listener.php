@@ -127,11 +127,45 @@ class LTMS_TPTC_Listener {
             // The reset uses direct $wpdb->postmeta SQL to stay consistent
             // with the claim mechanism above (so the same storage layer that
             // set the flag also clears it).
+            // CICLO12-P1-TL-028 FIX: el UPDATE de reset no se verificaba -
+            // si fallaba silenciosamente (false = error DB con last_error,
+            // 0 = no rows por schema drift), el flag quedaba en '1' y el
+            // retry nunca ocurria -> el pedido quedaba sin sincronizar con
+            // TPTC para siempre (puntos/comisiones TPTC nunca se
+            // acreditan al vendor, compliance contable TPTC pendiente
+            // permanentemente, remaindere de la traza regulatoria). Patron
+            // recurrente documentado en Ciclos 5-11 (ver P1-RL-025 del
+            // Ciclo 11 para el mismo bug en ReDi listener). Mismo fix
+            // estandar: capturar + check explicito false/0 + log critico
+            // con SQL de reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query( $wpdb->prepare(
+            $reset_result = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order_id, '_ltms_tptc_synced'
             ) );
+            if ( false === $reset_result || 0 === (int) $reset_result ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'TPTC_SYNC_FLAG_RESET_FAILED',
+                        sprintf(
+                            'TPTC sync fallo Y el reset del flag _ltms_tptc_synced tambien fallo. order_id=%d exception=%s reset_result=%s last_error=%s. El pedido queda sin sincronizar con TPTC para siempre - puntos/comisiones TPTC no se acreditan, compliance contable pendiente. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_tptc_synced\'.',
+                            $order_id,
+                            get_class( $e ),
+                            var_export( $reset_result, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $wpdb->prefix,
+                            $order_id
+                        ),
+                        [
+                            'order_id'      => $order_id,
+                            'exception'     => get_class( $e ),
+                            'exception_msg' => $e->getMessage(),
+                            'reset_result'  => var_export( $reset_result, true ),
+                            'last_error'    => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
             $order->update_meta_data( '_ltms_tptc_failed', 1 );
             $order->update_meta_data( '_ltms_tptc_last_error', $e->getMessage() );
             $order->save();
@@ -186,11 +220,43 @@ class LTMS_TPTC_Listener {
             // AUDIT-LISTENERS-001 P1-3 FIX (cont.): si no estaba synced,
             // resetear el claim para permitir undo si el pedido se_sync
             // más tarde (escenario raro pero defense-in-depth).
+            // CICLO12-P1-TL-030 FIX: el reset del claim en este path
+            // defense-in-depth tampoco se verificaba - si fallaba
+            // silenciosamente (false = error DB, 0 = no rows), el claim
+            // _ltms_tptc_reversed quedaba en '1' aunque la reversión NO
+            // ocurrio. Si el pedido se sincronizaba con TPTC mas tarde y
+            // entonces se reembolsaba, una nueva ejecucion de
+            // on_order_refunded salia por el early-return "Already
+            // reversed by another process" sin aplicar el reverse_sale
+            // -> la venta TPTC quedaba activa tras reembolso hechos
+            // posteriores, inconsistencia contable. Mismo patron
+            // recurrente Ciclos 5-11. Log critico (no warning) +
+            // SQL de reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query( $wpdb->prepare(
+            $reset_not_synced = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order_id, '_ltms_tptc_reversed'
             ) );
+            if ( false === $reset_not_synced || 0 === (int) $reset_not_synced ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'TPTC_REVERSED_CLAIM_RESET_FAILED_NOT_SYNCED',
+                        sprintf(
+                            'Pedido reembolsado NO estaba sincronizado con TPTC, Y el reset del claim _ltms_tptc_reversed tambien fallo. order_id=%d reset_result=%s last_error=%s. Si el pedido se sincroniza con TPTC mas tarde y entonces se reembolsa de nuevo, una nueva ejecucion de on_order_refunded saldra por early-return sin aplicar reverse_sale -> la venta TPTC quedara activa tras reembolso. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_tptc_reversed\'.',
+                            $order_id,
+                            var_export( $reset_not_synced, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $wpdb->prefix,
+                            $order_id
+                        ),
+                        [
+                            'order_id'         => $order_id,
+                            'reset_not_synced' => var_export( $reset_not_synced, true ),
+                            'last_error'       => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
             return;
         }
 
@@ -230,11 +296,48 @@ class LTMS_TPTC_Listener {
             // Antes, el catch solo logueaba — no había forma de distinguir
             // en admin un pedido con reversión pendiente de uno revertido,
             // ni había path de retry (claim quedaba en '1' permanentemente).
+            // CICLO12-P1-TL-029 FIX: el UPDATE de reset del claim
+            // _ltms_tptc_reversed no se verificaba - mismo patron que
+            // P1-TL-028 del catch de on_order_paid. Si el reset fallaba
+            // silenciosamente (false = error DB, 0 = no rows), el claim
+            // quedaba en '1' y el retry nunca ocurria -> la reversión
+            // TPTC quedaba pendiente para siempre (puntos/comisiones NO
+            // reversados al vendor en TPTC, inconsistencia contable
+            // permanente - el reembolso se proceso en WooCommerce pero
+            // TPTC sigue mostrando la venta como activa). Patron
+            // recurrente documentado en Ciclos 5-11. Mismo fix
+            // estandar: capturar + check explicito false/0 + log
+            // critico con SQL de reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query( $wpdb->prepare(
+            $reset_reversal = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order_id, '_ltms_tptc_reversed'
             ) );
+            if ( false === $reset_reversal || 0 === (int) $reset_reversal ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'TPTC_REVERSAL_FLAG_RESET_FAILED',
+                        sprintf(
+                            'TPTC reversal fallo Y el reset del claim _ltms_tptc_reversed tambien fallo. order_id=%d refund_id=%d exception=%s reset_reversal=%s last_error=%s. La reversión TPTC queda pendiente para siempre - el reembolso se proceso en WooCommerce pero TPTC sigue mostrando la venta como activa (puntos/comisiones NO reversados al vendor). Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_tptc_reversed\'.',
+                            $order_id,
+                            $refund_id,
+                            get_class( $e ),
+                            var_export( $reset_reversal, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $wpdb->prefix,
+                            $order_id
+                        ),
+                        [
+                            'order_id'        => $order_id,
+                            'refund_id'       => $refund_id,
+                            'exception'       => get_class( $e ),
+                            'exception_msg'   => $e->getMessage(),
+                            'reset_reversal'  => var_export( $reset_reversal, true ),
+                            'last_error'      => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
             $order->update_meta_data( '_ltms_tptc_reversal_failed', 1 );
             $order->update_meta_data( '_ltms_tptc_reversal_last_error', $e->getMessage() );
             $order->update_meta_data( '_ltms_tptc_reversal_last_refund_id', $refund_id );
