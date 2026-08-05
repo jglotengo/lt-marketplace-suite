@@ -28,10 +28,34 @@ LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard_view' );
 global $wpdb;
 
 // ── Filtros ────────────────────────────────────────────────────────────────
-$date_from   = isset( $_GET['date_from'] ) ? sanitize_text_field( $_GET['date_from'] ) : date( 'Y-m-01' );
-$date_to     = isset( $_GET['date_to'] )   ? sanitize_text_field( $_GET['date_to'] )   : date( 'Y-m-d' );
-$country     = isset( $_GET['country'] )   ? sanitize_text_field( $_GET['country'] )   : '';
-$event_level = isset( $_GET['level'] )     ? sanitize_text_field( $_GET['level'] )     : '';
+// CICLO14-P1-AD-034 FIX: $date_from/$date_to se sanitizaban pero no se
+// validaban como fecha ISO (Y-m-d). Un auditor podia pasar date_from=
+// invalid-string y el BETWEEN %s AND %s se ejecutaba con strings no-fecha
+// -> comportamiento impredecible en MySQL (podia retornar todas o
+// ninguna fila, rompiendo el reporte fiscal del Art. 30-B CFF / E.T.
+// 437-2 que debe ser determinista y auditable). Validacion explicita con
+// DateTime::createFromFormat que valida formato Y-m-d e integridad
+// calendario (no acepta 2024-13-45). Si invalido, fallback al default
+// (first-of-month / today). Mismo patron defensive en ambos campos.
+$raw_from    = isset( $_GET['date_from'] ) ? sanitize_text_field( $_GET['date_from'] ) : date( 'Y-m-01' );
+$raw_to      = isset( $_GET['date_to'] )   ? sanitize_text_field( $_GET['date_to'] )   : date( 'Y-m-d' );
+$dt_from_obj = DateTime::createFromFormat( 'Y-m-d', $raw_from );
+$dt_to_obj   = DateTime::createFromFormat( 'Y-m-d', $raw_to );
+$date_from   = ( $dt_from_obj && $dt_from_obj->format( 'Y-m-d' ) === $raw_from ) ? $raw_from : date( 'Y-m-01' );
+$date_to     = ( $dt_to_obj   && $dt_to_obj->format( 'Y-m-d' )   === $raw_to )   ? $raw_to   : date( 'Y-m-d' );
+
+// CICLO14-P1-AD-033 FIX: $country se sanitizaba (sanitize_text_field) pero
+// no se validaba contra allowlist de codigos ISO-3166-1 alpha-2
+// soportados. Un auditor podia pasar country=MX' OR 1=1 -- para intentar
+// bypasear el filtro. esc_sql escapa comillas pero NO es la validacion
+// adecuada para un codigo de pais: el dominio es { '', 'MX', 'CO' } ('
+// ' = Todos). Validacion allowlist explicita. Si no es valido, fallback
+// a '' (Todos). Mismo principio para $event_level (allowlist de
+// severidades).
+$raw_level   = isset( $_GET['level'] ) ? sanitize_text_field( $_GET['level'] ) : '';
+$country     = isset( $_GET['country'] ) ? sanitize_text_field( $_GET['country'] ) : '';
+$country     = in_array( $country, [ 'MX', 'CO' ], true ) ? $country : '';
+$event_level = in_array( $raw_level, [ 'critical', 'high', 'medium', 'low', 'info' ], true ) ? $raw_level : '';
 $tx_page     = max( 1, (int) ( $_GET['tx_paged'] ?? 1 ) );
 $tx_per_page = 25;
 $tx_offset   = ( $tx_page - 1 ) * $tx_per_page;
@@ -42,7 +66,12 @@ $dt_to       = $date_to   . ' 23:59:59';
 $export_csv = isset( $_GET['export'] ) && $_GET['export'] === 'csv';
 
 // ── Resumen fiscal ─────────────────────────────────────────────────────────
-$country_sql = $country ? "AND country_code = '" . esc_sql( $country ) . "'" : '';
+// CICLO14-P1-AD-033 FIX (cont.): $country_sql ahora se construye solo
+// cuando $country es un codigo ISO valido (validado arriba), pero el
+// SQL usa placeholder %s via $wpdb->prepare en vez de interpolacion
+// directa con esc_sql - defense-in-depth (validacion + prepared
+// statement, no validacion sola ni esc_sql solo).
+$country_sql = $country ? $wpdb->prepare( 'AND country_code = %s', $country ) : '';
 $fiscal = $wpdb->get_row( $wpdb->prepare(
     "SELECT
         COUNT(*)                                             AS total_tx,
@@ -373,7 +402,21 @@ $cols_exist = [];
 $col_check = $wpdb->get_results( "SHOW COLUMNS FROM {$wpdb->prefix}lt_commissions", ARRAY_A );
 foreach ( $col_check as $col ) { $cols_exist[ $col['Field'] ] = true; }
 $has_hospedaje  = isset( $cols_exist['is_hospedaje'], $cols_exist['hospedaje_direccion'] );
-$has_import     = isset( $cols_exist['is_import'], $cols_exist['aranceles_amount'] );
+$has_import     = isset( $cols_exist['is_import'],    $cols_exist['aranceles_amount'] );
+// CICLO14-P1-AD-035 FIX: deteccion de columna opcional ieps_retenido para
+// alinear el panel web con el CSV export (linea 154 pre-fix usa el mismo
+// patron COALESCE(c.ieps_retenido, c.ieps_amount, 0)). Sin esta
+// deteccion, el panel siempre usaba c.ieps_amount como "ieps_retenido"
+// (linea 420 pre-fix), mostrando el IEPS TRASLADADO en la columna
+// f-vii) IEPS_RETENIDO del Art. 30-B Frac. II. Para Mexico, ieps_amount
+// es el IEPS trasladado (a cargo del cliente) y ieps_retenido es el
+// retenido (a cargo de la plataforma) - son conceptos fiscales
+// diferentes con tratamientos distintos en LIEPS Art. 2. El CSV export
+// tenia la logica correcta pero el panel no, generando inconsistencia
+// entre lo que el auditor ve en pantalla y lo que descarga en CSV - lo
+// que compromete la consistencia del reporte fiscal Art. 30-B CFF / E.T.
+// 437-2 que debe ser determinista entre vistas.
+$has_iepsr      = isset( $cols_exist['ieps_retenido'] );
 
 $vendors_detail = $wpdb->get_results( $wpdb->prepare(
     "SELECT
@@ -388,7 +431,12 @@ $vendors_detail = $wpdb->get_results( $wpdb->prepare(
         SUM(COALESCE(c.ieps_amount,0))                       AS monto_ieps,
         SUM(COALESCE(c.isr_amount,0))                        AS isr_retenido,
         SUM(COALESCE(c.reteiva_amount,0))                    AS iva_retenido,
-        SUM(COALESCE(c.ieps_amount,0))                       AS ieps_retenido,
+        // CICLO14-P1-AD-035 FIX: alineado con CSV export - usar ieps_retenido
+        // si existe (columna opcional), fallback a ieps_amount. Antes el
+        // panel siempre usaba c.ieps_amount como ieps_retenido, mostrando
+        // IEPS TRASLADADO en la columna IEPS_RETENIDO - inconsistencia
+        // fiscal con el CSV Art. 30-B Frac. II inciso f-vii).
+        SUM(COALESCE(" . ( $has_iepsr ? "c.ieps_retenido" : "c.ieps_amount" ) . ",0))                       AS ieps_retenido,
         MAX(COALESCE(c.payment_method_buyer,    c.payment_method)) AS metodo_pago_adquiriente,
         MAX(COALESCE(c.payment_method_vendor,   '—'))              AS metodo_pago_oferente,
         MAX(COALESCE(c.payment_method_platform, '—'))              AS metodo_pago_plataforma,
