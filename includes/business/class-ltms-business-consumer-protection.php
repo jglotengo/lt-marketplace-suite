@@ -518,13 +518,63 @@ class LTMS_Business_Consumer_Protection {
         $release_at = gmdate( 'Y-m-d H:i:s', strtotime( "+{$hold_days} weekdays" ) );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
+        $delivered_updated = $wpdb->update(
             $table,
             [ 'release_at' => $release_at ],
             [ 'order_id' => $order_id, 'status' => 'held' ],
             [ '%s' ],
             [ '%d', '%s' ]
         );
+
+        // CICLO8-P1-CP-011 FIX: el UPDATE que reposiciona release_at al
+        // confirmar entrega del shipping no se verificaba. Si fallaba
+        // silenciosamente (=== false por error DB, o === 0 si no habia
+        // hold en status='held' - hold podria estar 'frozen' por disputa
+        // abierta, o ya 'released' por cron prematuro), el cron
+        // release_eligible_holds posterior usa el release_at ANTIGUO
+        // (calculado desde fecha de pago, no desde fecha de entrega) →
+        // libera el hold antes de que venza la ventana legal post-entrega
+        // → el vendor cobra antes del plazo de proteccion al consumidor
+        // (Ley 1480 CO, PROFECO MX). Si el UPDATE retorno 0 porque el
+        // hold ya esta 'released' o 'frozen', no es error (escenario
+        // esperado) - log info para trazabilidad. Si retorno false (error
+        // DB), log critico para reconciliacion manual (re-calcular
+        // release_at manualmente o re-disparar on_shipping_delivered).
+        if ( false === $delivered_updated ) {
+            LTMS_Core_Logger::critical(
+                'HOLD_DELIVERY_RELEASE_AT_UPDATE_FAILED',
+                sprintf(
+                    'Order #%d: UPDATE release_at a lt_wallet_holds fallo (last_error=%s). El cron release_eligible_holds usara el release_at ANTIGUO - posible liberacion prematura del hold (ventana legal post-entrega). Reconciliacion manual: UPDATE %s SET release_at=\'%s\' WHERE order_id=%d AND status=\'held\'.',
+                    $order_id,
+                    $wpdb->last_error ?: '(no error)',
+                    $table,
+                    $release_at,
+                    $order_id
+                ),
+                [
+                    'order_id'     => $order_id,
+                    'release_at'   => $release_at,
+                    'last_error'   => $wpdb->last_error,
+                    'sql_hint'     => "UPDATE {$table} SET release_at='{$release_at}' WHERE order_id={$order_id} AND status='held'",
+                ]
+            );
+        } elseif ( 0 === (int) $delivered_updated ) {
+            // No rows matched - hold ya released/frozen, o no existe. Log
+            // info para trazabilidad (no es error pero el admin debe verlo).
+            LTMS_Core_Logger::info(
+                'HOLD_DELIVERY_RELEASE_AT_NO_MATCH',
+                sprintf(
+                    'Order #%d: UPDATE release_at afecto 0 filas (hold en status distinto a held - ya released o frozen por disputa, o no existe). release_at=%s NO se persistio.',
+                    $order_id,
+                    $release_at
+                ),
+                [
+                    'order_id'     => $order_id,
+                    'release_at'   => $release_at,
+                    'rows_affected'=> 0,
+                ]
+            );
+        }
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::log(
@@ -684,14 +734,69 @@ class LTMS_Business_Consumer_Protection {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_wallet_holds';
 
+        // CICLO8-P1-CP-012 FIX: el `(bool) $wpdb->update(...)` colapsa false
+        // (error DB) y 0 (no rows matched - hold ya frozen, o no existe hold)
+        // ambos en false. El caller (file_dispute, on_shipping_failed) no
+        // sabe si el freeze fallo por error DB (reintentar) o porque no hay
+        // hold elegible (skip). Si el INSERT de la disputa procede con
+        // hold_frozen=false cuando el freeze fallo por error DB (no por hold
+        // ausente), el hold sigue 'held' y la ventana de dispute expira
+        // silenciosamente → el vendor cobra mientras el cliente piensa que
+        // tiene proteccion.
+        // Fix: capturar $frozen + distinguir false (log critical) de 0 (log
+        // info, no es error). Mismo patron que los fixes CP-011/013/014.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        return (bool) $wpdb->update(
+        $frozen = $wpdb->update(
             $table,
             [ 'status' => 'frozen', 'freeze_reason' => sanitize_text_field( $reason ) ],
             [ 'order_id' => $order_id, 'status' => 'held' ],
             [ '%s', '%s' ],
             [ '%d', '%s' ]
         );
+
+        if ( false === $frozen ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'HOLD_FREEZE_UPDATE_FAILED',
+                    sprintf(
+                        'Order #%d: UPDATE freeze_hold_for_dispute fallo (last_error=%s). Hold sigue en status anterior - revisar manualmente. Reconciliacion: UPDATE %s SET status=\'frozen\', freeze_reason=\'%s\' WHERE order_id=%d AND status=\'held\'.',
+                        $order_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $table,
+                        $reason,
+                        $order_id
+                    ),
+                    [
+                        'order_id'   => $order_id,
+                        'reason'     => $reason,
+                        'last_error' => $wpdb->last_error,
+                    ]
+                );
+            }
+            return false;
+        }
+
+        if ( 0 === (int) $frozen ) {
+            // No rows matched - hold ya frozen, released, o no existe.
+            // Log info para trazabilidad (no es error, pero el caller debe
+            // saber que el freeze no se aplico).
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'HOLD_FREEZE_NO_MATCH',
+                    sprintf(
+                        'Order #%d: freeze_hold_for_dispute afecto 0 filas (hold ya frozen o released, o no existe hold para este order).',
+                        $order_id
+                    ),
+                    [
+                        'order_id'     => $order_id,
+                        'rows_affected'=> 0,
+                    ]
+                );
+            }
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -706,14 +811,65 @@ class LTMS_Business_Consumer_Protection {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_wallet_holds';
 
+        // CICLO8-P1-CP-013 FIX: mismo patron que CP-012 - el
+        // `(bool) $wpdb->update(...)` colapsa false (error DB) y 0 (no rows
+        // matched - hold no estaba frozen, o no existe) en false. El caller
+        // (reject_dispute) no sabe si reintentar (error DB) o skip (hold ya
+        // released/frozen never). Si el unfreeze fallo por error DB, el
+        // hold queda frozen → el cron release_eligible_holds NO lo libera
+        // (filtra por status='held') → el vendor queda sin cobrar aunque
+        // la disputa fue rechazada a su favor.
+        // Fix: capturar $unfrozen + distinguir false (log critical) de 0
+        // (log info). Retornar bool con info de trazabilidad.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        return (bool) $wpdb->update(
+        $unfrozen = $wpdb->update(
             $table,
             [ 'status' => 'held', 'freeze_reason' => null ],
             [ 'order_id' => $order_id, 'status' => 'frozen' ],
             [ '%s', null ],
             [ '%d', '%s' ]
         );
+
+        if ( false === $unfrozen ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'HOLD_UNFREEZE_UPDATE_FAILED',
+                    sprintf(
+                        'Order #%d: UPDATE unfreeze_hold_for_dispute fallo (last_error=%s). Hold sigue frozen - cron no lo liberara. Reconciliacion manual: UPDATE %s SET status=\'held\', freeze_reason=NULL WHERE order_id=%d AND status=\'frozen\'.',
+                        $order_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $table,
+                        $order_id
+                    ),
+                    [
+                        'order_id'   => $order_id,
+                        'last_error' => $wpdb->last_error,
+                    ]
+                );
+            }
+            return false;
+        }
+
+        if ( 0 === (int) $unfrozen ) {
+            // No rows matched - hold no estaba frozen, o no existe.
+            // Log info para trazabilidad.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'HOLD_UNFREEZE_NO_MATCH',
+                    sprintf(
+                        'Order #%d: unfreeze_hold_for_dispute afecto 0 filas (hold no estaba frozen, o no existe).',
+                        $order_id
+                    ),
+                    [
+                        'order_id'     => $order_id,
+                        'rows_affected'=> 0,
+                    ]
+                );
+            }
+            return false;
+        }
+
+        return true;
     }
 
     /*
@@ -936,7 +1092,51 @@ class LTMS_Business_Consumer_Protection {
             [ '%d', '%s' ]
         );
 
-        if ( ! $updated ) {
+        // CICLO8-P1-CP-014 FIX: el check existente `if ( ! $updated )`
+        // cubre false (error DB) y 0 (fila inexistente o ya under_review)
+        // correctamente, pero colapsa ambos en un solo WP_Error
+        // 'invalid_dispute' sin distinguir el caso en el log. El caller no
+        // sabe si reintentar (error DB) o skip (fila ya bajo review).
+        // Fix: capturar $updated explicitamente + distinguir false (log
+        // critical con last_error) de 0 (log info, no es error) en logs
+        // separados. El WP_Error retornado sigue siendo el mismo para no
+        // romper el contract del caller (backward compatible).
+        if ( false === $updated ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'DISPUTE_REVIEW_UPDATE_FAILED',
+                    sprintf(
+                        'Dispute #%d: UPDATE review_dispute fallo (last_error=%s). Revisar manualmente - reintento posible.',
+                        $dispute_id,
+                        $wpdb->last_error ?: '(no error)'
+                    ),
+                    [
+                        'dispute_id'   => $dispute_id,
+                        'admin_id'     => $admin_id,
+                        'last_error'   => $wpdb->last_error,
+                    ]
+                );
+            }
+            return new WP_Error( 'invalid_dispute', __( 'Dispute not found or already under review', 'ltms' ) );
+        }
+
+        if ( 0 === (int) $updated ) {
+            // No rows matched - dispute no existe, o ya esta under_review
+            // (resolucion concurrente). Log info para trazabilidad.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'DISPUTE_REVIEW_NO_MATCH',
+                    sprintf(
+                        'Dispute #%d: review_dispute afecto 0 filas (dispute no existe, o ya esta under_review - resolucion concurrente?).',
+                        $dispute_id
+                    ),
+                    [
+                        'dispute_id'    => $dispute_id,
+                        'admin_id'      => $admin_id,
+                        'rows_affected' => 0,
+                    ]
+                );
+            }
             return new WP_Error( 'invalid_dispute', __( 'Dispute not found or already under review', 'ltms' ) );
         }
 
