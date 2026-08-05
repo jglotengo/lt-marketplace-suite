@@ -241,6 +241,56 @@ tocar código ya estable sin necesidad ("Alcance" arriba). Usa en su lugar:
 - Cada ciclo completo se resume en `CHANGELOG.md` con el mismo formato usado en
   el ciclo Plaza Viva (bugs por prioridad, tests nuevos, módulos tocados).
 
+## Checkpoint/ Restauro de contexto entre sesiones (GLM-5.2 limit de consumo)
+
+> Modelo en uso: `z-ai/glm-5.2` vía NVIDIA. Se cae ~17% uso de sesion por limite de
+> consumo de API. Sin este flujo, cada caida reinicia el loop de auditoria desde cero y
+> pierde el inventario/hallazgos/fixes acumulados.
+
+Dos comandos en `.opencode/commands/` (definidos como markdown con `tool.schema`):
+
+- `/checkpoint [nota opcional]` — el LLM redacta un snapshot estructurado del estado del
+  loop (TODO list real, ultimo fix, ultimo test, hallazgos pendientes, proximo paso,
+  archivos tocados, gotchas) y lo escribe con `write` sobreescribiendo
+  `C:\Users\User\LTMS\lee-archivo.txt`. Pensado para ejecutarse ANTES de que se caiga la
+  sesion (o inmediatamente despues, si el usuario logra reabrir opencode antes de que
+  cierre el proceso). No lee la SQLite interna de opencode (`opencode.db`) — el snapshot
+  se redacta desde el contexto vivo de la conversacion.
+- `/continuar` — el LLM lee `C:\Users\User\LTMS\lee-archivo.txt` con `read` (offsets
+  encadenados si excede el limite por lectura), replica el TODO en su todolist interna,
+  verifica que el ULTIMO FIX APLICADO sigue en el codigo (validacion anti working-tree
+  reset) y reanuda el loop exactamente desde PROXIMO PASO RECOMENDADO. No reinicia en
+  INVENTARIO salvo cambio estructural del modulo.
+
+Flujo operativo:
+1. Sesion viva, antes de caer o cuando el usuario ve el contador cerca de 17%:
+   ```bash
+   /checkpoint antes de cerrar por limite
+   ```
+2. Cierra opencode (Ctrl+C o cierre de terminal). No requiere reabrir la misma sesion.
+3. Reabre:
+   ```powershell
+   cd "C:\Users\User\LTMS\lt-marketplace-suite"
+   opencode
+   ```
+4. En la nueva sesion:
+   ```bash
+   /continuar
+   ```
+
+Reglas del flujo:
+- El checkpoint es un snapshot, no un append — se sobreescribe `lee-archivo.txt` en cada
+  `/checkpoint`. Si se quiere historico, copiar el archivo a mano antes de sobreescribir.
+- El comando `/checkpoint` NO debe correr tests ni hacer commits — eso contamina el
+  snapshot con estado de sesion nueva. Solo redacta el estado actual.
+- `/continuar` SIEMPRE debe validar que el ULTIMO FIX del checkpoint sigue presente en
+  el codigo (grep del tag `CICLO{N}-...-FIX`). Si no esta, el fix se perdio — pausar y
+  reportar antes de tocar nada mas.
+- Las NOTAS CRITICAS / GOTCHAS del checkpoint son reglas duras para la nueva sesion.
+  Son lecciones ya pagadas — no redescubrirlas.
+- Si el checkpoint tiene > 24h, advertir al usuario antes de continuar (baseline pudo
+  haber cambiado en SG).
+
 ---
 Regla madre: generar código ya no es el cuello de botella — verificar que hace lo que
 dice hacer sí lo es. Cada regla de este documento mueve esa verificación al momento en
