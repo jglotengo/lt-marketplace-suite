@@ -342,14 +342,51 @@ final class LTMS_Business_Redi_Incident {
         $comment_id = (int) $wpdb->insert_id;
 
         // Bump updated_at en la cabecera.
+        // CICLO16-P1-RI-042 FIX: el UPDATE de bump updated_at en la cabecera
+        // lt_redi_incidents no se verificaba. Si fallaba silenciosamente
+        // (false = error DB con last_error), el comentario se insertaba
+        // correctamente (linea 323 INSERT verificado) PERO la cabecera no
+        // reflejaba el bump -> el cron sla_check_cron() (linea 570 y 603)
+        // filtra incidencias WHERE status IN('open','investigating') AND
+        // sla_due_at < now, y escalaba basado en updated_at obsoleto -> el
+        // cron podia escalar erróneamente una incidencia que tuvo actividad
+        // reciente (comentario nuevo) solo porque la cabecera no registro
+        // el bump. SLA de primera respuesta (48h) y SLA de resolucion
+        // (15d) son criticos regulatorios de experiencia proveedor (LFP-
+        // SAGRILAFT UX-GAPS GAP-9). Patron recurrente Ciclos 5-15.
+        // Fix: capturar $bumped + check false === + log critico
+        // REDI_INCIDENT_BUMP_UPDATED_AT_FAILED con SQL de reconciliacion
+        // manual UPDATE lt_redi_incidents SET updated_at=UTC_TIMESTAMP()
+        // WHERE id=N. No se aborta el add_comment (el comentario YA esta
+        // guardado) - solo se loguea critico para reproceso manual.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $wpdb->update(
+        $bumped = $wpdb->update(
             $wpdb->prefix . 'lt_redi_incidents',
             [ 'updated_at' => $now ],
             [ 'id' => $incident_id ],
             [ '%s' ],
             [ '%d' ]
         );
+
+        if ( false === $bumped && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::critical(
+                'REDI_INCIDENT_BUMP_UPDATED_AT_FAILED',
+                sprintf(
+                    'Failed to bump updated_at in lt_redi_incidents for incident #%d (comment #%d was inserted OK but header is stale). last_error=%s. SLA cron may escalate this incident erroneously. Reconciliacion manual: UPDATE %slt_redi_incidents SET updated_at=UTC_TIMESTAMP() WHERE id=%d.',
+                    $incident_id,
+                    $comment_id,
+                    $wpdb->last_error ?: '(no error)',
+                    $wpdb->prefix,
+                    $incident_id
+                ),
+                [
+                    'incident_id' => $incident_id,
+                    'comment_id'  => $comment_id,
+                    'last_error'  => $wpdb->last_error ?: '(no error)',
+                    'bumped'      => var_export( $bumped, true ),
+                ]
+            );
+        }
 
         // Notificar a la otra parte (origin o reseller, según quien comenta).
         self::notify_incident_comment( $incident_id, $user_id, $comment );
@@ -687,8 +724,19 @@ final class LTMS_Business_Redi_Incident {
         ] );
 
         foreach ( $recipients as $user_id ) {
+            // CICLO16-P1-RI-043 FIX: el INSERT en lt_notifications (para
+            // cada vendor recipient) no se verificaba. Si fallaba
+            // silenciosamente (false = error DB con last_error), el
+            // vendor no recibia alerta in-app de la nueva incidencia ->
+            // el SLA de primera respuesta (48h, SLA_FIRST_RESPONSE_HOURS)
+            // corria sin que el vendor se enterara por la plataforma,
+            // enterandose solo via email (canal secundario, a menudo
+            // ignorado en mobile). Patron recurrente Ciclos 5-15.
+            // Fix: capturar $inserted_notif + check false === + log
+            // critico REDI_INCIDENT_NOTIFY_CREATED_INSERT_FAILED con
+            // SQL de reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert(
+            $inserted_notif = $wpdb->insert(
                 $table,
                 [
                     'user_id'    => $user_id,
@@ -706,6 +754,29 @@ final class LTMS_Business_Redi_Incident {
                 ],
                 [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
             );
+
+            if ( false === $inserted_notif && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_INCIDENT_NOTIFY_CREATED_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_incident_created) for vendor #%d, incident #%d. last_error=%s. El vendor no recibira alerta in-app de la nueva incidencia (SLA 48h corre sin que se entere en plataforma). Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_incident_created\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $user_id,
+                        $incident_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $user_id,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'incident_id' => $incident_id, 'order_id' => $data['order_id'], 'type' => $data['type'] ] )
+                    ),
+                    [
+                        'incident_id' => $incident_id,
+                        'user_id'     => $user_id,
+                        'last_error'  => $wpdb->last_error ?: '(no error)',
+                        'inserted'    => var_export( $inserted_notif, true ),
+                    ]
+                );
+            }
 
             // AUDIT-REDI-UX-GAPS GAP-8 FIX: email con template HTML si disponible.
             $user = get_userdata( $user_id );
@@ -745,8 +816,15 @@ final class LTMS_Business_Redi_Incident {
         $admins = get_users( [ 'role' => 'administrator', 'number' => 1 ] );
         if ( ! empty( $admins ) ) {
             $admin_id = (int) $admins[0]->ID;
+            // CICLO16-P1-RI-043 FIX (cont.): el INSERT de notif al admin
+            // tampoco se verificaba. Idem caso vendor: si fallaba, el
+            // admin no recibia alerta in-app de la incidencia nueva ->
+            // dependia solo del email del cron sla_check_cron (canal
+            // secundario, solo se dispara cuando ya hay overdue). El
+            // admin necesita la notificacion temprana (no la de overdue)
+            // para gestionar el riesgo proactivamente.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert(
+            $inserted_admin_notif = $wpdb->insert(
                 $table,
                 [
                     'user_id'    => $admin_id,
@@ -764,6 +842,29 @@ final class LTMS_Business_Redi_Incident {
                 ],
                 [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
             );
+
+            if ( false === $inserted_admin_notif && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_INCIDENT_NOTIFY_CREATED_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_incident_created) for ADMIN #%d, incident #%d. last_error=%s. El admin no recibira alerta in-app - dependera solo del email del cron sla_check_cron (canal secundario, solo dispara en overdue). Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_incident_created\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $admin_id,
+                        $incident_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $admin_id,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'incident_id' => $incident_id, 'order_id' => $data['order_id'], 'type' => $data['type'] ] )
+                    ),
+                    [
+                        'incident_id' => $incident_id,
+                        'user_id'     => $admin_id,
+                        'last_error'  => $wpdb->last_error ?: '(no error)',
+                        'inserted'    => var_export( $inserted_admin_notif, true ),
+                    ]
+                );
+            }
         }
     }
 
@@ -814,8 +915,23 @@ final class LTMS_Business_Redi_Incident {
         }
 
         foreach ( $recipients as $user_id_to ) {
+            // CICLO16-P1-RI-044 FIX: el INSERT en lt_notifications (aviso
+            // de comentario nuevo a la otra parte) no se verificaba. Si
+            // fallaba silenciosamente (false = error DB con last_error),
+            // la parte contraria no recibia alerta in-app del comentario
+            // nuevo -> el hilo de la incidencia se fragmenta: el autor
+            // piensa que la otra parte leyo el mensaje y la otra parte
+            // no se entera hasta proximo login a la plataforma (canal
+            // email es secundario). Esto extiende el SLA de primera
+            // respuesta y resolucion (SLA 48h/15d) sin que el cron
+            // detecte overdue (el comentario SI esta insertado en BD -
+            // solo la notif in-app fallaba). Patron recurrente Ciclos
+            // 5-15. Fix: capturar $inserted_comment_notif + check
+            // false === + log critico
+            // REDI_INCIDENT_NOTIFY_COMMENT_INSERT_FAILED con SQL de
+            // reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert(
+            $inserted_comment_notif = $wpdb->insert(
                 $notif_table,
                 [
                     'user_id'    => $user_id_to,
@@ -833,6 +949,30 @@ final class LTMS_Business_Redi_Incident {
                 ],
                 [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
             );
+
+            if ( false === $inserted_comment_notif && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_INCIDENT_NOTIFY_COMMENT_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_incident_comment) for user #%d, incident #%d. last_error=%s. La otra parte no recibira alerta in-app del comentario - el hilo se fragmenta. Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_incident_comment\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $user_id_to,
+                        $incident_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $user_id_to,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'incident_id' => $incident_id, 'order_id' => (int) $incident->order_id, 'comment_by' => $user_id ] )
+                    ),
+                    [
+                        'incident_id'  => $incident_id,
+                        'user_id_to'   => $user_id_to,
+                        'comment_by'   => $user_id,
+                        'last_error'   => $wpdb->last_error ?: '(no error)',
+                        'inserted'     => var_export( $inserted_comment_notif, true ),
+                    ]
+                );
+            }
 
             $user = get_userdata( $user_id_to );
             if ( $user && $user->user_email ) {
@@ -887,8 +1027,23 @@ final class LTMS_Business_Redi_Incident {
         ] );
 
         foreach ( $recipients as $user_id ) {
+            // CICLO16-P1-RI-045 FIX: el INSERT en lt_notifications (aviso
+            // de cambio de status) no se verificaba. Si fallaba
+            // silenciosamente (false = error DB con last_error), los
+            // vendedores no recibian alerta in-app del cambio de estado
+            // (escalado/resolucion) -> el admin cambia el estado a
+            // "resolved" pero el vendor no se entera en plataforma ->
+            // piensa que la incidencia sigue abierta, le da follow-up
+            // innecesario al admin, o peor, abre un nuevo incident
+            // duplicado. Para "escalated", el cron ya notifico al admin
+            // (canal admin) pero el vendor no recibe notif hasta el
+            // siguiente email (canal secundario). Patron recurrente
+            // Ciclos 5-15. Fix: capturar $inserted_status_notif + check
+            // false === + log critico
+            // REDI_INCIDENT_NOTIFY_STATUS_INSERT_FAILED con SQL de
+            // reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->insert(
+            $inserted_status_notif = $wpdb->insert(
                 $notif_table,
                 [
                     'user_id'    => $user_id,
@@ -906,6 +1061,31 @@ final class LTMS_Business_Redi_Incident {
                 ],
                 [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
             );
+
+            if ( false === $inserted_status_notif && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_INCIDENT_NOTIFY_STATUS_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_incident_status new=%s) for user #%d, incident #%d. last_error=%s. El vendor no recibira alerta in-app del cambio de estado - puede dar follow-up innecesario o duplicar. Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_incident_status\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $new_status,
+                        $user_id,
+                        $incident_id,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $user_id,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'incident_id' => $incident_id, 'order_id' => (int) $incident->order_id, 'new_status' => $new_status ] )
+                    ),
+                    [
+                        'incident_id'  => $incident_id,
+                        'user_id'      => $user_id,
+                        'new_status'   => $new_status,
+                        'last_error'   => $wpdb->last_error ?: '(no error)',
+                        'inserted'     => var_export( $inserted_status_notif, true ),
+                    ]
+                );
+            }
 
             $user = get_userdata( $user_id );
             if ( $user && $user->user_email ) {
