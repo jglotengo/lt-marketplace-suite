@@ -551,8 +551,17 @@ final class LTMS_Payout_Scheduler {
                         $wallet_err->getMessage()
                     )
                 );
+                // CICLO3-P1-PAYOUTS-EXEC-002/003 FIX: verificar el retorno del UPDATE
+                // del catch de wallet_error. Antes: el UPDATE no se verificaba (false o 0
+                // pasaba silenciosamente) y el do_action('ltms_payout_wallet_error')
+                // se disparaba igual. Si el UPDATE fallaba, el admin no veía el flag de
+                // error en notes (payout quedaba 'processing' sin nota visible) Y los
+                // downstream listeners escuchaban 'wallet_error' asumiendo el status
+                // persistido → inconsistencia en asientos Alegra/affiliate. Ahora: si el
+                // UPDATE falla, logueamos crítico y NO disparamos el hook (los listeners
+                // no tienen forma de actuar sobre un error no persistido).
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $wpdb->update(
+                $wallet_err_updated = $wpdb->update(
                     $table,
                     [
                         'status'      => 'processing', // Stuck in processing — admin must reconcile manually.
@@ -563,18 +572,55 @@ final class LTMS_Payout_Scheduler {
                     [ '%s', '%s', '%s' ],
                     [ '%d' ]
                 );
-                // FASE1-REAUDIT P0 FIX: do NOT fire ltms_payout_completed — that
-                // triggers downstream hooks (affiliate, accounting) that assume the
-                // wallet was debited. Fire a dedicated error action instead.
-                do_action( 'ltms_payout_wallet_error', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id, $wallet_err->getMessage() );
+
+                if ( $wallet_err_updated === false || $wallet_err_updated === 0 ) {
+                    // El UPDATE de flag de error falló — no disparamos el hook porque
+                    // el error no se persistió. Log crítico para monitoreo.
+                    LTMS_Core_Logger::error(
+                        'PAYOUT_WALLET_ERROR_UPDATE_FAILED',
+                        sprintf(
+                            'Retiro #%d: gateway OK pero wallet falló (%s) Y el UPDATE del flag de error tambien falló (updated=%s, last_error=%s). Estado del payout potencialmente inconsistente — requiere revisión SQL directa.',
+                            $payout_id,
+                            $wallet_err->getMessage(),
+                            $wallet_err_updated === false ? 'false' : '0',
+                            $wpdb->last_error
+                        ),
+                        [
+                            'payout_id'  => $payout_id,
+                            'vendor_id'  => $payout['vendor_id'],
+                            'amount'     => $payout['amount'],
+                            'wallet_err' => $wallet_err->getMessage(),
+                            'updated'    => $wallet_err_updated,
+                            'last_error' => $wpdb->last_error,
+                        ]
+                    );
+                } else {
+                    // FASE1-REAUDIT P0 FIX: do NOT fire ltms_payout_completed — that
+                    // triggers downstream hooks (affiliate, accounting) that assume the
+                    // wallet was debited. Fire a dedicated error action instead.
+                    // CICLO3-P1-PAYOUTS-EXEC-003: solo se dispara si el UPDATE persistió.
+                    do_action( 'ltms_payout_wallet_error', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id, $wallet_err->getMessage() );
+                }
                 return [
                     'success' => false,
                     'message' => __( 'Retiro procesado. Advertencia: billetera requiere revisión.', 'ltms' ),
                 ];
             }
 
+            // CICLO3-P0-PAYOUTS-EXEC-001 FIX: verificar el retorno del UPDATE a 'completed'.
+            // Antes: el UPDATE se ejecutaba sin verificar $updated. Si fallaba (=== false
+            // por error DB, o === 0 por fila desaparecida), el payout quedaba en
+            // 'processing' para siempre PERO el do_action('ltms_payout_completed') se
+            // disparaba igual → los downstream hooks (affiliate commission, Alegra
+            // accounting) ejecutaban asumiendo wallet debitado, cuando el status real
+            // era 'processing'. En un retry manual posterior, esos hooks se duplicaban
+            // (comisión de afiliado doble, asiento Alegra doble). Ahora: si el UPDATE
+            // falla, dejamos el payout en 'processing' con nota y disparamos
+            // ltms_payout_wallet_error (NO ltms_payout_completed) para requerir
+            // reconciliación manual. El wallet ya está debitado (línea 526) — el dinero
+            // salió del gateway y de la wallet — pero el status no se persistió.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $completed_updated = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $table,
                 [
                     'status'      => 'completed',
@@ -586,9 +632,54 @@ final class LTMS_Payout_Scheduler {
                 [ '%d' ]
             );
 
+            if ( $completed_updated === false || $completed_updated === 0 ) {
+                // El UPDATE final falló (error DB o fila no encontrada). El wallet ya
+                // debitó y el gateway ya envió el dinero, pero el payout stuck en
+                // 'processing'. Disparar acción de error, NO 'completed' — los
+                // downstream hooks verán que requiere reconciliación.
+                LTMS_Core_Logger::error(
+                    'PAYOUT_COMPLETED_UPDATE_FAILED',
+                    sprintf(
+                        'Retiro #%d: wallet debitado + gateway procesado, pero UPDATE final a status=completed falló (updated=%s, last_error=%s). Payout queda en processing. Requiere reconciliación manual.',
+                        $payout_id,
+                        $completed_updated === false ? 'false' : '0',
+                        $wpdb->last_error
+                    ),
+                    [
+                        'payout_id'  => $payout_id,
+                        'vendor_id'  => $payout['vendor_id'],
+                        'amount'     => $payout['amount'],
+                        'gateway_ref'=> $payment_result['reference'] ?? '',
+                        'updated'    => $completed_updated,
+                        'last_error' => $wpdb->last_error,
+                    ]
+                );
+                // Marcar el error en notes para visibilidad del admin (sin sobrescribir
+                // notes existentes — append).
+                $existing_notes_complete = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
+                $err_note = sprintf( 'AVISO: completado backend pero UPDATE de status falló (%s) — REQUIERE RECONCILIACIÓN MANUAL.', $wpdb->last_error ?: 'fila no encontrada' );
+                $new_notes_complete = empty( $existing_notes_complete ) ? $err_note : $existing_notes_complete . "\n---\n" . $err_note;
+                $wpdb->update(
+                    $table,
+                    [ 'notes' => $new_notes_complete ],
+                    [ 'id' => $payout_id ],
+                    [ '%s' ],
+                    [ '%d' ]
+                );
+                // Disparar acción de error (NO 'completed') para que listeners escuchen
+                // que el payout está en estado inconsistente y requiere revisión.
+                do_action( 'ltms_payout_wallet_error', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id, 'PAYOUT_COMPLETED_UPDATE_FAILED: ' . ( $wpdb->last_error ?: 'row not found' ) );
+                return [
+                    'success' => false,
+                    'message' => __( 'Retiro procesado pero el estado final no se persistió. Requiere reconciliación manual.', 'ltms' ),
+                ];
+            }
+
             // M-41: disparar acción para que Affiliates y otros listeners procesen la comisión de referido.
             // FU2 FIX (v2.9.1): incluir payout_id como 3er arg para que Alegra pueda
             // registrar el pago contra la factura correcta (antes solo tenía vendor_id+amount).
+            // CICLO3-P0-PAYOUTS-EXEC-001: solo se dispara si el UPDATE a 'completed'
+            // fue persistido — garantiza que downstream hooks vean status=completed real.
             do_action( 'ltms_payout_completed', (int) $payout['vendor_id'], (float) $payout['amount'], $payout_id );
 
             LTMS_Core_Logger::info(
@@ -637,22 +728,44 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         // only selects 'pending' — so the payout was stuck forever with NO recovery
         // path. Now: reset to 'pending' so the cron or admin can retry.
         // v2.9.115 PAYOUT-AUDIT P1-5 FIX: append error to existing notes, don't overwrite.
+        // CICLO3-P1-PAYOUTS-EXEC-004 FIX: atomicizar SELECT notes + UPDATE en un solo
+        // statement via CONCAT() en SET — antes, el SELECT lee notes y luego el UPDATE
+        // lo escribe; dos admins concurrentes (o admin + cron retry) podian ambos leer
+        // notes=vacio, ambos appendar su error, el segundo sobrescribia el primero →
+        // perdida del primer error de auditoria. Atomic claim previo protege status
+        // (processing no es eligible), pero un admin podia correr approve() fallido en
+        // paralelo a otro retry fallido del cron → ambos reset a 'pending' con su propio
+        // error, el segundo ganaba. CONCAT en una sola query garantiza append atomico.
+        $new_notes_fragment = sprintf( 'Error gateway: %s', $payment_result['message'] );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
-        $new_notes = sprintf( 'Error gateway: %s', $payment_result['message'] );
-        if ( ! empty( $existing_notes ) ) {
-            $new_notes = $existing_notes . "\n---\n" . $new_notes;
-        }
-        $wpdb->update(
-            $table,
-            [
-                'status' => 'pending',
-                'notes'  => $new_notes,
-            ],
-            [ 'id' => $payout_id ],
-            [ '%s', '%s' ],
-            [ '%d' ]
+        $gateway_fail_updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE `{$table}` SET status = 'pending', notes = CONCAT( IFNULL(notes, ''), IF( IFNULL(notes, '') = '', '', %s ), %s ) WHERE id = %d",
+                "\n---\n",
+                $new_notes_fragment,
+                $payout_id
+            )
         );
+
+        if ( $gateway_fail_updated === false ) {
+            // Error DB en el UPDATE — log critico. El payout queda en 'processing'
+            // (atomic claim previo) — el cron no lo retomara hasta que un admin lo
+            // resetee manualmente, pero al menos no se pierde el error en logs.
+            LTMS_Core_Logger::error(
+                'PAYOUT_GATEWAY_FAIL_UPDATE_FAILED',
+                sprintf(
+                    'Retiro #%d: fallo de gateway (%s) Y el UPDATE de reset a pending tambien fallo (last_error=%s). Payout stuck en processing — requiere reset SQL manual.',
+                    $payout_id,
+                    $payment_result['message'],
+                    $wpdb->last_error
+                ),
+                [
+                    'payout_id'   => $payout_id,
+                    'gateway_err' => $payment_result['message'],
+                    'last_error'  => $wpdb->last_error,
+                ]
+            );
+        }
 
         // FASE1-REAUDIT P0 FIX: release the held funds back to the vendor's
         // available balance so they're not locked. The hold() at create_request
@@ -762,24 +875,53 @@ Gracias por ser parte de Lo Tengo.", 'ltms' ),
         // Before, reject() saved the reason to 'notes' column, but the admin view
         // reads 'rejection_reason' column → admin could never see the reason in the
         // list view. Also preserve any existing notes (e.g., name mismatch flag).
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $existing_notes = $wpdb->get_var( $wpdb->prepare( "SELECT notes FROM `{$table}` WHERE id = %d", $payout_id ) );
+        // CICLO3-P1-PAYOUTS-EXEC-005 FIX: dos issues corregidos en un solo UPDATE.
+        // (a) El SELECT notes previo era redundante: el UPDATE solo queria preservar
+        //     notes existente (re-escribia el mismo valor). Si notes no esta en el SET,
+        //     MySQL lo deja intacto — SELECT eliminado, no hay SELECT+UPDATE que
+        //     atomicizar, no hay race window sobre la columna notes.
+        // (b) Race condition: dos admins concurrentes podian ambos pasar el guard
+        //     status==='pending' del inicio y ambos ejectuar UPDATE a 'rejected' →
+        //     ltms_payout_rejected disparado dos veces, dos emails al vendor, dos
+        //     asientos Alegra de reversion, y approved_by pisaba al otro. Agregamos
+        //     atomic claim `AND status = 'pending'` al WHERE + verificar affected=1
+        //     (mismo patron M-117 de approve()).
         $reason_clean = sanitize_textarea_field( $reason );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->update(
+        $rejected_rows = $wpdb->update(
             $table,
             [
                 'status'           => 'rejected',
                 'rejection_reason' => $reason_clean,
-                'notes'            => $existing_notes ?: null,
                 'approved_by'      => $admin_id,
                 'processed_at'     => LTMS_Utils::now_utc(),
             ],
-            [ 'id' => $payout_id ],
-            [ '%s', '%s', '%s', '%d', '%s' ],
-            [ '%d' ]
+            [ 'id' => $payout_id, 'status' => 'pending' ],
+            [ '%s', '%s', '%d', '%s' ],
+            [ '%d', '%s' ]
         );
+
+        if ( $rejected_rows === false || $rejected_rows === 0 ) {
+            // Otro admin acabo de procesar este payout (approve o reject) entre nuestro
+            // guard del inicio y este UPDATE. Log informativo + return seguro.
+            LTMS_Core_Logger::info(
+                'PAYOUT_REJECT_RACE_LOST',
+                sprintf(
+                    'Retiro #%d: rechazo perdido la carrera atomica contra otra accion concurrente (updated=%s, last_error=%s).',
+                    $payout_id,
+                    $rejected_rows === false ? 'false' : '0',
+                    $wpdb->last_error
+                ),
+                [
+                    'payout_id'  => $payout_id,
+                    'admin_id'   => $admin_id,
+                    'updated'    => $rejected_rows,
+                    'last_error' => $wpdb->last_error,
+                ]
+            );
+            return [ 'success' => false, 'message' => __( 'La solicitud fue procesada por otro administrador simultaneamente.', 'ltms' ) ];
+        }
 
         LTMS_Core_Logger::info(
             'PAYOUT_REJECTED',
@@ -887,6 +1029,25 @@ Puedes enviar una nueva solicitud desde tu panel.
             return;
         }
 
+        // CICLO3-P1-PAYOUTS-EXEC-006 FIX: el cron llamaba approve($id, 0), y approve()
+        // guardaba approved_by=0 → el audit trail de payouts automáticos no tenia un
+        // admin real, rompiendo trazabilidad fiscal (Art. 30-B CFF exige responsable).
+        // Lookup del primer admin del marketplace (patron ya usado en
+        // class-ltms-business-redi-incident.php:745). Cacheado por run para no repetir
+        // get_users() por cada payout del batch. Si no hay admin (raro), cae a 0 como
+        // fallback — la info del cron se preserva en el log PAYOUT_CRON_PROCESSED.
+        // Nota: se hace el lookup DESPUES del guard `if (empty($payouts)) return` para
+        // no penalizar runs vacios (caso comun — no hay payouts elegibles) con una
+        // query extra de usuario.
+        $cron_admins   = get_users( [ 'role' => 'administrator', 'number' => 1 ] );
+        $cron_admin_id = ! empty( $cron_admins ) ? (int) $cron_admins[0]->ID : 0;
+        if ( $cron_admin_id === 0 ) {
+            LTMS_Core_Logger::warning(
+                'PAYOUT_CRON_NO_ADMIN',
+                'process_pending_payouts: no se encontro ningun usuario administrator — approved_by quedara en 0. Recomendado crear al menos un rol administrator.'
+            );
+        }
+
         $processed = 0;
         $skipped   = 0;
         foreach ( $payouts as $payout ) {
@@ -900,7 +1061,7 @@ Puedes enviar una nueva solicitud desde tu panel.
                 continue;
             }
 
-            $result = self::approve( (int) $payout['id'], 0 ); // 0 = sistema automático.
+            $result = self::approve( (int) $payout['id'], $cron_admin_id ); // CICLO3-P1-PAYOUTS-EXEC-006 FIX: usar el primer admin del marketplace (lookup cacheado arriba), no 0.
             if ( $result['success'] ) {
                 $processed++;
             } else {

@@ -570,6 +570,19 @@ final class LTMS_Business_Wallet {
                 throw new \RuntimeException( 'LTMS Wallet: Error al actualizar el saldo de la billetera.' );
             }
 
+            // CICLO3-W-P2-1 FIX: $updated === 0 significa que ninguna fila fue
+            // modificada — el wallet con id=$wallet['id'] ya no existe (fue borrado
+            // por otra transaccion concurrente o stale cache). Si no detectamos
+            // esto, el INSERT del ledger siguiente inserta una tx con wallet_id
+            // stale → FK violation en databases con foreign keys, o tx huerfana en
+            // databases sin FK (la tx queda referenciando un wallet inexistente,
+            // el balance nunca cambio). Lanzamos excepcion para ROLLBACK transitivo.
+            if ( $updated === 0 ) {
+                throw new \RuntimeException(
+                    sprintf( 'LTMS Wallet: UPDATE de saldo afecto 0 filas — wallet id=%d no existe (fue borrado o stale).', (int) $wallet['id'] )
+                );
+            }
+
             // 5. Registrar la transacción en el ledger inmutable.
             // WL-CRASH-2: si se proveyó idempotency_key, se almacena en la columna `reference`
             // (ya existe en el schema VARCHAR(255)). La recovery cron puede buscar por esta
@@ -602,6 +615,19 @@ final class LTMS_Business_Wallet {
             }
 
             $tx_id = $wpdb->insert_id;
+
+            // CICLO3-W-P2-2 FIX: insert_id=0 puede ocurrir en casos patologicos
+            // (driver consulta el INSERT exitoso pero no propaga LAST_INSERT_ID, o
+            // inserciones con PK explicita en algunos drivers). Si retornamos $tx_id=0
+            // al caller, este lo persiste como referencia y rompe el journal_post
+            // (registra journal completado con tx_id=0 → imposible recuperarlo).
+            // Lanzamos excepcion para ROLLBACK transitivo — caller reintentara con
+            // idempotency key ya registrado (no habra doble INSERT en retry).
+            if ( $tx_id <= 0 ) {
+                throw new \RuntimeException(
+                    sprintf( 'LTMS Wallet: INSERT del ledger retorno insert_id=%d (esperado > 0). Posible driver bug o PK explicita.', $tx_id )
+                );
+            }
 
             if ( ! $managed_externally ) {
                 $wpdb->query( 'COMMIT' );
