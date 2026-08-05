@@ -273,7 +273,20 @@ class LTMS_Business_Redi_Manager {
         $new_product_id = $new_product->save();
 
         if ( ! $new_product_id ) {
-            LTMS_Core_Logger::error( 'REDI_ADOPT_SAVE_FAILED', sprintf( 'Failed to save reseller product copy of origin #%d', $origin_product_id ) );
+            // CICLO15-P1-RM-037 FIX: si el save() del reseller product falla,
+            // habia que retornar 0 PERO tambien habia que hacer ROLLBACK de la
+            // transaccion START TRANSACTION (linea 237) que tenia el SELECT
+            // FOR UPDATE lock. Sin el ROLLBACK, la transaccion quedaba abierta
+            // -> el row lock se mantenía hasta el timeout del MySQL server
+            // (50s por default innodb_lock_wait_timeout), bloqueando cualquier
+            // otra adopt_product concurrente para el mismo reseller+origin
+            // (exactamente el TOCTOU que se queria prevenir) + el objeto
+            // $wpdb quedaba en modo transaccional para queries posteriores
+            // no relacionados (race condition extensivo). Patron
+            // recurrente: rollback en TODOS los paths de fallo tras
+            // START TRANSACTION, no solo en el path del guard check.
+            $wpdb->query( 'ROLLBACK' );
+            LTMS_Core_Logger::error( 'REDI_ADOPT_SAVE_FAILED', sprintf( 'Failed to save reseller product copy of origin #%d (transaction rolled back)', $origin_product_id ) );
             return 0;
         }
 
@@ -286,7 +299,23 @@ class LTMS_Business_Redi_Manager {
         // Insert into lt_redi_agreements
         global $wpdb;
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert(
+        // CICLO15-P1-RM-036 FIX: el INSERT en lt_redi_agreements no se
+        // verificaba. Si fallaba silenciosamente (false = error DB con
+        // last_error), el COMMIT en linea 313 (post-fix) se ejecutaba
+        // INCONDICIONALMENTE -> el reseller quedaba con un producto
+        // copia + metas _ltms_redi_* pero SIN el acuerdo registrado en
+        // lt_redi_agreements. Esto rompe la trazabilidad: get_agreement_id
+        // (linea 401) retorna 0 -> detect_redi_items registra
+        // agreement_id=0 en lt_redi_commissions -> la comision no se
+        // atribuye correctamente al acuerdo que la genero, exactamente
+        // el bug que el comentario "AUDIT-RD-BK RD-1 FIX" (linea 404)
+        // del get_agreement_id intenta prevenir (columna
+        // reseller_vendor_id vs reseller_id). Patron recurrente
+        // documentado en Ciclos 5-14 (verificacion de retorno
+        // UPDATE/INSERT). Fix: capturar retorno + check false === +
+        // ROLLBACK (no COMMIT) + log critico con SQL de reconciliacion
+        // manual + return 0 (no continuar al exit path exitoso).
+        $insert_result = $wpdb->insert(
             $wpdb->prefix . 'lt_redi_agreements',
             [
                 'reseller_vendor_id'  => $reseller_id,
@@ -300,6 +329,41 @@ class LTMS_Business_Redi_Manager {
             ],
             [ '%d', '%d', '%d', '%d', '%f', '%s', '%s', '%s' ]
         );
+
+        if ( false === $insert_result ) {
+            // ROLLBACK de la transaccion + log critico con SQL de
+            // reconciliacion manual para que el admin pueda insertar
+            // el acuerdo manualmente (producto ya creado + metas ya
+            // seteadas, solo falta el agreement row).
+            $wpdb->query( 'ROLLBACK' );
+            LTMS_Core_Logger::critical(
+                'REDI_ADOPT_AGREEMENT_INSERT_FAILED',
+                sprintf(
+                    'Failed to insert agreement for reseller #%d → origin #%d → new product #%d (rate=%.4f). last_error=%s. El reseller product YA fue creado + metas seteadas pero SIN agreement row -> get_agreement_id retornara 0 -> comisiones futuras no atribuidas. Reconciliacion manual: INSERT INTO %slt_redi_agreements (reseller_vendor_id, origin_product_id, origin_vendor_id, reseller_product_id, redi_rate, status, created_at, updated_at) VALUES (%d, %d, %d, %d, %.4f, \'active\', UTC_TIMESTAMP(), UTC_TIMESTAMP()).',
+                    $reseller_id,
+                    $origin_product_id,
+                    $new_product_id,
+                    $redi_rate,
+                    $wpdb->last_error ?: '(no error)',
+                    $wpdb->prefix,
+                    $reseller_id,
+                    $origin_product_id,
+                    $origin_vendor_id,
+                    $new_product_id,
+                    $redi_rate
+                ),
+                [
+                    'reseller_id'        => $reseller_id,
+                    'origin_product_id'  => $origin_product_id,
+                    'origin_vendor_id'   => $origin_vendor_id,
+                    'new_product_id'     => $new_product_id,
+                    'redi_rate'          => $redi_rate,
+                    'last_error'         => $wpdb->last_error ?: '(no error)',
+                    'insert_result'      => var_export( $insert_result, true ),
+                ]
+            );
+            return 0;
+        }
 
         LTMS_Core_Logger::info(
             'REDI_PRODUCT_ADOPTED',
@@ -675,7 +739,24 @@ class LTMS_Business_Redi_Manager {
 
             // 1. Re-activar el acuerdo.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->update(
+            // CICLO15-P1-RM-038 FIX: el UPDATE de re-activar el acuerdo no se
+            // verificaba. Si fallaba silenciosamente (false = error DB con
+            // last_error), el acuerdo quedaba en status='paused' PERO el
+            // reseller_product se re-publicaba (set_stock_status instock +
+            // set_status publish + save, lineas 693-695) y la notificacion
+            // de resume se enviaba (linea 700) -> el reseller recibe email
+            // "ReDi reanudado", ve su producto publicado de nuevo, pero el
+            // acuerdo sigue 'paused' -> siguientes ventas no generan comision
+            // a pesar de ser visibles y vendibles. Inconsistencia silenciosa
+            // entre lo que el reseller ve (producto activo, notificacion
+            // positiva) y lo que el sistema sabe (acuerdo pausado, sin
+            // comision). Patron recurrente documentado en Ciclos 5-14.
+            // Fix: capturar $reactivated + check false === log critico
+            // REDI_RESUME_AGREEMENT_REACTIVATE_FAILED con SQL de
+            // reconciliacion + continue (NO ejecutar el re-publicar del
+            // producto ni la notificacion al reseller para no mentirle
+            // sobre el estado del acuerdo).
+            $reactivated = $wpdb->update(
                 $agree_table,
                 [
                     'status'     => 'active',
@@ -685,6 +766,33 @@ class LTMS_Business_Redi_Manager {
                 [ '%s', '%s' ],
                 [ '%d' ]
             );
+
+            if ( false === $reactivated ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'REDI_RESUME_AGREEMENT_REACTIVATE_FAILED',
+                        sprintf(
+                            'Failed to re-activate agreement #%d for origin #%d → reseller #%d. last_error=%s. El acuerdo sigue paused - NO se re-publica el producto reseller #%d ni se notifica al reseller (no mentir sobre estado real). Reconciliacion manual: UPDATE %slt_redi_agreements SET status=\'active\', updated_at=UTC_TIMESTAMP() WHERE id=%d.',
+                            $agreement_id,
+                            $origin_product_id,
+                            $reseller_id,
+                            $wpdb->last_error ?: '(no error)',
+                            $reseller_product_id,
+                            $wpdb->prefix,
+                            $agreement_id
+                        ),
+                        [
+                            'agreement_id'        => $agreement_id,
+                            'origin_product_id'   => $origin_product_id,
+                            'reseller_id'         => $reseller_id,
+                            'reseller_product_id' => $reseller_product_id,
+                            'last_error'          => $wpdb->last_error ?: '(no error)',
+                            'reactivated'         => var_export( $reactivated, true ),
+                        ]
+                    );
+                }
+                continue;
+            }
 
             // 2. Re-publicar la copia del revendedor (stock status instock + visible).
             if ( $reseller_product_id ) {
@@ -773,7 +881,23 @@ class LTMS_Business_Redi_Manager {
 
             // 1. Pausar el acuerdo (status='paused' — NO se elimina, para permitir re-anudar).
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->update(
+            // CICLO15-P1-RM-039 FIX: el UPDATE de pausar el acuerdo no se
+            // verificaba. Si fallaba silenciosamente (false = error DB con
+            // last_error), el acuerdo quedaba en status='active' PERO la
+            // copia del reseller se marcaba outofstock + private (lineas
+            // 793-800) y la notificacion de pausa se enviaba al reseller
+            // (linea 805) -> el reseller recibe "ReDi pausado" pero el
+            // acuerdo sigue activo -> si el stock se restaura despues, el
+            // reseller no puede vender (producto private) pero el acuerdo
+            // nunca nego la comision -> en el siguiente resume_redi el
+            // acuerdo no esta en la lista de paused (status='active' no
+            // entry en el SELECT WHERE status='paused'), asi que no se
+            // re-procesa -> la pausa fue cosmética en el producto pero no
+            // en el acuerdo. Patron recurrente Ciclos 5-14. Mismo fix
+            // estandar: capturar + check false === + log critico con SQL
+            // de reconciliacion + continue (NO marcar el reseller_product
+            // outofstock/private ni notificar al reseller).
+            $paused = $wpdb->update(
                 $agree_table,
                 [
                     'status'     => 'paused',
@@ -783,6 +907,33 @@ class LTMS_Business_Redi_Manager {
                 [ '%s', '%s' ],
                 [ '%d' ]
             );
+
+            if ( false === $paused ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'REDI_PAUSE_AGREEMENT_FAILED',
+                        sprintf(
+                            'Failed to pause agreement #%d for origin #%d → reseller #%d. last_error=%s. El acuerdo sigue active - NO se oculta el producto reseller #%d ni se notifica al reseller (no mentir sobre estado real). Reconciliacion manual: UPDATE %slt_redi_agreements SET status=\'paused\', updated_at=UTC_TIMESTAMP() WHERE id=%d.',
+                            $agreement_id,
+                            $origin_product_id,
+                            $reseller_id,
+                            $wpdb->last_error ?: '(no error)',
+                            $reseller_product_id,
+                            $wpdb->prefix,
+                            $agreement_id
+                        ),
+                        [
+                            'agreement_id'        => $agreement_id,
+                            'origin_product_id'   => $origin_product_id,
+                            'reseller_id'         => $reseller_id,
+                            'reseller_product_id' => $reseller_product_id,
+                            'last_error'          => $wpdb->last_error ?: '(no error)',
+                            'paused'              => var_export( $paused, true ),
+                        ]
+                    );
+                }
+                continue;
+            }
 
             // 2. Marcar la copia del revendedor como outofstock y privada
             //    (sigue existiendo para no romper órdenes previas, pero no se
@@ -851,8 +1002,16 @@ class LTMS_Business_Redi_Manager {
             $reason
         );
 
+        // CICLO15-P1-RM-040 FIX: el INSERT en lt_notifications no se
+        // verificaba. Si fallaba silenciosamente (false = error DB con
+        // last_error), el reseller no recibia alerta in-app de la pausa
+        // -> descubria la pausa solo cuando viera su producto outofstock
+        // en la tienda, sin alerta proactiva. La notificacion es el canal
+        // principal de aviso al reseller en soft pause ( GAP-10 FIX).
+        // Patron recurrente Ciclos 5-14. Mismo fix estandar: capturar +
+        // check false === + log critico con SQL de reconciliacion.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert(
+        $notif_result = $wpdb->insert(
             $table,
             [
                 'user_id'    => $reseller_id,
@@ -870,6 +1029,33 @@ class LTMS_Business_Redi_Manager {
             ],
             [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
         );
+
+        if ( false === $notif_result ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_PAUSED_NOTIFICATION_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_paused) for reseller #%d. origin product #%d (%s). last_error=%s. El reseller no recibira alerta in-app de la pausa - solo se entera cuando vea su producto outofstock en la tienda. Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_paused\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $reseller_id,
+                        $origin_product_id,
+                        $origin_product_name,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $reseller_id,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'origin_product_id' => $origin_product_id, 'origin_product_name' => $origin_product_name, 'reason' => $reason ] )
+                    ),
+                    [
+                        'reseller_id'          => $reseller_id,
+                        'origin_product_id'    => $origin_product_id,
+                        'origin_product_name'  => $origin_product_name,
+                        'last_error'           => $wpdb->last_error ?: '(no error)',
+                        'notif_result'         => var_export( $notif_result, true ),
+                    ]
+                );
+            }
+        }
 
         // Email — usar template HTML si está disponible, fallback texto plano.
         $reseller_user = get_userdata( $reseller_id );
@@ -939,8 +1125,17 @@ class LTMS_Business_Redi_Manager {
             $origin_product_name
         );
 
+        // CICLO15-P1-RM-041 FIX: el INSERT en lt_notifications no se
+        // verificaba. Si fallaba silenciosamente (false = error DB con
+        // last_error), el reseller no recibia alerta in-app del resume
+        // -> descubria el resume solo cuando viera su producto instock
+        // de nuevo, sin alerta proactiva ( GAP-10 FIX). Tambien en
+        // resume, el email se enviaba (linea 968 post-fix) pero la
+        // notificacion in-app era fire-and-forget -> el reseller que
+        // mira la plataforma SIN checkear email no se entera.
+        // Patron recurrente Ciclos 5-14. Mismo fix estandar.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert(
+        $notif_result = $wpdb->insert(
             $table,
             [
                 'user_id'    => $reseller_id,
@@ -956,6 +1151,31 @@ class LTMS_Business_Redi_Manager {
             ],
             [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' ]
         );
+
+        if ( false === $notif_result ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_RESUMED_NOTIFICATION_INSERT_FAILED',
+                    sprintf(
+                        'Failed to insert lt_notifications (redi_resumed) for reseller #%d. origin product (%s). last_error=%s. El reseller no recibira alerta in-app del resume - solo se entera cuando vea su producto instock de nuevo en la tienda. Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, channel, title, message, data, is_read, created_at) VALUES (%d, \'redi_resumed\', \'inapp\', %s, %s, %s, 0, UTC_TIMESTAMP()).',
+                        $reseller_id,
+                        $origin_product_name,
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix,
+                        $reseller_id,
+                        var_export( $title, true ),
+                        var_export( $message, true ),
+                        wp_json_encode( [ 'origin_product_name' => $origin_product_name ] )
+                    ),
+                    [
+                        'reseller_id'         => $reseller_id,
+                        'origin_product_name' => $origin_product_name,
+                        'last_error'          => $wpdb->last_error ?: '(no error)',
+                        'notif_result'        => var_export( $notif_result, true ),
+                    ]
+                );
+            }
+        }
 
         // Email de cortesía.
         $reseller_user = get_userdata( $reseller_id );
