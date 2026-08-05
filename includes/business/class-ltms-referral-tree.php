@@ -132,6 +132,25 @@ final class LTMS_Referral_Tree {
         $ancestor_path = self::build_ancestor_path( $sponsor_id, $table );
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        // CICLO10-P1-RT-019 FIX: el INSERT no se verificaba con
+        // distincion false (error DB) vs 0 (no rows - teorico de
+        // tabla corrupta o schema drift). Si el INSERT fallaba
+        // silenciosamente (false por DB lock, deadlock tras re-fire
+        // del hook de registro), el nodo MLM no se creaba y el caller
+        // no sabia si fue: sponsor invalido, self-reference, ciclo
+        // circular, o fallo DB - no hay log critico del fallo real.
+        // Consecuencia: el vendor pierde TODAS las comisiones MLM
+        // futuras para siempre (no hay re-intento, no hay
+        // reconciliacion manual documentada). El nodo es la base de
+        // toda la red MLM - sin nodo, distribute_commissions() futuras
+        // para este vendor retoman sponsor chain vacio ([]).
+        // Fix: captura $inserted explicitamente + check explicito
+        // false === $inserted (log critico con SQL de reconciliacion
+        // manual + last_error + var_export) y 0 === (int) $inserted
+        // (log info para distinguir el caso). Mismo patron verificado
+        // que los fixes de los Ciclos 5/6/7/8/9 (alegra-sync,
+        // shipping-ledger, order-split, consumer-protection,
+        // legal-compliance).
         $inserted = $wpdb->insert(
             $table,
             [
@@ -144,18 +163,69 @@ final class LTMS_Referral_Tree {
             [ '%d', '%d', '%d', '%s', '%s' ]
         );
 
-        if ( $inserted ) {
-            // Guardar código de referido del patrocinador en el perfil del vendedor
-            update_user_meta( $vendor_id, 'ltms_sponsor_id', $sponsor_id );
-            update_user_meta( $vendor_id, 'ltms_referral_level', $vendor_level );
-
-            LTMS_Core_Logger::info(
-                'REFERRAL_NODE_REGISTERED',
-                sprintf( 'Vendedor #%d registrado como referido de #%d (nivel %d)', $vendor_id, $sponsor_id, $vendor_level )
-            );
+        if ( false === $inserted ) {
+            // Error DB - log critico con SQL de reconciliacion manual.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REFERRAL_NODE_INSERT_FAILED',
+                    sprintf(
+                        'Nodo MLM NO insertado en lt_referral_network (error DB). vendor_id=%d sponsor_id=%d level=%d ancestor_path=%s last_error=%s result=%s. El vendor pierde todas las comisiones MLM futuras hasta que se reconcilie manualmente. Reconciliacion manual: INSERT INTO %slt_referral_network (vendor_id, sponsor_id, level, ancestor_path, joined_at) VALUES (%d, %d, %d, \'%s\', \'%s\').',
+                        $vendor_id,
+                        $sponsor_id,
+                        $vendor_level,
+                        $ancestor_path,
+                        $wpdb->last_error ?: '(no error)',
+                        var_export( $inserted, true ),
+                        $wpdb->prefix,
+                        $vendor_id,
+                        $sponsor_id,
+                        $vendor_level,
+                        $ancestor_path,
+                        LTMS_Utils::now_utc()
+                    ),
+                    [
+                        'vendor_id'     => $vendor_id,
+                        'sponsor_id'    => $sponsor_id,
+                        'level'         => $vendor_level,
+                        'ancestor_path' => $ancestor_path,
+                        'result'        => var_export( $inserted, true ),
+                        'last_error'    => $wpdb->last_error ?: '(no error)',
+                    ]
+                );
+            }
+            return false;
         }
 
-        return (bool) $inserted;
+        if ( 0 === (int) $inserted ) {
+            // 0 rows - caso teorico (tabla corrupta o schema drift).
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'REFERRAL_NODE_INSERT_NO_ROWS',
+                    sprintf(
+                        'Nodo MLM INSERT retorno 0 (no rows affected - teorico tabla corrupta o schema drift). vendor_id=%d sponsor_id=%d. Reconciliacion manual igual que INSERT_FAILED.',
+                        $vendor_id,
+                        $sponsor_id
+                    ),
+                    [
+                        'vendor_id'  => $vendor_id,
+                        'sponsor_id' => $sponsor_id,
+                        'result'      => var_export( $inserted, true ),
+                    ]
+                );
+            }
+            return false;
+        }
+
+        // INSERT exitoso - guardar codigo de referido del patrocinador en el perfil del vendedor.
+        update_user_meta( $vendor_id, 'ltms_sponsor_id', $sponsor_id );
+        update_user_meta( $vendor_id, 'ltms_referral_level', $vendor_level );
+
+        LTMS_Core_Logger::info(
+            'REFERRAL_NODE_REGISTERED',
+            sprintf( 'Vendedor #%d registrado como referido de #%d (nivel %d)', $vendor_id, $sponsor_id, $vendor_level )
+        );
+
+        return true;
     }
 
     /**
