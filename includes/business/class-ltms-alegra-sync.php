@@ -445,12 +445,42 @@ final class LTMS_Alegra_Sync {
                     sprintf( 'Egreso Alegra #%d — vendedor #%d — $%s', $payment['id'], $vendor_id, $net_amount ) );
             } else {
                 // AL-5 (relacionado): 200 sin id → flag para revisión manual.
+                // CICLO5-P2-ALEGRA-003 FIX: antes solo log_warning sin
+                // persistir flag. El cron ltms_alegra_retry_failed solo
+                // reintenta facturas (lee _ltms_alegra_invoice_failed),
+                // NO reintenta payouts — los payouts fallidos sin id eran
+                // invisibles para el cron y para el admin. Persistimos
+                // _ltms_alegra_payout_failed_{idem_key} meta en user meta
+                // para que un futuro cron de reintento de payouts (o el
+                // admin via admin-ajax) pueda detectarlos y reintentar.
+                // Sin este flag, un payout que Alegra respondió 200 sin id
+                // queda sin egreso contable para siempre (el vendor cobró,
+                // el marketplace no tiene el asiento de egreso).
+                $fail_meta = '_ltms_alegra_payout_failed_' . md5( $idem_key );
+                update_user_meta( $vendor_id, $fail_meta, current_time( 'mysql' ) );
+                update_user_meta( $vendor_id, $fail_meta . '_error',
+                    sprintf( '200 OK sin id — possible error body de Alegra. idem_key=%s', $idem_key ) );
                 $this->log_warning( 'alegra_payout_no_id',
-                    sprintf( 'Alegra devolvió 200 sin id para payout vendedor #%d ($%s) — posible error body.', $vendor_id, $net_amount ) );
+                    sprintf( 'Alegra devolvió 200 sin id para payout vendedor #%d ($%s) — flag persistido para reintento. idem_key=%s.', $vendor_id, $net_amount, $idem_key ),
+                    [ 'vendor_id' => $vendor_id, 'idem_key' => $idem_key, 'fail_meta' => $fail_meta ]
+                );
             }
         } catch ( \Throwable $e ) {
+            // CICLO5-P2-ALEGRA-004 FIX: antes solo log_warning sin persistir
+            // flag. El admin no tenía visibilidad del fallo (a diferencia de
+            // facturas que persisten _ltms_alegra_invoice_failed en order
+            // meta → retry_failed_invoices las reintenta). Sin este flag,
+            // el egreso Alegra faltante era invisible hasta que el
+            // contador lo notara en conciliación mensual. Mismo patrón que
+            // ALEGRA-003: persistir flag de fallo para reintento manual o
+            // futuro cron de payouts fallidos.
+            $fail_meta = '_ltms_alegra_payout_failed_' . md5( $idem_key );
+            update_user_meta( $vendor_id, $fail_meta, current_time( 'mysql' ) );
+            update_user_meta( $vendor_id, $fail_meta . '_error', $e->getMessage() );
             $this->log_warning( 'alegra_payout_failed',
-                sprintf( 'No se pudo registrar egreso Alegra para vendedor #%d: %s', $vendor_id, $e->getMessage() ) );
+                sprintf( 'No se pudo registrar egreso Alegra para vendedor #%d: %s — flag persistido para reintento. idem_key=%s.', $vendor_id, $e->getMessage(), $idem_key ),
+                [ 'vendor_id' => $vendor_id, 'idem_key' => $idem_key, 'fail_meta' => $fail_meta, 'exception' => $e->getMessage() ]
+            );
         }
     }
 
@@ -577,12 +607,51 @@ final class LTMS_Alegra_Sync {
 
             if ( ! empty( $result['id'] ) ) {
                 global $wpdb;
+                // CICLO5-P1-ALEGRA-001 FIX: el UPDATE del alegra_entry_id en
+                // lt_donations no se verificaba. Si fallaba silenciosamente
+                // (=== false por error DB, o === 0 por fila desaparecida entre
+                // el SELECT de short-circuit de arriba y este UPDATE), el
+                // asiento QUEDABA creado en Alegra PERO sin enlace en LTMS.
+                // En el siguiente re-fire del hook ltms_donation_credited
+                // (cron, webhook, retry manual), el short-circuit
+                // $existing_entry_id > 0 leía 0 (no persistió) → llamaba
+                // nuevamente a Alegra. El Idempotency-Key server-side
+                // ('ltms_donation_' . donation_id) debía dedupear, pero si
+                // Alegra no lo hacía correctamente (cache miss, key
+                // colision, o bug server-side) → ASIENTO DUPLICADO en
+                // Alegra (doble gasto contable). El admin no tenía visibilidad
+                // del fallo: el log info DONATION_ALEGRA_SYNCED se disparaba
+                // igual mintiendo sobre el éxito de la persistencia local.
+                // Fix: capturar $entry_updated + verificar === false o === 0.
+                // En fallo, log critico DONATION_ALEGRA_ENTRY_LINK_FAILED con
+                // alegra_entry_id y DB last_error para reconciliacion manual.
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $wpdb->update(
+                $entry_updated = $wpdb->update(
                     $wpdb->prefix . 'lt_donations',
                     [ 'alegra_entry_id' => (int) $result['id'] ],
                     [ 'id' => $donation_id ]
                 );
+
+                if ( $entry_updated === false || $entry_updated === 0 ) {
+                    $this->log_error(
+                        'DONATION_ALEGRA_ENTRY_LINK_FAILED',
+                        sprintf(
+                            'Donación #%d: asiento Alegra #%d creado PERO el UPDATE de alegra_entry_id falló (updated=%s, last_error=%s). Re-fire del hook puede duplicar el asiento en Alegra si el Idempotency-Key no dedupea. Reconciliación manual: actualizar lt_donations.alegra_entry_id = %d WHERE id = %d.',
+                            $donation_id,
+                            (int) $result['id'],
+                            var_export( $entry_updated, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            (int) $result['id'],
+                            $donation_id
+                        ),
+                        [
+                            'donation_id'     => $donation_id,
+                            'alegra_entry_id' => (int) $result['id'],
+                            'updated'         => $entry_updated,
+                            'last_error'      => $wpdb->last_error,
+                        ]
+                    );
+                }
 
                 $this->log_info( 'DONATION_ALEGRA_SYNCED',
                     sprintf( 'Donación #%d sincronizada con Alegra (entry #%d)', $donation_id, $result['id'] )
@@ -654,12 +723,49 @@ final class LTMS_Alegra_Sync {
             $alegra_payment_id = (int) ( $payment['id'] ?? 0 );
             if ( $alegra_payment_id > 0 ) {
                 global $wpdb;
+                // CICLO5-P1-ALEGRA-002 FIX: el UPDATE del alegra_entry_id en
+                // lt_donation_payouts no se verificaba. Mismo patrón que
+                // ALEGRA-001: si el UPDATE fallaba (=== false o === 0), el
+                // egreso QUEDABA creado en Alegra PERO sin enlace en LTMS.
+                // En el siguiente re-fire del hook ltms_donation_payout_completed
+                // (retry manual del batch, cron de pago fallido), el
+                // short-circuit local no existía para este endpoint — el
+                // Idempotency-Key server-side
+                // ('ltms_donation_payout_' . batch_id) debía dedupear, pero si
+                // Alegra no lo hacía correctamente → EGRESO DUPLICADO en
+                // Alegra (doble salida de caja contable). El batch LTMS
+                // quedaba con alegra_entry_id=0 → el admin veía el batch como
+                // "no sincronizado" y podía re-disparar el pago manualmente.
+                // Fix: capturar $batch_entry_updated + verificar === false o
+                // === 0. En fallo, log critico
+                // DONATION_PAYOUT_ALEGRA_ENTRY_LINK_FAILED para reconciliacion.
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-                $wpdb->update(
+                $batch_entry_updated = $wpdb->update(
                     $wpdb->prefix . 'lt_donation_payouts',
                     [ 'alegra_entry_id' => $alegra_payment_id ],
                     [ 'id' => $batch_id ]
                 );
+
+                if ( $batch_entry_updated === false || $batch_entry_updated === 0 ) {
+                    $this->log_error(
+                        'DONATION_PAYOUT_ALEGRA_ENTRY_LINK_FAILED',
+                        sprintf(
+                            'Batch de donaciones #%d: egreso Alegra #%d creado PERO el UPDATE de alegra_entry_id falló (updated=%s, last_error=%s). El batch queda con alegra_entry_id=0 — el admin puede re-disparar el pago manualmente creyendo que no se sincronizó. Reconciliación manual: actualizar lt_donation_payouts.alegra_entry_id = %d WHERE id = %d.',
+                            $batch_id,
+                            $alegra_payment_id,
+                            var_export( $batch_entry_updated, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $alegra_payment_id,
+                            $batch_id
+                        ),
+                        [
+                            'batch_id'        => $batch_id,
+                            'alegra_entry_id' => $alegra_payment_id,
+                            'updated'         => $batch_entry_updated,
+                            'last_error'      => $wpdb->last_error,
+                        ]
+                    );
+                }
             }
 
             $this->log_info( 'DONATION_PAYOUT_ALEGRA_SYNCED',
