@@ -165,12 +165,46 @@ class LTMS_Coupon_Attribution_Listener {
             // ante fallo transitorio para permitir retry. Sin este reset,
             // si Wallet::credit lanzaba (DB timeout, vendor nonexistent),
             // el flag quedaba en '1' y no había path de retry.
-            global $wpdb;
+            // CICLO13-P1-CA-031 FIX: el UPDATE de reset no se verificaba -
+            // mismo patron que P1-RL-025 (Ciclo 11, ReDi listener) y
+            // P1-TL-028 (Ciclo 12, TPTC listener). Si el reset fallaba
+            // silenciosamente (false = error DB con last_error, 0 = no
+            // rows por schema drift), el flag quedaba en '1' y el retry
+            // nunca ocurria -> la comision de referido nunca se acreditaba
+            // al referrer para siempre (vendor pierde comision MLM de
+            // referido silenciosamente, sin alerta al admin, sin path de
+            // reconciliacion). Patron recurrente documentado en Ciclos
+            // 5-12 (9 ciclos consecutivos). Mismo fix estandar: capturar
+            // + check explicito false/0 + log critico con SQL de
+            // reconciliacion manual.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $wpdb->query( $wpdb->prepare(
+            $reset_result = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order_id, '_ltms_referral_credited'
             ) );
+            if ( false === $reset_result || 0 === (int) $reset_result ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'REFERRAL_CREDIT_FLAG_RESET_FAILED',
+                        sprintf(
+                            'Comision de referido fallo Y el reset del flag _ltms_referral_credited tambien fallo. order_id=%d exception=%s reset_result=%s last_error=%s. La comision de referido NO se acredita al referrer para siempre - el vendor pierde comision MLM de referido silenciosamente. Reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_referral_credited\'.',
+                            $order_id,
+                            get_class( $e ),
+                            var_export( $reset_result, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $wpdb->prefix,
+                            $order_id
+                        ),
+                        [
+                            'order_id'      => $order_id,
+                            'exception'     => get_class( $e ),
+                            'exception_msg' => $e->getMessage(),
+                            'reset_result'  => var_export( $reset_result, true ),
+                            'last_error'    => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
             self::log_warning_static(
                 'REFERRAL_CREDIT_FAILED',
                 sprintf( 'credit_referrer order #%d: %s', $order_id, $e->getMessage() ),
