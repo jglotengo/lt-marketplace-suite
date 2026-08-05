@@ -1061,13 +1061,78 @@ final class LTMS_Business_Order_Split {
             'currency'            => $order_currency,
         ] );
 
+        // CICLO7-P1-OS-008 FIX: si el INSERT de la declaracion fallo
+        // (create_customs_declaration retorna 0 en fallo), early return.
+        // ANTES: el caller procedia con declaration_id=0 silenciosamente —
+        // persistia _ltms_customs_declaration_id=0 en order meta (el
+        // idempotency check en re-fire lee 0, entra a SELECT en tabla, no
+        // encuentra fila si el INSERT fallo, y proceed a crear OTRA
+        // declaracion → en reintentos sucesivos se intenta repetidamente
+        // sin log critico que alerte al admin). Adicionalmente, la
+        // seccion FX (3) y DDP debit (4) procedian con declaration_id=0
+        // como si fuera valido → wallets debitaban con reference a una
+        // declaracion inexistente → reconciliacion manual impossible.
+        // Fix: retornar early sin disparar hooks, no persistir metas con
+        // id=0 (que falsearia el idempotency check). El log critico ya
+        // fue disparado por create_customs_declaration en OS-007 FIX.
+        if ( $declaration_id <= 0 ) {
+            LTMS_Core_Logger::error(
+                'CROSS_BORDER_DECLARATION_NOT_CREATED',
+                sprintf(
+                    'Order #%d vendor #%d: create_customs_declaration retorno 0 (INSERT fallo). Cross-border abortado — no se persistira meta _ltms_customs_declaration_id=0, no se ejecutara FX/DDP/hooks. Reintentar manualmente tras corregir el fallo DB.',
+                    $order_id,
+                    $vendor_id
+                ),
+                [
+                    'order_id'  => $order_id,
+                    'vendor_id' => $vendor_id,
+                ]
+            );
+            return;
+        }
+
         // Store declaration reference on the order for traceability.
         $order->update_meta_data( '_ltms_customs_declaration', $customs );
         $order->update_meta_data( '_ltms_customs_declaration_id', $declaration_id );
         $order->update_meta_data( '_ltms_cross_border_origin', $origin_country );
         $order->update_meta_data( '_ltms_cross_border_destination', $destination_country );
         $order->update_meta_data( '_ltms_cross_border_incoterm', $customs['incoterm'] ?? $incoterm );
-        $order->save();
+
+        // CICLO7-P1-OS-009 FIX: $order->save() no se verificaba. Si fallaba
+        // silenciosamente (raro pero posible: WC_Data_Store exception por
+        // bloqueo de DB, post revision conflict, etc.), los metas
+        // _ltms_customs_declaration* NO se persistian PERO el INSERT en
+        // lt_customs_declarations ya habia ocurrido. En el siguiente re-fire
+        // del webhook, el idempotency check leia _ltms_customs_declaration_id
+        // meta = 0 (no persistio) → entraba al SELECT en tabla → encontraba
+        // la fila → retomaba el flujo desde ahi PERO YA CON UNA FILA
+        // NUEVA siendo insertada (porque create_customs_declaration no
+        // encontraba meta y hacia INSERT de nuevo → REGISTRO DUPLICADO en
+        // lt_customs_declarations). El log critico aqui deja trazabilidad
+        // para reconciliacion manual (no podemos deshacer el INSERT de la
+        // declaración ya commiteado al WC_Data_Store).
+        $saved = $order->save();
+        if ( ! $saved ) {
+            LTMS_Core_Logger::critical(
+                'CROSS_BORDER_META_SAVE_FAILED',
+                sprintf(
+                    'Order #%d vendor #%d: order->save() retorno %s tras update_meta_data(_ltms_customs_declaration_id=%d). El INSERT en lt_customs_declarations ya ocurrio (declaracion #%d) PERO los metas no se persistieron — el idempotency check en re-fire no la detectara y creara una declaracion DUPLICADA. Reconciliacion manual: UPDATE wp_postmeta SET meta_value=%d WHERE post_id=%d AND meta_key=\'_ltms_customs_declaration_id\'.',
+                    $order_id,
+                    $vendor_id,
+                    var_export( $saved, true ),
+                    $declaration_id,
+                    $declaration_id,
+                    $declaration_id,
+                    $order_id
+                ),
+                [
+                    'order_id'           => $order_id,
+                    'vendor_id'          => $vendor_id,
+                    'declaration_id'     => $declaration_id,
+                    'saved'              => var_export( $saved, true ),
+                ]
+            );
+        }
 
         // ── 3. Settlement currency conversion (display → vendor currency). ────
         // Only run if the Currency Manager is loaded. The vendor's wallet was
@@ -1433,10 +1498,36 @@ final class LTMS_Business_Order_Split {
             [ '%d', '%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%d', '%s', '%s', '%s' ]
         );
 
-        if ( ! $result ) {
-            LTMS_Core_Logger::warning(
+        // CICLO7-P1-OS-007 FIX: el check anterior `if ( ! $result )` solo
+        // cubria $result === false (truthy check) pero NO distinguia false
+        // (error DB con last_error) de 0 (0 rows inserted sin error reported
+        // — caso teorico de tabla corrupta o schema drift). Si el INSERT
+        // retornaba 0, $wpdb->insert_id podia estar en 0 igual → caller
+        // persistia meta _ltms_customs_declaration_id=0 → idempotency check
+        // (< 1) en re-fire del webhook entraba a SELECT en tabla → si el
+        // INSERT retorno 0 rows tampoco habia fila → proceed a crear OTRA
+        // declaracion → silencioso (no habia log critico, solo warning
+        // CUSTOMS_DECLARATION_INSERT_FAILED sin distinguir false de 0).
+        // Fix: verificacion explicita false === y 0 === con var_export en el
+        // log critico para distinguir error DB de 0 rows. Mismo patron
+        // verificado que los fixes OS-001..006 del Ciclo 6 (cloud ledger +
+        // alegra-sync).
+        if ( false === $result || 0 === (int) $result ) {
+            LTMS_Core_Logger::critical(
                 'CUSTOMS_DECLARATION_INSERT_FAILED',
-                sprintf( 'Could not insert customs declaration for order #%d vendor #%d: %s', $order_id, $vendor_id, $wpdb->last_error )
+                sprintf(
+                    'Order #%d vendor #%d: INSERT en lt_customs_declarations fallo (inserted=%s, last_error=%s). Reconciliacion manual: revisar si la fila fue persistida y actualizar _ltms_customs_declaration_id en el order meta.',
+                    $order_id,
+                    $vendor_id,
+                    var_export( $result, true ),
+                    $wpdb->last_error ?: '(no error)'
+                ),
+                [
+                    'order_id'      => $order_id,
+                    'vendor_id'     => $vendor_id,
+                    'inserted'      => var_export( $result, true ),
+                    'last_error'    => $wpdb->last_error,
+                ]
             );
             return 0;
         }
