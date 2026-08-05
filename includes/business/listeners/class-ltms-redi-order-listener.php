@@ -57,8 +57,15 @@ class LTMS_Redi_Order_Listener {
         // H-5 FIX: removed update_post_meta( $order_id, '_ltms_redi_processed', true )
         // here — the atomic claim above already marked the order as processed.
 
-        LTMS_Business_Redi_Order_Split::process( $order, $redi_items );
-        LTMS_Business_Redi_Manager::deduct_origin_stock( $order );
+        // CICLO11-P0-RL-024 FIX: las lineas previas invocaban
+        // Redi_Order_Split::process() + deduct_origin_stock() DOS VECES
+        // (una fuera del try/catch en lineas 60-61, otra dentro en 73-74).
+        // Esto provocaba doble stock deduction + doble comisiones + doble
+        // notificaciones en CADA ReDi order paid exitoso - exactamente el
+        // doble-procesamiento que el H-5 atomic claim intentaba prevenir.
+        // El commit "Ciclo 1.5" añadio el try/catch pero olvido eliminar
+        // las llamadas previas sueltas. Fix: dejar solo la invocacion
+        // dentro del try/catch.
 
         // AUDIT-LISTENERS-001 P0-2 FIX (Ciclo 1.5): envolver procesamiento
         // crítico en try/catch y resetear el flag _ltms_redi_processed en
@@ -74,11 +81,40 @@ class LTMS_Redi_Order_Listener {
             LTMS_Business_Redi_Manager::deduct_origin_stock( $order );
         } catch ( \Throwable $e ) {
             // Resetear el flag para permitir retry tras fallo transitorio.
+            // CICLO11-P1-RL-025 FIX: el UPDATE de reset no se verificaba -
+            // si fallaba silenciosamente (false = error DB, 0 = no rows
+            // matcheadas por schema drift), el flag quedaba en '1' y el
+            // retry nunca ocurria -> el order quedaba sin procesar para
+            // siempre, sin stock deduct ni comisiones ni notificaciones.
+            // Patron recurrente documentado en Ciclos 5-10.
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-            $wpdb->query( $wpdb->prepare(
+            $reset_result = $wpdb->query( $wpdb->prepare(
                 "UPDATE {$wpdb->postmeta} SET meta_value = '0' WHERE post_id = %d AND meta_key = %s",
                 $order_id, '_ltms_redi_processed'
             ) );
+            if ( false === $reset_result || 0 === (int) $reset_result ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::critical(
+                        'REDI_PROCESSING_FLAG_RESET_FAILED',
+                        sprintf(
+                            'ReDi processing fallo Y el reset del flag _ltms_redi_processed tambien fallo. order_id=%d exception=%s reset_result=%s last_error=%s. El order queda sin procesar para siempre - reconciliacion manual: UPDATE %spostmeta SET meta_value=\'0\' WHERE post_id=%d AND meta_key=\'_ltms_redi_processed\'.',
+                            $order_id,
+                            get_class( $e ),
+                            var_export( $reset_result, true ),
+                            $wpdb->last_error ?: '(no error)',
+                            $wpdb->prefix,
+                            $order_id
+                        ),
+                        [
+                            'order_id'      => $order_id,
+                            'exception'     => get_class( $e ),
+                            'exception_msg' => $e->getMessage(),
+                            'reset_result'  => var_export( $reset_result, true ),
+                            'last_error'    => $wpdb->last_error ?: '(no error)',
+                        ]
+                    );
+                }
+            }
             LTMS_Core_Logger::error(
                 'REDI_PROCESS_FAILED',
                 sprintf( 'ReDi processing failed for order #%d: %s', $order_id, $e->getMessage() ),
@@ -241,12 +277,47 @@ class LTMS_Redi_Order_Listener {
                 // AMBOS debits exitosos. Si cualquiera lanza, el status
                 // sigue 'paid' → retry re-intenta (los debits son idempotentes
                 // ahora, no hay doble débito).
-                $wpdb->update(
+                // CICLO11-P1-RL-026 FIX: el UPDATE no se verificaba - si
+                // fallaba silenciosamente (false = error DB, 0 = no rows
+                // por schema drift o comision ya reversed en retry previo),
+                // el status podia quedar en 'paid' o el retry re-debitaba.
+                // Patron recurrente documentado en Ciclos 5-10.
+                $reversed = $wpdb->update(
                     $wpdb->prefix . 'lt_redi_commissions',
                     [ 'status' => 'reversed' ],
                     [ 'id' => $commission->id ],
                     [ '%s' ], [ '%d' ]
                 );
+                if ( false === $reversed || 0 === (int) $reversed ) {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::critical(
+                            'REDI_REVERSAL_STATUS_UPDATE_FAILED',
+                            sprintf(
+                                'Reversal de comision ReDi NO marcada como reversed en lt_redi_commissions. order_id=%d commission_id=%d origin_id=%d reseller_id=%d reversed_result=%s last_error=%s. Los debits YA se aplicaron (no es idempotency hit). Reconciliacion manual: UPDATE %slt_redi_commissions SET status=\'reversed\' WHERE id=%d.',
+                                $order_id,
+                                (int) $commission->id,
+                                $origin_id,
+                                $reseller_id,
+                                var_export( $reversed, true ),
+                                $wpdb->last_error ?: '(no error)',
+                                $wpdb->prefix,
+                                (int) $commission->id
+                            ),
+                            [
+                                'order_id'        => $order_id,
+                                'commission_id'   => (int) $commission->id,
+                                'origin_id'       => $origin_id,
+                                'reseller_id'     => $reseller_id,
+                                'reversed_result' => var_export( $reversed, true ),
+                                'last_error'      => $wpdb->last_error ?: '(no error)',
+                            ]
+                        );
+                    }
+                    // No lanzar ni continuar - los debits YA se aplicaron.
+                    // Continuar para notificar a los vendors que el pedido
+                    // fue cancelado (la reversal del wallet si ocurrio), y
+                    // dejar el log critico para reconciliacion manual.
+                }
             } catch ( \Throwable $e ) {
                 LTMS_Core_Logger::error( 'REDI_REVERSAL_FAILED', $e->getMessage() );
                 continue; // Pasar a la siguiente comisión sin notificar (no hubo reversal exitoso).
@@ -305,8 +376,16 @@ class LTMS_Redi_Order_Listener {
     private static function create_notification( int $user_id, string $type, string $title, string $message, int $order_id = 0, string $link = '' ): void {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_notifications';
+        // CICLO11-P1-RL-027 FIX: el INSERT no se verificaba - si fallaba
+        // silenciosamente (false = error DB, 0 = no rows por schema drift),
+        // el vendor no recibia notificacion in-app sin que nadie lo
+        // supiera. Patron recurrente documentado en Ciclos 5-10. La
+        // notificacion es el canal principal para que el origin vendor
+        // sepa que debe enviar el producto - sin ella, el pedido se
+        // atrasa sin alerta. Log critico (no warning) + SQL de
+        // reconciliacion manual para reparar la notificacion forense.
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $wpdb->insert( $table, [
+        $notif_result = $wpdb->insert( $table, [
             'user_id'    => $user_id,
             'type'       => $type,
             'title'      => sanitize_text_field( $title ),
@@ -315,6 +394,36 @@ class LTMS_Redi_Order_Listener {
             'is_read'    => 0,
             'created_at' => current_time( 'mysql', true ),
         ], [ '%d', '%s', '%s', '%s', '%s', '%d', '%s' ] );
+
+        if ( false === $notif_result || 0 === (int) $notif_result ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::critical(
+                    'REDI_NOTIFICATION_INSERT_FAILED',
+                    sprintf(
+                        'Notificacion ReDi NO insertada en lt_notifications. user_id=%d type=%s order_id=%d result=%s last_error=%s. El vendor no recibira alerta in-app. Reconciliacion manual: INSERT INTO %slt_notifications (user_id, type, title, message, link, is_read, created_at) VALUES (%d, \'%s\', \'%s\', \'%s\', \'%s\', 0, \'%s\').',
+                        $user_id,
+                        $type,
+                        $order_id,
+                        var_export( $notif_result, true ),
+                        $wpdb->last_error ?: '(no error)',
+                        $wpdb->prefix . 'lt_notifications',
+                        $user_id,
+                        $type,
+                        sanitize_text_field( $title ),
+                        sanitize_text_field( $message ),
+                        esc_url_raw( $link ),
+                        current_time( 'mysql', true )
+                    ),
+                    [
+                        'user_id'      => $user_id,
+                        'type'         => $type,
+                        'order_id'     => $order_id,
+                        'notif_result' => var_export( $notif_result, true ),
+                        'last_error'   => $wpdb->last_error ?: '(no error)',
+                    ]
+                );
+            }
+        }
     }
 
     /**
