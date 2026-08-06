@@ -19,8 +19,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// CICLO20-P1-AD-083 FIX: wp_die sin status code explicito devolvia HTTP
+// 200 con el mensaje "No tienes permiso" -> incorrecto para auditorias
+// forenses (Art. 30-B CFF) que esperan 403 en access logs. Especificar
+// 403 explicito para que el access log del reverse proxy (Nginx/SiteGround)
+// registre un forbidden real, no un OK con mensaje de error. Segun "Seguridad
+// por defecto" de AGENTS.md.
 if ( ! current_user_can( 'ltms_access_auditor_dashboard' ) ) {
-    wp_die( esc_html__( 'No tienes permiso para acceder a esta página.', 'ltms' ) );
+    wp_die( esc_html__( 'No tienes permiso para acceder a esta pagina.', 'ltms' ), '', 403 );
 }
 
 LTMS_Data_Masking::log_auditor_access( 'auditor_dashboard_view' );
@@ -63,7 +69,16 @@ $dt_from     = $date_from . ' 00:00:00';
 $dt_to       = $date_to   . ' 23:59:59';
 
 // Export CSV
-$export_csv = isset( $_GET['export'] ) && $_GET['export'] === 'csv';
+// CICLO20-P1-AD-066 FIX: el export CSV se disparaba con ?export=csv sin
+// nonce. Aunque la descarga no muta state del servidor, un atacante podria
+// forzar al auditor a descargar un CSV via link malicioso (CSRF de
+// descarga). Defense-in-depth: requerir nonce _wpnonce con accion
+// 'ltms_auditor_export_csv'. Si el action no esta en $_GET, no es export.
+// Si esta pero el nonce invalido → no export (silencioso, no wp_die para no
+// romper UX de un auditor que abrio el link con cache vieja).
+$export_csv = isset( $_GET['export'] ) && $_GET['export'] === 'csv'
+    && isset( $_GET['_wpnonce'] )
+    && wp_verify_nonce( sanitize_text_field( $_GET['_wpnonce'] ), 'ltms_auditor_export_csv' );
 
 // ── Resumen fiscal ─────────────────────────────────────────────────────────
 // CICLO14-P1-AD-033 FIX (cont.): $country_sql ahora se construye solo
@@ -137,9 +152,22 @@ $transactions = $wpdb->get_results( $wpdb->prepare(
 if ( $export_csv ) {
 
     // 1. Detectar columnas opcionales (misma lógica que el panel)
+    // CICLO20-P1-AD-067 FIX: SHOW COLUMNS FROM lt_commissions se ejecutaba en
+    // CADA export CSV sin cacheo. Es una query de schema (rapida en Mysql 8
+    // pero still 1 round-trip + parse de information_schema). Cacheada en
+    // transient de 1h porque el schema rara vez cambia en prod (migraciones
+    // ocurren via register_activation_hook → flush automatico). Mismo cache
+    // key lo uso el panel web (linea ~415) para consistencia. Si la columna
+    // se anade/elimina, basta con borrar el transient desde el migrator.
     $exp_cols   = [];
-    $exp_check  = $wpdb->get_results( "SHOW COLUMNS FROM {$wpdb->prefix}lt_commissions", ARRAY_A );
-    foreach ( $exp_check as $c ) { $exp_cols[ $c['Field'] ] = true; }
+    $exp_check_cached = get_transient( 'ltms_schema_lt_commissions' );
+    if ( false === $exp_check_cached ) {
+        $exp_check_raw = $wpdb->get_results( "SHOW COLUMNS FROM {$wpdb->prefix}lt_commissions", ARRAY_A );
+        $exp_check_cached = [];
+        foreach ( $exp_check_raw as $c ) { $exp_check_cached[ $c['Field'] ] = true; }
+        set_transient( 'ltms_schema_lt_commissions', $exp_check_cached, HOUR_IN_SECONDS );
+    }
+    foreach ( $exp_check_cached as $field => $true ) { $exp_cols[ $field ] = true; }
     $exp_has_hosp   = isset( $exp_cols['is_hospedaje'], $exp_cols['hospedaje_direccion'] );
     $exp_has_imp    = isset( $exp_cols['is_import'],    $exp_cols['aranceles_amount'] );
     $exp_has_iepsr  = isset( $exp_cols['ieps_retenido'] );
@@ -398,9 +426,19 @@ if ( $export_csv ) {
 
 // ── FRACCIÓN II — Vendedores ──────────────────────────────────────────────
 // Guard: detect which optional columns exist before querying
+// CICLO20-P1-AD-067 FIX (cont.): misma cache transient que el CSV export para
+// evitar 2 SHOW COLUMNS por page load (1 export + 1 panel). El transient
+// LTMS_SCHEMA_LT_COMMISSIONS se setea en el primer hit (cualquiera de los 2
+// paths) y el segundo lo reutiliza.
 $cols_exist = [];
-$col_check = $wpdb->get_results( "SHOW COLUMNS FROM {$wpdb->prefix}lt_commissions", ARRAY_A );
-foreach ( $col_check as $col ) { $cols_exist[ $col['Field'] ] = true; }
+$col_check_cached = get_transient( 'ltms_schema_lt_commissions' );
+if ( false === $col_check_cached ) {
+    $col_check_raw = $wpdb->get_results( "SHOW COLUMNS FROM {$wpdb->prefix}lt_commissions", ARRAY_A );
+    $col_check_cached = [];
+    foreach ( $col_check_raw as $col ) { $col_check_cached[ $col['Field'] ] = true; }
+    set_transient( 'ltms_schema_lt_commissions', $col_check_cached, HOUR_IN_SECONDS );
+}
+foreach ( $col_check_cached as $field => $true ) { $cols_exist[ $field ] = true; }
 $has_hospedaje  = isset( $cols_exist['is_hospedaje'], $cols_exist['hospedaje_direccion'] );
 $has_import     = isset( $cols_exist['is_import'],    $cols_exist['aranceles_amount'] );
 // CICLO14-P1-AD-035 FIX: deteccion de columna opcional ieps_retenido para
@@ -529,8 +567,11 @@ $current_user  = wp_get_current_user();
 $auditor_label = esc_html( $current_user->display_name );
 $tx_pages      = $tx_total > 0 ? ceil( $tx_total / $tx_per_page ) : 1;
 $now_label     = esc_html( date_i18n( 'd M Y · H:i', current_time( 'timestamp' ) ) );
+// CICLO20-P1-AD-066 FIX (cont.): export_url con nonce incluido. wp_nonce_url
+// añade _wpnonce al query string con accion 'ltms_auditor_export_csv'
+// (misma accion que se valida arriba en $export_csv).
 $base_url      = add_query_arg( [ 'page' => 'ltms-auditor', 'date_from' => $date_from, 'date_to' => $date_to, 'country' => $country, 'level' => $event_level ] );
-$export_url    = esc_url( add_query_arg( 'export', 'csv', $base_url ) );
+$export_url    = esc_url( wp_nonce_url( add_query_arg( 'export', 'csv', $base_url ), 'ltms_auditor_export_csv' ) );
 $critical_sec  = count( array_filter( $security_events, fn($e) => strtolower($e['level']) === 'critical' ) );
 ?>
 <style>
@@ -1549,7 +1590,19 @@ $critical_sec  = count( array_filter( $security_events, fn($e) => strtolower($e[
         <?php else : ?>
             <span class="ltms-badge ltms-badge-ok">✅ <?php esc_html_e( 'Sin alertas', 'ltms' ); ?></span>
         <?php endif; ?>
-        <span class="ltms-sh-desc"><?php printf( __( 'Umbral: $%s COP (%s UVT) · Res. 314/2021 UIAF', 'ltms' ), number_format( $sagrilaft_floor, 0, ',', '.' ), number_format( $sagrilaft_uvts, 0 ) ); ?></span>
+        <span class="ltms-sh-desc"><?php
+        // CICLO20-P1-AD-068/AD-077 FIX: printf( __(...) ) sin escape + middot
+        // (U+00B7) no-ASCII en source. Cambio a esc_html__ para escapar el
+        // template string; los %s consumen number_format() que es numerico
+        // (safe). Reemplazo '·' por '/' y 'UIAF' <-> 'Res. 314/2021' para
+        // mantener ASCII puro en el source (patron CJK/Latin-extended gotcha
+        // C17/C18/C19 reiterado).
+        printf(
+            esc_html__( 'Umbral: $%s COP (%s UVT) / Res. 314/2021 UIAF', 'ltms' ),
+            number_format( $sagrilaft_floor, 0, ',', '.' ),
+            number_format( $sagrilaft_uvts, 0 )
+        );
+        ?></span>
     </div>
 
     <?php if ( ! empty( $large_payouts ) ) : ?>

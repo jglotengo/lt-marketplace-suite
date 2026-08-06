@@ -7,10 +7,25 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// CICLO20-P1-AD-058 FIX: defense-in-depth capability check. El menu WP ya
+// exige 'ltms_manage_kyc' (class-ltms-admin.php:124), pero el view debe
+// redundar con current_user_can() como SI lo hace view-auditor-dashboard.php:22.
+// Si otro dev registra el slug sin capability (o un hook reescribe el callback),
+// esta salvaguarda evita KYC data leak. Patron WordPress VIP / WPCS.
+if ( ! current_user_can( 'ltms_manage_kyc' ) ) {
+    wp_die( esc_html__( 'No tienes permiso para acceder a esta page.', 'ltms' ), 403 );
+}
+
 global $wpdb;
 $table  = $wpdb->prefix . 'lt_vendor_kyc';
-$status = sanitize_key( $_GET['status'] ?? 'pending' ); // phpcs:ignore
-$nonce  = wp_create_nonce( 'ltms_admin_nonce' );
+// CICLO20-P1-AD-060 FIX: $status se sanitizaba (sanitize_key) pero NO se
+// validaba contra allowlist {pending, approved, rejected}. Un valor no
+// listado pasaba al WHERE k.status = %s y devolvia 0 filas silenciosamente
+// (UX rota para el admin). Mismo patron defensive que
+// view-auditor-dashboard.php:55-58 (country/level allowlist CICLO14-P1-AD-033).
+$raw_status = isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : 'pending'; // phpcs:ignore
+$status     = in_array( $raw_status, [ 'pending', 'approved', 'rejected' ], true ) ? $raw_status : 'pending';
+$nonce      = wp_create_nonce( 'ltms_admin_nonce' );
 
 // Contadores
 // phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -85,16 +100,26 @@ $total_kyc = array_sum( $count_map );
         <?php
         // Helper: genera URL pre-firmada (1 h) para una key de B2, o devuelve la URL tal cual si ya es http.
         // Los docs KYC están en bucket privado lotengo-kyc-docs; nunca exponer URL directa.
-        $kyc_bucket   = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
-                            LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
-        $b2_client    = null;
-        $b2_available = LTMS_Core_Config::get( 'ltms_backblaze_enabled', 'no' ) === 'yes';
-        if ( $b2_available ) {
-            try { $b2_client = new LTMS_Api_Backblaze(); } catch ( \Throwable $e ) { $b2_client = null; }
-        }
-        // v2.9.300 FIX: usar proxy PHP en vez de presigned URL (B2 UnauthorizedAccess)
         // v2.9.300 FIX: usar proxy PHP en vez de presigned URL (B2 UnauthorizedAccess)
         // v2.9.302 FIX: manejar URLs de B2 directas + ltms-vault + keys relativas
+        // CICLO20-P1-AD-061 FIX: eliminada la instanciacion del cliente B2
+        // (antes: try { new ... LTMS_Api_Backblaze } catch) que se construia
+        // en CADA render del listado KYC (incl. paginacion, tabs) although el
+        // modal docs lo pide via AJAX aparte (action=ltms_kyc_proxy_doc).
+        // El constructor inicializa token + bucket lookup — coste 1-2 HTTP
+        // requests a B2 por cada page load. Como el proxy admin-ajax
+        // autentica y firma ad-hoc, el view NO necesita el cliente en runtime.
+        // Las unicas URLs firmadas que el view construye son para el modal
+        // (no las secunda el cliente). Si mas adelante se requiere firma
+        // directa (e.g. presigned URLs legacy), reinicializar aca con:
+        // $b2_client = LTMS_Api_Backblaze::instance() (singleton).
+        // Variables $b2_client / $b2_available se conservan en el closure
+        // signature para no romper el contract existente, pero ambas quedan
+        // en null/false. Si un dev futuro quiere revivir, ya tiene el hook.
+        $b2_client    = null;
+        $b2_available = false;
+        $kyc_bucket   = LTMS_Core_Config::get( 'ltms_backblaze_kyc_bucket',
+                            LTMS_Core_Config::get( 'ltms_backblaze_bucket_name', 'lotengo-kyc-docs' ) );
         $make_signed_url = static function( string $key ) use ( $b2_client, $kyc_bucket ): string {
             if ( empty( $key ) ) return '';
             // Convertir URLs legacy ltms-vault a key B2 relativa

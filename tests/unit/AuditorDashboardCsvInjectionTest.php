@@ -46,8 +46,19 @@ class AuditorDashboardCsvInjectionTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_C
     public function test_export_gate_is_correct(): void {
         // El bloque de exportación se ejecuta solo si $_GET['export'] === 'csv'.
         // Esto previene que se ejecute accidentalmente en la vista normal.
-        $this->assertStringContainsString( "\$export_csv = isset( \$_GET['export'] ) && \$_GET['export'] === 'csv';", $this->src );
+        // CICLO20-P1-AD-066 FIX: el gate ahora requiere ademas wp_verify_nonce
+        // con accion 'ltms_auditor_export_csv' (defense-in-depth contra CSRF
+        // de descarga). El test original (C14) buscaba el patron textual sin
+        // nonce; se actualiza para afirmar ambos componentes del nuevo gate.
+        $this->assertStringContainsString( "\$_GET['export'] === 'csv'", $this->src );
+        $this->assertStringContainsString( "wp_verify_nonce( sanitize_text_field( \$_GET['_wpnonce'] ), 'ltms_auditor_export_csv' )", $this->src );
         $this->assertStringContainsString( 'if ( $export_csv ) {', $this->src );
+        // El patron vulnerable original (sin nonce) ya NO debe estar.
+        $this->assertStringNotContainsString(
+            "\$export_csv = isset( \$_GET['export'] ) && \$_GET['export'] === 'csv';\n",
+            $this->src,
+            'AD-066: el patron sin nonce (CSRF-able) no debe existir.'
+        );
     }
 
     public function test_view_opens_with_abspath_guard(): void {
