@@ -196,6 +196,67 @@ class LTMS_Api_XCover extends LTMS_Abstract_API_Client {
     }
 
     /**
+     * Files an insurance claim against an existing policy.
+     *
+     * CICLO19-P1-XP-048 FIX: el listener LTMS_XCover_Policy_Listener::on_file_claim
+     * invoca este metodo cuando ConsumerProtection::maybe_trigger_insurance_claim
+     * dispara el action ltms_xcover_file_claim (disputas damaged/lost). Antes
+     * no existia — el listener caia en warning XCOVER_CLAIM_METHOD_MISSING y el
+     * claim nunca se fileaba en XCover (feature incompleto end-to-end).
+     *
+     * @param array $claim_data {
+     *     @type string $policy_id      XCover policy ID.
+     *     @type string $reason         Motivo del claim (damaged|lost|...).
+     *     @type string $description    Texto descriptivo del incidente.
+     *     @type string $incident_date   Fecha UTC Y-m-d H:i:s.
+     *     @type float  $amount         Monto reclamado.
+     *     @type string $currency       ISO 4217 (COP).
+     *     @type string $idempotency_key Clave dedup proveida por el listener.
+     * }
+     * @return array{success: bool, claim_id: string, claim_number: string}
+     */
+    public function file_claim( array $claim_data ): array {
+        $policy_id = $claim_data['policy_id'] ?? '';
+
+        // INTEGRATIONS-AUDIT P1 FIX / CICLO19-P1-XP-048: validar policy_id
+        // antes de construir URL path (mismo patron que cancel_policy/get_policy).
+        if ( ! preg_match( '/^[A-Za-z0-9_\-]{1,128}$/', $policy_id ) ) {
+            return [
+                'success' => false,
+                'claim_id'   => '',
+                'claim_number' => '',
+            ];
+        }
+
+        $payload = [
+            'reason'         => sanitize_text_field( $claim_data['reason'] ?? '' ),
+            'description'    => sanitize_textarea_field( $claim_data['description'] ?? '' ),
+            'incidentDate'   => $claim_data['incident_date'] ?? LTMS_Utils::now_utc(),
+            'amount'         => [
+                'amount'   => (float) ( $claim_data['amount'] ?? 0 ),
+                'currency' => $claim_data['currency'] ?? LTMS_Core_Config::get_currency(),
+            ],
+        ];
+
+        // Idempotency-Key: priorizar la proveida por el listener
+        // (ltms_claim_dispute_{D}_order_{O}) — dedupe server-side en 5xx retry.
+        $idem_key = $claim_data['idempotency_key'] ?? 'ltms_claim_policy_' . $policy_id;
+
+        $response = $this->perform_request(
+            'POST',
+            '/partners/' . rawurlencode( $this->partner_code ) . '/policies/' . $policy_id . '/claims/',
+            $payload,
+            [ 'Idempotency-Key' => $idem_key ]
+        );
+
+        return [
+            'success'       => isset( $response['id'] ),
+            'claim_id'       => $response['id'] ?? '',
+            'claim_number'   => $response['claimNumber'] ?? '',
+        ];
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function health_check(): array {
