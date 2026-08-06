@@ -28,9 +28,17 @@ $cross_border_enabled        = LTMS_Core_Config::get( 'ltms_cross_border_enabled
 $base_currency               = LTMS_Core_Config::get( 'ltms_base_currency', 'USD' );
 $enabled_currencies_raw      = LTMS_Core_Config::get( 'ltms_enabled_currencies', [ 'COP', 'MXN', 'USD' ] );
 $enabled_currencies          = is_array( $enabled_currencies_raw ) ? $enabled_currencies_raw : (array) json_decode( (string) $enabled_currencies_raw, true );
-$fx_spread_percentage        = (float) LTMS_Core_Config::get( 'ltms_fx_spread_percentage', 1.5 );
-$fx_provider                 = LTMS_Core_Config::get( 'ltms_fx_provider', 'frankfurter' );
-$fx_cache_ttl_hours          = (int) LTMS_Core_Config::get( 'ltms_fx_cache_ttl_hours', 6 );
+// CICLO21-P1-AD-SET-101 FIX: clampear los rangos al render para defense-in-depth.
+// El handler sanitize_settings() (class-ltms-admin-settings.php:280,285) ya clampea al
+// guardar (fx_spread_percentage a [0,5], fx_cache_ttl_hours a [1,168]), pero una
+// edición directa de wp_options vía DB (phpMyAdmin, wp-cli, migración manual) puede
+// inyectar un valor fuera de rango que pasaría al UI sin protection y posteriormente
+// al runtime del motor FX. Clampeo aqui garantiza que el render siempre muestre un
+// valor saneado y el input hidden/html reciba un numero valido. Los min/max del <input>
+// HTML5 (lineas 184,205) son solo advisory (no validan tras submit) — este clamping
+// ocurre ANTES de cualquier salida HTML.
+$fx_spread_percentage        = max( 0.0, min( 5.0, (float) LTMS_Core_Config::get( 'ltms_fx_spread_percentage', 1.5 ) ) );
+$fx_cache_ttl_hours          = max( 1, min( 168, (int) LTMS_Core_Config::get( 'ltms_fx_cache_ttl_hours', 6 ) ) );
 $fx_manual_overrides         = LTMS_Core_Config::get( 'ltms_fx_manual_overrides', '' );
 if ( is_array( $fx_manual_overrides ) ) {
 	// Convert array form to textual representation for the textarea.
@@ -342,5 +350,20 @@ $available_carriers = [
 
 	</table>
 
-	<?php wp_nonce_field( 'ltms_save_cross_border_settings', 'ltms_cross_border_nonce' ); ?>
+	<?php
+	// CICLO21-P1-AD-SET-100 FIX: este wp_nonce_field('ltms_save_cross_border_settings',
+	// 'ltms_cross_border_nonce') era HUÉRFANO — el handler central ajax_save_section()
+	// (class-ltms-admin-settings.php:334) solo verifica check_ajax_referer('ltms_admin_nonce',
+	// 'nonce') con el nonce maestro inyectado por html-admin-settings.php:72
+	// (wp_nonce_field('ltms_settings_nonce','ltms_nonce')). Las secciones no registran su
+	// propio action AJAX de guardado — todas enrutan via ltms_save_settings_section con el
+	// nonce maestro. Este nonce seccionado se generaba en el DOM pero NUNCA se verificaba en
+	// el server, induciendo a creer que había defense-in-depth cuando el servidor no lo
+	// validaba. Defense-in-depth residual: el nonce maestro del form (html-admin-settings.php:72)
+	// ya protege toda esta sección. Eliminado para evitar la falsa impresión de validación.
+	// El handler mantiene su hardening existente (capability check ltms_manage_platform_settings
+	// línea 336 + 403, ALLOWED_OPTION_PREFIX='ltms_' FASE3 P0 FIX línea 37, sanitize_settings
+	// exhaustivo). Mismo patrón que AD-SET-100 en section-donations.php (nonce huérfano similar
+	// eliminado) y que AVE-017 FIX en class-ltms-business-aveonline-sandbox.php (allowlist IDs).
+	?>
 </div>

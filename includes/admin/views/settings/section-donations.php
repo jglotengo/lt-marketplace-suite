@@ -200,5 +200,20 @@ $donation_certificate_enabled = LTMS_Core_Config::get( 'ltms_donation_certificat
         </tr>
     </table>
 
-    <?php wp_nonce_field( 'ltms_save_donations_settings', 'ltms_donations_nonce' ); ?>
+    <?php
+    // CICLO21-P1-AD-SET-100 FIX: este wp_nonce_field('ltms_save_donations_settings',
+    // 'ltms_donations_nonce') era HUÉRFANO — el handler central ajax_save_section()
+    // (class-ltms-admin-settings.php:334) solo verifica check_ajax_referer('ltms_admin_nonce',
+    // 'nonce') con el nonce maestro inyectado por html-admin-settings.php:72
+    // (wp_nonce_field('ltms_settings_nonce','ltms_nonce')). Las secciones no registran su
+    // propio action AJAX de guardado — todas enrutan via ltms_save_settings_section con el
+    // nonce maestro. Este nonce seccionado se generaba en el DOM pero NUNCA se verificaba en
+    // el server, induciendo a creer que había defense-in-depth cuando el servidor no lo
+    // validaba. Defense-in-depth residual: el nonce maestro del form
+    // (html-admin-settings.php:72) ya protege toda esta sección. Eliminado para evitar la
+    // falsa impresión de validación. Mismo patrón que AD-SET-100 en section-cross-border.
+    // El handler mantiene su hardening existente (capability check
+    // ltms_manage_platform_settings + 403, ALLOWED_OPTION_PREFIX='ltms_' FASE3 P0 FIX,
+    // sanitize_settings con handling especifico para donation_* en líneas 162-206).
+    ?>
 </div>
