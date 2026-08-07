@@ -2616,5 +2616,58 @@ Tres ramas: `null` → fail-safe (no tocar status); `>= total - 0.01` → refund
 5. **Compare handlers handshake con Handlers hermanos** — cuando un gateway (Stripe) ya implementa un evento de forma segura y otro (Openpay) implementa el mismo evento de forma insegura, el handler del primero es el precedent. En C24, el handler de Stripe (`handle_charge_refunded` solo `add_order_note()`, confía en `process_refund()`) era la referencia para arreglar Openpay. Al auditar un gateway nuevo, comparar con los ya auditados.
 
 
+### Lección 25.1 — Inconsistencia transversal en IP resolution entre handlers del mismo módulo = P2 silencioso (rate limit spoofing)
+
+**Contexto:**
+
+Tras auditar los 8 webhook handlers de `includes/api/webhooks/` (C18 + C24 + C25), se detectó que 2 de ellos NO delegaban la resolución de IP al helper centralizado `LTMS_Core_Security::get_client_ip_safe()`:
+- `class-ltms-siigo-webhook-handler.php` `client_ip()` — implementación manual del X-Forwarded-For tomando el último elemento del chain SIN validar el proxy contra `ltms_trusted_proxies`.
+- `class-ltms-api-webhook-router.php` `log_incoming()` — usaba `$_SERVER['REMOTE_ADDR']` directo para el campo `ip_address` del log.
+
+Los otros 5 handlers (Stripe no usa client_ip, pero Uber-Direct/Openpay/Addi/ZapSign sí) YA delegaban correctamente desde fixes previos (WH3 FIX v2.8.9 + reauditorias posteriores).
+
+**Causa raíz:**
+
+- `get_client_ip_safe()` se introdujo en `LTMS_Core_Security` para centralizar la validación de proxies confiables (WH3 FIX v2.8.9) — pero nunca se hizo un grep transversal para migrar TODOS los handlers. Cada fix individual migraba solo el handler auditado, dejando los otros con implementación manual.
+- El daño real del handler de Siigo: un atacante que controle `X-Forwarded-For` (cabecera trivial de forjar en cualquier request HTTP) puede enviar IPs falsas en cada petición → cada IP spoofed tiene su propio counter de rate limit → rate limit per-IP efectivamente bypasseado → flood de webhooks forjados (con token válido compartido vía leaks previos o routes comprometidas) puede pasar.
+- El daño del router: el log `lt_webhook_logs.ip_address` muestra la IP del proxy en vez de la del cliente real → investigación forensic tras webhook malicioso queda ciega (todas las entradas apuntan al mismo proxy, no al cliente).
+
+**Fix aplicado (CICLO25-P2-AD-GAP-003 + AD-GAP-004, commit `4ccd2890`):**
+
+```php
+// CICLO25-P2-AD-GAP-003 FIX (Siigo)
+private static function client_ip(): string {
+    if ( class_exists( 'LTMS_Core_Security' ) ) {
+        return LTMS_Core_Security::get_client_ip_safe();
+    }
+    return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+}
+
+// CICLO25-P2-AD-GAP-004 FIX (API router, log_incoming)
+$ip_address = class_exists( 'LTMS_Core_Security' )
+    ? LTMS_Core_Security::get_client_ip_safe()
+    : sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' );
+$wpdb->insert( $table, [
+    // ... otros campos sin cambios
+    'ip_address' => $ip_address,
+    // ...
+], [ '%s', '%s', '%s', '%s', '%s', '%s' ] );
+```
+
+Patrón idéntico en ambos: `class_exists('LTMS_Core_Security') ? return get_client_ip_safe() : fallback REMOTE_ADDR sanitizado`. El fallback al `class_exists` previene fatal error en boot temprano (edge case donde el autoloader todavía no cargó `LTMS_Core_Security`).
+
+**Reglas preventivas:**
+
+1. **Toda función que consuma `X-Forwarded-For` DEBE validar el proxy contra una lista de trusted proxies declarada.** Tomar el último elemento del chain sin validar es IP spoofing trivial — un atacante controla esa cabecera por completo. El helper `LTMS_Core_Security::get_client_ip_safe()` ya encapsula esa lógica; no reimplementar manualmente en handlers individuales.
+
+2. **Cuando un fix introduce un helper centralizado (`get_client_ip_safe`, `verify_webhook_signature`, `encrypt`, etc.), hacer grep transversal para migrar TODOS los callers potenciales en el MISMO ciclo que introduce el helper.** Dejar callers con implementación manualada es un P2 silencioso — el fix centralizado no se aplica donde hace falta hasta que un ciclo futuro lo descubra por casualidad. En este caso, pasaron 8 ciclos (C18 → C25) entre WH3 FIX v2.8.9 y la migración de Siigo + router.
+
+3. **El campo `ip_address` en tablas de log/audit (`lt_webhook_logs`, `lt_security_events`, etc.) DEBE contener la IP del cliente real, NO la del proxy.** Si el sistema operativo está detrás de un reverse proxy (Cloudflare, SiteGround, nginx), `$_SERVER['REMOTE_ADDR']` siempre es la IP del proxy — inútil para forensic. Resolver siempre con `get_client_ip_safe()` que respeta trusted proxies.
+
+4. **Test transversal guard**: al auditar un módulo con múltiples handlers, además de testear fixes individuales, escribir un test que verifique la consistencia transversal (todos los handlers con `client_ip()` delegan al mismo helper centralizado). En C25, `test_all_client_ip_handlers_delegate_to_core_security` itera sobre los 5 handlers y verifica que cada uno contiene `LTMS_Core_Security::get_client_ip_safe()`. Si un handler futuro se añade sin delegar, este test falla al ser añadido al repo — previene recaída al mismo anti-patrón.
+
+5. **Diferencia entre `class_exists` guard y `function_exists` guard** (ya documentada en Lección #120): aquí usamos `class_exists('LTMS_Core_Security')` porque `LTMS_Core_Security` es clase, no función. Confirmar siempre con `grep "^class \|^final class " incluye/core/class-ltms-security.php` antes de elegir entre los dos guards.
+
+
 
 
