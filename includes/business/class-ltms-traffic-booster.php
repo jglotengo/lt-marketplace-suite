@@ -477,7 +477,21 @@ class LTMS_Traffic_Booster {
         }
 
         // Rate limit: max 3 subscripciones por IP cada 15 minutos.
-        $ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( $_SERVER['REMOTE_ADDR'] ) : '';
+        // CICLO26-P1-TB-002 FIX: delegar resolucion de IP al helper centralizado
+        // LTMS_Core_Security::get_client_ip_safe() (consistencia transversal
+        // con Uber-Direct, Openpay, Addi, ZapSign, Siigo, API router — ver
+        // Leccion 25.1). Antes usaba $_SERVER['REMOTE_ADDR'] directo, que
+        // retorna la IP del reverse proxy (no del cliente real) en SiteGround
+        // → rate limit spoofable seteando X-Forwarded-For. El helper valida
+        // ltms_trusted_proxies antes de aceptar el chain.
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ) {
+            $ip = LTMS_Core_Security::get_client_ip_safe();
+        } else {
+            // Fallback defensivo si el helper no esta cargado (no deberia
+            // ocurrir en runtime normal — el kernel carga core/ antes que
+            // business/ — pero evita fatal si se invoca fuera del hook init).
+            $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+        }
         $key  = 'ltms_newsletter_rl_' . md5( $ip );
         $count = (int) get_transient( $key );
         if ( $count >= 3 ) {
@@ -563,20 +577,63 @@ class LTMS_Traffic_Booster {
         if ( empty( $new_products ) && empty( $on_sale ) ) return;
 
         $subject = sprintf( '📬 %s — Lo nuevo esta semana', wp_date( 'd/m' ) );
+        // CICLO26-P1-TB-004 FIX: el HTML del newsletter se construye UNA vez
+        // con un placeholder para el email del suscriptor en el link de
+        // unsubscribe, y se reemplaza por-email en el foreach. Antes el link
+        // era `home_url('/unsubscribe/?email=')` (email vacio), lo que
+        // imposibilitaba el one-click unsubscribe requerido por Ley 1581/2012
+        // (Colombia) y GDPR Art. 7(3). El suscriptor no podia desuscribirse
+        // desde el enlace del newsletter — tenia que ingresar el email a mano.
         $html = self::build_newsletter_html( $new_products, $on_sale );
         $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
 
         $sent = 0;
+        $failed_updates = 0;
         foreach ( $subscribers as $email ) {
-            wp_mail( $email, $subject, $html, $headers );
+            // Reemplazar el placeholder por el email del suscriptor codificado
+            // para URL (evita XSS en el link del newsletter y respeta RFC 3986).
+            $subscriber_html = str_replace(
+                '__TB_NEWSLETTER_UNSUB_EMAIL__',
+                rawurlencode( $email ),
+                $html
+            );
+            wp_mail( $email, $subject, $subscriber_html, $headers );
             $sent++;
-            $wpdb->update( $table, [ 'emails_sent' => new \WP_Expression( 'emails_sent + 1' ) ], [ 'email' => $email ] );
+
+            // CICLO26-P0-TB-001 FIX: WP_Expression NO existe en WordPress core
+            // (ni en namespaces del plugin) — el cron lanzaba
+            // `Uncaught Error: Class 'WP_Expression' not found` en cuanto
+            // entraba al primer wpdb->update, abortaba el foreach Y la
+            // posterior update_option('ltms_newsletter_last_sent'), por lo que
+            // el cron se repetia diariamente reenviando spam a los primeros
+            // suscriptores. Reemplazado por SQL atomic prepare() con
+            // emails_sent = emails_sent + 1 (patron WP correcto para
+            // incrementos SQL) y verificacion de retorno para forensic.
+            $updated = $wpdb->query(
+                $wpdb->prepare(
+                    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared — $table es interno (prefijo + sufijo constante).
+                    "UPDATE `{$table}` SET emails_sent = emails_sent + 1 WHERE email = %s",
+                    $email
+                )
+            );
+            if ( false === $updated ) {
+                $failed_updates++;
+            }
         }
 
         update_option( 'ltms_newsletter_last_sent', time() );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
-            LTMS_Core_Logger::info( 'TB_NEWSLETTER_SENT', sprintf( 'Newsletter enviado a %d suscriptores (%d productos nuevos, %d ofertas).', $sent, count( $new_products ), count( $on_sale ) ) );
+            LTMS_Core_Logger::info(
+                'TB_NEWSLETTER_SENT',
+                sprintf(
+                    'Newsletter enviado a %d suscriptores (%d productos nuevos, %d ofertas, %d fallos UPDATE counter).',
+                    $sent,
+                    count( $new_products ),
+                    count( $on_sale ),
+                    $failed_updates
+                )
+            );
         }
     }
 
@@ -635,7 +692,7 @@ class LTMS_Traffic_Booster {
         $html .= '<div style="text-align:center;margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;">';
         $html .= '<a href="' . esc_url( home_url( '/tienda/' ) ) . '" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver todos los productos</a>';
         $html .= '</div>';
-        $html .= '<p style="font-size:11px;color:#6b7280;margin-top:16px;text-align:center;">Recibes este email porque te suscribiste en Lo Tengo Colombia. <a href="' . esc_url( home_url( '/unsubscribe/?email=' ) ) . '">Desuscribir</a></p>';
+        $html .= '<p style="font-size:11px;color:#6b7280;margin-top:16px;text-align:center;">Recibes este email porque te suscribiste en Lo Tengo Colombia. <a href="' . esc_url( home_url( '/unsubscribe/?email=__TB_NEWSLETTER_UNSUB_EMAIL__' ) ) . '">Desuscribir</a></p>';
         $html .= '</div>';
 
         return $html;
