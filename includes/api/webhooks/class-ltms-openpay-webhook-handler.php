@@ -135,7 +135,73 @@ class LTMS_Openpay_Webhook_Handler {
                 $order->update_status( 'failed', __( 'Pago Openpay fallido vía webhook.', 'ltms' ) );
                 break;
             case 'refund.succeeded':
-                $order->update_status( 'refunded', __( 'Reembolso Openpay confirmado vía webhook.', 'ltms' ) );
+                // CICLO24-P1-AD-GAP-001 FIX: validar monto del refund antes de marcar el
+                // pedido como 'refunded'. Antes, este case hacia update_status('refunded')
+                // incondicionalmente — si un admin o API externa procesaba un refund
+                // PARCIAL por Openpay (ej. reembolsar $5 de un pedido de $100), el pedido
+                // WC quedaba en status 'refunded' (que WC y el vendor interpretan como
+                // FULLY refunded) desincronizando el status WC vs reality. Consecuencias
+                // reales: comisiones recalculadas como 0, payouts futuros omitidos,
+                // reportes contables erroneos, vendor cree que el pedido fue totalmente
+                // reembolsado cuando solo lo fue parcialmente.
+                //
+                // Openpay envia transaction.amount en el webhook (mismo formato que
+                // format_amount() del API client: int para COP, float 2 dec para USD).
+                // Comparamos contra $order->get_total() con tolerancia 0.01 (float compare):
+                //   - amount >= total: refund COMPLETO → update_status('refunded')
+                //   - amount < total: refund PARCIAL  → NO cambiar status, add_order_note
+                //     con info del monto parcial para que el admin vea el registro
+                //   - amount invalido/ausente: fail-safe — NO cambiar status (prefiero
+                //     NO marcar como refunded sin validar monto que arriesgar marcar
+                //     erroneamente). Log warning para investigar.
+                //
+                // Patron C24 defense-in-depth: codigo financiero critico (toca wallet,
+                // comisiones, payouts futuros) — SIEMPRE fail-safe conservativo.
+                // Requiere segundo modelo review antes de merge (AGENTS.md "Revisión
+                // como ultimo filtro"). Mismo patron que Stripe handler
+                // (handle_charge_refunded) que solo agrega add_order_note() sin tocar
+                // status — Stripe confia en process_refund() del gateway para crear el
+                // refund WC y solo logea el evento webhook.
+                $refund_amount_raw = $charge['amount'] ?? null;
+                $refund_amount     = ( is_numeric( $refund_amount_raw ) ) ? (float) $refund_amount_raw : null;
+                $order_total       = (float) $order->get_total();
+
+                if ( $refund_amount === null ) {
+                    // Fail-safe: amount ausente o no-numerico. No cambiar status crítico.
+                    LTMS_Core_Logger::warning(
+                        'OPENPAY_REFUND_AMOUNT_MISSING',
+                        sprintf(
+                            'Webhook refund.succeeded para pedido #%d sin campo transaction.amount válido (raw=%s). Status NO cambiado — requiere investigacion manual.',
+                            $order_id,
+                            is_scalar( $refund_amount_raw ) ? var_export( $refund_amount_raw, true ) : '(non-scalar)'
+                        )
+                    );
+                    $order->add_order_note(
+                        __( 'Reembolso Openpay recibido vía webhook pero monto no reportado. Revisar manualmente en dashboard Openpay.', 'ltms' )
+                    );
+                } elseif ( $refund_amount >= $order_total - 0.01 ) {
+                    // Refund completo (con tolerancia float 0.01) — seguro marcar como refunded.
+                    $order->update_status( 'refunded', __( 'Reembolso Openpay confirmado vía webhook (total).', 'ltms' ) );
+                } else {
+                    // Refund parcial — NO cambiar status del pedido. Solo registro.
+                    $order->add_order_note(
+                        sprintf(
+                            /* translators: 1: monto reembolsado, 2: total del pedido */
+                            __( 'Reembolso PARCIAL Openpay: %1$s de %2$s. Status del pedido NO modificado (no es fully refunded). Verificar en dashboard Openpay.', 'ltms' ),
+                            wc_price( $refund_amount ),
+                            wc_price( $order_total )
+                        )
+                    );
+                    LTMS_Core_Logger::info(
+                        'OPENPAY_REFUND_PARTIAL',
+                        sprintf(
+                            'Refund parcial Openpay para pedido #%d: %s/%s. Status NO cambiado (defense-in-depth AD-GAP-001).',
+                            $order_id,
+                            $refund_amount,
+                            $order_total
+                        )
+                    );
+                }
                 break;
         }
 
