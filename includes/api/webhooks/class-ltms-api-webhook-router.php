@@ -115,12 +115,22 @@ final class LTMS_Api_Webhook_Router {
         if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
             return;
         }
+        // CICLO25-P2-AD-GAP-004 FIX: delegar resolucion de IP a get_client_ip_safe()
+        // (consistencia con handlers). Antes usaba $_SERVER['REMOTE_ADDR'] directo,
+        // que ofrece la IP del proxy (no del cliente real) cuando hay reverse proxy
+        // — inutil para forensic/audit tras un webhook malicioso desde un cliente
+        // real escondido detras del proxy. get_client_ip_safe() valida trusted
+        // proxies y resuelve el X-Forwarded-For solo si REMOTE_ADDR es un proxy
+        // confiable declarado en ltms_trusted_proxies.
+        $ip_address = class_exists( 'LTMS_Core_Security' )
+            ? LTMS_Core_Security::get_client_ip_safe()
+            : sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' );
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $wpdb->insert( $table, [
             'provider'   => $provider,
             'event_type' => sanitize_text_field( $request->get_header( 'x-event-type' ) ?: 'unknown' ),
             'payload'    => wp_json_encode( $request->get_params() ),
-            'ip_address' => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ),
+            'ip_address' => $ip_address,
             'status'     => 'received',
             'created_at' => gmdate( 'Y-m-d H:i:s' ),
         ], [ '%s', '%s', '%s', '%s', '%s', '%s' ] );

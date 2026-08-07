@@ -92,17 +92,19 @@ class LTMS_Siigo_Webhook_Handler {
     /**
      * Resuelve la IP del cliente para rate limiting (API-BUG-19).
      *
+     * CICLO25-P2-AD-GAP-003 FIX: delega a LTMS_Core_Security::get_client_ip_safe()
+     * (consistencia con Uber-Direct/Openpay/Addi/ZapSign handlers). Antes tenia
+     * implementacion manual del X-Forwarded-For que tomaba el ultimo elemento del
+     * chain sin validar el proxy contra ltms_trusted_proxies — IP spoofing posible
+     * para bypassear rate limits (cada IP spoofed tenia su propio counter).
+     *
      * @return string
      */
     private static function client_ip(): string {
-        $ip = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
-        if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-            $forwarded = array_filter( array_map( 'trim', explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) ) ) );
-            if ( ! empty( $forwarded ) ) {
-                $ip = end( $forwarded );
-            }
+        if ( class_exists( 'LTMS_Core_Security' ) ) {
+            return LTMS_Core_Security::get_client_ip_safe();
         }
-        return $ip;
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 }
 
