@@ -2669,5 +2669,62 @@ Patrón idéntico en ambos: `class_exists('LTMS_Core_Security') ? return get_cli
 5. **Diferencia entre `class_exists` guard y `function_exists` guard** (ya documentada en Lección #120): aquí usamos `class_exists('LTMS_Core_Security')` porque `LTMS_Core_Security` es clase, no función. Confirmar siempre con `grep "^class \|^final class " incluye/core/class-ltms-security.php` antes de elegir entre los dos guards.
 
 
+### Lección 26.1 — Clase PHP inexistente usada en runtime (WP_Expression): fatal error silencioso tras ella puede producir efectos acumulativos graves (cron que reenvía spam diario)
+
+**Contexto:**
+
+Al auditar `includes/business/class-ltms-traffic-booster.php` (módulo `business/`, ~38,000 líneas en 68 archivos — la mayoría NO auditados a fondo hasta C26), se detectó que `maybe_send_weekly_newsletter()` (línea ~573 previa) usaba:
+
+```php
+$wpdb->update( $table, [ 'emails_sent' => new \WP_Expression( 'emails_sent + 1' ) ], [ 'email' => $email ] );
+```
+
+`WP_Expression` **NO existe** en WordPress core (verificado con `php -r "class_exists('WP_Expression') ? print('exists') : print('NOT EXISTS');"` → `NOT EXISTS`), ni en namespaces custom del plugin (verificado con `grep -rn "class WP_Expression" .` → 0 matches). Aparece una sola vez en el código del plugin (justo en este `maybe_send_weekly_newsletter`), y como espejo en `docs/temp/dependency_graphs/*.json` (grafos generados, no implementaciones).
+
+**Causa raíz — el bug P0 no era solo el fatal error, era el efecto acumulativo:**
+
+1. El cron `ltms_daily_cron` se dispara diariamente a las 01:00 (registrado en `class-ltms-activator.php:575` como `recurrence=daily`, time=01:00).
+2. `maybe_send_weekly_newsletter()` está enganchado a ese cron (`init` línea 65).
+3. La función chequea `get_option('ltms_newsletter_last_sent', 0)` y solo continúa si han pasado >= 7 días desde el último envío.
+4. Si han pasado 7 días, entra al foreach de suscriptores (hasta 5000, `LIMIT 5000` en `wpdb->get_col`).
+5. Para CADA suscriptor: `wp_mail( $email, ...)` envía el correo, `$sent++`, y luego `$wpdb->update(... new \WP_Expression(...) ...)`.
+6. En el PRIMER `$wpdb->update`, PHP lanza `Uncaught Error: Class 'WP_Expression' not found` → fatal error → script aborta.
+7. La línea `update_option( 'ltms_newsletter_last_sent', time() )` (post-foreach) **NUNCA se ejecuta**.
+8. Por lo tanto, el cron del día siguiente vuelve a entrar (no han pasado 7 días desde el último envío registrado, pero sí desde el último intento), y como `ltms_newsletter_last_sent` sigue siendo el valor de hace > 7 días, vuelve a enviar a los primeros N suscriptores antes de failed update.
+
+Resultado: el cron se dispara diariamente, los primeros N suscriptores reciben el newsletter CADA DÍA (spam diario en lugar de semanal), los demás nunca reciben nada, `emails_sent` nunca se incrementa para los primeros (porque el update fallo peta antes de tocar DB), y el log info `TB_NEWSLETTER_SENT` nunca se emite.
+
+**Fix aplicado (CICLO26-P0-TB-001, este commit):**
+
+Reemplazado por SQL atómico con `$wpdb->prepare()`:
+
+```php
+$updated = $wpdb->query(
+    $wpdb->prepare(
+        "UPDATE `{$table}` SET emails_sent = emails_sent + 1 WHERE email = %s",
+        $email
+    )
+);
+if ( false === $updated ) {
+    $failed_updates++;
+}
+```
+
+Y la línea `update_option('ltms_newsletter_last_sent', time())` se mantiene DESPUÉS del foreach, así que ahora se ejecuta y el cron NO se repite diariamente. El log info ahora incluye `$failed_updates` para forensic.
+
+**Reglas preventivas:**
+
+1. **Verificar que toda clase invocada en runtime exista antes de usarla.** `new \WP_Expression(...)` asumía que WP core proveía una clase que no existe. La regla "no asumir que una lib externa provee algo sin verificar" (AGENTS.md "Following conventions") aplica también a WP core. Si la clase no está en https://developer.wordpress.org/reference/ o en `grep -r "class WP_Expression" vendor/`, no existe.
+
+2. **Bug P0 silencioso con efecto acumulativo es más grave que bug P0 visible.** Un fatal error en una página visible se detecta en horas; un fatal error en un cron daily puede pasar DESAPERCIBIDO durante meses porque nadie ve el output del cron (excepto el admin que abre `error_log` o ve el count de `wp_mail` subiendo). Regla: TODO cron con efectos cumulativos (envío de emails, generación de reportes, sync externo) DEBE: (a) actualizar su timestamp de "última ejecución exitosa" SOLO al final de la función, post-foreach; (b) tener catch de excepciones que reporte con `LTMS_Core_Logger::error()` en lugar de dejar morir el script; (c) en el caso de WP_Expression, idealmente hacer un `try/catch` o un `if (class_exists('WP_Expression'))` guard antes de usar.
+
+3. **`$wpdb->update($table, [ 'col' => new WP_Expression('col + 1') ], $where)` NO existe en WordPress.** El estándar WP para incrementos SQL es `$wpdb->query($wpdb->prepare("UPDATE ... SET col = col + 1 WHERE ...", $value))`. Si en el código se ve `new WP_Expression` o similar sin `class_exists` guard, ES bug P0 latente.
+
+4. **El patrón "construir HTML una vez, susbtituir por-suscriptor en foreach" es correcto para personalizar links unsubscribe.** En el fix TB-004 (C26), el HTML del newsletter se construye con un placeholder `__TB_NEWSLETTER_UNSUB_EMAIL__` y se reemplaza por `rawurlencode($email)` en cada iteración del foreach. Esto evita rebuild por suscriptor (~75MB allocados para 5000 suscriptores × 15KB HTML, aceptable) y respeta Ley 1581/2012 art. 10 (derecho de revocación del consentimiento) y GDPR Art. 7(3) (one-click unsubscribe). El placeholder sobrevive `esc_url()` porque solo contiene underscores y mayúsculas (caracteres permitidos en URLs).
+
+5. **El guard transversal de Leccion 25.1 (todos los handlers de IP delegan a Core_Security) se EXTIENDE en C26 a `business/`.** Al auditar traffic-booster.php, se detectó que `ajax_subscribe_newsletter` usaba `$_SERVER['REMOTE_ADDR']` directo para el rate limit — MISMO anti-patrón documentado en 25.1 para Siigo + API router. Fix TB-002 (C26) aplica `class_exists('LTMS_Core_Security') ? get_client_ip_safe() : fallback REMOTE_ADDR sanitizado` a traffic-booster. El test `AuditCiclo26TrafficBoosterFixesTest::test_traffic_booster_ip_resolution_consistent_with_webhook_handlers` extiende el guard C25 a business/ — ahora webhook + business comparten el mismo test transversal de consistencia IP.
+
+6. **Inventario del módulo es especulativo hasta validar con glob.** El checkpoint C25 sugería candidates C26 = "aveonline-client, shipping-engine, cross-border-engine, redi-manager reverificar" — en realidad `includes/business/` tiene 68 archivos y 38,000 líneas, no 4 sub-módulos. La selección real para C26 priorizó los archivos con `wp_remote_*` NO auditados (fx-rate-provider, traffic-booster, compliance-guardian, etc.) que son los de mayor surface area para API client hardening. NOTAS CRITICAS C25 ya advertía: "el inventario de candidatos del checkpoint es especulativo - SIEMPRE validar con glob/grep del árbol real antes de arrancar un ciclo nuevo". Esta regla sigue siendo cierta.
+
 
 
