@@ -140,6 +140,21 @@ class LTMS_Zapsign_Webhook_Handler {
             update_user_meta( $vendor_id, '_ltms_zapsign_doc_token', $doc_token );
             update_user_meta( $vendor_id, '_ltms_zapsign_signed_at', gmdate( 'Y-m-d H:i:s' ) );
 
+            // CICLO27-P1-ZS-MGR-008 FIX: ademas de las metas privadas con guion
+            // bajo (_ltms_zapsign_*), actualizar las metas publicas que el
+            // resto del plugin espera (ltms_contract_status / _signed_at /
+            // _status_verified_at). Antes de este fix, el webhook solo movia
+            // ltms_kyc_status a 'approved' pero dejaba ltms_contract_status en
+            // 'pending' para siempre — get_contract_status() y cualquier
+            // lector del estado publico del contrato veia un contracto firmado
+            // como 'pending' eternamente. El status_verified_at se inicializa
+            // con la fecha del webhook para que el cron de re-verificacion
+            // (ZS-2 FIX, lineas 498-511 de zapsign-manager) no dispare de
+            // inmediato otra llamada a la API el mismo dia.
+            update_user_meta( $vendor_id, 'ltms_contract_status', 'signed' );
+            update_user_meta( $vendor_id, 'ltms_contract_signed_at', gmdate( 'Y-m-d H:i:s' ) );
+            update_user_meta( $vendor_id, 'ltms_contract_status_verified_at', gmdate( 'Y-m-d H:i:s' ) );
+
             // BC-01: respaldar el PDF firmado en Backblaze B2 (continuidad de negocio).
             // No-bloqueante: cualquier fallo se loguea dentro del método y nunca debe
             // impedir que el KYC avance a 'approved' más abajo.

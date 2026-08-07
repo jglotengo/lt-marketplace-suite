@@ -13,7 +13,7 @@
  *
  * Meta keys de usuario:
  *   ltms_contract_token        — Token del documento en ZapSign
- *   ltms_contract_status       — pending | signed | expired | cancelled
+ *   ltms_contract_status       — pending | signed | expired | cancelled | unknown
  *   ltms_contract_sent_at      — Fecha de envío
  *   ltms_contract_signed_at    — Fecha de firma
  *   ltms_contract_sign_url     — URL de firma pública (para mostrar al vendedor)
@@ -60,6 +60,16 @@ final class LTMS_ZapSign_Manager {
 
         // AJAX admin: enviar contrato manualmente desde el panel
         add_action( 'wp_ajax_ltms_admin_send_contract', [ $instance, 'ajax_admin_send_contract' ] );
+
+        // CICLO27-P1-ZS-MGR-008 FIX: el cron 'ltms_zapsign_poll_pending' ya
+        // estaba programado por el activator (cada hora, class-ltms-activator
+        // línea 613) pero NUNCA tuvo handler registrado — el cron disparaba al
+        // aire y ZapSign nunca era re-consultado para detectar contratos
+        // cancelados/refused/expired post-firma (bypass del ZS-2 FIX). Ahora
+        // el handler poll_pending_contracts() itera los vendedores con contrato
+        // pendiente + vencido y delega a get_contract_status() que ejecuta la
+        // re-verificación con rate-limit 24h + fail-closed default del match.
+        add_action( 'ltms_zapsign_poll_pending', [ __CLASS__, 'poll_pending_contracts' ] );
     }
 
     // ── Handlers de eventos ───────────────────────────────────────
@@ -524,12 +534,28 @@ final class LTMS_ZapSign_Manager {
             } else {
                 // ZS-2 FIX: if ZapSign no longer says 'completed', update local cache.
                 // Covers: contract cancelled, refused, expired, or voided after signing.
+                //
+                // CICLO27-P1-ZS-MGR-007 FIX: el `default` antes era
+                // `$cached_status ?: 'unknown'`, lo que significaba que si
+                // ZapSign introducia un estado nuevo fuera del enum conocido
+                // (ej. 'archived', 'legal_hold', 'pending_review'), y el
+                // cache local era 'signed', el sistema seguia reportando
+                // 'signed' — bypass silencioso del ZS-2 FIX. Ahora el default
+                // es fail-closed a 'unknown': cualquier estado remoto no
+                // reconocido se trata como "no confirmamos que sigue firmado"
+                // y se persiste para que el siguiente cron / compliance
+                // guardian re-valide. Costo: un vendor con un estado nuevo
+                // legitimo de ZapSign que NO sea 'completed' queda marcado
+                // 'unknown' hasta que se agregue el caso al match. Beneficio:
+                // cierre completo del bypass — sin importar lo que ZapSign
+                // devuelva, el cache local nuca vuelve a 'signed' sin un caso
+                // explicito del match.
                 $local_status = match ( $remote_status ) {
                     'active', 'pending'         => 'pending',
                     'refused', 'rejected'       => 'cancelled',
                     'expired'                   => 'expired',
                     'cancelled', 'voided'       => 'cancelled',
-                    default                     => $cached_status ?: 'unknown',
+                    default                     => 'unknown',
                 };
                 if ( $local_status !== $cached_status ) {
                     update_user_meta( $vendor_id, 'ltms_contract_status', $local_status );
@@ -550,6 +576,64 @@ final class LTMS_ZapSign_Manager {
                 'sign_url' => get_user_meta( $vendor_id, 'ltms_contract_sign_url', true ),
                 'error'    => esc_html( $e->getMessage() ), // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)
             ];
+        }
+    }
+
+    /**
+     * CICLO27-P1-ZS-MGR-008 FIX: poll periódico de contratos pendientes.
+     *
+     * El activator ya programa el cron 'ltms_zapsign_poll_pending' cada hora
+     * (class-ltms-activator.php:613) pero este hook no tenía handler —
+     * cualquier contrato que llegara a 'signed' via webhook y luego fuera
+     * cancelado/refused/expired en ZapSign nunca se detectaba porque
+     * get_contract_status() no tenía callers (codigo huérfano).
+     *
+     * Este handler se invoca cada hora y:
+     *   1. Busca vendedores con ltms_contract_token != '' cuyo contract esté
+     *      en 'pending' o 'signed' (en 'signed' sólo cada 24h via guard
+     *      internal de get_contract_status, línea 498-511).
+     *   2. Llama a get_contract_status($vendor_id) para cada uno — el propio
+     *      método ya aplica el rate-limit 24h y el fail-closed default.
+     *   3. Los contratos que se descubran retracted se marcan cancelled/
+     *      expired/unknown en user_meta, lo que dispara revisiones de
+     *      compliance o re-aprobación manual del KYC.
+     *
+     * Protección extra: el método debe ser no-bloqueante y nunca lanzar
+     * excepciones — cualquier fallo se loguea dentro de get_contract_status()
+     * (que ya catcha \Throwable internamente). El catch aqui es defense-in-depth
+     * por si get_contract_status lanza antes del try interno o por un fatal
+     * en el userId cast.
+     *
+     * @return void
+     */
+    public static function poll_pending_contracts(): void {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT user_id FROM {$wpdb->usermeta}
+             WHERE meta_key = 'ltms_contract_token'
+               AND meta_value != ''
+             ORDER BY user_id ASC
+             LIMIT 200",
+            ARRAY_A
+        );
+
+        if ( empty( $rows ) ) {
+            return;
+        }
+
+        foreach ( $rows as $row ) {
+            $vendor_id = absint( $row['user_id'] );
+            try {
+                self::get_contract_status( $vendor_id );
+            } catch ( \Throwable $e ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'ZAPSIGN_POLL_VENDOR_FAIL',
+                        sprintf( 'Fallo re-verificando contrato de vendor #%d en poll_pending_contracts: %s', $vendor_id, $e->getMessage() )
+                    );
+                }
+            }
         }
     }
 }
