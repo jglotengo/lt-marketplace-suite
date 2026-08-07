@@ -1,5 +1,27 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+// CICLO22-P1-AD-SET-114 FIX: el handler central sanitize_settings()
+// (class-ltms-admin-settings.php:115) cifra ltms_openpay_private_key y
+// ltms_addi_client_secret con AES-256 via LTMS_Core_Security::encrypt() — los
+// valores cifrados tienen prefijo 'v1:'. Si el valor crudo (incl. el hash
+// 'v1:...') se muestra en el atributo value= del input password, queda expuesto
+// en el DOM admin (visible via DevTools o capturado por password managers). El
+// renderer generico de html-admin-settings.php:290 ya aplica el patron correcto:
+// vaciar el value cuando detecta prefijo 'v1:'. Este view custom (renderer
+// dinamico local con $groups → $fields → campo) NO replicaba ese patron — lo
+// agrego aqui para cerrar el leak de las credenciales Openpay + Addi en el DOM.
+// Impacto: ltms_openpay_private_key permite operar reembolsos/capturas en la
+// pasarela Openpay Colombia/MX; ltms_addi_client_secret es credencial OAuth del
+// BNPL Addi (puede initiar financiamiento). Ambos leaked por el mismo view.
+// Patron identico al aplicado en section-zapsign.php AD-SET-107,
+// section-google_oauth.php AD-SET-108, section-backblaze.php AD-SET-112,
+// section-siigo.php AD-SET-113 (mismo ciclo). NOTA: los campos password de
+// Stripe (ltms_stripe_secret_key, ltms_stripe_webhook_secret) y Openpay MX
+// (ltms_openpay_mx_priv_key) NO estan en $encrypted_fields del handler —
+// presumiblemente se guardan en claro (legacy). El fix C22 no los toca (no hay
+// hash v1: en sus values). Ese es un hallazgo P2 separado (AD-SET-116) — ver
+// LECCIONES_APRENDIDAS.md.
 $groups = [
     'Openpay (Colombia)' => [
         'ltms_openpay_enabled'      => [ 'label' => 'Openpay Activo',       'type' => 'checkbox' ],
@@ -36,6 +58,19 @@ $groups = [
     <table class="form-table" role="presentation"><tbody>
     <?php foreach ( $fields as $key => $field ) :
         $value = get_option($key, '');
+        // AD-SET-114: si el campo es password y el valor ya esta cifrado (prefijo
+        // 'v1:'), vaciar el value para no exponer el hash en el DOM. Aplica a
+        // ltms_openpay_private_key + ltms_addi_client_secret (listados en
+        // $encrypted_fields del handler central). Los campos password no-cifrados
+        // (Stripe, openpay_mx) tienen valor vacio o texto plano — el strpos v1:
+        // no matchea, se muestra como antes. El handler mantiene el valor cifrado
+        // original si el input llega vacio (linea 124-130).
+        $is_password_encrypted = ( ($field['type'] ?? '') === 'password' )
+            && is_string( $value ) && strpos( $value, 'v1:' ) === 0;
+        $display_value = $is_password_encrypted ? '' : $value;
+        $display_placeholder = $is_password_encrypted
+            ? __( '(guardado — dejar vacío para mantener)', 'ltms' )
+            : ( $field['placeholder'] ?? '' );
     ?>
     <tr>
         <th scope="row"><label for="<?php echo esc_attr($key);?>"><?php echo esc_html($field['label']);?></label></th>
@@ -43,7 +78,7 @@ $groups = [
         <?php if($field['type']==='checkbox'):?>
             <input type="checkbox" name="<?php echo esc_attr($key);?>" value="yes" <?php checked($value,'yes');?>>
         <?php elseif($field['type']==='password'):?>
-            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text" autocomplete="new-password">
+            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($display_value);?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($display_placeholder); ?>">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>
         <?php else:?>
             <input type="text" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text">

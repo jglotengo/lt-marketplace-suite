@@ -26,9 +26,30 @@ $get_value = function( string $key, $field ): string {
     return (string) get_option( $key, '' );
 };
 
-// Token: mostrar placeholder si está cifrado para no exponer el valor
+// CICLO22-P2-AD-SET-115 FIX: el handler central sanitize_settings()
+// (class-ltms-admin-settings.php:119) cifra ltms_alegra_token con AES-256 via
+// LTMS_Core_Security::encrypt() — los valores cifrados tienen prefijo 'v1:'.
+// Antes, este view emitia en value= el placeholder visual '•••••••••••••••••'
+// (29 bullets) cuando detectaba el prefijo. Eso tenia 2 problemas: (1) el admin
+// ve un campo "lleno" — confusion UX: cree que el token esta disponible para
+// inspeccionar y se sorprende al ver solo bullets. (2) Si el admin guarda la
+// forma sin tocar el campo, el navegador envia los bullets como valor del
+// input; el handler central recibe '••••...' como nuevo token, lo pasa por
+// sanitize_text_field() (no empty()), NO esta en $encrypted_fields "is_v1" check
+// (porque los bullets no empiezan con 'v1:') y LO CIFRA COMO NUEVO TOKEN
+// perdiendo el valor original. Bug silencioso de "Guardar sin tocar" que
+// rompia integracion Alegra sin diagnostic claro. Fix: alinear al patron
+// estandar C22 (vaciar value= y usar placeholder '(guardado — dejar vacío para
+// mantener)') — identico a section-zapsign.php AD-SET-107, section-google_oauth
+// AD-SET-108, section-backblaze.php AD-SET-112, section-siigo.php AD-SET-113,
+// section-payments.php AD-SET-114. El handler mantiene el valor cifrado
+// original si el input llega vacio (linea 124-130).
 $token_val = $get_value( 'ltms_alegra_token', [] );
-$token_display = ( str_starts_with( $token_val, 'v1:' ) ) ? '••••••••••••••••••••••••••••••' : $token_val;
+$token_is_encrypted = is_string( $token_val ) && str_starts_with( $token_val, 'v1:' );
+$token_display = $token_is_encrypted ? '' : $token_val;
+$token_placeholder = $token_is_encrypted
+    ? __( '(guardado — dejar vacío para mantener)', 'ltms' )
+    : __( 'Ingresa el Token de acceso Alegra', 'ltms' );
 
 $test_result = get_transient( 'ltms_alegra_test_result' );
 ?>
@@ -50,10 +71,15 @@ $test_result = get_transient( 'ltms_alegra_test_result' );
     <table class="form-table" role="presentation"><tbody>
     <?php foreach ( $fields as $key => $field ) :
         $value = $get_value( $key, $field );
-        // Token cifrado: mostrar placeholder visual (no el hash) para no confundir al usuario
-        if ( $key === 'ltms_alegra_token' && str_starts_with( $value, 'v1:' ) ) {
-            $value = $token_display;
+        // Token cifrado: vaciar el value para que el admin no envie los bullets como
+        // nuevo token al guardar (bug silencioso AD-SET-115). El handler mantiene el
+        // valor cifrado original si el input llega vacio.
+        $is_token_encrypted = ( $key === 'ltms_alegra_token' )
+            && is_string( $value ) && str_starts_with( $value, 'v1:' );
+        if ( $is_token_encrypted ) {
+            $value = '';
         }
+        $current_placeholder = $is_token_encrypted ? $token_placeholder : ( $field['placeholder'] ?? '' );
     ?>
     <tr>
         <th scope="row"><label for="<?php echo esc_attr($key);?>"><?php echo esc_html($field['label']);?></label></th>
@@ -61,7 +87,7 @@ $test_result = get_transient( 'ltms_alegra_test_result' );
         <?php if($field['type']==='checkbox'):?>
             <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="yes" <?php checked($value,'yes');?>> <?php echo esc_html($field['desc']??'');?></label>
         <?php elseif($field['type']==='password'):?>
-            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text" autocomplete="new-password">
+            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($current_placeholder); ?>">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>
         <?php else:?>
             <input type="<?php echo esc_attr($field['type']);?>" name="<?php echo esc_attr($key);?>"

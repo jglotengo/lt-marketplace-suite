@@ -15,6 +15,23 @@ $attachment_id      = get_option( 'ltms_zapsign_contract_attachment_id', '' );
 $sandbox            = get_option( 'ltms_zapsign_sandbox', 'no' );
 $webhook_url        = home_url( '/wp-json/ltms/v1/webhooks/zapsign' );
 $is_configured      = ! empty( $api_token ) && $api_token !== '';
+// CICLO22-P1-AD-SET-107 FIX: el handler central sanitize_settings()
+// (class-ltms-admin-settings.php:116) cifra ltms_zapsign_api_token con AES-256 via
+// LTMS_Core_Security::encrypt() — los valores cifrados tienen prefijo 'v1:'. Si el
+// valor crudo (incl. el hash 'v1:...') se muestra en el atributo value= del input
+// password, queda expuesto en el DOM admin (visible via DevTools o un password
+// manager que lo capture). El renderer generico de html-admin-settings.php:290 ya
+// aplica el patron correcto: vaciar el value y usar placeholder alternativo cuando
+// detecta prefijo 'v1:'. Este view custom NO replicaba ese patron — lo agrego aqui
+// para cerrar el leak del hash de credencial en el DOM. Patron identico al aplicado
+// en section-google_oauth.php AD-SET-108 (mismo ciclo). Si el admin deja el campo
+// vacio, el handler mantiene el valor cifrado existente (linea 124-130 handler:
+// "Solo cifrar si no esta ya cifrado" + el checkbox-keys reseteo no aplica a
+// password fields).
+$api_token_display  = ( is_string( $api_token ) && strpos( $api_token, 'v1:' ) === 0 ) ? '' : $api_token;
+$api_token_placeholder = ( $api_token_display === '' && $is_configured )
+    ? __( '(guardado — dejar vacío para mantener)', 'ltms' )
+    : 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
 ?>
 
 <p style="color:#666;margin-bottom:16px;">
@@ -47,9 +64,9 @@ $is_configured      = ! empty( $api_token ) && $api_token !== '';
         <th scope="row"><label for="ltms_zapsign_api_token"><?php esc_html_e( 'Token API', 'ltms' ); ?></label></th>
         <td>
             <input type="password" id="ltms_zapsign_api_token" name="ltms_zapsign_api_token"
-                   value="<?php echo esc_attr( $api_token ); ?>"
+                   value="<?php echo esc_attr( $api_token_display ); ?>"
                    class="regular-text"
-                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                   placeholder="<?php echo esc_attr( $api_token_placeholder ); ?>"
                    autocomplete="new-password">
             <p class="description">
                 <?php esc_html_e( 'Ve a app.zapsign.com.br → Configuración → API → copia tu token.', 'ltms' ); ?>

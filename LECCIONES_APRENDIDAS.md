@@ -2501,8 +2501,70 @@ Tras corregir OPcache, `phpunit --group kyc` siguió fallando con `❌ ERROR: WP
 3. **Documentar el comando canónico en CLAUDE.md** para que futuros sessiones no redescubran el combo correcto por trial/error. Ver entrada nueva en `CLAUDE.md → Operación en SiteGround SSH`.
 
 
+### Lección 21.4 - Leak de hash 'v1:' cifrado en `value=` de password inputs en views custom (`section-*.php` que escriben su propio `<input type="password">`)
 
+**Ciclo:** 22 (AUDIT-ADMIN-SETTINGS-CICLO22)
+**Commits:** atomic fix C22 (pendiente push al cierre del ciclo)
+**Archivos afectados:** `section-zapsign.php` (AD-SET-107), `section-google_oauth.php` (AD-SET-108), `section-backblaze.php` (AD-SET-112), `section-siigo.php` (AD-SET-113), `section-payments.php` (AD-SET-114), `section-alegra.php` (AD-SET-115).
 
+**El error:**
+
+El handler central `LTMS_Admin_Settings::sanitize_settings()` (includes/admin/class-ltms-admin-settings.php:114-122) mantiene una lista `$encrypted_fields` de 16 opciones que se cifran con AES-256 vía `LTMS_Core_Security::encrypt()` antes de guardar. Los valores cifrados llevan el prefijo `'v1:'`. El renderer genérico `ltms_render_generic_settings_section()` (includes/admin/views/html-admin-settings.php:290) ya aplica el patrón de protección:
+
+```php
+// No mostrar contraseñas cifradas en texto plano
+if ( ( $field['type'] ?? '' ) === 'password' && strpos( $value, 'v1:' ) === 0 ) {
+    $value = '';
+    $field['placeholder'] = __( "(guardado — dejar vacío para mantener)", "ltms" );
+}
+```
+
+Pero **6 views custom** de `includes/admin/views/settings/section-*.php` escriben su propio `<input type="password">` (renderer dinámico local con `$fields` + foreach, o markup individual) en lugar de pasar por el renderer genérico. Esos views emitían `value="<?php echo esc_attr( $value ); ?>"` directo, lo que exponía el hash `v1:...` (visible vía DevTools, capturable por password managers). El admin ve el hash en el atributo value del input password; el `type="password"` solo oculta visualmente, no protege el dato del DOM.
+
+**Hallazgos del ciclo (5 P1 + 1 P2):**
+
+- AD-SET-107 P1 (zapsign): `ltms_zapsign_api_token`
+- AD-SET-108 P1 (google_oauth): `ltms_google_client_secret` — credencial OAuth de Google, permite impersonar login de vendors (impacto mayor que un API key genérico)
+- AD-SET-112 P1 (backblaze): `ltms_backblaze_app_key` — Application Key B2 de S3, concede acceso a buckets de KYC (documentos de identidad) y contratos ZapSign
+- AD-SET-113 P1 (siigo): `ltms_siigo_access_key` — token de API de facturación electrónica
+- AD-SET-114 P1 (payments): 2 leaks en 1 archivo — `ltms_openpay_private_key` (permite reembolsos/captura Openpay Col/MX) + `ltms_addi_client_secret` (credencial OAuth del BNPL Addi)
+- AD-SET-115 P2 (alegra): `ltms_alegra_token` — el approach viejo emitía `'••••••••••••••••••••••••••••••'` (29 bullets) en `value=` cuando detectaba `v1:`. Bug silencioso: el admin ve el campo "lleno" y si guarda la forma sin tocarlo, el navegador envía los bullets como nuevo token; el handler central los pasa por `sanitize_text_field()` (no empty), ve que NO empieza con `v1:` (porque son bullets), y **CIFRA LOS BULLETS COMO NUEVO TOKEN PERDIENDO EL ORIGINAL**. La integración Alegra queda silenciosamente rota sin diagnóstico claro. Fix P2 = alinear al patrón estándar (vaciar `value=` + placeholder `(guardado — dejar vacío para mantener)`).
+
+**Causa raíz:**
+
+El renderer genérico es seguro, pero los views custom no lo usan. Cada view custom reimplementa el foreach + `<input type="password">` a mano, y el 80% de los devs no recuerda aplicar el clamp `v1:` al render. El patrón de "renderer dinámico local con `$fields` + foreach" replicate-el-render sin heredar los invariantes de seguridad del renderer principal.
+
+**Fix aplicado (patrón estándar C22):**
+
+```php
+// CICLO22-P1-AD-SET-{NNN} FIX
+$is_password_encrypted = ( ($field['type'] ?? '') === 'password' )
+    && is_string( $value ) && strpos( $value, 'v1:' ) === 0;
+$display_value = $is_password_encrypted ? '' : $value;
+$display_placeholder = $is_password_encrypted
+    ? __( '(guardado — dejar vacío para mantener)', 'ltms' )
+    : ( $field['placeholder'] ?? '' );
+```
+
+Y en el `<input type="password">`: `value="<?php echo esc_attr( $display_value ); ?>" placeholder="<?php echo esc_attr( $display_placeholder ); ?>"`.
+
+El handler central mantiene el valor cifrado original cuando el input llega vacío (líneas 124-130: solo cifra si el campo está en `$encrypted_fields` Y no está vacío, y si el valor ya empieza con `v1:` lo mantiene como está). Por eso vaciar el value= es seguro.
+
+**Hallazgos derivados NO fixeados en C22 (P2 backlog, AD-SET-116):**
+
+`section-payments.php` declara password fields para `ltms_stripe_secret_key`, `ltms_stripe_webhook_secret`, `ltms_openpay_mx_priv_key` que NO están en `$encrypted_fields` del handler — se guardan en texto plano (legacy). El fix C22 NO los protege (no hay `v1:` que clamping aquí, el valor es claro). El leak de DOM existe igual pero el dato ya está en clara en la DB → equivalente a "secreto en claro". Fix requiere decisión de negocio: ¿alguno de los servicios Stripe/Openpay MX consume el secret en claro para firmar webhooks o hacer callbacks que esperen el valor raw? Investigar antes de agregarlos a `$encrypted_fields` y romper integraciones activas. Backlog C23.
+
+**Reglas preventivas:**
+
+1. **Todo view custom de `section-*.php` que escriba su propio `<input type="password">` debe clamping `v1:` al render.** El renderer genérico `html-admin-settings.php:290` ya lo hace; los views custom que no lo usan deben replicar el patrón. Antes de añadir un nuevo `<input type="password">` en un view custom, agregar el clamp `$is_password_encrypted = ... && strpos($value, 'v1:') === 0; $display_value = $is_password_encrypted ? '' : $value;`.
+
+2. **Al añadir una nueva opción a `$encrypted_fields` del handler**, auditar simultáneamente TODOS los `section-*.php` que renderizan esa opción vía `<input type="password">`. Si el view es custom (no renderer genérico), agregar el clamp. Si el view NO se actualiza, el cifrado backend expone el hash en el DOM — el fix backend solo hizo empeoró el leak visual (el hash ahora está en `value=` en lugar del valor en claro, pero sigue en el DOM).
+
+3. **El placeholder visual `'••••••••••••••••••••••••••••••'` (bullets en value=) NO es adecuado** para indicar "valor ya guardado". Tiene 2 problemas UX/seguridad: (a) el admin cree que puede inspeccionar el valor y se confunde al ver bullets, (b) si guarda la forma sin tocar el campo, el navegador envía los bullets como valor real, el handler los acepta como nuevo "token" y cifra esa basura perdiendo el dato original. El patrón correcto es `value=""` + `placeholder="(guardado — dejar vacío para mantener)"`.
+
+4. **El renderer dinámico local con `$fields` + foreach es un anti-patrón de duplicación** — replica el renderer genérico sin heredar sus invariantes de seguridad. Si un view custom necesita markup especial (e.g. campos extras, hooks UX), debe envolver el renderer genérico en lugar de reemplazarlo. Migración recomendada: declarar fields_map y dejar que `ltms_render_generic_settings_section()` haga el renderizado. Los 6 archivos fixeados en C22 son candidatos a migración futura.
+
+5. **`type="password"` solo oculta visualmente — el valor del input está en el DOM** y puede ser inspeccionado por DevTools, capturado por password managers, o leaked por una extensión de browser que escanee formularios. Para secretos reales (tokens, secret OAuth, API keys), NUNCA emitir el valor real en el HTML. El patrón "vaciar value= al render + placeholder alternativo" es estándar; si la UX necesita mostrar "valor existe", usar placeholder, no `value="••••"`.
 
 
 

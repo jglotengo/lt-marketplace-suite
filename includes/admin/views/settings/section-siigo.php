@@ -1,5 +1,19 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+// CICLO22-P1-AD-SET-113 FIX: el handler central sanitize_settings()
+// (class-ltms-admin-settings.php:115) cifra ltms_siigo_access_key con AES-256 via
+// LTMS_Core_Security::encrypt() — los valores cifrados tienen prefijo 'v1:'. Si el
+// valor crudo (incl. el hash 'v1:...') se muestra en el atributo value= del input
+// password, queda expuesto en el DOM admin (visible via DevTools o capturado por
+// password managers). El renderer generico de html-admin-settings.php:290 ya aplica
+// el patron correcto: vaciar el value cuando detecta prefijo 'v1:'. Este view custom
+// (renderer dinamico local con $fields + foreach) NO replicaba ese patron — lo
+// agrego aqui para cerrar el leak del Siigo Access Key en el DOM. El Access Key
+// Siigo concede acceso a la API de facturación electrónica (creacion de facturas,
+// consultas contables). Patron identico al aplicado en section-zapsign.php
+// AD-SET-107, section-google_oauth.php AD-SET-108, section-backblaze.php AD-SET-112,
+// section-payments.php AD-SET-114 (mismo ciclo).
 $fields = [
     'ltms_siigo_enabled'        => [ 'label' => 'Siigo Activo',                'type' => 'checkbox', 'desc' => 'Activar integración con Siigo ERP' ],
     'ltms_siigo_username'       => [ 'label' => 'Usuario (email)',              'type' => 'email' ],
@@ -24,6 +38,16 @@ $fields = [
     <table class="form-table" role="presentation"><tbody>
     <?php foreach ( $fields as $key => $field ) :
         $value = isset($field['value_fn']) ? ($field['value_fn'])() : get_option($key, $field['default'] ?? '');
+        // AD-SET-113: si el campo es password y el valor ya esta cifrado (prefijo
+        // 'v1:'), vaciar el value para no exponer el hash en el DOM. El handler
+        // mantiene el valor cifrado original si el input llega vacio (linea 124-130
+        // del handler central).
+        $is_password_encrypted = ( ($field['type'] ?? '') === 'password' )
+            && is_string( $value ) && strpos( $value, 'v1:' ) === 0;
+        $display_value = $is_password_encrypted ? '' : $value;
+        $display_placeholder = $is_password_encrypted
+            ? __( '(guardado — dejar vacío para mantener)', 'ltms' )
+            : ( $field['placeholder'] ?? '' );
     ?>
     <tr>
         <th scope="row"><label for="<?php echo esc_attr($key);?>"><?php echo esc_html($field['label']);?></label></th>
@@ -31,7 +55,7 @@ $fields = [
         <?php if($field['type']==='checkbox'):?>
             <label><input type="checkbox" name="<?php echo esc_attr($key);?>" value="yes" <?php checked($value,'yes');?>> <?php echo esc_html($field['desc']??'');?></label>
         <?php elseif($field['type']==='password'):?>
-            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($value);?>" class="regular-text" autocomplete="new-password">
+            <input type="password" name="<?php echo esc_attr($key);?>" value="<?php echo esc_attr($display_value);?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($display_placeholder); ?>">
             <?php if(!empty($field['desc'])):?><p class="description"><?php echo esc_html($field['desc']);?></p><?php endif;?>
         <?php else:?>
             <input type="<?php echo esc_attr($field['type']);?>" name="<?php echo esc_attr($key);?>"

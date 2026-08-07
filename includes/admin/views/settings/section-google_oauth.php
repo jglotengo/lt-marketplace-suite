@@ -13,6 +13,22 @@ $client_id     = get_option( 'ltms_google_client_id', '' );
 $client_secret = get_option( 'ltms_google_client_secret', '' );
 $is_configured = class_exists( 'LTMS_Google_OAuth' ) && LTMS_Google_OAuth::is_configured();
 $redirect_uri  = add_query_arg( 'ltms_oauth', 'google', home_url( '/' ) );
+// CICLO22-P1-AD-SET-108 FIX: el handler central sanitize_settings()
+// (class-ltms-admin-settings.php:120) cifra ltms_google_client_secret con AES-256 via
+// LTMS_Core_Security::encrypt() — los valores cifrados tienen prefijo 'v1:'. Si el
+// valor crudo (incl. el hash 'v1:...') se muestra en el atributo value= del input
+// password, queda expuesto en el DOM admin (visible via DevTools o password
+// manager). El renderer generico de html-admin-settings.php:290 ya aplica el patron
+// correcto: vaciar el value y usar placeholder alternativo cuando detecta prefijo
+// 'v1:'. Este view custom NO replicaba ese patron — lo agrego aqui para cerrar el
+// leak del hash de credencial Google OAuth en el DOM. ADVERTENCIA: client_secret
+// de Google OAuth permite impersonar el login de vendors via OAuth flow (impacto
+// mayor que un API token generico). Patron identico al aplicado en
+// section-zapsign.php AD-SET-107 (mismo ciclo). Si el admin deja el campo vacio,
+// el handler mantiene el valor cifrado existente.
+$client_secret_display = ( is_string( $client_secret ) && strpos( $client_secret, 'v1:' ) === 0 )
+    ? ''
+    : $client_secret;
 ?>
 <div class="ltms-settings-section">
     <h2 style="margin-top:24px;">🔑 Google OAuth — Login con Google</h2>
@@ -48,10 +64,10 @@ $redirect_uri  = add_query_arg( 'ltms_oauth', 'google', home_url( '/' ) );
             <th scope="row"><label for="ltms_google_client_secret"><?php esc_html_e( 'Client Secret', 'ltms' ); ?></label></th>
             <td>
                 <input type="password" id="ltms_google_client_secret" name="ltms_google_client_secret"
-                       value="<?php echo esc_attr( $client_secret ); ?>"
+                       value="<?php echo esc_attr( $client_secret_display ); ?>"
                        class="regular-text"
                        autocomplete="new-password"
-                       placeholder="<?php echo $client_secret ? '••••••••••••••••' : esc_attr__( 'Ingresa el Client Secret', 'ltms' ); ?>">
+                       placeholder="<?php echo $client_secret_display ? '••••••••••••••••' : esc_attr__( 'Ingresa el Client Secret', 'ltms' ); ?>">
                 <p class="description"><?php esc_html_e( 'Se guarda cifrado en la base de datos.', 'ltms' ); ?></p>
             </td>
         </tr>
