@@ -2567,4 +2567,54 @@ El handler central mantiene el valor cifrado original cuando el input llega vac�
 5. **`type="password"` solo oculta visualmente — el valor del input está en el DOM** y puede ser inspeccionado por DevTools, capturado por password managers, o leaked por una extensión de browser que escanee formularios. Para secretos reales (tokens, secret OAuth, API keys), NUNCA emitir el valor real en el HTML. El patrón "vaciar value= al render + placeholder alternativo" es estándar; si la UX necesita mostrar "valor existe", usar placeholder, no `value="••••"`.
 
 
+### Lección 24.1 — Webhook `refund.succeeded` SIN validar `transaction.amount` marca pedidos como "fully refunded" cuando son reembolsos parciales (P1 financiero)
+
+**Contexto:**
+
+El handler `LTMS_Openpay_Webhook_Handler::handle()` tenía en el `case 'refund.succeeded':` un único statement: `$order->update_status( 'refunded', __( 'Reembolso Openpay confirmado vía webhook.', 'ltms' ) );`. Sin validación de `transaction.amount`, **cualquier** webhook `refund.succeeded` —incluyendo un refund parcial de $5 sobre un pedido de $100— marcaba el pedido WC como `refunded`, status que WooCommerce y el vendor interpretan como **fully refunded**.
+
+**Causa raíz:**
+
+- Openpay emite eventos `refund.succeeded` tanto para refunds completos como parciales. El campo `transaction.amount` del webhook distingue ambos, pero el handler lo ignoraba.
+- Las consecuencias reales son graves porque el status `refunded` dispara lógica downstream: comisiones recalculadas como 0, payouts futuros omitidos, reportes contables erróneos, vendor cree que el pedido fue totalmente reembolsado cuando solo fue parcial.
+- El handler de Stripe (`handle_charge_refunded`) NO tiene este bug porque solo agrega `add_order_note()` sin tocar el status — confía en `process_refund()` del gateway para crear el refund WC. Openpay no tiene esa defensa equivalente.
+
+**Fix aplicado (CICLO24-P1-AD-GAP-001, commit `f1f38b08`):**
+
+```php
+// CICLO24-P1-AD-GAP-001 FIX
+$refund_amount_raw = $charge['amount'] ?? null;
+$refund_amount     = ( is_numeric( $refund_amount_raw ) ) ? (float) $refund_amount_raw : null;
+$order_total       = (float) $order->get_total();
+
+if ( $refund_amount === null ) {
+    // Fail-safe: amount ausente o no-numérico. NO cambiar status crítico.
+    LTMS_Core_Logger::warning( 'OPENPAY_REFUND_AMOUNT_MISSING', ... );
+    $order->add_order_note( __( '... monto no reportado. Revisar manualmente ...', 'ltms' ) );
+} elseif ( $refund_amount >= $order_total - 0.01 ) {
+    // Refund completo (tolerancia float 0.01) — seguro marcar como refunded.
+    $order->update_status( 'refunded', __( '... (total).', 'ltms' ) );
+} else {
+    // Refund parcial — NO cambiar status. Solo add_order_note + log info.
+    $order->add_order_note( sprintf( __( 'Reembolso PARCIAL Openpay: %1$s de %2$s ...', 'ltms' ), wc_price( $refund_amount ), wc_price( $order_total ) ) );
+    LTMS_Core_Logger::info( 'OPENPAY_REFUND_PARTIAL', ... );
+}
+```
+
+Tres ramas: `null` → fail-safe (no tocar status); `>= total - 0.01` → refund completo (marcar); resto → parcial (solo nota + log). La tolerancia `0.01` es correcta porque COP usa enteros (sin edge cases) y USD usa 2 decimales (tolerancia cubre float compare).
+
+**Regla preventiva:**
+
+1. **Todo webhook handler que procese `refund.succeeded` (o equivalente) DEBE validar `transaction.amount` contra `$order->get_total()` antes de invocar `update_status('refunded', ...)`.** El status `refunded` en WC es interpretado por downstream (comisiones, payouts, contabilidad) como "fully refunded". Marcar un pedido como refunded sin validar el monto es un bug P1 financiero aunque parezca un case simple.
+
+2. **El patrón fail-safe conservativo para código financiero crítico es:** cuando el monto del refund es desconocido o inválido, NO cambiar el status del pedido — solo log warning + `add_order_note()` para intervención manual. Es mejor NO marcar como refunded y requerir investigación, que marcar erróneamente y desincronizar wallet/comisiones/payouts.
+
+3. **Tolerancia `0.01` en float compare** es la elección correcta para montos: cubre floats de 2 decimales sin edge cases (99.995 no ocurre en USD real; COP usa enteros). No usar `===` para floats — por construcción `100.00 !== 100`. No usar tolerancia mayor (0.1+) porque opens the door a marcar como "completo" un refund del 99% que no lo es.
+
+4. **`is_numeric()` para validación de amount** es el guard correcto: acepta strings numéricos (`"100"`, `"50.5"`) y enteros/floats, rechaza arrays/objects/null (null se captura con `?? null` antes). Usar `(int)` o `(float)` directo sin `is_numeric` permitiría que un payload malicioso con `amount: []` colapse en el cast.
+
+5. **Compare handlers handshake con Handlers hermanos** — cuando un gateway (Stripe) ya implementa un evento de forma segura y otro (Openpay) implementa el mismo evento de forma insegura, el handler del primero es el precedent. En C24, el handler de Stripe (`handle_charge_refunded` solo `add_order_note()`, confía en `process_refund()`) era la referencia para arreglar Openpay. Al auditar un gateway nuevo, comparar con los ya auditados.
+
+
+
 
