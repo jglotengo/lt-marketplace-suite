@@ -524,10 +524,13 @@ class LTMS_Sales_Booster {
                         navigator.serviceWorker.ready.then(function(reg) {
                             return reg.pushManager.subscribe({ userVisibleOnly: true });
                         }).then(function(sub) {
+                            // CICLO29-P0-SB-001 FIX: enviar nonce (handler fail-closed).
+                            var pushNonce = ( window.ltmsUX && window.ltmsUX.nonce ) ? window.ltmsUX.nonce : '';
                             fetch(ajaxurl, {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                                body: 'action=ltms_subscribe_push&endpoint=' + encodeURIComponent(sub.endpoint) +
+                                body: 'action=ltms_subscribe_push&nonce=' + encodeURIComponent(pushNonce) +
+                                      '&endpoint=' + encodeURIComponent(sub.endpoint) +
                                       '&key=' + encodeURIComponent(sub.keys?.p256dh || '') +
                                       '&auth=' + encodeURIComponent(sub.keys?.auth || '')
                             });
@@ -548,9 +551,37 @@ class LTMS_Sales_Booster {
      * AJAX: guarda suscripción push.
      */
     public static function ajax_subscribe_push(): void {
-        $endpoint = esc_url_raw( $_POST['endpoint'] ?? '' );
-        $key = sanitize_text_field( $_POST['key'] ?? '' );
-        $auth = sanitize_text_field( $_POST['auth'] ?? '' );
+        // CICLO29-P0-SB-001 FIX: este endpoint `wp_ajax_ltms_subscribe_push`
+        // (requiere login via cookie de sesion) NO tenia NINGUN check_ajax_referer.
+        // Anti-patron PEOR que CG-001 C28: alla el nonce existia pero se ignoraba
+        // (check_ajax_referer(..., false) sin wp_send_json_error); aca el nonce
+        // brillaba por su ausencia. Cualquier site podia embed un `<form>` o
+        // `fetch()` POST a `/wp-admin/admin-ajax.php` con
+        // `action=ltms_subscribe_push&endpoint=https://atacante.com/...&key=...&auth=...`
+        // y la request se procesaba porque la cookie de sesion del usuario
+        // logueado viajaba con la request (CSRF clasico). El usuario quedaba
+        // subscrito a push notifications desde un endpoint controlado por el
+        // atacante -> superficie de phishing + exfiltracion de datos.
+        // Fix: nonce fail-closed. Si check_ajax_referer(..., false) devuelve
+        // false, el endpoint retorna 403 y NO persiste la suscripcion. El JS
+        // del front (render_push_subscription_prompt) se actualiza para enviar
+        // el nonce via wp_localize_script o inline. Mismo invariante transversal
+        // que CG-001 C28 + Leccion 28.1 regla #1 (check_ajax_referer false exige
+        // wp_send_json_error dentro del bloque if). Adicionalmente se anade
+        // wp_unslash() sobre los 3 inputs POST (endpoint, key, auth) antes de
+        // sanitizar — sin wp_unslash, WP agrega backslashes y esc_url_raw/
+        // sanitize_text_field reciben strings escapados que pueden pasar
+        // validacion pero romper la suscripcion push.
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error(
+                [ 'message' => __( 'Nonce invalido. Recargue la pagina.', 'ltms' ) ],
+                403
+            );
+        }
+
+        $endpoint = esc_url_raw( wp_unslash( $_POST['endpoint'] ?? '' ) );
+        $key = sanitize_text_field( wp_unslash( $_POST['key'] ?? '' ) );
+        $auth = sanitize_text_field( wp_unslash( $_POST['auth'] ?? '' ) );
         if ( empty( $endpoint ) ) wp_send_json_error();
 
         global $wpdb;
@@ -776,9 +807,14 @@ class LTMS_Sales_Booster {
             // Viewer count (solo en PDP).
             <?php if ( is_product() ) : ?>
             var productId = <?php echo esc_js( get_the_ID() ); ?>;
-            $.post(ajaxurl, { action: 'ltms_track_product_view', product_id: productId });
+            // CICLO29-P1-SB-002 FIX: enviar `nonce: spNonce` (handler fail-closed).
+            // Antes el JS no enviaba el nonce pero el backend lo exigia via
+            // check_ajax_referer('ltms_ux_nonce', 'nonce', false) -> wp_send_json_error().
+            // Resultado: la feature de viewer count estaba rota en runtime
+            // (todas las requests retornaban 403 efter handler fail-closed).
+            $.post(ajaxurl, { action: 'ltms_track_product_view', nonce: spNonce, product_id: productId });
             setInterval(function() {
-                $.post(ajaxurl, { action: 'ltms_track_product_view', product_id: productId }, function(resp) {
+                $.post(ajaxurl, { action: 'ltms_track_product_view', nonce: spNonce, product_id: productId }, function(resp) {
                     if (resp && resp.success) {
                         $('#ltms-viewer-count-num').text(resp.data.viewers);
                         $('#ltms-viewer-count').show();
@@ -817,7 +853,19 @@ class LTMS_Sales_Booster {
         $viewers = array_filter( $viewers, fn( $ts ) => ( $now - $ts ) < 30 );
 
         // Añadir/actualizar este viewer.
-        $session_id = WC()->session ? md5( WC()->session->get_session_cookie() ? implode( '', WC()->session->get_session_cookie() ) : ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) ) : md5( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+        // CICLO29-P1-SB-007 FIX: usar `LTMS_Core_Security::get_client_ip_safe()`
+        // (fuente unica de IP segun Leccion 25.1) en lugar de `$_SERVER['REMOTE_ADDR']`
+        // directo. Anti-patron identico al TB-002 P1 C26 (traffic-booster rate limit)
+        // y CG-002 P1 C28 (compliance-guardian CAPI). REMOTE_ADDR detras de reverse
+        // proxy (SiteGround) retorna la IP del proxy, no del cliente real — todas
+        // las requests comparten session_id, malogrando el viewer count (todos los
+        // viewers serian 1). Ademas spoofeable via X-Forwarded-For sin validar
+        // trusted_proxies — un atacante podria inflar el contador seteando XFF
+        // distinto por request (neutralizando SEC-8 FIX que protegia CSRF pero
+        // no IP-tracking). El invariante transversal del plugin es TODO usa
+        // get_client_ip_safe().
+        $safe_ip = LTMS_Core_Security::get_client_ip_safe();
+        $session_id = WC()->session ? md5( WC()->session->get_session_cookie() ? implode( '', WC()->session->get_session_cookie() ) : $safe_ip ) : md5( $safe_ip );
         $viewers[ $session_id ] = $now;
 
         set_transient( $transient_key, $viewers, 60 );
