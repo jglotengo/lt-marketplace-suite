@@ -225,6 +225,27 @@ if ( ! class_exists( 'LTMS_Core_Security', false ) ) {
             return (bool) current_user_can( $capability );
         }
 
+        /**
+         * Stub inline de get_client_ip_safe() para modo UNIT_ONLY.
+         *
+         * El stub de LTMS_Core_Security definido en este bootstrap (lineas
+         * 129-239) previene que Composer cargue la clase real de
+         * includes/core/class-ltms-security.php. La clase real define
+         * get_client_ip_safe() (Leccion 25.1 — fuente unica de verdad IP).
+         * Sin este stub inline, llamadas en wallet.php:606, deposit.php:164,
+         * public-auth-handler.php (5 sitios), dashboard-logic.php (2 sitios),
+         * external-auditor-role.php (2 sitios) y fiscal-online-access.php
+         * fallarian con "Call to undefined method" en modo UNIT_ONLY.
+         *
+         * CICLO31-P2-CG-28-P2-6 FIX: stub correspondiente a la migracion
+         * de cierre invariante transversal IP (10 ocurrencias migradas
+         * de LTMS_Utils::get_ip() -> get_client_ip_safe()).
+         */
+        public static function get_client_ip_safe(): string {
+            $remote_addr = sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+            return $remote_addr;
+        }
+
         private static function derive_key( string $master_key ): string {
             if ( defined( 'SECURE_AUTH_SALT' ) && '' !== SECURE_AUTH_SALT ) {
                 $site_salt = SECURE_AUTH_SALT;

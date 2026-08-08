@@ -235,7 +235,7 @@ final class LTMS_Public_Auth_Handler {
         // requests all read $tries=0, all increment to 1, the counter never advanced.
         // A botnet with 50 parallel connections could brute-force passwords with no
         // effective throttle.
-        $ip           = LTMS_Utils::get_ip();
+        $ip           = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: closure invariante transversal IP (Leccion 25.1)
         $throttle_key = 'ltms_login_attempts_' . md5( $ip );
         global $wpdb;
         $option_name  = '_transient_' . $throttle_key;
@@ -394,7 +394,7 @@ final class LTMS_Public_Auth_Handler {
         if ( ! empty( $_POST['ltms_hp_website'] ) ) { // phpcs:ignore — M-AUDIT-REG-05: campo renombrado para evitar autocompletado de gestores de contraseñas
             LTMS_Core_Logger::security(
                 'REGISTER_HONEYPOT',
-                sprintf( 'Honeypot disparado desde IP %s', LTMS_Utils::get_ip() )
+                sprintf( 'Honeypot disparado desde IP %s', LTMS_Core_Security::get_client_ip_safe() ) // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
             );
             // Respuesta genérica para no revelar el mecanismo al bot.
             wp_send_json_error( __( 'Error en el registro. Intenta de nuevo.', 'ltms' ) );
@@ -407,7 +407,7 @@ final class LTMS_Public_Auth_Handler {
         // Antes se hacía get_transient() + set_transient($tries+1) lo que permitía
         // race conditions bajo requests concurrentes. Ahora usamos INSERT ON DUPLICATE
         // KEY UPDATE que es atómico a nivel de MySQL.
-        $ip          = LTMS_Utils::get_ip();
+        $ip           = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: closure invariante transversal IP (Leccion 25.1)
         $throttle_key = 'ltms_register_attempts_' . md5( $ip );
 
         // Increment atómico via direct DB query (transients no son atómicos).
@@ -953,7 +953,7 @@ final class LTMS_Public_Auth_Handler {
         // (2^192) y el brute-force es impracticable de cualquier forma, pero el
         // rate-limit es defensa en profundidad y debe ser consistente con el resto
         // del módulo auth.
-        $ip = LTMS_Utils::get_ip();
+        $ip          = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         $verify_throttle = 'ltms_email_verify_attempts_' . md5( $ip );
         global $wpdb;
         $verify_option  = '_transient_' . $verify_throttle;
@@ -1446,7 +1446,7 @@ final class LTMS_Public_Auth_Handler {
     public function ajax_resend_verification_public(): void {
         check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
 
-        $ip           = LTMS_Utils::get_ip();
+        $ip           = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         $throttle_key = 'ltms_resend_pub_attempts_' . md5( $ip );
 
         // Mismo patrón atómico INSERT...ON DUPLICATE KEY que ajax_resend_verification

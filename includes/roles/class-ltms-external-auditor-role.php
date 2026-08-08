@@ -124,7 +124,7 @@ final class LTMS_External_Auditor_Role {
             [
                 'user_id'    => get_current_user_id(),
                 'page'       => $page,
-                'ip'         => LTMS_Utils::get_ip(),
+                'ip'         => LTMS_Core_Security::get_client_ip_safe(), // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
                 'user_agent' => sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ?? '' ),
             ]
         );
@@ -155,7 +155,7 @@ final class LTMS_External_Auditor_Role {
         LTMS_Core_Logger::security(
             'AUDITOR_LOGIN',
             sprintf( 'Auditor externo "%s" inició sesión. 2FA requerido.', $user_login ),
-            [ 'user_id' => $user->ID, 'ip' => LTMS_Utils::get_ip() ]
+            [ 'user_id' => $user->ID, 'ip' => LTMS_Core_Security::get_client_ip_safe() ] // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         );
     }
 }

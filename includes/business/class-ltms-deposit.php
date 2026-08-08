@@ -161,7 +161,7 @@ final class LTMS_Deposit {
                 'receipt_url' => esc_url_raw( $receipt_url ),
                 'notes'       => sanitize_textarea_field( $notes ),
                 'status'      => self::STATUS_PENDING,
-                'ip_address'  => LTMS_Utils::get_ip(),
+                'ip_address'  => LTMS_Core_Security::get_client_ip_safe(), // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
                 'created_by'  => $vendor_id,
                 'created_at'  => LTMS_Utils::now_utc(),
                 'updated_at'  => LTMS_Utils::now_utc(),

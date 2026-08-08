@@ -603,7 +603,7 @@ final class LTMS_Business_Wallet {
                     'reference'      => $idempotency_key ?: null,
                     'status'         => 'completed',
                     'metadata'       => $metadata ? wp_json_encode( $metadata ) : null,
-                    'ip_address'     => LTMS_Utils::get_ip(),
+                    'ip_address'     => LTMS_Core_Security::get_client_ip_safe(), // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
                     'created_by'     => get_current_user_id() ?: null,
                     'created_at'     => LTMS_Utils::now_utc(),
                 ],

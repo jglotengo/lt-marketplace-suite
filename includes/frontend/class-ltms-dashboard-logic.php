@@ -2377,7 +2377,7 @@ final class LTMS_Dashboard_Logic {
         global $wpdb;
 
         // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir abuso de wp_options.
-        $ip = LTMS_Utils::get_ip();
+        $ip = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         $throttle_key = 'ltms_backorder_' . md5( $ip );
         $attempts = (int) get_transient( $throttle_key );
         if ( $attempts >= 10 ) {
@@ -2585,7 +2585,7 @@ final class LTMS_Dashboard_Logic {
         check_ajax_referer( 'ltms_ux_nonce', 'nonce' );
 
         // v2.9.61 DEEP-AUDIT-002 P1 FIX: Rate limit para prevenir spam de preguntas.
-        $ip = LTMS_Utils::get_ip();
+        $ip = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         $throttle_key = 'ltms_question_' . md5( $ip );
         $attempts = (int) get_transient( $throttle_key );
         if ( $attempts >= 5 ) {

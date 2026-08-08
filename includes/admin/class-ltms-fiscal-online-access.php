@@ -353,7 +353,7 @@ class LTMS_Fiscal_Online_Access {
         global $wpdb;
 
         $endpoint = $request->get_route();
-        $ip       = LTMS_Utils::get_ip();
+        $ip       = LTMS_Core_Security::get_client_ip_safe(); // CICLO31-P2-CG-28-P2-6 FIX: Leccion 25.1
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $now     = current_time( 'mysql', true );
 

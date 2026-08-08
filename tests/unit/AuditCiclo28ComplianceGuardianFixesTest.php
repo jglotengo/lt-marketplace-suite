@@ -753,16 +753,21 @@ class AuditCiclo28ComplianceGuardianFixesTest extends LTMS_Unit_Test_Case {
 
 	public function test_ltms_utils_get_ip_method_still_exists(): void {
 		// No regression: Aunque compliance-guardian C28 dejo de usar
-		// LTMS_Utils::get_ip(), el metodo sigue existiendo para
-		// class-ltms-deposit.php:164 y class-ltms-wallet.php:606 (backlog
-		// futuro — fuera de scope C28).
+		// LTMS_Utils::get_ip(), el metodo sigue existiendo para el fallback
+		// defensivo en class-ltms-dashboard-logic.php:2491 (v2.9.120 reviews-
+		// audit P1-4: rama else de `if class_exists(LTMS_Core_Security)` —
+		// solo se ejecuta en ambiente degradado sin la clase Security).
+		// C28 docstring original decia "deposit/wallet dependen de el
+		// (backlog C29+)" — tras C31 esa dependencia se cerro (deposit:164
+		// y wallet:606 migraron a get_client_ip_safe). El metodo SIGUE
+		// definido por el fallback defensivo de dashboard-logic:2491.
 		$utils_path = __DIR__ . '/../../includes/core/utils/class-ltms-utils.php';
 		$this->assertFileExists( $utils_path );
 		$source = file_get_contents( $utils_path );
 		$this->assertStringContainsString(
 			'public static function get_ip(): string',
 			$source,
-			'LTMS_Utils::get_ip() sigue definido (deposit/wallet dependen de el — backlog C29+).'
+			'LTMS_Utils::get_ip() sigue definido (fallback defensivo dashboard-logic:2491 en ambiente sin LTMS_Core_Security).'
 		);
 	}
 
