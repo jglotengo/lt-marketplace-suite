@@ -152,6 +152,13 @@ final class LTMS_Business_Aveonline_Cities {
 
 		set_transient( self::TRANSIENT_LAST_SYNC, time(), self::SYNC_INTERVAL * 2 );
 
+		// CICLO32-P1-AVC-001 FIX: invalidar cache de opciones tras sync exitosa.
+		// Sin este flush, get_options() sirve el transient stale 'ltms_aveonline_city_options'
+		// (TTL 12h) aunque el upsert modifico las filas. flush_options_cache() era un metodo
+		// huerfano (definido en linea 381, sin callers). Invariante: toda write-op (sync)
+		// debe invalidar el cache derivado que lista la misma data.
+		self::flush_options_cache();
+
 		$message = sprintf(
 			'Catálogo Aveonline sincronizado: %d ciudades procesadas, %d errores.',
 			$synced,
@@ -393,6 +400,12 @@ final class LTMS_Business_Aveonline_Cities {
 		$response = wp_remote_get( self::SOURCE_URL, [
 			'timeout'    => 30,
 			'user-agent' => 'LTMS-Plugin/' . ( defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.0' ),
+			// CICLO32-P1-AVC-002 FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+			// (ver class-ltms-api-aveonline.php:950 INTEGRATIONS-AUDIT P1 FIX) exige
+			// sslverify=true salvo override por constante LTMS_DISABLE_SSL_VERIFY. Sin esto,
+			// un MITM podria inyectar un JSON malicioso en el catalogo de 20000 ciudades que
+			// el upsert ingresa sin mas sanitizacion que (string) cast.
+			'sslverify'   => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
 		] );
 
 		if ( is_wp_error( $response ) ) {
