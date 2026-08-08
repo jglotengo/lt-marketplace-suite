@@ -336,7 +336,14 @@ class LTMS_Compliance_Guardian {
         if ( $country_code ) $user_data['country'] = [ hash( 'sha256', $country_code ) ];
 
         // Client IP y User Agent (necesarios para CAPI).
-        $user_data['client_ip_address'] = LTMS_Utils::get_ip();
+        // CICLO28-P1-CG-002 FIX: usar `LTMS_Core_Security::get_client_ip_safe()`
+        // (fuente unica de IP segun Leccion 25.1) en lugar de `LTMS_Utils::get_ip()`.
+        // get_client_ip_safe() aplica sanitizacion spoofing-resistente (no confia
+        // en headers como X-Forwarded-For sin validacion estricta). Aunque el IP
+        // se envia a Meta (no se persiste en DB), mantener el mismo invariante
+        // transversal en todo el plugin evita divergencias futuras y endurece
+        // la superficie anti-CSRF/anti-logging del CAPI.
+        $user_data['client_ip_address'] = LTMS_Core_Security::get_client_ip_safe();
         $user_data['client_user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
         // FBP/FBC cookies.
@@ -356,7 +363,10 @@ class LTMS_Compliance_Guardian {
                 if ( $email ) $user_data['em'] = [ hash( 'sha256', $email ) ];
             }
         }
-        $user_data['client_ip_address'] = LTMS_Utils::get_ip();
+        // CICLO28-P1-CG-002 FIX: mismo switch a get_client_ip_safe() que
+        // build_capi_user_data() arriba. Antes usaba LTMS_Utils::get_ip() —
+        // divergencia con la fuente unica de IP (Leccion 25.1).
+        $user_data['client_ip_address'] = LTMS_Core_Security::get_client_ip_safe();
         $user_data['client_user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
         if ( isset( $_COOKIE['_fbp'] ) ) $user_data['fbp'] = sanitize_text_field( $_COOKIE['_fbp'] );
         if ( isset( $_COOKIE['_fbc'] ) ) $user_data['fbc'] = sanitize_text_field( $_COOKIE['_fbc'] );
@@ -532,6 +542,20 @@ class LTMS_Compliance_Guardian {
         ], [ 'ID' => $user_id ] );
 
         // Borrar metas PII adicionales (algunas no las cubre el eraser).
+        // CICLO28-P1-CG-003 FIX: anadir `ltms_opposition_*` y
+        // `ltms_meta_data_opt_out` al set de PII keys eliminadas. Estas metas
+        // son oposiciones activas del usuario (no consentimientos) — el
+        // usuario que pide "cancel" asume que NADA de su voluntad queda.
+        // La Ley 1581 art. 8 lit. e y la LFPDPPP art. 25 exigen Cancelacion
+        // efectiva: el dato debe desaparecer del sistema activo. Las entries
+        // en `lt_consent_log` (evidencia historica) SI se retienen por
+        // obligacion fiscal (ET art. 632 / LISR art. 30), pero el user_meta
+        // `ltms_opposition_marketing` etc. son la oposicion ACTUAL — si la
+        // cuenta esta cerrada, no recibira marketing, retener la oposicion
+        // es basura sin proposito valido y viola el principio de minimizacion
+        // de datos (Ley 1581 art. 4 lit. c). Lo mismo aplica a
+        // `ltms_meta_data_opt_out` (opt-out Meta M14): una cuenta cerrada no
+        // enviara eventos CAPI — retener el flag no aporta nada.
         $pii_keys = [
             'first_name', 'last_name', 'nickname', 'description',
             'ltms_kyc_status', 'ltms_kyc_document_number', 'ltms_kyc_file_banco',
@@ -544,6 +568,12 @@ class LTMS_Compliance_Guardian {
             '_ltms_zapsign_doc_token', '_ltms_zapsign_signed_at',
             'ltms_vendor_pixel_id', 'ltms_vendor_ga4_id',
             'ltms_browsing_history',
+            // CICLO28-P1-CG-003 FIX (ver rationale arriba).
+            'ltms_opposition_marketing',
+            'ltms_opposition_profiling',
+            'ltms_opposition_data_sharing',
+            'ltms_opposition_automated_decisions',
+            'ltms_meta_data_opt_out',
         ];
         foreach ( $pii_keys as $key ) {
             delete_user_meta( $user_id, $key );
@@ -761,17 +791,29 @@ class LTMS_Compliance_Guardian {
     // ================================================================
 
     public static function ajax_cookie_consent(): void {
-        // v2.9.127 BATCH-AUDIT P1-3 FIX: add nonce for CSRF protection.
-        // Before, this nopriv endpoint had no nonce — any site could embed
-        // a form that POSTs to this endpoint and set cookie consent level.
+        // CICLO28-P0-CG-001 FIX: el `check_ajax_referer(..., false)` previo
+        // ignoraba el fallo del nonce y procesaba de todas formas. Esto convierte
+        // un endpoint `wp_ajax_nopriv_` (sin login) en un blanco trivial de CSRF:
+        // cualquier site puede embed un form POST y forzar `level=full`,
+        // bypass del consent gating M3/M10/M14 y bypass del opt-out Meta.
+        // Igual anti-patron que TB-007 (C26), pero aqui es P0 porque toca
+        // compliance regulatorio + privacidad del usuario (Ley 1581 art. 9
+        // consentimiento libre/previo/expreso/informado — CSRF lo viola todo).
+        // Fix: nonce fail-closed. Si la validacion devuelve false (nonce
+        // ausente, expirado o invalido), NO se procesa la request — se
+        // retorna 403. La compat con paginas cacheadas se resuelve en JS:
+        // el banner debe entregar el nonce via `wp_localize_script` y
+        // refrescarlo si expira. No se degrada seguridad por cache.
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
-            // For backward compat with cached pages that may not have nonce,
-            // still process but don't log consent (just set cookie).
+            wp_send_json_error(
+                [ 'message' => __( 'Nonce invalido. Recargue la pagina.', 'ltms' ) ],
+                403
+            );
         }
 
-        $level = sanitize_text_field( $_POST['level'] ?? '' );
+        $level = sanitize_text_field( wp_unslash( $_POST['level'] ?? '' ) );
         if ( ! in_array( $level, [ 'full', 'essential' ], true ) ) {
-            wp_send_json_error( [ 'message' => 'Invalid level' ] );
+            wp_send_json_error( [ 'message' => 'Invalid level' ], 400 );
         }
 
         $user_id = get_current_user_id();
