@@ -16,7 +16,14 @@ class LTMS_Fiscal_Annual_Close {
 
     public static function init(): void {
         // LF-3: GMF 4x1000 en retiros de wallet.
-        add_action( 'ltms_payout_completed', [ __CLASS__, 'calculate_gmf_on_payout' ], 10, 2 );
+        // CICLO30-P0-FAC-001 FIX: aceptar el 3er arg `$payout_id` que `do_action('ltms_payout_completed')`
+        // ya disparaba desde payout-scheduler.php:683 y openpay-webhook-handler.php:349. Antes solo se
+        // aceptaban 2 args → el `$payout_id` se caía al limbo, y la idempotency_key del débito GMF
+        // se construía como `gmf_payout_v{vendor}_{month}` (misma key para todos los retiros del mes
+        // del mismo vendor). Wallet::execute_transaction() ignoraba el 2do+ débito como duplicado
+        // (same reference) → GMF NO se recaudaba sobre el 2do+ retiro del mes. Agente retenedor perdía
+        // GMF 4x1000 adeudado a la DIAN. Ver Leccion 30.1 regla #1.
+        add_action( 'ltms_payout_completed', [ __CLASS__, 'calculate_gmf_on_payout' ], 10, 3 );
 
         // LF-4: Cierre fiscal anual — cron.
         add_action( 'ltms_yearly_cron', [ __CLASS__, 'generate_annual_withholding_certificates' ] );
@@ -45,8 +52,11 @@ class LTMS_Fiscal_Annual_Close {
      *
      * @param int   $vendor_id
      * @param float $amount
+     * @param int   $payout_id  ID del payout (3er arg de `do_action('ltms_payout_completed')`
+     *                           disparado por payout-scheduler.php:683 / openpay-webhook-handler.php:349).
+     *                           Default 0 para back-compat con callers manuales (unit tests).
      */
-    public static function calculate_gmf_on_payout( int $vendor_id, float $amount ): void {
+    public static function calculate_gmf_on_payout( int $vendor_id, float $amount, int $payout_id = 0 ): void {
         $country = LTMS_Core_Config::get_country();
         if ( $country !== 'CO' ) return; // GMF solo aplica en Colombia.
 
@@ -63,7 +73,7 @@ class LTMS_Fiscal_Annual_Close {
         $accumulated = (float) get_user_meta( $vendor_id, $monthly_gmf_key, true );
 
         if ( ( $accumulated + $amount ) <= $monthly_exemption ) {
-            // Dentro de la exención: no se aplica GMF.
+            // Dentro de la exención: no se aplica GMF (caso exitoso, actualiza exención consumida).
             update_user_meta( $vendor_id, $monthly_gmf_key, $accumulated + $amount );
             return;
         }
@@ -73,15 +83,30 @@ class LTMS_Fiscal_Annual_Close {
         $taxable_base = min( $taxable_base, $amount ); // No puede ser mayor al retiro actual.
         $gmf_amount = round( $taxable_base * $gmf_rate, 2 );
 
-        // Actualizar acumulado.
-        update_user_meta( $vendor_id, $monthly_gmf_key, $accumulated + $amount );
-
-        if ( $gmf_amount <= 0 ) return;
+        if ( $gmf_amount <= 0 ) {
+            // Base imponible positiva pero redondea a 0 — no hay GMF a debitar, pero
+            // el monto SÍ consume exención mensual (caso límite: $1 sobre base de $0.40).
+            update_user_meta( $vendor_id, $monthly_gmf_key, $accumulated + $amount );
+            return;
+        }
 
         // Debitar GMF de la wallet del vendor.
+        // CICLO30-P0-FAC-001 FIX: idempotency_key ÚNICA por payout (no por mes). Antes era
+        // `gmf_payout_v{vendor}_{month}` → misma key para todos los retiros del mes → wallet
+        // hacia skip silencioso del 2do+ débito (referencia duplicada). Ahora:
+        //   - Si $payout_id > 0 (hook real), key = `gmf_payout_v{payout_id}` — única por payout.
+        //   - Si $payout_id = 0 (caller manual / unit test sin payout_id), fallback al key
+        //     por vendor+mes — back-compat pero SIGUE el anti-patron original. Documentado.
+        // CICLO30-P1-FAC-002 FIX: el `$accumulated` (exención mensual consumida) se persiste
+        // SÓLO si el débito tuvo éxito. Antes se actualizaba SIEMPRE en línea 77 (try),
+        // y si el débito lanzaba InvalidArgumentException por saldo insuficiente, el
+        // accumulated quedaba inflado → el vendor "consumía" exención mensual sin recibir
+        // débito → GMF perdido a la DIAN en subsiguientes retiros del mes.
         if ( class_exists( 'LTMS_Business_Wallet' ) ) {
+            $idem_key = $payout_id > 0
+                ? sprintf( 'gmf_payout_v%d', $payout_id )
+                : sprintf( 'gmf_payout_v%d_%s', $vendor_id, $month );
             try {
-                $idem_key = sprintf( 'gmf_payout_v%d_%s', $vendor_id, $month );
                 LTMS_Business_Wallet::debit(
                     $vendor_id,
                     $gmf_amount,
@@ -92,16 +117,30 @@ class LTMS_Fiscal_Annual_Close {
                         'base'        => $taxable_base,
                         'month'       => $month,
                         'exemption'   => $monthly_exemption,
+                        'payout_id'   => $payout_id,
                     ],
                     0,
                     '',
                     $idem_key
                 );
+                // Débito OK: persistir exención consumida (post-success, no pre-try).
+                update_user_meta( $vendor_id, $monthly_gmf_key, $accumulated + $amount );
             } catch ( \Throwable $e ) {
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                    LTMS_Core_Logger::warning( 'GMF_DEBIT_FAILED', sprintf( 'Vendor #%d: %s', $vendor_id, $e->getMessage() ) );
+                    LTMS_Core_Logger::warning(
+                        'GMF_DEBIT_FAILED',
+                        sprintf( 'Vendor #%d (payout_id=%d): %s', $vendor_id, $payout_id, $e->getMessage() )
+                    );
                 }
+                // FAC-002: NO persistir accumulated si el débito falló — el vendor NO
+                // consume exención mensual sobre un monto que no fue efectivamente retirado.
+                // El próximo retiro del mes verá el accumulated sin este amount y reintentará.
+                return;
             }
+        } else {
+            // Wallet no disponible (p.ej. modo UNIT_ONLY o clase deshabilitada): persistir
+            // accumulated como en el path de exención (no hay débito que fallar).
+            update_user_meta( $vendor_id, $monthly_gmf_key, $accumulated + $amount );
         }
 
         // Guardar certificado de retención GMF para el cierre anual.
@@ -110,18 +149,19 @@ class LTMS_Fiscal_Annual_Close {
         $cert = get_user_meta( $vendor_id, $cert_key, true ) ?: [ 'total' => 0, 'details' => [] ];
         $cert['total'] += $gmf_amount;
         $cert['details'][] = [
-            'date'   => current_time( 'mysql', true ),
-            'amount' => $amount,
-            'base'   => $taxable_base,
-            'gmf'    => $gmf_amount,
-            'month'  => $month,
+            'date'      => current_time( 'mysql', true ),
+            'amount'    => $amount,
+            'base'      => $taxable_base,
+            'gmf'       => $gmf_amount,
+            'month'     => $month,
+            'payout_id' => $payout_id,
         ];
         update_user_meta( $vendor_id, $cert_key, $cert );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info(
                 'GMF_WITHHELD',
-                sprintf( 'Vendor #%d: GMF 4x1000=$%.2f sobre base=$%.2f (retiro=$%.2f, exención mensual=$%.2f)', $vendor_id, $gmf_amount, $taxable_base, $amount, $monthly_exemption )
+                sprintf( 'Vendor #%d (payout_id=%d): GMF 4x1000=$%.2f sobre base=$%.2f (retiro=$%.2f, exención mensual=$%.2f)', $vendor_id, $payout_id, $gmf_amount, $taxable_base, $amount, $monthly_exemption )
             );
         }
     }
