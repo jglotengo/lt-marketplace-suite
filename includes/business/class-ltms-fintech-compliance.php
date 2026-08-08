@@ -528,7 +528,15 @@ class LTMS_Fintech_Compliance {
             $cached_list = get_transient( "ltms_sanctions_list_{$list_key}" );
             if ( false === $cached_list ) {
                 // Intentar descargar.
-                $response = wp_remote_get( $list_cfg['url'], [ 'timeout' => 30 ] );
+                // CICLO33-P1-SSL-FT-SANCTIONS FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+                // (establecida C18, extendida C32 Leccion 32.1 regla #3). CRITICO: esta lista alimenta el
+                // screening SARLAFT (CO Ley 526/1999) / Fintech (MX Ley art. 87) con fail-closed (FASE4 P0).
+                // Un MITM podia inyectar una lista vacia/falseada y desbloquear KYC de vendor sancionado.
+                // Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
+                $response = wp_remote_get( $list_cfg['url'], [
+                    'timeout'   => 30,
+                    'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
+                ] );
                 if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
                     // FASE4 P0 FIX (SARLAFT fail-open): previously did `continue`
                     // which skipped this list and approved the vendor WITHOUT

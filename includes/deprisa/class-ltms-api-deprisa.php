@@ -64,11 +64,13 @@ class LTMS_Deprisa_API {
             'Authorization' => 'Basic ' . base64_encode( $this->usuario . ':' . $this->password ),
         );
 
+        // CICLO33-P1-SSL-DEPRISA-POST FIX: migrar sslverify=true hardcodeado a patron canonico
+        // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
         $response = wp_remote_post( $url, array(
             'headers'   => $headers,
             'body'      => $xml_body,
             'timeout'   => 30,
-            'sslverify' => true,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ) );
 
         if ( is_wp_error( $response ) ) {
@@ -96,10 +98,12 @@ class LTMS_Deprisa_API {
             'Authorization' => 'Basic ' . base64_encode( $this->usuario . ':' . $this->password ),
         );
 
+        // CICLO33-P1-SSL-DEPRISA-GET FIX: migrar sslverify=true hardcodeado a patron canonico
+        // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
         $response = wp_remote_get( $url_completa, array(
             'headers'   => $headers,
             'timeout'   => 30,
-            'sslverify' => true,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ) );
 
         if ( is_wp_error( $response ) ) {

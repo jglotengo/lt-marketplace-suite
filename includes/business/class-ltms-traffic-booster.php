@@ -303,6 +303,8 @@ class LTMS_Traffic_Booster {
         $utm_caption = $caption . "\n\nutm_source=instagram&utm_medium=social&utm_campaign=product_auto_post";
 
         // Paso 1: crear container.
+        // CICLO33-P1-SSL-IG-CONTAINER FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( "https://graph.facebook.com/v18.0/{$ig_account}/media", [
             'body' => [
                 'image_url' => $image_url,
@@ -310,6 +312,7 @@ class LTMS_Traffic_Booster {
                 'access_token' => $token,
             ],
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -322,12 +325,15 @@ class LTMS_Traffic_Booster {
         }
 
         // Paso 2: publicar.
+        // CICLO33-P1-SSL-IG-PUBLISH FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $publish = wp_remote_post( "https://graph.facebook.com/v18.0/{$ig_account}/media_publish", [
             'body' => [
                 'creation_id' => $body['id'],
                 'access_token' => $token,
             ],
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $publish ) ) {
@@ -365,9 +371,12 @@ class LTMS_Traffic_Booster {
         $body = [ 'message' => $message, 'access_token' => $token ];
         if ( $image_url ) $body['link'] = $product->get_permalink();
 
+        // CICLO33-P1-SSL-FB-FEED FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( "https://graph.facebook.com/v18.0/{$fb_page}/feed", [
             'body' => $body,
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -398,6 +407,8 @@ class LTMS_Traffic_Booster {
             return [ 'status' => 'skipped', 'reason' => 'Sin imagen' ];
         }
 
+        // CICLO33-P1-SSL-PINTEREST FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( 'https://api.pinterest.com/v5/pins', [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -411,6 +422,7 @@ class LTMS_Traffic_Booster {
                 'media_source' => [ 'source_type' => 'image_url', 'url' => $image_url ],
             ] ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -948,6 +960,8 @@ class LTMS_Traffic_Booster {
             if ( empty( $acct['account_id'] ) ) continue;
 
             // Google Business Profile API: crear local post.
+            // CICLO33-P1-SSL-GBP FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+            // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
             $response = wp_remote_post(
                 "https://mybusiness.googleapis.com/v4/accounts/{$acct['account_id']}/locations/{$acct['location_id']}/localPosts",
                 [
@@ -968,6 +982,7 @@ class LTMS_Traffic_Booster {
                         ],
                     ] ),
                     'timeout' => 30,
+                    'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
                 ]
             );
 

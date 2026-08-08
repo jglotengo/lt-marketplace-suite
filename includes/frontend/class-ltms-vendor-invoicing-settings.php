@@ -267,12 +267,16 @@ class LTMS_Vendor_Invoicing_Settings {
      * Prueba conexión con Alegra (GET /api/v1/company).
      */
     private static function test_alegra( string $email, string $token ): array {
+        // CICLO33-P1-SSL-ALEGRA-TEST FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Test de conexion envia Basic Auth;
+        // un MITM podia interceptar creds. Patron canonico con override.
         $response = wp_remote_get( 'https://api.alegra.com/api/v1/company', [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode( $email . ':' . $token ),
                 'Accept'        => 'application/json',
             ],
             'timeout' => 20,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -294,6 +298,9 @@ class LTMS_Vendor_Invoicing_Settings {
      * Prueba conexión con Siigo (POST /auth/token-b2b/v1).
      */
     private static function test_siigo( string $username, string $key ): array {
+        // CICLO33-P1-SSL-SIIGO-TEST FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Test de conexion envia access_key;
+        // un MITM podia interceptar la key. Patron canonico con override.
         $response = wp_remote_post( 'https://api.siigo.com/auth/token-b2b/v1', [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -304,6 +311,7 @@ class LTMS_Vendor_Invoicing_Settings {
                 'access_key' => $key,
             ] ),
             'timeout' => 20,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

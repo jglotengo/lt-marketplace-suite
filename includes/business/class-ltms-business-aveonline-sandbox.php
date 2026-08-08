@@ -148,6 +148,11 @@ class LTMS_Business_Aveonline_Sandbox {
             'body'        => wp_json_encode( $payload ),
             'data_format' => 'body',
             'timeout'     => 20,
+            // CICLO33-P1-SSL-SANDBOX FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+            // (establecida C18, extendida C32 Leccion 32.1 regla #3). Sin override por constante
+            // LTMS_DISABLE_SSL_VERIFY, un MITM entre WP host y sandbox.aveonline.co podia inyectar
+            // JSON malicioso en la respuesta de prueba. Patron canonico identico a api-aveonline.php.
+            'sslverify'   => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

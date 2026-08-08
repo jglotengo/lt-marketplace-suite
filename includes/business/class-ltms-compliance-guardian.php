@@ -297,7 +297,9 @@ class LTMS_Compliance_Guardian {
             'body'      => wp_json_encode( $event_data ),
             'timeout'   => 0.01,   // Non-blocking: no esperar respuesta
             'blocking'  => false,  // PHP no espera el response
-            'sslverify' => true,
+            // CICLO33-P1-SSL-CAPI-ASYNC FIX: migrar sslverify=true hardcodeado a patron canonico
+            // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         // Log async (no bloquea).
@@ -383,6 +385,10 @@ class LTMS_Compliance_Guardian {
             'headers' => [ 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( $event_data ),
             'timeout' => 10,
+            // CICLO33-P1-SSL-CAPI-SYNC FIX: sslverify explicito (missing). Invariante INTEGRATIONS-AUDIT P1
+            // (establecida C18, extendida C32 Leccion 32.1 regla #3). El CAPI envia PII hasheada + IP
+            // del cliente a Meta; un MITM podia inyectar JSON malicioso en la respuesta de Graph API.
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

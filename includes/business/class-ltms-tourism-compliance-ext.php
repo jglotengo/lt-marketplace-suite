@@ -95,10 +95,15 @@ class LTMS_Tourism_Compliance_Ext {
     private static function query_fontur_rnt( string $rnt_number ): ?bool {
         $url = 'https://www.fontur.com.co/consultas/registro-nacional-de-turismo';
 
+        // CICLO33-P1-SSL-TOURISM-FONTUR FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). La verificacion RNT contra FONTUR
+        // determina el compliance legal de vendors turisticos; un MITM podia inyectar response
+        // falseada y aprobar un RNT invalido. Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
         $response = wp_remote_post( $url, [
             'body'    => [ 'rnt' => $rnt_number ],
             'timeout' => 10,
             'headers' => [ 'User-Agent' => 'LTMS-Tourism-Compliance/1.0' ],
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

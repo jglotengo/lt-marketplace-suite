@@ -756,11 +756,16 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
                 return [];
             }
 
+            // CICLO33-P1-SSL-OPENPAY-PSE FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+            // (establecida C18, extendida C32 Leccion 32.1 regla #3). La peticion envia private_key
+            // Openpay como Basic Auth; un MITM podia interceptar la llave o inyectar lista de bancos
+            // falseada. Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
             $resp = wp_remote_get(
                 "https://api.openpay.co/v1/{$merchant_id}/pseBanks",
                 [
                     'headers' => [ 'Authorization' => 'Basic ' . base64_encode( $private_key . ':' ) ],
                     'timeout' => 8,
+                    'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
                 ]
             );
 

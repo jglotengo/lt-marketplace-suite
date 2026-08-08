@@ -221,6 +221,9 @@ final class LTMS_Google_OAuth {
     // -------------------------------------------------------------------------
 
     private function exchange_code_for_token( string $code ): array|\WP_Error {
+        // CICLO33-P1-SSL-GOOGLE-TOKEN FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). El exchange manda client_secret;
+        // un MITM podia interceptar el codigo + secret + access_token. Patron canonico con override.
         $response = wp_remote_post(
             self::TOKEN_URL,
             [
@@ -232,6 +235,7 @@ final class LTMS_Google_OAuth {
                     'redirect_uri'  => self::get_redirect_uri(),
                     'grant_type'    => 'authorization_code',
                 ],
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 
@@ -256,11 +260,15 @@ final class LTMS_Google_OAuth {
     // -------------------------------------------------------------------------
 
     private function get_user_profile( string $access_token ): array|\WP_Error {
+        // CICLO33-P1-SSL-GOOGLE-USERINFO FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). La respuesta contiene email + PII
+        // del usuario Google; un MITM podia inyectar perfil falseado. Patron canonico con override.
         $response = wp_remote_get(
             self::USERINFO_URL,
             [
                 'timeout' => 10,
                 'headers' => [ 'Authorization' => 'Bearer ' . $access_token ],
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ]
         );
 

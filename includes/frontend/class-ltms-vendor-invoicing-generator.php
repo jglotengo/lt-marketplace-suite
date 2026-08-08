@@ -59,6 +59,10 @@ class LTMS_Vendor_Invoicing_Generator {
         ];
 
         // 5. Llamar a POST /api/v1/invoices.
+        // CICLO33-P1-SSL-ALEGRA-INVOICE FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). La peticion envia Basic Auth con
+        // creds del vendor + JSON con items de factura; un MITM podia interceptar creds o inyectar
+        // response falseada con invoice_id invalido. Patron canonico con override.
         $response = wp_remote_post( 'https://api.alegra.com/api/v1/invoices', [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode( $creds['email'] . ':' . $creds['token'] ),
@@ -67,6 +71,7 @@ class LTMS_Vendor_Invoicing_Generator {
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -146,6 +151,8 @@ class LTMS_Vendor_Invoicing_Generator {
         ];
 
         // 6. Llamar a POST /v1/invoices.
+        // CICLO33-P1-SSL-SIIGO-INVOICE FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( 'https://api.siigo.com/v1/invoices', [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -155,6 +162,7 @@ class LTMS_Vendor_Invoicing_Generator {
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 60,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -275,6 +283,8 @@ class LTMS_Vendor_Invoicing_Generator {
      */
     private static function alegra_get_or_create_contact( array $creds, array $buyer ): ?int {
         // Buscar por identification.
+        // CICLO33-P1-SSL-ALEGRA-CONTACT-GET FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $email_enc = rawurlencode( $buyer['email'] );
         $response = wp_remote_get( 'https://api.alegra.com/api/v1/contacts?identification=' . rawurlencode( $buyer['identification'] ), [
             'headers' => [
@@ -282,6 +292,7 @@ class LTMS_Vendor_Invoicing_Generator {
                 'Accept'        => 'application/json',
             ],
             'timeout' => 20,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
         if ( ! is_wp_error( $response ) ) {
             $body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -291,6 +302,8 @@ class LTMS_Vendor_Invoicing_Generator {
         }
 
         // Crear contacto nuevo.
+        // CICLO33-P1-SSL-ALEGRA-CONTACT-POST FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $name_parts = explode( ' ', $buyer['name'], 2 );
         $payload = [
             'name'           => $buyer['name'],
@@ -315,6 +328,7 @@ class LTMS_Vendor_Invoicing_Generator {
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
         if ( is_wp_error( $response ) ) {
             return null;
@@ -332,6 +346,8 @@ class LTMS_Vendor_Invoicing_Generator {
         if ( $cached ) {
             return $cached;
         }
+        // CICLO33-P1-SSL-SIIGO-AUTH FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( 'https://api.siigo.com/auth/token-b2b/v1', [
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -342,6 +358,7 @@ class LTMS_Vendor_Invoicing_Generator {
                 'access_key' => $key,
             ] ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
         if ( is_wp_error( $response ) ) {
             return '';
@@ -359,6 +376,8 @@ class LTMS_Vendor_Invoicing_Generator {
      */
     private static function siigo_get_or_create_customer( string $token, array $buyer ): ?string {
         // Buscar por identificación.
+        // CICLO33-P1-SSL-SIIGO-CUSTOMER-GET FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_get( 'https://api.siigo.com/v1/customers?identification=' . rawurlencode( $buyer['identification'] ), [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -366,6 +385,7 @@ class LTMS_Vendor_Invoicing_Generator {
                 'Partner-Id'    => 'ltms',
             ],
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
         if ( ! is_wp_error( $response ) ) {
             $body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -396,6 +416,8 @@ class LTMS_Vendor_Invoicing_Generator {
             ],
             'address'         => [ 'address' => $buyer['address'] ],
         ];
+        // CICLO33-P1-SSL-SIIGO-CUSTOMER-POST FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override.
         $response = wp_remote_post( 'https://api.siigo.com/v1/customers', [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -405,6 +427,7 @@ class LTMS_Vendor_Invoicing_Generator {
             ],
             'body'    => wp_json_encode( $payload ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
         if ( is_wp_error( $response ) ) {
             return null;

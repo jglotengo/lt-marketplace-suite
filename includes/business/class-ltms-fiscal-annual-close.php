@@ -430,6 +430,11 @@ class LTMS_Fiscal_Annual_Close {
     private static function timbrar_via_facturama( int $order_id, string $xml_base64, string $token ): array {
         $url = 'https://api.facturama.mx/cfdi33/issue/json';
 
+        // CICLO33-P1-SSL-PAC-FACTURAMA FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). PAC envia XML CFDI con sello digital;
+        // un MITM podia interceptar el xml_base64 o el token y falsificar el timbrado. Aunque el modulo
+        // es scaffolding (FAC-008/FAC-009 P2 - pendiente wire-up ltms_cfdi_request C30), el fix protege
+        // cualquier implementacion futura de LF-5 CFDI via PAC. Patron canonico con override.
         $response = wp_remote_post( $url, [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode( $token ),
@@ -437,6 +442,7 @@ class LTMS_Fiscal_Annual_Close {
             ],
             'body'    => wp_json_encode( [ 'xml' => $xml_base64 ] ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -473,6 +479,10 @@ class LTMS_Fiscal_Annual_Close {
     private static function timbrar_via_sw_sapien( int $order_id, string $xml_base64, string $token ): array {
         $url = 'https://sw.sw.com.mx/api/v3/cfdi33/issue/json/v1';
 
+        // CICLO33-P1-SSL-PAC-SW-SAPIEN FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override por
+        // LTMS_DISABLE_SSL_VERIFY. Scaffolding (FAC-008/FAC-009 P2 - pendiente wire-up C30) - igual
+        // se aplica patron defense-in-depth para LF-5 futura.
         $response = wp_remote_post( $url, [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -480,6 +490,7 @@ class LTMS_Fiscal_Annual_Close {
             ],
             'body'    => wp_json_encode( [ 'xml' => $xml_base64 ] ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -515,6 +526,10 @@ class LTMS_Fiscal_Annual_Close {
     private static function timbrar_via_edicom( int $order_id, string $xml_base64, string $token ): array {
         $url = 'https://api.edicom.mx/cfdi/issue';
 
+        // CICLO33-P1-SSL-PAC-EDICOM FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). Patron canonico con override por
+        // LTMS_DISABLE_SSL_VERIFY. Scaffolding (FAC-008/FAC-009 P2 - pendiente wire-up C30) - igual
+        // se aplica patron defense-in-depth para LF-5 futura.
         $response = wp_remote_post( $url, [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -522,6 +537,7 @@ class LTMS_Fiscal_Annual_Close {
             ],
             'body'    => wp_json_encode( [ 'xml' => $xml_base64 ] ),
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

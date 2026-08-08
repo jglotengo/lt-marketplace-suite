@@ -610,6 +610,10 @@ class LTMS_Authorities_Compliance {
             return;
         }
 
+        // CICLO33-P1-SSL-AC-PPC-SIC FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+        // (establecida C18, extendida C32 Leccion 32.1 regla #3). El reporte PQR PPC SIC envia
+        // Bearer token + XML con PQR radicada; un MITM podia interceptar el token o inyectar
+        // response falseada. Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
         $response = wp_remote_post( $endpoint, [
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
@@ -617,6 +621,7 @@ class LTMS_Authorities_Compliance {
             ],
             'body'    => $xml,
             'timeout' => 30,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {

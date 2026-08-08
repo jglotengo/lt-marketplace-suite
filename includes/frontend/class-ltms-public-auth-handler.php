@@ -474,6 +474,9 @@ final class LTMS_Public_Auth_Handler {
             }
 
             // Verificar token con la API de Cloudflare.
+            // CICLO33-P1-SSL-TURNSTILE FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
+            // (establecida C18, extendida C32 Leccion 32.1 regla #3). Sin esto, un MITM podia inyectar
+            // response 'success: true' falseada y bypassar Turnstile (anti-bot). Patron canonico override.
             $verify_response = wp_remote_post( 'https://challenges.cloudflare.com/turnstile/v0/siteverify', [
                 'timeout' => 10,
                 'body'    => [
@@ -481,6 +484,7 @@ final class LTMS_Public_Auth_Handler {
                     'response' => $turnstile_token,
                     'remoteip' => $ip,
                 ],
+                'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
             ] );
 
             if ( is_wp_error( $verify_response ) ) {

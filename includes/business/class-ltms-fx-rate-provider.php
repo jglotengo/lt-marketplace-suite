@@ -213,9 +213,11 @@ class LTMS_FX_Rate_Provider {
      */
     private static function fetch_from_frankfurter( string $base ): ?array {
         $url = sprintf( self::PROVIDERS['frankfurter'], $base );
+        // CICLO33-P1-SSL-FX-FRANKFURTER FIX: migrar sslverify=true hardcodeado a patron canonico
+        // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
         $response = wp_remote_get( $url, [
             'timeout'   => 10,
-            'sslverify' => true,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -259,9 +261,11 @@ class LTMS_FX_Rate_Provider {
      */
     private static function fetch_from_exchangerate( string $base ): ?array {
         $url = sprintf( self::PROVIDERS['exchangerate'], $base );
+        // CICLO33-P1-SSL-FX-EXCHANGERATE FIX: migrar sslverify=true hardcodeado a patron canonico
+        // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
         $response = wp_remote_get( $url, [
             'timeout'   => 10,
-            'sslverify' => true,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
@@ -301,9 +305,11 @@ class LTMS_FX_Rate_Provider {
      * @return array<string, float>|null
      */
     private static function fetch_from_ecb(): ?array {
+        // CICLO33-P1-SSL-FX-ECB FIX: migrar sslverify=true hardcodeado a patron canonico
+        // con override por LTMS_DISABLE_SSL_VERIFY. Invariante INTEGRATIONS-AUDIT P1 (C18/C32).
         $response = wp_remote_get( self::PROVIDERS['ecb'], [
             'timeout'   => 10,
-            'sslverify' => true,
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
 
         if ( is_wp_error( $response ) ) {
