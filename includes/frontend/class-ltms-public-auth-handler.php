@@ -579,12 +579,16 @@ final class LTMS_Public_Auth_Handler {
 
         // v2.9.113 P2 FIX: Validate referral code if provided.
         if ( ! empty( $data['referral_code'] ) ) {
+            // AUTH-RA3 (P2) RE-AUDIT-AUTH FIX: la clave 'number' => 1 estaba
+            // duplicada en el array (lineas 585 y 587 originales). PHP silenciosamente
+            // usa el ultimo valor (era 1 en ambos, sin efecto funcional), pero el
+            // duplicate key es codigo confuso y un analizador estatico lo flagga
+            // como bug. Eliminado el duplicado.
             $referrer = get_users( [
                 'meta_key'   => 'ltms_referral_code',
                 'meta_value' => $data['referral_code'],
                 'number'     => 1,
                 'fields'     => 'ID',
-                'number'     => 1,
             ] );
             if ( empty( $referrer ) ) {
                 // Invalid code — don't fail registration, just clear it.

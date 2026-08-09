@@ -141,6 +141,21 @@
                 } else {
                     var msg = data.data && data.data.message ? data.data.message : 'Usuario o contraseña incorrectos.';
                     showLoginNotice(msg, 'error');
+                    // AUTH-RA4 (P1) RE-AUDIT-AUTH FIX: seguir data.data.redirect en
+                    // branch error. El backend (ajax_vendor_login, AUTH-01) retorna
+                    // HTTP 403 con message + redirect cuando el vendor tiene email
+                    // no verificado — el redirect apunta a la página de login con
+                    // ?resend_verification=1 que muestra el mini-form de reenvío.
+                    // Antes el JS solo mostraba el message e ignoraba el redirect,
+                    // rompiendo la UX del fix AUTH-01: el vendor veia el mensaje
+                    // "verifica tu email" pero NO era llevado al form de reenvío.
+                    // Pequeño delay (1.2s) para que el usuario lea el message antes
+                    // del redirect automatico (mismo patron que el branch success).
+                    if (data.data && data.data.redirect) {
+                        var redirectUrl = data.data.redirect;
+                        if (submitBtn) submitBtn.disabled = true;
+                        setTimeout(function () { window.location.href = redirectUrl; }, 1200);
+                    }
                 }
             })
             .catch(function (err) {

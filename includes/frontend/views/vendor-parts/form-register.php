@@ -339,6 +339,12 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             <?php endif; ?>
         </div>
 
+    </form><!-- #ltms-register-form -->
+    <!-- AUTH-RA1 (P1) RE-AUDIT-AUTH FIX: cierre de <form> ausente — el tag <form id="ltms-register-form"> -->
+    <!-- abierto en línea ~53 nunca se cerraba, dejando el footer-auth y el cierre del card dentro -->
+    <!-- del form. Bug HTML: (a) semántica inválida, (b) form.reset() en el JS (línea ~397) -->
+    <!-- resetearía inputs futuros del footer si los tuviera, (c) el wizard step nav (.ltms-wizard-back) -->
+    <!-- quedaba semánticamente dentro del form. -->
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-login-register.js

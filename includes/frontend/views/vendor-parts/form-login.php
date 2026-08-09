@@ -121,7 +121,17 @@ if ( current_user_can( 'manage_options' ) && class_exists( 'LTMS_Google_OAuth' )
     <div id="ltms-login-notice" class="ltms-notice" style="display:none;" role="alert"></div>
 
     <form id="ltms-login-form" class="ltms-auth-form" novalidate>
-        <?php wp_nonce_field( 'ltms_vendor_login', 'ltms_login_nonce' ); ?>
+        <?php
+        // AUTH-RA2 (P2) RE-AUDIT-AUTH FIX: wp_nonce_field('ltms_vendor_login', 'ltms_login_nonce')
+        // eliminado — código muerto. El AJAX handler (ajax_vendor_login) verifica
+        // check_ajax_referer('ltms_auth_nonce', 'nonce') donde el nonce viaja via
+        // wp_localize_script('ltmsAuth', nonce: wp_create_nonce('ltms_auth_nonce'))
+        // desde class-ltms-frontend-assets.php:812 o template-sellers-page.php:40.
+        // El JS (ltms-login-register.js:123) envía ltmsAuth.nonce como campo 'nonce',
+        // NO usa 'ltms_login_nonce' ni el action 'ltms_vendor_login'. M-2 eliminó
+        // el wp_nonce_field en form-register.php pero no aquí, dejando este input
+        // hidden muerto que solo ensuciaba el DOM.
+        ?>
 
         <div class="ltms-form-group">
             <label for="ltms-login-username"><?php esc_html_e( 'Usuario o Email', 'ltms' ); ?></label>
