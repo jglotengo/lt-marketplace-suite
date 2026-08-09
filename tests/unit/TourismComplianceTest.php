@@ -357,12 +357,16 @@ class TourismComplianceTest extends TestCase
         $this->assertStringContainsString('0', $code);
     }
 
-    public function test_save_rnt_return_type_is_bool(): void
+    public function test_save_rnt_return_type_is_int_or_false(): void
     {
+        // CICLO34-P1-TC-005 FIX (H7): save_rnt cambio de bool a int|false para distinguir
+        // 0 filas idempotente (re-guardado con datos identicos) de false-error real de $wpdb.
+        // El hook ltms_save_rnt se dispara en $saved !== false (incluye 0 idempotente) - antes
+        // con (bool) cast el 0 se convertia en false y el hook no se disparaba en re-guardados.
         $ref  = new \ReflectionMethod('LTMS_Business_Tourism_Compliance', 'save_rnt');
         $type = $ref->getReturnType();
         $this->assertNotNull($type);
-        $this->assertSame('bool', (string) $type);
+        $this->assertSame('int|false', (string) $type);
     }
 
     // ════════════════════════════════════════════════════════════════════

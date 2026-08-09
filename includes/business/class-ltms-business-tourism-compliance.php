@@ -85,9 +85,17 @@ class LTMS_Business_Tourism_Compliance {
      *
      * @param int   $vendor_id
      * @param array $data  Keys: rnt_number, rnt_expiry_date, sectur_folio, country_code, sworn_declaration_signed
-     * @return bool
+     * @return int|false Número de filas afectadas (1 = update real, 2 = insert nuevo, 0 = idempotente
+     *                   sin cambios en re-guardado), false en error de $wpdb. El caller debe disparar
+     *                   el hook `ltms_save_rnt` siempre que el retorno NO sea false (incluye 0
+     *                   idempotente = éxito válido para re-verificar RNT contra FONTUR).
+     *                   CICLO34-P1-TC-005 FIX (H7): antes retornaba (bool)$wpdb->update/insert, lo que
+     *                   convertía 0 filas idempotente en false → el do_action('ltms_save_rnt') en
+     *                   ajax_save_rnt NO se disparaba cuando el usuario guardaba exactamente los
+     *                   mismos datos dos veces. La verificación automática RNT/FONTUR era
+     *                   no determinista (dependía de si los datos eran diferentes a los existentes).
      */
-    public static function save_rnt( int $vendor_id, array $data ): bool {
+    public static function save_rnt( int $vendor_id, array $data ): int|false {
         global $wpdb;
 
         $record = self::get_record( $vendor_id );
@@ -104,7 +112,7 @@ class LTMS_Business_Tourism_Compliance {
         ];
 
         if ( $record ) {
-            return (bool) $wpdb->update(
+            return $wpdb->update(
                 $wpdb->prefix . 'lt_tourism_compliance',
                 $payload,
                 [ 'vendor_id' => $vendor_id ],
@@ -115,7 +123,7 @@ class LTMS_Business_Tourism_Compliance {
 
         $payload['vendor_id']  = $vendor_id;
         $payload['created_at'] = current_time( 'mysql' );
-        return (bool) $wpdb->insert( $wpdb->prefix . 'lt_tourism_compliance', $payload );
+        return $wpdb->insert( $wpdb->prefix . 'lt_tourism_compliance', $payload );
     }
 
     /**
@@ -449,7 +457,27 @@ class LTMS_Business_Tourism_Compliance {
             if ( class_exists( 'LTMS_Utils' ) && ! LTMS_Utils::is_ltms_vendor( $vendor_id ) && ! current_user_can( 'manage_options' ) ) {
                 wp_send_json_error( __( 'Acceso denegado.', 'ltms' ) ); return;
             }
-            self::save_rnt( $vendor_id, $data );
+            // CICLO34-P1-TC-004 FIX (H2): disparar `ltms_save_rnt` tras save_rnt exitoso para activar
+            // el listener `auto_verify_rnt_fontur` en class-ltms-tourism-compliance-ext.php:20 (NT-3
+            // verificacion automatica RNT contra FONTUR). Antes de este fix el add_action estaba
+            // registrado pero `do_action('ltms_save_rnt')` JAMAS se llamaba en todo el codebase, así
+            // la verificacion automatica era dead-code-by-design (análogo a AVC-DEADHOOKS C32).
+            // El hook se dispara con (vendor_id, data) para coincidir con la firma del listener
+            // (int $vendor_id, array $data): void. El timeout 30s de query_fontur_rnt + fallback a
+            // pending-manual ya protegen el UX del vendor.
+            // CICLO34-P1-TC-005 FIX (H7): el hook se dispara cuando $saved !== false (incluye 0
+            // filas idempotente = re-guardado con datos idénticos). Antes el check era solo `if ($saved)`
+            // que omitía el disparo en 0-idempotente (caso de usuario que guarda dos veces los mismos
+            // datos → la 2ª vez la verificación automática RNT/FONTUR no se re-ejecutaba). false en
+            // $wpdb->update/insert significa error real de BD, en cuyo caso SÍ queremos omitir el hook
+            // y reportar error al usuario (no marcar success en AJAX si falló la persistencia).
+            $saved = self::save_rnt( $vendor_id, $data );
+            if ( $saved !== false ) {
+                do_action( 'ltms_save_rnt', $vendor_id, $data );
+            } else {
+                wp_send_json_error( __( 'Error al guardar la información. Intenta de nuevo.', 'ltms' ) );
+                return;
+            }
             wp_send_json_success( __( 'Información guardada. Pendiente de verificación por el administrador.', 'ltms' ) );
         } catch ( \Throwable $e ) {
             wp_send_json_error( esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-BIZ-001, P1)

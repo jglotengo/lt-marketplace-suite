@@ -99,9 +99,16 @@ class LTMS_Tourism_Compliance_Ext {
         // (establecida C18, extendida C32 Leccion 32.1 regla #3). La verificacion RNT contra FONTUR
         // determina el compliance legal de vendors turisticos; un MITM podia inyectar response
         // falseada y aprobar un RNT invalido. Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
+        // CICLO34-P1-TC-001 FIX (H1+H3+H4): (H1) agregar wp_remote_retrieve_response_code check antes
+        // de procesar el body - un 404/500/redirect con HTML conteniendo casualmente el RNT podia dar
+        // falso "verificado". Patron canonico: fintech-compliance.php:540 + authorities-compliance.php:638.
+        // (H3) strpos crudo es fragil (falsos positivos cuando RNT aparece en URL/headers/HTML adyacente);
+        // ahora se usa word boundary con delimitadores (\b o comas/espacios/parentesis). (H4) timeout 10
+        // es muy corto - canonico del proyecto es 30s (fintech-compliance:537 / authorities-compliance:623);
+        // portal FONTUR puede ser lento.
         $response = wp_remote_post( $url, [
             'body'    => [ 'rnt' => $rnt_number ],
-            'timeout' => 10,
+            'timeout' => 30,
             'headers' => [ 'User-Agent' => 'LTMS-Tourism-Compliance/1.0' ],
             'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
         ] );
@@ -110,10 +117,17 @@ class LTMS_Tourism_Compliance_Ext {
             return null; // Error de conexión → fallback a manual.
         }
 
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        if ( $code < 200 || $code >= 300 ) {
+            // Cuerpo no legible (404/500/redirect/captcha) → no confiable, fallback a manual.
+            return null;
+        }
+
         $body = wp_remote_retrieve_body( $response );
 
-        // Si la página contiene el número RNT en la respuesta, está registrado.
-        if ( strpos( $body, $rnt_number ) !== false ) {
+        // Si la página contiene el número RNT como token delimitado en la respuesta, está registrado.
+        // H3 FIX: word boundary para evitar falso positivo por aparicion casual en URLs/HTML adyacente.
+        if ( preg_match( '/(?:^|[^\d])' . preg_quote( $rnt_number, '/' ) . '(?:[^\d]|$)/', $body ) ) {
             return true;
         }
 
@@ -291,7 +305,19 @@ class LTMS_Tourism_Compliance_Ext {
             __( "Hola %s,\n\nTu RNT ha sido verificado. Como prestador de servicios turísticos, debes mantener una póliza de Responsabilidad Civil vigente (Resolución FONTUR 0220/2020).\n\nSube tu póliza desde: Panel → Configuración → Turismo → Póliza RC\n\nSin la póliza vigente, tus productos de hospedaje no podrán publicarse.\n\n— Equipo Lo Tengo", 'ltms' ),
             $user->display_name
         );
-        wp_mail( $user->user_email, $subject, $message );
+        // CICLO34-P1-TC-002 FIX (H5): wp_mail retorno NO se verificaba. Si el mail falla (SMTP caido,
+        // dominio bounce, etc.), el vendor nunca sabra que necesita subir póliza RC (NT-5 Res. FONTUR
+        // 0220/2020) y se quedara atascado sin productos publicables sin explicacion. Ahora se loguea
+        // error critical para que el oficial de cumplimiento pueda detectar y reintentar manualmente.
+        $sent = wp_mail( $user->user_email, $subject, $message );
+        if ( ! $sent ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'RC_INSURANCE_REQUEST_MAIL_FAILED',
+                    sprintf( 'Vendor #%d RNT aprobado pero wp_mail fallo al notificar solicitud de póliza RC (NT-5 Res. FONTUR 0220/2020). Official de cumplimiento debe contactar manualmente. Email destino: %s', $vendor_id, $user->user_email )
+                );
+            }
+        }
     }
 
     /**
@@ -323,6 +349,12 @@ class LTMS_Tourism_Compliance_Ext {
      * - Ingresos brutos por servicios turísticos
      * - Ocupación promedio (si aplica)
      * - Procedencia de los turistas (nacional/extranjero)
+     *
+     * CICLO34-P2-TC-003 FIX (H6): aclarar el flujo operacional. FONTUR no publica API oficial
+     * para envio automatico de reportes - este metodo GENERA el reporte y lo guarda en option
+     * `ltms_fontur_report_{periodo}`. La entrega a FONTUR se hace por canal externo (descarga
+     * manual via ajax_generate_fontur_report + entrega humana por email/portal de FONTUR).
+     * El cron `ltms_monthly_cron` agenda la generacion automatica el dia 1 del mes a las 03:30 UTC.
      */
     public static function generate_fontur_report( int $month = 0, int $year = 0 ): array {
         global $wpdb;
