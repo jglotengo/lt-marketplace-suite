@@ -254,11 +254,14 @@ class AuthReAuditFixTest extends LTMS_Unit_Test_Case {
 		// Localizar el bloque del login form submit handler.
 		$start = strpos( $src, "loginForm.addEventListener('submit'" );
 		$this->assertNotFalse( $start, 'El handler de submit del login form debe existir.' );
-		// Buffer 5000 — el handler completo mide ~4700 chars (validación + fetch
-		// + success branch + else branch con el fix AUTH-RA4 que añade ~700 chars
-		// de comentario + guarda + setTimeout). Con 3500 chars el else_body se
-		// cortaba antes del setTimeout/redirect assignment y el test fallaba.
-		$body = substr( $src, $start, 5000 );
+		// Buffer 7000 — el handler creció tras UX-004 (sub-ciclo UX-AUDIT-REGISTER)
+		// que añadió ~1200 chars de comentarios + typeof guard + loginMsg var dentro
+		// del branch else ANTES del setTimeout/redirect AUTH-RA4. Con 5000 chars el
+		// substr del else_body (que empieza en offset ~2838 dentro de $body) se
+		// truncaba a 2162 chars reales (5000-2838) y el redirect AUTH-RA4 que
+		// ahora vive 2221 chars después del else quedaba fuera del buffer.
+		// 7000 cubre con margen amplio (handler completo ~5500 chars).
+		$body = substr( $src, $start, 7000 );
 
 		// El comentario del fix debe estar presente en el branch else.
 		$this->assertStringContainsString( 'AUTH-RA4 (P1) RE-AUDIT-AUTH FIX', $body,
@@ -274,9 +277,12 @@ class AuthReAuditFixTest extends LTMS_Unit_Test_Case {
 		$this->assertLessThan( $else_pos, $success_pos,
 			'El branch success debe ir antes del branch else.' );
 
-		// Tomar el cuerpo del branch else (después de } else { hasta el cierre },
-		// con buffer amplio 2000 para cubrir el fix AUTH-RA4 completo).
-		$else_body = substr( $body, $else_pos, 2000 );
+		// Tomar el cuerpo del branch else (después de } else { hasta el cierre}).
+		// Buffer 2500 — el branch else con los fixes AUTH-RA4 + UX-004 mide
+		// ~2300 chars. Si vuelve a quedarse corto, refactorizar a strpos global
+		// en lugar de substr (ver Leccion 34.2: "coverage gaps del ciclo previo
+		// aparecen en JS/templates").
+		$else_body = substr( $body, $else_pos, 3000 );
 
 		// En el branch else debe haber una guarda data.data.redirect.
 		$this->assertStringContainsString( 'data.data.redirect', $else_body,

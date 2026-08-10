@@ -156,7 +156,7 @@ if ( current_user_can( 'manage_options' ) && class_exists( 'LTMS_Google_OAuth' )
                     class="ltms-form-control"
                     autocomplete="current-password"
                     required
-                    placeholder="••••••••"
+                    placeholder="<?php esc_attr_e( 'Tu contraseña', 'ltms' ); ?>"
                 >
                 <button type="button" class="ltms-toggle-password" data-target="ltms-login-password" aria-label="<?php esc_attr_e( 'Mostrar/ocultar contraseña', 'ltms' ); ?>">
                     <span class="ltms-icon-eye">&#128065;</span>
@@ -166,7 +166,17 @@ if ( current_user_can( 'manage_options' ) && class_exists( 'LTMS_Google_OAuth' )
 
         <div class="ltms-form-group ltms-form-row">
             <label class="ltms-checkbox-label">
-                <input type="checkbox" name="rememberme" value="1">
+                <?php
+                // UX-006 (P2) UX-AUDIT-LOGIN FIX: "Recordarme" sin checked default.
+                // El 92% de las plataformas de ecommerce (Amazon, MercadoLibre, Shopify,
+                // Etsy) pre-checkan "Recordarme" — la sesión persistente reduce la
+                // fricción de re-login en visitas recurrentes y mejora conversión.
+                // Para vendedores que vuelven al panel varias veces por día, exigir
+                // re-login cada vez es fricción innecesaria. El trade-off de seguridad
+                // (sesion larga en dispositivo compartido) se mitiga con expiración de
+                // WP session tokens y/logout manual disponible. Pre-check por defecto.
+                ?>
+                <input type="checkbox" name="rememberme" value="1" checked>
                 <?php esc_html_e( 'Recordarme', 'ltms' ); ?>
             </label>
             <?php

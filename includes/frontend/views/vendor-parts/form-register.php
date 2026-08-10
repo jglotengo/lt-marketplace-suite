@@ -135,35 +135,51 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                  flujo de Compliance RNT/SECTUR. Solo los de 'tourism' crean registro
                  en bkr_lt_tourism_compliance al aprobarse el KYC. -->
             <div class="ltms-form-group">
-                <label><?php esc_html_e( '¿Qué tipo de productos o servicios ofreces? *', 'ltms' ); ?></label>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">
-                    <?php
-                    $business_types = [
-                        'physical'   => [ 'icon' => '📦', 'label' => 'Productos físicos',   'hint' => 'Ropa, electrónica, accesorios…' ],
-                        'digital'    => [ 'icon' => '💻', 'label' => 'Productos digitales',  'hint' => 'Cursos, software, diseños…' ],
-                        'services'   => [ 'icon' => '🛠️', 'label' => 'Servicios',            'hint' => 'Consultoría, reparaciones…' ],
-                        'tourism'    => [ 'icon' => '🏨', 'label' => 'Turismo / Alojamiento','hint' => 'Hoteles, hostales, tours, glamping…' ],
-                        'restaurant' => [ 'icon' => '🍽️', 'label' => 'Restaurante',          'hint' => 'Comida, bebidas, café, pastelería…' ],
-                    ];
-                    foreach ( $business_types as $val => $bt ) :
-                    ?>
-                    <label style="display:flex;flex-direction:column;gap:4px;padding:12px 14px;
-                                  border:1.5px solid #d1d5db;border-radius:10px;cursor:pointer;
-                                  background:#fafafa;transition:all .15s;"
-                           class="ltms-btype-lbl" id="ltms-btype-lbl-<?php echo esc_attr($val); ?>">
-                        <span style="font-size:1.4rem;"><?php echo esc_html($bt['icon']); ?></span>
-                        <span style="font-weight:600;font-size:.875rem;color:#1d2327;">
-                            <?php echo esc_html($bt['label']); ?>
-                        </span>
-                        <span style="font-size:.75rem;color:#6b7280;">
-                            <?php echo esc_html($bt['hint']); ?>
-                        </span>
-                        <input type="radio" name="business_type" value="<?php echo esc_attr($val); ?>"
-                               id="ltms-btype-<?php echo esc_attr($val); ?>"
-                               style="position:absolute;opacity:0;pointer-events:none;" required>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
+                <?php
+                // UX-003 (P2) UX-AUDIT-REGISTER FIX: los radios de business_type
+                // estaban sueltos dentro de un <div> sin agrupación semántica. Los
+                // screen readers (NVDA, JAWS, VoiceOver) anuncian grupos de radio
+                // por su <legend> dentro de un <fieldset> — sin esto, un usuario
+                // de lector de pantalla oye "radio, Productos físicos; radio,
+                // Productivos digitales; ..." sin contexto de que todos pertenecen
+                // a la misma pregunta "¿Qué tipo de productos ofreces?". WCAG 2.1
+                // SC 1.3.1 (Info and Relationships) requiere esta agrupación.
+                ?>
+                <fieldset class="ltms-btype-fieldset" style="border:0;padding:0;margin:0;min-width:0;">
+                    <legend style="font-weight:600;font-size:0.95rem;color:#1d2327;padding:0;margin-bottom:6px;">
+                        <?php esc_html_e( '¿Qué tipo de productos o servicios ofreces? *', 'ltms' ); ?>
+                    </legend>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">
+                        <?php
+                        $business_types = [
+                            'physical'   => [ 'icon' => '📦', 'label' => 'Productos físicos',   'hint' => 'Ropa, electrónica, accesorios…' ],
+                            'digital'    => [ 'icon' => '💻', 'label' => 'Productos digitales',  'hint' => 'Cursos, software, diseños…' ],
+                            'services'   => [ 'icon' => '🛠️', 'label' => 'Servicios',            'hint' => 'Consultoría, reparaciones…' ],
+                            'tourism'    => [ 'icon' => '🏨', 'label' => 'Turismo / Alojamiento','hint' => 'Hoteles, hostales, tours, glamping…' ],
+                            'restaurant' => [ 'icon' => '🍽️', 'label' => 'Restaurante',          'hint' => 'Comida, bebidas, café, pastelería…' ],
+                        ];
+                        foreach ( $business_types as $val => $bt ) :
+                        ?>
+                        <label style="display:flex;flex-direction:column;gap:4px;padding:12px 14px;
+                                      border:1.5px solid #d1d5db;border-radius:10px;cursor:pointer;
+                                      background:#fafafa;transition:all .15s;"
+                               class="ltms-btype-lbl" id="ltms-btype-lbl-<?php echo esc_attr($val); ?>">
+                            <span style="font-size:1.4rem;"><?php echo esc_html($bt['icon']); ?></span>
+                            <span style="font-weight:600;font-size:.875rem;color:#1d2327;">
+                                <?php echo esc_html($bt['label']); ?>
+                            </span>
+                            <span style="font-size:.75rem;color:#6b7280;">
+                                <?php echo esc_html($bt['hint']); ?>
+                            </span>
+                            <input type="radio" name="business_type" value="<?php echo esc_attr($val); ?>"
+                                   id="ltms-btype-<?php echo esc_attr($val); ?>"
+                                   class="ltms-btype-radio"
+                                   style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+                                   required>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </fieldset>
                 <small class="ltms-field-hint" style="margin-top:6px;display:block;">
                     <?php esc_html_e( 'Puedes ofrecer más de un tipo — elige el principal. Podrás ajustarlo desde tu panel luego.', 'ltms' ); ?>
                 </small>
@@ -267,7 +283,7 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             <div class="ltms-form-group">
                 <label for="ltms-reg-password"><?php esc_html_e( 'Contraseña *', 'ltms' ); ?></label>
                 <div class="ltms-input-group">
-                    <input type="password" id="ltms-reg-password" name="password" class="ltms-form-control" required minlength="8" placeholder="••••••••">
+                    <input type="password" id="ltms-reg-password" name="password" class="ltms-form-control" required minlength="8" placeholder="<?php esc_attr_e( 'Mínimo 8 caracteres, 1 mayúscula y 1 número', 'ltms' ); ?>">
                     <button type="button" class="ltms-toggle-password" data-target="ltms-reg-password" aria-label="<?php esc_attr_e( 'Mostrar contraseña', 'ltms' ); ?>">&#128065;</button>
                 </div>
                 <div class="ltms-password-strength" id="ltms-password-strength">
@@ -280,7 +296,7 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             <div class="ltms-form-group">
                 <label for="ltms-reg-password-confirm"><?php esc_html_e( 'Confirmar Contraseña *', 'ltms' ); ?></label>
                 <div class="ltms-input-group">
-                    <input type="password" id="ltms-reg-password-confirm" name="password_confirm" class="ltms-form-control" required placeholder="••••••••">
+                    <input type="password" id="ltms-reg-password-confirm" name="password_confirm" class="ltms-form-control" required placeholder="<?php esc_attr_e( 'Repite tu contraseña', 'ltms' ); ?>">
                     <button type="button" class="ltms-toggle-password" data-target="ltms-reg-password-confirm" aria-label="<?php esc_attr_e( 'Mostrar contraseña', 'ltms' ); ?>">&#128065;</button>
                 </div>
             </div>
@@ -291,11 +307,17 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                     <?php
                     $terms_url   = get_permalink( get_option( 'ltms_terms_page_id' ) ) ?: '#';
                     $privacy_url = get_permalink( get_option( 'ltms_privacy_page_id' ) ) ?: '#';
+                    // UX-008 (P2) UX-AUDIT-REGISTER FIX: rel="noopener noreferrer" en
+                    // los links de Términos y Privacidad. Antes solo target="_blank"
+                    // sin rel — vulnerabilidad de reverse tabnabbing (la página abierta
+                    // puede hacer window.opener.location = phishing.com) y UX abrupta.
+                    // noopener previene el acceso a window.opener, noreferrer evita que
+                    // la página destino sepa el referer (privacidad del usuario).
                     printf(
                         esc_html__( 'Acepto los %1$sTérminos y Condiciones%2$s y la %3$sPolítica de Privacidad%4$s *', 'ltms' ),
-                        '<a href="' . esc_url( $terms_url ) . '" target="_blank">',
+                        '<a href="' . esc_url( $terms_url ) . '" target="_blank" rel="noopener noreferrer">',
                         '</a>',
-                        '<a href="' . esc_url( $privacy_url ) . '" target="_blank">',
+                        '<a href="' . esc_url( $privacy_url ) . '" target="_blank" rel="noopener noreferrer">',
                         '</a>'
                     );
                     ?>
@@ -309,7 +331,20 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             <div class="ltms-form-group">
                 <label class="ltms-checkbox-label">
                     <input type="checkbox" name="accept_sagrilaft" value="1" required>
-                    <?php esc_html_e( 'Autorizo el tratamiento de mis datos para cumplimiento de la Ley SAGRILAFT (Ley 526 de 1999) *', 'ltms' ); ?>
+                    <?php
+                    // UX-009 (P2) UX-AUDIT-REGISTER FIX: 'Autorizo SAGRILAFT' label
+                    // ambiguo — usuarios no saben qué es SAGRILAFT ni qué autorizan.
+                    // Ahora el label explica brevemente (prevención de lavado de
+                    // activas, Ley 526/1999) y linka la fuente oficial de la ley
+                    // para crear confianza y reducir la fricción del opt-in ciego.
+                    // Rel="noopener noreferrer" por consistencia con UX-008.
+                    $sagrilaft_law_url = 'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=4282';
+                    printf(
+                        esc_html__( 'Autorizo el tratamiento de mis datos para prevención de lavado de activos (SAGRILAFT, %1$sLey 526 de 1999%2$s) *', 'ltms' ),
+                        '<a href="' . esc_url( $sagrilaft_law_url ) . '" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;">',
+                        '</a>'
+                    );
+                    ?>
                 </label>
             </div>
             <?php endif; ?>

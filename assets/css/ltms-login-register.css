@@ -559,6 +559,30 @@
     color: #6d28d9 !important;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   UX-005 (P2) UX-AUDIT-REGISTER FIX: focus visible para keyboard users.
+   Antes los radios tenían opacity:0 + pointer-events:none, lo que los
+   hacía invisibles al focus del teclado — un usuario que navega con Tab
+   no veía qué opción estaba focusada. Cambiado a sr-only pattern (clip
+   rect) que mantiene el focus accesible. :focus-within en el label
+   aplica el mismo highlight visual que :checked, dando feedback claro
+   de qué opción tiene el foco del teclado. WCAG 2.1 SC 2.4.7 (Focus
+   Visible). :has() y :focus-within cubren browsers modernos; para
+   legacy, el JS ya agrega .ltms-btype-selected que combinamos aquí.
+   ════════════════════════════════════════════════════════════════ */
+.ltms-btype-lbl:has(input:focus-visible) {
+    border-color: #6d28d9 !important;
+    box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.35) !important;
+    outline: 2px solid #6d28d9;
+    outline-offset: 2px;
+}
+.ltms-btype-lbl:focus-within {
+    border-color: #6d28d9 !important;
+    box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.35) !important;
+    outline: 2px solid #6d28d9;
+    outline-offset: 2px;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    v2.9.272 FIXES — UX audit login/registro/panel
    ═══════════════════════════════════════════════════════════════ */

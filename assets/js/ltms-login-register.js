@@ -139,8 +139,23 @@
                         setTimeout(function () { window.location.href = data.data.redirect; }, 1000);
                     }
                 } else {
-                    var msg = data.data && data.data.message ? data.data.message : 'Usuario o contraseña incorrectos.';
-                    showLoginNotice(msg, 'error');
+                    // UX-004 (P2) UX-AUDIT-LOGIN FIX: el backend de login retorna
+                    // data.data como string en varios casos: credenciales inválidas
+                    // ("Usuario o contraseña incorrectos."), campos vacíos
+                    // ("Usuario y contraseña son requeridos."), rate limit 429, etc.
+                    // El ternario data.data.message accedía a .message de un string
+                    // (=> undefined) y caía al fallback genérico, OCULTANDO el mensaje
+                    // real del server. Ahora detectamos string-vs-object para extraer
+                    // el mensaje correcto en ambos formatos.
+                    var loginMsg = 'Usuario o contraseña incorrectos.';
+                    if (data.data) {
+                        if (typeof data.data === 'string') {
+                            loginMsg = data.data;
+                        } else if (data.data.message) {
+                            loginMsg = data.data.message;
+                        }
+                    }
+                    showLoginNotice(loginMsg, 'error');
                     // AUTH-RA4 (P1) RE-AUDIT-AUTH FIX: seguir data.data.redirect en
                     // branch error. El backend (ajax_vendor_login, AUTH-01) retorna
                     // HTTP 403 con message + redirect cuando el vendor tiene email
@@ -151,7 +166,7 @@
                     // "verifica tu email" pero NO era llevado al form de reenvío.
                     // Pequeño delay (1.2s) para que el usuario lea el message antes
                     // del redirect automatico (mismo patron que el branch success).
-                    if (data.data && data.data.redirect) {
+                    if (data.data && typeof data.data === 'object' && data.data.redirect) {
                         var redirectUrl = data.data.redirect;
                         if (submitBtn) submitBtn.disabled = true;
                         setTimeout(function () { window.location.href = redirectUrl; }, 1200);
@@ -407,6 +422,19 @@
                     // Auto-login — redirect to dashboard
                     showNotice('<strong>¡Cuenta creada!</strong> Redirigiendo a tu panel…', 'success');
                     setTimeout(function () { window.location.href = data.data.redirect; }, 1500);
+                } else if (data.data && data.data.message && !data.data.email_verification_required) {
+                    // UX-001 (P1) UX-AUDIT-REGISTER FIX: el backend retorna success:true
+                    // con message + redirect:"" cuando el email YA EXISTE (línea 574 de
+                    // class-ltms-public-auth-handler.php). Antes este flujo caía al
+                    // else genérico abajo y mostraba "¡Cuenta creada! Revisa tu email",
+                    // message incoherente — el server dice "ya existe cuenta" pero el
+                    // JS decía "cuenta creada", confundiendo al usuario legítimo que
+                    // intentaba registrarse 2 veces. Ahora respetamos el message real
+                    // del server (info, no success) y NO reseteamos el form (el usuario
+                    // podría querer corregir el email e intentar de nuevo). El backend
+                    // ya envía correo con link de login al email existente (línea 564).
+                    // No hay redirect automático — el usuario decide: ir al login manual.
+                    showNotice('<strong>' + data.data.message + '</strong>', 'info');
                 } else {
                     showNotice('<strong>¡Cuenta creada!</strong> Revisa tu email para verificar tu cuenta.', 'success');
                     form.reset();
@@ -414,7 +442,28 @@
                 }
             } else {
                 // Server returned errors
-                var errorMsg = data.data && data.data.message ? data.data.message : 'Error al registrar. Intenta de nuevo.';
+                // UX-004 (P2) UX-AUDIT-LOGIN FIX: el backend a veces retorna data
+                // como string directo (ej: login inválido → "Usuario o contraseña
+                // incorrectos.", rate limit 429 → "Demasiados registros...") y a
+                // veces como objeto con .message (errores estructurados con errors[]).
+                // Antes el ternario data.data.message fallaba cuando data.data era
+                // string (accedia a .message de un string => undefined) y caía al
+                // fallback genérico "Error al registrar", ocultando el mensaje real.
+                // UX-002 (P1) UX-AUDIT-REGISTER FIX: el rate limit de registro
+                // (class-ltms-public-auth-handler.php:462) viaja como
+                // wp_send_json_error($string, 429) → data.data es string. fetch()
+                // NO rechaza la promise con 429 (solo rechaza errores de red), así
+                // que el flujo cae aquí. Antes mostraba "Error al registrar. Intenta
+                // de nuevo." (genérico). Ahora extraemos el mensaje real del server.
+                var serverMsg = 'Error al registrar. Intenta de nuevo.';
+                if (data.data) {
+                    if (typeof data.data === 'string') {
+                        serverMsg = data.data;
+                    } else if (data.data.message) {
+                        serverMsg = data.data.message;
+                    }
+                }
+                var errorMsg = serverMsg;
                 if (data.data && data.data.errors && data.data.errors.length) {
                     errorMsg += '<br>• ' + data.data.errors.map(function (e) { return e.message; }).join('<br>• ');
                 }
