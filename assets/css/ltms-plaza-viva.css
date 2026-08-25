@@ -123,6 +123,11 @@
 .pv-btn--accent:hover{background:#098a6b;}
 .pv-btn--gold{background:var(--gold);color:#3a2a08;}
 .pv-btn--gold:hover{background:#c29648;}
+/* AUDIT-FE-UIUX2-D01 FIX: variante ghost para fondos oscuros/gradiente.
+   El hero del storefront del vendedor ya usaba .pv-btn--invert en el markup
+   pero la clase no existía — CTAs sin contraste sobre el hero azul. */
+.pv-btn--invert{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.38);}
+.pv-btn--invert:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.6);color:#fff;box-shadow:none;}
 .pv-btn--danger{background:var(--danger);color:#fff;}
 .pv-btn--danger:hover{background:#cf3a3f;}
 .pv-btn--brand{background:var(--brand);color:#fff;}
@@ -1147,4 +1152,208 @@ li.product.pv-enhanced:hover {
 .pv-card-fav:hover {
     transform: scale(1.1) !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   21. VENDOR STOREFRONT — capa de página (.pv-vendor-store)
+   AUDIT-FE-UIUX2-D01 FIX (Ciclo 2, P0): el markup de vendor-store.php emitía
+   la capa BEM .pv-vendor-store__* SIN NINGUNA regla CSS en el repo — hero,
+   stats, panels, reseñas y paginación renderizaban sin layout. Esta sección
+   define la capa de página con tokens del sistema; los componentes compartidos
+   (pv-btn/card/badge/tabs/stars) ya existían y NO se duplican.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pv-scope.pv-vendor-store .pv-vendor-store__hero-wrap{padding-top:24px;padding-bottom:0;}
+.pv-scope.pv-vendor-store .pv-vendor-store__hero{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--primary) 0%,var(--primary-700) 100%);
+  border-radius:var(--r-card);padding:32px 36px 0;
+  box-shadow:var(--sh-3);color:#fff;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__hero-glow{
+  position:absolute;top:-80px;right:-60px;width:320px;height:320px;
+  background:radial-gradient(circle,rgba(212,168,87,.35) 0%,transparent 65%);
+  pointer-events:none;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__hero-inner{
+  position:relative;display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  padding-bottom:26px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__avatar{
+  position:relative;width:96px;height:96px;flex-shrink:0;
+  border-radius:50%;overflow:hidden;
+  border:3px solid rgba(255,255,255,.35);box-shadow:var(--sh-2);
+  background:var(--surface);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__avatar.is-star{border-color:var(--gold);}
+.pv-scope.pv-vendor-store .pv-vendor-store__avatar img{width:100%;height:100%;object-fit:cover;}
+.pv-scope.pv-vendor-store .pv-vendor-store__star{
+  position:absolute;bottom:-2px;right:-2px;width:30px;height:30px;
+  border-radius:50%;background:var(--gold);color:#3a2a08;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--primary-700);box-shadow:var(--sh-1);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__hero-meta{
+  display:flex;flex-direction:column;gap:8px;min-width:0;flex:1;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__badges{display:flex;gap:8px;flex-wrap:wrap;}
+.pv-scope.pv-vendor-store .pv-vendor-store__title{
+  font-family:var(--display);font-weight:800;font-size:28px;line-height:1.15;
+  color:#fff;margin:0;overflow-wrap:anywhere;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__handle{
+  font-family:var(--mono);font-size:13px;color:rgba(255,255,255,.72);margin:0;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__hero-actions{
+  display:flex;gap:10px;flex-wrap:wrap;margin-left:auto;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__stats{
+  position:relative;display:grid;grid-template-columns:repeat(4,1fr);
+  margin:0;padding:18px 0 22px;
+  border-top:1px solid rgba(255,255,255,.18);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__stat{
+  display:flex;flex-direction:column;gap:3px;padding:0 18px;
+  border-left:1px solid rgba(255,255,255,.14);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__stat:first-child{border-left:none;padding-left:0;}
+.pv-scope.pv-vendor-store .pv-vendor-store__stat dt{
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:rgba(255,255,255,.66);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__stat dd{
+  font-family:var(--display);font-weight:800;font-size:22px;color:#fff;margin:0;
+  display:flex;align-items:center;gap:8px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__stat .pv-stars{font-size:13px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__rating-num{font-size:22px;}
+
+.pv-scope.pv-vendor-store .pv-vendor-store__tabs-wrap{padding-top:28px;padding-bottom:40px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__panel{min-height:200px;}
+
+/* Reseñas */
+.pv-scope.pv-vendor-store .pv-vendor-store__reviews-head{
+  display:flex;justify-content:flex-end;margin-bottom:14px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__reviews-summary{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);
+  padding:8px 18px;box-shadow:var(--sh-1);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__reviews-big{
+  font-family:var(--display);font-weight:800;font-size:22px;color:var(--text);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__reviews-count{font-size:13px;font-weight:600;color:var(--text-2);}
+.pv-scope.pv-vendor-store .pv-vendor-store__reviews{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:14px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review{padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-head{display:flex;align-items:center;gap:10px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-avatar{
+  width:36px;height:36px;flex-shrink:0;border-radius:50%;
+  background:var(--bg-2);color:var(--text-2);
+  font-family:var(--display);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-author{
+  font-family:var(--display);font-weight:600;font-size:13.5px;color:var(--text);
+  display:block;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-head time{
+  margin-left:auto;font-size:12px;color:var(--text-3);flex-shrink:0;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-text{
+  margin:0;font-size:14px;line-height:1.55;color:var(--text-2);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-product{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);
+  font-size:13px;font-weight:600;color:var(--text);
+  transition:border-color var(--t),background var(--t);
+  align-self:flex-start;max-width:100%;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-product:hover{border-color:var(--primary-100);background:var(--primary-50);}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-product img{width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-product span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Sobre nosotros + Políticas */
+.pv-scope.pv-vendor-store .pv-vendor-store__about,
+.pv-scope.pv-vendor-store .pv-vendor-store__policies{padding:26px 28px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-title,
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-title{
+  font-family:var(--display);font-weight:800;font-size:20px;color:var(--text);margin:0 0 12px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-text,
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-text{
+  font-size:14.5px;line-height:1.65;color:var(--text-2);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-text p{margin:0 0 10px;}
+.pv-scope.pv-vendor-store .pv-text-muted{color:var(--text-3);font-style:italic;}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-meta{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:0 28px;
+  margin:18px 0 0;padding:0;list-style:none;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-meta li{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 0;border-bottom:1px dashed var(--border);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-meta-label{font-size:13px;color:var(--text-3);}
+.pv-scope.pv-vendor-store .pv-vendor-store__about-meta-value{font-size:13.5px;font-weight:600;color:var(--text);text-align:right;}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-default{
+  margin-top:20px;padding:16px 18px;background:var(--bg);border-radius:var(--r-md);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-default h3{
+  font-family:var(--display);font-weight:700;font-size:14.5px;color:var(--text);margin:0 0 10px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-list{
+  display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-list li{display:flex;gap:10px;font-size:13.5px;line-height:1.55;color:var(--text-2);}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-list svg{color:var(--accent);flex-shrink:0;margin-top:1px;}
+.pv-scope.pv-vendor-store .pv-vendor-store__policies-list strong{color:var(--text);}
+
+/* Empty states */
+.pv-scope.pv-vendor-store .pv-vendor-store__empty{
+  padding:52px 28px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__empty-icon{
+  width:76px;height:76px;border-radius:50%;background:var(--bg-2);color:var(--text-3);
+  display:flex;align-items:center;justify-content:center;margin-bottom:10px;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__empty h3{
+  font-family:var(--display);font-weight:700;font-size:17px;color:var(--text);margin:0;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__empty p{
+  font-size:14px;color:var(--text-2);margin:0 0 14px;max-width:440px;line-height:1.55;
+}
+
+/* Paginación */
+.pv-scope.pv-vendor-store .pv-vendor-store__pagination{
+  display:flex;justify-content:center;gap:6px;margin-top:24px;flex-wrap:wrap;
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__pagination .page-numbers{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:40px;height:40px;padding:0 12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);
+  font-size:13.5px;font-weight:600;color:var(--text-2);text-decoration:none;
+  transition:border-color var(--t),background var(--t),color var(--t);
+}
+.pv-scope.pv-vendor-store .pv-vendor-store__pagination .page-numbers:hover{border-color:var(--primary-100);color:var(--primary);}
+.pv-scope.pv-vendor-store .pv-vendor-store__pagination .page-numbers.current{
+  background:var(--primary);border-color:var(--primary);color:#fff;
+}
+
+/* Responsive — breakpoint tablet canónico */
+@media (max-width:760px){
+  .pv-scope.pv-vendor-store .pv-vendor-store__hero{padding:24px 20px 0;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__hero-inner{flex-direction:column;align-items:flex-start;gap:16px;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__hero-actions{margin-left:0;width:100%;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__hero-actions .pv-btn{flex:1;justify-content:center;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__stats{grid-template-columns:repeat(2,1fr);gap:14px 0;padding:14px 0 18px;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__stat:nth-child(odd){border-left:none;padding-left:0;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__stat:nth-child(n+3){border-top:1px solid rgba(255,255,255,.14);padding-top:12px;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__reviews{grid-template-columns:1fr;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__about-meta{grid-template-columns:1fr;}
+  .pv-scope.pv-vendor-store .pv-vendor-store__about,
+  .pv-scope.pv-vendor-store .pv-vendor-store__policies{padding:20px;}
 }

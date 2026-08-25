@@ -845,4 +845,60 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-UIUX2-D03: el outline debe llevar offset'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D01 (P0, vendor-store sin CSS de página): el markup
+	 * emitía la capa BEM .pv-vendor-store__* sin NINGUNA regla en el repo —
+	 * hero, stats, panels, reseñas y paginación renderizaban sin layout.
+	 * Fix: sección 21 en ltms-plaza-viva.css + variante .pv-btn--invert.
+	 */
+	public function test_022_vendor_store_capa_pagina_estilada(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		// (1) Hero con gradiente de tokens.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-vendor-store \.pv-vendor-store__hero\s*\{[^}]*linear-gradient\(135deg,var\(--primary\)[^}]*var\(--primary-700\)/s',
+			$css,
+			'UIUX2-D01 fix: el hero del vendor store debe tener gradiente con tokens'
+		);
+
+		// (2) Stats en grid 4-col con números display.
+		$this->assertMatchesRegularExpression(
+			'/__stats\s*\{[^}]*grid-template-columns:repeat\(4,1fr\)/s',
+			$css,
+			'UIUX2-D01 fix: las stats del vendor deben ir en grid 4 columnas'
+		);
+		$this->assertMatchesRegularExpression(
+			'/__stat dd\s*\{[^}]*var\(--display\)/s',
+			$css,
+			'UIUX2-D01: los números de stats deben usar la fuente display'
+		);
+
+		// (3) Reseñas en grid + paginación con .page-numbers estiladas.
+		$this->assertMatchesRegularExpression(
+			'/__reviews\s*\{[^}]*grid-template-columns:repeat\(2,1fr\)/s',
+			$css,
+			'UIUX2-D01 fix: las reseñas deben ir en grid 2 columnas'
+		);
+		$this->assertMatchesRegularExpression(
+			'/__pagination \.page-numbers\.current\s*\{[^}]*var\(--primary\)/s',
+			$css,
+			'UIUX2-D01 fix: la paginación debe estilar .page-numbers con estado current'
+		);
+
+		// (4) La variante invert existe (CTAs sobre hero oscuro).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-btn--invert\{[^}]*rgba\(255,255,255/',
+			$css,
+			'UIUX2-D01 fix: falta la variante .pv-btn--invert para CTAs sobre fondo oscuro'
+		);
+
+		// (5) Traza del fix.
+		$this->assertStringContainsString(
+			'AUDIT-FE-UIUX2-D01',
+			$css,
+			'UIUX2-D01: ltms-plaza-viva.css must contain the traceable fix marker'
+		);
+	}
 }
