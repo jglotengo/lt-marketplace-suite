@@ -378,4 +378,70 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-006 fix: cart.php no debe contener style="display:none" inline — usar .d-none'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-007 (P1-5, N+1 reviews en vendor-store): la sección de
+	 * reseñas consultaba las últimas 8 reviews GLOBALES y filtraba por
+	 * vendor en PHP (get_post_field por comentario ≈8 queries) + un
+	 * wc_get_product() por review en el render (~6 queries más). Además el
+	 * query global podía dejar la sección vacía aunque el vendor sí tuviera
+	 * reseñas recientes.
+	 *
+	 * Fix: 1 query SQL con JOIN scopeado a post_author del vendor (rating
+	 * incluido vía LEFT JOIN a commentmeta) + prefetch de productos en una
+	 * sola llamada wc_get_products() → 2 queries totales.
+	 */
+	public function test_009_vendor_reviews_sin_n1_query_scopeado_y_prefetch(): void {
+		$vendor_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/vendor-store.php';
+		$this->assertFileExists( $vendor_path );
+		$src = file_get_contents( $vendor_path );
+
+		// (1) Query SQL directo con prepare, scopeado al post_author del vendor.
+		$this->assertMatchesRegularExpression(
+			'/\$wpdb->prepare\(\s*"[^"]*INNER JOIN \{\$wpdb->posts\}[^"]*p\.post_author = %d/s',
+			$src,
+			'AUDIT-FE-PV-DS-007 fix: las reviews deben consultarse con JOIN scopeado a post_author (un solo query, $wpdb->prepare)'
+		);
+
+		// (2) El rating viene en el mismo query (LEFT JOIN a commentmeta).
+		$this->assertMatchesRegularExpression(
+			'/LEFT JOIN \{\$wpdb->commentmeta\}[^"]*meta_key = .rating./s',
+			$src,
+			'AUDIT-FE-PV-DS-007: el rating debe venir en el mismo query (evita get_comment_meta por review)'
+		);
+
+		// (3) Prefetch de productos reseñados en una sola llamada.
+		$this->assertStringContainsString(
+			'$pv_review_product_ids',
+			$src,
+			'AUDIT-FE-PV-DS-007 fix: debe existir el prefetch $pv_review_product_ids para los productos reseñados'
+		);
+		$this->assertMatchesRegularExpression(
+			'/wc_get_products\(\s*\[\s*[\'"]include[\'"]\s*=>\s*\$pv_review_product_ids/',
+			$src,
+			'AUDIT-FE-PV-DS-007 fix: los productos de las reviews deben precargarse en UNA llamada wc_get_products(include=>...)'
+		);
+
+		// (4) El render ya NO llama wc_get_product() por review.
+		$this->assertStringNotContainsString(
+			'wc_get_product( $pv_r_pid )',
+			$src,
+			'AUDIT-FE-PV-DS-007 regression: el render no debe llamar wc_get_product por review — usar el mapa $pv_review_products'
+		);
+
+		// (5) La ASIGNACIÓN del array muerto sigue eliminada (los comments
+		// de trazabilidad pueden citar el nombre).
+		$this->assertStringNotContainsString(
+			'$pv_reviews_args = [',
+			$src,
+			'AUDIT-FE-PV-DS-007: el array muerto pv_reviews_args no debe reintroducirse'
+		);
+
+		// (6) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-PV-DS-007',
+			$src,
+			'AUDIT-FE-PV-DS-007: vendor-store.php must contain the traceable fix marker'
+		);
+	}
 }

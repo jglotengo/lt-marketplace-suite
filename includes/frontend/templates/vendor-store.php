@@ -151,34 +151,48 @@ $pv_max_pages    = is_object( $pv_products_q ) && property_exists( $pv_products_
 
 /* ---------------------------------------------------------------------------
  * 5. Reseñas del vendor (últimas 6 comentarios tipo "review" en sus productos)
+ *
+ * AUDIT-FE-PV-DS-007 FIX (P1-5, N+1): antes se consultaban las últimas 8
+ * reviews GLOBALES (no scopeadas al vendor) y se filtraban en PHP con
+ * get_post_field() por comentario (~8 queries) + wc_get_product() por review
+ * en el render (~6 más). El filtro global además podía dejar la sección
+ * vacía aunque el vendor sí tuviera reseñas recientes. También había un
+ * array $pv_reviews_args muerto que nadie consumía (eliminado).
+ *
+ * Ahora: UN query SQL con JOIN que filtra por post_author del vendor
+ * (LIMIT 6 exacto, rating traído en el mismo query vía LEFT JOIN a
+ * commentmeta) + prefetch de los productos reseñados en UNA llamada
+ * wc_get_products(). Total: 2 queries en lugar de ~15.
  * ------------------------------------------------------------------------- */
-$pv_reviews_args = [
-    'status'     => 'approve',
-    'type'       => 'review',
-    'number'     => 6,
-    'post_status'=> 'publish',
-    'post_type'  => 'product',
-    'author__in' => [ $pv_vendor_id ], // comments on posts authored by vendor.
-    'meta_key'   => 'rating',
-];
-// WP_Comment_Query no soporta author__in directo sobre post_author; lo filtramos vía query.
-$pv_reviews_q = new WP_Comment_Query();
-$pv_reviews   = $pv_reviews_q->query( [
-    'status'  => 'approve',
-    'type'    => 'review',
-    'number'  => 8,
-    'orderby' => 'comment_date',
-    'order'   => 'DESC',
-    'meta_query' => [
-        [ 'key' => 'rating', 'compare' => 'EXISTS' ],
-    ],
-] );
-// Filtrar por author del producto.
-$pv_reviews = array_filter( (array) $pv_reviews, function ( $c ) use ( $pv_vendor_id ) {
-    $pid = $c->comment_post_ID ?? 0;
-    return $pid > 0 && (int) get_post_field( 'post_author', $pid ) === $pv_vendor_id;
-} );
-$pv_reviews = array_slice( $pv_reviews, 0, 6 );
+global $wpdb;
+$pv_reviews = $wpdb->get_results( $wpdb->prepare(
+    "SELECT c.*, cm.meta_value AS rating
+     FROM {$wpdb->comments} AS c
+     INNER JOIN {$wpdb->posts} AS p ON p.ID = c.comment_post_ID
+     LEFT JOIN {$wpdb->commentmeta} AS cm ON cm.comment_id = c.comment_ID AND cm.meta_key = 'rating'
+     WHERE c.comment_type = 'review'
+       AND c.comment_approved = '1'
+       AND p.post_status = 'publish'
+       AND p.post_type = 'product'
+       AND p.post_author = %d
+     ORDER BY c.comment_date DESC
+     LIMIT 6",
+    $pv_vendor_id
+) );
+
+// Prefetch de los productos reseñados en una sola llamada (evita N+1 en render).
+$pv_review_product_ids = array_values( array_unique( array_filter( array_map( static function ( $c ) {
+    return (int) ( $c->comment_post_ID ?? 0 );
+}, (array) $pv_reviews ) ) ) );
+$pv_review_products = [];
+if ( ! empty( $pv_review_product_ids ) && function_exists( 'wc_get_products' ) ) {
+    foreach ( (array) wc_get_products( [
+        'include' => $pv_review_product_ids,
+        'limit'   => count( $pv_review_product_ids ),
+    ] ) as $pv_rp ) {
+        $pv_review_products[ $pv_rp->get_id() ] = $pv_rp;
+    }
+}
 
 /* ---------------------------------------------------------------------------
  * 6. URLs de acción
@@ -475,9 +489,11 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
             <?php if ( ! empty( $pv_reviews ) ) : ?>
                 <ul class="pv-vendor-store__reviews">
                     <?php foreach ( $pv_reviews as $pv_r ) :
-                        $pv_r_rating = (int) get_comment_meta( $pv_r->comment_ID, 'rating', true );
-                        $pv_r_pid    = (int) $pv_r->comment_post_ID;
-                        $pv_r_product = $pv_r_pid > 0 ? wc_get_product( $pv_r_pid ) : null;
+                        // AUDIT-FE-PV-DS-007: rating viene en el query JOIN y el
+                        // producto del prefetch map — cero queries por review.
+                        $pv_r_rating  = isset( $pv_r->rating ) ? (int) $pv_r->rating : 0;
+                        $pv_r_pid     = (int) $pv_r->comment_post_ID;
+                        $pv_r_product = isset( $pv_review_products[ $pv_r_pid ] ) ? $pv_review_products[ $pv_r_pid ] : null;
                         ?>
                         <li class="pv-card pv-vendor-store__review">
                             <div class="pv-vendor-store__review-head">
