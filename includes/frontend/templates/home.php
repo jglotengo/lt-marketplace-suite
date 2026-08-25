@@ -903,7 +903,10 @@ do_action( 'ltms_after_home_plazaviva' );
     margin-top:56px;background:var(--surface);border-top:1px solid var(--border);
 }
 .pv-scope.pv-home .pv-home-footer__inner{
-    display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;
+    /* AUDIT-FE-PV-DS-016 FIX (P2-4): 2fr apretaba las 3 columnas de enlaces
+       en 1100-1400px — 1.6fr da breathing room a los links sin vaciar la
+       columna de marca. */
+    display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;
     padding-top:48px;padding-bottom:40px;
 }
 .pv-scope.pv-home .pv-home-footer__logo{
