@@ -873,6 +873,11 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
     .pv-scope.pv-product-page .pv-bundle{padding:16px;}
     .pv-scope.pv-product-page .pv-bundle__footer{flex-direction:column;align-items:stretch;}
     .pv-scope.pv-product-page .pv-bundle__footer .pv-btn{width:100%;}
+}
+/* AUDIT-FE-PV-DS-010 FIX (P1-8): related products mantiene 2 columnas hasta
+   el breakpoint chico canónico del sistema (400px, paridad WoodMart ~400px).
+   Antes colapsaba a 1 col en <560px desperdiciando ancho en móviles grandes. */
+@media (max-width:400px){
     .pv-scope.pv-product-page .pv-related ul.products{grid-template-columns:1fr;}
 }
 </style>

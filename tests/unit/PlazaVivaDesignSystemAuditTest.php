@@ -539,4 +539,35 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-009: ltms-plaza-viva.js must contain the traceable fix marker'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-010 (P1-8, related products 1-col demasiado pronto):
+	 * single-product.php colapsaba related a 1 columna en <560px; WoodMart
+	 * mantiene 2 cols hasta ~400px. Fix: el colapso vive en su propio
+	 * @media (max-width:400px) — breakpoint chico canónico del sistema.
+	 */
+	public function test_012_related_products_dos_columnas_hasta_400px(): void {
+		$this->assertFileExists( $this->product_template_path );
+		$tpl = file_get_contents( $this->product_template_path );
+
+		// (1) El bloque 560px ya NO contiene el colapso de related a 1fr
+		// (ventana corta: la regla vieja vivía a ~200 chars del @media).
+		$this->assertDoesNotMatchRegularExpression(
+			'/max-width:560px[\s\S]{0,260}?pv-related ul\.products\{grid-template-columns:1fr\}/',
+			$tpl,
+			'AUDIT-FE-PV-DS-010 fix: related no debe colapsar a 1 columna en el breakpoint 560px'
+		);
+		$this->assertMatchesRegularExpression(
+			'/max-width:980px[\s\S]{0,400}?pv-related ul\.products\{grid-template-columns:repeat\(2,1fr\);?\}/',
+			$tpl,
+			'AUDIT-FE-PV-DS-010: entre 400-980px related debe mantener 2 columnas'
+		);
+
+		// (2) Existe un @media 400px con el colapso a 1 columna.
+		$this->assertMatchesRegularExpression(
+			'/max-width:400px[\s\S]{0,120}?pv-related ul\.products\{grid-template-columns:1fr;?\}\s*\}/',
+			$tpl,
+			'AUDIT-FE-PV-DS-010 fix: el colapso a 1 col de related debe vivir en max-width:400px'
+		);
+	}
 }
