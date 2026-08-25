@@ -1039,4 +1039,40 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D06 regression: no deben quedar touch targets de 42px en checkout'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D07 (P1, prefers-reduced-motion): el hallazgo reportaba
+	 * ausencia de kill-switch en checkout.css y en el CSS inline de cart.
+	 * Verificación: la cobertura es GLOBAL — plaza-viva.css define el
+	 * kill-switch sobre `.pv-scope *` con !important (sección 8), se encola
+	 * sin guard de página (class-ltms-native-templates.php:77) y checkout/
+	 * cart renderizan bajo `.pv-scope`. Este test congela esa cobertura:
+	 * si alguien vuelve el enqueue condicional o mueve el kill-switch, falla.
+	 */
+	public function test_026_reduced_motion_cobertura_global(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		// (1) Kill-switch global presente con !important.
+		$this->assertMatchesRegularExpression(
+			'/@media \(prefers-reduced-motion:reduce\)\s*\{\s*\.pv-scope \*,\.pv-scope \*::before,\.pv-scope \*::after\s*\{[^}]*animation-duration:\.001ms !important/s',
+			$css,
+			'UIUX2-D07: el kill-switch reduced-motion global (.pv-scope *) debe permanecer en plaza-viva.css'
+		);
+
+		// (2) Los templates de checkout/cart renderizan bajo .pv-scope
+		// (requisito para heredar el kill-switch).
+		$cko_tpl = dirname( __DIR__, 2 ) . '/includes/frontend/templates/checkout.php';
+		$cart_tpl = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		$this->assertStringContainsString( 'pv-scope pv-checkout', file_get_contents( $cko_tpl ), 'UIUX2-D07: checkout debe renderizar bajo .pv-scope' );
+		$this->assertStringContainsString( 'pv-scope pv-cart', file_get_contents( $cart_tpl ), 'UIUX2-D07: cart debe renderizar bajo .pv-scope' );
+
+		// (3) El enqueue del design system es global (sin guard de página).
+		$native = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php' );
+		$this->assertMatchesRegularExpression(
+			"/add_action\( 'wp_enqueue_scripts', \[ __CLASS__, 'enqueue_assets' \], 20 \)/",
+			$native,
+			'UIUX2-D07: enqueue_assets debe seguir global (el kill-switch reduced-motion y todo el design system dependen de ello)'
+		);
+	}
 }
