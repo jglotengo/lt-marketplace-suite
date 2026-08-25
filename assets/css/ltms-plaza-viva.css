@@ -980,7 +980,11 @@
 }
 
 /* ── RESPONSIVE: Shop sidebar mobile ─────────────────────────────────────── */
-@media (max-width: 768px) {
+/* AUDIT-FE-PV-DS-004 FIX (P1-2): breakpoint alineado al sistema canónico
+   1100/760/400 (ver @media en líneas ~770-803). El 768px era un leak
+   Tailwind-style de la sección shop v2.9.191 — dejaba una ventana de 8px
+   (761-768px) donde el sidebar se comportaba distinto al resto del sistema. */
+@media (max-width: 760px) {
     .pv-shop .pv-shop-sidebar,
     .pv-shop .pv-shop__sidebar {
         position: static !important;

@@ -278,4 +278,38 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-003: el loop debe setear el global $product antes de wc_get_template_part (content-product.php lo consume)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-004 (P1-2, breakpoints canónicos): el design system
+	 * Plaza Viva usa breakpoints canónicos 1100/760/400px (ver @media del
+	 * bloque responsive compartido). La sección shop v2.9.191 introdujo un
+	 * `max-width: 768px` Tailwind-style que dejaba una ventana de 8px
+	 * (761-768px) donde el sidebar de shop se comportaba distinto al resto
+	 * del sistema.
+	 *
+	 * Este test garantiza que el archivo NO vuelva a acumular breakpoints
+	 * fuera del sistema canónico.
+	 */
+	public function test_006_breakpoints_canonicos_sin_leaks_768(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		$this->assertStringNotContainsString(
+			'max-width: 768px',
+			$css,
+			'AUDIT-FE-PV-DS-004 fix: ltms-plaza-viva.css no debe contener max-width:768px — usar el breakpoint canónico 760px'
+		);
+		$this->assertStringNotContainsString(
+			'max-width:768px',
+			$css,
+			'AUDIT-FE-PV-DS-004 fix: ltms-plaza-viva.css no debe contener max-width:768px (variación sin espacio) — usar 760px'
+		);
+
+		// El breakpoint canónico del sidebar shop sigue presente.
+		$this->assertMatchesRegularExpression(
+			'/@media \(max-width:\s?760px\)\s?\{[^}]*pv-shop-sidebar/s',
+			$css,
+			'AUDIT-FE-PV-DS-004: la regla mobile del pv-shop-sidebar debe existir bajo el breakpoint canónico 760px'
+		);
+	}
 }
