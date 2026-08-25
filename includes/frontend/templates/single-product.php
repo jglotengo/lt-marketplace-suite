@@ -754,6 +754,11 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 ?>
 <style>
 .pv-scope.pv-product-page{--pv-pg-gap:32px;display:block;}
+/* AUDIT-FE-PV-DS-017 FIX (P2-5): breathing room del layout en desktop
+   grande — WoodMart usa ~48px; en ≥1280px el gap de 32px se sentía justo. */
+@media (min-width:1280px){
+    .pv-scope.pv-product-page{--pv-pg-gap:48px;}
+}
 .pv-scope.pv-product-page .pv-product-page__breadcrumb{padding-top:10px;padding-bottom:0;}
 .pv-scope.pv-product-page .pv-product-page__main{display:block;}
 .pv-scope.pv-product-page .pv-product-page__layout{

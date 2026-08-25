@@ -756,4 +756,28 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-016 fix: pv-home-footer__inner debe usar grid 1.6fr 1fr 1fr 1fr'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-017 (P2-5, gap del layout producto en desktop grande):
+	 * --pv-pg-gap 32px era justo en ≥1280px. Fix: override a 48px vía
+	 * @media (min-width:1280px).
+	 */
+	public function test_019_product_layout_gap_48px_desktop_grande(): void {
+		$this->assertFileExists( $this->product_template_path );
+		$tpl = file_get_contents( $this->product_template_path );
+
+		// Base sigue en 32px (mobile/tablet/desktop normal).
+		$this->assertStringContainsString(
+			'--pv-pg-gap:32px;',
+			$tpl,
+			'AUDIT-FE-PV-DS-017: la base del gap debe seguir siendo 32px'
+		);
+
+		// Override desktop grande a 48px.
+		$this->assertMatchesRegularExpression(
+			'/min-width:1280px[\s\S]{0,200}?--pv-pg-gap:48px/',
+			$tpl,
+			'AUDIT-FE-PV-DS-017 fix: debe existir @media(min-width:1280px) con --pv-pg-gap:48px'
+		);
+	}
 }
