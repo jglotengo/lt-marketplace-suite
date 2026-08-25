@@ -390,7 +390,9 @@
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .cart-subtotal td,
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total td{font-weight:700;color:var(--text);}
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total td .woocommerce-Price-amount{
-    font-family:var(--display);font-weight:800;font-size:20px;color:var(--primary);
+    /* AUDIT-FE-UIUX2-D13 FIX: el total va SIEMPRE en --brand (paridad con
+       el total del carrito); el azul --primary queda para montos secundarios. */
+    font-family:var(--display);font-weight:800;font-size:20px;color:var(--brand);
 }
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .shipping td{color:var(--accent);font-weight:700;}
 

@@ -1253,4 +1253,19 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D12 fix: billingHeading debe exponerse via wp_localize_script con __()'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D13 (P1, semántica de color del dinero): el total del
+	 * checkout iba en azul --primary mientras el del carrito usa --brand.
+	 * Regla unificada: TOTAL siempre --brand; montos secundarios --primary.
+	 */
+	public function test_034_total_checkout_color_paridad_con_carrito(): void {
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+
+		$this->assertMatchesRegularExpression(
+			'/order-total td \.woocommerce-Price-amount\s*\{[^}]*color:var\(--brand\)/s',
+			$cko_css,
+			'UIUX2-D13 fix: el total del checkout debe usar --brand (paridad con el carrito)'
+		);
+	}
 }
