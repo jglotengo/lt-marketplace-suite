@@ -60,8 +60,11 @@ Builds regenerados (`build:js`, `build:css`); `lint:php/lint:js` verdes.
 #36.2 (ventanas regex `{0,N}` sobre código comentado), #36.3 (deberes simultáneos al migrar inline→design
 system: tests, .min.*, drift ajeno).
 
-**Pendiente del ciclo:** P1-9 (threshold free-shipping multi-moneda — decisión de producto), validación SSH
-en SiteGround antes de push, bump `LTMS_VERSION` al desplegar (cache-busting).
+**Pendiente del ciclo:** ~~P1-9~~ → **cerrado como obsoleto** (decisión de producto 2026-08-25): el umbral
+ya leía `woocommerce_free_shipping_settings` + filtro `ltms_cart_free_shipping_threshold` existentes; la
+limitación multi-moneda (sin conversión con currency switcher cuando moneda activa ≠ base) queda documentada
+como aceptada en `cart.php`. Validación SG ejecutada post-deploy v2.9.312 (pull `b2c12979..b4636e2a`, php -l
+9/9, plugin reload, caches flush, assets 200 con scope TRACKING servido, 0 fatales en logs).
 
 ---
 

@@ -118,6 +118,14 @@ if ( ! empty( $unknown_vendor['items'] ) ) {
 
 /* ---------------------------------------------------------------------------
  * 2. Envío gratis — umbral (woocommerce_free_shipping_settings o 100000 COP).
+ *
+ * AUDIT-FE-PV-DS-CICLO1 — P1-9 CERRADO COMO OBSOLETO (decisión de producto
+ * 2026-08-25): el hallazgo original ("umbral hardcodeado sin válvula") estaba
+ * desactualizado — este bloque ya lee la config WC y expone el filtro
+ * ltms_cart_free_shipping_threshold. Limitación conocida ACEPTADA: si la
+ * moneda activa ≠ moneda base, el umbral NO se convierte con el currency
+ * switcher (la tienda opera single-currency; reabrir solo si se activa
+ * multi-moneda real). Ver CHANGELOG PLAZA-VIVA-DS-AUDIT-CICLO1.
  * ------------------------------------------------------------------------- */
 $free_shipping_threshold = 100000; // Fallback razonable en COP.
 $fs_settings = get_option( 'woocommerce_free_shipping_settings', array() );
