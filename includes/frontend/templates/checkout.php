@@ -145,7 +145,7 @@ get_header( 'shop' );
 
         <!-- Stepper visual (4 pasos) -->
         <ol class="pv-checkout__stepper" role="list" aria-label="<?php esc_attr_e( 'Pasos del checkout', 'ltms' ); ?>">
-            <li class="pv-checkout__stepper-step is-active" data-step="1">
+            <li class="pv-checkout__stepper-step is-active" data-step="1" aria-current="step">
                 <span class="pv-checkout__stepper-num">1</span>
                 <span class="pv-checkout__stepper-label"><?php esc_html_e( 'Contacto', 'ltms' ); ?></span>
             </li>
@@ -410,7 +410,17 @@ get_header( 'shop' );
                                 <?php if ( empty( $available_gateways ) ) : ?>
                                     <div class="pv-checkout__no-payment">
                                         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
-                                        <p><?php esc_html_e( 'No hay métodos de pago configurados. Contacta al administrador.', 'ltms' ); ?></p>
+                                        <!-- AUDIT-FE-UIUX2-D30 FIX (P2): el mensaje sin
+                                             pasarelas era callejón sin salida; ahora
+                                             incluye acción real de contacto. -->
+                                        <p><?php
+                                            $pv_support_email = apply_filters( 'ltms_support_email', get_option( 'admin_email' ) );
+                                            printf(
+                                                /* translators: %s: email de soporte */
+                                                esc_html__( 'No hay métodos de pago configurados todavía. Escríbenos a %s y lo resolvemos enseguida.', 'ltms' ),
+                                                '<a href="mailto:' . esc_attr( $pv_support_email ) . '">' . esc_html( $pv_support_email ) . '</a>'
+                                            );
+                                        ?></p>
                                     </div>
                                 <?php else : ?>
                                     <ul class="pv-payment-options" role="radiogroup" aria-label="<?php esc_attr_e( 'Métodos de pago', 'ltms' ); ?>">

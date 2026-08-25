@@ -1065,7 +1065,9 @@ get_header();
    ========================================================================== */
 @media (max-width:980px){
     .pv-scope.pv-tracking .pv-tracking__layout{grid-template-columns:1fr;gap:18px;}
-    .pv-scope.pv-tracking .pv-tracking__sidebar{position:static;top:auto;order:-1;}
+    /* AUDIT-FE-UIUX2-D25 FIX (P2): sin order:-1 — el timeline (progreso) es
+       el contenido primario; la sidebar ETA/repartidor va después, no antes. */
+    .pv-scope.pv-tracking .pv-tracking__sidebar{position:static;top:auto;}
 }
 @media (max-width:760px){
     .pv-scope.pv-tracking .pv-tracking__header-inner{padding:18px;gap:14px;}

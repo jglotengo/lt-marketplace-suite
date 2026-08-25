@@ -1650,9 +1650,12 @@
             li.classList.toggle('is-done', done);
             if (!done && !activeAssigned) {
               li.classList.add('is-active');
+              // AUDIT-FE-UIUX2-D33 FIX: aria-current sigue al paso activo.
+              li.setAttribute('aria-current', 'step');
               activeAssigned = true;
             } else {
               li.classList.remove('is-active');
+              li.removeAttribute('aria-current');
             }
           });
         }
@@ -2103,17 +2106,16 @@
    * → 0 tras este fix; ver LECCIONES_APRENDIDAS #141: la migración debe
    * ser física, no un comment que lo declare).
    *
-   * Behaviours migrados (3):
-   *   1. Auto-scroll "bounce" del paso activo del timeline via
-   *      IntersectionObserver (threshold .4): anima el icono scale(1.05)
-   *      durante 320ms la primera vez que entra al viewport.
-   *   2. Live refresh (polling 60s) SOLO si current_step < 2 y no hay
+   * Behaviours migrados (2 — AUDIT-FE-UIUX2-D36 FIX retiró el bounce del
+   *   paso activo: doble animación simultánea con el pulse CSS del halo;
+   *   queda solo el pulse):
+   *   1. Live refresh (polling 60s) SOLO si current_step < 2 y no hay
    *      tracking number visible (preserva AUDIT-FE-OT-003 FIX: respeta
    *      modal abierto, <details open>, campos con focus y visibilityState
    *      — no recarga mientras el usuario lee/interactúa). Limitación
    *      técnica documentada como P2-1: sin live refresh cuando el envío
    *      ya avanzó (current_step >= 2).
-   *   3. Smooth scroll al head del accordion al abrir el order summary.
+   *   2. Smooth scroll al head del accordion al abrir el order summary.
    *
    * Los data-attributes que alimenta este scope ya estaban expuestos por
    * el PHP en el wrapper del template (order-tracking.php:358):
@@ -2124,26 +2126,7 @@
       var scope = document.querySelector('.pv-scope.pv-tracking');
       if (!scope) return;
 
-      /* --- 1. Auto-scroll al paso activo del timeline ------------------- */
-      var activeStep = scope.querySelector('.pv-timeline-step--active');
-      if (activeStep && 'IntersectionObserver' in window) {
-        var io = new IntersectionObserver(function (entries) {
-          entries.forEach(function (entry) {
-            if (entry.isIntersecting) {
-              // Pequeña animación de "rebote" al hacer visible.
-              var icon = entry.target.querySelector('.pv-timeline-step__icon');
-              if (icon) {
-                icon.style.transform = 'scale(1.05)';
-                setTimeout(function () { icon.style.transform = ''; }, 320);
-              }
-              io.unobserve(entry.target);
-            }
-          });
-        }, { threshold: .4 });
-        io.observe(activeStep);
-      }
-
-      /* --- 2. Live refresh (polling cada 60s solo si la orden está activa
+      /* --- 1. Live refresh (polling cada 60s solo si la orden está activa
        *        y NO hay datos de envío todavía). Preserva AUDIT-FE-OT-003
        *        FIX: antes se disparaba cada 60s para siempre (las metas
        *        _ltms_driver_* nunca se llenaban → !hasTracking siempre
@@ -2179,7 +2162,7 @@
         }
       }
 
-      /* --- 3. Smooth scroll al top del timeline al abrir order summary -- */
+      /* --- 2. Smooth scroll al top del timeline al abrir order summary -- */
       var summaryToggle = scope.querySelector('.pv-tracking__summary-toggle');
       if (summaryToggle) {
         summaryToggle.addEventListener('toggle', function () {

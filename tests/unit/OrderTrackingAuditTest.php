@@ -437,11 +437,13 @@ final class OrderTrackingAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-OT-005: trackingScope debe inicializarse solo cuando .pv-scope.pv-tracking está presente en el DOM'
 		);
 
-		// (3) Behaviour 1: bounce del paso activo via IntersectionObserver.
-		$this->assertStringContainsString(
-			"querySelector('.pv-timeline-step--active')",
+		// (3) Behaviour 1 (bounce del paso activo) fue RETIRADO por
+		// AUDIT-FE-UIUX2-D36: doble animación simultánea con el pulse CSS
+		// del halo. El timeline-step--active ahora solo lo consume el CSS.
+		$this->assertDoesNotMatchRegularExpression(
+			'/querySelector\(\'.pv-timeline-step--active\'\)/',
 			$js,
-			'AUDIT-FE-OT-005: behaviour 1 (auto-scroll bounce del paso activo) debe leer .pv-timeline-step--active'
+			'AUDIT-FE-UIUX2-D36: el bounce del paso activo no debe volver al scope TRACKING (doble animación con el pulse CSS)'
 		);
 
 		// (4) Behaviour 2: polling lee los data-attributes del wrapper PHP.

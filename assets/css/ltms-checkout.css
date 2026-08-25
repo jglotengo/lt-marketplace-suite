@@ -370,6 +370,8 @@
 .pv-scope.pv-checkout .pv-checkout__review[data-pv-sticky]{
     position:sticky;top:20px;display:flex;flex-direction:column;gap:14px;
 }
+/* AUDIT-FE-UIUX2-D28 FIX (P2): offset bajo admin-bar. */
+body.admin-bar .pv-scope.pv-checkout .pv-checkout__review[data-pv-sticky]{top:52px;}
 .pv-scope.pv-checkout .pv-checkout__review-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .pv-scope.pv-checkout .pv-checkout__review-title{font-family:var(--display);font-weight:800;font-size:18px;}
 .pv-scope.pv-checkout .pv-checkout__review-edit{

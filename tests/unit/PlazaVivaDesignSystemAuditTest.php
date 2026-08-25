@@ -1406,4 +1406,55 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'D37 fix: el CTA buscar del hero help debe ser ghost'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D25/D28/D30/D33/D36 (P2, lote tracking/checkout):
+	 * orden móvil del timeline, offsets admin-bar, mailto sin pasarelas,
+	 * aria-current del stepper y retirada del bounce doble.
+	 */
+	public function test_039_lote_tracking_checkout_ux(): void {
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+		$cko_tpl = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/checkout.php' );
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js' );
+		$cart = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php' );
+
+		// D-25: sin order:-1 en la sidebar móvil del tracking.
+		$this->assertDoesNotMatchRegularExpression(
+			'/__sidebar\{position:static;top:auto;order:-1;\}/',
+			$tracking,
+			'D25 fix: la sidebar no debe anteposerse al timeline en móvil'
+		);
+
+		// D-28: offsets admin-bar en cart y checkout.
+		$this->assertMatchesRegularExpression(
+			'/body\.admin-bar \.pv-scope\.pv-cart \.pv-cart__summary\[data-pv-sticky\]\{top:52px;\}/',
+			$cart,
+			'D28 fix: falta offset admin-bar en el summary del carrito'
+		);
+		$this->assertMatchesRegularExpression(
+			'/body\.admin-bar \.pv-scope\.pv-checkout \.pv-checkout__review\[data-pv-sticky\]\{top:52px;\}/',
+			$cko_css,
+			'D28 fix: falta offset admin-bar en el review del checkout'
+		);
+
+		// D-30: mailto en el mensaje sin pasarelas.
+		$this->assertMatchesRegularExpression(
+			'/No hay métodos de pago configurados todavía[\s\S]{0,200}?mailto:/',
+			$cko_tpl,
+			'D30 fix: el mensaje sin pasarelas debe incluir acción de contacto'
+		);
+
+		// D-33: aria-current en el stepper (PHP default + gestión JS).
+		$this->assertMatchesRegularExpression(
+			'/__stepper-step is-active" data-step="1" aria-current="step"/',
+			$cko_tpl,
+			'D33 fix: el stepper debe marcar aria-current="step" en el paso activo'
+		);
+		$this->assertMatchesRegularExpression(
+			"/setAttribute\('aria-current', 'step'\)/",
+			$js,
+			'D33 fix: refreshStepper debe gestionar aria-current'
+		);
+	}
 }

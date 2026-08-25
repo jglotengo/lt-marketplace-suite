@@ -837,6 +837,9 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
     position:sticky;top:20px;
     display:flex;flex-direction:column;gap:16px;
 }
+/* AUDIT-FE-UIUX2-D28 FIX (P2): con admin-bar activa el sticky quedaba
+   parcialmente tapado (barra 32px). */
+body.admin-bar .pv-scope.pv-cart .pv-cart__summary[data-pv-sticky]{top:52px;}
 .pv-scope.pv-cart .pv-cart__summary-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .pv-scope.pv-cart .pv-cart__summary-title{font-family:var(--display);font-weight:800;font-size:18px;}
 
