@@ -1268,4 +1268,42 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D13 fix: el total del checkout debe usar --brand (paridad con el carrito)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D14 (P1, 4 identidades de bloques legales): terms/consent
+	 * tenían 4 generaciones CSS simultáneas (brand custom-mark, duplicado con
+	 * checkbox nativo, amarillo !important, azul) — hoy se veían azul y
+	 * amarillo. Fix: generaciones B/C/D eliminadas; identidad única = brand-card.
+	 */
+	public function test_035_checkout_legales_identidad_unica(): void {
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+
+		// (1) Ya no existe el bloque amarillo con !important.
+		$this->assertDoesNotMatchRegularExpression(
+			'/#fefce8|#facc15/i',
+			$cko_css,
+			'UIUX2-D14 fix: la identidad amarilla del consent debe estar eliminada'
+		);
+
+		// (2) Ya no existe el bloque azul que pisaba a terms.
+		$this->assertDoesNotMatchRegularExpression(
+			'/\.pv-checkout__terms-toggle\s*\{\s*padding: 12px 14px;\s*background: var\(--primary-50\)/',
+			$cko_css,
+			'UIUX2-D14 fix: la identidad azul de terms debe estar eliminada'
+		);
+
+		// (3) La generación duplicada con checkbox nativo también.
+		$this->assertDoesNotMatchRegularExpression(
+			'/Consolidar T&C \+ Privacy/',
+			$cko_css,
+			'UIUX2-D14 fix: la generación duplicada debe estar eliminada'
+		);
+
+		// (4) La identidad canónica brand-card sigue presente.
+		$this->assertMatchesRegularExpression(
+			'/__terms-toggle,\s*\.pv-scope\.pv-checkout \.ltms-checkout-consent\s*\{[^}]*var\(--brand-50\)[^}]*border-left:4px solid var\(--brand\)/s',
+			$cko_css,
+			'UIUX2-D14: la brand-card canónica de legales debe permanecer'
+		);
+	}
 }
