@@ -1159,4 +1159,24 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D10 regression: el summary no debe volver a count($pv_reviews) (capped por LIMIT 6)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D16 (P1, empty state de reseñas inconsistente): era solo
+	 * texto mientras el de productos tiene icono+copy+CTA. Fix: estructura
+	 * simétrica con CTA que salta al tab de productos (data-pv-jump-tab).
+	 */
+	public function test_031_vendor_empty_reviews_simetrico(): void {
+		$vendor = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/vendor-store.php' );
+
+		$this->assertMatchesRegularExpression(
+			'/UIUX2-D16 FIX[\s\S]{0,700}?<polygon points="12 2 15\.09[\s\S]{0,300}?Aún no hay reseñas/s',
+			$vendor,
+			'UIUX2-D16 fix: el empty de reseñas debe llevar icono como el de productos'
+		);
+		$this->assertMatchesRegularExpression(
+			'/Aún no hay reseñas[\s\S]{0,300}?data-pv-jump-tab="products"/s',
+			$vendor,
+			'UIUX2-D16 fix: el empty de reseñas debe tener CTA al tab de productos'
+		);
+	}
 }

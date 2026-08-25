@@ -538,9 +538,15 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
                     <?php endforeach; ?>
                 </ul>
             <?php else : ?>
+                <!-- AUDIT-FE-UIUX2-D16 FIX (P1): empty state simétrico al de
+                     productos (icono + copy + CTA) — antes era solo texto. -->
                 <div class="pv-card pv-card--flat pv-vendor-store__empty">
+                    <div class="pv-vendor-store__empty-icon" aria-hidden="true">
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    </div>
                     <h3><?php esc_html_e( 'Aún no hay reseñas', 'ltms' ); ?></h3>
                     <p><?php esc_html_e( 'Cuando los compradores compren a este vendedor y dejen su calificación, aparecerán aquí.', 'ltms' ); ?></p>
+                    <a class="pv-btn pv-btn--ghost" href="#pv-vendor-panel-products" data-pv-jump-tab="products"><?php esc_html_e( 'Ver productos del vendedor', 'ltms' ); ?></a>
                 </div>
             <?php endif; ?>
         </div>
