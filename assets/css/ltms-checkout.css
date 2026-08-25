@@ -323,7 +323,8 @@
     display:flex;align-items:flex-start;gap:10px;
     padding:14px 16px;margin:12px 0;
     background:var(--brand-50);border:1px solid var(--brand-100);border-left:4px solid var(--brand);
-    border-radius:10px;cursor:pointer;transition:all .15s;
+    border-radius:10px;cursor:pointer;/* UIUX2-D27: transición explícita (all animaba padding/margin en reflow) */
+    transition:background var(--t),border-color var(--t),box-shadow var(--t);
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle:hover,
 .pv-scope.pv-checkout .ltms-checkout-consent:hover{
@@ -338,7 +339,7 @@
 .pv-scope.pv-checkout .ltms-checkout-consent::before{
     flex-shrink:0;width:22px;height:22px;border:2px solid var(--border-2);
     border-radius:6px;background:#fff;display:flex;align-items:center;
-    justify-content:center;transition:all .15s;color:#fff;
+    justify-content:center;transition:background var(--t),border-color var(--t),color var(--t);color:#fff;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle input:checked + .pv-checkout__ship-toggle-mark,
 .pv-scope.pv-checkout .ltms-checkout-consent input:checked + .ltms-checkout-consent-mark{
@@ -503,7 +504,7 @@
     border-left: 4px solid var(--brand);
     border-radius: 10px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background var(--t), border-color var(--t), box-shadow var(--t);
 }
 .pv-scope.pv-checkout #ship-to-different-address:hover {
     background: var(--brand-50);

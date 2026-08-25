@@ -168,7 +168,11 @@ do_action( 'ltms_before_help_center_plazaviva' );
                 <!-- AUDIT-FE-PV-DS-018 FIX (P2-6): hint de atajo de teclado —
                      la tecla "/" enfoca este input (handler en scope HELP). -->
                 <kbd class="pv-help__search-kbd" aria-hidden="true">/</kbd>
-                <button type="submit" class="pv-btn pv-help__search-btn" aria-label="<?php esc_attr_e( 'Buscar', 'ltms' ); ?>">
+                <!-- AUDIT-FE-UIUX2-D37 FIX (P2): ghost en vez de primary —
+                     dentro de la píldora blanca del hero, el botón primario
+                     competía con los CTAs de las quick-cards (una sola acción
+                     primaria por viewport). -->
+                <button type="submit" class="pv-btn pv-btn--ghost pv-help__search-btn" aria-label="<?php esc_attr_e( 'Buscar', 'ltms' ); ?>">
                     <?php esc_html_e( 'Buscar', 'ltms' ); ?>
                 </button>
             </form>

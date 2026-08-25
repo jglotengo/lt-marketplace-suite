@@ -1366,4 +1366,44 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'D35 fix: la regla inválida value:CO debe permanecer eliminada'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D22/D24/D27/D37 (P2, micro-fixes de cascada y landmarks):
+	 * role="banner" duplicado en hero vendor; grid-4 contradictorio con
+	 * grid-auto; transition:all animaba padding/margin en reflow; CTA del
+	 * buscador help competía con la acción primaria.
+	 */
+	public function test_038_micro_fixes_cascada_y_landmarks(): void {
+		$vendor = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/vendor-store.php' );
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+		$help = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/help-center.php' );
+
+		// D-22: sin role banner duplicado.
+		$this->assertDoesNotMatchRegularExpression(
+			'/__hero" role="banner"/',
+			$vendor,
+			'D22 fix: el hero del vendor no debe duplicar el landmark banner'
+		);
+
+		// D-24: solo grid-auto en el grid de productos del vendor.
+		$this->assertDoesNotMatchRegularExpression(
+			'/__grid pv-scope grid-4/',
+			$vendor,
+			'D24 fix: el grid del vendor no debe llevar grid-4 contradictorio'
+		);
+
+		// D-27: sin transition:all en checkout.css.
+		$this->assertDoesNotMatchRegularExpression(
+			'/transition:\s*all\b/',
+			$cko_css,
+			'D27 fix: checkout.css no debe usar transition:all'
+		);
+
+		// D-37: el submit del buscador help es ghost.
+		$this->assertMatchesRegularExpression(
+			'/pv-btn--ghost pv-help__search-btn/',
+			$help,
+			'D37 fix: el CTA buscar del hero help debe ser ghost'
+		);
+	}
 }

@@ -340,7 +340,10 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
      */
     ?>
     <section class="pv-section pv-vendor-store__hero-wrap" aria-labelledby="pv-vendor-store-title">
-        <div class="pv-vendor-store__hero" role="banner">
+        <!-- AUDIT-FE-UIUX2-D22 FIX (P2): sin role="banner" — duplicaba el
+             landmark banner del header del sitio (HTML inválido por landmarks
+             repetidos). La section ya está etiquetada por aria-labelledby. -->
+        <div class="pv-vendor-store__hero">
             <span class="pv-vendor-store__hero-glow" aria-hidden="true"></span>
 
             <div class="pv-vendor-store__hero-inner">
@@ -452,7 +455,10 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
         ?>
         <div class="pv-tabpanel pv-vendor-store__panel" role="tabpanel" id="pv-vendor-panel-products" aria-labelledby="pv-vendor-tab-products">
             <?php if ( ! empty( $pv_products ) ) : ?>
-                <div class="pv-vendor-store__grid pv-scope grid-4 grid-auto">
+                <!-- AUDIT-FE-UIUX2-D24 FIX (P2): solo grid-auto — la clase grid-4
+                     declaraba grid-template-columns contradictorio que perdía
+                     por orden de cascada en silencio. -->
+                <div class="pv-vendor-store__grid pv-scope grid-auto">
                     <?php foreach ( $pv_products as $pv_vp ) : ?>
                         <?php ltms_pv_vendor_render_product( $pv_vp ); ?>
                     <?php endforeach; ?>
