@@ -25,6 +25,16 @@
  *     solo recarga si current_step < 2 y no hay tracking_number y respeta
  *     <details open> y campos con focus.
  *
+ *   * AUDIT-FE-OT-005 (P0, <script> inline rompe CSP): el template era el
+ *     ÚLTIMO del design system con un bloque <script> inline (76 líneas,
+ *     líneas 1071-1146 originales). Fix: los 3 behaviours (auto-scroll
+ *     bounce del paso activo, live refresh 60s con guards, smooth scroll
+ *     del summary toggle) migraron a assets/js/ltms-plaza-viva.js como
+ *     IIFE trackingScope() (scope TRACKING al final del archivo), que lee
+ *     data-order-id/data-current-step ya expuestos por el PHP en :358.
+ *     El bloque inline fue eliminado FÍSICAMENTE del template (ver
+ *     LECCIONES_APRENDIDAS #141 — migración física, no un comment).
+ *
  * Estos tests son PURAMENTE estructurales (file_get_contents + asserts sobre
  * el source PHP/JS): NO cargan clases del plugin ni invocan WP → deterministas
  * en LTMS_UNIT_ONLY=true y CI Ubuntu sin depender del classmap estático del
@@ -54,6 +64,17 @@ final class OrderTrackingAuditTest extends LTMS_Unit_Test_Case {
 	private string $template_path;
 
 	/**
+	 * Ruta absoluta al design system JS (ltms-plaza-viva.js).
+	 */
+	private string $js_path;
+
+	/**
+	 * Ruta absoluta al design system JS minificado (ltms-plaza-viva.min.js).
+	 * Debe regenerarse con `npm run build:js` tras editar el source.
+	 */
+	private string $js_min_path;
+
+	/**
 	 * @inheritDoc
 	 *
 	 * NOTA INTENCIONAL: este test NO llama $this->require_class(). Los
@@ -65,6 +86,8 @@ final class OrderTrackingAuditTest extends LTMS_Unit_Test_Case {
 	protected function setUp(): void {
 		parent::setUp();
 		$this->template_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php';
+		$this->js_path       = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->js_min_path   = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.min.js';
 	}
 
 	/**
@@ -276,10 +299,17 @@ final class OrderTrackingAuditTest extends LTMS_Unit_Test_Case {
 	 * Fix: el reload solo dispara si current_step < 2 (todavía en
 	 * preparación, sin tracking) y respeta <details open> y form fields
 	 * con focus (no rompe UX mientras el usuario interactúa).
+	 *
+	 * NOTA AUDIT-FE-OT-005: este behaviour (junto con todo el bloque
+	 * <script> inline) migró físicamente a assets/js/ltms-plaza-viva.js
+	 * como scope TRACKING. Las invariantes se verifican ahora contra el
+	 * source del design system JS (antes contra el template — ver
+	 * LECCIONES #119: actualizar los tests al migrar código entre
+	 * archivos, en el MISMO commit que la migración).
 	 */
 	public function test_004_auto_reload_no_incondicional_respeta_interaccion(): void {
-		$this->assertFileExists( $this->template_path );
-		$src = file_get_contents( $this->template_path );
+		$this->assertFileExists( $this->js_path );
+		$src = file_get_contents( $this->js_path );
 
 		// (1) La condición ΟLD de "currentStep < 4" (cualquier paso no
 		// entregado) fue reemplazada por "currentStep < 2" (solo en
@@ -335,7 +365,138 @@ final class OrderTrackingAuditTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString(
 			'AUDIT-FE-OT-003',
 			$src,
-			'AUDIT-FE-OT-003: template must contain the traceable fix marker comment for future audits'
+			'AUDIT-FE-OT-003: the design system JS (scope TRACKING) must contain the traceable fix marker comment for future audits'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-OT-005 (P0, <script> inline rompe CSP): order-tracking.php
+	 * era el ÚLTIMO template del design system con un bloque <script>
+	 * inline (76 líneas, líneas 1071-1146 originales: auto-scroll bounce
+	 * + polling 60s + smooth scroll del accordion).
+	 *
+	 * Fix: el bloque fue eliminado FÍSICAMENTE del template (ver
+	 * LECCIONES_APRENDIDAS #141 — canarios mentirosos en comment blocks:
+	 * la migración debe ser física, no un comment que declare "fue
+	 * eliminado"). Este test detecta la regresión si alguien reintroduce
+	 * un <script> inline en el template.
+	 */
+	public function test_007_bloque_script_inline_eliminado_csp(): void {
+		$this->assertFileExists( $this->template_path );
+		$src = file_get_contents( $this->template_path );
+
+		$this->assertStringNotContainsString(
+			'<script',
+			$src,
+			'AUDIT-FE-OT-005 fix: order-tracking.php must NOT contain any <script> tag (inline JS breaks CSP-compliance; behaviours live in ltms-plaza-viva.js scope TRACKING)'
+		);
+		$this->assertStringNotContainsString(
+			'</script>',
+			$src,
+			'AUDIT-FE-OT-005 fix: order-tracking.php must NOT contain </script> closing tag'
+		);
+
+		// El wrapper sigue exponiendo los data-attributes que alimenta el
+		// scope TRACKING migrado (si alguien los elimina, el polling y el
+		// bounce dejan de funcionar silenciosamente).
+		$this->assertStringContainsString(
+			'data-order-id=',
+			$src,
+			'AUDIT-FE-OT-005: wrapper must keep data-order-id (consumed by trackingScope in ltms-plaza-viva.js)'
+		);
+		$this->assertStringContainsString(
+			'data-current-step=',
+			$src,
+			'AUDIT-FE-OT-005: wrapper must keep data-current-step (consumed by trackingScope in ltms-plaza-viva.js)'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-OT-005 (continuación): los 3 behaviours migrados deben
+	 * estar presentes en assets/js/ltms-plaza-viva.js como IIFE
+	 * trackingScope() (scope TRACKING al final del archivo). Detecta la
+	 * regresión inversa: si alguien elimina el scope TRACKING del design
+	 * system sin restaurar el inline (o viceversa), la página de
+	 * seguimiento pierde auto-scroll/polling/accordion-scroll.
+	 */
+	public function test_008_scope_tracking_presente_en_design_system_js(): void {
+		$this->assertFileExists( $this->js_path );
+		$js = file_get_contents( $this->js_path );
+
+		// (1) IIFE trackingScope presente.
+		$this->assertStringContainsString(
+			'function trackingScope',
+			$js,
+			'AUDIT-FE-OT-005 fix: el scope TRACKING debe estar migrado a ltms-plaza-viva.js como IIFE trackingScope()'
+		);
+
+		// (2) Selector del scope — solo inicializa en la página tracking.
+		$this->assertStringContainsString(
+			"querySelector('.pv-scope.pv-tracking')",
+			$js,
+			'AUDIT-FE-OT-005: trackingScope debe inicializarse solo cuando .pv-scope.pv-tracking está presente en el DOM'
+		);
+
+		// (3) Behaviour 1: bounce del paso activo via IntersectionObserver.
+		$this->assertStringContainsString(
+			"querySelector('.pv-timeline-step--active')",
+			$js,
+			'AUDIT-FE-OT-005: behaviour 1 (auto-scroll bounce del paso activo) debe leer .pv-timeline-step--active'
+		);
+
+		// (4) Behaviour 2: polling lee los data-attributes del wrapper PHP.
+		$this->assertStringContainsString(
+			"getAttribute('data-current-step')",
+			$js,
+			'AUDIT-FE-OT-005: behaviour 2 (live refresh) debe leer data-current-step del wrapper'
+		);
+		$this->assertStringContainsString(
+			"getAttribute('data-order-id')",
+			$js,
+			'AUDIT-FE-OT-005: behaviour 2 (live refresh) debe leer data-order-id del wrapper'
+		);
+
+		// (5) Behaviour 3: smooth scroll del summary toggle.
+		$this->assertStringContainsString(
+			"querySelector('.pv-tracking__summary-toggle')",
+			$js,
+			'AUDIT-FE-OT-005: behaviour 3 (smooth scroll accordion) debe escuchar .pv-tracking__summary-toggle'
+		);
+
+		// (6) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-OT-005',
+			$js,
+			'AUDIT-FE-OT-005: ltms-plaza-viva.js must contain the traceable fix marker comment for future audits'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-OT-005 (sincronización .min.js): ltms-plaza-viva.min.js se
+	 * genera con terser (`npm run build:js`) y es el archivo que sirve WP
+	 * cuando está optimizado. Debe contener el scope TRACKING migrado —
+	 * si alguien edita el source y no regenera el min, producción pierde
+	 * los behaviours. Terser manglea variables pero preserva los string
+	 * literals, por lo que las invariantes son sobre selectores/attrs.
+	 */
+	public function test_009_min_js_sincronizado_con_scope_tracking(): void {
+		$this->assertFileExists( $this->js_min_path );
+		$min = file_get_contents( $this->js_min_path );
+
+		$this->assertStringContainsString(
+			'.pv-scope.pv-tracking',
+			$min,
+			'AUDIT-FE-OT-005: ltms-plaza-viva.min.js desactualizado — regenerar con npm run build:js (falta selector .pv-scope.pv-tracking)'
+		);
+		$this->assertStringContainsString(
+			'data-current-step',
+			$min,
+			'AUDIT-FE-OT-005: ltms-plaza-viva.min.js desactualizado — falta lectura de data-current-step (polling)'
+		);
+		$this->assertStringContainsString(
+			'.pv-tracking__summary-toggle',
+			$min,
+			'AUDIT-FE-OT-005: ltms-plaza-viva.min.js desactualizado — falta .pv-tracking__summary-toggle (accordion scroll)'
 		);
 	}
 

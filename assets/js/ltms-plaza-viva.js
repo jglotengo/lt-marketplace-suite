@@ -1995,3 +1995,111 @@
       initProduct();
     }
   })();
+
+  /* =========================================================================
+   * AUDIT-FE-OT-005 FIX (auditoría Plaza Viva design system, Ciclo 1):
+   * scope TRACKING — migración del bloque <script> inline de
+   * order-tracking.php:1071-1146 al design system global. Cierra
+   * CSP-compliance para order-tracking.php — era el ÚLTIMO template del
+   * design system con un <script> inline (grep "<script" en templates/
+   * → 0 tras este fix; ver LECCIONES_APRENDIDAS #141: la migración debe
+   * ser física, no un comment que lo declare).
+   *
+   * Behaviours migrados (3):
+   *   1. Auto-scroll "bounce" del paso activo del timeline via
+   *      IntersectionObserver (threshold .4): anima el icono scale(1.05)
+   *      durante 320ms la primera vez que entra al viewport.
+   *   2. Live refresh (polling 60s) SOLO si current_step < 2 y no hay
+   *      tracking number visible (preserva AUDIT-FE-OT-003 FIX: respeta
+   *      modal abierto, <details open>, campos con focus y visibilityState
+   *      — no recarga mientras el usuario lee/interactúa). Limitación
+   *      técnica documentada como P2-1: sin live refresh cuando el envío
+   *      ya avanzó (current_step >= 2).
+   *   3. Smooth scroll al head del accordion al abrir el order summary.
+   *
+   * Los data-attributes que alimenta este scope ya estaban expuestos por
+   * el PHP en el wrapper del template (order-tracking.php:358):
+   * data-order-id + data-current-step — cero inyección PHP en JS.
+   * ========================================================================= */
+  (function trackingScope() {
+    function initTracking() {
+      var scope = document.querySelector('.pv-scope.pv-tracking');
+      if (!scope) return;
+
+      /* --- 1. Auto-scroll al paso activo del timeline ------------------- */
+      var activeStep = scope.querySelector('.pv-timeline-step--active');
+      if (activeStep && 'IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              // Pequeña animación de "rebote" al hacer visible.
+              var icon = entry.target.querySelector('.pv-timeline-step__icon');
+              if (icon) {
+                icon.style.transform = 'scale(1.05)';
+                setTimeout(function () { icon.style.transform = ''; }, 320);
+              }
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: .4 });
+        io.observe(activeStep);
+      }
+
+      /* --- 2. Live refresh (polling cada 60s solo si la orden está activa
+       *        y NO hay datos de envío todavía). Preserva AUDIT-FE-OT-003
+       *        FIX: antes se disparaba cada 60s para siempre (las metas
+       *        _ltms_driver_* nunca se llenaban → !hasTracking siempre
+       *        true → loop infinito), recargando la página mientras el
+       *        usuario leía/interactuaba. Solo recarga si: current_step
+       *        < 2 (todavía en preparación) y no hay tracking_number y
+       *        order no delivered y no hay <details> abierto ni input/
+       *        textarea/button con focus.
+       */
+      var currentStep = parseInt(scope.getAttribute('data-current-step'), 10);
+      if (!isNaN(currentStep) && currentStep >= 0 && currentStep < 2) {
+        var orderId = scope.getAttribute('data-order-id');
+        var hasTracking = !!scope.querySelector('.pv-timeline-step__tracking-num');
+        if (orderId && !hasTracking) {
+          setTimeout(function () {
+            // Solo recargar si el usuario sigue en la página, no está en
+            // un modal abierto, no tiene <details> expandido (anti-pérdida
+            // de scroll/contexto mientras lee el detalle colapsable) y
+            // ningún campo del formulario tiene focus (anti-pérdida input).
+            var hasModal = !!document.querySelector('.pv-modal.is-open');
+            var hasOpenDetails = !!scope.querySelector('details[open]');
+            var activeEl = document.activeElement;
+            var isFormFocused = activeEl && (
+              activeEl.tagName === 'INPUT' ||
+              activeEl.tagName === 'TEXTAREA' ||
+              activeEl.tagName === 'SELECT' ||
+              activeEl.tagName === 'BUTTON'
+            );
+            if (document.visibilityState === 'visible' && !hasModal && !hasOpenDetails && !isFormFocused) {
+              window.location.reload();
+            }
+          }, 60000);
+        }
+      }
+
+      /* --- 3. Smooth scroll al top del timeline al abrir order summary -- */
+      var summaryToggle = scope.querySelector('.pv-tracking__summary-toggle');
+      if (summaryToggle) {
+        summaryToggle.addEventListener('toggle', function () {
+          if (summaryToggle.open) {
+            var head = summaryToggle.querySelector('.pv-accordion__head');
+            if (head) {
+              setTimeout(function () {
+                head.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }, 50);
+            }
+          }
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initTracking);
+    } else {
+      initTracking();
+    }
+  })();

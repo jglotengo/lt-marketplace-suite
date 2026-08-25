@@ -355,6 +355,17 @@ do_action( 'ltms_before_tracking_plazaviva', $order );
 get_header();
 ?>
 
+<?php
+/**
+ * AUDIT-FE-OT-005 FIX: los behaviours JS de esta página (auto-scroll bounce
+ * del paso activo del timeline, live refresh 60s con guards de interacción,
+ * smooth scroll al abrir el accordion del summary) viven en
+ * assets/js/ltms-plaza-viva.js — scope TRACKING (IIFE trackingScope al final
+ * del archivo). Este template NO contiene JS inline (CSP-compliant); el
+ * wrapper de abajo expone data-order-id y data-current-step que el scope
+ * migrado lee.
+ */
+?>
 <div class="pv-scope pv-tracking" data-order-id="<?php echo esc_attr( $order_id ); ?>" data-current-step="<?php echo esc_attr( $current_step_idx ); ?>">
 
     <!-- ===================================================================
@@ -1067,83 +1078,6 @@ get_header();
     .pv-scope.pv-tracking .pv-order-summary__item-media{width:48px;height:48px;}
 }
 </style>
-
-<script>
-(function(){
-    'use strict';
-    var scope = document.querySelector('.pv-scope.pv-tracking');
-    if (!scope) return;
-
-    /* --- 1. Auto-scroll al paso activo del timeline -------------------- */
-    var activeStep = scope.querySelector('.pv-timeline-step--active');
-    if (activeStep && 'IntersectionObserver' in window){
-        var io = new IntersectionObserver(function(entries){
-            entries.forEach(function(entry){
-                if (entry.isIntersecting){
-                    // Pequeña animación de "rebote" al hacer visible.
-                    var icon = entry.target.querySelector('.pv-timeline-step__icon');
-                    if (icon){
-                        icon.style.transform = 'scale(1.05)';
-                        setTimeout(function(){ icon.style.transform = ''; }, 320);
-                    }
-                    io.unobserve(entry.target);
-                }
-            });
-        }, { threshold:.4 });
-        io.observe(activeStep);
-    }
-
-    /* --- 2. Live refresh (polling cada 60s solo si la order está activa
-     *        y NO hay datos de envío todavía). AUDIT-FE-OT-003 FIX:
-     *        antes se disparaba cada 60s para siempre (las metas _ltms_driver_*
-     *        nunca se llenaban → ﾒ!hasDriver siempre true → loop infinito),
-     *        recargando la página mientras el usuario leía/interactuaba.
-     *        Ahora solo recarga si: current_step < 2 (todavía en preparación)
-     *        y no hay tracking_number y order no delivered y no hay <details>
-     *        abierto ni input/textarea/button con focus.
-     */
-    var currentStep = parseInt(scope.getAttribute('data-current-step'), 10);
-    if (!isNaN(currentStep) && currentStep >= 0 && currentStep < 2){
-        var orderId = scope.getAttribute('data-order-id');
-        var hasTracking = !!scope.querySelector('.pv-timeline-step__tracking-num');
-        if (orderId && !hasTracking){
-            setTimeout(function(){
-                // Solo recargar si el usuario sigue en la página, no está en
-                // un modal abierto, no tiene <details> expandido (anti-pérdida
-                // de scroll/contexto mientras lee el detalle colapsable) y
-                // ningún campo del formulario tiene focus (anti-pérdida input).
-                var hasModal = !!document.querySelector('.pv-modal.is-open');
-                var hasOpenDetails = !!scope.querySelector('details[open]');
-                var activeEl = document.activeElement;
-                var isFormFocused = activeEl && (
-                    activeEl.tagName === 'INPUT' ||
-                    activeEl.tagName === 'TEXTAREA' ||
-                    activeEl.tagName === 'SELECT' ||
-                    activeEl.tagName === 'BUTTON'
-                );
-                if (document.visibilityState === 'visible' && !hasModal && !hasOpenDetails && !isFormFocused){
-                    window.location.reload();
-                }
-            }, 60000);
-        }
-    }
-
-    /* --- 3. Smooth scroll al top del timeline al abrir order summary ----- */
-    var summaryToggle = scope.querySelector('.pv-tracking__summary-toggle');
-    if (summaryToggle){
-        summaryToggle.addEventListener('toggle', function(){
-            if (summaryToggle.open){
-                var head = summaryToggle.querySelector('.pv-accordion__head');
-                if (head){
-                    setTimeout(function(){
-                        head.scrollIntoView({ behavior:'smooth', block:'nearest' });
-                    }, 50);
-                }
-            }
-        });
-    }
-})();
-</script>
 
 <?php
 get_footer();
