@@ -6,6 +6,65 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `PLAZA-VIVA-DS-AUDIT-CICLO1` (auditoría integral del design system Plaza Viva: 21 hallazgos — 3 P0 + 11 P1 + 6 P2 + 2 documentados, ~20 tests nuevos)
+
+> **Ciclo completo Audit → Fix → Re-audit** sobre los 11 archivos del design system público (8 templates +
+> `wc-parts/content-product.php` + `ltms-plaza-viva.css/.js`). Sesión read-only (inventario/auditoría/priorización)
+> el 2026-08-22; fixes atómicos el 2026-08-25. Suite completa verde de punta a punta (4,608 → **4,624 tests,
+> 9,204 assertions OK**, 3 skips preexistentes). IDs trazables `AUDIT-FE-OT-005` y `AUDIT-FE-PV-DS-001..018`.
+
+**P0 (bloqueantes) — 3 fixes:**
+
+- **OT-005** (`08b3d26f`): `order-tracking.php` era el ÚLTIMO template con `<script>` inline (76 líneas).
+  Migración física al scope TRACKING de `ltms-plaza-viva.js` (IIFE `trackingScope()`; auto-scroll bounce +
+  polling 60s con guards OT-003 + smooth scroll accordion). CSP-compliance cerrado para TODO el design
+  system (`grep '<script' templates/*.php` → solo menciones históricas en docblocks). `test_004` re-apuntado
+  al JS source (Lección #119) + 3 tests nuevos (CSP / scope presente / min-sync).
+- **PV-DS-001** (`8baea4a7`): badges `--soft` ("Oferta") y `--muted` ("Agotado") referenciados por
+  `content-product.php:190/:197` SIN reglas CSS — heredaban el rojo `--danger` del badge `-X%`. Fix con
+  tokens (`--gold`, `--bg-2`+borde). Test nuevo `PlazaVivaDesignSystemAuditTest` (contrato HTML↔CSS + min.css).
+- **PV-DS-002** (`bb8c885b`): `.pv-empty` sin regla en design system (solo duplicado inline en el propio
+  single-product). Regla genérica `.pv-scope .pv-empty` en sección EMPTY STATE + eliminación del inline.
+
+**P1 (gaps funcionales/visuales) — 11 fixes:**
+
+| ID | Commit | Fix |
+|----|--------|-----|
+| PV-DS-003 | `d38bb837` | DRY: card trending de home delega a `content-product.php` via `wc_get_template_part`; helper duplicado `ltms_pv_render_trending_card()` eliminado. Las cards trending heredan KYC/SF-04/swatches/stock-urgency/badges automáticamente |
+| PV-DS-004 | `f4d78076` | Breakpoint sidebar shop `768px`→`760px` (canónico del sistema; leak Tailwind-style v2.9.191) |
+| PV-DS-005 | `331a9787` | Empty state del shop archive envuelto en `.pv-shop__empty` + CSS integrado (hook WC preservado como válvula) |
+| PV-DS-006 | `5829bd87` | Form cupón oculto con clase `.d-none` en vez de atributo style inline |
+| PV-DS-007 | `a3c7642d` | Reviews vendor-store sin N+1: ~15 queries → **2** (JOIN scopeado a post_author con rating via LEFT JOIN commentmeta + prefetch de productos). Corrige bug colateral: query global podía dejar sección vacía con reseñas recientes existentes |
+| PV-DS-008 | `e89382e2` | Empty states visibles (`.pv-home__empty-note`) para bento cats/trending/star vendors |
+| PV-DS-009 | `a531d74c` | Stepper checkout marca `.is-done` por completitud de campos requeridos del bloque; `.is-active` sigue al primer paso incompleto; refresca en `updated_checkout` |
+| PV-DS-010 | `f0c849b6` | Related products mantiene 2 columnas hasta 400px (canónico; antes colapsaba en 560px) |
+| PV-DS-011 | `a9c5bd21` | Count de related filtrable: `apply_filters('ltms_related_products_count', 4)` |
+| PV-DS-012 | `b4be25fc` | Badge Star Seller centrado respecto al avatar via wrapper + `translateX(-50%)` (antes offset fijo dependiente del ancho) |
+| PV-DS-013 | `0d575eb9` | FAQ sin item abierto por defecto (no estorba a la búsqueda en vivo) |
+
+**P2 (cosmético) — 4 fixes + 2 resueltos sin patch:**
+
+- PV-DS-014 (`53ffd1a6`): P2-2 (Intl.NumberFormat para bundle total) resuelto como **no-aplicable justificado**
+  — `formatMoney` ya replica el config de moneda WC y `recompute()` corre al init; test congela la decisión.
+- PV-DS-015 (`969775b2`): toast optimista al aplicar cupón (`PV.i18n.couponApplying` vía localize).
+- PV-DS-016 (`a5f5c193`): footer home grid `1.6fr 1fr 1fr 1fr`.
+- PV-DS-017 (`00042f46`): gap layout producto 48px en ≥1280px.
+- PV-DS-018 (`79001a41`): atajo teclado `/` enfoca búsqueda help-center + hint `<kbd>` (oculto en mobile).
+- P2-1 (polling solo current_step<2): documentado en el header del scope TRACKING (sin patch requerido).
+
+**Tests:** `OrderTrackingAuditTest` (+3 tests, test_004 re-apuntado), `PlazaVivaDesignSystemAuditTest`
+(nuevo, 15 tests), `HomeQuickViewAttrTest`/`WishlistPvToggleTest` re-apuntados a delegación (Lección #119).
+Builds regenerados (`build:js`, `build:css`); `lint:php/lint:js` verdes.
+
+**Lecciones nuevas:** #36.1 (assertions estructurales vs comments de trazabilidad — reincidente x5),
+#36.2 (ventanas regex `{0,N}` sobre código comentado), #36.3 (deberes simultáneos al migrar inline→design
+system: tests, .min.*, drift ajeno).
+
+**Pendiente del ciclo:** P1-9 (threshold free-shipping multi-moneda — decisión de producto), validación SSH
+en SiteGround antes de push, bump `LTMS_VERSION` al desplegar (cache-busting).
+
+---
+
 ### Fixed — `SITEGROUND-NO-ASSERT-2026-08-04` (PHPUnit usable en SiteGround a pesar de `assert()` en `disable_functions`)
 
 > **Bloqueo de producción crítico resuelto.** SiteGround tiene `assert()` en `disable_functions`, y el flag NO es overrideable por CLI (`-d zend.assertions=1 -d assert.active=1` no reenable la función — verificado con `function_exists('assert')` → `false`). Esto rompía PHPUnit (`Call to undefined function assert()` en `vendor/sebastian/cli-parser/src/Parser.php:68`) y, peor, rompía también al propio Composer.phar global de SG (`Composer\Repository\ComposerRepository.php:175` usa `assert()`), haciendo que `composer install` no pudiera ni siquiera arrancar — *inutilizando cualquier approach `cweagans/composer-patches` autoaplicado en el server*.

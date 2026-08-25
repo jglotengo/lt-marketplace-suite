@@ -3028,6 +3028,66 @@ Y la línea `update_option('ltms_newsletter_last_sent', time())` se mantiene DES
 7. **Sub-ciclo UX-AUDIT-REGISTER vs ciclo AUTH-AUDIT: mismo modulo, layers distintos.** El ciclo AUTH-AUDIT original (C24-C33 segun Historico) y el sub-ciclo RE-AUDIT-AUTH (`3c97c2fa`) auditaron el handler PHP (seguridad, validacion, persistencia, redirects). El sub-ciclo UX-AUDIT-REGISTER cubre el LAYER de UX/UX-a11y/microcopy/formato-de-messages que las auditorias previas no especializaron. Cada sub-ciclo profundiza en un layer distinto. **Regla: cuando un modulo tiene N capas (handler + JS + template + CSS + a11y + UX copy), un solo ciclo de auditoria no basta. Planear sub-ciclos por layer si la complejidad del modulo los requiere. En este caso: AUTH-AUDIT (seguridad handler) → RE-AUDIT-AUTH (HTML bugs + JS handler) → UX-AUDIT-REGISTER (UX copy + a11y + microcopy + format inconsistency).**
 
 
+## 22. Ciclo 1 auditoría Plaza Viva design system (2026-08-22 → 2026-08-25)
+
+> Alcance: 11 archivos del design system público (8 templates + content-product.php + ltms-plaza-viva.css/.js).
+> Resultado: 21 hallazgos resueltos (3 P0 + 11 P1 + 6 P2 + 2 documentados/no-aplicables), 18 commits atómicos,
+> ~20 tests estructurales nuevos (suite 4,608 → 4,624 verde). IDs AUDIT-FE-OT-005 y AUDIT-FE-PV-DS-001..018.
+
+### Leccion 36.1: Los comments de trazabilidad citan lo que eliminaron — las assertions estructurales NUNCA deben asertar sobre el string suelto, sino sobre la definición/regla
+
+1. **El patrón reincidente (5 ocurrencias en UNA sesión):** la convención de la casa exige comments trazables
+   (`AUDIT-FE-PV-DS-XXX FIX: el helper ltms_pv_render_trending_card() fue eliminado...`). Esos comentarios
+   contienen LITERALMENTE el nombre/string de lo que se eliminó. Si el test nuevo valida la eliminación con
+   `assertStringNotContainsString('ltms_pv_render_trending_card', $src)`, el propio comentario del fix hace
+   fallar el test. Ocurrió con: helper trending card, `$pv_reviews_args`, `translateX(30px)`,
+   `style="display:none"` y el marcador `<script>` — cinco veces el mismo traje.
+2. **Regla preventiva:** para validar ausencias, anclar a la FORMA VIVA del código, no al string suelto:
+   - función eliminada → `'function ltms_pv_render_trending_card'`
+   - asignación muerta → `'$pv_reviews_args = ['`
+   - regla CSS vieja → `'/\.clase\s*\{[^}]*offset-viejo/'` (dentro de la regla, no global)
+   - atributo inline → el literal exacto del atributo, y redactar el comentario sin reproducirlo.
+   Los comentarios de trazabilidad quedan libres de citar nombres; es el test el que debe ser quirúrgico.
+3. **Corolario:** esto CONVIVE con #141 (migración física, no comment que declare). La migración física se
+   verifica contra la definición viva; el comment histórico que la narra es deseable y no debe prohibirse.
+
+### Leccion 36.2: Ventanas regex `{0,N}` cortas en tests sobre código con comments largos — medir la distancia real antes de fijar N
+
+1. **Tercera variante del mismo género que #136 (substr buffers):** aquí el fallo fue en regex sobre el
+   source completo tipo `/couponBtn.addEventListener('click'[\s\S]{0,400}?PV.toast/`. Entre el ancla y el
+   objetivo median ~430 chars DE COMENTARIOS DEL PROPIO FIX (que la convención exige largos y explicativos).
+   El test fallaba aunque el código era correcto. Pasó también con el guard del stepper (~440 chars hasta
+   `preventDefault()`), con selectores CSS multi-línea (`selector {` con espacio/salto antes de `{`), con
+   reglas que terminan en `;}` (el `;` interno antes del cierre) y con media queries (`max-width:Xpx){` —
+   el `)` entre el número y la llave rompe `\s*\{`).
+2. **Reglas preventivas para escribir la assertion la primera vez bien:**
+   - Copiar el fragmento real del source y CONTAR los chars del ancla al objetivo antes de elegir N; usar 2x margen.
+   - Nunca asumir formato minificado ni expandido del CSS: tolerar `\s*\{` y `;?\}`.
+   - En media queries, anclar al texto `max-width:Npx` y usar `[\s\S]{0,N}?` generoso — nunca exigir `{` adyacente.
+   - Preferir 2 asserts precisos (regla base existe + sub-regla usa token X) antes que 1 regex gigante frágil.
+3. **Costo real del anti-patrón en este ciclo:** 7 ciclos extra de test-fail→debug por ventanas cortas o
+   literales mal elegidos. Con estas reglas, cada uno era evitable en la primera escritura del test.
+
+### Leccion 36.3: Migrar JS/CSS inline al design system dispara tres deberes simultáneos en el MISMO commit — re-apuntar tests, regenerar .min.*, y aislar drift preexistente de otros assets
+
+1. **Tests que grep-ean el template origen quedan huérfanos** (#119 confirmado en dominio frontend):
+   `HomeQuickViewAttrTest` y `WishlistPvToggleTest` validaban attrs/marcos que solo existían vía el bloque
+   inline migrado. Ambos se re-apuntaron a la delegación (`wc_get_template_part`) en el mismo commit
+   `d38bb837`. Igual con `OrderTrackingAuditTest::test_004` → ahora lee el source del design system JS.
+2. **El build regenera TODOS los .min.*** (`node scripts/build.js` itera assets/js/*.js y assets/css/*.css
+   completos). Eso destapa drift PREEXISTENTE de assets ajenos al fix (en este ciclo: `ltms-login-register.min.js/.css`
+   estaban desactualizados vs su fuente desde antes de la sesión). **Regla: tras cada build, revisar
+   `git status`; los .min.* ajenos al hallazgo NO se commitean con él — se reportan aparte** (mezclarlos
+   ensucia la atomicidad y puede publicar cambios de terceros no revisados).
+3. **Contrato de doble archivo:** todo fix en `ltms-plaza-viva.js/.css` exige su par en `.min.js/.min.css`
+   (terser/clean-css preservan strings/selectores — los asserts de sync van sobre literales, no sobre
+   comments, que el minificador borra). Test canónico: `test_009_min_js_sincronizado_con_scope_tracking`.
+4. **Enqueue global verificado antes de migrar:** el scope nuevo solo funciona si el bundle llega a esa página.
+   `enqueue_assets()` se engancha en `wp_enqueue_scripts` sin guard de página — verificado ANTES de mover el
+   script inline de order-tracking. Si algún día ese enqueue se vuelve condicional, el test CSP del template
+   pasará igual (no ejecuta JS) y el behaviour morirá en silencio: añadir cross-check si cambia.
+
+
 
 
 
