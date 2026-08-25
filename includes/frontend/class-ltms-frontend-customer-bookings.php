@@ -110,7 +110,9 @@ final class LTMS_Frontend_Customer_Bookings {
             .ltms-cb-grid-item span { font-size: .9rem; color: #111827; font-weight: 500; }
             .ltms-cb-refund { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: .82rem; color: #92400e; margin-bottom: 14px; }
             .ltms-cb-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-            .ltms-cb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 18px; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: all .15s; text-decoration: none; }
+            /* AUDIT-FE-UIUX3-MA-03 FIX: transicion limitada a propiedades visuales explicitas
+               (patron D-27 del ciclo 2: nada de transiciones comodin que animen layout). */
+            .ltms-cb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 18px; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: background .15s, border-color .15s, color .15s; text-decoration: none; }
             .ltms-cb-btn-danger { background: #fee2e2; color: #991b1b; }
             .ltms-cb-btn-danger:hover { background: #fecaca; }
             .ltms-cb-btn-outline { background: transparent; color: #374151; border: 1.5px solid #d1d5db; }
