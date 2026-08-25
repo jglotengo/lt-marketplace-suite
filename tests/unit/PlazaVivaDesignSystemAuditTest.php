@@ -976,4 +976,67 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D05 regression: los estados orientadores no deben volver a --danger'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D06 (P1, touch targets <44px y hover-only): fav 38px
+	 * con opacity:0 hover-only, acciones del card 40px hover-only, remove
+	 * del carrito 36px, chip de cupón 20px, inputs de cupón 42px. Fix:
+	 * 44px en todos + :focus-within revela + @media(hover:none) muestra
+	 * las acciones siempre en táctil + hit-area expandida en el chip.
+	 */
+	public function test_025_touch_targets_44px_y_visibles_en_tactil(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		$cko_css = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$cko = file_get_contents( $cko_css );
+
+		$cart_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		$cart = file_get_contents( $cart_path );
+
+		// (1) Fav del card a 44px + focus-within + hover:none siempre visible.
+		$this->assertMatchesRegularExpression(
+			'/__fav\s*\{[^}]*width:44px;height:44px/s',
+			$css,
+			'UIUX2-D06 fix: el fav del product card debe medir 44px'
+		);
+		$this->assertMatchesRegularExpression(
+			'/@media \(hover:none\)\{[^}]*__fav\{opacity:1/s',
+			$css,
+			'UIUX2-D06 fix: en táctil el fav debe estar siempre visible'
+		);
+		$this->assertMatchesRegularExpression(
+			'/-card:focus-within \.pv-product-card__fav\{opacity:1/s',
+			$css,
+			'UIUX2-D06 fix: el fav debe revelarse con focus-within (teclado)'
+		);
+
+		// (2) Acciones del card a 44px.
+		$this->assertMatchesRegularExpression(
+			'/__actions \.pv-btn\{flex:1;height:44px/s',
+			$css,
+			'UIUX2-D06 fix: los botones de acción del card deben medir 44px'
+		);
+
+		// (3) Remove del carrito a 44px.
+		$this->assertMatchesRegularExpression(
+			'/__item-remove\s*\{[^}]*width:44px;height:44px/s',
+			$cart,
+			'UIUX2-D06 fix: el remove del carrito debe medir 44px'
+		);
+
+		// (4) Chip de cupón con hit-area expandida.
+		$this->assertMatchesRegularExpression(
+			'/__coupon-chip-remove::before\s*\{[^}]*inset:-10px/s',
+			$cart,
+			'UIUX2-D06 fix: el chip-remove debe expandir su hit-area'
+		);
+
+		// (5) Cupón checkout a 44px.
+		$this->assertDoesNotMatchRegularExpression(
+			'/height:42px/',
+			$cko,
+			'UIUX2-D06 regression: no deben quedar touch targets de 42px en checkout'
+		);
+	}
 }
