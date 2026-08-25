@@ -742,7 +742,7 @@ get_header();
     background:var(--primary-50);color:var(--primary);
 }
 .pv-scope.pv-tracking .pv-tracking__order-meta{display:flex;flex-direction:column;gap:3px;min-width:0;}
-.pv-scope.pv-tracking .pv-tracking__order-label{font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.pv-scope.pv-tracking .pv-tracking__order-label{font-size:12px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
 .pv-scope.pv-tracking .pv-tracking__order-number{font-family:var(--display);font-weight:800;font-size:24px;line-height:1.1;color:var(--text);margin:0;}
 .pv-scope.pv-tracking .pv-tracking__order-date{
     display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-3);
@@ -759,7 +759,7 @@ get_header();
 .pv-scope.pv-tracking .pv-tracking__status--on-hold,
 .pv-scope.pv-tracking .pv-tracking__status--pending{background:#FFF4E0;color:#a06b00;}
 .pv-scope.pv-tracking .pv-tracking__order-total{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
-.pv-scope.pv-tracking .pv-tracking__order-total-label{font-size:12px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.pv-scope.pv-tracking .pv-tracking__order-total-label{font-size:12px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
 .pv-scope.pv-tracking .pv-tracking__order-total-value{font-family:var(--display);font-weight:800;font-size:22px;color:var(--primary);}
 
 /* Main layout */
@@ -949,7 +949,7 @@ get_header();
     display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;
 }
 .pv-scope.pv-tracking .pv-eta-card__label{
-    font-size:12px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    font-size:12px;color:var(--text-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em;
 }
 .pv-scope.pv-tracking .pv-eta-card__date{
     font-family:var(--display);font-weight:800;font-size:22px;color:var(--text);line-height:1.2;
@@ -983,7 +983,7 @@ get_header();
     display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;
 }
 .pv-scope.pv-tracking .pv-tracker-card__label{
-    font-size:12px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    font-size:12px;color:var(--text-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em;
 }
 .pv-scope.pv-tracking .pv-tracker-card__rating{
     display:inline-flex;align-items:center;gap:4px;

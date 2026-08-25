@@ -1075,4 +1075,28 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D07: enqueue_assets debe seguir global (el kill-switch reduced-motion y todo el design system dependen de ello)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D08 (P1, contraste WCAG AA): labels uppercase 12px en
+	 * --text-3 (3.1:1) en tracking y .optional 0.78rem #9ca3af (2.5:1) en
+	 * checkout. Fix: --text-2 (7:1) y mínimo 12px.
+	 */
+	public function test_027_contraste_labels_aa(): void {
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+
+		// (1) Labels uppercase del tracking ya no usan --text-3.
+		$this->assertDoesNotMatchRegularExpression(
+			'/text-transform:uppercase[^;}]*color:var\(--text-3\)|color:var\(--text-3\)[^;}]*text-transform:uppercase/',
+			$tracking,
+			'UIUX2-D08 fix: los labels uppercase del tracking no deben usar --text-3 (3.1:1 < AA)'
+		);
+
+		// (2) .optional con tamaño y color AA.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-checkout__form \.optional\s*\{[^}]*var\(--text-2\)[^}]*font-size: ?12px/s',
+			$cko_css,
+			'UIUX2-D08 fix: .optional debe ser >=12px en --text-2'
+		);
+	}
 }

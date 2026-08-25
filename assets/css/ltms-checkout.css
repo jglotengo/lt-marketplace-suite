@@ -784,10 +784,11 @@
     cursor: pointer;
 }
 
-/* Campos opcionales: estilo sutil */
+/* Campos opcionales: estilo sutil — AUDIT-FE-UIUX2-D08 FIX: 0.78rem +
+   --text-3 fallaba WCAG AA (≈2.5:1). Mínimo 12px + --text-2 (7:1). */
 .pv-checkout__form .optional {
-    color: var(--text-3);
-    font-size: 0.78rem;
+    color: var(--text-2);
+    font-size: 12px;
     font-weight: 400;
 }
 
