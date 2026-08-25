@@ -293,7 +293,7 @@
 
 /* UX-AUDIT-FE-P0-03 FIX: .pv-btn--brand ahora vive en el design system global
  * (ltms-plaza-viva.css §3 COMPONENTS · BUTTONS) usando --brand token. Antes
- * estaba duplicado aquí con #E80001 hardcodeado. Eliminada la definición
+ * estaba duplicado aquí con var(--brand) hardcodeado. Eliminada la definición
  * scoped — el selector global .pv-btn--brand ya aplica dentro de .pv-scope
  * por el reset de PV. */
 
@@ -303,7 +303,7 @@
 }
 .pv-scope.pv-checkout .pv-checkout__submit[disabled],
 .pv-scope.pv-checkout .pv-checkout__submit.is-loading{
-    pointer-events:none;background:#B80001;color:transparent;
+    pointer-events:none;background:var(--brand-600);color:transparent;
 }
 .pv-scope.pv-checkout .pv-checkout__submit[disabled]::after,
 .pv-scope.pv-checkout .pv-checkout__submit.is-loading::after{
@@ -319,12 +319,12 @@
 .pv-scope.pv-checkout .ltms-checkout-consent{
     display:flex;align-items:flex-start;gap:10px;
     padding:14px 16px;margin:12px 0;
-    background:#FFF9F9;border:1px solid #FFD6D6;border-left:4px solid #E80001;
+    background:var(--brand-50);border:1px solid var(--brand-100);border-left:4px solid var(--brand);
     border-radius:10px;cursor:pointer;transition:all .15s;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle:hover,
 .pv-scope.pv-checkout .ltms-checkout-consent:hover{
-    background:#FFF1F1;border-color:#E80001;
+    background:var(--brand-50);border-color:var(--brand);
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle input[type="checkbox"],
 .pv-scope.pv-checkout .ltms-checkout-consent input[type="checkbox"]{
@@ -333,25 +333,25 @@
 .pv-scope.pv-checkout .pv-checkout__terms-toggle .pv-checkout__ship-toggle-mark,
 .pv-scope.pv-checkout .ltms-checkout-consent .ltms-checkout-consent-mark,
 .pv-scope.pv-checkout .ltms-checkout-consent::before{
-    flex-shrink:0;width:22px;height:22px;border:2px solid #D1D5DB;
+    flex-shrink:0;width:22px;height:22px;border:2px solid var(--border-2);
     border-radius:6px;background:#fff;display:flex;align-items:center;
     justify-content:center;transition:all .15s;color:#fff;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle input:checked + .pv-checkout__ship-toggle-mark,
 .pv-scope.pv-checkout .ltms-checkout-consent input:checked + .ltms-checkout-consent-mark{
-    background:#E80001;border-color:#E80001;
+    background:var(--brand);border-color:var(--brand);
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle input:focus-visible + .pv-checkout__ship-toggle-mark,
 .pv-scope.pv-checkout .ltms-checkout-consent input:focus-visible + .ltms-checkout-consent-mark{
-    outline:2px solid #E80001;outline-offset:2px;
+    outline:2px solid var(--brand);outline-offset:2px;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle .pv-checkout__ship-toggle-text,
 .pv-scope.pv-checkout .ltms-checkout-consent span:not(.ltms-checkout-consent-mark){
-    font-size:13px;line-height:1.5;color:#1A1F2E;font-weight:500;
+    font-size:13px;line-height:1.5;color:var(--text);font-weight:500;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle a,
 .pv-scope.pv-checkout .ltms-checkout-consent a{
-    color:#E80001;font-weight:600;text-decoration:underline;
+    color:var(--brand);font-weight:600;text-decoration:underline;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle a:hover,
 .pv-scope.pv-checkout .ltms-checkout-consent a:hover{
@@ -484,24 +484,24 @@
     gap: 10px;
     padding: 12px 16px;
     margin: 8px 0;
-    background: #FFF9F9;
-    border: 1px solid #FFD6D6;
-    border-left: 4px solid #E80001;
+    background: var(--brand-50);
+    border: 1px solid var(--brand-100);
+    border-left: 4px solid var(--brand);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.15s;
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle:hover,
 .pv-scope.pv-checkout .ltms-checkout-consent:hover {
-    background: #FFF1F1;
-    border-color: #E80001;
+    background: var(--brand-50);
+    border-color: var(--brand);
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle input[type="checkbox"],
 .pv-scope.pv-checkout .ltms-checkout-consent input[type="checkbox"] {
     width: 20px;
     height: 20px;
     margin-top: 2px;
-    accent-color: #E80001;
+    accent-color: var(--brand);
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -509,7 +509,7 @@
 .pv-scope.pv-checkout .ltms-checkout-consent label {
     font-size: 13px;
     font-weight: 500;
-    color: #1A1F2E;
+    color: var(--text);
     line-height: 1.5;
     cursor: pointer;
     display: flex;
@@ -519,7 +519,7 @@
 }
 .pv-scope.pv-checkout .pv-checkout__terms-toggle a,
 .pv-scope.pv-checkout .ltms-checkout-consent a {
-    color: #E80001;
+    color: var(--brand);
     font-weight: 600;
     text-decoration: underline;
 }
@@ -535,21 +535,21 @@
     gap: 10px;
     padding: 14px 16px;
     margin: 16px 0 12px;
-    background: #FFF9F9;
-    border: 1px solid #FFD6D6;
-    border-left: 4px solid #E80001;
+    background: var(--brand-50);
+    border: 1px solid var(--brand-100);
+    border-left: 4px solid var(--brand);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.15s;
 }
 .pv-scope.pv-checkout #ship-to-different-address:hover {
-    background: #FFF1F1;
-    border-color: #E80001;
+    background: var(--brand-50);
+    border-color: var(--brand);
 }
 .pv-scope.pv-checkout #ship-to-different-address label {
     font-size: 14px;
     font-weight: 600;
-    color: #1A1F2E;
+    color: var(--text);
     line-height: 1.5;
     cursor: pointer;
     display: flex;
@@ -561,7 +561,7 @@
     width: 20px;
     height: 20px;
     margin-top: 2px;
-    accent-color: #E80001;
+    accent-color: var(--brand);
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -570,22 +570,22 @@
 .pv-scope.pv-checkout .ltms-invoice-toggle-row {
     padding: 14px 16px !important;
     margin: 12px 0 !important;
-    background: #FFF9F9 !important;
-    border: 1px solid #FFD6D6 !important;
-    border-left: 4px solid #E80001 !important;
+    background: var(--brand-50) !important;
+    border: 1px solid var(--brand-100) !important;
+    border-left: 4px solid var(--brand) !important;
     border-radius: 10px !important;
 }
 .pv-scope.pv-checkout .ltms-invoice-toggle-row label {
     font-size: 14px;
     font-weight: 600;
-    color: #1A1F2E;
+    color: var(--text);
     cursor: pointer;
 }
 .pv-scope.pv-checkout .ltms-invoice-toggle-row input[type="checkbox"] {
     width: 20px;
     height: 20px;
     margin-top: 2px;
-    accent-color: #E80001;
+    accent-color: var(--brand);
     cursor: pointer;
 }
 
@@ -594,19 +594,19 @@
 .pv-scope.pv-checkout .woocommerce-billing-fields legend {
     font-size: 15px;
     font-weight: 700;
-    color: #1A1F2E;
+    color: var(--text);
     margin: 0 0 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #E7E5EC;
+    border-bottom: 1px solid var(--border);
 }
 .pv-scope.pv-checkout .woocommerce-shipping-fields h3,
 .pv-scope.pv-checkout .woocommerce-shipping-fields legend {
     font-size: 15px;
     font-weight: 700;
-    color: #1A1F2E;
+    color: var(--text);
     margin: 0 0 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #E7E5EC;
+    border-bottom: 1px solid var(--border);
 }
 
 /* ============================================================================
@@ -620,7 +620,7 @@
     height: 20px !important;
     position: static !important;
     margin-top: 2px !important;
-    accent-color: #E80001 !important;
+    accent-color: var(--brand) !important;
     cursor: pointer !important;
     flex-shrink: 0 !important;
 }
@@ -643,7 +643,7 @@
     align-items: flex-start !important;
     gap: 8px !important;
     font-size: 14px !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     line-height: 1.5 !important;
 }
 
@@ -677,10 +677,10 @@
 .pv-scope.pv-checkout .woocommerce-billing-fields h3::before {
     font-size: 15px !important;
     font-weight: 700 !important;
-    color: #1A1F2E !important;
+    color: var(--text) !important;
     margin: 0 0 12px !important;
     padding-bottom: 8px !important;
-    border-bottom: 1px solid #E7E5EC !important;
+    border-bottom: 1px solid var(--border) !important;
 }
 
 .pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
@@ -694,10 +694,10 @@
 .pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
     font-size: 15px !important;
     font-weight: 700 !important;
-    color: #1A1F2E !important;
+    color: var(--text) !important;
     margin: 0 0 12px !important;
     padding-bottom: 8px !important;
-    border-bottom: 1px solid #E7E5EC !important;
+    border-bottom: 1px solid var(--border) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -708,19 +708,19 @@
 .pv-checkout__login-toggle {
     margin-bottom: 12px;
     padding: 10px 14px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--bg);
+    border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.85rem;
 }
 .pv-checkout__login-toggle summary {
     cursor: pointer;
-    color: #2563eb;
+    color: var(--primary);
     font-weight: 600;
     user-select: none;
 }
-.pv-checkout__login-toggle summary:hover { color: #1e40af; }
-.pv-checkout__login-body { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+.pv-checkout__login-toggle summary:hover { color: var(--primary-700); }
+.pv-checkout__login-body { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* Checkbox "Crear cuenta": ocultar por defecto (causa confusión) */
 .pv-checkout__form .createaccount,
@@ -741,7 +741,7 @@
 .pv-checkout__form input[type="checkbox"] {
     width: 18px;
     height: 18px;
-    accent-color: #E80001;
+    accent-color: var(--brand);
     flex-shrink: 0;
     margin-right: 8px;
     cursor: pointer;
@@ -749,7 +749,7 @@
 .pv-checkout__form input[type="checkbox"] + span,
 .pv-checkout__form label.checkbox {
     font-size: 0.85rem !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     line-height: 1.4;
 }
 
@@ -770,8 +770,8 @@
 /* Términos y condiciones: destacar */
 .pv-checkout__terms-toggle {
     padding: 12px 14px;
-    background: #eff6ff;
-    border: 1.5px solid #3b82f6;
+    background: var(--primary-50);
+    border: 1.5px solid var(--primary);
     border-radius: 8px;
     margin: 12px 0;
     display: flex;
@@ -782,7 +782,7 @@
 
 /* Campos opcionales: estilo sutil */
 .pv-checkout__form .optional {
-    color: #9ca3af;
+    color: var(--text-3);
     font-size: 0.78rem;
     font-weight: 400;
 }
@@ -839,14 +839,14 @@
     gap: 8px !important;
     margin-top: 10px !important;
     font-size: 14px !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     cursor: pointer !important;
 }
 .woocommerce-form-login__rememberme input[type="checkbox"],
 .woocommerce-form-login input[name="rememberme"] {
     width: 18px !important;
     height: 18px !important;
-    accent-color: #E80001 !important;
+    accent-color: var(--brand) !important;
     flex-shrink: 0 !important;
     margin: 0 !important;
     cursor: pointer !important;
@@ -854,7 +854,7 @@
 .woocommerce-form-login__rememberme span,
 .woocommerce-form-login .woocommerce-form__label-for-checkbox span {
     font-size: 14px !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     font-weight: 500 !important;
 }
 
@@ -866,12 +866,12 @@
 .pv-checkout .woocommerce-form-login input[type="password"] {
     width: 100% !important;
     padding: 10px 14px !important;
-    border: 1.5px solid #d1d5db !important;
+    border: 1.5px solid var(--border-2) !important;
     border-radius: 8px !important;
     font-size: 14px !important;
 }
 .pv-checkout .woocommerce-form-login .woocommerce-form-login__submit {
-    background: #E80001 !important;
+    background: var(--brand) !important;
     color: #fff !important;
     border: none !important;
     border-radius: 8px !important;
@@ -880,19 +880,19 @@
     cursor: pointer !important;
 }
 .pv-checkout .woocommerce-form-login .woocommerce-form-login__submit:hover {
-    background: #B90001 !important;
+    background: var(--brand-600) !important;
 }
 
 /* Asegurar que el link 'Acceder' del toggle sea claro */
 .pv-checkout__login-toggle summary {
     font-size: 14px !important;
     font-weight: 600 !important;
-    color: #2563eb !important;
+    color: var(--primary) !important;
     cursor: pointer !important;
     padding: 8px 0 !important;
 }
 .pv-checkout__login-toggle summary:hover {
-    color: #1e40af !important;
+    color: var(--primary-700) !important;
 }
 
 /* Ocultar el checkbox 'Recuérdame' duplicado si hay dos login forms */
@@ -913,7 +913,7 @@
     align-items: flex-start !important;
     gap: 8px !important;
     font-size: 14px !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     line-height: 1.5 !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -923,7 +923,7 @@
 .ltms-checkout-consent input[type="checkbox"] {
     width: 18px !important;
     height: 18px !important;
-    accent-color: #E80001 !important;
+    accent-color: var(--brand) !important;
     flex-shrink: 0 !important;
     margin-top: 2px !important;
     cursor: pointer !important;
@@ -935,7 +935,7 @@
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    color: #374151 !important;
+    color: var(--text-2) !important;
     font-size: 14px !important;
     line-height: 1.5 !important;
 }
@@ -944,7 +944,7 @@
 .pv-checkout__terms-toggle input[type="checkbox"] {
     width: 18px !important;
     height: 18px !important;
-    accent-color: #E80001 !important;
+    accent-color: var(--brand) !important;
     flex-shrink: 0 !important;
     margin-top: 2px !important;
     cursor: pointer !important;
@@ -983,7 +983,7 @@
 }
 .pv-escrow-notice p {
     font-size: 12px !important;
-    color: #4b5563 !important;
+    color: var(--text-2) !important;
     line-height: 1.4 !important;
 }
 
@@ -1005,6 +1005,6 @@
 #ltms_needs_invoice {
     width: 20px !important;
     height: 20px !important;
-    accent-color: #E80001 !important;
+    accent-color: var(--brand) !important;
     cursor: pointer !important;
 }
