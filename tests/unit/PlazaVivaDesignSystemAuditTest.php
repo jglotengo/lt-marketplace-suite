@@ -661,4 +661,48 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-013: el item FAQ debe conservar data-pv-faq-item para el filtro en vivo'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-014 (P2-2, bundle total: decisión de diseño congelada).
+	 *
+	 * La sugerencia original era migrar el formateo del total del bundle a
+	 * Intl.NumberFormat. Se resuelve como NO-APLICABLE intencional:
+	 *
+	 *   1. El formateo cliente ya replica EXACTAMENTE el config de moneda de
+	 *      WooCommerce (symbol/decimal/thousand/decimals/position via
+	 *      PV.config.pvCurrency — AUDIT-FE-SP-002). Intl.NumberFormat usa
+	 *      reglas de locale que pueden DIVERGIR del formato WC configurado
+	 *      en la tienda (p.ej. separador de miles o posición del símbolo
+	 *      custom) → precios inconsistentes en la misma página.
+	 *   2. El valor inicial renderizado server-side (wc_price) es efímero:
+	 *      productScope llama recompute() al init, reemplazándolo de inmediato
+	 *      por el cálculo cliente — cero divergencia real incluso sin interacción.
+	 *
+	 * Este test congela ambos invariantes para que una futura "optimización"
+	 * no rompa la paridad de formato con WC.
+	 */
+	public function test_016_bundle_total_formato_parity_con_wc(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// (1) El formateo del bundle lee el config de moneda de WC (no Intl).
+		$this->assertMatchesRegularExpression(
+			'/function formatMoney\(n\)\s*\{[^}]*PV\.config(\.\w+)?\.pvCurrency/s',
+			$js,
+			'AUDIT-FE-PV-DS-014: formatMoney debe leer PV.config.pvCurrency (config WC) — NO migrar a Intl.NumberFormat'
+		);
+		$this->assertStringNotContainsString(
+			'Intl.NumberFormat',
+			$js,
+			'AUDIT-FE-PV-DS-014 regression: Intl.NumberFormat divergería del formato de precios de WC — mantener formatMoney con config WC'
+		);
+
+		// (2) recompute() corre al init del scope PRODUCT (total siempre cliente).
+		$this->assertMatchesRegularExpression(
+			'/items\.forEach\(function \(it\)\s*\{[\s\S]*?recompute\(\);/',
+			$js,
+			'AUDIT-FE-PV-DS-014: recompute() debe correr al init para reemplazar el total server-side sin esperar interacción'
+		);
+	}
 }
