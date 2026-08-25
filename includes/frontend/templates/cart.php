@@ -947,21 +947,24 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
  * Variante danger del ghost button (rojo sutil para indicar acción
  * destructiva). Estados: hover refuerza brand-danger, is-loading
  * deshabilita y muestra indicador. is-pending marca el botón update
- * cuando cambian cantidades (del script migrado a ltms-plaza-viva.js). */
-.pv-scope.pv-cart .pv-btn--danger{color:var(--danger, #dc2626);border-color:rgba(220,38,38,0.3);}
-.pv-scope.pv-cart .pv-btn--danger:hover{background:rgba(220,38,38,0.08);border-color:var(--danger, #dc2626);}
-.pv-scope.pv-cart .pv-btn--danger:focus-visible{outline:2px solid var(--danger, #dc2626);outline-offset:2px;}
+ * cuando cambian cantidades (del script migrado a ltms-plaza-viva.js).
+ * AUDIT-FE-UIUX2-D15 FIX: fallbacks de otra época eliminados (--primary
+ * apuntaba a teal #00867d en el fallback) y el keyframe pulsaba teal en
+ * vivo — todo normalizado a los tokens actuales. */
+.pv-scope.pv-cart .pv-btn--danger{color:var(--danger);border-color:rgba(229,72,77,0.3);}
+.pv-scope.pv-cart .pv-btn--danger:hover{background:rgba(229,72,77,0.08);border-color:var(--danger);}
+.pv-scope.pv-cart .pv-btn--danger:focus-visible{outline:2px solid var(--danger);outline-offset:2px;}
 .pv-scope.pv-cart .pv-btn--danger:disabled,
 .pv-scope.pv-cart .pv-btn--danger.is-loading{opacity:0.55;cursor:default;pointer-events:none;}
 .pv-scope.pv-cart .pv-btn--danger.is-loading{cursor:wait;}
 .pv-scope.pv-cart .pv-cart__update-btn.is-pending{
-    background:var(--primary-50, #eef6ff);border-color:var(--primary, #00867d);
-    color:var(--primary-700, #006b63);font-weight:700;
+    background:var(--primary-50);border-color:var(--primary);
+    color:var(--primary-700);font-weight:700;
     animation:pv-pulse-pending 1.4s ease-in-out infinite;
 }
 @keyframes pv-pulse-pending{
-    0%,100%{box-shadow:0 0 0 0 rgba(0,134,125,0);}
-    50%{box-shadow:0 0 0 4px rgba(0,134,125,0.18);}
+    0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,0);}
+    50%{box-shadow:0 0 0 4px rgba(37,99,235,0.18);}
 }
 
 /* Payment methods */

@@ -1179,4 +1179,40 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D16 fix: el empty de reseñas debe tener CTA al tab de productos'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D15 (P1, residuos de paleta legacy en cart inline):
+	 * fallbacks var(--primary, #00867d teal) y keyframe pv-pulse-pending
+	 * que pulsaba teal rgba(0,134,125) en vivo. Fix: tokens limpios y
+	 * pulso azul primario.
+	 */
+	public function test_032_cart_sin_residuos_teal_legacy(): void {
+		$cart_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		$this->assertFileExists( $cart_path );
+		$cart = file_get_contents( $cart_path );
+
+		// (1) Sin fallback teal en primary.
+		$this->assertDoesNotMatchRegularExpression(
+			'/var\(--primary-700?,\s*#00[68]b?6[0-9a-f]{2}\)/i',
+			$cart,
+			'UIUX2-D15 fix: no debe haber fallback teal #00867d/#006b63'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/var\(--danger,\s*#dc2626\)/i',
+			$cart,
+			'UIUX2-D15 fix: no debe haber fallback #dc2626'
+		);
+
+		// (2) El pulso is-pending es azul primario.
+		$this->assertDoesNotMatchRegularExpression(
+			'/rgba\(0,\s*134,\s*125/',
+			$cart,
+			'UIUX2-D15 regression: el keyframe no debe volver a pulsar teal'
+		);
+		$this->assertMatchesRegularExpression(
+			'/pv-pulse-pending\s*\{\s*0%,100%\{box-shadow:0 0 0 0 rgba\(37,99,235,0\);\}/',
+			$cart,
+			'UIUX2-D15 fix: el pulso is-pending debe usar el azul primario'
+		);
+	}
 }
