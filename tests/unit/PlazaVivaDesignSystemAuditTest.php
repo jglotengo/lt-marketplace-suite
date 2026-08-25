@@ -594,4 +594,38 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-011 regression: posts_per_page no debe hardcodearse numéricamente — usar el filtro'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-012 (P1-11, badge Star Seller frágil): el badge usaba
+	 * right:50% + translateX(30px) fijo — la alineación dependía del ancho
+	 * del texto del badge (fuente/traducción lo rompen). Fix: wrapper
+	 * .pv-vendor-card__avatar-wrap alrededor de avatar+badge y centrado
+	 * real con left:50% + translateX(-50%), independiente del ancho.
+	 */
+	public function test_014_vendor_star_badge_centrado_width_independiente(): void {
+		$this->assertFileExists( $this->home_template_path );
+		$home = file_get_contents( $this->home_template_path );
+
+		// (1) El markup envuelve avatar+badge en el wrapper relativo.
+		$this->assertMatchesRegularExpression(
+			'/pv-vendor-card__avatar-wrap">\s*<span class="pv-vendor-card__avatar">[\s\S]{0,300}?pv-vendor-card__star/',
+			$home,
+			'AUDIT-FE-PV-DS-012 fix: avatar y badge Star Seller deben vivir dentro de .pv-vendor-card__avatar-wrap'
+		);
+
+		// (2) El CSS centra con translateX(-50%) — width-independiente.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-vendor-card__star\{[^}]*left:50%;transform:translateX\(-50%\)/',
+			$home,
+			'AUDIT-FE-PV-DS-012 fix: el badge debe centrarse con left:50%+translateX(-50%) respecto al wrapper del avatar'
+		);
+
+		// (3) El hack viejo desapareció de la REGLA (los comments pueden
+		// documentarlo).
+		$this->assertDoesNotMatchRegularExpression(
+			'/\.pv-vendor-card__star\s*\{[^}]*translateX\(30px\)/',
+			$home,
+			'AUDIT-FE-PV-DS-012 regression: la regla .pv-vendor-card__star no debe volver a usar el offset fijo translateX(30px)'
+		);
+	}
 }

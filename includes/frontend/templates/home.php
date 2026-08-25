@@ -550,9 +550,15 @@ do_action( 'ltms_before_home_plazaviva' );
                 ?>
                     <article class="pv-vendor-card pv-card pv-fade-up" role="listitem">
                         <div class="pv-vendor-card__head">
-                            <span class="pv-vendor-card__avatar"><?php echo $pv_vavatar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
-                            <span class="pv-badge pv-badge--gold pv-vendor-card__star">
-                                <?php esc_html_e( '★ Star Seller', 'ltms' ); ?>
+                            <!-- AUDIT-FE-PV-DS-012 FIX (P1-11): el badge vive dentro
+                                 del wrapper del avatar y se centra con translateX(-50%)
+                                 — antes usaba right:50%+translateX(30px) fijo, que se
+                                 desalineaba si el ancho del badge cambiaba. -->
+                            <span class="pv-vendor-card__avatar-wrap">
+                                <span class="pv-vendor-card__avatar"><?php echo $pv_vavatar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+                                <span class="pv-badge pv-badge--gold pv-vendor-card__star">
+                                    <?php esc_html_e( '★ Star Seller', 'ltms' ); ?>
+                                </span>
                             </span>
                         </div>
                         <div class="pv-vendor-card__body">
@@ -855,9 +861,15 @@ do_action( 'ltms_after_home_plazaviva' );
     border:3px solid var(--gold-100);box-shadow:var(--sh-1);
 }
 .pv-scope.pv-home .pv-vendor-card__avatar img{width:100%;height:100%;object-fit:cover;}
+/* AUDIT-FE-PV-DS-012 FIX (P1-11): wrapper relativo del avatar — el badge
+   Star Seller se centra respecto al AVATAR (translateX(-50%)) en vez del
+   hack right:50%+translateX(30px) dependiente del ancho del badge. */
+.pv-scope.pv-home .pv-vendor-card__avatar-wrap{
+    position:relative;display:inline-block;
+}
 .pv-scope.pv-home .pv-vendor-card__star{
-    position:absolute;bottom:-4px;right:50%;transform:translateX(30px);
-    box-shadow:var(--sh-1);
+    position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+    box-shadow:var(--sh-1);white-space:nowrap;z-index:1;
 }
 .pv-scope.pv-home .pv-vendor-card__body{display:flex;flex-direction:column;gap:6px;align-items:center;width:100%;}
 .pv-scope.pv-home .pv-vendor-card__name{
