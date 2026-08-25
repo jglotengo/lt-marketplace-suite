@@ -473,7 +473,7 @@
                         ${t('ob_subtitle', 'Completa estos 4 pasos para tener tu tienda 100% lista y empezar a vender. Puedes hacerlos en el orden que prefieras.')}
                     </div>
                     <div style="background:#eff6ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.82rem;color:#1e40af;font-weight:600;">
-                        ⏳ ${t('ob_time', 'Tiempo estimado: 10-15 minutos · Si tienes dudas, contacta soporte@lo-tengo.com.co')}
+                        ⏳ ${t('ob_time', 'Tiempo estimado: 10-15 minutos · Si tienes dudas, contacta pqrscolombia@lo-tengo.com.co')}
                     </div>
                     ${stepsHtml}
                     <div style="margin-top:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;font-size:.8rem;color:#6b7280;line-height:1.5;">

@@ -414,7 +414,11 @@ get_header( 'shop' );
                                              pasarelas era callejón sin salida; ahora
                                              incluye acción real de contacto. -->
                                         <p><?php
-                                            $pv_support_email = apply_filters( 'ltms_support_email', get_option( 'admin_email' ) );
+                                            // AUDIT-FE-EMAILS-01 FIX: misma fuente canónica que
+                                            // help-center.php:35 (opción ltms_support_email con
+                                            // fallback admin_email) — antes leía admin_email
+                                            // directo y mostraba un gmail distinto al canal de ayuda.
+                                            $pv_support_email = apply_filters( 'ltms_support_email', get_option( 'ltms_support_email', get_option( 'admin_email' ) ) );
                                             printf(
                                                 /* translators: %s: email de soporte */
                                                 esc_html__( 'No hay métodos de pago configurados todavía. Escríbenos a %s y lo resolvemos enseguida.', 'ltms' ),

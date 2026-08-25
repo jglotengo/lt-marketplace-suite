@@ -1514,4 +1514,35 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'D31 fix: faltan estilos de notices WC en el design system'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-EMAILS-01 (actualización de correos oficiales info.txt):
+	 * soporte@lo-tengo.com.co no es un correo oficial (oficiales: dircomercialcol@,
+	 * pqrscolombia@, sellerscolombia@, rgutierrez@, jgmontes@ — todos
+	 * @lo-tengo.com.co). El dashboard lo mostraba y el checkout leía
+	 * admin_email (gmail) en vez de la opción canónica ltms_support_email.
+	 */
+	public function test_041_emails_oficiales_sin_soporte_generico(): void {
+		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-dashboard.js' );
+		$cko_tpl = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/checkout.php' );
+
+		// (1) El dashboard ya no muestra el correo no-oficial.
+		$this->assertDoesNotMatchRegularExpression(
+			'/soporte@lo-tengo\.com\.co/',
+			$js,
+			'EMAILS-01 fix: soporte@ no es oficial — usar pqrscolombia@'
+		);
+		$this->assertStringContainsString(
+			'pqrscolombia@lo-tengo.com.co',
+			$js,
+			'EMAILS-01: el dashboard debe mostrar el correo oficial PQRS'
+		);
+
+		// (2) El checkout lee la opción canónica ltms_support_email.
+		$this->assertMatchesRegularExpression(
+			"/apply_filters\( 'ltms_support_email', get_option\( 'ltms_support_email', get_option\( 'admin_email' \) \) \)/",
+			$cko_tpl,
+			'EMAILS-01 fix: el checkout debe leer ltms_support_email (misma fuente que help-center)'
+		);
+	}
 }
