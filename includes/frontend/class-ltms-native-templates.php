@@ -370,6 +370,10 @@ class LTMS_Native_Templates {
                 'faq_result_singular' => _n( 'resultado', 'resultado', 1, 'ltms' ),
                 'faq_result_plural'   => _n( 'resultado', 'resultados', 2, 'ltms' ),
                 'chat_unavailable'    => __( 'El chat no está disponible en este momento. Escríbenos por WhatsApp o email.', 'ltms' ),
+                // AUDIT-FE-PV-DS-015 FIX (P2-3): acknowledgment inmediato al
+                // aplicar cupón en el carrito (el resultado real lo imprime WC
+                // tras el reload; este toast cubre la espera).
+                'couponApplying'      => __( 'Aplicando cupón…', 'ltms' ),
             ],
         ] );
     }

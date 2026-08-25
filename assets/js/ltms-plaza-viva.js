@@ -1213,6 +1213,15 @@
         couponBtn.addEventListener('click', function (e) {
           var hidden = couponForm.querySelector('input[name="coupon_code"]');
           if (hidden) { hidden.value = couponInput.value; }
+          // AUDIT-FE-PV-DS-015 FIX (P2-3): acknowledgment inmediato al aplicar
+          // (el submit recarga la página y WC imprime su notice de éxito/error;
+          // sin este toast el clic no daba feedback hasta terminar el reload).
+          if (PV.toast) {
+            PV.toast(
+              (PV.i18n && PV.i18n.couponApplying) || 'Aplicando cupón…',
+              { type: 'info', duration: 2500 }
+            );
+          }
           // Re-dirigimos el submit al form nativo de WC para que aplique.
           e.preventDefault();
           couponForm.submit();

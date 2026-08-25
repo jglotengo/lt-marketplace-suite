@@ -705,4 +705,33 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-014: recompute() debe correr al init para reemplazar el total server-side sin esperar interacción'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-015 (P2-3, cupón sin confirmación): al aplicar un cupón
+	 * el submit recarga la página — el clic no daba feedback inmediato. Fix:
+	 * toast optimista vía PV.toast con string i18n couponApplying (expuesto
+	 * por wp_localize_script; el resultado real lo imprime WC tras reload).
+	 */
+	public function test_017_cupon_toast_ack_inmediato(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// (1) El handler del cupón muestra toast antes del submit.
+		$this->assertMatchesRegularExpression(
+			'/couponBtn\.addEventListener\(\s*[\'"]click[\'"][\s\S]{0,600}?PV\.toast\([\s\S]{0,200}?couponApplying[\s\S]{0,300}?couponForm\.submit\(\)/s',
+			$js,
+			'AUDIT-FE-PV-DS-015 fix: aplicar cupón debe mostrar PV.toast(couponApplying) antes de couponForm.submit()'
+		);
+
+		// (2) String i18n expuesto via localize (pasa por __()).
+		$native = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php';
+		$this->assertFileExists( $native );
+		$php = file_get_contents( $native );
+		$this->assertMatchesRegularExpression(
+			'/\'couponApplying\'\s*=>\s*__\(/',
+			$php,
+			'AUDIT-FE-PV-DS-015 fix: couponApplying debe exponerse via wp_localize_script con __() para traducción'
+		);
+	}
 }
