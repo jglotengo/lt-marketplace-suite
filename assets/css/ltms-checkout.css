@@ -175,12 +175,15 @@
 .pv-scope.pv-checkout .woocommerce-shipping-fields{display:none;}
 .pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible{display:block;animation:pv-fade .25s ease;}
 
-/* No shipping / no payment */
+/* No shipping / no payment — AUDIT-FE-UIUX2-D05 FIX: son estados
+   ORIENTADORES ("completa tu dirección y aparecerán aquí"), no errores.
+   Antes usaban --danger (falsa alarma); ahora superficie info azul suave.
+   El rojo queda reservado para fallos reales. */
 .pv-scope.pv-checkout .pv-checkout__no-shipping,
 .pv-scope.pv-checkout .pv-checkout__no-payment{
     display:flex;align-items:center;gap:10px;padding:14px 16px;
-    background:var(--danger-50);border:1px solid var(--danger);border-radius:var(--r-md);
-    color:var(--danger);
+    background:var(--primary-50);border:1px solid var(--primary-100);border-radius:var(--r-md);
+    color:var(--primary);
 }
 .pv-scope.pv-checkout .pv-checkout__no-shipping p,
 .pv-scope.pv-checkout .pv-checkout__no-payment p{margin:0;font-size:13.5px;color:var(--text-2);}

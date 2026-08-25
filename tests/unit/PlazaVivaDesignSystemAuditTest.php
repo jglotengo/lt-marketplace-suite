@@ -953,4 +953,27 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D02: ltms-plaza-viva.css must contain the traceable fix marker'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D05 (P1, estado orientador con styling de error): el
+	 * bloque "Aún no calculamos el envío" usaba --danger — falsa alarma en
+	 * un estado transitorio normal. Fix: superficie info azul suave; el
+	 * rojo queda para fallos reales.
+	 */
+	public function test_024_checkout_estado_orientador_sin_rojo_error(): void {
+		$cko_css = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$this->assertFileExists( $cko_css );
+		$cko = file_get_contents( $cko_css );
+
+		$this->assertMatchesRegularExpression(
+			'/__no-shipping,\s*\.pv-scope\.pv-checkout \.pv-checkout__no-payment\s*\{[^}]*var\(--primary-50\)[^}]*var\(--primary-100\)/s',
+			$cko,
+			'UIUX2-D05 fix: los estados no-shipping/no-payment deben usar superficie info (primary-50/100)'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/__no-shipping,[^{]*\{[^}]*var\(--danger-50\)/',
+			$cko,
+			'UIUX2-D05 regression: los estados orientadores no deben volver a --danger'
+		);
+	}
 }
