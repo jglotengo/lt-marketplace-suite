@@ -188,109 +188,15 @@ $pv_star_vendors = get_users( array(
 
 /* ---------------------------------------------------------------------------
  * 5. Helpers de render
- * ------------------------------------------------------------------------- */
-
-/**
- * Renderiza un producto trending como .pv-product-card.
  *
- * @param WC_Product $pv_p Objeto producto.
- */
-if ( ! function_exists( 'ltms_pv_render_trending_card' ) ) :
-function ltms_pv_render_trending_card( $pv_p ) {
-    if ( ! $pv_p instanceof WC_Product ) {
-        return;
-    }
-    $pv_pid     = $pv_p->get_id();
-    $pv_permalink = $pv_p->get_permalink();
-    $pv_rating  = (float) $pv_p->get_average_rating();
-    $pv_reviews = (int) $pv_p->get_review_count();
-    $pv_on_sale = $pv_p->is_on_sale();
-    $pv_disc    = '';
-    if ( $pv_on_sale ) {
-        $pv_reg  = (float) $pv_p->get_regular_price();
-        $pv_sale = (float) $pv_p->get_sale_price();
-        if ( $pv_reg > 0 && $pv_sale > 0 && $pv_sale < $pv_reg ) {
-            $pv_disc = round( 100 - ( ( $pv_sale / $pv_reg ) * 100 ) );
-        }
-    }
-    $pv_is_virtual = $pv_p->is_virtual();
-    $pv_vendor_id  = (int) get_post_field( 'post_author', $pv_pid );
-    $pv_vname      = '';
-    if ( $pv_vendor_id > 0 ) {
-        $pv_vname = (string) get_user_meta( $pv_vendor_id, 'ltms_store_name', true );
-        if ( '' === $pv_vname ) {
-            $pv_vu = get_userdata( $pv_vendor_id );
-            $pv_vname = $pv_vu ? ( $pv_vu->display_name ?: $pv_vu->user_login ) : '';
-        }
-    }
-    ?>
-    <article class="pv-product-card pv-fade-up" data-pv-product-id="<?php echo esc_attr( $pv_pid ); ?>">
-        <div class="pv-product-card__media">
-            <a href="<?php echo esc_url( $pv_permalink ); ?>" aria-label="<?php echo esc_attr( wp_strip_all_tags( $pv_p->get_name() ) ); ?>" tabindex="-1">
-                <?php echo $pv_p->get_image( 'woocommerce_thumbnail' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-            </a>
-            <?php if ( $pv_disc ) : ?>
-                <span class="pv-product-card__discount"><?php echo esc_html( sprintf( __( '-%d%%', 'ltms' ), $pv_disc ) ); ?></span>
-            <?php endif; ?>
-            <button type="button"
-                    class="pv-product-card__fav"
-                    data-pv-wishlist-toggle="<?php echo esc_attr( $pv_pid ); ?>"
-                    aria-label="<?php esc_attr_e( 'Añadir a favoritos', 'ltms' ); ?>"
-                    aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            </button>
-            <div class="pv-product-card__actions">
-                <?php if ( $pv_p->is_purchasable() && $pv_p->is_in_stock() ) : ?>
-                    <button type="button"
-                            class="pv-btn pv-btn--sm"
-                            data-pv-add-to-cart="<?php echo esc_attr( $pv_pid ); ?>"
-                            aria-label="<?php echo esc_attr( sprintf( __( 'Añadir %s al carrito', 'ltms' ), wp_strip_all_tags( $pv_p->get_name() ) ) ); ?>">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                        <?php esc_html_e( 'Añadir', 'ltms' ); ?>
-                    </button>
-                <?php else : ?>
-                    <a class="pv-btn pv-btn--sm pv-btn--ghost" href="<?php echo esc_url( $pv_permalink ); ?>"><?php esc_html_e( 'Ver', 'ltms' ); ?></a>
-                <?php endif; ?>
-                <button type="button"
-                        class="pv-product-card__quickview"
-                        data-pv-quickview="<?php echo esc_attr( $pv_pid ); ?>"
-                        aria-label="<?php esc_attr_e( 'Vista rápida', 'ltms' ); ?>">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-            </div>
-        </div>
-        <div class="pv-product-card__body">
-            <?php if ( $pv_vname ) : ?>
-                <span class="pv-product-card__brand"><?php echo esc_html( $pv_vname ); ?></span>
-            <?php endif; ?>
-            <h3 class="pv-product-card__title">
-                <a href="<?php echo esc_url( $pv_permalink ); ?>"><?php echo esc_html( wp_strip_all_tags( $pv_p->get_name() ) ); ?></a>
-            </h3>
-            <div class="pv-product-card__rating">
-                <?php echo wc_get_rating_html( $pv_rating ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                <span>(<?php echo esc_html( number_format_i18n( $pv_reviews ) ); ?>)</span>
-            </div>
-            <div class="pv-product-card__price">
-                <?php if ( $pv_on_sale ) : ?>
-                    <span class="pv-product-card__price-now"><?php echo wc_price( $pv_p->get_sale_price() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
-                    <span class="pv-product-card__price-old"><?php echo wc_price( $pv_p->get_regular_price() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
-                <?php else : ?>
-                    <span class="pv-product-card__price-now"><?php echo $pv_p->get_price_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
-                <?php endif; ?>
-            </div>
-            <?php if ( ! $pv_is_virtual ) : ?>
-                <div class="pv-product-card__meta">
-                    <span class="pv-product-card__shipping">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                        <?php esc_html_e( 'Envío a todo el país', 'ltms' ); ?>
-                    </span>
-                </div>
-            <?php endif; ?>
-        </div>
-    </article>
-    <?php
-}
-endif; // ltms_pv_render_trending_card
+ * AUDIT-FE-PV-DS-003 FIX (P1-1, DRY): el helper ltms_pv_render_trending_card()
+ * fue eliminado — reimplementaba .pv-product-card duplicando
+ * wc-parts/content-product.php con un subconjunto de features (sin KYC badge,
+ * sin SF-04 free shipping, sin swatches, sin stock urgency, sin badges
+ * --soft/--muted). La sección trending ahora delega vía
+ * wc_get_template_part( 'content', 'product' ) — una sola fuente de verdad
+ * para el UI de card de producto (ver loop TRENDING más abajo).
+ * ------------------------------------------------------------------------- */
 
 /**
  * Renderiza un icono SVG de red social.
@@ -556,13 +462,26 @@ do_action( 'ltms_before_home_plazaviva' );
 
             <div class="pv-home__product-grid" role="list">
                 <?php
+                /*
+                 * AUDIT-FE-PV-DS-003 FIX (P1-1, DRY): la card trending delega al
+                 * template part canónico wc-parts/content-product.php — el mismo
+                 * markup que shop/related/cross-sells. El helper duplicado
+                 * ltms_pv_render_trending_card() fue eliminado físicamente.
+                 */
                 foreach ( $pv_trending_ids as $pv_tid ) :
-                    $pv_tp = wc_get_product( $pv_tid );
-                    if ( ! $pv_tp ) {
+                    $pv_trending_product = wc_get_product( $pv_tid );
+                    if ( ! $pv_trending_product instanceof WC_Product || ! $pv_trending_product->is_visible() ) {
                         continue;
                     }
-                    ltms_pv_render_trending_card( $pv_tp );
+                    // content-product.php consume los globals $product/$post.
+                    global $product, $post;
+                    // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
+                    $product = $pv_trending_product;
+                    // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
+                    $post    = get_post( $pv_tid );
+                    wc_get_template_part( 'content', 'product' );
                 endforeach;
+                wp_reset_postdata();
                 ?>
             </div>
         </section>

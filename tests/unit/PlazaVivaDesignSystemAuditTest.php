@@ -65,6 +65,11 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	private string $product_template_path;
 
 	/**
+	 * Ruta absoluta al template home.php.
+	 */
+	private string $home_template_path;
+
+	/**
 	 * @inheritDoc
 	 *
 	 * NOTA INTENCIONAL: este test NO llama $this->require_class(). Los
@@ -79,6 +84,7 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$this->css_min_path   = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css';
 		$this->card_part_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/wc-parts/content-product.php';
 		$this->product_template_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/single-product.php';
+		$this->home_template_path    = dirname( __DIR__, 2 ) . '/includes/frontend/templates/home.php';
 	}
 
 	/**
@@ -229,6 +235,47 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'.pv-scope .pv-empty',
 			$min,
 			'AUDIT-FE-PV-DS-002: ltms-plaza-viva.min.css desactualizado — regenerar con npm run build:css (falta .pv-empty)'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-PV-DS-003 (P1-1, DRY): la sección trending de home.php delega
+	 * al template part canónico wc-parts/content-product.php vía
+	 * wc_get_template_part( 'content', 'product' ). Antes el helper
+	 * ltms_pv_render_trending_card() reimplementaba .pv-product-card con un
+	 * subconjunto de features (sin KYC, sin SF-04, sin swatches, sin stock
+	 * urgency, sin badges --soft/--muted) — dos fuentes de verdad para el
+	 * mismo UI que divergían con cada fix del card. Helper eliminado
+	 * físicamente (Lecciones #119/#141).
+	 *
+	 * Beneficio colateral: las cards trending ahora heredan automáticamente
+	 * cualquier fix futuro de content-product.php (incluidos PV-DS-001).
+	 */
+	public function test_005_home_trending_delega_a_content_product(): void {
+		$this->assertFileExists( $this->home_template_path );
+		$home = file_get_contents( $this->home_template_path );
+
+		// (1) Delegación presente en el loop trending.
+		$this->assertStringContainsString(
+			"wc_get_template_part( 'content', 'product' )",
+			$home,
+			'AUDIT-FE-PV-DS-003 fix: el loop trending de home.php debe delegar a wc_get_template_part(content,product)'
+		);
+
+		// (2) La DEFINICIÓN del helper duplicado fue eliminada físicamente
+		// (los comments de trazabilidad pueden citar el nombre — lo que no
+		// puede volver es la función).
+		$this->assertStringNotContainsString(
+			'function ltms_pv_render_trending_card',
+			$home,
+			'AUDIT-FE-PV-DS-003 fix: ltms_pv_render_trending_card() debe estar eliminada físicamente de home.php'
+		);
+
+		// (3) El setup de globals para el template part ($product/$post).
+		$this->assertStringContainsString(
+			'$product = $pv_trending_product;',
+			$home,
+			'AUDIT-FE-PV-DS-003: el loop debe setear el global $product antes de wc_get_template_part (content-product.php lo consume)'
 		);
 	}
 }

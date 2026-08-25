@@ -190,15 +190,27 @@ final class WishlistPvToggleTest extends LTMS_Unit_Test_Case {
     }
 
     /**
-     * AUDIT-FE-AP-001 (d): las 3 plantillas públicas con botón fav siguen
+     * AUDIT-FE-AP-001 (d): las plantillas públicas con botón fav siguen
      * usando el mismo selector (.pv-product-card__fav) + el mismo data attr
      * (data-pv-wishlist-toggle o data-product-id) para que el handler JS
-     * delegado funcione en todas. No se modificó el HTML de estas plantillas
-     * en este fix — solo se añadió persistencia via el nuevo endpoint.
+     * delegado funcione en todas.
+     *
+     * AUDIT-FE-PV-DS-003 (P1-1, DRY): home.php ya no emite el botón fav
+     * directamente — delega las cards trending al template part canónico
+     * content-product.php vía wc_get_template_part() (que sí emite el fav y
+     * está cubierto abajo). La aserción de home verifica la delegación.
      */
     public function test_three_card_templates_keep_fav_button_markup(): void {
+        // home.php: delegación al template part (el fav lo emite content-product).
+        $this->assertFileExists( $this->home_template, 'home.php debe existir' );
+        $home_src = file_get_contents( $this->home_template );
+        $this->assertStringContainsString(
+            "wc_get_template_part( 'content', 'product' )",
+            $home_src,
+            'AUDIT-FE-PV-DS-003: home.php debe delegar las cards (fav incluido) a content-product.php via wc_get_template_part'
+        );
+
         $templates = [
-            'home.php'            => $this->home_template,
             'vendor-store.php'    => $this->vendor_store_template,
             'content-product.php' => $this->content_product_template,
         ];

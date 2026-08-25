@@ -32,18 +32,32 @@ final class HomeQuickViewAttrTest extends LTMS_Unit_Test_Case {
     private const CONTENT_PRODUCT_TPL = __DIR__ . '/../../includes/frontend/templates/wc-parts/content-product.php';
 
     /**
-     * La card de quick-view en home debe tener SOLO `data-pv-quickview` (sin guion).
-     * AUDIT-FE-AP-002: el atributo CON guion (`data-pv-quick-view=`) fue removido.
+     * AUDIT-FE-PV-DS-003 (P1-1, DRY): home.php ya NO emite el botón de
+     * quick-view directamente — delega las cards trending al template part
+     * canónico content-product.php vía wc_get_template_part(). El atributo
+     * canonical `data-pv-quickview=` lo emite ese template part (verificado
+     * en test_vendor_store_and_content_product_quick_view_attr_canonical).
+     *
+     * AUDIT-FE-AP-002: el atributo CON guion (`data-pv-quick-view=`) sigue
+     * ausente de home.php.
      */
-    public function test_home_template_quick_view_button_emits_canonical_attr(): void {
+    public function test_home_template_delegates_trending_cards_to_content_product(): void {
         $this->assertFileExists( self::HOME_TEMPLATE );
         $source = file_get_contents( self::HOME_TEMPLATE );
 
-        // Atributo canonical (sin guion) — DEBE estar presente.
+        // Delegación al template part canónico (única fuente del card).
         $this->assertStringContainsString(
-            'data-pv-quickview=',
+            "wc_get_template_part( 'content', 'product' )",
             $source,
-            'home.php must emit data-pv-quickview (sin guion) — JS lo lee en ltms-plaza-viva.js:603'
+            'AUDIT-FE-PV-DS-003: home.php debe delegar las cards trending a wc_get_template_part(content,product) en vez de emitir markup propio'
+        );
+
+        // La DEFINICIÓN del helper duplicado debe estar eliminada físicamente
+        // (los comments de trazabilidad pueden citar el nombre).
+        $this->assertStringNotContainsString(
+            'function ltms_pv_render_trending_card',
+            $source,
+            'AUDIT-FE-PV-DS-003: el helper ltms_pv_render_trending_card() fue eliminado — no debe reaparecer'
         );
 
         // AUDIT-FE-AP-002: el atributo legacy CON guion DEBE estar ausente.
