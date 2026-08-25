@@ -582,7 +582,18 @@ get_header();
                 <div class="pv-eta-card pv-card pv-card--pad-lg" data-pv-eta>
                     <header class="pv-eta-card__head">
                         <span class="pv-eta-card__label"><?php esc_html_e( 'Entrega estimada', 'ltms' ); ?></span>
-                        <span class="pv-badge pv-badge--trust pv-badge--dot"><?php esc_html_e( 'En curso', 'ltms' ); ?></span>
+                        <?php
+                        /**
+                         * AUDIT-FE-UIUX2-D09 FIX (P1): el badge "En curso" se
+                         * imprimía siempre, incluso con la orden cancelada —
+                         * contradictorio con el banner rojo de cancelado que
+                         * aparece al lado. Ahora refleja el estado real.
+                         */
+                        if ( $is_cancelled ) : ?>
+                            <span class="pv-badge pv-badge--danger pv-badge--dot"><?php esc_html_e( 'Cancelada', 'ltms' ); ?></span>
+                        <?php else : ?>
+                            <span class="pv-badge pv-badge--trust pv-badge--dot"><?php esc_html_e( 'En curso', 'ltms' ); ?></span>
+                        <?php endif; ?>
                     </header>
                     <?php if ( $eta_fm ) : ?>
                         <div class="pv-eta-card__date"><?php echo esc_html( $eta_fm ); ?></div>

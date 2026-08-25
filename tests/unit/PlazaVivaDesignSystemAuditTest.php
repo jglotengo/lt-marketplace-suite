@@ -1099,4 +1099,21 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D08 fix: .optional debe ser >=12px en --text-2'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D09 (P1, badge contradictorio en tracking): el badge
+	 * "En curso" del ETA card se imprimía siempre, incluso con orden
+	 * cancelada — contradictorio con el banner rojo de cancelado. Fix:
+	 * condicional $is_cancelled → badge danger "Cancelada".
+	 */
+	public function test_028_tracking_eta_badge_coherente_con_cancelacion(): void {
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+
+		// (1) El badge del ETA está condicionado a $is_cancelled.
+		$this->assertMatchesRegularExpression(
+			'/if \( \$is_cancelled \) :\s*\?>\s*<span class="pv-badge pv-badge--danger pv-badge--dot">[^<]*<\?php esc_html_e\( .Cancelada./s',
+			$tracking,
+			'UIUX2-D09 fix: el badge del ETA debe mostrar Cancelada (danger) cuando la orden está cancelada'
+		);
+	}
 }
