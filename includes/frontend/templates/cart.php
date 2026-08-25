@@ -496,7 +496,11 @@ get_header( 'shop' );
                          * compatibilidad con WC < 7.0 que dependen del form propio.
                          */
                         ?>
-                        <form id="pv-cart-coupon-form" class="pv-cart__coupon-form woocommerce-form-coupon" method="post" action="<?php echo esc_url( wc_get_cart_url() ); ?>" style="display:none;">
+                        <!-- AUDIT-FE-PV-DS-006 FIX (P1-4): ocultamiento via atributo
+                             style inline reemplazado por la clase utilitaria .d-none
+                             del design system (CSP-friendly, paridad con
+                             .pv-scope .d-none en ltms-plaza-viva.css). -->
+                        <form id="pv-cart-coupon-form" class="pv-cart__coupon-form woocommerce-form-coupon d-none" method="post" action="<?php echo esc_url( wc_get_cart_url() ); ?>">
                             <?php wp_nonce_field( 'apply-coupon', 'security' ); ?>
                             <input type="hidden" name="coupon_code" value="" />
                         </form>

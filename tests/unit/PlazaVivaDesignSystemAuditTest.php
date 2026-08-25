@@ -348,7 +348,34 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString(
 			'AUDIT-FE-PV-DS-005',
 			$css,
-			'AUDIT-FE-PV-DS-005: ltms-plaza-viva.css must contain the traceable fix marker comment'
+			'AUDIT-FE-PV-DS-005: ltms-plaza-viva.css must contain the traceable fix marker'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-PV-DS-006 (P1-4, sin style= inline): el form oculto del cupón
+	 * en cart.php usaba style="display:none;" inline pese a que el design
+	 * system provee la utilitaria .pv-scope .d-none { display:none !important }.
+	 * El inline es el antipattern que la auditoría UX (UX-AUDIT-FE-P0-*)
+	 * viene eliminando de todas las plantillas públicas.
+	 */
+	public function test_008_cart_coupon_form_oculto_con_clase_d_none(): void {
+		$cart_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		$this->assertFileExists( $cart_path );
+		$cart = file_get_contents( $cart_path );
+
+		// (1) El form del cupón usa la utilitaria del design system.
+		$this->assertMatchesRegularExpression(
+			'/id="pv-cart-coupon-form"[^>]*class="[^"]*\bd-none\b/',
+			$cart,
+			'AUDIT-FE-PV-DS-006 fix: pv-cart-coupon-form debe ocultarse con la clase .d-none del design system'
+		);
+
+		// (2) Ya NO hay style="display:none" inline en cart.php.
+		$this->assertStringNotContainsString(
+			'style="display:none',
+			$cart,
+			'AUDIT-FE-PV-DS-006 fix: cart.php no debe contener style="display:none" inline — usar .d-none'
 		);
 	}
 }
