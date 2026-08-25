@@ -1586,6 +1586,63 @@
         });
         setTimeout(syncStateFromCity, 800);
       }
+
+      /* --- 8. Stepper: marcar pasos completados -------------------------- */
+      /* AUDIT-FE-PV-DS-009 FIX (P1-7): el stepper era estático (paso 1 siempre
+       * is-active y .is-done nunca aplicado pese a existir en ltms-checkout.css).
+       * Ahora el JS evalúa los campos requeridos de cada bloque
+       * [data-step-block] y marca .is-done en su item del stepper;
+       * .is-active pasa al primer paso aún incompleto. El default PHP
+       * (is-active en paso 1) queda como fallback sin-JS.
+       */
+      var stepItems = Array.prototype.slice.call(scope.querySelectorAll('.pv-checkout__stepper-step[data-step]'));
+      if (stepItems.length) {
+        function blockComplete(block, stepNum) {
+          var reqs = block.querySelectorAll('input[required]:not([type="hidden"]), select[required], textarea[required]');
+          for (var i = 0; i < reqs.length; i++) {
+            var f = reqs[i];
+            var t = (f.getAttribute('type') || '').toLowerCase();
+            if (t === 'radio' || t === 'checkbox') {
+              if (!block.querySelector('input[name="' + f.name + '"]:checked')) return false;
+            } else if (String(f.value || '').trim() === '') {
+              return false;
+            }
+          }
+          // Grupos de elección que WC no marca required:
+          if (stepNum === 3 && block.querySelector('input[name^="shipping_method"]')
+              && !block.querySelector('input[name^="shipping_method"]:checked')) {
+            return false;
+          }
+          if (stepNum === 4 && block.querySelector('input[name="payment_method"]')
+              && !block.querySelector('input[name="payment_method"]:checked')) {
+            return false;
+          }
+          return true;
+        }
+
+        function refreshStepper() {
+          var activeAssigned = false;
+          stepItems.forEach(function (li) {
+            var n = parseInt(li.getAttribute('data-step'), 10);
+            var block = scope.querySelector('[data-step-block="' + n + '"]');
+            var done = !!(block && blockComplete(block, n));
+            li.classList.toggle('is-done', done);
+            if (!done && !activeAssigned) {
+              li.classList.add('is-active');
+              activeAssigned = true;
+            } else {
+              li.classList.remove('is-active');
+            }
+          });
+        }
+
+        scope.addEventListener('input', refreshStepper);
+        scope.addEventListener('change', refreshStepper);
+        if (typeof jQuery !== 'undefined') {
+          jQuery(document.body).on('updated_checkout', refreshStepper);
+        }
+        refreshStepper();
+      }
     }
 
     if (document.readyState === 'loading') {

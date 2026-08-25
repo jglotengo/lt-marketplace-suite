@@ -486,4 +486,57 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-008: home.php must contain the traceable fix marker'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-009 (P1-7, stepper del checkout estático): el markup
+	 * dejaba el paso 1 con is-active hardcodeado y .is-done nunca se aplicaba,
+	 * pese a que ltms-checkout.css define estilos para ambos estados.
+	 *
+	 * Fix: el scope CHECKOUT de ltms-plaza-viva.js evalúa los campos
+	 * requeridos de cada bloque [data-step-block] y marca .is-done en el
+	 * item correspondiente; .is-active pasa al primer paso incompleto.
+	 */
+	public function test_011_stepper_checkout_marca_pasos_completados(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// (1) El JS lee los bloques por data-step-block.
+		$this->assertStringContainsString(
+			"querySelector('[data-step-block=\"' + n + '\"]')",
+			$js,
+			'AUDIT-FE-PV-DS-009 fix: refreshStepper debe mapear cada item [data-step] a su bloque [data-step-block]'
+		);
+
+		// (2) Aplica la clase is-done que ya estila ltms-checkout.css.
+		$this->assertMatchesRegularExpression(
+			'/classList\.toggle\(\s*[\'"]is-done[\'"],\s*done\s*\)/',
+			$js,
+			'AUDIT-FE-PV-DS-009 fix: el stepper debe alternar la clase is-done según completitud del bloque'
+		);
+
+		// (3) Reacciona a updated_checkout (WC refresca fragmentos via jQuery).
+		$this->assertStringContainsString(
+			"'updated_checkout', refreshStepper",
+			$js,
+			'AUDIT-FE-PV-DS-009: el stepper debe refrescarse en updated_checkout (WC re-renderiza métodos de envío/pago)'
+		);
+
+		// (4) El CSS destino conserva los estados (contrato JS ↔ CSS).
+		$checkout_css = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$this->assertFileExists( $checkout_css );
+		$ccss = file_get_contents( $checkout_css );
+		$this->assertStringContainsString(
+			'.pv-checkout__stepper-step.is-done',
+			$ccss,
+			'AUDIT-FE-PV-DS-009: ltms-checkout.css debe seguir definiendo el estado .is-done que el JS aplica'
+		);
+
+		// (5) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-PV-DS-009',
+			$js,
+			'AUDIT-FE-PV-DS-009: ltms-plaza-viva.js must contain the traceable fix marker'
+		);
+	}
 }
