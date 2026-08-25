@@ -444,4 +444,46 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-007: vendor-store.php must contain the traceable fix marker'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-008 (P1-6, secciones silenciosas en home): bento cats,
+	 * trending y star vendors usaban if(!empty) sin else — si el query no
+	 * devuelve datos la sección desaparece sin explicación (UX confusa en
+	 * installs nuevos o catálogos vacíos).
+	 *
+	 * Fix: cada sección tiene else con .pv-home__empty-note (título + texto
+	 * + CTA donde aplica) estilado con tokens del sistema.
+	 */
+	public function test_010_home_secciones_dinamicas_con_empty_state(): void {
+		$this->assertFileExists( $this->home_template_path );
+		$home = file_get_contents( $this->home_template_path );
+
+		// (1) Las 3 secciones tienen rama else visible.
+		foreach ( [ 'pv-home__cats', 'pv-home__trending', 'pv-home__vendors' ] as $section_class ) {
+			$this->assertMatchesRegularExpression(
+				'/else\s*:\s*\?\>[\s\S]{0,600}?class="[^"]*' . $section_class . '/',
+				$home,
+				"AUDIT-FE-PV-DS-008 fix: la sección $section_class debe tener empty state en su rama else"
+			);
+		}
+
+		// (2) El componente .pv-home__empty-note está estilado con tokens.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-home__empty-note\s*\{/',
+			$home,
+			'AUDIT-FE-PV-DS-008 fix: falta el estilo .pv-home__empty-note en el bloque CSS de home.php'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-home__empty-note p\s*\{[^}]*var\(--text-2\)/s',
+			$home,
+			'AUDIT-FE-PV-DS-008 fix: el texto del empty-note debe usar el token var(--text-2)'
+		);
+
+		// (3) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-PV-DS-008',
+			$home,
+			'AUDIT-FE-PV-DS-008: home.php must contain the traceable fix marker'
+		);
+	}
 }

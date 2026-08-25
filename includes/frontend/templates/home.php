@@ -439,6 +439,15 @@ do_action( 'ltms_before_home_plazaviva' );
                 <?php endforeach; ?>
             </div>
         </section>
+    <?php else : ?>
+        <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
+        <section class="pv-section pv-home__cats">
+            <div class="pv-card pv-card--flat pv-home__empty-note">
+                <h3><?php esc_html_e( 'Próximamente más categorías', 'ltms' ); ?></h3>
+                <p><?php esc_html_e( 'Estamos organizando el catálogo. Mientras tanto, explora todos los productos disponibles.', 'ltms' ); ?></p>
+                <a class="pv-btn pv-btn--sm" href="<?php echo esc_url( $pv_shop_url ); ?>"><?php esc_html_e( 'Ver todos los productos', 'ltms' ); ?></a>
+            </div>
+        </section>
     <?php endif; ?>
 
     <?php
@@ -483,6 +492,15 @@ do_action( 'ltms_before_home_plazaviva' );
                 endforeach;
                 wp_reset_postdata();
                 ?>
+            </div>
+        </section>
+    <?php else : ?>
+        <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
+        <section class="pv-section pv-home__trending">
+            <div class="pv-card pv-card--flat pv-home__empty-note">
+                <h3><?php esc_html_e( 'Aún no hay productos en tendencia', 'ltms' ); ?></h3>
+                <p><?php esc_html_e( 'Cuando los vendedores publiquen sus productos, los más vendidos aparecerán aquí.', 'ltms' ); ?></p>
+                <a class="pv-btn pv-btn--sm" href="<?php echo esc_url( $pv_shop_url ); ?>"><?php esc_html_e( 'Explorar productos', 'ltms' ); ?></a>
             </div>
         </section>
     <?php endif; ?>
@@ -569,6 +587,14 @@ do_action( 'ltms_before_home_plazaviva' );
                         </a>
                     </article>
                 <?php endforeach; ?>
+            </div>
+        </section>
+    <?php else : ?>
+        <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
+        <section class="pv-section pv-home__vendors">
+            <div class="pv-card pv-card--flat pv-home__empty-note">
+                <h3><?php esc_html_e( 'Aún no hay vendedores destacados', 'ltms' ); ?></h3>
+                <p><?php esc_html_e( 'Los Star Sellers verificados con KYC y excelente reputación aparecerán aquí.', 'ltms' ); ?></p>
             </div>
         </section>
     <?php endif; ?>
@@ -843,6 +869,22 @@ do_action( 'ltms_after_home_plazaviva' );
 .pv-scope.pv-home .pv-vendor-card__rating-num{font-weight:700;color:var(--text);}
 .pv-scope.pv-home .pv-vendor-card__sales{font-size:12.5px;color:var(--text-3);}
 .pv-scope.pv-home .pv-vendor-card__products{font-size:12.5px;color:var(--text-3);font-weight:600;}
+
+/* ── EMPTY STATES (secciones dinámicas) ───────────────────────────────────
+   AUDIT-FE-PV-DS-008 FIX (P1-6): bento cats / trending / star vendors eran
+   secciones silenciosas (if !empty sin else). Ahora muestran una nota vacía
+   con CTA en vez de desaparecer sin explicación. */
+.pv-scope.pv-home .pv-home__empty-note{
+    padding:32px 24px;text-align:center;
+}
+.pv-scope.pv-home .pv-home__empty-note h3{
+    font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);
+    margin-bottom:6px;
+}
+.pv-scope.pv-home .pv-home__empty-note p{
+    font-size:14px;color:var(--text-2);line-height:1.55;
+    margin-bottom:14px;
+}
 
 /* ── FOOTER ──────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home-footer{
