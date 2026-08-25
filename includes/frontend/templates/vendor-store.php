@@ -194,6 +194,21 @@ if ( ! empty( $pv_review_product_ids ) && function_exists( 'wc_get_products' ) )
     }
 }
 
+// AUDIT-FE-UIUX2-D10 FIX (P1): el summary mostraba count($pv_reviews) que está
+// capped por LIMIT 6 — decía "6 reseñas" con 200 reales (KPI mentiroso).
+// Conteo total real en un query aparte (barato, indexado por el mismo JOIN).
+$pv_total_reviews = (int) $wpdb->get_var( $wpdb->prepare(
+    "SELECT COUNT(*)
+     FROM {$wpdb->comments} AS c
+     INNER JOIN {$wpdb->posts} AS p ON p.ID = c.comment_post_ID
+     WHERE c.comment_type = 'review'
+       AND c.comment_approved = '1'
+       AND p.post_status = 'publish'
+       AND p.post_type = 'product'
+       AND p.post_author = %d",
+    $pv_vendor_id
+) );
+
 /* ---------------------------------------------------------------------------
  * 6. URLs de acción
  * ------------------------------------------------------------------------- */
@@ -482,7 +497,7 @@ do_action( 'ltms_before_vendor_store_plazaviva', $pv_vendor_id );
                             <span class="pv-stars__fill" style="width:<?php echo esc_attr( ( $pv_rating / 5 ) * 100 ); ?>%"></span>
                         </span>
                     </span>
-                    <span class="pv-vendor-store__reviews-count"><?php echo esc_html( sprintf( _n( '%d reseña', '%d reseñas', count( $pv_reviews ), 'ltms' ), count( $pv_reviews ) ) ); ?></span>
+                    <span class="pv-vendor-store__reviews-count"><?php echo esc_html( sprintf( _n( '%d reseña', '%d reseñas', $pv_total_reviews, 'ltms' ), $pv_total_reviews ) ); ?></span>
                 </div>
             </div>
 

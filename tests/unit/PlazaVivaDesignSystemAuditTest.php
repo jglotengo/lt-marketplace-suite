@@ -1136,4 +1136,27 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D11 fix: in_transit debe tener badge accent (ambas variantes de sanitize_html_class)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D10 (P1, contador de reseñas mentiroso): el summary
+	 * mostraba count($pv_reviews) capped por LIMIT 6 — "6 reseñas" con 200
+	 * reales. Fix: COUNT(*) real en query aparte ($pv_total_reviews).
+	 */
+	public function test_030_vendor_reviews_count_real(): void {
+		$vendor = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/vendor-store.php' );
+
+		// (1) Existe el conteo total real.
+		$this->assertMatchesRegularExpression(
+			'/\$pv_total_reviews = \(int\) \$wpdb->get_var\( \$wpdb->prepare\(\s*"SELECT COUNT\(\*\)/s',
+			$vendor,
+			'UIUX2-D10 fix: debe existir $pv_total_reviews con COUNT(*) real'
+		);
+
+		// (2) El summary ya NO usa el array capped.
+		$this->assertDoesNotMatchRegularExpression(
+			'/__reviews-count">.*_n\( .%d reseña., .%d reseñas., count\( \$pv_reviews \)/s',
+			$vendor,
+			'UIUX2-D10 regression: el summary no debe volver a count($pv_reviews) (capped por LIMIT 6)'
+		);
+	}
 }
