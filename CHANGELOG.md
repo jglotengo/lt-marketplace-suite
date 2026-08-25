@@ -6,6 +6,47 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `PLAZA-VIVA-DS-CICLO2` (auditoría de diseño UI/UX páginas públicas: 37 hallazgos — 3 P0 + 17 P1 + 17 P2 resueltos, 3 en backlog documentado)
+
+> **Ciclo 2 Audit → Fix** sobre las 8 páginas públicas del design system (home, tienda, storefront del
+> vendedor, producto, carrito, checkout, tracking, ayuda) + content-product. Método source-based (el WAF de
+> SG bloquea render headless — Lección 35.1); QA visual final pendiente del usuario. IDs `AUDIT-FE-UIUX2-D01..D37`.
+
+**P0 — 3 fixes:**
+
+- **D-01** (`fdd124f1`): vendor-store.php emitía la capa `.pv-vendor-store__*` **sin NINGUNA regla CSS** —
+  hero, stats, tabs, reseñas y paginación renderizaban sin layout. Sección 21 en ltms-plaza-viva.css
+  (hero gradiente, stats 4-col, reviews grid, paginación pills) + variante `.pv-btn--invert`.
+- **D-02** (`f8f4c89b`): help-center con `.pv-help__*` igual de huérfana — grids 3-col, canales, FAQ y
+  CTA card + reset del marcador nativo de `<summary>` (doble indicador) + estado `.is-disabled` del chat.
+- **D-03** (`d066951c`): radios de envío/pago del checkout `opacity:0` sin focus-visible — teclado ciego
+  en el paso de conversión (WCAG 2.4.7). Outline vía `:focus-within`.
+
+**P1 — 14 fixes:** tokenización de 67 hex en checkout.css (D-04 `231e6e25`) · estados orientadores sin rojo
+de error (D-05 `271f8ed6`) · touch targets 44px + acciones visibles en táctil/teclado (D-06 `3d6505a7`) ·
+reduced-motion: cobertura global congelada por test (D-07 `2592b743`) · contraste AA en labels (D-08
+`7e674da5`) · badge ETA coherente con cancelación (D-09 `d535b56f`) · badges shipped/in_transit (D-11
+`88c683f5`) · contador real de reseñas (D-10 `7f9011af`) · empty-state de reseñas simétrico (D-16
+`b002abc2`) · residuos teal legacy (D-15 `74fc4523`) · headings checkout via PV.i18n sin hack CSS (D-12
+`85788f72`) · total en `--brand` (D-13 `beb4da4f`) · identidad única brand-card para legales — eliminadas
+3 generaciones CSS que pisaban la canónica (D-14 `aa8057b4`) · emoji estructurales → SVG en home (D-17
+`e012e460`).
+
+**P2 — 17 fixes:** micro-fixes de cascada y landmarks (D-22/D24/D27/D37 `410ca1d9`) · CSS muerto (D-34/D35
+`e8f78b1f`) · lote tracking/checkout: orden móvil del timeline, admin-bar offsets, mailto sin pasarelas,
+aria-current del stepper, retirado bounce doble (D-25/D28/D30/D33/D36 `7299b24b`) · lote transversal:
+breakpoints canon, tokens de variantes de badge, paginación de tienda, avatar con dimensiones, notices WC
+estilados (D-18/D19/D21/D23/D31 `d4d7edc7`).
+
+**Backlog documentado (P2 organizativo, sin cambio visual):** extracción del CSS inline de tracking (~360
+líneas) y de cart (~330 líneas) a hojas propias; consolidación de ~60 `!important` heredados de 5
+generaciones de parches en checkout.css (parcial ya resuelto por D-14).
+
+**Tests:** +20 invariantes en `PlazaVivaDesignSystemAuditTest` (test_021..040) + test_008 de
+`OrderTrackingAuditTest` re-apuntado por el retiro del bounce (Lección #119).
+
+---
+
 ### Fixed — `PLAZA-VIVA-DS-AUDIT-CICLO1` (auditoría integral del design system Plaza Viva: 21 hallazgos — 3 P0 + 11 P1 + 6 P2 + 2 documentados, ~20 tests nuevos)
 
 > **Ciclo completo Audit → Fix → Re-audit** sobre los 11 archivos del design system público (8 templates +
