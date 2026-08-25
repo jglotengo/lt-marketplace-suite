@@ -819,4 +819,30 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-018 fix: falta estilo .pv-help__search-kbd en ltms-plaza-viva.css'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D03 (P0, focus visible en radio-cards checkout): los
+	 * inputs de envío/pago son opacity:0 sin ningún :focus-visible/:focus-within
+	 * sobre la tarjeta — usuario de teclado ciego en el paso crítico
+	 * (WCAG 2.4.7). Fix: outline primario vía :focus-within.
+	 */
+	public function test_021_checkout_radio_cards_focus_visible(): void {
+		$cko_css = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$this->assertFileExists( $cko_css );
+		$cko = file_get_contents( $cko_css );
+
+		// (1) Existe regla focus-within para AMBOS tipos de opción.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-shipping-option:focus-within[\s\S]{0,200}?\.pv-payment-option:focus-within\s*\{[^}]*outline:2px solid var\(--primary\)/',
+			$cko,
+			'AUDIT-FE-UIUX2-D03 fix: las radio-cards deben mostrar outline al recibir foco de teclado'
+		);
+
+		// (2) El outline usa offset (separación visual del borde de la card).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-shipping-option:focus-within[\s\S]{0,300}?outline-offset:2px/s',
+			$cko,
+			'AUDIT-FE-UIUX2-D03: el outline debe llevar offset'
+		);
+	}
 }

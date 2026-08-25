@@ -206,6 +206,15 @@
 .pv-scope.pv-checkout .pv-payment-option__input{
     position:absolute;opacity:0;width:0;height:0;
 }
+/* AUDIT-FE-UIUX2-D03 FIX (P0): los inputs son opacity:0 — sin esto el
+   usuario de TECLADO no ve qué opción tiene foco en el paso crítico de
+   conversión (WCAG 2.4.7 Focus Visible). focus-within como baseline
+   universal (has(:focus-visible) queda como mejora cuando el soporte
+   sea total). */
+.pv-scope.pv-checkout .pv-shipping-option:focus-within,
+.pv-scope.pv-checkout .pv-payment-option:focus-within{
+    outline:2px solid var(--primary);outline-offset:2px;
+}
 .pv-scope.pv-checkout .pv-shipping-option__label,
 .pv-scope.pv-checkout .pv-payment-option__label{
     display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;
