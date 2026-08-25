@@ -8,10 +8,10 @@
 :root{
   --primary:#2563EB; --primary-600:#1D4ED8; --primary-700:#1E40AF;
   --primary-50:#EFF4FF; --primary-100:#DBE6FE;
-  --accent:#0BA37F; --accent-50:#E5F7F1; --accent-100:#C7EFE2;
-  --gold:#D4A857; --gold-50:#FBF4E5; --gold-100:#F4E5C5;
-  --danger:#E5484D; --danger-50:#FDECEC;
-  --warn:#F5A623;
+  --accent:#0BA37F; --accent-50:#E5F7F1; --accent-100:#C7EFE2; --accent-700:#0a8a68;
+  --gold:#D4A857; --gold-50:#FBF4E5; --gold-100:#F4E5C5; --gold-700:#8a6d20;
+  --danger:#E5484D; --danger-50:#FDECEC; --danger-700:#b73a3e;
+  --warn:#F5A623; --warn-50:#FFF4E0; --warn-700:#a06b00;
   --brand:#E80001; --brand-600:#C70001; --brand-50:#FEEFF0; --brand-100:#FCD9DA;
   --surface:#FFFFFF; --bg:#F6F5F8; --bg-2:#EFEDF2;
   --text:#0F1111; --text-2:#565C66; --text-3:#8A909A;
@@ -192,7 +192,7 @@
 .pv-info-card--success .pv-info-card__body{color:#0a7a58;}
 .pv-info-card--warning{background:var(--gold-50);border-color:var(--gold-100);}
 .pv-info-card--warning .pv-info-card__title,
-.pv-info-card--warning .pv-info-card__body{color:#8a6d20;}
+.pv-info-card--warning .pv-info-card__body{color:var(--gold-700);}
 .pv-info-card--info{background:var(--primary-50);border-color:var(--primary-100);}
 .pv-info-card--info .pv-info-card__title,
 .pv-info-card--info .pv-info-card__body{color:var(--primary-700);}
@@ -301,10 +301,10 @@
   background:var(--bg-2);color:var(--text-2);
 }
 .pv-badge--trust{background:var(--primary-50);color:var(--primary-700);}
-.pv-badge--verified{background:var(--accent-50);color:#0a8a68;}
-.pv-badge--gold{background:var(--gold-50);color:#8a6d20;}
-.pv-badge--danger{background:var(--danger-50);color:#b73a3e;}
-.pv-badge--warning{background:#FFF4E0;color:#a06b00;}
+.pv-badge--verified{background:var(--accent-50);color:var(--accent-700);}
+.pv-badge--gold{background:var(--gold-50);color:var(--gold-700);}
+.pv-badge--danger{background:var(--danger-50);color:var(--danger-700);}
+.pv-badge--warning{background:var(--warn-50);color:var(--warn-700);}
 .pv-badge--dot::before{
   content:"";width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;
 }
@@ -1393,7 +1393,7 @@ li.product.pv-enhanced:hover {
 }
 .pv-scope.pv-help .pv-help__quick-icon svg{width:22px;height:22px;}
 .pv-scope.pv-help .pv-help__quick-icon--primary{background:var(--primary-50);color:var(--primary);}
-.pv-scope.pv-help .pv-help__quick-icon--gold{background:var(--gold-50);color:#8a6d20;}
+.pv-scope.pv-help .pv-help__quick-icon--gold{background:var(--gold-50);color:var(--gold-700);}
 .pv-scope.pv-help .pv-help__quick-icon--accent{background:var(--accent-50);color:var(--accent);}
 .pv-scope.pv-help .pv-help__quick-body{
   display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;
@@ -1417,7 +1417,7 @@ li.product.pv-enhanced:hover {
   display:flex;align-items:center;justify-content:center;
 }
 .pv-scope.pv-help .pv-help__channel-icon--primary{background:var(--primary-50);color:var(--primary);}
-.pv-scope.pv-help .pv-help__channel-icon--gold{background:var(--gold-50);color:#8a6d20;}
+.pv-scope.pv-help .pv-help__channel-icon--gold{background:var(--gold-50);color:var(--gold-700);}
 .pv-scope.pv-help .pv-help__channel-icon--accent{background:var(--accent-50);color:var(--accent);}
 .pv-scope.pv-help .pv-help__channel-title{
   font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);margin:0;
@@ -1471,4 +1471,49 @@ li.product.pv-enhanced:hover {
   .pv-scope.pv-help .pv-help__quick-grid,
   .pv-scope.pv-help .pv-help__channels-grid{grid-template-columns:1fr;}
   .pv-scope.pv-help .pv-help__cta-card{padding:24px 22px;}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   23. NOTICES WC + PAGINACIÓN (transversal)
+   AUDIT-FE-UIUX2-D31 FIX (P2): los notices de WooCommerce (mensaje cupón
+   aplicado, errores de carrito, info) renderizaban con estilos crudos del
+   theme dentro del design system. AUDIT-FE-UIUX2-D21 FIX (P2): paginación
+   de la tienda con pills (paridad con vendor-store D-01).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pv-scope .woocommerce-message,
+.pv-scope .woocommerce-info,
+.pv-scope .woocommerce-error{
+  display:flex;align-items:flex-start;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  box-shadow:var(--sh-1);color:var(--text-2);font-size:14px;line-height:1.5;
+  padding:14px 18px;margin:0 0 16px;list-style:none;
+  border-left:4px solid var(--primary);
+}
+.pv-scope .woocommerce-message{border-left-color:var(--accent);}
+.pv-scope .woocommerce-error{border-left-color:var(--danger);color:var(--danger-700);}
+.pv-scope .woocommerce-message::before,
+.pv-scope .woocommerce-info::before,
+.pv-scope .woocommerce-error::before{display:none;}
+.pv-scope .woocommerce-message a,
+.pv-scope .woocommerce-info a,
+.pv-scope .woocommerce-error a{color:var(--primary);font-weight:600;text-decoration:underline;}
+.pv-scope .woocommerce-error li{list-style:none;}
+
+.pv-scope.pv-shop .woocommerce-pagination{
+  display:flex;justify-content:center;margin-top:24px;padding-top:4px;
+}
+.pv-scope.pv-shop .woocommerce-pagination ul.page-numbers{
+  display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
+}
+.pv-scope.pv-shop .woocommerce-pagination ul.page-numbers li{margin:0;}
+.pv-scope.pv-shop .woocommerce-pagination ul.page-numbers .page-numbers{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:40px;height:40px;padding:0 12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);
+  font-size:13.5px;font-weight:600;color:var(--text-2);text-decoration:none;
+  transition:border-color var(--t),background var(--t),color var(--t);
+}
+.pv-scope.pv-shop .woocommerce-pagination ul.page-numbers .page-numbers:hover{border-color:var(--primary-100);color:var(--primary);}
+.pv-scope.pv-shop .woocommerce-pagination ul.page-numbers .page-numbers.current{
+  background:var(--primary);border-color:var(--primary);color:#fff;
 }

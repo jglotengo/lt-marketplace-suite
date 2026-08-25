@@ -1457,4 +1457,61 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'D33 fix: refreshStepper debe gestionar aria-current'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D18/D19/D21/D23/D31 (P2, lote transversal):
+	 * breakpoints canon en tracking, tokens de variantes de badge,
+	 * paginación de tienda, avatar con dimensiones, notices WC estilados.
+	 */
+	public function test_040_lote_transversal_tokens_y_notices(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+		$vendor = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/vendor-store.php' );
+
+		// D-18: breakpoints canon en tracking (sin 980 ni 480).
+		$this->assertDoesNotMatchRegularExpression(
+			'/max-width:980px|max-width:480px/',
+			$tracking,
+			'D18 fix: el tracking no debe tener breakpoints fuera del canon 1100/760/400'
+		);
+
+		// D-19: tokens de variantes definidos y usados por los badges.
+		$this->assertMatchesRegularExpression(
+			'/--accent-700:#0a8a68/',
+			$css,
+			'D19 fix: falta token --accent-700'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-badge--verified\{background:var\(--accent-50\);color:var\(--accent-700\);\}/',
+			$css,
+			'D19 fix: los badges deben usar los tokens de variante'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/color:#0a8a68|color:#b73a3e|color:#a06b00|background:#FFF4E0/',
+			$tracking,
+			'D19 regression: el tracking no debe volver a hex de badges sueltos'
+		);
+
+		// D-21: paginación de la tienda estilada.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-shop \.woocommerce-pagination ul\.page-numbers \.page-numbers\.current\s*\{[^}]*var\(--primary\)/s',
+			$css,
+			'D21 fix: falta paginación pills para la tienda'
+		);
+
+		// D-23: avatar del vendor con dimensiones explícitas.
+		$this->assertMatchesRegularExpression(
+			"/wp_get_attachment_image\( \(int\) \\\$pv_store_logo, 'medium'/",
+			$vendor,
+			'D23 fix: el avatar del hero debe usar tamaño medium'
+		);
+
+		// D-31: notices WC estilados bajo .pv-scope.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope \.woocommerce-message,\s*\.pv-scope \.woocommerce-info,\s*\.pv-scope \.woocommerce-error\s*\{/s',
+			$css,
+			'D31 fix: faltan estilos de notices WC en el design system'
+		);
+	}
 }

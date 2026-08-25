@@ -90,9 +90,18 @@ $pv_policies          = (string) get_user_meta( $pv_vendor_id, 'ltms_store_polic
 $pv_logo_html = '';
 if ( $pv_store_logo ) {
     if ( is_numeric( $pv_store_logo ) ) {
-        $pv_logo_html = wp_get_attachment_image( (int) $pv_store_logo, 'thumbnail', false, [ 'class' => 'pv-vendor-store__avatar-img', 'alt' => esc_attr( $pv_store_name ) ] );
+        // AUDIT-FE-UIUX2-D23 FIX (P2): tamaño medium (300px, el hero lo
+        // muestra a 96px → thumbnail 150px pixelaba en pantallas retina)
+        // + dimensiones explícitas anti-CLS.
+        $pv_logo_html = wp_get_attachment_image( (int) $pv_store_logo, 'medium', false, [
+            'class'    => 'pv-vendor-store__avatar-img',
+            'alt'      => esc_attr( $pv_store_name ),
+            'width'    => 96,
+            'height'   => 96,
+            'loading'  => 'eager',
+        ] );
     } else {
-        $pv_logo_html = '<img class="pv-vendor-store__avatar-img" src="' . esc_url( $pv_store_logo ) . '" alt="' . esc_attr( $pv_store_name ) . '" />';
+        $pv_logo_html = '<img class="pv-vendor-store__avatar-img" src="' . esc_url( $pv_store_logo ) . '" alt="' . esc_attr( $pv_store_name ) . '" width="96" height="96" />';
     }
 }
 if ( '' === $pv_logo_html ) {

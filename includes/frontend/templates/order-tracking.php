@@ -763,18 +763,18 @@ get_header();
     text-transform:capitalize;
 }
 .pv-scope.pv-tracking .pv-tracking__status--completed,
-.pv-scope.pv-tracking .pv-tracking__status--processing{background:var(--accent-50);color:#0a8a68;}
+.pv-scope.pv-tracking .pv-tracking__status--processing{background:var(--accent-50);color:var(--accent-700);}
 /* AUDIT-FE-UIUX2-D11 FIX (P1): los estados custom shipped/in_transit (que
    el mapa status_to_step genera) no tenían color — el badge quedaba gris
    neutro justo en el tramo más importante del envío. */
 .pv-scope.pv-tracking .pv-tracking__status--shipped{background:var(--primary-50);color:var(--primary-700);}
 .pv-scope.pv-tracking .pv-tracking__status--in-transit,
-.pv-scope.pv-tracking .pv-tracking__status--in_transit{background:var(--accent-50);color:#0a8a68;}
+.pv-scope.pv-tracking .pv-tracking__status--in_transit{background:var(--accent-50);color:var(--accent-700);}
 .pv-scope.pv-tracking .pv-tracking__status--cancelled,
 .pv-scope.pv-tracking .pv-tracking__status--refunded,
-.pv-scope.pv-tracking .pv-tracking__status--failed{background:var(--danger-50);color:#b73a3e;}
+.pv-scope.pv-tracking .pv-tracking__status--failed{background:var(--danger-50);color:var(--danger-700);}
 .pv-scope.pv-tracking .pv-tracking__status--on-hold,
-.pv-scope.pv-tracking .pv-tracking__status--pending{background:#FFF4E0;color:#a06b00;}
+.pv-scope.pv-tracking .pv-tracking__status--pending{background:var(--warn-50);color:var(--warn-700);}
 .pv-scope.pv-tracking .pv-tracking__order-total{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
 .pv-scope.pv-tracking .pv-tracking__order-total-label{font-size:12px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
 .pv-scope.pv-tracking .pv-tracking__order-total-value{font-family:var(--display);font-weight:800;font-size:22px;color:var(--primary);}
@@ -1063,7 +1063,9 @@ get_header();
 /* ============================================================================
    RESPONSIVE
    ========================================================================== */
-@media (max-width:980px){
+/* AUDIT-FE-UIUX2-D18 FIX (P2): breakpoints al canon del sistema 1100/760/400
+   (980 y 480 eran leaks fuera del canon). */
+@media (max-width:1100px){
     .pv-scope.pv-tracking .pv-tracking__layout{grid-template-columns:1fr;gap:18px;}
     /* AUDIT-FE-UIUX2-D25 FIX (P2): sin order:-1 — el timeline (progreso) es
        el contenido primario; la sidebar ETA/repartidor va después, no antes. */
@@ -1086,7 +1088,7 @@ get_header();
     .pv-scope.pv-tracking .pv-eta-card__date{font-size:18px;}
     .pv-scope.pv-tracking .pv-tracker-card__actions{grid-template-columns:1fr;}
 }
-@media (max-width:480px){
+@media (max-width:400px){
     .pv-scope.pv-tracking .pv-tracking__order-side{width:100%;justify-content:space-between;}
     .pv-scope.pv-tracking .pv-tracking__order-info{width:100%;}
     .pv-scope.pv-tracking .pv-tracking__order-total-value{font-size:16px;}
