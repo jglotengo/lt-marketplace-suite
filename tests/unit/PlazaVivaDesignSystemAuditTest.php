@@ -570,4 +570,28 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-010 fix: el colapso a 1 col de related debe vivir en max-width:400px'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-011 (P1-10, related count filtrable): el count de
+	 * productos relacionados estaba hardcodeado (4) sin válvula de
+	 * extensión. Fix: apply_filters( 'ltms_related_products_count', 4 ).
+	 */
+	public function test_013_related_products_count_filtrable(): void {
+		$this->assertFileExists( $this->product_template_path );
+		$tpl = file_get_contents( $this->product_template_path );
+
+		$this->assertStringContainsString(
+			"apply_filters( 'ltms_related_products_count', 4 )",
+			$tpl,
+			'AUDIT-FE-PV-DS-011 fix: posts_per_page de related debe pasar por el filtro ltms_related_products_count (default 4)'
+		);
+
+		// El default sin filtro sigue siendo 4 (paridad con grid 4-col) y
+		// ningún posts_per_page numérico hardcodeado queda en el template.
+		$this->assertDoesNotMatchRegularExpression(
+			'/posts_per_page\'\s*=>\s*\d/',
+			$tpl,
+			'AUDIT-FE-PV-DS-011 regression: posts_per_page no debe hardcodearse numéricamente — usar el filtro'
+		);
+	}
 }

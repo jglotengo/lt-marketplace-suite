@@ -676,9 +676,13 @@ do_action( 'woocommerce_before_main_content' );
             /**
              * Related products — woocommerce_related_products().
              * 4 productos, 4 columnas (responsive via design system grid).
+             *
+             * AUDIT-FE-PV-DS-011 FIX (P1-10): el count es filtrable via
+             * ltms_related_products_count (default 4) para que módulos o
+             * extensiones ajusten la cantidad sin tocar el template.
              */
             woocommerce_related_products( array(
-                'posts_per_page' => 4,
+                'posts_per_page' => (int) apply_filters( 'ltms_related_products_count', 4 ),
                 'columns'        => 4,
                 'orderby'        => 'rand',
             ) );
