@@ -231,6 +231,13 @@
 .pv-empty-state__title{margin:0 0 6px;font-weight:600;color:var(--text);font-size:14px;}
 .pv-empty-state__sub{margin:0;color:var(--text-2);font-size:13px;line-height:1.45;}
 
+/* AUDIT-FE-PV-DS-002 FIX: .pv-empty genérico para mensajes "sin contenido"
+   (single-product.php:583 "Este producto no tiene especificaciones técnicas
+   adicionales."). Antes solo existía una regla duplicada en el <style>
+   inline del template single-product.php (ex :850), que se pierde al
+   centralizar y dejaba sin estilo a cualquier otro emisor de la clase. */
+.pv-scope .pv-empty{color:var(--text-3);font-style:italic;}
+
 /* ── 3.1.4 FALLBACK STATE ─────────────────────────────────────────────────────
    UX-AUDIT-FE-P0-04 FIX: bloque de fallback reusable para páginas públicas
    sin dependencias WC o vendor inexistente. Reemplaza 6 ocurrencias de

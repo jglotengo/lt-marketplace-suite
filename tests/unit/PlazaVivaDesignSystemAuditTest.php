@@ -15,6 +15,13 @@
  *     alerta de oferta agresiva. Fix: reglas --soft (dorado var(--gold))
  *     y --muted (neutral var(--bg-2)/var(--text-2)) después de la base.
  *
+ *   * AUDIT-FE-PV-DS-002 (P0, .pv-empty sin regla en design system):
+ *     single-product.php:583 emite <p class="pv-empty"> pero la única
+ *     regla era inline en el <style> del propio template (ex :850) — se
+ *     pierde al centralizar y cualquier otro emisor quedaba sin estilo.
+ *     Fix: regla genérica .pv-scope .pv-empty en ltms-plaza-viva.css
+ *     (sección 3.1.3 EMPTY STATE) + eliminación del duplicado inline.
+ *
  * Estos tests son PURAMENTE estructurales (file_get_contents + asserts
  * sobre el source CSS/PHP): NO cargan clases del plugin ni invocan WP →
  * deterministas en LTMS_UNIT_ONLY=true y CI Ubuntu (mismo patrón que
@@ -53,6 +60,11 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	private string $card_part_path;
 
 	/**
+	 * Ruta absoluta al template single-product.php.
+	 */
+	private string $product_template_path;
+
+	/**
 	 * @inheritDoc
 	 *
 	 * NOTA INTENCIONAL: este test NO llama $this->require_class(). Los
@@ -66,6 +78,7 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$this->css_path       = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css';
 		$this->css_min_path   = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css';
 		$this->card_part_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/wc-parts/content-product.php';
+		$this->product_template_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/single-product.php';
 	}
 
 	/**
@@ -148,6 +161,74 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'.pv-product-card__discount--muted',
 			$min,
 			'AUDIT-FE-PV-DS-001: ltms-plaza-viva.min.css desactualizado — regenerar con npm run build:css (falta --muted)'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-PV-DS-002 (P0, .pv-empty sin regla en design system): el
+	 * mensaje "Este producto no tiene especificaciones técnicas
+	 * adicionales." (single-product.php:583) usaba una regla definida SOLO
+	 * en el <style> inline del propio template (ex :850) — un duplicado que
+	 * se pierde al centralizar estilos y dejaba sin estilo a cualquier otro
+	 * emisor de la clase.
+	 *
+	 * Fix: regla genérica .pv-scope .pv-empty en ltms-plaza-viva.css y el
+	 * duplicado inline eliminado del template. Paridad visual exacta con la
+	 * regla eliminada: color var(--text-3) + font-style italic.
+	 */
+	public function test_003_pv_empty_definido_en_design_system_y_duplicado_inline_eliminado(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+		$this->assertFileExists( $this->product_template_path );
+		$tpl = file_get_contents( $this->product_template_path );
+
+		// (1) El template sigue emitiendo la clase (el mensaje no desaparece).
+		$this->assertStringContainsString(
+			'class="pv-empty"',
+			$tpl,
+			'AUDIT-FE-PV-DS-002: single-product.php debe seguir emitiendo <p class="pv-empty"> para specs vacías'
+		);
+
+		// (2) El design system define la regla genérica con paridad de tokens.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope \.pv-empty\{[^}]*var\(--text-3\)[^}]*\}/',
+			$css,
+			'AUDIT-FE-PV-DS-002 fix: falta .pv-scope .pv-empty{color:var(--text-3);...} en ltms-plaza-viva.css'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope \.pv-empty\{[^}]*italic[^}]*\}/',
+			$css,
+			'AUDIT-FE-PV-DS-002: la regla .pv-empty debe preservar font-style italic (paridad con la regla inline eliminada)'
+		);
+
+		// (3) El duplicado inline fue eliminado FÍSICAMENTE del template
+		// (LECCIONES #141: migración física, no un comment que lo declare).
+		$this->assertStringNotContainsString(
+			'.pv-empty{',
+			$tpl,
+			'AUDIT-FE-PV-DS-002 fix: el duplicado inline .pv-scope.pv-product-page .pv-empty{...} debe eliminarse del <style> de single-product.php'
+		);
+
+		// (4) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-PV-DS-002',
+			$css,
+			'AUDIT-FE-PV-DS-002: ltms-plaza-viva.css must contain the traceable fix marker comment for future audits'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-PV-DS-002 (sincronización .min.css): el min debe contener la
+	 * regla .pv-empty migrada al design system.
+	 */
+	public function test_004_min_css_sincronizado_con_pv_empty(): void {
+		$this->assertFileExists( $this->css_min_path );
+		$min = file_get_contents( $this->css_min_path );
+
+		$this->assertStringContainsString(
+			'.pv-scope .pv-empty',
+			$min,
+			'AUDIT-FE-PV-DS-002: ltms-plaza-viva.min.css desactualizado — regenerar con npm run build:css (falta .pv-empty)'
 		);
 	}
 }

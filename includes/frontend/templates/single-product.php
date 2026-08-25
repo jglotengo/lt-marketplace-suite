@@ -847,7 +847,6 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 .pv-scope.pv-product-page .pv-anchor-section__body table{width:100%;border-collapse:collapse;margin-top:8px;}
 .pv-scope.pv-product-page .pv-anchor-section__body th,.pv-scope.pv-product-page .pv-anchor-section__body td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;}
 .pv-scope.pv-product-page .pv-anchor-section__body th{font-weight:600;color:var(--text);background:var(--bg);}
-.pv-scope.pv-product-page .pv-empty{color:var(--text-3);font-style:italic;}
 
 /* Related */
 .pv-scope.pv-product-page .pv-related{margin-top:36px;}
