@@ -402,11 +402,12 @@
 }
 .pv-scope.pv-checkout .pv-checkout__review-coupon .woocommerce-form-coupon p.form-row{margin:0;flex:1;}
 .pv-scope.pv-checkout .pv-checkout__review-coupon .woocommerce-form-coupon input.input-text{
-    height:42px;width:100%;padding:0 12px;border:2px solid var(--border);border-radius:var(--r-sm);
+    /* AUDIT-FE-UIUX2-D06 FIX: touch target 44px (antes 42px). */
+    height:44px;width:100%;padding:0 12px;border:2px solid var(--border);border-radius:var(--r-sm);
     font-size:13.5px;
 }
 .pv-scope.pv-checkout .pv-checkout__review-coupon .woocommerce-form-coupon button.button{
-    height:42px;padding:0 14px;border:0;border-radius:var(--r-sm);
+    height:44px;padding:0 14px;border:0;border-radius:var(--r-sm);
     background:var(--primary);color:#fff;font-weight:700;font-size:13px;cursor:pointer;
 }
 .pv-scope.pv-checkout .pv-checkout__review-coupon .woocommerce-form-coupon button.button:hover{background:var(--primary-600);}

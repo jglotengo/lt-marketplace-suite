@@ -794,7 +794,8 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
 }
 .pv-scope.pv-cart .pv-cart__item-subtotal .woocommerce-Price-amount{color:var(--primary);}
 .pv-scope.pv-cart .pv-cart__item-remove{
-    width:36px;height:36px;border-radius:var(--r-sm);
+    /* AUDIT-FE-UIUX2-D06 FIX: touch target 44px (antes 36px). */
+    width:44px;height:44px;border-radius:var(--r-sm);
     display:flex;align-items:center;justify-content:center;
     color:var(--text-3);transition:background var(--t),color var(--t);
 }
@@ -842,8 +843,8 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
 /* Coupon */
 .pv-scope.pv-cart .pv-cart__coupon{display:flex;flex-direction:column;gap:8px;padding-bottom:14px;border-bottom:1px dashed var(--border);}
 .pv-scope.pv-cart .pv-cart__coupon-label{font-size:13px;font-weight:600;color:var(--text-2);}
-.pv-scope.pv-cart .pv-cart__coupon-input .pv-input{height:42px;border-radius:var(--r-sm) 0 0 var(--r-sm);}
-.pv-scope.pv-cart .pv-cart__coupon-input .pv-btn{height:42px;border-radius:0 var(--r-sm) var(--r-sm) 0;}
+.pv-scope.pv-cart .pv-cart__coupon-input .pv-input{height:44px;border-radius:var(--r-sm) 0 0 var(--r-sm);}
+.pv-scope.pv-cart .pv-cart__coupon-input .pv-btn{height:44px;border-radius:0 var(--r-sm) var(--r-sm) 0;}
 
 .pv-scope.pv-cart .pv-cart__coupons-applied{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .pv-scope.pv-cart .pv-cart__coupon-chip{
@@ -854,9 +855,16 @@ if ( ! empty( $pv_breadcrumb_was_hooked ) ) {
 }
 .pv-scope.pv-cart .pv-cart__coupon-chip-remove{
     color:inherit;text-decoration:none;font-size:16px;line-height:1;
-    width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+    /* AUDIT-FE-UIUX2-D06 FIX: touch target 24px visible + hit-area 44px via
+       pseudo-elemento (el chip es compacto; el área clicable se expande sin
+       romper el layout del chip). */
+    width:24px;height:24px;display:flex;align-items:center;justify-content:center;
     border-radius:50%;background:rgba(11,163,127,.18);
     transition:background var(--t);
+    position:relative;
+}
+.pv-scope.pv-cart .pv-cart__coupon-chip-remove::before{
+    content:"";position:absolute;inset:-10px;
 }
 .pv-scope.pv-cart .pv-cart__coupon-chip-remove:hover{background:rgba(11,163,127,.32);}
 
