@@ -443,7 +443,12 @@
   padding:16px 18px;background:transparent;
   font-family:var(--display);font-weight:600;font-size:15px;color:var(--text);
   text-align:left;cursor:pointer;transition:background var(--t);
+  /* AUDIT-FE-UIUX2-D02 FIX: ocultar el marcador nativo de <summary> —
+     sin esto el FAQ y los accordions muestran DOBLE indicador (triángulo
+     nativo + chevron SVG rotatorio). */
+  list-style:none;
 }
+.pv-accordion__head::-webkit-details-marker{display:none;}
 .pv-accordion__head:hover{background:var(--bg);}
 .pv-accordion__icon{
   width:20px;height:20px;flex-shrink:0;color:var(--text-2);
@@ -1356,4 +1361,104 @@ li.product.pv-enhanced:hover {
   .pv-scope.pv-vendor-store .pv-vendor-store__about-meta{grid-template-columns:1fr;}
   .pv-scope.pv-vendor-store .pv-vendor-store__about,
   .pv-scope.pv-vendor-store .pv-vendor-store__policies{padding:20px;}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   22. HELP CENTER — capa de página (.pv-help)
+   AUDIT-FE-UIUX2-D02 FIX (Ciclo 2, P0): help-center.php emitía la capa BEM
+   .pv-help__* sin NINGUNA regla CSS — quick-grid, channels-grid, faq-list y
+   cta-card colapsaban a columna única sin cards. Incluye el estado
+   .is-disabled del canal Chat (hallazgo P1 del mismo ciclo).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pv-scope.pv-help .pv-help__quick{padding-top:26px;padding-bottom:6px;}
+.pv-scope.pv-help .pv-help__quick-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+}
+.pv-scope.pv-help .pv-help__quick-card{
+  display:flex;align-items:center;gap:14px;padding:18px 20px;
+}
+.pv-scope.pv-help .pv-help__quick-icon{
+  width:48px;height:48px;flex-shrink:0;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;
+}
+.pv-scope.pv-help .pv-help__quick-icon svg{width:22px;height:22px;}
+.pv-scope.pv-help .pv-help__quick-icon--primary{background:var(--primary-50);color:var(--primary);}
+.pv-scope.pv-help .pv-help__quick-icon--gold{background:var(--gold-50);color:#8a6d20;}
+.pv-scope.pv-help .pv-help__quick-icon--accent{background:var(--accent-50);color:var(--accent);}
+.pv-scope.pv-help .pv-help__quick-body{
+  display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;
+}
+.pv-scope.pv-help .pv-help__quick-title{
+  font-family:var(--display);font-weight:700;font-size:15px;color:var(--text);
+}
+.pv-scope.pv-help .pv-help__quick-desc{font-size:13px;color:var(--text-3);}
+.pv-scope.pv-help .pv-help__quick-arrow{flex-shrink:0;color:var(--text-3);transition:transform var(--t),color var(--t);}
+.pv-scope.pv-help .pv-help__quick-card:hover .pv-help__quick-arrow{transform:translateX(3px);color:var(--primary);}
+
+.pv-scope.pv-help .pv-help__channels{padding-top:34px;}
+.pv-scope.pv-help .pv-help__channels-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+}
+.pv-scope.pv-help .pv-help__channel{
+  padding:22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+}
+.pv-scope.pv-help .pv-help__channel-icon{
+  width:52px;height:52px;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;
+}
+.pv-scope.pv-help .pv-help__channel-icon--primary{background:var(--primary-50);color:var(--primary);}
+.pv-scope.pv-help .pv-help__channel-icon--gold{background:var(--gold-50);color:#8a6d20;}
+.pv-scope.pv-help .pv-help__channel-icon--accent{background:var(--accent-50);color:var(--accent);}
+.pv-scope.pv-help .pv-help__channel-title{
+  font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);margin:0;
+}
+.pv-scope.pv-help .pv-help__channel-desc{
+  margin:0;font-size:13.5px;line-height:1.5;color:var(--text-2);flex:1;
+}
+.pv-scope.pv-help .pv-help__channel-cta{overflow-wrap:anywhere;word-break:break-word;}
+/* AUDIT-FE-UIUX2-D02 (P1 asociado): canal Chat sin proveedor configurado —
+   antes se veía idéntico a los activos salvo por el botón disabled. */
+.pv-scope.pv-help .pv-help__channel.is-disabled{
+  opacity:.6;border-style:dashed;filter:grayscale(.35);
+}
+
+.pv-scope.pv-help .pv-help__faq{padding-top:34px;}
+.pv-scope.pv-help .pv-help__faq-count{
+  font-size:13px;font-weight:600;color:var(--text-3);
+  background:var(--bg-2);border-radius:var(--r-pill);padding:5px 12px;
+  white-space:nowrap;
+}
+.pv-scope.pv-help .pv-help__faq-q{font-size:14.5px;}
+.pv-scope.pv-help .pv-help__faq-q-text{flex:1;min-width:0;}
+.pv-scope.pv-help .pv-help__faq-empty{margin-top:14px;}
+.pv-scope.pv-help .pv-help__faq-empty-card{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:40px 24px;text-align:center;color:var(--text-3);
+}
+.pv-scope.pv-help .pv-help__faq-empty-card h3{
+  font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);margin:4px 0 0;
+}
+.pv-scope.pv-help .pv-help__faq-empty-card p{
+  margin:0;font-size:13.5px;color:var(--text-2);max-width:400px;
+}
+
+.pv-scope.pv-help .pv-help__cta{padding-top:34px;padding-bottom:56px;}
+.pv-scope.pv-help .pv-help__cta-card{
+  display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+  background:linear-gradient(135deg,var(--primary-50) 0%,var(--surface) 65%);
+  border:1px solid var(--primary-100);border-radius:var(--r-card);
+  padding:32px 36px;box-shadow:var(--sh-1);
+}
+.pv-scope.pv-help .pv-help__cta-text h2{
+  font-family:var(--display);font-weight:800;font-size:22px;color:var(--text);margin:0 0 6px;
+}
+.pv-scope.pv-help .pv-help__cta-text p{
+  margin:0;font-size:14.5px;color:var(--text-2);max-width:520px;line-height:1.55;
+}
+.pv-scope.pv-help .pv-help__cta-actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+@media (max-width:760px){
+  .pv-scope.pv-help .pv-help__quick-grid,
+  .pv-scope.pv-help .pv-help__channels-grid{grid-template-columns:1fr;}
+  .pv-scope.pv-help .pv-help__cta-card{padding:24px 22px;}
 }

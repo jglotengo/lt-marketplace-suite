@@ -901,4 +901,56 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D01: ltms-plaza-viva.css must contain the traceable fix marker'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D02 (P0, help-center sin CSS de página): la capa BEM
+	 * .pv-help__* no tenía NINGUNA regla — quick-grid, channels-grid,
+	 * faq-list y cta-card colapsaban a columna única. Fix: sección 22 en
+	 * ltms-plaza-viva.css + reset del marcador nativo de <summary> (doble
+	 * indicador) + estado .is-disabled del canal Chat.
+	 */
+	public function test_023_help_center_capa_pagina_estilada(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		// (1) Grids 3-col para quick links y canales.
+		$this->assertMatchesRegularExpression(
+			'/__quick-grid\s*\{[^}]*grid-template-columns:repeat\(3,1fr\)/s',
+			$css,
+			'UIUX2-D02 fix: quick-grid debe ser grid 3 columnas'
+		);
+		$this->assertMatchesRegularExpression(
+			'/__channels-grid\s*\{[^}]*grid-template-columns:repeat\(3,1fr\)/s',
+			$css,
+			'UIUX2-D02 fix: channels-grid debe ser grid 3 columnas'
+		);
+
+		// (2) CTA final con gradiente de tokens.
+		$this->assertMatchesRegularExpression(
+			'/__cta-card\s*\{[^}]*linear-gradient\(135deg,var\(--primary-50\)/s',
+			$css,
+			'UIUX2-D02 fix: la cta-card debe llevar gradiente primary-50'
+		);
+
+		// (3) Canal deshabilitado con tratamiento visual propio.
+		$this->assertMatchesRegularExpression(
+			'/__channel\.is-disabled\s*\{[^}]*opacity/s',
+			$css,
+			'UIUX2-D02 fix: el canal Chat is-disabled debe distinguirse visualmente'
+		);
+
+		// (4) Reset del marcador nativo de <summary> (doble indicador).
+		$this->assertStringContainsString(
+			'.pv-accordion__head::-webkit-details-marker{display:none;}',
+			$css,
+			'UIUX2-D02 fix: falta el reset del marcador nativo del summary'
+		);
+
+		// (5) Traza del fix.
+		$this->assertStringContainsString(
+			'AUDIT-FE-UIUX2-D02',
+			$css,
+			'UIUX2-D02: ltms-plaza-viva.css must contain the traceable fix marker'
+		);
+	}
 }
