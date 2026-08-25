@@ -1338,4 +1338,32 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D17 regression: los títulos de sección no deben volver a llevar emoji'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D34 + D35 (P2, CSS muerto en checkout.css): selector
+	 * __badge que nunca matcheó (los badges reales son .pv-badge) y regla
+	 * inválida `#billing_country { value:'CO' }` (value no es propiedad CSS).
+	 */
+	public function test_037_checkout_css_sin_selectores_muertos(): void {
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+
+		// (1) D-34: el declutter móvil apunta a los badges reales.
+		$this->assertMatchesRegularExpression(
+			'/shipping-option \.pv-badge,\s*\.pv-scope\.pv-checkout \.pv-payment-option \.pv-badge\{display:none;\}/s',
+			$cko_css,
+			'D34 fix: el declutter móvil debe apuntar a .pv-badge'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/option__badge\{display:none/',
+			$cko_css,
+			'D34 regression: el selector muerto __badge no debe reaparecer'
+		);
+
+		// (2) D-35: sin regla inválida value:.
+		$this->assertDoesNotMatchRegularExpression(
+			'/value:\s*.CO.\s*!important/',
+			$cko_css,
+			'D35 fix: la regla inválida value:CO debe permanecer eliminada'
+		);
+	}
 }

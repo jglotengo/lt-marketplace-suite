@@ -441,8 +441,11 @@
     .pv-scope.pv-checkout .pv-checkout__step-num{width:26px;height:26px;font-size:13px;}
     .pv-scope.pv-checkout .pv-shipping-option__price,
     .pv-scope.pv-checkout .pv-payment-option__info{font-size:14px;}
-    .pv-scope.pv-checkout .pv-shipping-option__badge,
-    .pv-scope.pv-checkout .pv-payment-option__badge{display:none;}
+    /* AUDIT-FE-UIUX2-D34 FIX: los badges reales son .pv-badge (checkout.php
+       :369/:440) — el selector __badge nunca matcheó y el declutter móvil
+       no aplicaba. */
+    .pv-scope.pv-checkout .pv-shipping-option .pv-badge,
+    .pv-scope.pv-checkout .pv-payment-option .pv-badge{display:none;}
 }
 
 /* ============================================================================
@@ -728,11 +731,10 @@
 #customer_details #shipping_country_field {
     display: none !important;
 }
-
-/* Pero asegurar que el valor CO se envíe */
-#billing_country, #shipping_country {
-    value: 'CO' !important;
-}
+/* AUDIT-FE-UIUX2-D35 FIX: la regla `#billing_country { value:'CO' }` era CSS
+   inválido (value no es propiedad — la intención nunca se aplicó; el valor
+   real lo fija fixFieldLabels en ltms-plaza-viva.js via PV.config.country).
+   Eliminada. */
 
 /* ═══════════════════════════════════════════════════════════════
    v2.9.290 FIX — Checkbox 'Recuérdame' texto visible + login form colapsado
