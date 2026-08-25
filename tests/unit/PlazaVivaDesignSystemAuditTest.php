@@ -628,4 +628,37 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-012 regression: la regla .pv-vendor-card__star no debe volver a usar el offset fijo translateX(30px)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-013 (P1-12, FAQ abierto por defecto): help-center.php
+	 * dejaba la primera FAQ expandida ($pv_open = idx===0) — confundía al
+	 * usuario que busca un tema específico y estorbaba al filtrar con la
+	 * búsqueda en vivo. Fix: todos los items colapsan por defecto.
+	 */
+	public function test_015_help_faq_sin_item_abierto_por_defecto(): void {
+		$help_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/help-center.php';
+		$this->assertFileExists( $help_path );
+		$help = file_get_contents( $help_path );
+
+		// (1) Ya NO existe la variable del default-open.
+		$this->assertDoesNotMatchRegularExpression(
+			'/\$pv_open\s*=\s*\(\s*\$pv_idx\s*===\s*0\s*\)/',
+			$help,
+			'AUDIT-FE-PV-DS-013 fix: la primera FAQ no debe abrirse por defecto (sin $pv_open idx===0)'
+		);
+
+		// (2) El <details> del FAQ item ya NO imprime el atributo open condicional.
+		$this->assertDoesNotMatchRegularExpression(
+			'/<details class="pv-accordion pv-help__faq-item"[^>]*\?php echo \$pv_open/',
+			$help,
+			'AUDIT-FE-PV-DS-013 fix: el details del FAQ no debe imprimir el atributo open condicional'
+		);
+
+		// (3) El item sigue exponiendo data-pv-faq-item (búsqueda en vivo).
+		$this->assertStringContainsString(
+			'data-pv-faq-item',
+			$help,
+			'AUDIT-FE-PV-DS-013: el item FAQ debe conservar data-pv-faq-item para el filtro en vivo'
+		);
+	}
 }

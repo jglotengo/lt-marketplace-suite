@@ -297,9 +297,15 @@ do_action( 'ltms_before_help_center_plazaviva' );
             <?php foreach ( $pv_faq_items as $pv_idx => $pv_item ) :
                 $pv_q = isset( $pv_item['q'] ) ? $pv_item['q'] : '';
                 $pv_a = isset( $pv_item['a'] ) ? $pv_item['a'] : '';
-                $pv_open = ( $pv_idx === 0 ); // primera abierta por defecto
+                /*
+                 * AUDIT-FE-PV-DS-013 FIX (P1-12): sin item abierto por defecto.
+                 * Antes la primera FAQ quedaba expandida ($pv_open = idx===0),
+                 * lo que confundía al usuario que busca un tema específico y
+                 * estorbaba al filtrar con la búsqueda en vivo. Todos colapsan;
+                 * el usuario abre el que necesita.
+                 */
                 ?>
-                <details class="pv-accordion pv-help__faq-item" <?php echo $pv_open ? 'open' : ''; ?> data-pv-faq-item>
+                <details class="pv-accordion pv-help__faq-item" data-pv-faq-item>
                     <summary class="pv-accordion__head pv-help__faq-q">
                         <span class="pv-help__faq-q-text"><?php echo esc_html( $pv_q ); ?></span>
                         <svg class="pv-accordion__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
