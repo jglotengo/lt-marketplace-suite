@@ -1306,4 +1306,36 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D14: la brand-card canónica de legales debe permanecer'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D17 (P1, emoji como iconos estructurales en home):
+	 * logo 📍, títulos 🔥/⭐ — renderizado irregular entre OS y ruido en
+	 * lectores. Fix: logo → SVG map-pin (header + footer); títulos limpios.
+	 * Los emojis de categorías del bento quedan como identidad por-categoría
+	 * (data-driven, intencional).
+	 */
+	public function test_036_home_sin_emoji_estructurales(): void {
+		$home = file_get_contents( $this->home_template_path );
+
+		// (1) El logo del header usa el SVG map-pin.
+		$this->assertMatchesRegularExpression(
+			'/__logo-mark" aria-hidden="true">\s*<svg[\s\S]{0,200}?M21 10c0 7-9 13-9 13/s',
+			$home,
+			'UIUX2-D17 fix: el logo-mark del header debe ser el SVG map-pin'
+		);
+
+		// (2) El logo del footer también (con su clase propia, sin style inline).
+		$this->assertMatchesRegularExpression(
+			'/footer__logo-mark" aria-hidden="true">\s*<svg/s',
+			$home,
+			'UIUX2-D17 fix: el logo del footer debe usar la clase logo-mark con SVG'
+		);
+
+		// (3) Los títulos de sección no llevan emoji.
+		$this->assertDoesNotMatchRegularExpression(
+			'/section__title">[^<]*(🔥|⭐)/u',
+			$home,
+			'UIUX2-D17 regression: los títulos de sección no deben volver a llevar emoji'
+		);
+	}
 }

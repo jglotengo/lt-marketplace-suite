@@ -239,7 +239,10 @@ do_action( 'ltms_before_home_plazaviva' );
 
             <?php /* --- Zona 1: Logo "Lo Tengo" --- */ ?>
             <a class="pv-home-header__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                <span class="pv-home-header__logo-mark" aria-hidden="true">📍</span>
+                <?php /* AUDIT-FE-UIUX2-D17 FIX: emoji 📍 → SVG map-pin (lenguaje de iconos stroke consistente con el resto del sistema). */ ?>
+                <span class="pv-home-header__logo-mark" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </span>
                 <span class="pv-home-header__logo-text">
                     <span class="pv-home-header__logo-name"><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
                     <span class="pv-home-header__logo-tag"><?php esc_html_e( 'Marketplace', 'ltms' ); ?></span>
@@ -460,7 +463,7 @@ do_action( 'ltms_before_home_plazaviva' );
         <section class="pv-section pv-home__trending" aria-labelledby="pv-home-trending-title">
             <header class="pv-section__head">
                 <div>
-                    <h2 id="pv-home-trending-title" class="pv-section__title"><?php esc_html_e( '🔥 Productos en tendencia', 'ltms' ); ?></h2>
+                    <h2 id="pv-home-trending-title" class="pv-section__title"><?php esc_html_e( 'Productos en tendencia', 'ltms' ); ?></h2>
                     <p class="pv-section__sub"><?php esc_html_e( 'Los más vendidos del marketplace esta semana', 'ltms' ); ?></p>
                 </div>
                 <a class="pv-section__more" href="<?php echo esc_url( add_query_arg( 'orderby', 'popularity', $pv_shop_url ) ); ?>">
@@ -515,7 +518,7 @@ do_action( 'ltms_before_home_plazaviva' );
         <section class="pv-section pv-home__vendors" aria-labelledby="pv-home-vendors-title">
             <header class="pv-section__head">
                 <div>
-                    <h2 id="pv-home-vendors-title" class="pv-section__title"><?php esc_html_e( '⭐ Vendedores destacados', 'ltms' ); ?></h2>
+                    <h2 id="pv-home-vendors-title" class="pv-section__title"><?php esc_html_e( 'Vendedores destacados', 'ltms' ); ?></h2>
                     <p class="pv-section__sub"><?php esc_html_e( 'Star Sellers verificados con KYC y excelente reputación', 'ltms' ); ?></p>
                 </div>
                 <a class="pv-section__more" href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>">
@@ -616,7 +619,9 @@ do_action( 'ltms_before_home_plazaviva' );
 
             <div class="pv-home-footer__col pv-home-footer__col--brand">
                 <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
-                    <span aria-hidden="true">📍</span>
+                    <span class="pv-home-footer__logo-mark" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </span>
                     <span><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
                 </a>
                 <p class="pv-home-footer__tagline">
@@ -913,6 +918,12 @@ do_action( 'ltms_after_home_plazaviva' );
     display:inline-flex;align-items:center;gap:8px;
     font-family:var(--display);font-weight:800;font-size:20px;color:var(--text);
     text-decoration:none;margin-bottom:12px;
+}
+/* AUDIT-FE-UIUX2-D17 FIX: el mark del footer ahora es SVG (antes emoji 📍). */
+.pv-scope.pv-home .pv-home-footer__logo-mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:30px;height:30px;border-radius:var(--r-sm);
+    background:var(--primary-50);color:var(--primary);
 }
 .pv-scope.pv-home .pv-home-footer__tagline{font-size:13.5px;color:var(--text-3);line-height:1.6;max-width:340px;}
 .pv-scope.pv-home .pv-home-footer__col-title{
