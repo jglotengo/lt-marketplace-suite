@@ -165,6 +165,9 @@ do_action( 'ltms_before_help_center_plazaviva' );
                        placeholder="<?php esc_attr_e( 'Ej: ¿Cómo rastreo mi pedido?', 'ltms' ); ?>"
                        data-pv-faq-search
                        aria-controls="pv-help-faq-list" />
+                <!-- AUDIT-FE-PV-DS-018 FIX (P2-6): hint de atajo de teclado —
+                     la tecla "/" enfoca este input (handler en scope HELP). -->
+                <kbd class="pv-help__search-kbd" aria-hidden="true">/</kbd>
                 <button type="submit" class="pv-btn pv-help__search-btn" aria-label="<?php esc_attr_e( 'Buscar', 'ltms' ); ?>">
                     <?php esc_html_e( 'Buscar', 'ltms' ); ?>
                 </button>

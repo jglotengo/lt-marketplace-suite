@@ -1709,6 +1709,26 @@
       var scope = document.querySelector('.pv-scope.pv-help');
       if (!scope) return;
 
+      /* --- 0. Atajo de teclado "/" enfoca la búsqueda -------------------- */
+      /* AUDIT-FE-PV-DS-018 FIX (P2-6): el hint kbd "/" junto al input del
+       * hero necesita handler. Ignora la tecla si el usuario ya está en un
+       * campo de texto (anti-robo de foco). */
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        var active = document.activeElement;
+        var typing = active && (
+          active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.tagName === 'SELECT' ||
+          active.isContentEditable
+        );
+        if (typing) return;
+        var searchInput = scope.querySelector('[data-pv-faq-search]');
+        if (!searchInput) return;
+        e.preventDefault();
+        searchInput.focus();
+      });
+
       /* --- 1. FAQ search — filtrado en vivo por texto (vanilla JS) ------ */
       var search = scope.querySelector('[data-pv-faq-search]');
       var items  = scope.querySelectorAll('[data-pv-faq-item]');

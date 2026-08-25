@@ -780,4 +780,43 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-017 fix: debe existir @media(min-width:1280px) con --pv-pg-gap:48px'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-018 (P2-6, atajo "/" en búsqueda del help center):
+	 * hint kbd junto al input + handler global que enfoca la búsqueda al
+	 * presionar "/" fuera de campos de texto.
+	 */
+	public function test_020_help_search_keyboard_shortcut(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		$help_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/help-center.php';
+		$this->assertFileExists( $help_path );
+		$help = file_get_contents( $help_path );
+
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// (1) El template emite el hint kbd dentro del form hero.
+		$this->assertMatchesRegularExpression(
+			'/data-pv-faq-search[\s\S]{0,300}?<kbd class="pv-help__search-kbd"[^>]*>\/<\/kbd>/',
+			$help,
+			'AUDIT-FE-PV-DS-018 fix: falta el hint <kbd>/</kbd> junto al input de búsqueda'
+		);
+
+		// (2) El JS enfoca el input al presionar "/" fuera de campos de texto.
+		$this->assertMatchesRegularExpression(
+			'/e\.key !== \'\/\'[\s\S]{0,700}?preventDefault\(\);\s*searchInput\.focus\(\)/',
+			$js,
+			'AUDIT-FE-PV-DS-018 fix: el scope HELP debe enfocar [data-pv-faq-search] al presionar / (fuera de inputs)'
+		);
+
+		// (3) El CSS estila el kbd y lo oculta en mobile (sin teclado físico).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-hero__search \.pv-help__search-kbd\s*\{/',
+			$css,
+			'AUDIT-FE-PV-DS-018 fix: falta estilo .pv-help__search-kbd en ltms-plaza-viva.css'
+		);
+	}
 }

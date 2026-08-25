@@ -581,6 +581,19 @@
 .pv-hero__search .pv-input{height:44px;border:0;background:transparent;}
 .pv-hero__search .pv-input:focus{box-shadow:none;}
 .pv-hero__search .pv-btn{height:44px;border-radius:var(--r-pill);}
+/* AUDIT-FE-PV-DS-018 FIX (P2-6): hint de atajo "/" en el buscador hero
+   (help center). Oculto en mobile — no hay teclado físico. */
+.pv-hero__search .pv-help__search-kbd{
+  align-self:center;flex-shrink:0;
+  min-width:22px;height:22px;padding:0 6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--bg-2);border:1px solid var(--border-2);border-bottom-width:2px;
+  border-radius:5px;color:var(--text-3);
+  font-family:var(--mono);font-size:11.5px;font-weight:600;line-height:1;
+}
+@media (max-width:760px){
+  .pv-hero__search .pv-help__search-kbd{display:none;}
+}
 
 /* ── 3.13 TRUST BAR ────────────────────────────────────────────────────────── */
 .pv-trust-bar{
