@@ -764,6 +764,12 @@ get_header();
 }
 .pv-scope.pv-tracking .pv-tracking__status--completed,
 .pv-scope.pv-tracking .pv-tracking__status--processing{background:var(--accent-50);color:#0a8a68;}
+/* AUDIT-FE-UIUX2-D11 FIX (P1): los estados custom shipped/in_transit (que
+   el mapa status_to_step genera) no tenían color — el badge quedaba gris
+   neutro justo en el tramo más importante del envío. */
+.pv-scope.pv-tracking .pv-tracking__status--shipped{background:var(--primary-50);color:var(--primary-700);}
+.pv-scope.pv-tracking .pv-tracking__status--in-transit,
+.pv-scope.pv-tracking .pv-tracking__status--in_transit{background:var(--accent-50);color:#0a8a68;}
 .pv-scope.pv-tracking .pv-tracking__status--cancelled,
 .pv-scope.pv-tracking .pv-tracking__status--refunded,
 .pv-scope.pv-tracking .pv-tracking__status--failed{background:var(--danger-50);color:#b73a3e;}

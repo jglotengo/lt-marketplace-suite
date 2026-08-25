@@ -1116,4 +1116,24 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D09 fix: el badge del ETA debe mostrar Cancelada (danger) cuando la orden está cancelada'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D11 (P1, estados custom sin color): shipped/in_transit
+	 * generados por el mapa status_to_step no tenían regla — badge gris en
+	 * el tramo crítico del envío. Fix: shipped→primary, in_transit→accent.
+	 */
+	public function test_029_tracking_badges_estados_custom_coloreados(): void {
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+
+		$this->assertMatchesRegularExpression(
+			'/__status--shipped\{background:var\(--primary-50\)/',
+			$tracking,
+			'UIUX2-D11 fix: shipped debe tener badge primario'
+		);
+		$this->assertMatchesRegularExpression(
+			'/__status--in-transit,\s*\.pv-scope\.pv-tracking \.pv-tracking__status--in_transit\{background:var\(--accent-50\)/',
+			$tracking,
+			'UIUX2-D11 fix: in_transit debe tener badge accent (ambas variantes de sanitize_html_class)'
+		);
+	}
 }
