@@ -1465,6 +1465,18 @@
       }
 
       function fixFieldLabels() {
+        // AUDIT-FE-UIUX2-D12 FIX: renombrar headings de WC (facturación →
+        // entrega) via i18n — antes era un hack CSS font-size:0 + ::before
+        // que leía el heading DOBLE en lectores de pantalla y atrapaba el
+        // string en CSS. Idempotente (fixFieldLabels corre varias veces).
+        var billingHeading = scope.querySelector('.woocommerce-billing-fields h3');
+        if (billingHeading && PV.i18n && PV.i18n.billingHeading) {
+          billingHeading.textContent = PV.i18n.billingHeading;
+        }
+        var shippingHeading = scope.querySelector('.woocommerce-shipping-fields h3');
+        if (shippingHeading && PV.i18n && PV.i18n.shippingHeadingAlt) {
+          shippingHeading.textContent = PV.i18n.shippingHeadingAlt;
+        }
         Object.keys(labelMap).forEach(function (fieldKey) {
           var newLabel = labelMap[fieldKey];
           // Buscar el label por 'for' attribute.

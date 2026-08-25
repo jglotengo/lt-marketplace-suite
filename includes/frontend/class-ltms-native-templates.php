@@ -374,6 +374,11 @@ class LTMS_Native_Templates {
                 // aplicar cupón en el carrito (el resultado real lo imprime WC
                 // tras el reload; este toast cubre la espera).
                 'couponApplying'      => __( 'Aplicando cupón…', 'ltms' ),
+                // AUDIT-FE-UIUX2-D12 FIX: headings del checkout renombrados via
+                // JS (antes hack CSS font-size:0+::before con doble lectura en
+                // lectores y string atrapado sin i18n).
+                'billingHeading'      => __( 'Datos de entrega', 'ltms' ),
+                'shippingHeadingAlt'  => __( 'Dirección de entrega alternativa', 'ltms' ),
             ],
         ] );
     }

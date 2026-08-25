@@ -669,39 +669,17 @@
     display: block !important;
 }
 
-/* Renombrar headings: facturación → entrega (marketplace no factura) */
-.pv-scope.pv-checkout .woocommerce-billing-fields h3::before {
-    content: 'Datos de entrega';
-    display: block;
-}
-.pv-scope.pv-checkout .woocommerce-billing-fields h3 {
-    font-size: 0 !important;
-    color: transparent !important;
-}
-.pv-scope.pv-checkout .woocommerce-billing-fields h3::before {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    color: var(--text) !important;
-    margin: 0 0 12px !important;
-    padding-bottom: 8px !important;
-    border-bottom: 1px solid var(--border) !important;
-}
-
-.pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
-    content: 'Dirección de entrega alternativa';
-    display: block;
-}
-.pv-scope.pv-checkout .woocommerce-shipping-fields h3 {
-    font-size: 0 !important;
-    color: transparent !important;
-}
-.pv-scope.pv-checkout .woocommerce-shipping-fields h3::before {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    color: var(--text) !important;
-    margin: 0 0 12px !important;
-    padding-bottom: 8px !important;
-    border-bottom: 1px solid var(--border) !important;
+/* AUDIT-FE-UIUX2-D12 FIX: el renombrado de headings ("Información de
+   facturación" → "Datos de entrega") se hacía con hack font-size:0 +
+   ::before content — los lectores de pantalla leían el heading DOBLE y el
+   string quedaba atrapado en CSS sin i18n. Ahora lo renombra el scope
+   CHECKOUT de ltms-plaza-viva.js via PV.i18n (mismo patrón que
+   fixFieldLabels). Los estilos del heading los pone WC/tema; el título
+   hereda la tipografía del form. */
+.pv-scope.pv-checkout .woocommerce-billing-fields h3,
+.pv-scope.pv-checkout .woocommerce-shipping-fields h3{
+    font-family:var(--display);font-weight:700;font-size:15px;color:var(--text);
+    margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
 }
 
 /* ═══════════════════════════════════════════════════════════════

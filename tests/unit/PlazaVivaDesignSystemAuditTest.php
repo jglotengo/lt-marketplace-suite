@@ -1215,4 +1215,42 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'UIUX2-D15 fix: el pulso is-pending debe usar el azul primario'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX2-D12 (P1, hack font-size:0 en headings checkout): el
+	 * renombrado "facturación → entrega" usaba font-size:0 + ::before —
+	 * doble lectura en lectores y string sin i18n atrapado en CSS. Fix:
+	 * rename via PV.i18n en fixFieldLabels + CSS limpio del heading.
+	 */
+	public function test_033_checkout_headings_sin_hack_css(): void {
+		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
+		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js' );
+		$native = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php' );
+
+		// (1) El hack CSS desapareció físicamente.
+		$this->assertDoesNotMatchRegularExpression(
+			'/woocommerce-billing-fields h3::before\s*\{[^}]*content:/s',
+			$cko_css,
+			'UIUX2-D12 fix: el hack ::before en headings de billing debe estar eliminado'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/woocommerce-billing-fields h3\s*\{[^}]*font-size: 0 !important/s',
+			$cko_css,
+			'UIUX2-D12 fix: el font-size:0 en headings debe estar eliminado'
+		);
+
+		// (2) El rename vive en el JS via PV.i18n.
+		$this->assertMatchesRegularExpression(
+			'/billingHeading\)\s*\{\s*billingHeading\.textContent = PV\.i18n\.billingHeading/',
+			$js,
+			'UIUX2-D12 fix: el heading de billing debe renombrarse via PV.i18n en el JS'
+		);
+
+		// (3) Strings i18n expuestos con __().
+		$this->assertMatchesRegularExpression(
+			'/\'billingHeading\'\s*=>\s*__\(/',
+			$native,
+			'UIUX2-D12 fix: billingHeading debe exponerse via wp_localize_script con __()'
+		);
+	}
 }
