@@ -78,7 +78,20 @@ do_action( 'woocommerce_before_main_content' );
                 ?>
 
             <?php else : ?>
-                <?php do_action( 'woocommerce_no_products_found' ); ?>
+                <?php
+                /*
+                 * AUDIT-FE-PV-DS-005 FIX (P1-3): el empty state del shop se
+                 * envuelve en .pv-shop__empty para que el output de
+                 * woocommerce_no_products_found (típicamente el notice
+                 * .woocommerce-info de WC) reciba styling del design system
+                 * y no caiga al look crudo del theme. El hook se preserva
+                 * como válvula de extensión para plugins que inyectan
+                 * resultados alternativos.
+                 */
+                ?>
+                <div class="pv-shop__empty">
+                    <?php do_action( 'woocommerce_no_products_found' ); ?>
+                </div>
             <?php endif; ?>
 
         </div><!-- /.pv-shop__main -->

@@ -946,6 +946,30 @@
     margin-bottom: 20px !important;
 }
 
+/* AUDIT-FE-PV-DS-005 FIX (P1-3): empty state del shop archive. El output
+   de woocommerce_no_products_found (.woocommerce-info) queda integrado al
+   design system en vez de heredar estilos crudos del theme. */
+.pv-scope.pv-shop .pv-shop__empty {
+    padding: 40px 0;
+    text-align: center;
+}
+.pv-scope.pv-shop .pv-shop__empty .woocommerce-info {
+    display: block;
+    float: none;
+    width: auto;
+    text-align: center;
+    background: var(--surface);
+    border: 1px dashed var(--border-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-1);
+    color: var(--text-2);
+    font-size: 14.5px;
+    padding: 32px 24px;
+}
+.pv-scope.pv-shop .pv-shop__empty .woocommerce-info::before {
+    display: none;
+}
+
 /* Complementary products — less dominant */
 .pv-product-page .ltms-addon-items {
     margin-top: 32px !important;

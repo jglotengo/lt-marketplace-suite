@@ -312,4 +312,43 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-004: la regla mobile del pv-shop-sidebar debe existir bajo el breakpoint canónico 760px'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-PV-DS-005 (P1-3, empty state del shop): archive-product.php
+	 * delega el caso "sin productos" a do_action('woocommerce_no_products_found')
+	 * — WC imprime un .woocommerce-info crudo sin styling del design system.
+	 *
+	 * Fix: wrapper .pv-shop__empty en el template (hook preservado como
+	 * válvula) + reglas CSS que integran el notice al sistema (superficie,
+	 * borde dashed, tokens de texto).
+	 */
+	public function test_007_shop_empty_state_envuelto_y_estilado(): void {
+		$this->assertFileExists( $this->css_path );
+		$css = file_get_contents( $this->css_path );
+
+		$archive_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/archive-product.php';
+		$this->assertFileExists( $archive_path );
+		$archive = file_get_contents( $archive_path );
+
+		// (1) El template envuelve el hook en el wrapper semantic.
+		$this->assertMatchesRegularExpression(
+			'/class="pv-shop__empty"[^>]*>\s*<\?php do_action\( \'woocommerce_no_products_found\' \); \?>/',
+			$archive,
+			'AUDIT-FE-PV-DS-005 fix: woocommerce_no_products_found debe renderizarse dentro del wrapper .pv-shop__empty'
+		);
+
+		// (2) El design system estila el notice de WC dentro del wrapper.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-shop \.pv-shop__empty \.woocommerce-info\s*\{[^}]+\}/',
+			$css,
+			'AUDIT-FE-PV-DS-005 fix: falta la regla .pv-shop__empty .woocommerce-info en ltms-plaza-viva.css'
+		);
+
+		// (3) Traza del fix para auditorías futuras.
+		$this->assertStringContainsString(
+			'AUDIT-FE-PV-DS-005',
+			$css,
+			'AUDIT-FE-PV-DS-005: ltms-plaza-viva.css must contain the traceable fix marker comment'
+		);
+	}
 }
