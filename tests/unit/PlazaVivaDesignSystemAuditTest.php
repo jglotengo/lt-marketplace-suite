@@ -1671,4 +1671,99 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'MIN-01: la fuente debe conservar el patron canonico .001ms del kill-switch'
 		);
 	}
+
+	/**
+	 * BACKLOG-D26 (consolidacion de !important en checkout.css), fase 1:
+	 * las generaciones de parches apilaban reglas duplicadas que se pisaban
+	 * entre si dentro del MISMO contexto de cascada. Se retiraron las
+	 * capas muertas (10 declaraciones; los ~116 !important restantes son
+	 * defensa legítima contra theme/WC sobre markup nativo y permanecen).
+	 *
+	 * Este test porta el analizador de duplicados (parseo con anidamiento
+	 * @media correcto) y congela dos garantias:
+	 *  (1) cero declaraciones (contexto, selector, propiedad) repetidas —
+	 *      toda capa nueva debe editar la canonica, no apilar encima;
+	 *  (2) techo duro de tokens !important para detectar re-acumulacion.
+	 */
+	public function test_045_checkout_css_sin_capas_muertas(): void {
+		$path = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$src = (string) file_get_contents( $path );
+		$this->assertNotSame( '', $src );
+
+		// Sin comentarios para simplificar el parseo.
+		$src = (string) preg_replace( '~/\*.*?\*/~s', '', $src );
+		$len = strlen( $src );
+		$i = 0;
+		$stack = array(); // marcos 'cond' (@media/@supports) abiertos
+		$rules = array();
+		$sel_buf = '';
+
+		while ( $i < $len ) {
+			$ch = $src[ $i ];
+			if ( '{' === $ch ) {
+				$sel = trim( preg_replace( '/\s+/', ' ', $sel_buf ) );
+				$sel_buf = '';
+				if ( '' === $sel ) { ++$i; continue; }
+				if ( preg_match( '/^@(media|supports)/i', $sel ) ) {
+					$stack[] = 'cond';
+					++$i;
+					continue;
+				}
+				if ( preg_match( '/^@/', $sel ) ) {
+					// at-rule opaco: saltar balanceado
+					$depth = 1;
+					++$i;
+					while ( $i < $len && $depth > 0 ) {
+						if ( '{' === $src[ $i ] ) { ++$depth; }
+						elseif ( '}' === $src[ $i ] ) { --$depth; }
+						++$i;
+					}
+					continue;
+				}
+				$body = '';
+				++$i;
+				while ( $i < $len && '}' !== $src[ $i ] ) {
+					$body .= $src[ $i ];
+					++$i;
+				}
+				++$i; // consumir '}'
+				$context = str_repeat( 'm:', count( $stack ) );
+				foreach ( explode( ';', $body ) as $decl ) {
+					if ( ! preg_match( '/^\s*([a-zA-Z-]+)\s*:\s*(.+)$/', $decl, $m ) ) { continue; }
+					$key = $context . '|' . $sel . '|' . strtolower( trim( $m[1] ) );
+					$rules[ $key ][] = trim( $m[2] );
+				}
+				continue;
+			}
+			if ( '}' === $ch ) {
+				// cierra el condicional mas interno (las llaves de regla ya
+				// fueron consumidas por el escaneo del cuerpo; todo marco
+				// abierto del stack es un @media/@supports)
+				array_pop( $stack );
+				++$i;
+				continue;
+			}
+			$sel_buf .= $ch;
+			++$i;
+		}
+
+		$dups = array();
+		foreach ( $rules as $key => $values ) {
+			if ( count( $values ) > 1 ) {
+				$dups[] = $key . ' (' . count( $values ) . 'x)';
+			}
+		}
+		$this->assertSame(
+			array(),
+			$dups,
+			'D26 fix: checkout.css tiene declaraciones (contexto,selector,propiedad) duplicadas — consolidar editando la capa canonica en lugar de apilar'
+		);
+
+		$total_important = preg_match_all( '/!important/', $src );
+		$this->assertLessThanOrEqual(
+			120,
+			$total_important,
+			'D26: checkout.css re-acumulo !important por encima del techo congelado'
+		);
+	}
 }

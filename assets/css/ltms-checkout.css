@@ -172,8 +172,10 @@
 .pv-scope.pv-checkout .pv-checkout__terms-toggle .pv-checkout__ship-toggle-text a{color:var(--primary);text-decoration:underline;}
 
 /* Hidden shipping fields (cuando ship_to_different_address está off) */
-.pv-scope.pv-checkout .woocommerce-shipping-fields{display:none;}
-.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible{display:block;animation:pv-fade .25s ease;}
+/* BACKLOG-D26 FIX: el display de shipping fields lo gobiernan las capas
+   canonicas CRITICAL de mas abajo; aqui queda solo la animacion de
+   entrada del estado visible. */
+.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible{animation:pv-fade .25s ease;}
 
 /* No shipping / no payment — AUDIT-FE-UIUX2-D05 FIX: son estados
    ORIENTADORES ("completa tu dirección y aparecerán aquí"), no errores.
@@ -472,21 +474,9 @@ body.admin-bar .pv-scope.pv-checkout .pv-checkout__review[data-pv-sticky]{top:52
     position: relative;
 }
 
-/* Shipping fields ocultos por defecto (colapsable) */
-.pv-scope.pv-checkout .woocommerce-shipping-fields {
-    display: none !important;
-}
-.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible {
-    display: block !important;
-}
-
-/* Invoice fields ocultos por defecto (colapsable) */
-.pv-scope.pv-checkout .ltms-invoice-field {
-    display: none !important;
-}
-.pv-scope.pv-checkout .ltms-invoice-field.ltms-invoice-visible {
-    display: block !important;
-}
+/* BACKLOG-D26 FIX: las generaciones duplicadas de shipping/invoice fields
+   fueron retiradas - el estado colapsable lo gobiernan las capas
+   canonicas CRITICAL mas abajo (con !important contra el theme). */
 
 /* AUDIT-FE-UIUX2-D14 FIX: la generación duplicada de los bloques legales
    (checkbox nativo 20px que chocaba con el custom-mark de la gen canónica
@@ -657,13 +647,11 @@ body.admin-bar .pv-scope.pv-checkout .pv-checkout__review[data-pv-sticky]{top:52
     border-radius: 8px;
     font-size: 0.85rem;
 }
+/* BACKLOG-D26 FIX: cursor/color/font-weight viven en la capa canonica
+   con !important de mas abajo; aqui queda solo user-select. */
 .pv-checkout__login-toggle summary {
-    cursor: pointer;
-    color: var(--primary);
-    font-weight: 600;
     user-select: none;
 }
-.pv-checkout__login-toggle summary:hover { color: var(--primary-700); }
 .pv-checkout__login-body { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 /* Checkbox "Crear cuenta": ocultar por defecto (causa confusión) */
