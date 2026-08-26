@@ -73,6 +73,24 @@ async function minifyJS(filePath) {
     }
 }
 
+function normalizeSubMsDurations(css) {
+    // AUDIT-FE-UIUX-BACKLOG-MIN-01 FIX: clean-css@5.3.3 (ultima version, proyecto
+    // sin mantenimiento desde 2023) corrompe duraciones sub-milisegundo en level 2:
+    //   '.001ms' -> 'NaNs' (CSS invalido, el navegador descarta la regla)
+    //   '0.01ms' -> '0s'    (deriva semantica del patron reduced-motion)
+    // Los microsegundos sobreviven intactos al optimizador, asi que normalizamos
+    // todo valor <1ms a su equivalente exacto en us ANTES de minificar. Misma
+    // duracion fisica, salida valida. El guard posterior a minify falla el build
+    // si algun NaN llegara a aparecer por otra via.
+    return css.replace(/(\d*\.?\d+)ms\b/g, (match, num) => {
+        const value = parseFloat(num);
+        if (!(value > 0 && value < 1)) {
+            return match;
+        }
+        return Math.round(value * 1000) + 'us';
+    });
+}
+
 function minifyCSS(filePath) {
     const relPath = path.relative(PLUGIN_DIR, filePath);
     const outPath = filePath.replace(/\.css$/, '.min.css');
@@ -87,13 +105,19 @@ function minifyCSS(filePath) {
     console.log(`  📦 Minifying: ${relPath}`);
 
     try {
-        const source = fs.readFileSync(filePath, 'utf8');
+        const rawSource = fs.readFileSync(filePath, 'utf8');
+        const source = normalizeSubMsDurations(rawSource);
         const result = new CleanCSS({
             level: 2,
             returnPromise: false,
         }).minify(source);
 
         if (result.styles) {
+            if (/NaN/.test(result.styles)) {
+                console.error(`     ❌ Error: output contains invalid "NaN" values (minifier corruption guard)`);
+                stats.css.errors++;
+                return;
+            }
             const originalSize = Buffer.byteLength(source);
             const minSize = Buffer.byteLength(result.styles);
             const reduction = ((1 - minSize / originalSize) * 100).toFixed(1);

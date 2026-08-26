@@ -1630,4 +1630,45 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'BACKLOG-D32 fix: falta el enqueue condicional de ltms-cart.css (con dependencia del design system)'
 		);
 	}
+
+	/**
+	 * AUDIT-FE-UIUX-BACKLOG-MIN-01 (P1 de pipeline): clean-css@5.3.3
+	 * corrompia las duraciones sub-milisegundo al minificar — '.001ms'
+	 * salia como 'NaNs' (CSS invalido: el navegador descarta la regla y el
+	 * kill-switch reduced-motion dejaba de existir en el artefacto minificado)
+	 * y '0.01ms' derivaba a '0s'. El builder normaliza ahora <1ms a su
+	 * equivalente exacto en microsegundos (1us = 0.001ms) y falla si un NaN
+	 * llegara al output. Este test congela ambas garantias sobre TODOS los
+	 * .min.css generados.
+	 */
+	public function test_044_min_css_sin_nan_y_killswitch_valido(): void {
+		$min_files = glob( dirname( __DIR__, 2 ) . '/assets/css/*.min.css' );
+		$this->assertNotEmpty( $min_files, 'Deben existir hojas .min.css generadas por el build' );
+
+		foreach ( $min_files as $min_path ) {
+			$contents = file_get_contents( $min_path );
+			$this->assertDoesNotMatchRegularExpression(
+				'/NaN/',
+				$contents,
+				'MIN-01 fix: ' . basename( $min_path ) . ' contiene valores NaN invalidos — el guard del build fallo o alguien minifico fuera del pipeline'
+			);
+		}
+
+		// El kill-switch reduced-motion del design system debe seguir vivo y
+		// con una duracion valida en el artefacto minificado.
+		$pv_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css' );
+		$this->assertMatchesRegularExpression(
+			'/prefers-reduced-motion:reduce\)\{[^}]*animation-duration:(?:1us|\.001ms)!important/s',
+			$pv_min,
+			'MIN-01 fix: el kill-switch reduced-motion debe sobrevivir la minificacion con duracion valida'
+		);
+
+		// La fuente conserva la representacion canonica legible (.001ms).
+		$pv_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css' );
+		$this->assertStringContainsString(
+			'animation-duration:.001ms !important',
+			$pv_src,
+			'MIN-01: la fuente debe conservar el patron canonico .001ms del kill-switch'
+		);
+	}
 }
