@@ -89,8 +89,10 @@
     border:1px solid var(--border);border-radius:var(--r-md);padding:0;background:var(--bg);
     grid-column:1 / -1;
 }
+/* BACKLOG-D26 fase 2 FIX: padding/cursor/font-weight/color son gobernados
+   por la capa canonica con !important de mas abajo (misma cobertura de
+   elementos); aqui queda solo list-style. */
 .pv-scope.pv-checkout .pv-checkout__login-toggle summary{
-    padding:12px 16px;cursor:pointer;font-weight:600;color:var(--primary);
     list-style:none;
 }
 .pv-scope.pv-checkout .pv-checkout__login-toggle summary::-webkit-details-marker{display:none;}

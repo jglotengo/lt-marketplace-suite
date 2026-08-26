@@ -1766,4 +1766,129 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'D26: checkout.css re-acumulo !important por encima del techo congelado'
 		);
 	}
+
+	/**
+	 * BACKLOG-D26 fase 2: pares muertos CROSS-SELECTOR — una declaracion
+	 * temprana (normal) es muerta cuando una capa posterior con !important
+	 * cubre los mismos elementos. Patron probado aqui: mismo "tail" de
+	 * selector tras quitar el prefijo de scope ".pv-scope.pv-checkout "
+	 * (prefijo+tail es subconjunto exacto de tail; el !important posterior
+	 * gana sin importar la especificidad).
+	 */
+	public function test_046_checkout_css_sin_muertas_cross_selector(): void {
+		$path = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
+		$src = (string) file_get_contents( $path );
+		$this->assertNotSame( '', $src );
+		$src = (string) preg_replace( '~/\*.*?\*/~s', '', $src );
+
+		// Reutiliza el mismo parseo del test_045 para coleccionar entradas
+		// (contexto, selector, propiedad) con valor/importancia/orden.
+		$len = strlen( $src );
+		$i = 0;
+		$stack = array();
+		$rules = array();
+		$sel_buf = '';
+		$rule_seq = 0;
+		while ( $i < $len ) {
+			$ch = $src[ $i ];
+			if ( '{' === $ch ) {
+				$sel = trim( preg_replace( '/\s+/', ' ', $sel_buf ) );
+				$sel_buf = '';
+				if ( '' === $sel ) { ++$i; continue; }
+				if ( preg_match( '/^@(media|supports)/i', $sel ) ) {
+					$stack[] = 'cond';
+					++$i;
+					continue;
+				}
+				if ( preg_match( '/^@/', $sel ) ) {
+					$depth = 1;
+					++$i;
+					while ( $i < $len && $depth > 0 ) {
+						if ( '{' === $src[ $i ] ) { ++$depth; }
+						elseif ( '}' === $src[ $i ] ) { --$depth; }
+						++$i;
+					}
+					continue;
+				}
+				$body = '';
+				++$i;
+				while ( $i < $len && '}' !== $src[ $i ] ) {
+					$body .= $src[ $i ];
+					++$i;
+				}
+				++$i;
+				++$rule_seq;
+				$context = str_repeat( 'm:', count( $stack ) );
+				foreach ( explode( ';', $body ) as $decl_order => $decl ) {
+					if ( ! preg_match( '/^\s*([a-zA-Z-]+)\s*:\s*(.+)$/', $decl, $m ) ) { continue; }
+					$key = $context . '|' . $sel . '|' . strtolower( trim( $m[1] ) );
+					$rules[ $key ][] = array(
+						'seq' => $rule_seq,
+						'order' => $decl_order,
+						'val' => trim( $m[2] ),
+						'imp' => strpos( $m[2], '!important' ) !== false,
+					);
+				}
+				continue;
+			}
+			if ( '}' === $ch ) {
+				array_pop( $stack );
+				++$i;
+				continue;
+			}
+			$sel_buf .= $ch;
+			++$i;
+		}
+
+		$scope_prefix = '.pv-scope.pv-checkout ';
+		$tails = static function ( string $selector_list ) use ( $scope_prefix ): array {
+			$out = array();
+			foreach ( explode( ',', $selector_list ) as $compound ) {
+				$c = trim( preg_replace( '/\s+/', ' ', $compound ) );
+				if ( 0 === strpos( $c, $scope_prefix ) ) {
+					$c = substr( $c, strlen( $scope_prefix ) );
+				}
+				$out[ $c ] = true;
+			}
+			return $out;
+		};
+
+		$entries = array();
+		foreach ( $rules as $key => $values ) {
+			$parts = explode( '|', $key );
+			foreach ( $values as $v ) {
+				$entries[] = array(
+					'ctx' => $parts[0], 'sel' => $parts[1], 'prop' => $parts[2],
+					'val' => $v['val'], 'imp' => $v['imp'],
+					'seq' => $v['seq'], 'order' => $v['order'],
+				);
+			}
+		}
+
+		$dead = array();
+		foreach ( $entries as $a ) {
+			foreach ( $entries as $b ) {
+				if ( $b['imp'] !== true || $b['ctx'] !== $a['ctx'] || $b['prop'] !== $a['prop'] ) { continue; }
+				// B debe ser estrictamente posterior en cascada
+				$later = ( $b['seq'] > $a['seq'] )
+					|| ( $b['seq'] === $a['seq'] && $b['order'] > $a['order'] );
+				if ( ! $later ) { continue; }
+				$ta = $tails( $a['sel'] );
+				$tb = $tails( $b['sel'] );
+				$covered = true;
+				foreach ( $ta as $t => $_ ) {
+					if ( ! isset( $tb[ $t ] ) ) { $covered = false; break; }
+				}
+				if ( ! $covered ) { continue; }
+				$dead[] = $a['sel'] . ' {' . $a['prop'] . ':' . $a['val'] . '}';
+				break;
+			}
+		}
+
+		$this->assertSame(
+			array(),
+			array_unique( $dead ),
+			'D26 fase 2 fix: hay declaraciones cubiertas por una capa posterior con !important'
+		);
+	}
 }
