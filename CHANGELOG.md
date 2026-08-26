@@ -6,6 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `MY-ACCOUNT-DS-CICLO3` (auditoría UI/UX de la experiencia Mi Cuenta: 8 hallazgos — 0 P0 + 4 P1 + 3 P2 resueltos, 1 en backlog documentado)
+
+> **Ciclo 3 Audit → Fix → Re-audit** sobre la única superficie que el plugin aporta hoy a `/mi-cuenta`: la
+> extensión **Mis Reservas** (`includes/frontend/class-ltms-frontend-customer-bookings.php`, markup/CSS/JS
+> inline). La página de cuenta NO tiene template nativo (cae al tema) — ver backlog MA-08. IDs `AUDIT-FE-UIUX3-MA-01..08`.
+> Suite completa verde: **4,652 tests, 9,353 assertions OK** (+8 tests), 3 skips preexistentes.
+
+**P1 — 4 fixes:**
+
+- **MA-03** (`f6362b01`): transición comodín de botones → lista explícita de propiedades visuales (paridad D-27).
+- **MA-01+MA-05** (`2c3edcf0`): paleta hex heredada (grises Tailwind, azul literal, ámbar/rojo propios) migrada
+  a tokens globales del DS; badges de estado con estilo inline dinámico → clases modificadoras
+  `.ltms-cb-badge--{status}` con receta `-50`/`-700` (paridad `pv-badge--*`).
+- **MA-02** (`5ba5325a`): iconografía emoji (hotel/reloj/check/lupa/documento/alerta) → SVG stroke con
+  `currentColor` (paridad D-17); rótulos de estado como texto plano; label del botón cancelar a `<span>`
+  para que el restore del JS no borre el icono.
+- **MA-05b** (`46feb8a6`): re-auditoría — badge base con estilo neutro de respaldo para estados desconocidos
+  (rol que antes cumplía el fallback del mapa retirado).
+
+**P2 — 3 fixes:** targets táctiles de 44px en botones y paginación pills (MA-04 `370d6556`) · foco visible de
+teclado WCAG 2.4.7 (MA-06 `4129fce9`) · animaciones jQuery respetan `prefers-reduced-motion` (MA-07 `4d364fb6`).
+
+**Backlog documentado:**
+
+- **MA-08**: el router de templates intenta cargar `templates/my-account.php` pero el archivo no existe
+  (`class-ltms-native-templates.php:242`) — `/mi-cuenta` renderiza con el tema, fuera del design system.
+  Crear el override nativo es una feature mayor con riesgo conocido (el override de tienda está DISABLED por
+  conflicto con Elementor). Requiere decisión de producto antes de implementarse.
+
+**Tests:** +7 invariantes estructurales en `MyAccountDesignSystemAuditTest` (nuevo, patrón
+`PlazaVivaDesignSystemAuditTest`: filesystem puro, determinista en UNIT_ONLY).
+
+---
+
 ### Fixed — `PLAZA-VIVA-DS-CICLO2` (auditoría de diseño UI/UX páginas públicas: 37 hallazgos — 3 P0 + 17 P1 + 17 P2 resueltos, 3 en backlog documentado)
 
 > **Ciclo 2 Audit → Fix** sobre las 8 páginas públicas del design system (home, tienda, storefront del
