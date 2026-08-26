@@ -6,6 +6,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `MY-ACCOUNT-BACKLOG-MIN` (pipeline de minificación: kill-switch reduced-motion corrupto en los .min.css)
+
+> Hallazgo colateral del backlog D-20/D-32, ahora resuelto de raíz. Suite completa verde:
+> **4,655 tests, 9,388 assertions OK** (+1 test), 3 skips preexistentes.
+
+- **MIN-01** (`1c76fc65`): `clean-css@5.3.3` (última versión; sin mantenimiento desde 2023) corrompía las
+  duraciones sub-milisegundo al minificar: `.001ms` → **`NaNs!important`** (CSS inválido — el navegador
+  descarta la regla y el kill-switch `prefers-reduced-motion` dejaba de existir en el artefacto minificado;
+  afectaba a `ltms-plaza-viva.min.css`) y `0.01ms` → `0s` (deriva semántica; `ltms-ux-enhancements.min.css`
+  y `ltms-admin-ux.min.css`). Fix en `scripts/build.js`: normalización determinista de todo valor `<1ms` a
+  su equivalente EXACTO en microsegundos antes de minificar (`1us` sobrevive intacto al optimizador) +
+  guard post-minify que falla el build si un `NaN` llegara al output por cualquier otra vía. Fuente CSS sin
+  cambios (conserva el patrón canónico `.001ms`). Invariante nuevo `test_044`: cero `NaN` en todos los
+  `.min.css` + kill-switch válido en `plaza-viva.min`.
+
+---
+
 ### Changed — `MY-ACCOUNT-BACKLOG` (ejecución del backlog organizativo del ciclo 2: D-20 + D-32; D-26 permanece como deuda documentada)
 
 > Extracciones CSS inline → hojas externas, sin cambio visual (movimiento literal). Suite completa verde:
