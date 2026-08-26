@@ -132,6 +132,10 @@ final class LTMS_Frontend_Customer_Bookings {
             /* AUDIT-FE-UIUX3-MA-04 FIX: pills de paginacion con area tactil de 44px. */
             .ltms-cb-page-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--border-2); border-radius: var(--r-pill, 999px); font-size: .85rem; background: var(--surface); cursor: pointer; color: var(--text-2); text-decoration: none; }
             .ltms-cb-page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+            /* AUDIT-FE-UIUX3-MA-06 FIX: foco visible para teclado (WCAG 2.4.7),
+               misma receta del fix D-03 del ciclo 2. */
+            .ltms-cb-btn:focus-visible,
+            .ltms-cb-page-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
             /* AUDIT-FE-UIUX3-MA-01 FIX: notices con receta D-31 (borde izquierdo de color). */
             .ltms-cb-notice { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: .875rem; background: var(--surface); border: 1px solid var(--border); }
             .ltms-cb-notice.error { border-left: 4px solid var(--danger); color: var(--danger-700); }

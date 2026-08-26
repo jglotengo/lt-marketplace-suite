@@ -46,6 +46,30 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
+	 * AUDIT-FE-UIUX3-MA-06 (P2): botones y paginacion carecian de estado
+	 * de foco visible para navegacion por teclado (WCAG 2.4.7). Misma
+	 * receta que D-03: outline solido --primary con offset 2px.
+	 */
+	public function test_006_foco_visible_en_controles(): void {
+		$this->assertFileExists( $this->bookings_path );
+		$src = file_get_contents( $this->bookings_path );
+
+		foreach ( [ '.ltms-cb-btn:focus-visible', '.ltms-cb-page-btn:focus-visible' ] as $selector ) {
+			$this->assertStringContainsString(
+				$selector,
+				$src,
+				'AUDIT-FE-UIUX3-MA-06 fix: falta estado de foco visible para ' . $selector
+			);
+		}
+
+		$this->assertMatchesRegularExpression(
+			'/focus-visible\s*\{[^}]*outline\s*:\s*2px\s+solid\s+var\(--primary\)[^}]*outline-offset\s*:\s*2px/is',
+			$src,
+			'AUDIT-FE-UIUX3-MA-06 fix: el outline visible debe usar la receta D-03'
+		);
+	}
+
+	/**
 	 * AUDIT-FE-UIUX3-MA-04 (P2): los botones (~35px de alto) y las pills
 	 * de paginacion (~31px) quedaban por debajo del minimo de target
 	 * tactil de 44px establecido por D-06 en el ciclo 2.
