@@ -46,6 +46,35 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
+	 * AUDIT-FE-UIUX3-MA-07 (P2): las animaciones jQuery (desvanecido del
+	 * aviso y de la tarjeta cancelada) ignoraban la preferencia de
+	 * movimiento reducido del usuario. Paridad con D-07 del ciclo 2.
+	 */
+	public function test_007_animaciones_respetan_movimiento_reducido(): void {
+		$this->assertFileExists( $this->bookings_path );
+		$src = file_get_contents( $this->bookings_path );
+
+		// (1) La preferencia se consulta via matchMedia.
+		$this->assertMatchesRegularExpression(
+			'/matchMedia\(\s*[\'"]\(prefers-reduced-motion:\s*reduce\)[\'"]\s*\)/i',
+			$src,
+			'AUDIT-FE-UIUX3-MA-07 fix: falta consultar prefers-reduced-motion via matchMedia'
+		);
+
+		// (2) Ambos usos de desvanecido estan guardados por la bandera.
+		$this->assertMatchesRegularExpression(
+			'/reduceMotion\s*\?\s*\$n\.hide\(\)\s*:\s*\$n\.fadeOut\(/',
+			$src,
+			'AUDIT-FE-UIUX3-MA-07 fix: el aviso debe condicionar su desvanecido a la bandera'
+		);
+		$this->assertMatchesRegularExpression(
+			'/if\s*\(\s*reduceMotion\s*\)\s*\{\s*\$card\.remove\(\);\s*\}\s*else\s*\{\s*\$card\.fadeOut\(/',
+			$src,
+			'AUDIT-FE-UIUX3-MA-07 fix: la tarjeta cancelada debe condicionar su desvanecido a la bandera'
+		);
+	}
+
+	/**
 	 * AUDIT-FE-UIUX3-MA-06 (P2): botones y paginacion carecian de estado
 	 * de foco visible para navegacion por teclado (WCAG 2.4.7). Misma
 	 * receta que D-03: outline solido --primary con offset 2px.

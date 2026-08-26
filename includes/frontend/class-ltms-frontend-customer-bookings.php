@@ -302,11 +302,14 @@ final class LTMS_Frontend_Customer_Bookings {
         /* global jQuery, ltmsCustomerBookings */
         jQuery(function($){
             var i18n = (typeof ltmsCustomerBookings !== 'undefined') ? ltmsCustomerBookings.i18n : {};
+            /* AUDIT-FE-UIUX3-MA-07 FIX: se respeta la preferencia de movimiento
+               reducido del usuario (paridad D-07 del ciclo 2). */
+            var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
             function showNotice(msg, type) {
                 var $n = $('#ltms-cb-notice');
                 $n.attr('class', 'ltms-cb-notice ' + type).html(msg).show();
-                setTimeout(function(){ $n.fadeOut(); }, 4000);
+                setTimeout(function(){ reduceMotion ? $n.hide() : $n.fadeOut(); }, 4000);
             }
 
             $(document).on('click', '.ltms-cb-cancel-btn', function(){
@@ -324,7 +327,8 @@ final class LTMS_Frontend_Customer_Bookings {
                     nonce:      nonce,
                 }, function(r) {
                     if ( r.success ) {
-                        $('#ltms-cb-booking-' + bookingId).fadeOut(300, function(){ $(this).remove(); });
+                        var $card = $('#ltms-cb-booking-' + bookingId);
+                        if ( reduceMotion ) { $card.remove(); } else { $card.fadeOut(300, function(){ $(this).remove(); }); }
                         showNotice(r.data.message || '<?php echo esc_js( __( "Reserva cancelada.", "ltms" ) ); ?>', 'success');
                     } else {
                         $btn.prop('disabled', false).find('.ltms-cb-btn-label').text('<?php echo esc_js( __( "Cancelar reserva", "ltms" ) ); ?>');
