@@ -49,6 +49,81 @@
             this.initGlobalSearch();    // v2.9.84 P1
             this.initKeyboardShortcuts(); // v2.9.91 P3
             this.initNonceRefresh();    // FIX-403-NONCE
+            this.initResilience();      // AUDIT-DASH-NET-01
+        },
+
+        /**
+         * AUDIT-DASH-NET-01: resiliencia de red del SPA del panel.
+         *
+         * Sintoma en produccion: al hacer clic en cualquier vista los datos
+         * quedaban cargando indefinidamente y la consola mostraba
+         * net::ERR_NETWORK_IO_SUSPENDED sobre ?ltms_ajax=1. Diagnostico
+         * end-to-end exonero al servidor (endpoints 200 success en ~0.27s
+         * con sesion autenticada por ambas rutas): el navegador suspende la
+         * pila de red (pestaña congelada en segundo plano, ahorro de
+         * bateria/datos, AV o proxy con inspeccion SSL) y las peticiones
+         * fallan a nivel de red.
+         *
+         * El amplificador era nuestro: 24 llamadas $.ajax SIN handler .fail
+         * y SIN timeout (jQuery default = infinito), mas polling que seguia
+         * disparandose con la pestana oculta. Tres capas:
+         *
+         *  1) Timeout global de 20s para toda llamada al router AJAX — una
+         *     peticion muerta termina sola y dispara sus handlers de error.
+         *  2) Red global ajaxError: aviso accionable una sola vez por racha
+         *     (toast) y limpieza de loaders/skeletons pegados.
+         *  3) Polling pausado con document.hidden; al volver al frente se
+         *     refresca el nonce y se recarga la vista actual.
+         */
+        initResilience() {
+            const self = this;
+
+            // (1) Timeout global solo para endpoints del panel.
+            if (typeof jQuery !== 'undefined' && jQuery.ajaxPrefilter) {
+                jQuery.ajaxPrefilter(function (options) {
+                    const u = options.url || '';
+                    if (u.indexOf('ltms_ajax=1') !== -1 || u.indexOf('admin-ajax.php') !== -1) {
+                        if (!options.timeout) {
+                            options.timeout = 20000;
+                        }
+                    }
+                });
+            }
+
+            // (2) Red global de errores de red/HTTP del panel.
+            let lastNetToastAt = 0;
+            $(document).on('ajaxError', function (event, jqxhr, settings) {
+                const u = (settings && settings.url) || '';
+                if (u.indexOf('ltms_ajax=1') === -1 && u.indexOf('admin-ajax.php') === -1) {
+                    return;
+                }
+                $('#ltms-dashboard-container .ltms-view-loader').hide();
+                if (typeof self.hideSkeleton === 'function') {
+                    self.hideSkeleton(self.currentView);
+                }
+                if (document.hidden) {
+                    return; // no alarmar por fallos ocurridos en segundo plano
+                }
+                const now = Date.now();
+                if (now - lastNetToastAt < 8000) {
+                    return; // una sola vez por racha de fallos
+                }
+                lastNetToastAt = now;
+                if (typeof self.showToast === 'function') {
+                    self.showToast('error', 'Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo.');
+                }
+            });
+
+            // (3) Al volver la pestana al frente: nonce fresco + recarga.
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    return;
+                }
+                self.initNonceRefresh();
+                if (self.currentView) {
+                    self.loadView(self.currentView, true);
+                }
+            });
         },
 
         /**
@@ -87,6 +162,13 @@
             }); // ping inicial, no crÃ­tico si falla â€” el intervalo abajo reintenta.
 
             setInterval(function () {
+                // AUDIT-DASH-NET-01: con la pestana oculta el navegador puede
+                // suspender la red y las requests salen rotas
+                // (ERR_NETWORK_IO_SUSPENDED); el ciclo visible siguiente
+                // repone todo via visibilitychange.
+                if (document.hidden) {
+                    return;
+                }
                 $.post(ltmsDashboard.ajax_url, {
                     action: 'ltms_refresh_dashboard_nonce',
                     nonce: ltmsDashboard.nonce
@@ -906,6 +988,10 @@
         startNotificationPolling() {
             this.fetchNotifications();
             this.notifTimer = setInterval(() => {
+                // AUDIT-DASH-NET-01: sin polling en pestana oculta.
+                if (document.hidden) {
+                    return;
+                }
                 this.fetchNotifications();
             }, ltmsDashboard.polling_interval || 30000);
         },
