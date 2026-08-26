@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `AUDIT-DASH-NET-01` (panel del vendedor: vistas colgando "cargando" por fallos de red sin manejo)
+
+> Reporte del usuario: clic en cualquier submenú (incl. Inicio) quedaba esperando datos indefinidamente,
+> consola con `net::ERR_NETWORK_IO_SUSPENDED ?ltms_ajax=1`, en desktop y móvil. Diagnóstico end-to-end con
+> sesión de vendedor de prueba: **servidor exonerado** — página completa (656KB, 18 secciones) y los 5
+> endpoints devuelven `200 success:true` en ~0.27s por ambas rutas (`?ltms_ajax=1` y admin-ajax directo);
+> WAF propio sin bloqueos recientes (`bkr_lt_security_events`, último hace un mes); min.js sincronizado.
+> La causa es **cliente/red**: el navegador suspende la pila de red (pestaña congelada en segundo plano,
+> ahorro de batería/datos, AV o proxy con inspección SSL). Suite completa verde: **4,663 tests, 9,428
+> assertions OK** (+4), 3 skips preexistentes.
+
+- **Amplificador corregido** (`92c08013`): el SPA tenía **24 llamadas `$.ajax` sin handler `.fail` y sin
+  timeout** (jQuery default = infinito) — cualquier fallo de red dejaba spinners eternos en vez de un
+  error visible. Tres capas de resiliencia en `initResilience()`: timeout global de 20s vía
+  `ajaxPrefilter` para toda ruta del panel; red global `ajaxError` que limpia loaders/skeletons pegados y
+  muestra toast accionable ("Sin conexión con el servidor…") una sola vez por racha; polling de
+  nonce-refresh y notificaciones **pausado con `document.hidden`** (origen del error de suspensión) y al
+  volver al frente repone nonce + recarga la vista actual. Tests +4 en `DashboardResilienceTest` (timeout,
+  red de errores, pausa/reposición, min sincronizado).
+- **Lección de método**: el humo real post-deploy volvió a ser decisivo — la primera verificación HTTP tras
+  desplegar MA-08 detectó que el router no servía la página; aquí la réplica autenticada end-to-end evitó
+  parchear a ciegas un servidor sano. Los fallos "de red suspendida" no se reproducen server-side: si el
+  usuario lo reintenta desde otra red / sin extensiones y persistiera, revisar AV/proxy corporativo.
+
+---
+
 ### Added — `MY-ACCOUNT-NATIVE` (MA-08 autorizado por producto: template nativo de Mi Cuenta bajo el design system)
 
 > Último item del backlog del ciclo 3. Suite completa verde: **4,659 tests, 9,413 assertions OK** (+2),
