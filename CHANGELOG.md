@@ -24,6 +24,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     en desktop y scroll horizontal en móvil ≤760px, formularios/tablas/botones WC tokenizados).
   - Convenciones DS: sin `<style>` ni `<script>` incrustados (CSP); hooks propios
     `ltms_before/after_account_plazaviva`.
+- **Router con Elementor** (`d13d9c27`): primera verificación en producción reveló que la rama
+  "con Elementor activo" del router solo permitía single-product/cart/checkout/vendor-store — Mi Cuenta
+  seguía cayendo al tema. Se añadió `is_account_page()` al allowlist: misma clase segura que cart/checkout
+  (página singular por shortcode); el fatal histórico era exclusivo de archivos de shop/categoría/tag.
+  Verificado en vivo: `/mi-cuenta` invitado sirve `pv-scope pv-account` + form-login. `test_008` exige el
+  override en AMBAS ramas del router.
 - **Tests** (+2 en `MyAccountDesignSystemAuditTest`): `test_008` estructura del template (rama invitados,
   navegación escapada, delegación WC, cero inline, router intacto) y `test_009` sección CSS sincronizada.
 - **QA visual requerido**: `/mi-cuenta` como invitado (login), logueado (dashboard/orders/direcciones/
