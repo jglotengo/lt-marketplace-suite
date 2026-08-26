@@ -119,8 +119,9 @@ final class LTMS_Frontend_Customer_Bookings {
             .ltms-cb-refund { background: var(--warn-50); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-size: .82rem; color: var(--warn-700); margin-bottom: 14px; }
             .ltms-cb-actions { display: flex; gap: 10px; flex-wrap: wrap; }
             /* AUDIT-FE-UIUX3-MA-03 FIX: transicion limitada a propiedades visuales explicitas
-               (patron D-27 del ciclo 2: nada de transiciones comodin que animen layout). */
-            .ltms-cb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 18px; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: background .15s, border-color .15s, color .15s; text-decoration: none; }
+               (patron D-27 del ciclo 2: nada de transiciones comodin que animen layout).
+               AUDIT-FE-UIUX3-MA-04 FIX: altura minima 44px para target tactil (patron D-06). */
+            .ltms-cb-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 8px 18px; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: background .15s, border-color .15s, color .15s; text-decoration: none; }
             .ltms-cb-btn-danger { background: var(--danger-50); color: var(--danger-700); }
             .ltms-cb-btn-danger:hover { background: var(--danger); color: #fff; }
             .ltms-cb-btn-outline { background: transparent; color: var(--text-2); border: 1.5px solid var(--border-2); }
@@ -128,7 +129,8 @@ final class LTMS_Frontend_Customer_Bookings {
             .ltms-cb-empty { text-align: center; padding: 48px 20px; color: var(--text-3); }
             .ltms-cb-empty .icon { margin-bottom: 12px; }
             .ltms-cb-pagination { display: flex; gap: 8px; margin-top: 20px; }
-            .ltms-cb-page-btn { padding: 6px 14px; border: 1.5px solid var(--border-2); border-radius: 6px; font-size: .85rem; background: var(--surface); cursor: pointer; color: var(--text-2); }
+            /* AUDIT-FE-UIUX3-MA-04 FIX: pills de paginacion con area tactil de 44px. */
+            .ltms-cb-page-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--border-2); border-radius: var(--r-pill, 999px); font-size: .85rem; background: var(--surface); cursor: pointer; color: var(--text-2); text-decoration: none; }
             .ltms-cb-page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
             /* AUDIT-FE-UIUX3-MA-01 FIX: notices con receta D-31 (borde izquierdo de color). */
             .ltms-cb-notice { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: .875rem; background: var(--surface); border: 1px solid var(--border); }

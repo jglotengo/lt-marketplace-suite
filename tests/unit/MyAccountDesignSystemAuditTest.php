@@ -46,6 +46,27 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
+	 * AUDIT-FE-UIUX3-MA-04 (P2): los botones (~35px de alto) y las pills
+	 * de paginacion (~31px) quedaban por debajo del minimo de target
+	 * tactil de 44px establecido por D-06 en el ciclo 2.
+	 */
+	public function test_004_targets_tactiles_44px(): void {
+		$this->assertFileExists( $this->bookings_path );
+		$src = file_get_contents( $this->bookings_path );
+
+		$this->assertMatchesRegularExpression(
+			'/\.ltms-cb-btn\s*\{[^}]*min-height\s*:\s*44px/i',
+			$src,
+			'AUDIT-FE-UIUX3-MA-04 fix: .ltms-cb-btn debe garantizar 44px de alto tactil'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.ltms-cb-page-btn\s*\{[^}]*min-height\s*:\s*44px[^}]*min-width\s*:\s*44px|\.ltms-cb-page-btn\s*\{[^}]*min-width\s*:\s*44px[^}]*min-height\s*:\s*44px/is',
+			$src,
+			'AUDIT-FE-UIUX3-MA-04 fix: .ltms-cb-page-btn debe garantizar area tactil de 44x44'
+		);
+	}
+
+	/**
 	 * AUDIT-FE-UIUX3-MA-02 (P1): la vista usaba iconografia emoji para
 	 * funciones de interfaz (menu, rótulos de estado, empty state, CTA,
 	 * avisos y botones). El estandar del design system desde D-17 es
