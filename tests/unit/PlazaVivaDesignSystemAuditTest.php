@@ -991,7 +991,8 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$cko_css = dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css';
 		$cko = file_get_contents( $cko_css );
 
-		$cart_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		// BACKLOG-D32 FIX: el CSS scoped del carrito vive ahora en hoja dedicada.
+		$cart_path = dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.css';
 		$cart = file_get_contents( $cart_path );
 
 		// (1) Fav del card a 44px + focus-within + hover:none siempre visible.
@@ -1189,7 +1190,8 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	 * pulso azul primario.
 	 */
 	public function test_032_cart_sin_residuos_teal_legacy(): void {
-		$cart_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php';
+		// BACKLOG-D32 FIX: el CSS del carrito vive ahora en su hoja dedicada.
+		$cart_path = dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.css';
 		$this->assertFileExists( $cart_path );
 		$cart = file_get_contents( $cart_path );
 
@@ -1419,7 +1421,8 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$cko_tpl = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/checkout.php' );
 		$cko_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-checkout.css' );
 		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js' );
-		$cart = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php' );
+		// BACKLOG-D32 FIX: la regla admin-bar del carrito vive en su hoja dedicada.
+		$cart = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.css' );
 
 		// D-25: sin order:-1 en la sidebar móvil del tracking.
 		$this->assertDoesNotMatchRegularExpression(
@@ -1581,6 +1584,50 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'.pv-scope.pv-tracking{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px}',
 			$css_min,
 			'BACKLOG-D20 fix: ltms-plaza-viva.min.css desincronizado — correr npm run build:css'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-UIUX-BACKLOG-D32 (P2 organizativo): cart.php incrustaba
+	 * ~330 lineas de CSS scoped en el markup. Los estilos viven ahora en
+	 * assets/css/ltms-cart.css, encolada SOLO en paginas de carrito desde
+	 * LTMS_Native_Templates::enqueue_assets() con version para
+	 * cache-busting. Congela la extraccion y su mecanismo de carga.
+	 */
+	public function test_043_cart_css_extraido_y_encolado_condicional(): void {
+		$cart = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/cart.php' );
+		$cart_css_path = dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.css';
+		$this->assertFileExists( $cart_css_path );
+		$cart_css = file_get_contents( $cart_css_path );
+		$cart_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.min.css' );
+		$native = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php' );
+
+		// (1) El template ya no trae bloque de estilos incrustado.
+		$this->assertStringNotContainsString(
+			'<style',
+			$cart,
+			'BACKLOG-D32 fix: cart.php no debe incrustar estilos — viven en assets/css/ltms-cart.css'
+		);
+
+		// (2) La hoja dedicada conserva la regla raiz del scope del carrito.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-cart\{display:flex;flex-direction:column;gap:18px;padding-bottom:48px;\}/',
+			$cart_css,
+			'BACKLOG-D32 fix: falta la regla raiz .pv-scope.pv-cart en ltms-cart.css'
+		);
+
+		// (3) El .min.css dedicado esta sincronizado.
+		$this->assertStringContainsString(
+			'.pv-scope.pv-cart{display:flex;flex-direction:column;gap:18px;padding-bottom:48px}',
+			$cart_min,
+			'BACKLOG-D32 fix: ltms-cart.min.css desincronizado — correr npm run build:css'
+		);
+
+		// (4) El enqueue condicional existe y usa version del plugin.
+		$this->assertMatchesRegularExpression(
+			"/wp_enqueue_style\( 'ltms-cart', \\\$url \. 'css\/ltms-cart\.css', \[ 'ltms-plaza-viva' \], \\\$ver \)/",
+			$native,
+			'BACKLOG-D32 fix: falta el enqueue condicional de ltms-cart.css (con dependencia del design system)'
 		);
 	}
 }

@@ -240,10 +240,13 @@ final class CartAuditTest extends LTMS_Unit_Test_Case {
 		// El botón debe tener la clase pv-cart__empty-btn para el scope CSS.
 		$this->assertStringContainsString( 'pv-cart__empty-btn', $src, 'AUDIT-FE-CART-009: empty-cart button must have class pv-cart__empty-btn' );
 
-		// El CSS de estados del botón (danger + is-loading + is-pending) debe estar.
-		$this->assertStringContainsString( 'pv-btn--danger', $src, 'AUDIT-FE-CART-009: CSS for pv-btn--danger variant must be defined in cart.php <style> block' );
-		$this->assertStringContainsString( '.is-loading', $src, 'AUDIT-FE-CART-009: CSS for is-loading disabled state must be defined' );
-		$this->assertStringContainsString( '.is-pending', $src, 'AUDIT-FE-CART-003 (update highlight): CSS for is-pending state of update_cart button must be defined' );
+		// BACKLOG-D32 FIX: el CSS del carrito vive en hoja dedicada; los
+		// estados del botón se verifican contra ella.
+		$cart_css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-cart.css' );
+		$this->assertNotEmpty( $cart_css );
+		$this->assertStringContainsString( 'pv-btn--danger', $cart_css, 'AUDIT-FE-CART-009: CSS for pv-btn--danger variant must be defined in ltms-cart.css' );
+		$this->assertStringContainsString( '.is-loading', $cart_css, 'AUDIT-FE-CART-009: CSS for is-loading disabled state must be defined' );
+		$this->assertStringContainsString( '.is-pending', $cart_css, 'AUDIT-FE-CART-003 (update highlight): CSS for is-pending state of update_cart button must be defined' );
 	}
 
 	/**

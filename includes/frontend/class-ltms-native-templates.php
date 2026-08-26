@@ -310,6 +310,20 @@ class LTMS_Native_Templates {
         // Design system CSS.
         wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver . '-b' . time() );
 
+        // AUDIT-FE-UIUX-BACKLOG-D32 FIX: los estilos scoped del carrito viven
+        // en hoja dedicada (extraidos del template). Encolado condicional con
+        // fallback is_page por la misma razon del guard de checkout
+        // (is_cart puede no resolver aun a prioridad 20).
+        if (
+            function_exists( 'is_cart' )
+            && (
+                is_cart()
+                || ( function_exists( 'wc_get_page_id' ) && is_page( wc_get_page_id( 'cart' ) ) )
+            )
+        ) {
+            wp_enqueue_style( 'ltms-cart', $url . 'css/ltms-cart.css', [ 'ltms-plaza-viva' ], $ver );
+        }
+
         // Design system JS (vanilla, no jQuery).
         // SG Optimizer strips query params and caches by filename.
         // Solution: use wp_add_inline_script to inject critical PV functions
