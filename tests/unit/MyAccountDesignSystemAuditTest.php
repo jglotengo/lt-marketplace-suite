@@ -130,12 +130,19 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString( '<style', $tpl, 'MA-08 fix: el template no debe incrustar estilos — viven en plaza-viva.css seccion 25' );
 		$this->assertStringNotContainsString( '<script', $tpl, 'MA-08 fix: el template no debe incrustar scripts (CSP)' );
 
-		// (5) El router sigue cableando el archivo (regresion de MA-08).
+		// (5) El router sigue cableando el archivo (regresion de MA-08) y el
+		// override debe existir EN AMBAS ramas del router: con Elementor
+		// activo (produccion) y sin el.
 		$native = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php' );
 		$this->assertStringContainsString(
 			"'my-account.php'",
 			$native,
 			'MA-08 fix: el router debe seguir resolviendo is_account_page() al template nativo'
+		);
+		$this->assertGreaterThanOrEqual(
+			2,
+			preg_match_all( '/is_account_page\(\)/', $native ),
+			'MA-08 fix: el router debe resolver Mi Cuenta tambien en la rama con Elementor activo'
 		);
 	}
 

@@ -186,6 +186,17 @@ class LTMS_Native_Templates {
                 }
             }
 
+            // AUDIT-FE-UIUX3-MA-08 FIX: Mi Cuenta nativa tambien con Elementor
+            // activo. Misma clase segura que cart/checkout (pagina singular de
+            // WC por shortcode, no archivo); el fatal historico era exclusivo
+            // de los archivos de shop/categoria/tag.
+            if ( function_exists( 'is_account_page' ) && is_account_page() ) {
+                $native = self::$template_dir . 'my-account.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+
             // VS-FIX: Vendor store SIEMPRE usa el template nativo de Plaza Viva
             // (con stats, tabs, reseñas, grid mejorado) — incluso con Elementor activo.
             if ( self::is_vendor_store_page() ) {
