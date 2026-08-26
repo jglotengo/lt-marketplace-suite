@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Changed — `BACKLOG-D26` fase 1 (consolidación de `!important` en checkout.css: 10 capas muertas retiradas, deuda restante clasificada y con techo)
+
+> Auditoría con parser propio (anidamiento `@media` correcto — un primer análisis ingenuo confundía base
+> desktop con override móvil y habría roto la página). Suite completa verde: **4,656 tests, 9,392
+> assertions OK** (+1 test), 3 skips preexistentes.
+
+- **Capas muertas retiradas** (`bde12674`): 10 declaraciones `(contexto, selector, propiedad)` duplicadas
+  entre generaciones de parches que se pisaban sin efecto (shipping-fields ×2 generaciones, invoice-field
+  duplicada, login-toggle summary/hover). La capa ganadora se conserva → **cero cambio de estilo
+  computado**. El min se regeneró sincronizado.
+- **Clasificación del resto**: los ~116 `!important` supervivientes son **defensa legítima** contra el
+  theme/Elementor/WC sobre markup nativo (radios opacity:0, cupones, `#place_order`, ocultamientos) —
+  permanecen por diseño. Limitación documentada: quedan pares muertos cross-selector (normal de alta
+  especificidad vs `!important` no-scoped posterior, ej. login summary :92 vs :809) detectables solo con
+  análisis de especificidad completo; fuera del alcance de fase 1.
+- **Anti re-acumulación**: `test_045` porta el analizador al suite — cero declaraciones duplicadas por
+  `(contexto, selector, propiedad)` + techo duro de 120 tokens `!important`. Cualquier parche futuro debe
+  editar la capa canónica, no apilar.
+
+---
+
 ### Fixed — `MY-ACCOUNT-BACKLOG-MIN` (pipeline de minificación: kill-switch reduced-motion corrupto en los .min.css)
 
 > Hallazgo colateral del backlog D-20/D-32, ahora resuelto de raíz. Suite completa verde:
