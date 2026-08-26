@@ -1123,16 +1123,18 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	 * el tramo crítico del envío. Fix: shipped→primary, in_transit→accent.
 	 */
 	public function test_029_tracking_badges_estados_custom_coloreados(): void {
-		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+		// BACKLOG-D20 FIX: los estilos scoped del tracking viven ahora en la
+		// seccion 24 de plaza-viva.css (el template ya no los incrusta).
+		$css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css' );
 
 		$this->assertMatchesRegularExpression(
 			'/__status--shipped\{background:var\(--primary-50\)/',
-			$tracking,
+			$css,
 			'UIUX2-D11 fix: shipped debe tener badge primario'
 		);
 		$this->assertMatchesRegularExpression(
 			'/__status--in-transit,\s*\.pv-scope\.pv-tracking \.pv-tracking__status--in_transit\{background:var\(--accent-50\)/',
-			$tracking,
+			$css,
 			'UIUX2-D11 fix: in_transit debe tener badge accent (ambas variantes de sanitize_html_class)'
 		);
 	}
@@ -1543,6 +1545,42 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			"/apply_filters\( 'ltms_support_email', get_option\( 'ltms_support_email', get_option\( 'admin_email' \) \) \)/",
 			$cko_tpl,
 			'EMAILS-01 fix: el checkout debe leer ltms_support_email (misma fuente que help-center)'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-UIUX-BACKLOG-D20 (P2 organizativo): order-tracking.php
+	 * incrustaba ~360 lineas de CSS scoped en un bloque de estilos dentro
+	 * del markup — la ultima hoja inline del design system. Los estilos
+	 * viven ahora en la seccion 24 de plaza-viva.css y el template queda
+	 * sin hojas incrustadas. Congela la extraccion: si alguien re-introduce
+	 * el bloque o borra la seccion, este test falla.
+	 */
+	public function test_042_tracking_css_extraido_al_design_system(): void {
+		$tracking = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/order-tracking.php' );
+		$css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css' );
+		$css_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css' );
+
+		// (1) El template ya no trae bloque de estilos incrustado.
+		$this->assertStringNotContainsString(
+			'<style',
+			$tracking,
+			'BACKLOG-D20 fix: order-tracking.php no debe incrustar estilos — viven en plaza-viva.css seccion 24'
+		);
+
+		// (2) La seccion 24 existe con los selectores raiz del tracking.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-tracking\{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px;\}/',
+			$css,
+			'BACKLOG-D20 fix: falta la regla raiz .pv-scope.pv-tracking en plaza-viva.css'
+		);
+
+		// (3) El .min.css esta sincronizado con la nueva seccion (clean-css
+		//     retira el punto y coma previo a la llave de cierre).
+		$this->assertStringContainsString(
+			'.pv-scope.pv-tracking{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px}',
+			$css_min,
+			'BACKLOG-D20 fix: ltms-plaza-viva.min.css desincronizado — correr npm run build:css'
 		);
 	}
 }
