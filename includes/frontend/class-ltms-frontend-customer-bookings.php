@@ -87,44 +87,51 @@ final class LTMS_Frontend_Customer_Bookings {
             'cancelled' => __( '✗ Cancelada', 'ltms' ),
             'completed' => __( '☑ Completada', 'ltms' ),
         ];
-        $status_colors = [
-            'pending'   => '#f59e0b',
-            'confirmed' => '#10b981',
-            'cancelled' => '#6b7280',
-            'completed' => '#2563eb',
-        ];
+        // AUDIT-FE-UIUX3-MA-05 FIX: el mapa de colores y el estilo inline del badge
+        // se retiraron; el estado se expresa con clases modificadoras definidas
+        // en el bloque <style> de abajo (receta -50/-700 del design system).
         ?>
         <style>
+            /* AUDIT-FE-UIUX3-MA-01 FIX: paleta migrada a los tokens globales del design
+               system Plaza Viva (:root en ltms-plaza-viva.css, encolado en todo el
+               frontend). Antes cada regla traia su propio hex, desincronizado del DS. */
             .ltms-cb-wrap { font-family: inherit; max-width: 900px; }
             .ltms-cb-header { margin-bottom: 20px; }
-            .ltms-cb-header h2 { font-size: 1.3rem; color: #111827; margin: 0 0 4px; }
-            .ltms-cb-header p { color: #6b7280; font-size: .875rem; margin: 0; }
-            .ltms-cb-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+            .ltms-cb-header h2 { font-size: 1.3rem; color: var(--text); margin: 0 0 4px; }
+            .ltms-cb-header p { color: var(--text-2); font-size: .875rem; margin: 0; }
+            .ltms-cb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
             .ltms-cb-card-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; flex-wrap: wrap; gap: 10px; }
-            .ltms-cb-card-head-left h3 { margin: 0 0 4px; font-size: .95rem; color: #111827; }
-            .ltms-cb-card-head-left p { margin: 0; font-size: .8rem; color: #6b7280; }
+            .ltms-cb-card-head-left h3 { margin: 0 0 4px; font-size: .95rem; color: var(--text); }
+            .ltms-cb-card-head-left p { margin: 0; font-size: .8rem; color: var(--text-2); }
             .ltms-cb-badge { display: inline-block; padding: 3px 12px; border-radius: 99px; font-size: .78rem; font-weight: 700; }
-            .ltms-cb-card-body { padding: 16px 20px; border-top: 1px solid #f3f4f6; }
+            /* AUDIT-FE-UIUX3-MA-05 FIX: variantes de estado con receta del DS
+               (fondo -50 + texto -700), paridad con .pv-badge--* de plaza-viva. */
+            .ltms-cb-badge--pending   { background: var(--warn-50); color: var(--warn-700); }
+            .ltms-cb-badge--confirmed { background: var(--accent-50); color: var(--accent-700); }
+            .ltms-cb-badge--cancelled { background: var(--bg-2); color: var(--text-2); }
+            .ltms-cb-badge--completed { background: var(--primary-50); color: var(--primary-700); }
+            .ltms-cb-card-body { padding: 16px 20px; border-top: 1px solid var(--border); }
             .ltms-cb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 20px; margin-bottom: 14px; }
-            .ltms-cb-grid-item label { display: block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #9ca3af; margin-bottom: 3px; }
-            .ltms-cb-grid-item span { font-size: .9rem; color: #111827; font-weight: 500; }
-            .ltms-cb-refund { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: .82rem; color: #92400e; margin-bottom: 14px; }
+            .ltms-cb-grid-item label { display: block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); margin-bottom: 3px; }
+            .ltms-cb-grid-item span { font-size: .9rem; color: var(--text); font-weight: 500; }
+            .ltms-cb-refund { background: var(--warn-50); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-size: .82rem; color: var(--warn-700); margin-bottom: 14px; }
             .ltms-cb-actions { display: flex; gap: 10px; flex-wrap: wrap; }
             /* AUDIT-FE-UIUX3-MA-03 FIX: transicion limitada a propiedades visuales explicitas
                (patron D-27 del ciclo 2: nada de transiciones comodin que animen layout). */
             .ltms-cb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 18px; border-radius: 7px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: background .15s, border-color .15s, color .15s; text-decoration: none; }
-            .ltms-cb-btn-danger { background: #fee2e2; color: #991b1b; }
-            .ltms-cb-btn-danger:hover { background: #fecaca; }
-            .ltms-cb-btn-outline { background: transparent; color: #374151; border: 1.5px solid #d1d5db; }
-            .ltms-cb-btn-outline:hover { border-color: #9ca3af; }
-            .ltms-cb-empty { text-align: center; padding: 48px 20px; color: #9ca3af; }
+            .ltms-cb-btn-danger { background: var(--danger-50); color: var(--danger-700); }
+            .ltms-cb-btn-danger:hover { background: var(--danger); color: #fff; }
+            .ltms-cb-btn-outline { background: transparent; color: var(--text-2); border: 1.5px solid var(--border-2); }
+            .ltms-cb-btn-outline:hover { border-color: var(--text-3); }
+            .ltms-cb-empty { text-align: center; padding: 48px 20px; color: var(--text-3); }
             .ltms-cb-empty .icon { font-size: 3rem; margin-bottom: 12px; }
             .ltms-cb-pagination { display: flex; gap: 8px; margin-top: 20px; }
-            .ltms-cb-page-btn { padding: 6px 14px; border: 1.5px solid #d1d5db; border-radius: 6px; font-size: .85rem; background: #fff; cursor: pointer; color: #374151; }
-            .ltms-cb-page-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
-            .ltms-cb-notice { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: .875rem; }
-            .ltms-cb-notice.error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
-            .ltms-cb-notice.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+            .ltms-cb-page-btn { padding: 6px 14px; border: 1.5px solid var(--border-2); border-radius: 6px; font-size: .85rem; background: var(--surface); cursor: pointer; color: var(--text-2); }
+            .ltms-cb-page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+            /* AUDIT-FE-UIUX3-MA-01 FIX: notices con receta D-31 (borde izquierdo de color). */
+            .ltms-cb-notice { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: .875rem; background: var(--surface); border: 1px solid var(--border); }
+            .ltms-cb-notice.error { border-left: 4px solid var(--danger); color: var(--danger-700); }
+            .ltms-cb-notice.success { border-left: 4px solid var(--accent); color: var(--accent-700); }
         </style>
 
         <div class="ltms-cb-wrap">
@@ -151,7 +158,6 @@ final class LTMS_Frontend_Customer_Bookings {
                 <?php foreach ( $bookings as $b ) :
                     $status      = $b['status'] ?? 'pending';
                     $status_lbl  = $status_labels[ $status ] ?? $status;
-                    $status_col  = $status_colors[ $status ] ?? '#9ca3af';
                     $checkin     = $b['checkin_date']  ? date_i18n( get_option( 'date_format' ), strtotime( $b['checkin_date'] ) )  : '—';
                     $checkout    = $b['checkout_date'] ? date_i18n( get_option( 'date_format' ), strtotime( $b['checkout_date'] ) ) : '—';
                     $nights      = ( $b['checkin_date'] && $b['checkout_date'] )
@@ -182,8 +188,7 @@ final class LTMS_Frontend_Customer_Bookings {
                                 <?php endif; ?>
                             </p>
                         </div>
-                        <span class="ltms-cb-badge"
-                              style="background:<?php echo esc_attr( $status_col ); ?>22;color:<?php echo esc_attr( $status_col ); ?>;">
+                        <span class="ltms-cb-badge ltms-cb-badge--<?php echo esc_attr( $status ); ?>">
                             <?php echo esc_html( $status_lbl ); ?>
                         </span>
                     </div>
@@ -194,14 +199,14 @@ final class LTMS_Frontend_Customer_Bookings {
                                 <label><?php esc_html_e( 'Check-in', 'ltms' ); ?></label>
                                 <span><?php echo esc_html( $checkin ); ?></span>
                                 <?php if ( $b['checkin_time'] ) : ?>
-                                    <br><span style="font-size:.75rem;color:#6b7280;"><?php echo esc_html( $b['checkin_time'] ); ?></span>
+                                    <br><span style="font-size:.75rem;color:var(--text-2);"><?php echo esc_html( $b['checkin_time'] ); ?></span>
                                 <?php endif; ?>
                             </div>
                             <div class="ltms-cb-grid-item">
                                 <label><?php esc_html_e( 'Check-out', 'ltms' ); ?></label>
                                 <span><?php echo esc_html( $checkout ); ?></span>
                                 <?php if ( $b['checkout_time'] ) : ?>
-                                    <br><span style="font-size:.75rem;color:#6b7280;"><?php echo esc_html( $b['checkout_time'] ); ?></span>
+                                    <br><span style="font-size:.75rem;color:var(--text-2);"><?php echo esc_html( $b['checkout_time'] ); ?></span>
                                 <?php endif; ?>
                             </div>
                             <div class="ltms-cb-grid-item">
