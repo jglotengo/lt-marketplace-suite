@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Changed — `BACKLOG-D26` fase 2 (pares muertos cross-selector en checkout.css: 4 declaraciones retiradas)
+
+> Complemento de fase 1. Suite completa verde: **4,657 tests, 9,394 assertions OK** (+1), 3 skips preexistentes.
+
+- **Cross-selector** (`3b3a2a5f`): una declaración normal temprana es muerta cuando una capa posterior con
+  `!important` cubre sus mismos elementos — patrón probado: mismo "tail" de selector tras el prefijo de scope
+  `.pv-scope.pv-checkout `. Caso real retirado: login-toggle summary (padding/cursor/font-weight/color de :92,
+  cubiertos por la capa canónica `!important`); sobrevive `list-style` (sin gemela). `test_046` congela esta
+  clase completa con orden de cascada por contador secuencial de reglas (evita falsos positivos direccionales).
+
+---
+
 ### Changed — `BACKLOG-D26` fase 1 (consolidación de `!important` en checkout.css: 10 capas muertas retiradas, deuda restante clasificada y con techo)
 
 > Auditoría con parser propio (anidamiento `@media` correcto — un primer análisis ingenuo confundía base
