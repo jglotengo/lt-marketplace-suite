@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Added — `MY-ACCOUNT-NATIVE` (MA-08 autorizado por producto: template nativo de Mi Cuenta bajo el design system)
+
+> Último item del backlog del ciclo 3. Suite completa verde: **4,659 tests, 9,413 assertions OK** (+2),
+> 3 skips preexistentes.
+
+- **MA-08** (`d096b813`): `includes/frontend/templates/my-account.php` — la ruta fantasma del router
+  (`class-ltms-native-templates.php:242` apuntaba a un archivo inexistente desde siempre; `/mi-cuenta`
+  renderizaba con el tema) ahora existe y sirve la página bajo `.pv-scope.pv-account`. Decisiones clave:
+  - **Invitados**: rama propia con `myaccount/form-login.php` estilado (sin ella el shell quedaba vacío).
+  - **Navegación**: `wc_get_account_menu_items()` — preserva automáticamente los endpoints LTMS
+    ("Mis Reservas", compliance turístico) y de terceros; item activo vía `is_wc_endpoint_url()`,
+    logout nunca activo.
+  - **Contenido**: delegado a `do_action('woocommerce_account_content')` + `wc_print_notices()` — este
+    template NO reimplementa lógica de negocio, solo envuelve y estila.
+  - **CSS**: sección 25 MY ACCOUNT en plaza-viva.css (layout grid sidebar+contenido, nav pills con sticky
+    en desktop y scroll horizontal en móvil ≤760px, formularios/tablas/botones WC tokenizados).
+  - Convenciones DS: sin `<style>` ni `<script>` incrustados (CSP); hooks propios
+    `ltms_before/after_account_plazaviva`.
+- **Tests** (+2 en `MyAccountDesignSystemAuditTest`): `test_008` estructura del template (rama invitados,
+  navegación escapada, delegación WC, cero inline, router intacto) y `test_009` sección CSS sincronizada.
+- **QA visual requerido**: `/mi-cuenta` como invitado (login), logueado (dashboard/orders/direcciones/
+  Mis Reservas), desktop y móvil. Riesgo residual documentado: conflicto teórico con plantilla Elementor
+  de la página Mi Cuenta (mismo mecanismo que cart/checkout, que funcionan en producción).
+
+---
+
 ### Changed — `BACKLOG-D26` fase 2 (pares muertos cross-selector en checkout.css: 4 declaraciones retiradas)
 
 > Complemento de fase 1. Suite completa verde: **4,657 tests, 9,394 assertions OK** (+1), 3 skips preexistentes.
