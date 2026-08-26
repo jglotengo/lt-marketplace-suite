@@ -82,15 +82,17 @@ final class DashboardResilienceTest extends LTMS_Unit_Test_Case {
 	public function test_003_polling_pausado_en_segundo_plano(): void {
 		$src = file_get_contents( $this->js_path );
 
-		// Guard en ambos pollers (nonce-refresh y notificaciones), anclado a
-		// su marcador para no confundirlo con el guard de visibilitychange.
+		// Guard en ambos pollers (nonce-refresh y notificaciones). El ancla
+		// funcional ($ .post / fetchNotifications) evita confundirlos con
+		// el guard de visibilitychange y es tolerante a comentarios
+		// multilínea entre medias.
 		$this->assertMatchesRegularExpression(
-			"/setInterval\(function \(\) \{\s*\/\/ AUDIT-DASH-NET-01[^\n]*\n\s*if \(document\.hidden\) \{/",
+			'/setInterval\(function \(\) \{[\s\S]{0,400}?if \(document\.hidden\) \{\s*return;\s*\}\s*\$\.post\(ltmsDashboard\.ajax_url/',
 			$src,
 			'NET-01 fix: el polling de nonce-refresh debe saltar su tick con document.hidden'
 		);
 		$this->assertMatchesRegularExpression(
-			"/notifTimer = setInterval\(\(\) => \{\s*\/\/ AUDIT-DASH-NET-01[^\n]*\n\s*if \(document\.hidden\) \{/",
+			'/notifTimer = setInterval\(\(\) => \{[\s\S]{0,200}?if \(document\.hidden\) \{\s*return;\s*\}\s*this\.fetchNotifications\(\)/',
 			$src,
 			'NET-01 fix: el polling de notificaciones debe saltar su tick con document.hidden'
 		);
