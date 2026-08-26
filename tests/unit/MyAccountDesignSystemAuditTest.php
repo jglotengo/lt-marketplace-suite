@@ -242,6 +242,15 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-UIUX3-MA-05 fix: falta la variante --cancelled neutral'
 		);
 
+		// (3b) Re-auditoria: el badge BASE lleva el neutral por defecto, para
+		// que un estado desconocido nunca quede sin fondo (heredaba ese
+		// rol el fallback del mapa retirado).
+		$this->assertMatchesRegularExpression(
+			'/\.ltms-cb-badge\s*\{[^}]*background\s*:\s*var\(--bg-2\)[^}]*color\s*:\s*var\(--text-2\)/is',
+			$src,
+			'AUDIT-FE-UIUX3-MA-05 fix: el badge base debe tener estilo neutro de respaldo'
+		);
+
 		// (4) El mapa PHP de colores fue eliminado por completo.
 		$this->assertStringNotContainsString(
 			'status_colors',

@@ -105,7 +105,7 @@ final class LTMS_Frontend_Customer_Bookings {
             .ltms-cb-card-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; flex-wrap: wrap; gap: 10px; }
             .ltms-cb-card-head-left h3 { margin: 0 0 4px; font-size: .95rem; color: var(--text); }
             .ltms-cb-card-head-left p { margin: 0; font-size: .8rem; color: var(--text-2); }
-            .ltms-cb-badge { display: inline-block; padding: 3px 12px; border-radius: 99px; font-size: .78rem; font-weight: 700; }
+            .ltms-cb-badge { display: inline-block; padding: 3px 12px; border-radius: 99px; font-size: .78rem; font-weight: 700; background: var(--bg-2); color: var(--text-2); }
             /* AUDIT-FE-UIUX3-MA-05 FIX: variantes de estado con receta del DS
                (fondo -50 + texto -700), paridad con .pv-badge--* de plaza-viva. */
             .ltms-cb-badge--pending   { background: var(--warn-50); color: var(--warn-700); }
