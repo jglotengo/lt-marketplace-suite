@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Changed — `MY-ACCOUNT-BACKLOG` (ejecución del backlog organizativo del ciclo 2: D-20 + D-32; D-26 permanece como deuda documentada)
+
+> Extracciones CSS inline → hojas externas, sin cambio visual (movimiento literal). Suite completa verde:
+> **4,654 tests, 9,362 assertions OK** (+2 tests), 3 skips preexistentes.
+
+- **D-20** (`a5b981b8`): los ~360 líneas de CSS scoped de `order-tracking.php` migraron a la **sección 24
+  ORDER TRACKING** de `ltms-plaza-viva.css`. El template queda sin hojas incrustadas (paridad con el resto
+  del design system). `test_029` re-apuntado al nuevo destino + invariante nuevo `test_042` (sin `<style>`
+  en template, sección presente, `.min.css` sincronizado).
+- **D-32** (`5e517a0b`, `73f8939a`): los ~330 líneas de CSS de `cart.php` migraron a hoja dedicada
+  **`assets/css/ltms-cart.css`**, encolada SOLO en páginas de carrito desde
+  `LTMS_Native_Templates::enqueue_assets()` (guard `is_cart()` + fallback `is_page(wc_get_page_id('cart'))`,
+  dependencia `ltms-plaza-viva`, versionada con `LTMS_VERSION` para cache-busting — mismo patrón que el
+  enqueue de checkout). Re-apuntados `test_025`(3)(4), `test_032`, D28 de `test_039` y estados de botón en
+  `CartAuditTest::test_009`; invariante nuevo `test_043`. El `.min.css` dedicado se trackea a propósito
+  (excepción al `.gitignore`, paridad checkout/plaza-viva).
+- **D-26** (consolidación de ~60 `!important` heredados en checkout.css): sigue como deuda documentada —
+  refactor de alto riesgo de cascada sin beneficio visible; requiere ciclo propio con QA visual.
+
+**Hallazgo colateral (P2, sin fix este ciclo):** el `.min.css` generado por clean-css corrompe el
+kill-switch reduced-motion global (`animation-duration:.001ms` → `NaNs!important`, inválido) — artefacto
+preexistente verificado idéntico antes/después del rebuild. No afecta producción mientras se sirva el
+`.css` fuente (el enqueue usa la versión no minificada); documentado para cuando se revise el pipeline
+de minificación.
+
+---
+
 ### Fixed — `MY-ACCOUNT-DS-CICLO3` (auditoría UI/UX de la experiencia Mi Cuenta: 8 hallazgos — 0 P0 + 4 P1 + 3 P2 resueltos, 1 en backlog documentado)
 
 > **Ciclo 3 Audit → Fix → Re-audit** sobre la única superficie que el plugin aporta hoy a `/mi-cuenta`: la
