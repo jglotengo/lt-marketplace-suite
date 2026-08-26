@@ -1886,3 +1886,124 @@ li.product.pv-enhanced:hover {
     .pv-scope.pv-tracking .pv-order-summary__item-total{grid-column:1 / -1;text-align:left;}
     .pv-scope.pv-tracking .pv-order-summary__item-media{width:48px;height:48px;}
 }
+
+/* ============================================================================
+   25. MY ACCOUNT (AUDIT-FE-UIUX3-MA-08 FIX: template nativo my-account.php;
+   antes la pagina renderizaba con el tema, fuera del design system)
+   ============================================================================ */
+.pv-scope.pv-account{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px;}
+
+/* Header */
+.pv-scope.pv-account .pv-account__header-inner{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+.pv-scope.pv-account .pv-account__title{
+    font-family:var(--display);font-weight:800;font-size:clamp(26px,3vw,34px);
+    line-height:1.1;color:var(--text);margin:0;
+}
+.pv-scope.pv-account .pv-account__sub{
+    color:var(--text-2);font-size:14.5px;margin:6px 0 0;max-width:560px;
+}
+.pv-scope.pv-account .pv-account__header .pv-badge{flex-shrink:0;margin-top:6px;}
+
+/* Layout principal: navegacion | contenido (1 columna en movil) */
+.pv-scope.pv-account .pv-account__main--guest{width:100%;max-width:520px;margin:0 auto;}
+.pv-scope.pv-account .pv-account__main:not(.pv-account__main--guest){
+    display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr);
+    gap:24px;align-items:start;width:100%;
+}
+.pv-scope.pv-account .pv-account__content-col{min-width:0;}
+
+/* Navegacion de endpoints (sidebar en desktop) */
+.pv-scope.pv-account .pv-account__nav-list{
+    display:flex;flex-direction:column;gap:4px;list-style:none;margin:0;padding:0;
+    position:sticky;top:20px;
+}
+.pv-scope.pv-account .pv-account__nav-link{
+    display:block;padding:10px 16px;border-radius:var(--r-md);
+    border:1px solid transparent;font-size:14.5px;font-weight:600;
+    color:var(--text-2);text-decoration:none;
+    transition:background var(--t),color var(--t),border-color var(--t);
+}
+.pv-scope.pv-account .pv-account__nav-link:hover{
+    background:var(--primary-50);color:var(--primary);
+}
+.pv-scope.pv-account .pv-account__nav-link.is-active,
+.pv-scope.pv-account .pv-account__nav-item.is-active > .pv-account__nav-link{
+    background:var(--primary-50);color:var(--primary);font-weight:700;
+    border-color:var(--primary-100);
+}
+
+/* Contenido del endpoint: tarjeta sobre fondo del scope */
+.pv-scope.pv-account .pv-account__content{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);
+    box-shadow:var(--sh-1);padding:24px;
+}
+.pv-scope.pv-account .pv-account__content p{font-size:14.5px;line-height:1.55;color:var(--text-2);}
+.pv-scope.pv-account .pv-account__content h2{
+    font-family:var(--display);font-weight:700;font-size:18px;color:var(--text);margin:0 0 12px;
+}
+
+/* Formularios WC dentro de la cuenta (login invitados, direcciones, datos) */
+.pv-scope.pv-account form.login,
+.pv-scope.pv-account form.register,
+.pv-scope.pv-account .woocommerce-Address,
+.pv-scope.pv-account address{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+    padding:20px;font-style:normal;
+}
+.pv-scope.pv-account form.login label,
+.pv-scope.pv-account form.register label{display:block;font-weight:600;margin-bottom:4px;}
+.pv-scope.pv-account .woocommerce-form-row{margin-bottom:14px;}
+.pv-scope.pv-account input.input-text,
+.pv-scope.pv-account input[type="text"],
+.pv-scope.pv-account input[type="email"],
+.pv-scope.pv-account input[type="password"],
+.pv-scope.pv-account input[type="tel"],
+.pv-scope.pv-account select,
+.pv-scope.pv-account textarea{
+    width:100%;padding:10px 12px;border:1.5px solid var(--border-2);
+    border-radius:var(--r-sm);font-size:14px;background:var(--surface);color:var(--text);
+    transition:border-color var(--t),box-shadow var(--t);
+}
+.pv-scope.pv-account input:focus,
+.pv-scope.pv-account select:focus,
+.pv-scope.pv-account textarea:focus{
+    outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+.pv-scope.pv-account button.button,
+.pv-scope.pv-account .woocommerce-button{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:44px;padding:10px 22px;border:none;border-radius:var(--r-sm);
+    background:var(--brand);color:#fff;font-weight:700;font-size:14px;cursor:pointer;
+    text-decoration:none;transition:background var(--t);
+}
+.pv-scope.pv-account button.button:hover{background:var(--brand-600);}
+.pv-scope.pv-account a.woocommerce-Button,
+.pv-scope.pv-account .woocommerce-MyAccount-content a{
+    color:var(--primary);font-weight:600;text-decoration:none;
+}
+.pv-scope.pv-account a.woocommerce-Button:hover{text-decoration:underline;}
+
+/* Tabla de pedidos */
+.pv-scope.pv-account .woocommerce-orders-table{width:100%;border-collapse:collapse;}
+.pv-scope.pv-account .woocommerce-orders-table th,
+.pv-scope.pv-account .woocommerce-orders-table td{
+    padding:10px 8px;border-bottom:1px solid var(--border);font-size:13.5px;text-align:left;
+}
+.pv-scope.pv-account .woocommerce-orders-table th{font-weight:700;color:var(--text);}
+
+/* Movil: navegacion horizontal scrollable tipo pills */
+@media (max-width:760px){
+    .pv-scope.pv-account .pv-account__main:not(.pv-account__main--guest){
+        grid-template-columns:1fr;gap:16px;
+    }
+    .pv-scope.pv-account .pv-account__nav-list{
+        position:static;flex-direction:row;gap:6px;
+        overflow-x:auto;scrollbar-width:none;padding-bottom:2px;
+    }
+    .pv-scope.pv-account .pv-account__nav-list::-webkit-scrollbar{display:none;}
+    .pv-scope.pv-account .pv-account__nav-item{flex-shrink:0;}
+    .pv-scope.pv-account .pv-account__nav-link{white-space:nowrap;padding:8px 14px;}
+    .pv-scope.pv-account .pv-account__content{padding:16px;}
+}

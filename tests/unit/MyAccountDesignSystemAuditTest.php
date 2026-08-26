@@ -75,6 +75,110 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
+	 * AUDIT-FE-UIUX3-MA-08 (backlog autorizado por producto): /mi-cuenta
+	 * renderizaba con el tema porque el router apuntaba a un archivo
+	 * inexistente. El template nativo debe existir, servir invitados con el
+	 * form-login de WC, preservar TODOS los endpoints registrados
+	 * (wc_get_account_menu_items incluye Mis Reservas y compliance turistico)
+	 * y delegar el contenido a woocommerce_account_content sin reimplementar
+	 * logica de negocio. Convenciones del DS: sin hojas ni scripts incrustados.
+	 */
+	public function test_008_template_nativo_mi_cuenta_estructura(): void {
+		$tpl_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/my-account.php';
+		$this->assertFileExists( $tpl_path );
+		$tpl = file_get_contents( $tpl_path );
+
+		// (1) Scope del design system y rama de invitados.
+		foreach (
+			array(
+				'pv-scope pv-account',
+				'myaccount/form-login.php',
+				'is_user_logged_in()',
+				"get_header( 'shop' )",
+				"get_footer( 'shop' )",
+			) as $needle ) {
+				$this->assertStringContainsString(
+					$needle,
+					$tpl,
+					'MA-08 fix: falta ' . $needle . ' en el template nativo de Mi Cuenta'
+				);
+		}
+
+		// (2) Navegacion completa de endpoints con escape correcto.
+		foreach (
+			array(
+				'wc_get_account_menu_items()',
+				'esc_url( wc_get_account_endpoint_url( $pv_ep ) )',
+				'esc_html( $pv_label )',
+				'customer-logout',
+			) as $needle ) {
+				$this->assertStringContainsString(
+					$needle,
+					$tpl,
+					'MA-08 fix: la navegacion debe listar todos los endpoints con salida escapada'
+				);
+		}
+
+		// (3) Contenido delegado a WC (sin reimplementar logica).
+		$this->assertStringContainsString(
+			"do_action( 'woocommerce_account_content' )",
+			$tpl,
+			'MA-08 fix: el contenido del endpoint debe venir de woocommerce_account_content'
+		);
+
+		// (4) Convenciones DS: cero CSS/JS incrustados.
+		$this->assertStringNotContainsString( '<style', $tpl, 'MA-08 fix: el template no debe incrustar estilos — viven en plaza-viva.css seccion 25' );
+		$this->assertStringNotContainsString( '<script', $tpl, 'MA-08 fix: el template no debe incrustar scripts (CSP)' );
+
+		// (5) El router sigue cableando el archivo (regresion de MA-08).
+		$native = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php' );
+		$this->assertStringContainsString(
+			"'my-account.php'",
+			$native,
+			'MA-08 fix: el router debe seguir resolviendo is_account_page() al template nativo'
+		);
+	}
+
+	/**
+	 * AUDIT-FE-UIUX3-MA-08 (continuacion): los estilos del account viven en
+	 * la seccion 25 de plaza-viva.css, sincronizados con el .min.css.
+	 */
+	public function test_009_css_seccion_25_account_sincronizado(): void {
+		$css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css' );
+		$css_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css' );
+
+		$this->assertMatchesRegularExpression(
+			'/25\. MY ACCOUNT/',
+			$css,
+			'MA-08 fix: falta la seccion 25 MY ACCOUNT en plaza-viva.css'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-account\{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px;\}/',
+			$css,
+			'MA-08 fix: falta la regla raiz .pv-scope.pv-account'
+		);
+
+		// Min sincronizado (clean-css retira el punto y coma previo a la llave).
+		$this->assertStringContainsString(
+			'.pv-scope.pv-account{display:flex;flex-direction:column;gap:18px;padding:24px 0 48px}',
+			$css_min,
+			'MA-08 fix: ltms-plaza-viva.min.css desincronizado — correr npm run build:css'
+		);
+
+		// Rama de invitados presente en la fuente y navegacion movil en el min.
+		$this->assertStringContainsString(
+			'.pv-account__main--guest',
+			$css,
+			'MA-08 fix: falta el estilo de la rama de invitados para Mi Cuenta'
+		);
+		$this->assertStringContainsString(
+			'@media (max-width:760px){.pv-scope.pv-account .pv-account__main:not(.pv-account__main--guest)',
+			$css_min,
+			'MA-08 fix: falta la navegacion horizontal de Mi Cuenta en movil'
+		);
+	}
+
+	/**
 	 * AUDIT-FE-UIUX3-MA-06 (P2): botones y paginacion carecian de estado
 	 * de foco visible para navegacion por teclado (WCAG 2.4.7). Misma
 	 * receta que D-03: outline solido --primary con offset 2px.
