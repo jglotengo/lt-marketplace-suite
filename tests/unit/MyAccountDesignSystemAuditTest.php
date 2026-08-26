@@ -46,6 +46,52 @@ final class MyAccountDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
+	 * AUDIT-FE-UIUX3-MA-02 (P1): la vista usaba iconografia emoji para
+	 * funciones de interfaz (menu, rótulos de estado, empty state, CTA,
+	 * avisos y botones). El estandar del design system desde D-17 es
+	 * SVG stroke con currentColor; los rótulos de estado quedan como
+	 * texto plano porque el significado lo comunica la variante del badge.
+	 */
+	public function test_002_sin_iconografia_emoji_svg_stroke_en_su_lugar(): void {
+		$this->assertFileExists( $this->bookings_path );
+		$src = file_get_contents( $this->bookings_path );
+
+		$emojis = [
+			"\u{1F3E8}", // hotel
+			"\u{23F3}",  // reloj de arena
+			"\u{2705}",  // check verde
+			"\u{2611}",  // checkbox
+			"\u{2717}",  // cruz
+			"\u{1F50D}", // lupa
+			"\u{1F4C4}", // documento
+			"\u{26A0}\u{FE0F}", // advertencia
+			"\u{26A0}",  // advertencia sin selector
+		];
+		foreach ( $emojis as $emoji ) {
+			$this->assertStringNotContainsString(
+				$emoji,
+				$src,
+				'AUDIT-FE-UIUX3-MA-02 fix: la iconografia emoji fue reemplazada por SVG stroke o texto'
+			);
+		}
+
+		// Contrato positivo: los tres SVG funcionales siguen presentes.
+		foreach (
+			[
+				'M3 21h18',           // edificio (header + empty state)
+				'<circle cx="11" cy="11" r="8"/>', // lupa del CTA
+				'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', // alerta
+				'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', // documento pedido
+			] as $svg_signature ) {
+			$this->assertStringContainsString(
+				$svg_signature,
+				$src,
+				'AUDIT-FE-UIUX3-MA-02 fix: falta el SVG esperado en la vista'
+			);
+		}
+	}
+
+	/**
 	 * AUDIT-FE-UIUX3-MA-01 (P1): el CSS de Mis Reservas traia su propia
 	 * paleta hex desincronizada del design system (grises Tailwind, azul
 	 * literal, ambar/rojo propios). Los tokens globales (--text*, --border*,

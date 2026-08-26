@@ -50,7 +50,7 @@ final class LTMS_Frontend_Customer_Bookings {
         $new = [];
         foreach ( $items as $key => $label ) {
             if ( 'customer-logout' === $key ) {
-                $new[ self::ENDPOINT ] = __( '🏨 Mis Reservas', 'ltms' );
+                $new[ self::ENDPOINT ] = __( 'Mis Reservas', 'ltms' );
             }
             $new[ $key ] = $label;
         }
@@ -81,11 +81,13 @@ final class LTMS_Frontend_Customer_Bookings {
         $total    = $result['total'];
         $pages    = (int) ceil( $total / self::ITEMS_PER_PAGE );
 
+        // AUDIT-FE-UIUX3-MA-02 FIX: los rótulos de estado pierden la iconografia
+        // emoji — el significado ya lo comunica el badge con su variante de color.
         $status_labels = [
-            'pending'   => __( '⏳ Pendiente de pago', 'ltms' ),
-            'confirmed' => __( '✅ Confirmada', 'ltms' ),
-            'cancelled' => __( '✗ Cancelada', 'ltms' ),
-            'completed' => __( '☑ Completada', 'ltms' ),
+            'pending'   => __( 'Pendiente de pago', 'ltms' ),
+            'confirmed' => __( 'Confirmada', 'ltms' ),
+            'cancelled' => __( 'Cancelada', 'ltms' ),
+            'completed' => __( 'Completada', 'ltms' ),
         ];
         // AUDIT-FE-UIUX3-MA-05 FIX: el mapa de colores y el estilo inline del badge
         // se retiraron; el estado se expresa con clases modificadoras definidas
@@ -124,7 +126,7 @@ final class LTMS_Frontend_Customer_Bookings {
             .ltms-cb-btn-outline { background: transparent; color: var(--text-2); border: 1.5px solid var(--border-2); }
             .ltms-cb-btn-outline:hover { border-color: var(--text-3); }
             .ltms-cb-empty { text-align: center; padding: 48px 20px; color: var(--text-3); }
-            .ltms-cb-empty .icon { font-size: 3rem; margin-bottom: 12px; }
+            .ltms-cb-empty .icon { margin-bottom: 12px; }
             .ltms-cb-pagination { display: flex; gap: 8px; margin-top: 20px; }
             .ltms-cb-page-btn { padding: 6px 14px; border: 1.5px solid var(--border-2); border-radius: 6px; font-size: .85rem; background: var(--surface); cursor: pointer; color: var(--text-2); }
             .ltms-cb-page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -137,7 +139,11 @@ final class LTMS_Frontend_Customer_Bookings {
         <div class="ltms-cb-wrap">
 
             <div class="ltms-cb-header">
-                <h2>🏨 <?php esc_html_e( 'Mis Reservas', 'ltms' ); ?></h2>
+                <!-- AUDIT-FE-UIUX3-MA-02 FIX: icono de edificio en SVG stroke (antes iconografia emoji). -->
+                <h2>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-right:6px;"><path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/><path d="M9 7h.01M14 7h.01M9 11h.01M14 11h.01M9 15h.01M14 15h.01"/></svg>
+                    <?php esc_html_e( 'Mis Reservas', 'ltms' ); ?>
+                </h2>
                 <p><?php esc_html_e( 'Aquí puedes consultar y gestionar todas tus reservas de alojamiento y servicios en Lo Tengo.', 'ltms' ); ?></p>
             </div>
 
@@ -145,11 +151,14 @@ final class LTMS_Frontend_Customer_Bookings {
 
             <?php if ( empty( $bookings ) ) : ?>
                 <div class="ltms-cb-empty">
-                    <div class="icon">🏨</div>
+                    <div class="icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/><path d="M9 7h.01M14 7h.01M9 11h.01M14 11h.01M9 15h.01M14 15h.01"/></svg>
+                    </div>
                     <p><strong><?php esc_html_e( 'Aún no tienes reservas.', 'ltms' ); ?></strong></p>
                     <p><?php esc_html_e( 'Cuando reserves un alojamiento o servicio en Lo Tengo, aparecerá aquí.', 'ltms' ); ?></p>
                     <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-cb-btn ltms-cb-btn-outline">
-                        🔍 <?php esc_html_e( 'Explorar alojamientos', 'ltms' ); ?>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <?php esc_html_e( 'Explorar alojamientos', 'ltms' ); ?>
                     </a>
                 </div>
 
@@ -230,13 +239,16 @@ final class LTMS_Frontend_Customer_Bookings {
                         <?php if ( $refund_info ) : ?>
                         <div class="ltms-cb-refund">
                             <?php if ( $refund_info['amount'] > 0 ) : ?>
-                                ⚠️ <?php printf(
+                                <!-- AUDIT-FE-UIUX3-MA-02 FIX: aviso con SVG alerta (antes iconografia emoji). -->
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                <?php printf(
                                     /* translators: 1: formatted currency amount */
                                     esc_html__( 'Si cancelas ahora, recibirías un reembolso de %s según la política de cancelación del alojamiento.', 'ltms' ),
                                     wp_kses_post( wc_price( $refund_info['amount'] ) )
                                 ); ?>
                             <?php else : ?>
-                                ⚠️ <?php esc_html_e( 'Si cancelas ahora, no recibirías reembolso según la política de cancelación del alojamiento.', 'ltms' ); ?>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                <?php esc_html_e( 'Si cancelas ahora, no recibirías reembolso según la política de cancelación del alojamiento.', 'ltms' ); ?>
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
@@ -244,7 +256,8 @@ final class LTMS_Frontend_Customer_Bookings {
                         <div class="ltms-cb-actions">
                             <?php if ( $order_url ) : ?>
                             <a href="<?php echo esc_url( $order_url ); ?>" class="ltms-cb-btn ltms-cb-btn-outline">
-                                📄 <?php esc_html_e( 'Ver pedido', 'ltms' ); ?>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                <?php esc_html_e( 'Ver pedido', 'ltms' ); ?>
                             </a>
                             <?php endif; ?>
 
@@ -255,7 +268,8 @@ final class LTMS_Frontend_Customer_Bookings {
                                 data-booking-id="<?php echo esc_attr( $b['id'] ); ?>"
                                 data-nonce="<?php echo esc_attr( $nonce ); ?>"
                             >
-                                ✗ <?php esc_html_e( 'Cancelar reserva', 'ltms' ); ?>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <span class="ltms-cb-btn-label"><?php esc_html_e( 'Cancelar reserva', 'ltms' ); ?></span>
                             </button>
                             <?php endif; ?>
                         </div>
@@ -290,8 +304,11 @@ final class LTMS_Frontend_Customer_Bookings {
             }
 
             $(document).on('click', '.ltms-cb-cancel-btn', function(){
-                if ( ! confirm(i18n.cancel_confirm || 'Cancelar reserva?') ) return;
-                var $btn      = $(this).prop('disabled', true).text(i18n.cancelling || 'Cancelando…');
+                if ( ! confirm(i18n.cancel_confirm || '¿Cancelar reserva?') ) return;
+                var $btn      = $(this).prop('disabled', true);
+                /* AUDIT-FE-UIUX3-MA-02 FIX: el label vive en un span para que la
+                   carga/restore no borre el SVG del boton. */
+                $btn.find('.ltms-cb-btn-label').text(i18n.cancelling || 'Cancelando…');
                 var bookingId = $(this).data('booking-id');
                 var nonce     = $(this).data('nonce');
 
@@ -304,7 +321,7 @@ final class LTMS_Frontend_Customer_Bookings {
                         $('#ltms-cb-booking-' + bookingId).fadeOut(300, function(){ $(this).remove(); });
                         showNotice(r.data.message || '<?php echo esc_js( __( "Reserva cancelada.", "ltms" ) ); ?>', 'success');
                     } else {
-                        $btn.prop('disabled', false).text('✗ <?php echo esc_js( __( "Cancelar reserva", "ltms" ) ); ?>');
+                        $btn.prop('disabled', false).find('.ltms-cb-btn-label').text('<?php echo esc_js( __( "Cancelar reserva", "ltms" ) ); ?>');
                         showNotice(r.data || '<?php echo esc_js( __( "Error al cancelar.", "ltms" ) ); ?>', 'error');
                     }
                 });
