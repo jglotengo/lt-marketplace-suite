@@ -3084,8 +3084,57 @@ Y la línea `update_option('ltms_newsletter_last_sent', time())` se mantiene DES
    comments, que el minificador borra). Test canónico: `test_009_min_js_sincronizado_con_scope_tracking`.
 4. **Enqueue global verificado antes de migrar:** el scope nuevo solo funciona si el bundle llega a esa página.
    `enqueue_assets()` se engancha en `wp_enqueue_scripts` sin guard de página — verificado ANTES de mover el
-   script inline de order-tracking. Si algún día ese enqueue se vuelve condicional, el test CSP del template
-   pasará igual (no ejecuta JS) y el behaviour morirá en silencio: añadir cross-check si cambia.
+script inline de order-tracking. Si algún día ese enqueue se vuelve condicional, el test CSP del template
+    pasará igual (no ejecuta JS) y el behaviour morirá en silencio: añadir cross-check si cambia.
+
+---
+
+## 23. v2.9.310 - REGISTRO-E2E: el fix de seguridad AUTH-04 rompió el e2e de registro con Google (3 lecciones nuevas)
+
+> Alcance: `class-ltms-google-oauth.php` (callback + login_or_register), `form-register.php`,
+> `class-ltms-public-auth-handler.php` (ajax_complete_profile). Hallazgos: REG-E2E-001 (P0) + REG-E2E-002
+> (P1) + REG-E2E-003 (P2). Suite completa 4,674 tests verde (grupo nuevo `audit-register-e2e`, +11 tests).
+
+### Leccion 37.1: Un fix de seguridad que "se ve" correcto rompe el e2e aguas abajo si el comentario describe una intención que el código no ejecuta
+
+1. **Caso real:** el fix AUTH-04 (ciclo AUDIT-AUTH) quitó `wp_set_auth_cookie()` del flujo de Google OAuth
+   con perfil incompleto para evitar el redirect a 2FA (hook `wp_login` prio 30 de TOTP_2FA). El comentario
+   del fix decía "el flujo correcto es... y solo una vez que el wizard se completa via ajax_complete_profile
+   (que verifica sesión), recién autenticar" — pero el código NUNCA creó esa sesión. Resultado: el vendor
+   recién creado con Google llegaba al wizard de 3 pasos y al dar "Crear Cuenta" recibía
+   `401 "Debes iniciar sesión"` de `ajax_complete_profile()` — el e2e de registro con Google quedó
+   completamente roto y así lo reportó el usuario.
+2. **Regla preventiva:** cuando un fix de seguridad elimina un mecanismo (cookie, token, gate), hay que
+   reemplazarlo por la alternativa que el resto del flujo espera, NO solo quitarlo. Si un comentario
+   describe un estado intermedio ("el wizard verifica sesión"), el código DEBE crear ese estado. La
+   reproducción end-to-end del usuario destapa estos gaps que los tests estructurales del propio fix no ven.
+3. **El fix aplicado:** el branch de perfil incompleto ahora establece la sesión real (`wp_set_current_user`
+   + `wp_set_auth_cookie`) SIN disparar `do_action('wp_login')` — se conserva la intención de AUTH-04
+   (no gatillar el intercept de TOTP_2FA) y el wizard completa. El email ya está verificado por Google
+   (`email_verified=true` se exige), así que la sesión es legítima y el dashboard sigue redirigiendo al
+   wizard mientras `ltms_profile_incomplete=1`.
+
+### Leccion 37.2: El mismo gate de verificación aplicado en un path debe aplicarse en todos los paths de ese flujo
+
+1. **Caso real:** el path de registro NUEVO vía Google marcaba `ltms_email_verified=1` (Google ya verificó
+   el email), pero el path de usuario EXISTENTE que entraba por Google NO lo hacía. Un vendor registrado por
+   email sin verificar (que no había clickeado el link) entraba por Google, accedía al panel por ese path
+   sin el gate AUTH-01, y quedaba con `ltms_email_verified=0` — bloqueado en módulos que leen el flag y en
+   su próximo login por password.
+2. **Regla preventiva:** al implementar un gate/flag de verificación, auditar TODOS los paths que crean o
+   autentican la entidad (registro nuevo, promoción, login existente, importación/migración) y aplicar el
+   mismo criterio en cada uno. Un flag de seguridad que se setea en 3 de 4 paths es un bug latente.
+
+### Leccion 37.3: Un wizard que pide datos que el backend ignora es una trampa de UX
+
+1. **Caso real:** el wizard de completar perfil (Google path) mostraba y VALIDABA los campos de contraseña
+   (min 8, mayúscula, número, confirmación) pero `ajax_complete_profile()` nunca los guarda — la cuenta usa
+   password aleatorio y autentica con Google. El usuario creía haber creado una contraseña válida para
+   login por credenciales que jamás funcionaría.
+2. **Regla preventiva:** en un flujo condicional de wizard, los campos que el backend no procesa en ese modo
+   deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que el server ignora = promesa
+   rota al usuario. Fix: ocultar password en el modo complete_profile con aviso "Tu cuenta usa Google para
+   iniciar sesión".
 
 
 

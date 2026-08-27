@@ -6,6 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `REGISTRO-E2E` (e2e de registro de vendedores: el flujo con Google quedaba bloqueado en "Debes iniciar sesión")
+
+> Reporte del usuario: al registrarse con Google (opción "Continuar con Google"), la cuenta se creaba,
+> se abría el wizard de 3 pasos, pero al dar "Crear Cuenta" el sistema respondía "Debes iniciar sesión" y
+> no permitía avanzar. Suite completa verde: **4,674 tests, 9,462 assertions OK** (+11), 3 skips
+> preexistentes.
+
+- **REG-E2E-001 (P0)** (`includes/frontend/class-ltms-google-oauth.php`): el fix AUTH-04 (ciclo AUDIT-AUTH)
+  había quitado la cookie de auth del flujo de perfil incompleto PERO nunca creó una sesión alternativa —
+  `ajax_complete_profile()` exige `is_user_logged_in()` → 401 "Debes iniciar sesión". El e2e de registro
+  con Google quedó completamente roto. Fix: el branch de perfil incompleto ahora establece la sesión real
+  (`wp_set_current_user` + `wp_set_auth_cookie`) SIN disparar `do_action('wp_login')` (preservando la
+  intención de AUTH-04 de no gatillar el intercept de TOTP_2FA), + `log_oauth_access` para trazabilidad.
+- **REG-E2E-002 (P1)** (`class-ltms-google-oauth.php`): el login con Google de un vendor existente no
+  marcaba `ltms_email_verified=1` aunque Google ya verificó el email (Google OAuth exige
+  `email_verified=true`). El vendor quedaba con el meta en 0 pese a acceder por el path de Google. Fix:
+  marcar `ltms_email_verified=1` + `ltms_email_verified_at` en el branch de usuario existente.
+- **REG-E2E-003 (P2)** (`includes/frontend/views/vendor-parts/form-register.php`): en el wizard de
+  completar perfil (Google path) se mostraban los campos de contraseña, pero `ajax_complete_profile()` no
+  los guarda (la cuenta usa password aleatorio y autentica con Google). El usuario creía haber creado una
+  contraseña válida para login por credenciales. Fix: ocultar los campos de password en ese modo con aviso
+  "Tu cuenta usa Google para iniciar sesión".
+- **Tests** +11 en `tests/unit/RegisterAuditE2ETest.php` (grupo `audit-register-e2e`, patrón estructural)
+  + `test_04b` de `AuthAuditFixTest` actualizado al nuevo diseño (AUTH-04: sesión sin `wp_login`).
+- **Lección de método**: un fix que "se ve" correcto (AUTH-04 evitó el redirect a 2FA) puede romper el
+  e2e aguas abajo si el comentario describe una intención (el wizard "que verifica sesión") sin el código
+  que la ejecuta (la sesión nunca se creó). La reproducción end-to-end del usuario destapó el gap que los
+  tests estructurales del propio fix no veían — re-auditar contra el flujo real, no solo contra el diff.
+
+---
+
 ### Fixed — `AUDIT-DASH-NET-01` (panel del vendedor: vistas colgando "cargando" por fallos de red sin manejo)
 
 > Reporte del usuario: clic en cualquier submenú (incl. Inicio) quedaba esperando datos indefinidamente,
