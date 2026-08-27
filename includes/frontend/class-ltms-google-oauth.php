@@ -185,15 +185,35 @@ final class LTMS_Google_OAuth {
         }
 
         // AUTH-04 (P1) AUDIT-AUTH FIX: Si el vendor recién promoted/registrado tiene
-        // perfil incompleto, NO autenticarlo con cookie persistente aquí. El flujo
-        // correcto es: redirect a la página de registro con ?complete_profile=1, mostrar
-        // el wizard de completar datos, y solo una vez que el wizard se completa via
-        // ajax_complete_profile (que verifica sesión), recién autenticar. Antes,
-        // wp_set_auth_cookie() se ponía INCONDICIONALMENTE, lo que combinado con el
-        // hook wp_login prio 30 de TOTP_2FA::intercept_login_for_2fa disparaba redirect
-        // a 2FA challenge — el usuario terminaba en wp-login.php con sesión inconsistente.
+        // perfil incompleto, NO completar el login con cookie persistente + hook
+        // wp_login aquí. El flujo correcto es: redirect a la página de registro con
+        // ?complete_profile=1, mostrar el wizard de completar datos, y solo una vez
+        // que el wizard se completa via ajax_complete_profile, recién redirigir al panel.
+        //
+        // REG-E2E-001 (P0) REGISTRO-E2E FIX: AUTH-04 quitó la cookie de auth de este
+        // flujo pero NUNCA estableció una sesión alternativa. ajax_complete_profile()
+        // exige is_user_logged_in() (class-ltms-public-auth-handler.php:1547) → el
+        // vendor recién creado con Google recibía "Debes iniciar sesión" al dar "Crear
+        // Cuenta" y quedaba bloqueado sin poder completar el wizard — el e2e de registro
+        // con Google estaba completamente roto (reproducido: login → Continuar con
+        // Google → cuenta creada → wizard 3 pasos → Crear Cuenta → 401 "Debes iniciar
+        // sesión"). Ahora establecemos la sesión REAL aquí (wp_set_current_user +
+        // wp_set_auth_cookie) PERO SIN disparar do_action('wp_login'): ese hook es lo
+        // que dispara TOTP_2FA::intercept_login_for_2fa (prio 30) y causaba el redirect
+        // a 2FA challenge que AUTH-04 buscaba evitar. El email YA está verificado por
+        // Google (email_verified=true se exige en get_user_profile), así que la sesión
+        // es legítima; el acceso queda acotado porque el dashboard sigue redirigiendo
+        // al wizard mientras ltms_profile_incomplete=1 (class-ltms-dashboard-logic.php).
         $profile_incomplete = (bool) get_user_meta( $user_id, 'ltms_profile_incomplete', true );
         if ( $profile_incomplete ) {
+            wp_set_current_user( $user_id );
+            wp_set_auth_cookie( $user_id, true );
+            // L-5 FIX: sin el hook wp_login, el log de acceso no se dispara solo —
+            // registrar acceso de autenticación para trazabilidad (Ley 1581/2012).
+            if ( class_exists( 'LTMS_Legal_Compliance' ) ) {
+                LTMS_Legal_Compliance::log_oauth_access( $user_id, 'google_oauth' );
+            }
+
             $pages   = get_option( 'ltms_installed_pages', [] );
             $reg_id  = $pages['ltms-vendor-register'] ?? 0;
             $reg_url = $reg_id
@@ -331,6 +351,20 @@ final class LTMS_Google_OAuth {
             // Guardar/actualizar el Google ID en meta.
             update_user_meta( $existing->ID, 'ltms_google_id', $profile['google_id'] );
             update_user_meta( $existing->ID, 'ltms_google_avatar', $profile['avatar_url'] );
+
+            // REG-E2E-002 (P1) REGISTRO-E2E FIX: un vendor existente que entra por
+            // Google quedaba con ltms_email_verified=0 aunque Google YA verificó su
+            // email (email_verified=true se exige en get_user_profile). Caso real:
+            // vendor registrado por email normal sin clickear el link de verificación
+            // entraba por Google y (a) accedía al panel por el path de Google sin el
+            // gate AUTH-01, pero (b) su meta seguía en 0, dejándolo bloqueado en otros
+            // módulos que leen el flag y en su próximo login por password. Google OAuth
+            // es tan válido como el link del email para probar posesión del correo —
+            // marcar verificado aquí (mismo criterio que el path de registro nuevo).
+            update_user_meta( $existing->ID, 'ltms_email_verified', 1 );
+            if ( ! get_user_meta( $existing->ID, 'ltms_email_verified_at', true ) ) {
+                update_user_meta( $existing->ID, 'ltms_email_verified_at', LTMS_Utils::now_utc() );
+            }
 
             // Si ya es vendor, directo.
             if ( LTMS_Utils::is_ltms_vendor( $existing->ID ) ) {

@@ -278,8 +278,20 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
             </div>
         </div>
 
-        <!-- Paso 3: Contraseña y TyC -->
+        <!-- Paso 3: Contraseña (solo registro normal) y TyC -->
         <div class="ltms-wizard-page" data-page="3" style="display:none;">
+
+            <?php if ( $complete_profile || $profile_incomplete ) : ?>
+            <!-- REG-E2E-003 (P2) REGISTRO-E2E FIX: en el flujo de completar perfil
+                 (Google OAuth) los campos de contraseña NO se guardan —
+                 ajax_complete_profile() no los lee y el vendor autentica con Google
+                 (la cuenta se creó con password aleatorio). Antes se mostraban y
+                 el usuario creía haber creado una contraseña válida para login por
+                 credenciales, que nunca se guardaba. Ocultarlos + aviso claro. -->
+            <div class="ltms-notice ltms-notice-info" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;font-size:0.85rem;" role="note">
+                <p style="margin:0;">🔐 <?php esc_html_e( 'Tu cuenta usa Google para iniciar sesión. No necesitas crear una contraseña.', 'ltms' ); ?></p>
+            </div>
+            <?php else : ?>
             <div class="ltms-form-group">
                 <label for="ltms-reg-password"><?php esc_html_e( 'Contraseña *', 'ltms' ); ?></label>
                 <div class="ltms-input-group">
@@ -300,6 +312,7 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
                     <button type="button" class="ltms-toggle-password" data-target="ltms-reg-password-confirm" aria-label="<?php esc_attr_e( 'Mostrar contraseña', 'ltms' ); ?>">&#128065;</button>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="ltms-form-group">
                 <label class="ltms-checkbox-label">

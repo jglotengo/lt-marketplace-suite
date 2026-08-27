@@ -738,6 +738,12 @@ $files = [
     'tests/unit/XcoverApiTest.php',
     'tests/unit/TptcApiTest.php',
     'tests/unit/EscMsgApiTest.php',
+    // REGISTRO-E2E v2.9.321 — e2e registro con Google: form-register.php (ocultar
+    // password en complete_profile) + tests AuthAuditFixTest (test_04b actualizado
+    // al nuevo diseño de sesión) y RegisterAuditE2ETest (ciclo nuevo).
+    'includes/frontend/views/vendor-parts/form-register.php',
+    'tests/unit/AuthAuditFixTest.php',
+    'tests/unit/RegisterAuditE2ETest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

@@ -381,35 +381,47 @@ class AuthAuditFixTest extends LTMS_Unit_Test_Case {
 			'Google OAuth callback debe redirigir con ?complete_profile=1 cuando el perfil está incompleto.' );
 	}
 
-	public function test_04b_google_oauth_no_auth_cookie_for_incomplete_profile(): void {
+	public function test_04b_google_oauth_establishes_session_for_incomplete_profile(): void {
 		$file = $this->plugin_path( 'includes/frontend/class-ltms-google-oauth.php' );
 		$src  = file_get_contents( $file );
 
-		// Localizar el bloque de AUTH-04 y verificar que wp_set_auth_cookie
-		// solo se ejecuta si $profile_incomplete es false.
+		// REG-E2E-001 (P0): el branch de perfil incompleto debe ESTABLECER la sesión
+		// (wp_set_current_user + wp_set_auth_cookie) para que ajax_complete_profile()
+		// pase su check is_user_logged_in(). Antes, AUTH-04 quitó la cookie pero nunca
+		// creó una sesión alternativa → el vendor recién creado con Google recibía
+		// "Debes iniciar sesión" al dar "Crear Cuenta" y quedaba bloqueado (e2e de
+		// registro con Google roto). La sesión se establece SIN disparar wp_login para
+		// preservar la intención de AUTH-04 (evitar el intercept de TOTP_2FA prio 30).
 		$start = strpos( $src, 'AUTH-04 (P1) AUDIT-AUTH FIX' );
 		$this->assertNotFalse( $start );
 
-		// Tomar 2000 chars después del fix.
-		$body = substr( $src, $start, 2000 );
+		// Tomar 3000 chars después del fix (el bloque creció con la sesión del
+		// branch incompleto REG-E2E-001 — el redirect + exit están ~780 chars
+		// después del if, y wp_login ~1000 chars después).
+		$body = substr( $src, $start, 3000 );
 
-		// La condición if ( $profile_incomplete ) debe estar ANTES de
-		// wp_set_auth_cookie, y dentro de esa condición debe haber wp_safe_redirect + exit.
-		$if_pos          = strpos( $body, 'if ( $profile_incomplete )' );
-		$auth_cookie_pos = strpos( $body, 'wp_set_auth_cookie( $user_id, true )' );
+		// El guard $profile_incomplete debe existir.
+		$if_pos = strpos( $body, 'if ( $profile_incomplete )' );
 		$this->assertNotFalse( $if_pos, 'Debe haber un if ($profile_incomplete) como guard.' );
-		$this->assertNotFalse( $auth_cookie_pos, 'wp_set_auth_cookie debe seguir existiendo (cuando perfil completo).' );
-		$this->assertLessThan( $auth_cookie_pos, $if_pos,
-			'AUTH-04: la guarda $profile_incomplete debe ir ANTES que wp_set_auth_cookie (no autenticar si perfil incompleto).' );
 
-		// Dentro del if debe haber un wp_safe_redirect + exit.
-		// Buffer amplio (800) porque el bloque if incluye la construcción de
-		// $reg_url con fallback ternario ANTES de llegar al redirect + exit.
-		$if_block = substr( $body, $if_pos, 800 );
+		// Dentro del if: sesión real + redirect + exit.
+		// Buffer amplio (900) porque el bloque incluye set_current_user, auth_cookie,
+		// el log L-5 y la construcción de $reg_url antes del redirect + exit.
+		$if_block = substr( $body, $if_pos, 900 );
+		$this->assertStringContainsString( 'wp_set_current_user( $user_id )', $if_block,
+			'El branch de perfil incompleto debe setear current_user (el wizard exige sesión).' );
+		$this->assertStringContainsString( 'wp_set_auth_cookie( $user_id, true )', $if_block,
+			'El branch de perfil incompleto debe setear la auth cookie (ajax_complete_profile exige is_user_logged_in).' );
 		$this->assertStringContainsString( 'wp_safe_redirect( $reg_url )', $if_block,
 			'Cuando perfil incompleto, debe redirigir a $reg_url (URL con complete_profile=1).' );
 		$this->assertStringContainsString( 'exit;', $if_block,
 			'Cuando perfil incompleto, debe exit; tras el redirect.' );
+
+		// NO debe dispararse el hook wp_login dentro del branch incompleto — es lo
+		// que dispara TOTP_2FA::intercept_login_for_2fa (prio 30) y causaba el redirect
+		// a 2FA challenge que AUTH-04 buscaba evitar (sesión inconsistente).
+		$this->assertStringNotContainsString( "do_action( 'wp_login'", $if_block,
+			'El branch de perfil incompleto NO debe disparar wp_login (evita intercept de TOTP_2FA).' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
