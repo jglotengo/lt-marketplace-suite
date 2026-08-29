@@ -32,6 +32,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **PANEL-E2E-008 (P0, config server)**: `wp-config.php` pasa a `LTMS_ENVIRONMENT='production'` + opción DB
   `ltms_environment='production'` → activa endpoints LIVE de las integraciones y completa el minificado.
   *(Decisión de negocio confirmada por el usuario: las integraciones deben apuntar a LIVE.)*
+- **PANEL-E2E-009 (P0)** (`class-ltms-db-migrations.php` + DB): la tabla `lt_vendor_drivers` en producción
+  quedó con un schema LEGACY (`name`/`is_active`/`current_order_id`) que difería del canónico
+  (`full_name`/`status`/`wp_user_id`) porque `CREATE TABLE IF NOT EXISTS` nunca re-crea tablas existentes.
+  Todo el código (driver-ajax, view-drivers, shipping-own-delivery) lee `full_name` + `status` → el submenú
+  "Domiciliarios" fallaba con `Unknown column 'full_name'` y logueaba errores de DB. Fix: delta de migración
+  `2.9.18` (ALTER idempotente: rename `name`→`full_name`, +`status` ENUM con backfill desde `is_active`,
+  +`wp_user_id`) + aplicado en el server (tabla vacía, sin pérdida de datos).
 - **Tests** +38 en `tests/unit/PanelAuditE2ETest.php` (grupo `audit-panel-e2e`, estructurales) + stub del
   helper en `tests/bootstrap.php`. Verificación post-deploy: payload del panel ~1.4MB → ~430KB, endpoints
   200, `is_production()` = true.
