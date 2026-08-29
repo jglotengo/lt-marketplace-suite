@@ -6,6 +6,41 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Added — `VTEX-INTEGRATION` (integración VTEX para vendedores: Catalog + Pricing + Inventory con reglas de negocio estilo PosGold)
+
+> Alcance acordado con el usuario: **Catalog + Pricing + Inventory** (mismo alcance funcional que PosGold).
+> Cada vendedor configura su cuenta VTEX (accountName + appKey + appToken) y sincroniza su catálogo hacia
+> WooCommerce con las MISMAS reglas de negocio configurables que PosGold. Documentación de referencia leída:
+> developers.vtex.com/docs/api-reference (Catalog API, Pricing API, Logistics API). Suite completa verde:
+> **4,726 tests, 9,611 assertions OK** (+13), 3 skips preexistentes.
+
+- **`includes/api/class-ltms-api-vtex.php`** (`LTMS_Api_Vtex`): cliente API con auth `X-VTEX-API-AppKey`/
+  `X-VTEX-API-AppToken`, base URL `https://{accountName}.{environment}.com.br` (SSRF guard en accountName y
+  environment, mismo patrón que PosGold). Endpoints: Search API de catálogo (fuente principal del sync:
+  devuelve catalog+pricing+inventory+imágenes en una respuesta por página), category tree, product PVT,
+  SKU PVT, SKU files, Pricing (`/pricing/prices/{itemId}`), Inventory (`/api/logistics/pvt/inventory/skus/`),
+  warehouses. `normalize_search_item()` mapea item VTEX → formato canónico (RefId como SKU, commertialOffer.
+  Price→precio, AvailableQuantity→stock, images, ean, categoría jerárquica).
+- **`includes/business/class-ltms-vtex-price-calculator.php`** (`LTMS_Vtex_Price_Calculator`): MISMAS reglas
+  de negocio que PosGold (transporte, publicidad, devoluciones, margen, comisión Lo Tengo, IVA, ReDi,
+  redondeo) delegando la fórmula a `LTMS_PosGold_Price_Calculator`, con meta prefix independiente
+  (`ltms_vtex_price_*`). Filtro por categoría considera `categoriesIds` (ancestros).
+- **`includes/business/class-ltms-vtex-sync.php`** (`LTMS_Vtex_Sync`): sync engine con credenciales cifradas,
+  cron en background, rate limit 2min, paginación del Search API (50 items/página, máx 200 páginas),
+  filtro de categorías, dedupe, creación/actualización de productos WC, categorías jerárquicas
+  (categoria>grupo>subgrupo), descarga de imágenes y notificación in-dashboard.
+- **`includes/frontend/views/view-vtex.php`** + **`assets/js/ltms-vtex.js`**: UI del vendor (estado de
+  conexión, sync, credenciales, árbol de categorías, reglas de precio con ejemplo en vivo, plantilla SEO).
+- **Handlers AJAX** en `class-ltms-dashboard-logic.php`: save_credentials, test_connection, sync_products,
+  save_categories, save_rules, save_seo, get_categories (+ cron `ltms_vtex_sync_cron`).
+- **Registro**: autoloader (3 clases), nav del dashboard (icono + item + vista), versión **2.9.323**.
+- **Tests** +13 en `tests/unit/VtexIntegrationAuditTest.php` (grupo `audit-vtex`, estructurales).
+- **Nota**: "todos los servicios de la API de VTEX" quedó acotado por decisión del usuario a
+  Catalog + Pricing + Inventory (las ~50 APIs restantes —Orders, Checkout, Payments, Logistics full, etc.—
+  son un ecosistema aparte; se entrega por fases si se requieren).
+
+---
+
 ### Fixed — `PANEL-E2E` (panel del vendedor: submenús sin datos + "Failed to load resource: net::")
 
 > Reporte del usuario: al clicar submenús del panel los datos no cargaban y la consola mostraba
