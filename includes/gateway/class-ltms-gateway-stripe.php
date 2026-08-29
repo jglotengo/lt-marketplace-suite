@@ -445,7 +445,7 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
         // Script propio de LTMS para montar Stripe Elements.
         wp_enqueue_script(
             'ltms-stripe',
-            LTMS_ASSETS_URL . 'js/ltms-stripe.js',
+            ltms_asset_url( 'js/ltms-stripe' ),
             [ 'jquery', 'stripe-js' ],
             defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.5.0',
             true

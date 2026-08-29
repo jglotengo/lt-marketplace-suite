@@ -154,5 +154,5 @@ $type_counts = array_column( $type_counts_raw, 'total', 'type' );
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-marketing.js
-wp_enqueue_script( 'ltms-marketing', LTMS_ASSETS_URL . 'js/ltms-marketing.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-marketing', ltms_asset_url( 'js/ltms-marketing' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

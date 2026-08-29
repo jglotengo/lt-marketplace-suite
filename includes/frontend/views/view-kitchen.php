@@ -125,7 +125,7 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
 
     <?php
     // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-kitchen-view.js
-    wp_enqueue_script( 'ltms-kitchen-view', LTMS_ASSETS_URL . 'js/ltms-kitchen-view.js', [ 'jquery' ], LTMS_VERSION, true );
+    wp_enqueue_script( 'ltms-kitchen-view', ltms_asset_url( 'js/ltms-kitchen-view' ), [ 'jquery' ], LTMS_VERSION, true );
     ?>
 
     <?php endif; ?>

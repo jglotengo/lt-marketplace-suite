@@ -35,7 +35,7 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.321' );
+define( 'LTMS_VERSION', '2.9.322' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -128,6 +128,33 @@ if ( ! function_exists( 'ltms_ajax_url' ) ) {
      */
     function ltms_ajax_url(): string {
         return home_url( '/?ltms_ajax=1' );
+    }
+}
+
+// PANEL-E2E-007 (P1) FIX: helper de asset con sufijo .min desacoplado de
+// LTMS_ENVIRONMENT. Antes, la mayoría de los views hardcodeaban
+// LTMS_ASSETS_URL . 'js/ltms-XXX.js' (sin minificar) y solo enqueue_ux_enhancements
+// miraba el flag de entorno — si producción corre con LTMS_ENVIRONMENT != 'production'
+// (caso real: 'staging' en wp-config), el panel servía ~1.4MB de JS no-min, abriendo
+// la ventana a los fallos de red "net::ERR_NETWORK_IO_SUSPENDED" que dejan submenús
+// sin datos. Ahora el sufijo .min se decide por SCRIPT_DEBUG (estándar WP) + existencia
+// real del archivo, sin importar el entorno de pago.
+if ( ! function_exists( 'ltms_asset_url' ) ) {
+    /**
+     * Devuelve la URL de un asset JS de LTMS aplicando el sufijo .min en producción
+     * (SCRIPT_DEBUG off) si el archivo .min existe.
+     *
+     * @param string $relative_base Ruta relativa SIN extensión (ej: 'js/ltms-wallet').
+     * @return string URL completa con .min o sin él.
+     */
+    function ltms_asset_url( string $relative_base ): string {
+        if ( ! ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ) {
+            $min_path = LTMS_PLUGIN_DIR . 'assets/' . $relative_base . '.min.js';
+            if ( file_exists( $min_path ) ) {
+                return LTMS_ASSETS_URL . $relative_base . '.min.js';
+            }
+        }
+        return LTMS_ASSETS_URL . $relative_base . '.js';
     }
 }
 

@@ -262,5 +262,5 @@ $current_step = $step_labels[ $onboarding_status ] ?? 1;
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-aveonline-onboarding.js
-wp_enqueue_script( 'ltms-aveonline-onboarding', LTMS_ASSETS_URL . 'js/ltms-aveonline-onboarding.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-aveonline-onboarding', ltms_asset_url( 'js/ltms-aveonline-onboarding' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

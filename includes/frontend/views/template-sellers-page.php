@@ -33,9 +33,9 @@ add_action( 'wp_enqueue_scripts', function() {
         wp_enqueue_style( 'ltms-login-register', $url . 'css/ltms-login-register.css', [ 'ltms-dashboard' ], $ver );
     }
     if ( ! wp_script_is( 'ltms-login-register', 'enqueued' ) ) {
-        $suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
-        // El .min puede no existir en todos los entornos; usamos el no-minificado como fallback seguro.
-        $js_url = $url . 'js/ltms-login-register.js';
+        // PANEL-E2E-007 FIX: servir .min en producción via helper (antes hardcodeaba
+        // el .js no-minificado a pesar de calcular un $suffix que nunca usaba).
+        $js_url = ltms_asset_url( 'js/ltms-login-register' );
         wp_enqueue_script( 'ltms-login-register', $js_url, [ 'jquery' ], $ver, true );
         wp_localize_script( 'ltms-login-register', 'ltmsAuth', [
             'ajax_url' => admin_url( 'admin-ajax.php' ),

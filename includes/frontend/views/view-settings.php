@@ -512,5 +512,5 @@ $siigo_user   = $invoice_provider === 'siigo' ? get_user_meta( $vendor_id, 'ltms
 // moved to external assets/js/ltms-settings.js (appended al final del archivo existente).
 // FASE2B P0 FIX (CSP): el último inline <script> del panel — view-settings invoicing section.
 // El enqueue de ltms-settings.js cubre tanto settings generales como la sección invoicing nueva.
-wp_enqueue_script( 'ltms-settings', LTMS_ASSETS_URL . 'js/ltms-settings.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-settings', ltms_asset_url( 'js/ltms-settings' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

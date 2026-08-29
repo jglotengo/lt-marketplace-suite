@@ -389,6 +389,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-bookings.js
-wp_enqueue_script( 'ltms-bookings', LTMS_ASSETS_URL . 'js/ltms-bookings.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-bookings', ltms_asset_url( 'js/ltms-bookings' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>
 

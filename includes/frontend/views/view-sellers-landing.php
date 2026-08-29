@@ -194,7 +194,7 @@ $vendor_earn  = 100 - $vendor_fee;
 
     <?php
     // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-sellers-landing.js
-    wp_enqueue_script( 'ltms-sellers-landing', LTMS_ASSETS_URL . 'js/ltms-sellers-landing.js', [], LTMS_VERSION, true );
+    wp_enqueue_script( 'ltms-sellers-landing', ltms_asset_url( 'js/ltms-sellers-landing' ), [], LTMS_VERSION, true );
     ?>
 
 </div><!-- .ltms-sellers-landing -->

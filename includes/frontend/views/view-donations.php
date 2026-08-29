@@ -165,5 +165,5 @@ $total_pages = max( 1, (int) ceil( $total_orders / $per_page ) );
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-donations.js
-wp_enqueue_script( 'ltms-donations', LTMS_ASSETS_URL . 'js/ltms-donations.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-donations', ltms_asset_url( 'js/ltms-donations' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

@@ -357,7 +357,7 @@ final class LTMS_Admin {
             2
         );
 
-        wp_enqueue_script( 'ltms-admin', $url . 'js/ltms-admin.js', [ 'jquery', 'wp-util', 'chart-js' ], $ver, true );
+        wp_enqueue_script( 'ltms-admin', ltms_asset_url( 'js/ltms-admin' ), [ 'jquery', 'wp-util', 'chart-js' ], $ver, true );
 
         wp_localize_script( 'ltms-admin', 'ltmsAdmin', [
             'ajax_url'  => admin_url( 'admin-ajax.php' ),

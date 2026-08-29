@@ -432,5 +432,5 @@ $currency = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_currency(
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-drivers.js
-wp_enqueue_script( 'ltms-drivers', LTMS_ASSETS_URL . 'js/ltms-drivers.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-drivers', ltms_asset_url( 'js/ltms-drivers' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

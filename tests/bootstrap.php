@@ -548,6 +548,21 @@ if ( $ltms_unit_only ) {
     defined( 'LTMS_COUNTRY' )         || define( 'LTMS_COUNTRY',         'CO' );
     defined( 'LTMS_ENCRYPTION_KEY' )  || define( 'LTMS_ENCRYPTION_KEY',  str_repeat( 'x', 32 ) );
 
+    // PANEL-E2E-007: helper global ltms_asset_url() espejo del real (el plugin
+    // principal no se carga en UNIT_ONLY, pero enqueue_assets() de AdminTest y
+    // los views lo invocan). Misma lógica: .min en producción si el archivo existe.
+    if ( ! function_exists( 'ltms_asset_url' ) ) {
+        function ltms_asset_url( string $relative_base ): string {
+            if ( ! ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ) {
+                $min_path = LTMS_PLUGIN_DIR . 'assets/' . $relative_base . '.min.js';
+                if ( file_exists( $min_path ) ) {
+                    return LTMS_ASSETS_URL . $relative_base . '.min.js';
+                }
+            }
+            return LTMS_ASSETS_URL . $relative_base . '.js';
+        }
+    }
+
     // ── Stubs de funciones WordPress usadas por Logger/Config ──────────────────
     if ( ! function_exists( 'is_email' ) ) {
         function is_email( string $email ): bool { return (bool) filter_var( $email, FILTER_VALIDATE_EMAIL ); }

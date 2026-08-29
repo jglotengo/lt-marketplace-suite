@@ -744,6 +744,31 @@ $files = [
     'includes/frontend/views/vendor-parts/form-register.php',
     'tests/unit/AuthAuditFixTest.php',
     'tests/unit/RegisterAuditE2ETest.php',
+    // PANEL-E2E v2.9.322 — minificación de assets desacoplada de LTMS_ENVIRONMENT:
+    // views/clases que ahora enquean via ltms_asset_url() (antes hardcodeaban .js
+    // no-min → ~1.4MB de JS en el panel) + test del ciclo + bootstrap (stub helper).
+    'includes/admin/class-ltms-admin.php',
+    'includes/core/class-ltms-kernel.php',
+    'includes/booking/class-ltms-booking-calendar.php',
+    'includes/frontend/class-ltms-frontend-checkout-script-injector.php',
+    'includes/gateway/class-ltms-gateway-stripe.php',
+    'includes/api/gateways/class-ltms-api-gateways.php',
+    'includes/frontend/views/view-wallet.php',
+    'includes/frontend/views/view-bookings.php',
+    'includes/frontend/views/view-security.php',
+    'includes/frontend/views/view-posgold.php',
+    'includes/frontend/views/view-drivers.php',
+    'includes/frontend/views/view-envios.php',
+    'includes/frontend/views/view-marketing.php',
+    'includes/frontend/views/view-ordenes-compra.php',
+    'includes/frontend/views/view-kitchen.php',
+    'includes/frontend/views/view-insurance.php',
+    'includes/frontend/views/view-donations.php',
+    'includes/frontend/views/view-shipping-statement.php',
+    'includes/frontend/views/view-aveonline-onboarding.php',
+    'includes/frontend/views/template-sellers-page.php',
+    'tests/unit/PanelAuditE2ETest.php',
+    'tests/bootstrap.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

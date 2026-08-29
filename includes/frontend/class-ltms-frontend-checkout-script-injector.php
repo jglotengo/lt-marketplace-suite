@@ -55,7 +55,7 @@ class LTMS_Frontend_Checkout_Script_Injector {
         // v2.9.230: Static JS file + wp_localize_script for country config.
         wp_enqueue_script(
             'ltms-checkout-fixes',
-            LTMS_ASSETS_URL . 'js/ltms-checkout-fixes.js',
+            ltms_asset_url( 'js/ltms-checkout-fixes' ),
             [ 'jquery' ],
             LTMS_VERSION,
             true

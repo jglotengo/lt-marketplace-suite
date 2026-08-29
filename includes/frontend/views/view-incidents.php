@@ -173,7 +173,7 @@ $dashboard_nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 // AUDIT-PANEL-FN-03 (re-auditoría): inline <script> moved to external assets/js/ltms-incidents.js.
 // FASE2B P0 FIX (CSP): completes the migration of view-incidents (el inline script
 // mas grande, 445 lineas) - era el ultimo bloque grande JS no migrado en el panel.
-wp_enqueue_script( 'ltms-incidents', LTMS_ASSETS_URL . 'js/ltms-incidents.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-incidents', ltms_asset_url( 'js/ltms-incidents' ), [ 'jquery' ], LTMS_VERSION, true );
 wp_localize_script( 'ltms-incidents', 'ltmsIncidents', [
     'nonce'          => wp_create_nonce( 'ltms_dashboard_nonce' ),
     'currentUserId'  => get_current_user_id(),

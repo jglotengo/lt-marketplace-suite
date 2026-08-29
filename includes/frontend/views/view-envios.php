@@ -213,7 +213,7 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
          restoration) is wired up in the external JS (ltms-envios.js). -->
     <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-envios.js
-wp_enqueue_script( 'ltms-envios', LTMS_ASSETS_URL . 'js/ltms-envios.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-envios', ltms_asset_url( 'js/ltms-envios' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>
 </div><!-- /.ltms-view-pad — AUD-07 FIX: this closing div was missing,
           causing all subsequent view sections (shipping-statement, redi,

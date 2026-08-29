@@ -376,7 +376,7 @@ $nonce = wp_create_nonce( 'ltms_dashboard_nonce' );
 
         <?php
         // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-kyc.js
-        wp_enqueue_script( 'ltms-kyc', LTMS_ASSETS_URL . 'js/ltms-kyc.js', [ 'jquery' ], LTMS_VERSION, true );
+        wp_enqueue_script( 'ltms-kyc', ltms_asset_url( 'js/ltms-kyc' ), [ 'jquery' ], LTMS_VERSION, true );
         ?>
     <?php endif; ?>
 </div>

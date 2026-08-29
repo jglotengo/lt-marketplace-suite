@@ -311,7 +311,7 @@ class LTMS_Product_Tabs {
         // assets/js/ltms-product-tabs.js (enqueued below).
         wp_enqueue_script(
             'ltms-product-tabs',
-            LTMS_ASSETS_URL . 'js/ltms-product-tabs.js',
+            ltms_asset_url( 'js/ltms-product-tabs' ),
             [ 'jquery' ],
             LTMS_VERSION,
             true

@@ -423,7 +423,7 @@ final class LTMS_Core_Kernel {
             $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '2.9.2';
             $url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '';
             wp_enqueue_style( 'ltms-product-enhancements', $url . 'css/ltms-product-enhancements.css', [], $ver );
-            wp_enqueue_script( 'ltms-product-enhancements', $url . 'js/ltms-product-enhancements.js', [ 'jquery' ], $ver, true );
+            wp_enqueue_script( 'ltms-product-enhancements', ltms_asset_url( 'js/ltms-product-enhancements' ), [ 'jquery' ], $ver, true );
             wp_localize_script( 'ltms-product-enhancements', 'ltmsDrawerData', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'ajaxurl' => admin_url( 'admin-ajax.php' ), // v2.9.40: some JS code uses ajaxurl directly

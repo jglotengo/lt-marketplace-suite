@@ -114,7 +114,7 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
 
         wp_enqueue_script(
             'ltms-openpay-gateway',
-            LTMS_ASSETS_URL . 'js/ltms-openpay-gateway.js',
+            ltms_asset_url( 'js/ltms-openpay-gateway' ),
             [ 'jquery', 'openpay-data' ],
             LTMS_VERSION,
             true

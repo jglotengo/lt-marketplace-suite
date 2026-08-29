@@ -166,5 +166,5 @@ $backup_codes = is_array( $backup_codes ) ? $backup_codes : [];
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-security.js
-wp_enqueue_script( 'ltms-security', LTMS_ASSETS_URL . 'js/ltms-security.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-security', ltms_asset_url( 'js/ltms-security' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

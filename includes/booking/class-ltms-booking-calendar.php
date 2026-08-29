@@ -71,7 +71,7 @@ class LTMS_Booking_Calendar {
         );
         wp_enqueue_script(
             'ltms-booking-calendar',
-            LTMS_PLUGIN_URL . 'assets/js/ltms-booking-calendar.js',
+            ltms_asset_url( 'js/ltms-booking-calendar' ),
             [ 'flatpickr', 'flatpickr-es', 'jquery' ],
             LTMS_VERSION,
             true

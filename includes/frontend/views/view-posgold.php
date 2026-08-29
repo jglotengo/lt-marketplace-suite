@@ -542,5 +542,5 @@ if ( empty( $seo_template ) ) {
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-posgold.js
-wp_enqueue_script( 'ltms-posgold', LTMS_ASSETS_URL . 'js/ltms-posgold.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-posgold', ltms_asset_url( 'js/ltms-posgold' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

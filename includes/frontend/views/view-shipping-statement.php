@@ -230,5 +230,5 @@ $fmt = function( $v ) use ( $currency ) {
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-shipping-statement.js
 // Filename passed via data-filename attribute on the button (no inline JS needed).
-wp_enqueue_script( 'ltms-shipping-statement', LTMS_ASSETS_URL . 'js/ltms-shipping-statement.js', [], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-shipping-statement', ltms_asset_url( 'js/ltms-shipping-statement' ), [], LTMS_VERSION, true );
 ?>

@@ -276,7 +276,7 @@
 // AUDIT-PANEL-FN-03 (re-auditoría): inline <script> moved to external assets/js/ltms-redi.js.
 // FASE2B P0 FIX (CSP): completes the migration that left this view + view-incidents +
 // view-settings (invoicing section) as the only 3 with inline scripts in the panel.
-wp_enqueue_script( 'ltms-redi', LTMS_ASSETS_URL . 'js/ltms-redi.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-redi', ltms_asset_url( 'js/ltms-redi' ), [ 'jquery' ], LTMS_VERSION, true );
 wp_localize_script( 'ltms-redi', 'ltmsRedi', [
     'nonce'   => wp_create_nonce( 'ltms_dashboard_nonce' ),
     'strings' => [

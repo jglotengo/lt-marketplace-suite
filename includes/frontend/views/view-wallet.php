@@ -350,6 +350,6 @@ $has_bank_data     = ! empty( $saved_bank_acc );
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-wallet.js
-wp_enqueue_script( 'ltms-wallet', LTMS_ASSETS_URL . 'js/ltms-wallet.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-wallet', ltms_asset_url( 'js/ltms-wallet' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>
 

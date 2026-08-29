@@ -271,7 +271,7 @@ class LTMS_Vendor_Storefront {
 
         wp_enqueue_script(
             'ltms-storefront',
-            LTMS_ASSETS_URL . 'js/ltms-storefront.js',
+            ltms_asset_url( 'js/ltms-storefront' ),
             [ 'jquery', 'wc-add-to-cart' ],
             LTMS_VERSION,
             true

@@ -188,5 +188,5 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-ordenes-compra.js
-wp_enqueue_script( 'ltms-ordenes-compra', LTMS_ASSETS_URL . 'js/ltms-ordenes-compra.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-ordenes-compra', ltms_asset_url( 'js/ltms-ordenes-compra' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>

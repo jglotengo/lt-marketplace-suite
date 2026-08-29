@@ -339,7 +339,7 @@ class LTMS_Native_Templates {
         // SG Optimizer strips query params and caches by filename.
         // Solution: use wp_add_inline_script to inject critical PV functions
         // directly in the HTML, bypassing SG JS cache entirely.
-        wp_enqueue_script( 'ltms-plaza-viva', $url . 'js/ltms-plaza-viva.js', [], $ver, true );
+        wp_enqueue_script( 'ltms-plaza-viva', ltms_asset_url( 'js/ltms-plaza-viva' ), [], $ver, true );
 
         // v2.9.202 — Inline PV patch: inject critical functions that may not
         // be in the cached version of ltms-plaza-viva.js. This runs AFTER

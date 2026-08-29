@@ -108,7 +108,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-homepage-fixes',
-            $url . 'js/ltms-homepage-fixes.js',
+            ltms_asset_url( 'js/ltms-homepage-fixes' ),
             [],
             $ver,
             true
@@ -134,7 +134,7 @@ final class LTMS_Frontend_Assets {
 
         wp_enqueue_script(
             'ltms-header-nav',
-            $url . 'js/ltms-header-nav.js',
+            ltms_asset_url( 'js/ltms-header-nav' ),
             [ 'jquery' ],
             $ver,
             true
@@ -172,7 +172,7 @@ final class LTMS_Frontend_Assets {
      * @return void
      */
     public function enqueue_frontend_assets(): void {
-        $is_prod = defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production';
+        $is_prod = ! ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG );
         $ver     = LTMS_VERSION;
         $url     = LTMS_ASSETS_URL;
         // v2.9.99 FIX: solo usar sufijo .min si el archivo .min realmente existe.
@@ -180,6 +180,9 @@ final class LTMS_Frontend_Assets {
         // ltms-modal, ltms-notifications, ltms-kds) NO tienen versión .min →
         // el navegador recibía 404 y el JS nunca cargaba → las vistas del panel
         // del vendedor no funcionaban.
+        // PANEL-E2E-006 (P1) FIX: el sufijo se decide por SCRIPT_DEBUG (estándar WP),
+        // no por LTMS_ENVIRONMENT. Producción corría con LTMS_ENVIRONMENT='staging'
+        // en wp-config, lo que servía todo el JS del panel no-minificado (~1.4MB).
         $suffix  = $is_prod ? '.min' : '';
         $page_id = get_queried_object_id();
         $pages   = $this->get_installed_pages();
@@ -427,7 +430,13 @@ final class LTMS_Frontend_Assets {
             return;
         }
 
-        $min = ( defined( 'LTMS_ENVIRONMENT' ) && LTMS_ENVIRONMENT === 'production' ) ? '.min' : '';
+        // PANEL-E2E-005 (P1) FIX: $min por SCRIPT_DEBUG (no LTMS_ENVIRONMENT).
+        // Producción corría con LTMS_ENVIRONMENT='staging' → este archivo se servía
+        // a 613KB no-min en CADA página (con ?v= que excluye la minificación de SG
+        // Optimizer) — el payload más pesado del panel, que ampliaba la ventana de
+        // fallos "net::ERR_NETWORK_IO_SUSPENDED" en submenús. SCRIPT_DEBUG es el
+        // estándar WP para decidir minificar y no depende del entorno de pago.
+        $min = ( ! defined( 'SCRIPT_DEBUG' ) || ! SCRIPT_DEBUG ) ? '.min' : '';
         $ver = LTMS_VERSION;
         $url = LTMS_ASSETS_URL;
 

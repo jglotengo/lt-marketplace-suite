@@ -396,7 +396,7 @@ $profile_incomplete = $current_user_id && get_user_meta( $current_user_id, 'ltms
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-login-register.js
-wp_enqueue_script( 'ltms-login-register', LTMS_ASSETS_URL . 'js/ltms-login-register.js', [], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-login-register', ltms_asset_url( 'js/ltms-login-register' ), [], LTMS_VERSION, true );
 ?>
     <div class="ltms-auth-footer">
         <p>

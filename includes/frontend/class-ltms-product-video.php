@@ -125,7 +125,7 @@ class LTMS_Product_Video {
         // INTEGRATIONS-AUDIT P0 FIX (CSP): replaced inline onclick + inline
         // <script> with data-* attributes. The handler is registered via
         // addEventListener in assets/js/ltms-product-video.js (enqueued below).
-        wp_enqueue_script( 'ltms-product-video', LTMS_PLUGIN_URL . 'assets/js/ltms-product-video.js', [ 'jquery' ], LTMS_VERSION, true );
+        wp_enqueue_script( 'ltms-product-video', ltms_asset_url( 'js/ltms-product-video' ), [ 'jquery' ], LTMS_VERSION, true );
         ?>
         <div class="ltms-product-video-wrap" data-ltms-video-url="<?php echo esc_attr( $video_url ); ?>"
              style="cursor:pointer;position:relative;width:100%;margin-bottom:10px;border-radius:8px;overflow:hidden;">

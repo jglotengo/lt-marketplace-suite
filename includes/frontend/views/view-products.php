@@ -425,7 +425,7 @@ $products  = wc_get_products([
 
 <?php
 // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-products.js
-wp_enqueue_script( 'ltms-products', LTMS_ASSETS_URL . 'js/ltms-products.js', [ 'jquery' ], LTMS_VERSION, true );
+wp_enqueue_script( 'ltms-products', ltms_asset_url( 'js/ltms-products' ), [ 'jquery' ], LTMS_VERSION, true );
 ?>
 
 <!-- ═══════════════════════════════════════════════════════════════
