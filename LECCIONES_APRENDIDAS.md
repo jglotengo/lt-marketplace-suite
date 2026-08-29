@@ -3132,9 +3132,66 @@ script inline de order-tracking. Si algún día ese enqueue se vuelve condiciona
    password aleatorio y autentica con Google. El usuario creía haber creado una contraseña válida para
    login por credenciales que jamás funcionaría.
 2. **Regla preventiva:** en un flujo condicional de wizard, los campos que el backend no procesa en ese modo
-   deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que el server ignora = promesa
-   rota al usuario. Fix: ocultar password en el modo complete_profile con aviso "Tu cuenta usa Google para
-   iniciar sesión".
+deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que el server ignora = promesa
+    rota al usuario. Fix: ocultar password en el modo complete_profile con aviso "Tu cuenta usa Google para
+    iniciar sesión".
+
+---
+
+## 24. v2.9.322 - PANEL-E2E: el flag único de "entorno" rompió el panel (APIs sandbox + JS no-min) y CREATE TABLE IF NOT EXISTS nunca migra (4 lecciones nuevas)
+
+> Alcance: panel del vendedor (submenús sin datos + "failed to load resource: net::"), configuración de
+> entorno de producción, schema de `lt_vendor_drivers`. Hallazgos: PANEL-E2E-005/006/007 (P1, JS no-min)
+> + PANEL-E2E-008 (P0, entorno) + PANEL-E2E-009 (P0, schema drivers). Suite 4,712 tests verde.
+
+### Leccion 38.1: Un flag único de "entorno" que gobierna PAGO (LIVE/SANDBOX) Y asset-minificación es acoplamiento peligroso
+
+1. **Caso real:** `LTMS_ENVIRONMENT` en `wp-config.php` corría como `'staging'` en producción (con la opción
+   DB `ltms_environment='sandbox'`). Ese único flag gobernaba DOS cosas no relacionadas: (a) las integraciones
+   (Aveonline/TPTC/XCover/Addi) resolvían `=== 'production' ? LIVE : SANDBOX` → apuntaban a SANDBOX en
+   producción; y (b) toda la pipeline de assets decidía `.min` vs no-min por el mismo flag → el panel servía
+   ~1.4MB de JS no-min. Producción quedó "correcta" en un dominio y rota en el otro, y el reporte del usuario
+   (submenús sin datos + `net::`) era la punta del iceberg de una configuración rota.
+2. **Regla preventiva:** el minificado/optimización de assets debe responder a `SCRIPT_DEBUG` (estándar WP),
+   NUNCA al entorno de pago. El entorno de pago (LIVE/SANDBOX) es una decisión de negocio por integración;
+   la optimización de assets es una decisión técnica. Un solo flag no debe gobernar ambas. Además: el
+   diagnóstico end-to-end (endpoints 200 con sesión real) exonera al servidor y obliga a buscar la causa
+   raíz config del cliente — en este caso el payload que ampliaba la ventana de `ERR_NETWORK_IO_SUSPENDED`.
+
+### Leccion 38.2: `CREATE TABLE IF NOT EXISTS` NUNCA migra una tabla existente — el schema drift es silencioso
+
+1. **Caso real:** la migración define `lt_vendor_drivers` con `full_name`/`status`/`wp_user_id`, pero la
+   tabla en producción quedó con un schema LEGACY (`name`/`is_active`/`current_order_id`). `CREATE TABLE IF
+   NOT EXISTS` es no-op sobre la tabla existente → el drift persistió meses. Todo el código (driver-ajax,
+   view-drivers, shipping-own-delivery) lee `full_name` + `status` → el submenú "Domiciliarios" fallaba con
+   `Unknown column 'full_name'` y logueaba 68 errores de DB. El mismo patrón ya había pasado con KYC
+   (`bank_name`, errores históricos 27-Jul hasta que las columnas se añadieron).
+2. **Regla preventiva:** cada cambio de schema en una tabla existente DEBE ir como delta de migración
+   versionado con ALTER explícito (idempotente, con `SHOW COLUMNS`/`information_schema` para no re-aplicar),
+   nunca confiar en `CREATE TABLE IF NOT EXISTS`. Y el debug.log es el canario: barrerlo agrupando
+   `database error` por query revela qué submenú está roto antes de que el usuario lo reporte.
+
+### Leccion 38.3: El no-min por hardcode es deuda silenciosa — el payload del panel es un multiplicador de fallos de red
+
+1. **Caso real:** ~30 views/clases hardcodeaban `LTMS_ASSETS_URL . 'js/ltms-XXX.js'` (sin sufijo), mientras
+   el SPA principal usaba `.min`. El panel cargaba ~1.4MB de JS (solo `ltms-ux-enhancements.js` = 613KB, con
+   `?v=` que además excluía la minificación de SG Optimizer). En conexiones móviles/flaky el payload amplía
+   la ventana de `net::ERR_NETWORK_IO_SUSPENDED` → submenús que quedan sin datos.
+2. **Regla preventiva:** todo enqueue de asset JS debe pasar por un helper centralizado
+   (`ltms_asset_url()`) que aplique `.min` en producción con fallback a existencia del archivo. Prohibido
+   el hardcode de `.js` suelto en views. Y el cache-busting manual (`?v=`) rompe la minificación de SG
+   Optimizer — no mezclarlo con la pipeline del optimizador.
+
+### Leccion 38.4: La decisión de negocio de "entorno" debe confirmarse antes de tocar APIs de pago
+
+1. **Caso real:** flipar `LTMS_ENVIRONMENT` a `'production'` activa los endpoints LIVE de TODAS las
+   integraciones (Aveonline/TPTC/XCover/Addi). Cambiar eso unilateralmente podría apuntar pagos reales a
+   LIVE sin verificación. Se consultó al usuario (decisión explícita) antes de aplicar — y se respaldó
+   `wp-config.php` antes del cambio.
+2. **Regla preventiva:** cualquier cambio que afecte el routing de pago/integraciones (LIVE/SANDBOX) es una
+   decisión de negocio → preguntar antes de asumir (AGENTS.md "Decisiones de producto"), respaldar el
+   archivo de config antes de editarlo, y verificar post-cambio `is_production()`, el endpoint resuelto y
+   que los endpoints del panel sigan en 200.
 
 
 
