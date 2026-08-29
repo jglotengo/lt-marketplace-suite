@@ -499,7 +499,9 @@ final class LTMS_Api_Vtex {
      * @return array Producto normalizado con claves estándar (mismas que PosGold).
      */
     public static function normalize_search_item( array $product, array $item ): array {
-        $offer = $item['sellers'][0]['commertialOffer'] ?? [];
+        // VTEX documenta el campo con el typo 'commertialOffer'; algunas cuentas
+        // devuelven 'commercialOffer' (corregido). Soportar ambos.
+        $offer = $item['sellers'][0]['commertialOffer'] ?? $item['sellers'][0]['commercialOffer'] ?? [];
         if ( ! is_array( $offer ) ) {
             $offer = [];
         }
@@ -543,7 +545,7 @@ final class LTMS_Api_Vtex {
             'stock_quantity'   => (int)   ( $offer['AvailableQuantity'] ?? 0 ),
             'categoria'        => $categoria,
             'categoria_id'     => (string) ( $product['categoryId'] ?? '' ),
-            'categoria_ids'    => is_array( $product['categoriesIds'] ?? null ) ? array_map( 'strval', $product['categoriesIds'] ) : [],
+            'categoria_ids'    => self::normalize_category_ids( $product['categoriesIds'] ?? null ),
             'grupo'            => $grupo,
             'subgrupo'         => $subgrupo,
             'marca'            => (string) ( $product['brand'] ?? '' ),
@@ -555,6 +557,39 @@ final class LTMS_Api_Vtex {
             'unidad'           => '',
             '_raw'             => [ 'product' => $product, 'item' => $item ],
         ];
+    }
+
+    /**
+     * Normaliza los ids de categorías del Search API de VTEX.
+     *
+     * VTEX devuelve `categoriesIds` con formato "/2/", "/2/3/" (con slashes).
+     * El árbol de categorías (get_category_tree) devuelve ids limpios ("2").
+     * Para que el filtro por categoría ancestro coincida, hay que quitar los
+     * slashes. También se filtran vacíos.
+     *
+     * @param mixed $categories_ids Valor crudo de $product['categoriesIds'].
+     * @return array Lista de ids limpios.
+     */
+    private static function normalize_category_ids( $categories_ids ): array {
+        if ( ! is_array( $categories_ids ) ) {
+            return [];
+        }
+        // Cada valor de VTEX es un PATH de ids ("/2/", "/2/3/"). Expandir en los
+        // ids individuales (2, 3) para que el filtro ancestro coincida con el id
+        // plano que el vendor selecciona en el árbol de categorías.
+        $clean = [];
+        foreach ( $categories_ids as $id ) {
+            $trimmed = trim( (string) $id, '/' );
+            if ( '' === $trimmed ) {
+                continue;
+            }
+            foreach ( explode( '/', $trimmed ) as $seg ) {
+                if ( '' !== $seg ) {
+                    $clean[] = $seg;
+                }
+            }
+        }
+        return array_values( array_unique( $clean ) );
     }
 
     /**

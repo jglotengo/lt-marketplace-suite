@@ -358,10 +358,18 @@ final class LTMS_Vtex_Sync {
         $app_token = (string) get_user_meta( $vendor_id, 'ltms_vtex_app_token', true );
 
         // Desencriptar appKey/appToken si están cifrados.
+        // QA-VTEX FIX: try/catch — LTMS_Core_Security::decrypt() LANZA
+        // InvalidArgumentException si el valor no es ciphertext válido (token
+        // corrupto o guardado en texto plano legacy). Sin el catch, una sync
+        // con credenciales planas/corruptas crasheaba en lugar de degradar.
         foreach ( [ 'app_key', 'app_token' ] as $field ) {
             $raw = $field === 'app_key' ? $app_key : $app_token;
             if ( $raw && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
-                $decrypted = LTMS_Core_Security::decrypt( $raw );
+                try {
+                    $decrypted = LTMS_Core_Security::decrypt( $raw );
+                } catch ( \Throwable $e ) {
+                    $decrypted = false;
+                }
                 if ( $decrypted ) {
                     if ( 'app_key' === $field ) {
                         $app_key = $decrypted;
