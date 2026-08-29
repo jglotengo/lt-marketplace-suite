@@ -196,4 +196,32 @@ final class PanelAuditE2ETest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( "LTMS_ENVIRONMENT === 'production' ? self::API_BASE_LIVE : self::API_BASE_SANDBOX", $src,
 			'Las integraciones siguen resolviendo LIVE/SANDBOX por LTMS_ENVIRONMENT (el fix de assets no debe tocarlas).' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PANEL-E2E-009 (P0) — delta de migración que alinea lt_vendor_drivers.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_009_migration_drivers_schema_delta(): void {
+		$src = $this->src( 'includes/core/migrations/class-ltms-db-migrations.php' );
+
+		$this->assertStringContainsString( 'PANEL-E2E-009 (P0) FIX', $src,
+			'El fix PANEL-E2E-009 debe estar documentado en las migraciones.' );
+		$this->assertStringContainsString( "private const CURRENT_VERSION = '2.9.18';", $src,
+			'La versión de migración debe bumpear a 2.9.18.' );
+		$this->assertStringContainsString( "migrate_2_9_18_drivers_schema", $src,
+			'Debe existir el delta migrate_2_9_18_drivers_schema.' );
+
+		$start = strpos( $src, 'private static function migrate_2_9_18_drivers_schema' );
+		$this->assertNotFalse( $start, 'Debe existir la definición del método migrate_2_9_18_drivers_schema.' );
+		$block = substr( $src, $start, 2600 );
+
+		$this->assertStringContainsString( "CHANGE COLUMN `name` `full_name` VARCHAR(200) NOT NULL", $block,
+			'El delta debe renombrar la columna legacy name → full_name.' );
+		$this->assertStringContainsString( "ENUM('active','inactive','suspended')", $block,
+			'El delta debe añadir la columna status ENUM canónica.' );
+		$this->assertStringContainsString( '`wp_user_id`', $block,
+			'El delta debe añadir la columna wp_user_id.' );
+		$this->assertStringContainsString( "UPDATE `{\$t}` SET `status` = 'active' WHERE `is_active` = 1", $block,
+			'El delta debe hacer backfill de status desde is_active legacy.' );
+	}
 }

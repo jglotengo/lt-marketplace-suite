@@ -27,7 +27,7 @@ final class LTMS_DB_Migrations {
      * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
      * en sites ya migrados a 2.8.1.
      */
-    private const CURRENT_VERSION = '2.9.17';
+    private const CURRENT_VERSION = '2.9.18';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -117,6 +117,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.17', '<' ) ) {
             self::migrate_2_9_17_kyc_rejection_source();
+        }
+
+        if ( version_compare( $installed_version, '2.9.18', '<' ) ) {
+            self::migrate_2_9_18_drivers_schema();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3541,6 +3545,65 @@ final class LTMS_DB_Migrations {
                 'DB_MIGRATION',
                 sprintf( 'v2.9.17: lt_vendor_kyc.rejection_source column added; %d existing rejected rows backfilled as manual.', $backfilled )
             );
+        }
+    }
+
+    /**
+     * PANEL-E2E-009 (P0) FIX: alinea lt_vendor_drivers con el schema canónico.
+     *
+     * La tabla en producción quedó con un schema LEGACY (name/is_active/is_available/
+     * current_order_id) que difiere del canónico (full_name/status/wp_user_id) porque
+     * CREATE TABLE IF NOT EXISTS nunca re-crea una tabla existente. Todo el código
+     * (class-ltms-driver-ajax.php, view-drivers.php, class-ltms-shipping-method-own-
+     * delivery.php) lee/escribe full_name + status → en producción el submenú
+     * "Domiciliarios" fallaba con "Unknown column 'full_name' in 'field list'" y
+     * logueaba errores de DB en cada carga. Fix: ALTER idempotente que agrega/renombra
+     * las columnas canónicas y deja intactas las extras legacy (inofensivas).
+     */
+    private static function migrate_2_9_18_drivers_schema(): void {
+        global $wpdb;
+        $t = $wpdb->prefix . 'lt_vendor_drivers';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) !== $t ) {
+            return; // create_tables() la creará con el schema canónico.
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+        $cols = $wpdb->get_col( "SHOW COLUMNS FROM `{$t}`" );
+
+        // wp_user_id (canónico).
+        if ( ! in_array( 'wp_user_id', $cols, true ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query( "ALTER TABLE `{$t}` ADD COLUMN `wp_user_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'WP user si tiene cuenta' AFTER `vendor_id`" );
+        }
+
+        // full_name (canónico) — la columna legacy se llamaba `name`.
+        if ( ! in_array( 'full_name', $cols, true ) ) {
+            if ( in_array( 'name', $cols, true ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( "ALTER TABLE `{$t}` CHANGE COLUMN `name` `full_name` VARCHAR(200) NOT NULL" );
+            } else {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( "ALTER TABLE `{$t}` ADD COLUMN `full_name` VARCHAR(200) NOT NULL AFTER `vendor_id`" );
+            }
+        }
+
+        // status ENUM (canónico) — la columna legacy usaba is_active/is_available.
+        if ( ! in_array( 'status', $cols, true ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query(
+                "ALTER TABLE `{$t}` ADD COLUMN `status` ENUM('active','inactive','suspended') NOT NULL DEFAULT 'active' AFTER `vehicle_plate`"
+            );
+            // Backfill: si hay filas con is_active=1 (legacy), marcarlas activas.
+            if ( in_array( 'is_active', $cols, true ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( "UPDATE `{$t}` SET `status` = 'active' WHERE `is_active` = 1" );
+            }
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'DB_MIGRATION', 'v2.9.18: lt_vendor_drivers alineado con schema canónico (full_name + status + wp_user_id).' );
         }
     }
 
