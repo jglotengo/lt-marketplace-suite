@@ -769,6 +769,14 @@ $files = [
     'includes/frontend/views/template-sellers-page.php',
     'tests/unit/PanelAuditE2ETest.php',
     'tests/bootstrap.php',
+    // VTEX v2.9.323 — integración Catalog + Pricing + Inventory (estilo PosGold).
+    'includes/api/class-ltms-api-vtex.php',
+    'includes/business/class-ltms-vtex-price-calculator.php',
+    'includes/business/class-ltms-vtex-sync.php',
+    'includes/frontend/views/view-vtex.php',
+    'assets/js/ltms-vtex.js',
+    'assets/js/ltms-vtex.min.js',
+    'tests/unit/VtexIntegrationAuditTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

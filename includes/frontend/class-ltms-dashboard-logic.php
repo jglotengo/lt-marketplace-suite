@@ -83,6 +83,15 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_save_posgold_seo',            [ $instance, 'ajax_save_posgold_seo' ] );
         add_action( 'wp_ajax_ltms_get_posgold_categories',      [ $instance, 'ajax_get_posgold_categories' ] );
 
+        // v2.9.323: VTEX — sincronización de catálogo (Catalog + Pricing + Inventory).
+        add_action( 'wp_ajax_ltms_save_vtex_credentials',   [ $instance, 'ajax_save_vtex_credentials' ] );
+        add_action( 'wp_ajax_ltms_test_vtex_connection',     [ $instance, 'ajax_test_vtex_connection' ] );
+        add_action( 'wp_ajax_ltms_sync_vtex_products',       [ $instance, 'ajax_sync_vtex_products' ] );
+        add_action( 'wp_ajax_ltms_save_vtex_categories',     [ $instance, 'ajax_save_vtex_categories' ] );
+        add_action( 'wp_ajax_ltms_save_vtex_rules',          [ $instance, 'ajax_save_vtex_rules' ] );
+        add_action( 'wp_ajax_ltms_save_vtex_seo',            [ $instance, 'ajax_save_vtex_seo' ] );
+        add_action( 'wp_ajax_ltms_get_vtex_categories',      [ $instance, 'ajax_get_vtex_categories' ] );
+
         // v2.9.31: Activity Feed — endpoint faltante que causaba error AJAX en home del vendor.
         add_action( 'wp_ajax_ltms_get_activity_feed',           [ $instance, 'ajax_get_activity_feed' ] );
 
@@ -106,6 +115,11 @@ final class LTMS_Dashboard_Logic {
         // v2.9.72 P3-11: Inicializar PosGold Sync cron hook.
         if ( class_exists( 'LTMS_PosGold_Sync' ) && method_exists( 'LTMS_PosGold_Sync', 'init' ) ) {
             LTMS_PosGold_Sync::init();
+        }
+
+        // v2.9.323: Inicializar VTEX Sync cron hook.
+        if ( class_exists( 'LTMS_Vtex_Sync' ) && method_exists( 'LTMS_Vtex_Sync', 'init' ) ) {
+            LTMS_Vtex_Sync::init();
         }
     }
 
@@ -2258,6 +2272,322 @@ final class LTMS_Dashboard_Logic {
                 /* translators: %d: número de categorías */
                 _n( '%d categoría encontrada.', '%d categorías encontradas.', count( $result['categories'] ), 'ltms' ),
                 count( $result['categories'] )
+            ),
+        ] );
+    }
+
+    /**
+     * v2.9.323 — AJAX: Guardar credenciales VTEX del vendor.
+     */
+    public function ajax_save_vtex_credentials(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $account_name = sanitize_text_field( wp_unslash( $_POST['account_name'] ?? '' ) );
+        $environment  = sanitize_text_field( wp_unslash( $_POST['environment'] ?? '' ) );
+        $app_key      = sanitize_text_field( wp_unslash( $_POST['app_key'] ?? '' ) );
+        $app_token    = sanitize_text_field( wp_unslash( $_POST['app_token'] ?? '' ) );
+
+        if ( empty( $account_name ) || empty( $app_key ) || empty( $app_token ) ) {
+            wp_send_json_error( [ 'message' => __( 'Account name, AppKey y AppToken son obligatorios.', 'ltms' ) ], 400 );
+        }
+
+        // Validar accountName para prevenir SSRF (misma protección que PosGold).
+        if ( ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $account_name ) ) {
+            wp_send_json_error( [ 'message' => __( 'Account name inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
+        }
+        if ( '' !== $environment && ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $environment ) ) {
+            wp_send_json_error( [ 'message' => __( 'Environment inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
+        }
+
+        // Cifrar appKey/appToken (si LTMS_Core_Security está disponible).
+        $key_to_save   = $app_key;
+        $token_to_save = $app_token;
+        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+            $enc_key   = LTMS_Core_Security::encrypt( $app_key );
+            $enc_token = LTMS_Core_Security::encrypt( $app_token );
+            if ( $enc_key )   { $key_to_save = $enc_key; }
+            if ( $enc_token ) { $token_to_save = $enc_token; }
+        }
+
+        update_user_meta( $user_id, 'ltms_vtex_account_name', $account_name );
+        update_user_meta( $user_id, 'ltms_vtex_environment', $environment );
+        update_user_meta( $user_id, 'ltms_vtex_app_key',     $key_to_save );
+        update_user_meta( $user_id, 'ltms_vtex_app_token',   $token_to_save );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'VTEX_CREDENTIALS_SAVED', sprintf( 'Vendor #%d guardó credenciales VTEX (account=%s)', $user_id, $account_name ) );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Credenciales guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.323 — AJAX: Probar conexión VTEX del vendor.
+     */
+    public function ajax_test_vtex_connection(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Vtex_Sync' ) || ! class_exists( 'LTMS_Api_Vtex' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $creds = LTMS_Vtex_Sync::get_vendor_credentials( $user_id );
+        if ( ! $creds['configured'] ) {
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales VTEX.', 'ltms' ) ], 400 );
+        }
+
+        $result = LTMS_Api_Vtex::test_connection(
+            $creds['account_name'],
+            $creds['app_key'],
+            $creds['app_token'],
+            $creds['environment']
+        );
+
+        if ( $result['success'] ) {
+            wp_send_json_success( [ 'message' => $result['message'] ] );
+        } else {
+            wp_send_json_error( [ 'message' => $result['message'] ] );
+        }
+    }
+
+    /**
+     * v2.9.323 — AJAX: Sincronizar productos VTEX → WooCommerce.
+     */
+    public function ajax_sync_vtex_products(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Vtex_Sync' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $max_exec = (int) ini_get( 'max_execution_time' );
+        $desired_limit = 600;
+        if ( $max_exec > 0 && $max_exec < $desired_limit ) {
+            $desired_limit = max( 30, $max_exec - 5 );
+        }
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( $desired_limit );
+        }
+
+        $result = LTMS_Vtex_Sync::sync_vendor_products( $user_id );
+
+        if ( $result['success'] ) {
+            wp_send_json_success( [
+                'message'      => $result['message'],
+                'created'      => $result['created'],
+                'updated'      => $result['updated'],
+                'skipped'      => $result['skipped'],
+                'duplicates'   => $result['duplicates'] ?? 0,
+                'filtered_out' => $result['filtered_out'] ?? 0,
+                'errors'       => $result['errors'],
+                'time_limit'   => $desired_limit,
+            ] );
+        } else {
+            wp_send_json_error( [ 'message' => $result['message'] ] );
+        }
+    }
+
+    /**
+     * v2.9.323 — AJAX: Guardar filtro de categorías VTEX del vendor.
+     */
+    public function ajax_save_vtex_categories(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $raw  = sanitize_text_field( wp_unslash( $_POST['category_ids'] ?? '' ) );
+        $ids  = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
+        $sanitized = [];
+        foreach ( $ids as $id ) {
+            if ( is_numeric( $id ) ) {
+                $sanitized[] = (string) absint( $id );
+            }
+        }
+
+        $clean_json = wp_json_encode( $sanitized );
+        update_user_meta( $user_id, 'ltms_vtex_category_ids', $clean_json );
+
+        $clean_csv = implode( ',', $sanitized );
+        update_user_meta( $user_id, 'ltms_vtex_category_ids_csv', $clean_csv );
+
+        wp_send_json_success( [
+            'message'      => __( 'Categorías guardadas correctamente.', 'ltms' ),
+            'category_ids' => $clean_csv,
+        ] );
+    }
+
+    /**
+     * v2.9.323 — AJAX: Guardar reglas de precio VTEX del vendor.
+     */
+    public function ajax_save_vtex_rules(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Vtex_Price_Calculator' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $rules = [
+            'is_redi'                => sanitize_text_field( wp_unslash( $_POST['is_redi'] ?? 'no' ) ) === 'yes',
+            'transport_pct'          => (float) ( $_POST['transport_pct'] ?? 0 ),
+            'advertising_pct'        => (float) ( $_POST['advertising_pct'] ?? 0 ),
+            'returns_pct'            => (float) ( $_POST['returns_pct'] ?? 0 ),
+            'margin_pct'             => (float) ( $_POST['margin_pct'] ?? 30 ),
+            'lotengo_commission_pct' => (float) ( $_POST['lotengo_commission_pct'] ?? 10 ),
+            'iva_pct'                => (float) ( $_POST['iva_pct'] ?? 19 ),
+            'redi_cost_pct'          => (float) ( $_POST['redi_cost_pct'] ?? 0 ),
+            'round_multiple'         => (int)   ( $_POST['round_multiple'] ?? 1000 ),
+        ];
+
+        $rules['transport_pct']          = max( 0, min( 100, $rules['transport_pct'] ) );
+        $rules['advertising_pct']        = max( 0, min( 100, $rules['advertising_pct'] ) );
+        $rules['returns_pct']            = max( 0, min( 100, $rules['returns_pct'] ) );
+        $rules['margin_pct']             = max( 0, min( 500, $rules['margin_pct'] ) );
+        $rules['lotengo_commission_pct'] = max( 0, min( 50, $rules['lotengo_commission_pct'] ) );
+        $rules['redi_cost_pct']          = max( 0, min( 100, $rules['redi_cost_pct'] ) );
+        $rules['round_multiple']         = max( 1, $rules['round_multiple'] );
+
+        LTMS_Vtex_Price_Calculator::save_vendor_rules( $user_id, $rules );
+
+        wp_send_json_success( [ 'message' => __( 'Reglas de precio guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.323 — AJAX: Guardar plantilla SEO VTEX del vendor.
+     */
+    public function ajax_save_vtex_seo(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        $template = sanitize_text_field( wp_unslash( $_POST['seo_template'] ?? '' ) );
+        if ( empty( $template ) ) {
+            $template = '{nombre} {marca} {categoria}';
+        }
+
+        $allowed_placeholders = [ '{nombre}', '{marca}', '{categoria}', '{modelo}', '{codigo}' ];
+        $check = $template;
+        foreach ( $allowed_placeholders as $ph ) {
+            $check = str_replace( $ph, '', $check );
+        }
+        if ( preg_match( '/[<>{}]/', $check ) ) {
+            wp_send_json_error( [ 'message' => __( 'Plantilla inválida. Solo se permiten los placeholders {nombre}, {marca}, {categoria}, {modelo}, {codigo} y texto plano.', 'ltms' ) ], 400 );
+        }
+
+        update_user_meta( $user_id, 'ltms_vtex_seo_template', $template );
+
+        wp_send_json_success( [ 'message' => __( 'Plantilla SEO guardada correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.323 — AJAX: Obtener categorías VTEX del vendor (árbol → lista plana).
+     */
+    public function ajax_get_vtex_categories(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Vtex_Sync' ) || ! class_exists( 'LTMS_Api_Vtex' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $creds = LTMS_Vtex_Sync::get_vendor_credentials( $user_id );
+        if ( ! $creds['configured'] ) {
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales VTEX.', 'ltms' ) ], 400 );
+        }
+
+        // Cache transitorio (1 hora).
+        $cache_key = 'ltms_vtex_cats_' . $user_id;
+        $force_refresh = sanitize_text_field( wp_unslash( $_POST['force_refresh'] ?? 'no' ) ) === 'yes';
+        if ( ! $force_refresh ) {
+            $cached = get_transient( $cache_key );
+            if ( is_array( $cached ) && ! empty( $cached ) ) {
+                wp_send_json_success( [
+                    'categories' => $cached,
+                    'source'     => 'cache',
+                    'message'    => __( 'Categorías cargadas desde cache.', 'ltms' ),
+                ] );
+            }
+        }
+
+        $result = LTMS_Api_Vtex::get_category_tree(
+            $creds['account_name'],
+            $creds['app_key'],
+            $creds['app_token'],
+            4,
+            $creds['environment']
+        );
+
+        if ( ! $result['success'] ) {
+            wp_send_json_error( [ 'message' => $result['error'] ] );
+        }
+
+        $categories = LTMS_Api_Vtex::flatten_categories( $result['data'] );
+        set_transient( $cache_key, $categories, HOUR_IN_SECONDS );
+
+        wp_send_json_success( [
+            'categories' => $categories,
+            'source'     => 'endpoint',
+            'message'    => sprintf(
+                /* translators: %d: número de categorías */
+                _n( '%d categoría encontrada.', '%d categorías encontradas.', count( $categories ), 'ltms' ),
+                count( $categories )
             ),
         ] );
     }

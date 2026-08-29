@@ -35,7 +35,7 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.322' );
+define( 'LTMS_VERSION', '2.9.323' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -656,6 +656,10 @@ function ltms_load_autoloader(): void {
                 'ltms-api-posgold'                       => 'api/class-ltms-api-posgold.php',
                 'ltms-posgold-sync'                      => 'business/class-ltms-posgold-sync.php',
                 'ltms-posgold-price-calculator'          => 'business/class-ltms-posgold-price-calculator.php',
+                // v2.9.323 — VTEX integration (Catalog + Pricing + Inventory).
+                'ltms-api-vtex'                          => 'api/class-ltms-api-vtex.php',
+                'ltms-vtex-sync'                         => 'business/class-ltms-vtex-sync.php',
+                'ltms-vtex-price-calculator'             => 'business/class-ltms-vtex-price-calculator.php',
                 // v2.9.204 — Native Templates (Plaza Viva design system).
                 'ltms-native-templates'                  => 'frontend/class-ltms-native-templates.php',
             ];
