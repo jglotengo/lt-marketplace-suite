@@ -138,8 +138,9 @@ class KycAudit2FixTest extends LTMS_Unit_Test_Case {
 		// test is "CURRENT_VERSION must be bumped to the latest migration's
 		// version so existing installs run it". The literal value follows
 		// the latest migration added.
-		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.17'", $src,
-			'CURRENT_VERSION debe bumparse a 2.9.17 para que la migracion v2.9.17 corra en sites ya activados.' );
+		// v2.9.322 PANEL-E2E-009: bumped to 2.9.18 for migrate_2_9_18_drivers_schema.
+		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.18'", $src,
+			'CURRENT_VERSION debe bumparse a 2.9.18 para que la migracion v2.9.18 (drivers schema) corra en sites ya activados.' );
 	}
 
 	public function test_01f_migration_dispatched_in_run(): void {
