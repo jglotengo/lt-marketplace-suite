@@ -6,6 +6,41 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `PANEL-E2E` (panel del vendedor: submenús sin datos + "Failed to load resource: net::")
+
+> Reporte del usuario: al clicar submenús del panel los datos no cargaban y la consola mostraba
+> `failed to load resource: net::`. Diagnóstico end-to-end con sesión real de vendor (#141) en
+> producción: **servidor exonerado** — los 5 endpoints del panel (`ltms_get_dashboard_data`,
+> `ltms_get_orders_data`, `ltms_get_wallet_data`, `ltms_get_analytics_data`, `ltms_get_notifications`)
+> responden `200 success:true` en ~1s; WAF sin bloqueos (0 eventos/7d); JS del panel actual + resiliencia
+> NET-01 presente. **Causa raíz encontrada: producción corría con `LTMS_ENVIRONMENT='staging'`
+> (wp-config.php:168) + opción DB `ltms_environment='sandbox'`**, lo que (a) apuntaba Aveonline/TPTC/
+> XCover/Addi a endpoints SANDBOX y (b) servía todo el JS del panel NO-minificado (`ltms-ux-enhancements.js`
+> a 613KB en cada página + ~800KB de vistas no-min → ~1.4MB de JS). El payload ampliaba la ventana de
+> fallos `net::ERR_NETWORK_IO_SUSPENDED` en conexiones móviles/flaky. Suite completa verde: **4,712 tests,
+> 9,540 assertions OK** (+38), 3 skips preexistentes.
+
+- **PANEL-E2E-005 (P1)** (`class-ltms-frontend-assets.php`): `enqueue_ux_enhancements()` decidía el sufijo
+  `.min` por `LTMS_ENVIRONMENT === 'production'`; con el flag roto servía 613KB no-min (y `?v=` excluía la
+  minificación de SG Optimizer). Fix: sufijo por `SCRIPT_DEBUG` (estándar WP), desacoplado del entorno de pago.
+- **PANEL-E2E-006 (P1)** (`class-ltms-frontend-assets.php`): `$suffix` de `enqueue_frontend_assets()` pasó de
+  `LTMS_ENVIRONMENT` a `SCRIPT_DEBUG`.
+- **PANEL-E2E-007 (P1)**: helper global `ltms_asset_url()` (SCRIPT_DEBUG + `file_exists`) y **~30 views/
+  clases** (panel + storefront) que hardcodeaban `LTMS_ASSETS_URL . 'js/ltms-XXX.js'` migrados al helper —
+  fin del no-min por hardcode en producción. Único enqueue no-min restante: `ltms-openpay-mx` (sin `.min`,
+  gateway MX inactivo en CO).
+- **PANEL-E2E-008 (P0, config server)**: `wp-config.php` pasa a `LTMS_ENVIRONMENT='production'` + opción DB
+  `ltms_environment='production'` → activa endpoints LIVE de las integraciones y completa el minificado.
+  *(Decisión de negocio confirmada por el usuario: las integraciones deben apuntar a LIVE.)*
+- **Tests** +38 en `tests/unit/PanelAuditE2ETest.php` (grupo `audit-panel-e2e`, estructurales) + stub del
+  helper en `tests/bootstrap.php`. Verificación post-deploy: payload del panel ~1.4MB → ~430KB, endpoints
+  200, `is_production()` = true.
+- **Lección de método**: un flag único de "entorno" (LTMS_ENVIRONMENT) gobernando BOTH pago (LIVE/SANDBOX)
+  Y asset-minificación es un acoplamiento peligroso — producción puede correr correcta en uno y rota en el
+  otro. El minificado debe responder a `SCRIPT_DEBUG`, no al entorno de pago.
+
+---
+
 ### Fixed — `REGISTRO-E2E` (e2e de registro de vendedores: el flujo con Google quedaba bloqueado en "Debes iniciar sesión")
 
 > Reporte del usuario: al registrarse con Google (opción "Continuar con Google"), la cuenta se creaba,
