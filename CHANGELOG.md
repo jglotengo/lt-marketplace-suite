@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-04
 
+### Fixed — `VTEX-QA` (QA funcional/e2e de la integración VTEX: filtro de categorías roto + decrypt crash)
+
+> QA funcional con HTTP mockeado (payloads realistas del Search API de VTEX) + smoke test de red real a
+> VTEX (dominio/SSL OK; 404 esperado sin credenciales). Suite completa verde: **4,737 tests, 9,654
+> assertions OK** (+11 funcionales), 3 skips preexistentes.
+
+- **VTEX-QA-001 (P1)** (`class-ltms-api-vtex.php`): VTEX devuelve `categoriesIds` como paths con slashes
+  (`"/2/", "/2/3/"`). El filtro por categoría comparaba el id plano del vendor contra esos paths → nunca
+  coincidía (seleccionar "Moda" no incluía sus productos). Fix: `normalize_category_ids()` expande cada
+  path en sus ids individuales (2, 3) y deduplica. El filtro ancestro ahora funciona.
+- **VTEX-QA-002 (P1)** (`class-ltms-vtex-sync.php`): `LTMS_Core_Security::decrypt()` LANZA
+  `InvalidArgumentException` si el valor no es ciphertext válido (token plano legacy o corrupto). Sin
+  try/catch, una sync con credenciales planas/corruptas crasheaba. Fix: try/catch → degrada y usa el valor
+  raw (mismo patrón defensivo que otros módulos).
+- **VTEX-QA-003 (P2)** (`class-ltms-api-vtex.php`): fallback a `commercialOffer` (campo corregido) cuando
+  VTEX no devuelve el typo `commertialOffer`.
+- **Tests funcionales/e2e** +11 en `tests/unit/VtexFunctionalE2ETest.php` (grupo `audit-vtex-functional`):
+  parseo del Search API, normalización (RefId→SKU, Price, AvailableQuantity, EAN, categoría, imagen),
+  filtro por ancestro con slashes, test_connection, error 401, retry 429, SSRF guard, precio end-to-end
+  (idéntico a PosGold), y **sync_vendor_products e2e** (API mockeada → normalizar → precio → crear
+  producto WC con SKU=RefId). Stub de WC_Product_Simple/Attribute en `tests/unit/stubs/`.
+- **Classmap**: `composer dump-autoload` regenerado (registra las 3 clases VTEX + stub en el autoloader
+  de tests — sin esto los tests se marcaban skipped en UNIT_ONLY).
+
+---
+
 ### Added — `VTEX-INTEGRATION` (integración VTEX para vendedores: Catalog + Pricing + Inventory con reglas de negocio estilo PosGold)
 
 > Alcance acordado con el usuario: **Catalog + Pricing + Inventory** (mismo alcance funcional que PosGold).
