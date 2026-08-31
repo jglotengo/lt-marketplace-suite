@@ -6,6 +6,48 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-30
 
+### Fixed — `KDS-AUDIT` (Panel de Cocina / Kitchen Display System — doble implementación + stats rotas + field names)
+
+> El KDS tenía DOS implementaciones JS corriendo al mismo tiempo en el mismo DOM, cada una
+> repintando `#ltms-kds-grid` con markup distinto, doblando polls de API, sonidos y handlers de
+> click. La legacy (ltms-kitchen-view.js) tenía field names rotos contra el PHP (cantidad siempre 1x,
+> cliente siempre "Cliente", KPIs en 0). Suite completa verde: **4,759 tests, 9,729 assertions OK**,
+> 3 skips preexistentes.
+
+- **KDS-001 (P0)** — doble KDS eliminado: `view-kitchen.php` ya no enqueua `ltms-kitchen-view(.min).js`
+  (legacy). Se eliminaron los archivos `assets/js/ltms-kitchen-view.js`/`.min.js` y sus entradas de la
+  whitelist de deploy. El KDS usa UN solo script: `ltms-kds.min.js` + `ltms-kds.css` (enqueued por
+  `LTMS_Frontend_Assets::enqueue_kds_assets()`).
+- **KDS-002 (P0)** — bug de lógica en `ltms-kds.js`: enviaba `since` (timestamp) y el PHP filtraba por
+  `date_created`, pero el JS **borraba los pedidos que no estaban en la respuesta** → cada poll (10s)
+  eliminaba todos los pedidos activos excepto los creados en el último intervalo. Fix: se eliminó el
+  parámetro `since`; cada poll trae todos los activos y el merge por id ahora funciona (también
+  propaga cambios de estado entre dispositivos).
+- **KDS-004 (P1)** — `ltms_kitchen_get_stats` nunca se llamaba desde el JS → los KPIs
+  (Nuevos/Preparando/Listos/Servidos hoy) quedaban siempre en 0. Fix: `ltms-kds.js` ahora llama al
+  endpoint de stats en cada poll y actualiza los contadores.
+- **KDS-005 (P1)** — query HPOS de `ajax_get_stats` filtraba `o.status IN ('processing','on-hold')`
+  sin el prefijo `wc-` que guarda la columna `wc_orders.status` (default `wc-pending`) → contadores en 0
+  aun llamando al endpoint. Fix: `wc-processing`/`wc-on-hold`/`wc-completed`.
+- **KDS-006 (P1)** — `enqueue_kds_assets` se condicionaba solo a `$page_id === $pages['ltms-dashboard']`
+  (sin fallback), mientras `$is_vendor_panel` detecta el panel por shortcode y slug (M-56). Si el panel
+  vivía en otra página, el KDS se quedaba sin JS/CSS. Fix: usar `$is_vendor_panel`.
+- **KDS-007 (P2)** — `assets/sounds/new-order.mp3` no existe (carpeta `sounds/` ausente): el `<audio>` del
+  view daba 404 y `alert_sound` se localizaba siempre. Fix: `alert_sound` solo si `file_exists()`, y se
+  removió el elemento de audio del view (el JS cae al fallback beep via Web Audio API).
+- **KDS-008 (P2)** — markup del JS no coincidía con el CSS: el JS no seteaba `data-status` (el CSS usa
+  `[data-status="processing"]` con nombres WC, no kitchen) ni la clase de pulso `ltms-kds-new`. Fix:
+  `data-status` con el kitchen status + clase `ltms-kds-new` + `data-next` en botones; CSS con selectores
+  para `new`/`served`; keyframes `ltms-kds-spin`/`ltms-kds-livepulse` movidas del inline al CSS.
+- **Tests** +15 en `tests/unit/KitchenAuditTest.php` (grupo `audit-kitchen`): source-level de todos los
+  fixes + funcionales de `auto_set_kitchen_status_new()` (setea `new`, skip no-restaurante, skip sin
+  vendor meta, no sobreescribe). `PanelAuditE2ETest` provider actualizado (view-kitchen ya no enqueua el
+  legacy). `.min` de `ltms-kds` regenerados con terser/clean-css.
+
+---
+
+## [Unreleased] — 2026-08-30
+
 ### Added — `VTEX-AUTOSYNC` (re-sync automático periódico VTEX → WooCommerce)
 
 > El catálogo/precios de VTEX cambian en la cuenta del vendor y el marketplace debe reflejarlo sin que el

@@ -23,7 +23,6 @@ LTMS.KDS = (function ($) {
         soundEnabled: true,
         notificationEnabled: false,
         lastUpdated: null,
-        lastSince: null,
         isVisible: true,
     };
 
@@ -48,6 +47,7 @@ LTMS.KDS = (function ($) {
         bindEvents();
         requestNotificationPermission();
         loadOrders(true);
+        fetchStats();
         startPolling();
         updateClock();
         setInterval(updateClock, 1000);
@@ -59,6 +59,7 @@ LTMS.KDS = (function ($) {
                 stopPolling();
             } else {
                 loadOrders(true);
+                fetchStats();
                 startPolling();
             }
         });
@@ -73,7 +74,10 @@ LTMS.KDS = (function ($) {
     function startPolling() {
         if (state.pollingInterval) return;
         state.pollingInterval = setInterval(function () {
-            if (state.isVisible) loadOrders(false);
+            if (state.isVisible) {
+                loadOrders(false);
+                fetchStats();
+            }
         }, config.pollInterval);
     }
 
@@ -96,19 +100,39 @@ LTMS.KDS = (function ($) {
                 action: 'ltms_kitchen_get_orders',
                 nonce: config.nonce,
                 vendor_id: config.vendorId,
-                since: state.lastSince || '',
             },
         })
         .done(function (res) {
             if (res.success) {
                 processOrderUpdates(res.data.orders);
                 state.lastUpdated = new Date();
-                state.lastSince = res.data.timestamp;
                 updateLastUpdatedDisplay();
             }
         })
         .always(function () {
             $('#ltms-kds-grid').removeClass('ltms-kds-loading');
+        });
+    }
+
+    // KDS-AUDIT-004 FIX: los KPIs (Nuevos/Preparando/Listos/Servidos hoy) se
+    // actualizan desde el endpoint dedicado ltms_kitchen_get_stats. Antes ningún
+    // script llamaba este endpoint y los contadores quedaban siempre en 0.
+    function fetchStats() {
+        $.ajax({
+            url: config.ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'ltms_kitchen_get_stats',
+                nonce: config.nonce,
+            },
+        })
+        .done(function (res) {
+            if (!res.success) return;
+            var s = res.data || {};
+            $('#ltms-kds-stat-new').text(s.new || 0);
+            $('#ltms-kds-stat-preparing').text(s.preparing || 0);
+            $('#ltms-kds-stat-ready').text(s.ready || 0);
+            $('#ltms-kds-stat-served').text(s.served_today || 0);
         });
     }
 
@@ -180,9 +204,12 @@ LTMS.KDS = (function ($) {
 
         const $card = $('<div>', {
             class: 'ltms-kds-order-card ltms-kds-status-' + order.status +
+                   (order.status === 'new' ? ' ltms-kds-new' : '') +
                    (isUrgent ? ' ltms-kds-urgent' : '') +
                    (isCritical ? ' ltms-kds-critical' : ''),
             'data-order-id': order.id,
+            // KDS-AUDIT-008 FIX: data-status con el kitchen status (CSS [data-status]).
+            'data-status': order.status,
         });
 
         var itemsHtml = (order.items || []).map(function (item) {
@@ -202,7 +229,7 @@ LTMS.KDS = (function ($) {
                 '<div class="ltms-kds-order-type">' + orderTypeLabel + '</div>' +
                 '<div class="ltms-kds-elapsed ' + (isUrgent ? 'ltms-kds-elapsed-urgent' : '') + (isCritical ? ' ltms-kds-elapsed-critical' : '') + '">' + elapsed + ' min</div>' +
             '</div>' +
-            '<div class="ltms-kds-status-badge" style="background:' + statusCfg.color + '">' +
+            '<div class="ltms-kds-status-badge" data-status="' + order.status + '" style="background:' + statusCfg.color + '">' +
                 statusCfg.icon + ' ' + statusCfg.label +
             '</div>' +
             '<div class="ltms-kds-customer-info">' +
@@ -212,7 +239,7 @@ LTMS.KDS = (function ($) {
             '<ul class="ltms-kds-items-list">' + itemsHtml + '</ul>' +
             (order.notes ? '<div class="ltms-kds-order-notes">📋 ' + escapeHtml(order.notes) + '</div>' : '') +
             '<div class="ltms-kds-card-footer">' +
-                (nextStatus ? '<button class="ltms-kds-status-btn ltms-btn ltms-btn-sm" data-order-id="' + order.id + '" data-new-status="' + nextStatus.key + '" style="background:' + nextStatus.color + '">' + nextStatus.icon + ' ' + nextStatus.label + '</button>' : '<span class="ltms-kds-done-badge">✓ Completado</span>') +
+                (nextStatus ? '<button class="ltms-kds-status-btn ltms-btn ltms-btn-sm" data-order-id="' + order.id + '" data-new-status="' + nextStatus.key + '" data-next="' + nextStatus.key + '" style="background:' + nextStatus.color + '">' + nextStatus.icon + ' ' + nextStatus.label + '</button>' : '<span class="ltms-kds-done-badge">✓ Completado</span>') +
                 '<span class="ltms-kds-order-time">' + formatTime(order.date_created) + '</span>' +
             '</div>'
         );

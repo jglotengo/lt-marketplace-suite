@@ -637,8 +637,7 @@ $files = [
     'assets/js/ltms-marketing.min.js',
     'assets/js/ltms-shipping-statement.js',
     'assets/js/ltms-shipping-statement.min.js',
-    'assets/js/ltms-kitchen-view.js',
-    'assets/js/ltms-kitchen-view.min.js',
+    // KDS-AUDIT-001: eliminados los JS legacy duplicados del Kitchen Display.
     'assets/js/ltms-login-register.js',
     'assets/js/ltms-login-register.min.js',
     'assets/js/ltms-insurance-view.js',

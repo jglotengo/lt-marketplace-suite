@@ -20,10 +20,10 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
     <div class="ltms-view-header">
         <h2>🍳 <?php esc_html_e( 'Kitchen Display', 'ltms' ); ?></h2>
         <div style="display:flex;gap:8px;align-items:center;">
-            <!-- v2.9.92 P2: Sound toggle with audio element -->
-            <audio id="ltms-kds-audio" preload="auto" style="display:none;">
-                <source src="<?php echo esc_url( LTMS_ASSETS_URL . 'sounds/new-order.mp3' ); ?>" type="audio/mpeg">
-            </audio>
+            <!-- KDS-AUDIT-007 FIX: se removió el elemento de audio que apuntaba a un mp3
+                 inexistente (assets/sounds/ no existe). El sonido lo gestiona
+                 ltms-kds.js con el alert_sound localizado + fallback beep via
+                 Web Audio API. -->
             <button type="button" id="ltms-kds-sound-toggle" class="ltms-btn ltms-btn-outline ltms-btn-sm"
                     data-sound-on="1" aria-label="<?php esc_attr_e( 'Activar/desactivar sonido', 'ltms' ); ?>">
                 🔔 <span id="ltms-kds-sound-label"><?php esc_html_e( 'Sonido: ON', 'ltms' ); ?></span>
@@ -32,11 +32,6 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
                     aria-label="<?php esc_attr_e( 'Actualizar pedidos', 'ltms' ); ?>">
                 🔄 <?php esc_html_e( 'Actualizar', 'ltms' ); ?>
             </button>
-            <!-- v2.9.92 P2: Auto-refresh indicator -->
-            <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:#6b7280;">
-                <input type="checkbox" id="ltms-kds-auto-refresh" checked style="cursor:pointer;">
-                <?php esc_html_e( 'Auto', 'ltms' ); ?>
-            </label>
         </div>
     </div>
 
@@ -108,25 +103,19 @@ $is_restaurant = get_user_meta( $user_id, 'ltms_is_restaurant', true ) === 'yes'
         <span>
             🕐 <span id="ltms-kds-clock">--:--:--</span>
             · <span id="ltms-kds-last-updated">—</span>
-            <!-- v2.9.92 P2: Live indicator -->
-            <span id="ltms-kds-live" style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%;margin-left:6px;animation:ltms-kds-pulse 2s infinite;" title="<?php esc_attr_e( 'En vivo', 'ltms' ); ?>"></span>
+            <!-- KDS-AUDIT-006 FIX: el indicador "En vivo" usa ltms-kds-livepulse
+                 (opacity) — ltms-kds-pulse ahora pertenece a ltms-kds.css (box-shadow
+                 de pedidos nuevos) y no debe reutilizarse para el dot. -->
+            <span id="ltms-kds-live" style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%;margin-left:6px;animation:ltms-kds-livepulse 2s infinite;" title="<?php esc_attr_e( 'En vivo', 'ltms' ); ?>"></span>
         </span>
     </div>
 
-    <style>
-    @keyframes ltms-kds-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    @keyframes ltms-kds-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-    .ltms-kds-card { background:#fff; border-radius:12px; padding:16px; border-left:4px solid #dc2626; box-shadow:0 1px 4px rgba(0,0,0,0.06); transition: all 0.2s; }
-    .ltms-kds-card:hover { box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-    .ltms-kds-card.status-preparing { border-left-color: #d97706; }
-    .ltms-kds-card.status-ready { border-left-color: #16a34a; }
-    .ltms-kds-card.status-served { border-left-color: #6b7280; opacity: 0.6; }
-    </style>
-
     <?php
-    // FASE2B P0 FIX (CSP): inline <script> moved to external assets/js/ltms-kitchen-view.js
-    wp_enqueue_script( 'ltms-kitchen-view', ltms_asset_url( 'js/ltms-kitchen-view' ), [ 'jquery' ], LTMS_VERSION, true );
+    // KDS-AUDIT-001 FIX: se eliminó el enqueue de assets/js/ltms-kitchen-view(.min).js
+    // (implementación legacy duplicada con field names rotos y sin stats), junto con
+    // el <style> inline legacy (.ltms-kds-card) y las keyframes que ahora viven en
+    // assets/css/ltms-kds.css. El KDS usa UN solo script: ltms-kds.min.js + ltms-kds.css,
+    // enqueued por LTMS_Frontend_Assets::enqueue_kds_assets().
     ?>
-
     <?php endif; ?>
 </div>

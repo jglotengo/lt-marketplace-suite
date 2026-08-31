@@ -18,6 +18,12 @@
     overflow: hidden;
 }
 
+/* KDS-AUDIT: keyframes que el view-kitchen.php tenía inline — movidas aquí
+   (skeleton spinner + indicador "En vivo"). ltms-kds-pulse queda reservada
+   para la animación box-shadow de pedidos nuevos. */
+@keyframes ltms-kds-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes ltms-kds-livepulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
 /* ── Barra superior ─────────────────────────────────────────────────────── */
 
 #ltms-kds-header {
@@ -165,10 +171,10 @@
 }
 
 /* Colores de borde por estado */
-.ltms-kds-order-card[data-status="processing"] { border-color: #ef4444; }
+.ltms-kds-order-card[data-status="new"]        { border-color: #ef4444; }
 .ltms-kds-order-card[data-status="preparing"]  { border-color: #f59e0b; }
 .ltms-kds-order-card[data-status="ready"]       { border-color: #22c55e; }
-.ltms-kds-order-card[data-status="completed"]   { border-color: #4b5563; opacity: 0.7; }
+.ltms-kds-order-card[data-status="served"]      { border-color: #4b5563; opacity: 0.7; }
 .ltms-kds-order-card[data-status="cancelled"]   { border-color: #374151; opacity: 0.5; }
 
 /* Nuevo pedido — animación de entrada */
@@ -209,10 +215,10 @@
     letter-spacing: 0.06em;
 }
 
-.ltms-kds-status-badge[data-status="processing"] { background: #7f1d1d; color: #fca5a5; }
+.ltms-kds-status-badge[data-status="new"]        { background: #7f1d1d; color: #fca5a5; }
 .ltms-kds-status-badge[data-status="preparing"]  { background: #78350f; color: #fcd34d; }
 .ltms-kds-status-badge[data-status="ready"]       { background: #14532d; color: #86efac; }
-.ltms-kds-status-badge[data-status="completed"]   { background: #1f2937; color: #9ca3af; }
+.ltms-kds-status-badge[data-status="served"]      { background: #1f2937; color: #9ca3af; }
 .ltms-kds-status-badge[data-status="cancelled"]   { background: #1f2937; color: #6b7280; }
 
 /* ── Información del cliente ─────────────────────────────────────────────── */
@@ -385,8 +391,8 @@
 .ltms-kds-status-btn[data-next="ready"] { border-color: #22c55e; }
 .ltms-kds-status-btn[data-next="ready"]:hover { background: #22c55e; border-color: #22c55e; color: #0f172a; }
 
-.ltms-kds-status-btn[data-next="completed"] { border-color: #6b7280; }
-.ltms-kds-status-btn[data-next="completed"]:hover { background: #6b7280; border-color: #6b7280; color: #fff; }
+.ltms-kds-status-btn[data-next="served"] { border-color: #6b7280; }
+.ltms-kds-status-btn[data-next="served"]:hover { background: #6b7280; border-color: #6b7280; color: #fff; }
 
 /* =========================================================================
    Panel de detalle de pedido (modal lateral)

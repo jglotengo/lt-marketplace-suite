@@ -256,10 +256,13 @@ class LTMS_Kitchen_Ajax {
         global $wpdb;
 
         // AUDIT-RESTAURANT-ENGINE FIX: COUNT directa en DB, mucho más eficiente.
+        // KDS-AUDIT-005 FIX: la columna wc_orders.status guarda el status CON prefijo
+        // 'wc-' (ej. 'wc-processing'; el default de la tabla es 'wc-pending'). Sin el
+        // prefijo, la query HPOS no matcheaba nada y los contadores daban 0.
         $base_query = "SELECT COUNT(DISTINCT o.id) FROM {$wpdb->prefix}wc_orders o
              INNER JOIN {$wpdb->prefix}wc_orders_meta m1 ON m1.order_id = o.id AND m1.meta_key = '_ltms_vendor_id' AND m1.meta_value = %d
              INNER JOIN {$wpdb->prefix}wc_orders_meta m2 ON m2.order_id = o.id AND m2.meta_key = '_ltms_kitchen_status' AND m2.meta_value = %s
-             WHERE o.status IN ('processing', 'on-hold')";
+             WHERE o.status IN ('wc-processing', 'wc-on-hold')";
 
         // HPOS fallback.
         $orders_table = $wpdb->prefix . 'wc_orders';
@@ -278,7 +281,7 @@ class LTMS_Kitchen_Ajax {
         $ready_count    = (int) $wpdb->get_var( $wpdb->prepare( $base_query, $vendor_id, self::KITCHEN_STATUS_READY ) );
 
         // Completed today (served).
-        $served_query = str_replace( "o.status IN ('processing', 'on-hold')", "o.status = 'completed'", $base_query );
+        $served_query = str_replace( "o.status IN ('wc-processing', 'wc-on-hold')", "o.status = 'wc-completed'", $base_query );
         if ( ! $has_hpos ) {
             $served_query = str_replace( "p.post_status IN ('wc-processing', 'wc-on-hold')", "p.post_status = 'wc-completed'", $served_query );
         }

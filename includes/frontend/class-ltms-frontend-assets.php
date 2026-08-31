@@ -281,8 +281,13 @@ final class LTMS_Frontend_Assets {
 
         // KDS — Kitchen Display System (tab=kds o view=kitchen en el dashboard SPA).
         // AUDIT-RESTAURANT-ENGINE: también cargar cuando el vendor es restaurante.
+        // KDS-AUDIT-006 FIX: usar $is_vendor_panel (detecta el dashboard por shortcode
+        // y por slug via M-56) en vez de comparar solo contra $pages['ltms-dashboard'].
+        // El view-kitchen.php se renderiza dentro del SPA del dashboard, que puede
+        // vivir en cualquier página con el shortcode — con el chequeo estricto el KDS
+        // se quedaba sin JS/CSS (panel de cocina roto).
         $_is_restaurant_vendor = is_user_logged_in() && get_user_meta( get_current_user_id(), 'ltms_is_restaurant', true ) === 'yes';
-        if ( $page_id === (int) ( $pages['ltms-dashboard'] ?? 0 ) &&
+        if ( $is_vendor_panel &&
              ( $_is_restaurant_vendor ||
                ( isset( $_GET['tab'] ) && sanitize_key( $_GET['tab'] ) === 'kds' ) ||
                ( isset( $_GET['view'] ) && sanitize_key( $_GET['view'] ) === 'kitchen' ) ) ) {
@@ -797,7 +802,10 @@ final class LTMS_Frontend_Assets {
             'nonce'         => wp_create_nonce( 'ltms_dashboard_nonce' ),
             'vendor_id'     => $vendor_id,
             'poll_interval' => 10000, // AUDIT-RESTAURANT-ENGINE: 10s (era 15s — too slow for kitchen).
-            'alert_sound'   => $url . 'sounds/new-order.mp3', // AUDIT-RESTAURANT-ENGINE: dynamic path.
+            // KDS-AUDIT-007 FIX: solo apuntar al mp3 si existe — assets/sounds/ no
+            // existía y el <audio> daba 404. Con alert_sound vacío, ltms-kds.js usa
+            // el fallback beep via Web Audio API.
+            'alert_sound'   => file_exists( LTMS_PLUGIN_DIR . 'assets/sounds/new-order.mp3' ) ? $url . 'sounds/new-order.mp3' : '',
             'i18n'          => [
                 'loading'        => __( 'Cargando pedidos...', 'ltms' ),
                 'no_orders'      => __( 'No hay pedidos activos', 'ltms' ),

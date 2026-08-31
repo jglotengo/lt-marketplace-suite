@@ -141,7 +141,6 @@ final class PanelAuditE2ETest extends LTMS_Unit_Test_Case {
 			[ 'includes/frontend/views/view-envios.php', 'js/ltms-envios' ],
 			[ 'includes/frontend/views/view-marketing.php', 'js/ltms-marketing' ],
 			[ 'includes/frontend/views/view-ordenes-compra.php', 'js/ltms-ordenes-compra' ],
-			[ 'includes/frontend/views/view-kitchen.php', 'js/ltms-kitchen-view' ],
 			[ 'includes/frontend/views/view-insurance.php', 'js/ltms-insurance-view' ],
 			[ 'includes/frontend/views/view-donations.php', 'js/ltms-donations' ],
 			[ 'includes/frontend/views/view-shipping-statement.php', 'js/ltms-shipping-statement' ],
