@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-08-30
+
+### Added — `VTEX-AUTOSYNC` (re-sync automático periódico VTEX → WooCommerce)
+
+> El catálogo/precios de VTEX cambian en la cuenta del vendor y el marketplace debe reflejarlo sin que el
+> vendor pulse "Sincronizar" a mano. Decisión de producto: **re-sync diario automático** para **todos los
+> vendors con credenciales VTEX configuradas**. Suite completa verde (se confirma en el paso de verificación).
+
+- **`includes/business/class-ltms-vtex-sync.php`** (`LTMS_Vtex_Sync`):
+  - Nuevo hook recurrente `ltms_vtex_auto_sync` (recurrencia `daily` de WP core, sin filtro de intervalos
+    nuevo). `init()` lo registra y lo programa a las 03:00 de forma idempotente (guard `wp_next_scheduled`),
+    corriendo en cada request del frontend vía `kernel::boot_frontend()` → `LTMS_Dashboard_Logic::init()`.
+  - `run_auto_sync()`: enlista vendors con `ltms_vtex_account_name` + rol `ltms_vendor`/`ltms_vendor_premium`
+    + credenciales completas (`get_vendor_credentials()['configured']`) y programa un single-event por vendor
+    en el hook existente `ltms_vtex_sync_cron` (reusa `run_scheduled_sync` → notificación + resultado + log),
+    escalonado **+5s** por vendor para no saturar WP-Cron con todos los catálogos en el mismo tick.
+  - `auto_sync_allowed()` (guard por vendor): omite si hay sync manual en curso (`_ltms_vtex_sync_in_progress`
+    <10 min) o si el rate-limit de 2 min de `sync_vendor_products()` está activo (`ltms_vtex_last_sync`).
+- **Tests** +8 en `tests/unit/VtexAutoSyncTest.php` (grupo `audit-vtex-autosync`): init registra hook y
+  programa el evento diario (y no lo duplica si ya existe), programación escalonada +5s con vendors
+  configurados, guards de sync en curso y rate-limit reciente, filtro de non-vendors y credenciales
+  incompletas, no-op sin vendors, y auditoría estática del patrón.
+- **Nota para la próxima sesión**: en los helpers de captura de tests, devolver el array capturado **por
+  valor** es un bug sutil — el closure captura la variable por referencia y el test recibe una copia que
+  nunca se llena. Capturar en propiedades del objeto (o `use (&$var)` con la misma variable en scope).
+
+---
+
 ## [Unreleased] — 2026-08-04
 
 ### Fixed — `VTEX-QA` (QA funcional/e2e de la integración VTEX: filtro de categorías roto + decrypt crash)

@@ -34,6 +34,12 @@ final class LTMS_Vtex_Sync {
     /** Cron hook para sync en background. */
     const CRON_HOOK = 'ltms_vtex_sync_cron';
 
+    /** Cron hook para el re-sync automático periódico (VTEX → WooCommerce). */
+    const AUTO_SYNC_CRON_HOOK = 'ltms_vtex_auto_sync';
+
+    /** Recurrencia del re-sync automático. 'daily' es un intervalo core de WP. */
+    const AUTO_SYNC_INTERVAL = 'daily';
+
     /** Página del Search API (items por página, máx 50). */
     const PAGE_SIZE = 50;
 
@@ -41,10 +47,21 @@ final class LTMS_Vtex_Sync {
     const MAX_PAGES = 200;
 
     /**
-     * Registra el cron hook.
+     * Registra el cron hook y programa el re-sync automático diario.
+     *
+     * VTEX-AUTOSYNC: el re-sync periódico re-consulta el catálogo VTEX de todos
+     * los vendors con credenciales configuradas, sin que el vendor tenga que
+     * pulsar "Sincronizar" a mano. La programación es idempotente (guard
+     * wp_next_scheduled) y se dispara desde el boot del kernel, que corre en
+     * cada request del frontend.
      */
     public static function init(): void {
         add_action( self::CRON_HOOK, [ __CLASS__, 'run_scheduled_sync' ] );
+        add_action( self::AUTO_SYNC_CRON_HOOK, [ __CLASS__, 'run_auto_sync' ] );
+
+        if ( ! wp_next_scheduled( self::AUTO_SYNC_CRON_HOOK ) ) {
+            wp_schedule_event( strtotime( 'tomorrow 03:00' ), self::AUTO_SYNC_INTERVAL, self::AUTO_SYNC_CRON_HOOK );
+        }
     }
 
     /**
@@ -131,6 +148,112 @@ final class LTMS_Vtex_Sync {
                 [ '%d', '%s', '%s', '%s', '%d', '%s' ]
             );
         }
+    }
+
+    /**
+     * Re-sync automático periódico (VTEX → WooCommerce).
+     *
+     * VTEX-AUTOSYNC FIX: el catálogo/precios de VTEX cambian en la cuenta del
+     * vendor y el marketplace debe reflejarlos sin que el vendor pulse
+     * "Sincronizar" a mano. Este handler (disparado por AUTO_SYNC_CRON_HOOK,
+     * recurrencia diaria) enlista los vendors con credenciales VTEX válidas y
+     * programa un single-event por vendor (reusando CRON_HOOK →
+     * run_scheduled_sync) escalonado +5s para no saturar WP-Cron con todos los
+     * catálogos en el mismo tick.
+     *
+     * @return void
+     */
+    public static function run_auto_sync(): void {
+        $vendors = self::get_vtex_configured_vendors();
+        if ( empty( $vendors ) ) {
+            return;
+        }
+
+        $offset = 5;
+        foreach ( $vendors as $vendor_id ) {
+            if ( ! self::auto_sync_allowed( $vendor_id ) ) {
+                continue;
+            }
+
+            wp_schedule_single_event( time() + $offset, self::CRON_HOOK, [ $vendor_id ] );
+            update_user_meta( $vendor_id, '_ltms_vtex_sync_in_progress', time() );
+
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::info(
+                    'VTEX_AUTO_SYNC_SCHEDULED',
+                    sprintf( 'Vendor #%d auto-sync programado (+%ds)', $vendor_id, $offset )
+                );
+            }
+
+            $offset += 5;
+        }
+    }
+
+    /**
+     * Enlista los vendors con credenciales VTEX configuradas y completas.
+     *
+     * Usa la presencia de la meta ltms_vtex_account_name como proxy y luego
+     * valida con get_vendor_credentials() (account + appKey + appToken).
+     * Filtra por LTMS_Utils::is_ltms_vendor() para no disparar sync sobre
+     * usuarios con meta huérfana (admin/editor que probaron credenciales).
+     *
+     * @return int[] IDs de vendors con VTEX configurado.
+     */
+    private static function get_vtex_configured_vendors(): array {
+        $vendors = [];
+
+        $users = get_users( [
+            'fields'     => 'ID',
+            'meta_query' => [
+                [
+                    'key'     => 'ltms_vtex_account_name',
+                    'value'   => '',
+                    'compare' => '!=',
+                ],
+            ],
+        ] );
+
+        foreach ( (array) $users as $user_id ) {
+            $user_id = (int) $user_id;
+            if ( $user_id <= 0 ) {
+                continue;
+            }
+            if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+                continue;
+            }
+            $creds = self::get_vendor_credentials( $user_id );
+            if ( $creds['configured'] ) {
+                $vendors[] = $user_id;
+            }
+        }
+
+        return $vendors;
+    }
+
+    /**
+     * Guard para el auto-sync de un vendor.
+     *
+     * Evita solapar con un sync manual en curso (_ltms_vtex_sync_in_progress
+     * <10 min) y respeta el rate-limit de 2 minutos que sync_vendor_products()
+     * impone por vendor (ltms_vtex_last_sync). Si el cron diario cayera justo
+     * después de una sync manual, el single-event se omite y se reintenta al día
+     * siguiente en lugar de chocar con el rate-limit.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return bool
+     */
+    private static function auto_sync_allowed( int $vendor_id ): bool {
+        $in_progress = (int) get_user_meta( $vendor_id, '_ltms_vtex_sync_in_progress', true );
+        if ( $in_progress && ( time() - $in_progress ) < 600 ) {
+            return false;
+        }
+
+        $last_sync = (int) get_user_meta( $vendor_id, 'ltms_vtex_last_sync', true );
+        if ( $last_sync && ( time() - $last_sync ) < ( 2 * MINUTE_IN_SECONDS ) ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
