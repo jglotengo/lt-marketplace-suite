@@ -75,6 +75,51 @@ final class LTMS_Api_Vtex {
     }
 
     /**
+     * Normaliza el accountName ingresado por un vendor.
+     *
+     * VTEX-CONN-003 FIX: el vendor frecuentemente pega la URL completa de su tienda
+     * (ej. "dkosmetic.myvtex.com", "https://dkosmetic.vtexcommercestable.com.br/admin")
+     * o su email en el campo accountName. En vez de rechazar el guardado con un error
+     * genérico, se extrae automáticamente el subdominio corto de la cuenta.
+     *
+     * Un email no se puede derivar a un accountName → se devuelve tal cual y la
+     * validación posterior lo rechaza con un mensaje claro.
+     *
+     * @param string $input Valor crudo del campo accountName.
+     * @return string Subdominio de cuenta normalizado (o '' si no es resoluble).
+     */
+    public static function normalize_account_name( string $input ): string {
+        $value = strtolower( trim( $input ) );
+        if ( '' === $value ) {
+            return '';
+        }
+
+        // Quitar protocolo.
+        if ( str_contains( $value, '://' ) ) {
+            $value = explode( '://', $value, 2 )[1];
+        }
+        // Quitar path/query/fragment.
+        $value = preg_replace( '~[/?#].*$~', '', $value );
+        if ( null === $value ) {
+            return '';
+        }
+        // Quitar prefijo www.
+        $value = preg_replace( '#^www\.#', '', $value );
+
+        // Hosts VTEX conocidos → subdominio de cuenta.
+        if ( preg_match( '#^([a-z0-9][a-z0-9-]{0,62}[a-z0-9]|[a-z0-9])\.(myvtex|vtexcommercestable|vtexcommercial)\.com(\.br)?$#', $value, $m ) ) {
+            return $m[1];
+        }
+        // Cualquier otro dominio → primer subdominio (el vendor pegó su URL).
+        if ( preg_match( '#^([a-z0-9][a-z0-9-]{0,62}[a-z0-9]|[a-z0-9])\.([a-z0-9][a-z0-9-]{0,62}\.)?[a-z]{2,24}$#', $value, $m ) ) {
+            return $m[1];
+        }
+
+        // Sin dots: devolver tal cual (la validación final lo valida).
+        return $value;
+    }
+
+    /**
      * Realiza una petición a la API de VTEX.
      *
      * @param string $account_name Nombre de la cuenta VTEX.
@@ -437,13 +482,40 @@ final class LTMS_Api_Vtex {
         string $app_token,
         string $environment = ''
     ): array {
-        $result = self::get_products_search( $account_name, $app_key, $app_token, 0, 9, $environment );
+        // VTEX-CONN-002 FIX: validar las credenciales REALMENTE con un endpoint
+        // autenticado (PVT category tree). El Search API /api/catalog_system/pub/...
+        // es PÚBLICO: con un appToken inválido igual responde 200, por lo que
+        // "Probar conexión" reportaba éxito aunque las credenciales estuvieran
+        // mal. Con este probe, un token inválido responde 401/403 → error claro.
+        $auth = self::request(
+            $account_name, $app_key, $app_token,
+            '/api/catalog_system/pvt/category/tree/1',
+            [],
+            'GET',
+            $environment
+        );
 
-        if ( ! $result['success'] ) {
+        if ( ! $auth['success'] ) {
+            $error = $auth['error'] ?: ( 'HTTP ' . $auth['status'] );
+            // 401/403 → credenciales inválidas (no exponer el detalle técnico).
+            $message = ( 401 === (int) $auth['status'] || 403 === (int) $auth['status'] )
+                ? __( 'Credenciales inválidas. Verifica tu AppKey y AppToken en tu admin VTEX (Configuración de la cuenta → Credenciales de aplicación).', 'ltms' )
+                : sprintf( __( 'No se pudo conectar con VTEX: %s', 'ltms' ), $error );
             return [
                 'success'        => false,
-                'message'        => $result['error'] ?: 'Error desconocido',
+                'message'        => $message,
                 'products_count' => 0,
+            ];
+        }
+
+        // Credenciales OK → contar productos del catálogo (Search API, público).
+        $result = self::get_products_search( $account_name, $app_key, $app_token, 0, 9, $environment );
+        if ( ! $result['success'] ) {
+            return [
+                'success'        => true,
+                'message'        => __( 'Conexión exitosa. Credenciales válidas.', 'ltms' ),
+                'products_count' => 0,
+                'skus_count'     => 0,
             ];
         }
 
@@ -601,9 +673,16 @@ final class LTMS_Api_Vtex {
      */
     private static function pick_field( array $array, array $keys ) {
         foreach ( $keys as $key ) {
-            if ( isset( $array[ $key ] ) && $array[ $key ] !== '' && $array[ $key ] !== null ) {
+            if ( isset( $array[ $key ] ) && is_string( $array[ $key ] ) && '' !== $array[ $key ] ) {
                 return $array[ $key ];
             }
+        }
+        // VTEX envuelve errores como {"error":{"message":"..."}}: extraer el
+        // mensaje anidado. VTEX-CONN-005 FIX: antes se devolvía el array crudo
+        // como "error" → el sprintf posterior mostraba "Array" (bug visible en
+        // el error 401/403 de "Probar conexión").
+        if ( isset( $array['error']['message'] ) && is_string( $array['error']['message'] ) ) {
+            return $array['error']['message'];
         }
         return '';
     }

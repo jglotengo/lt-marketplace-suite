@@ -2291,43 +2291,103 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
         }
 
-        $account_name = sanitize_text_field( wp_unslash( $_POST['account_name'] ?? '' ) );
-        $environment  = sanitize_text_field( wp_unslash( $_POST['environment'] ?? '' ) );
-        $app_key      = sanitize_text_field( wp_unslash( $_POST['app_key'] ?? '' ) );
-        $app_token    = sanitize_text_field( wp_unslash( $_POST['app_token'] ?? '' ) );
+        if ( ! class_exists( 'LTMS_Vtex_Sync' ) || ! class_exists( 'LTMS_Api_Vtex' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
 
-        if ( empty( $account_name ) || empty( $app_key ) || empty( $app_token ) ) {
+        $form = [
+            'account_name' => sanitize_text_field( wp_unslash( $_POST['account_name'] ?? '' ) ),
+            'environment'  => sanitize_text_field( wp_unslash( $_POST['environment'] ?? '' ) ),
+            'app_key'      => sanitize_text_field( wp_unslash( $_POST['app_key'] ?? '' ) ),
+            'app_token'    => sanitize_text_field( wp_unslash( $_POST['app_token'] ?? '' ) ),
+        ];
+
+        $persisted = $this->persist_vtex_credentials( $user_id, $form );
+        if ( is_wp_error( $persisted ) ) {
+            wp_send_json_error( [ 'message' => $persisted->get_error_message() ], 400 );
+        }
+
+        // Requisito del guardado: configuración completa (account + key + token).
+        $creds = LTMS_Vtex_Sync::get_vendor_credentials( $user_id );
+        if ( ! $creds['configured'] ) {
             wp_send_json_error( [ 'message' => __( 'Account name, AppKey y AppToken son obligatorios.', 'ltms' ) ], 400 );
         }
 
-        // Validar accountName para prevenir SSRF (misma protección que PosGold).
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $account_name ) ) {
-            wp_send_json_error( [ 'message' => __( 'Account name inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
-        }
-        if ( '' !== $environment && ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $environment ) ) {
-            wp_send_json_error( [ 'message' => __( 'Environment inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
-        }
-
-        // Cifrar appKey/appToken (si LTMS_Core_Security está disponible).
-        $key_to_save   = $app_key;
-        $token_to_save = $app_token;
-        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
-            $enc_key   = LTMS_Core_Security::encrypt( $app_key );
-            $enc_token = LTMS_Core_Security::encrypt( $app_token );
-            if ( $enc_key )   { $key_to_save = $enc_key; }
-            if ( $enc_token ) { $token_to_save = $enc_token; }
-        }
-
-        update_user_meta( $user_id, 'ltms_vtex_account_name', $account_name );
-        update_user_meta( $user_id, 'ltms_vtex_environment', $environment );
-        update_user_meta( $user_id, 'ltms_vtex_app_key',     $key_to_save );
-        update_user_meta( $user_id, 'ltms_vtex_app_token',   $token_to_save );
-
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
-            LTMS_Core_Logger::info( 'VTEX_CREDENTIALS_SAVED', sprintf( 'Vendor #%d guardó credenciales VTEX (account=%s)', $user_id, $account_name ) );
+            LTMS_Core_Logger::info( 'VTEX_CREDENTIALS_SAVED', sprintf( 'Vendor #%d guardó credenciales VTEX (account=%s)', $user_id, $creds['account_name'] ) );
         }
 
         wp_send_json_success( [ 'message' => __( 'Credenciales guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * Persiste credenciales VTEX de un vendor con validación y normalización.
+     *
+     * VTEX-CONN-003 FIX: normaliza el accountName (URL completa / dominio myvtex
+     * → subdominio corto) antes de validar y guardar, y rechaza con mensaje claro
+     * los emails. AppKey/AppToken se cifran con LTMS_Core_Security y se guardan
+     * en user_meta (nunca texto plano). Si un campo no viene en el formulario se
+     * conserva el valor ya guardado.
+     *
+     * @param int   $user_id ID del vendor.
+     * @param array $form    Campos saneados: account_name, environment, app_key, app_token.
+     * @return true|\WP_Error
+     */
+    private function persist_vtex_credentials( int $user_id, array $form ) {
+        $account_name = (string) ( $form['account_name'] ?? '' );
+        $environment  = (string) ( $form['environment'] ?? '' );
+        $app_key      = (string) ( $form['app_key'] ?? '' );
+        $app_token    = (string) ( $form['app_token'] ?? '' );
+
+        // Normalizar accountName (URL/dominio → subdominio corto de la cuenta).
+        if ( '' !== $account_name && class_exists( 'LTMS_Api_Vtex' ) ) {
+            $normalized   = LTMS_Api_Vtex::normalize_account_name( $account_name );
+            $account_name = '' !== $normalized ? $normalized : $account_name;
+        }
+        if ( '' !== $account_name && ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/', $account_name ) ) {
+            return new \WP_Error(
+                'ltms_vtex_invalid_account',
+                __( 'Account name inválido. Ingresa solo el nombre corto de tu cuenta VTEX (ej. mistienda), no la URL completa ni un email.', 'ltms' )
+            );
+        }
+        if ( '' !== $environment && ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/', $environment ) ) {
+            return new \WP_Error(
+                'ltms_vtex_invalid_environment',
+                __( 'Environment inválido. Usa solo letras, números y guiones.', 'ltms' )
+            );
+        }
+
+        // AppKey + AppToken siempre juntos.
+        $has_key   = '' !== $app_key;
+        $has_token = '' !== $app_token;
+        if ( $has_key !== $has_token ) {
+            return new \WP_Error(
+                'ltms_vtex_incomplete_creds',
+                __( 'AppKey y AppToken deben pegarse juntos. Si solo cambias uno, vuelve a pegar ambos desde tu admin VTEX.', 'ltms' )
+            );
+        }
+
+        if ( '' !== $account_name ) {
+            update_user_meta( $user_id, 'ltms_vtex_account_name', $account_name );
+        }
+        if ( '' !== $environment ) {
+            update_user_meta( $user_id, 'ltms_vtex_environment', $environment );
+        }
+
+        if ( $has_key ) {
+            $key_to_save   = $app_key;
+            $token_to_save = $app_token;
+            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+                $enc_key   = LTMS_Core_Security::encrypt( $app_key );
+                $enc_token = LTMS_Core_Security::encrypt( $app_token );
+                if ( $enc_key )   { $key_to_save = $enc_key; }
+                if ( $enc_token ) { $token_to_save = $enc_token; }
+            }
+            update_user_meta( $user_id, 'ltms_vtex_app_key',   $key_to_save );
+            update_user_meta( $user_id, 'ltms_vtex_app_token', $token_to_save );
+        }
+
+        return true;
     }
 
     /**
@@ -2349,9 +2409,29 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
         }
 
+        // VTEX-CONN-001 FIX: "Probar conexión" acepta las credenciales del
+        // formulario y las persiste antes de probar. Antes solo leía de la DB:
+        // un vendor que acababa de escribir sus credenciales recibía
+        // "No has configurado tus credenciales VTEX." porque nunca se habían
+        // guardado (el caso real de kosmetic — 0 credenciales en user_meta).
+        $form = [
+            'account_name' => sanitize_text_field( wp_unslash( $_POST['account_name'] ?? '' ) ),
+            'environment'  => sanitize_text_field( wp_unslash( $_POST['environment'] ?? '' ) ),
+            'app_key'      => sanitize_text_field( wp_unslash( $_POST['app_key'] ?? '' ) ),
+            'app_token'    => sanitize_text_field( wp_unslash( $_POST['app_token'] ?? '' ) ),
+        ];
+        $has_form_values = '' !== $form['account_name'] || '' !== $form['app_key'] || '' !== $form['app_token'];
+
+        if ( $has_form_values ) {
+            $persisted = $this->persist_vtex_credentials( $user_id, $form );
+            if ( is_wp_error( $persisted ) ) {
+                wp_send_json_error( [ 'message' => $persisted->get_error_message() ], 400 );
+            }
+        }
+
         $creds = LTMS_Vtex_Sync::get_vendor_credentials( $user_id );
         if ( ! $creds['configured'] ) {
-            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales VTEX.', 'ltms' ) ], 400 );
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales VTEX. Completa el formulario y pulsa "Guardar credenciales".', 'ltms' ) ], 400 );
         }
 
         $result = LTMS_Api_Vtex::test_connection(
@@ -2362,7 +2442,10 @@ final class LTMS_Dashboard_Logic {
         );
 
         if ( $result['success'] ) {
-            wp_send_json_success( [ 'message' => $result['message'] ] );
+            wp_send_json_success( [
+                'message'        => $result['message'],
+                'products_count' => $result['products_count'] ?? 0,
+            ] );
         } else {
             wp_send_json_error( [ 'message' => $result['message'] ] );
         }

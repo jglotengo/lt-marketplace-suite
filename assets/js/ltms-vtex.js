@@ -214,13 +214,21 @@
     });
 
     // Probar conexión
+    // VTEX-CONN-001 FIX: enviar los valores actuales del formulario (accountName,
+    // appKey, appToken). Antes el botón no enviaba nada y el backend solo leía las
+    // credenciales guardadas en DB → si el vendor no había pulsado "Guardar"
+    // primero, siempre fallaba con "No has configurado tus credenciales VTEX."
     $('#ltms-vtex-test-btn').on('click', function(){
         var $btn = $(this);
         $btn.prop('disabled', true).text('Probando...');
 
         $.post(ajaxUrl, {
             action: 'ltms_test_vtex_connection',
-            nonce: nonce
+            nonce: nonce,
+            account_name: $('#ltms-vtex-account-name').val(),
+            environment: $('#ltms-vtex-environment').val(),
+            app_key: $('#ltms-vtex-app-key').val(),
+            app_token: $('#ltms-vtex-app-token').val()
         }).done(function(resp){
             $btn.prop('disabled', false).html('🔍 Probar conexión');
             var $result = $('#ltms-vtex-test-result');

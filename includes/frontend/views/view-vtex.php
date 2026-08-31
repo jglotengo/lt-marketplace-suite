@@ -172,9 +172,11 @@ if ( empty( $seo_template ) ) {
                             </label>
                             <?php $has_key = ! empty( $creds['app_key'] ); ?>
                             <?php if ( $has_key ) : ?>
+                                <!-- VTEX-CONN-004 FIX: no exponer el prefijo del appKey/appToken
+                                     descifrado (antes se mostraban los primeros 12 caracteres en claro). -->
                                 <div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;margin-bottom:8px;font-family:monospace;font-size:0.85rem;color:#166534;">
                                     ✅ <?php esc_html_e( 'AppKey configurada:', 'ltms' ); ?>
-                                    <code><?php echo esc_html( substr( $creds['app_key'], 0, 12 ) . '…' ); ?></code>
+                                    <code>vtexappkey-••••••••</code>
                                 </div>
                                 <details style="margin-bottom:8px;">
                                     <summary style="cursor:pointer;font-size:0.85rem;color:#6b7280;"><?php esc_html_e( 'Actualizar AppKey', 'ltms' ); ?></summary>
@@ -199,9 +201,10 @@ if ( empty( $seo_template ) ) {
                             </label>
                             <?php $has_token = ! empty( $creds['app_token'] ); ?>
                             <?php if ( $has_token ) : ?>
+                                <!-- VTEX-CONN-004 FIX: token enmascarado, sin caracteres en claro. -->
                                 <div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;margin-bottom:8px;font-family:monospace;font-size:0.85rem;color:#166534;">
                                     ✅ <?php esc_html_e( 'AppToken configurado:', 'ltms' ); ?>
-                                    <code><?php echo esc_html( substr( $creds['app_token'], 0, 12 ) . '…' ); ?></code>
+                                    <code>••••••••••••••••</code>
                                 </div>
                                 <details style="margin-bottom:8px;">
                                     <summary style="cursor:pointer;font-size:0.85rem;color:#6b7280;"><?php esc_html_e( 'Actualizar AppToken', 'ltms' ); ?></summary>

@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-08-31
+
+### Fixed — `VTEX-CREDS-AUDIT` (vendor real no conectaba: "Probar conexión" no guardaba, test no validaba credenciales, accountName sin normalizar)
+
+> Caso real: el vendor kosmetic (cuenta `dkosmetic`) con credenciales VÁLIDAS no podía conectar. Diagnóstico:
+> las credenciales reales funcionan en la API de VTEX (200 en endpoint autenticado; 401 con token inválido),
+> pero en producción **no había ninguna credencial VTEX guardada** (0 filas en user_meta). El flujo del panel
+> impedía guardar/probar: "Probar conexión" leía SOLO de la DB (si no pulsabas "Guardar" antes, fallaba con
+> "No has configurado tus credenciales"), y `test_connection` usaba el Search API **público** (nunca validaba
+> el appToken). Suite completa verde: **4,770 tests, 9,768 assertions OK**, 3 skips preexistentes.
+
+- **VTEX-CONN-001 (P1 — causa raíz)** (`class-ltms-dashboard-logic.php` + `ltms-vtex.js`): "Probar conexión"
+  ahora envía las credenciales del formulario y el handler las **persiste antes de probar** (método compartido
+  `persist_vtex_credentials()` con validación, normalización y cifrado). Antes solo leía de la DB → un vendor
+  que acababa de escribir sus credenciales recibía "No has configurado tus credenciales VTEX." sin haberse
+  guardado nunca.
+- **VTEX-CONN-002 (P1)** (`class-ltms-api-vtex.php`): `test_connection()` ahora valida credenciales con un
+  **endpoint autenticado** (`GET /api/catalog_system/pvt/category/tree/1`; 200=OK, 401/403=inválidas) y luego
+  cuenta productos vía Search API. Antes usaba el Search API público → con appToken inválido reportaba éxito.
+- **VTEX-CONN-003 (P1)** (`class-ltms-api-vtex.php` + dashboard-logic): nuevo `normalize_account_name()` que
+  extrae el subdominio corto de URLs/dominios VTEX (ej. `dkosmetic.myvtex.com` → `dkosmetic`). Emails se
+  rechazan con mensaje claro. El vendor ya no se bloquea por pegar la URL completa de su tienda.
+- **VTEX-CONN-004 (P2)** (`view-vtex.php`): el appKey/appToken configurados se muestran **enmascarados**
+  (`vtexappkey-••••••••` / `••••••••••••••••`) — antes se exponían los primeros 12 caracteres del valor
+  descifrado en el HTML del panel.
+- **VTEX-CONN-005 (P2)** (`class-ltms-api-vtex.php`): `pick_field()` solo devuelve strings y extrae el mensaje
+  anidado de error VTEX (`{"error":{"message":...}}`). Antes devolvía el array crudo → "Probar conexión"
+  mostraba `Array` (warning de sprintf) en el error 401/403. Ahora los 401/403 se mapean a "Credenciales
+  inválidas. Verifica tu AppKey y AppToken..." en español.
+- **Tests** +11 en `tests/unit/VtexCredsAuditTest.php` (grupo `audit-vtex-creds`): normalize_account_name
+  (URL/dominio/email/plain), test_connection con probe de auth (401→mensaje claro, 200+search→conteo, auth OK
+  con search fallido→éxito), request extrae error anidado, y source-level de handlers/vista/JS.
+- **Verificación en vivo**: credenciales reales de `dkosmetic` validadas contra la API de VTEX (warehouses y
+  category tree PVT → 200; token inválido → 401). Cuenta con catálogo real (cosmética).
+
+---
+
 ## [Unreleased] — 2026-08-30
 
 ### Fixed — `KDS-AUDIT` (Panel de Cocina / Kitchen Display System — doble implementación + stats rotas + field names)
