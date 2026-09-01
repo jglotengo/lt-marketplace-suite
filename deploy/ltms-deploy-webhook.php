@@ -602,6 +602,17 @@ $files = [
     'includes/business/class-ltms-data-protection-compliance.php',
     'includes/business/class-ltms-compliance-guardian.php',
     'includes/business/class-ltms-business-consumer-protection.php',
+    // RECONCILIATION-FIX v2.9.x — reconciliador de holds + sync trazabilidad.
+    // Sin estos 3 archivos + los 2 tests en la whitelist, el deploy webhook no
+    // los entregaba al server: el reconciliador llamaba a classify_by_nombre()
+    // (método nuevo en el webhook handler) que no existía en el archivo viejo →
+    // excepción atrapada y el hold nunca se resolvía. Validado con
+    // method_exists() en SG (bool(false) antes del sync).
+    'includes/business/class-ltms-business-aveonline-guias.php',
+    'includes/api/webhooks/class-ltms-aveonline-webhook-handler.php',
+    'includes/core/class-ltms-core-cron-manager.php',
+    'tests/unit/AveonlineHoldReconcilerTest.php',
+    'tests/unit/AveonlineGuiasEstadoSyncTest.php',
     'includes/business/class-ltms-booking-notifications.php',
     'includes/business/class-ltms-affiliates.php',
     'includes/business/class-ltms-sales-booster.php',
