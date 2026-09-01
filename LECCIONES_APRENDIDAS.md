@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-08-01
-> **Versión del plugin:** 2.9.305
-> **Total de lecciones:** 148 (35 originales + 25 nuevas de v2.9.36-98 + 10 de estabilización + 15 de auditorías v2.9.113-118 + 5 de auditorías v2.9.119-132 + 10 de v2.9.143-160 + 13 del ciclo Plaza Viva v2.9.178-188 + 10 de la sesión Skeleton Loader/Nonce Refresh/WAF v2.9.222-239 + 7 del ciclo Registro de Vendedores + Dashboard + Productos v2.9.240-293 + 1 del ciclo AUDIT-PANEL v2.9.294 + 1 del ciclo KYC-AUDIT2 v2.9.305 + 10 del ciclo AUDIT-FE v2.9.305-2.9.x + 1 del ciclo AUDIT-PROD-QA-001 v2.9.x + 1 del ciclo UX-AUDIT-FE v2.9.306 + 1 del ciclo ADMIN-KYC-APPROVE-AUDIT v2.9.305 + 1 del ciclo ADMIN-PAYOUT-AUDIT-RE v2.9.305 + 1 del fix CI-RED-BASELINE v2.9.305 — suite verde por primera vez tras 73 tests falsos en rojo)
+> **Última actualización:** 2026-08-31
+> **Versión del plugin:** 2.9.x
+> **Total de lecciones:** 155 (…+ 1 del fix CI-RED-BASELINE v2.9.305 — suite verde por primera vez tras 73 tests falsos en rojo + 2 del ciclo RECONCILIATION-FIX Aveonline v2.9.x #154-155)
 
 ---
 
@@ -3192,6 +3192,47 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    decisión de negocio → preguntar antes de asumir (AGENTS.md "Decisiones de producto"), respaldar el
    archivo de config antes de editarlo, y verificar post-cambio `is_production()`, el endpoint resuelto y
    que los endpoints del panel sigan en 200.
+
+---
+
+## 25. v2.9.x - RECONCILIATION-FIX Aveonline: holds congelados por webhook perdido + clasificación por substring (2 lecciones nuevas)
+
+> Alcance: conciliación trazabilidad-envíos ↔ comisiones por vendor. Hallazgo P0: el webhook de estados de
+> Aveonline era el ÚNICO camino para confirmar entrega; si no resolvía el `order_id`, el hold de comisión
+> quedaba `held` para siempre hasta liberación manual. Se añadió `reconcile_stuck_aveonline_holds()` (cron
+> diario, prioridad 5) + sync de `lt_aveonline_guias.estado` + fix de clasificación por substring. Suite
+> completa verde: **4,786 tests, 9,823 assertions OK**, 3 skips preexistentes.
+
+### Lección #154: clasificar estados por `str_contains` requiere evaluar las keywords MÁS ESPECÍFICAS primero — `NO ENTREGADA` contiene `ENTREGADA`
+
+1. **Caso real:** la clasificación de estados de Aveonline evaluaba las keywords de entrega (`ENTREGADA`,
+   `ENTREGADO`) ANTES que las de fallo. `'NO ENTREGADA'` (estado FALLIDO) contiene la substring `'ENTREGADA'`
+   → se clasificaba como `delivered`. El webhook no lo exponía porque el estado_id (13) caía en `ESTADO_MAP`
+   como `failed`, pero al extraer `classify_by_nombre()` para el reconciliador de holds (que solo recibe el
+   nombre crudo de `track_shipment()`, sin estado_id), el bug se volvía peligroso: el reconciliador habría
+   marcado el pedido como entregado y **liberado fondos de un envío NO entregado**.
+2. **Regla preventiva:** en toda clasificación por coincidencia de substring, evaluar las keywords de la
+   clase MÁS específica/negativa ANTES que las de la clase genérica. Regla de oro para estados de envío:
+   `failed` se evalúa antes que `delivered` (ningún estado entregado real contiene keywords de fallo, pero
+   los fallidos sí pueden contener substrings de entregado). Y cuando un método de clasificación solo maneja
+   texto (sin el ID que desambigua), los tests unitarios deben cubrir los casos negativos que comparten
+   substrings (`NO ENTREGADA`, `NO ENTREGADO`), no solo los positivos.
+
+### Lección #155: un flujo financiero crítico no puede depender SOLO de webhooks — necesita un backstop de reconciliación y el vínculo persistido desde el origen
+
+1. **Caso real:** la liberación de holds de comisión dependía 100% de que el webhook de estados de Aveonline
+   llegara y resolviera el `order_id`. Dos causas lo rompían en silencio: (a) si el webhook no resolvía el
+   pedido, el hold quedaba `held` para siempre (solo liberación manual); (b) la guía generada desde el
+   dashboard NO persistía `_ltms_aveonline_tracking` en el pedido — el cron de polling de 30 min y el
+   webhook no tenían cómo localizar la guía. La traza vivía en `lt_aveonline_guias` pero el flujo financiero
+   leía el meta del pedido → dos vistas del mismo dato que nunca se sincronizaban.
+2. **Regla preventiva:** todo flujo que termine liberando dinero (hold → payout) debe tener un **backstop de
+   reconciliación**: un proceso periódico que detecte estados atascados (hold vencido + no entregado) y los
+   resuelva consultando la fuente real (la API del carrier), no esperando el evento. Además, el vínculo
+   entre la entidad de negocio (guía) y el pedido debe persistirse EN EL ORIGEN (generación de guía), no
+   dejarse como efecto secundario del webhook. Si una columna de trazabilidad (`lt_aveonline_guias.estado`)
+   no la escribe ningún proceso automático, es display muerto que desinforma — el sync debe ir en webhook +
+   cron + reconciliador, no en el AJAX manual.
 
 
 

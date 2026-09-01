@@ -797,6 +797,13 @@ class LTMS_Core_Cron_Manager {
         update_post_meta( $order_id, '_ltms_tracking_status', $new_status );
         update_post_meta( $order_id, '_ltms_tracking_updated_at', current_time( 'mysql', true ) );
 
+        // RECONCILIATION FIX: sincronizar la trazabilidad local
+        // `lt_aveonline_guias.estado` cuando el cron consulta el estado de una
+        // guía de Aveonline. Antes la columna solo la tocaba el AJAX manual.
+        if ( 'aveonline' === $carrier && $tracking_n && class_exists( 'LTMS_Business_Aveonline_Guias' ) ) {
+            LTMS_Business_Aveonline_Guias::update_estado_by_numguia( $tracking_n, $new_status );
+        }
+
         $order->add_order_note(
             sprintf(
                 /* translators: 1: carrier name, 2: tracking number, 3: new status */

@@ -144,6 +144,37 @@ class LTMS_Business_Aveonline_Guias {
     }
 
     /**
+     * Actualiza el estado de una guía en la tabla local `lt_aveonline_guias`.
+     *
+     * Fuente única de sincronización de trazabilidad: el webhook de estados
+     * de Aveonline, el cron de tracking y el reconciliador de holds escriben
+     * aquí. Antes, la columna `estado` solo la actualizaba el AJAX manual del
+     * vendor y quedaba desactualizada (display engañoso en el dashboard).
+     *
+     * @param string $numguia Número de guía.
+     * @param string $estado  Estado (nombre crudo o normalizado).
+     * @return bool True si la fila se actualizó (0 filas afectadas cuenta como no).
+     */
+    public static function update_estado_by_numguia( string $numguia, string $estado ): bool {
+        if ( '' === $numguia || '' === $estado ) {
+            return false;
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $updated = $wpdb->update(
+            $table,
+            [ 'estado' => strtoupper( sanitize_text_field( $estado ) ) ],
+            [ 'numguia' => $numguia ],
+            [ '%s' ],
+            [ '%s' ]
+        );
+
+        return false !== $updated && (int) $updated > 0;
+    }
+
+    /**
      * Persiste una guía generada en la tabla local.
      */
     private static function db_insert( array $data ): void {
@@ -474,6 +505,20 @@ class LTMS_Business_Aveonline_Guias {
             // FASE5 P0 FIX: release the TOCTOU lock on success.
             if ( $order_id ) {
                 delete_transient( $lock_key );
+            }
+
+            // RECONCILIATION FIX: persistir el tracking en el pedido. Antes la
+            // guía generada desde el dashboard solo se guardaba en
+            // lt_aveonline_guias; sin el meta `_ltms_aveonline_tracking` el
+            // cron de tracking y el reconciliador de holds no podían localizar
+            // la guía del pedido → si el webhook no resolvía el order_id, el
+            // hold quedaba congelado indefinidamente.
+            if ( $order_id ) {
+                $order = wc_get_order( $order_id );
+                if ( $order ) {
+                    $order->update_meta_data( '_ltms_aveonline_tracking', (string) $result['tracking_number'] );
+                    $order->save();
+                }
             }
 
             wp_send_json_success( [

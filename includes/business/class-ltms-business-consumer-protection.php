@@ -38,6 +38,12 @@ class LTMS_Business_Consumer_Protection {
     public static function init(): void {
         // Verificar y liberar fondos retenidos — se ejecuta en el cron diario
         add_action( 'ltms_daily_cron', [ __CLASS__, 'release_eligible_holds' ] );
+        // RECONCILIATION FIX (P0): reconciliar holds atascados consultando a
+        // Aveonline. Corre ANTES que release_eligible_holds (prioridad 5 vs 10)
+        // para que las entregas confirmadas por API marquen el pedido y
+        // reposicionen release_at antes de evaluar la liberación. Sin esto, un
+        // webhook perdido (order_id sin resolver) congelaba el hold para siempre.
+        add_action( 'ltms_daily_cron', [ __CLASS__, 'reconcile_stuck_aveonline_holds' ], 5 );
         add_action( 'ltms_release_vendor_hold', [ __CLASS__, 'release_single_hold' ], 10, 2 );
 
         // M-202: extender hold cuando shipping provider confirma entrega
@@ -439,6 +445,205 @@ class LTMS_Business_Consumer_Protection {
                 ]
             );
         }
+    }
+
+    /**
+     * RECONCILIATION FIX (P0): detecta holds vencidos atascados porque el
+     * webhook de Aveonline no confirmó la entrega (ej. order_id no resuelto,
+     * webhook nunca llegó) y los resuelve consultando el estado de la guía
+     * directamente a la API de Aveonline.
+     *
+     * Comportamiento por estado:
+     *  - 'delivered'  → marca el pedido entregado y dispara ltms_shipping_delivered
+     *                   (con guard de idempotencia) → on_shipping_delivered()
+     *                   reposiciona release_at a +N días hábiles desde la
+     *                   confirmación real → el hold se libera tras la ventana
+     *                   legal post-entrega, sin liberación prematura.
+     *  - 'failed'     → dispara ltms_shipping_failed() → congela el hold hasta
+     *                   revisión manual (puede requerir clawback).
+     *  - in_transit / unknown → no toca el hold; solo actualiza trazabilidad.
+     *
+     * La fuente de verdad de entrega sigue siendo el pedido WooCommerce
+     * (_ltms_aveonline_status / _ltms_delivered_at); la API solo la alimenta.
+     *
+     * @return void
+     */
+    public static function reconcile_stuck_aveonline_holds(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_wallet_holds';
+        $now   = gmdate( 'Y-m-d H:i:s' );
+
+        // Con el gate de entrega desactivado no hay holds que reconciliar.
+        if ( LTMS_Core_Config::get( 'ltms_payout_require_delivery', 'yes' ) !== 'yes' ) {
+            return;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $holds = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM `{$table}` WHERE status = 'held' AND release_at <= %s LIMIT 50",
+            $now
+        ) );
+
+        if ( empty( $holds ) ) {
+            return;
+        }
+
+        $api_available      = class_exists( 'LTMS_Api_Factory' ) && class_exists( 'LTMS_Api_Aveonline' );
+        $guias_available    = class_exists( 'LTMS_Business_Aveonline_Guias' );
+        $webhook_available  = class_exists( 'LTMS_Aveonline_Webhook_Handler' );
+
+        $counters = [
+            'checked'    => 0,
+            'delivered'  => 0,
+            'failed'     => 0,
+            'in_transit' => 0,
+            'no_guia'    => 0,
+            'api_error'  => 0,
+            'exception'  => 0,
+        ];
+
+        foreach ( $holds as $hold ) {
+            $order_id = (int) $hold->order_id;
+            $counters['checked']++;
+
+            // Ya entregado/confirmado → lo gestiona release_eligible_holds().
+            if ( self::is_order_delivered_or_no_shipping( $order_id ) ) {
+                continue;
+            }
+
+            if ( ! $api_available ) {
+                continue;
+            }
+
+            try {
+                $guia = self::resolve_aveonline_guia( $order_id );
+                if ( '' === $guia ) {
+                    // Pedido no vinculado a Aveonline (otro carrier o sin guía).
+                    $counters['no_guia']++;
+                    continue;
+                }
+
+                /** @var \LTMS_Api_Aveonline $api */
+                $api    = LTMS_Api_Factory::get( 'aveonline' );
+                $result = $api->track_shipment( $guia );
+                $estado = (string) ( $result['status'] ?? '' );
+
+                if ( '' === $estado || 'unknown' === strtolower( $estado ) ) {
+                    // Guía no encontrada o sin estado concluyente — no tocar.
+                    $counters['api_error']++;
+                    continue;
+                }
+
+                $accion = $webhook_available
+                    ? LTMS_Aveonline_Webhook_Handler::classify_by_nombre( $estado )
+                    : 'in_transit'; // Safe default: never release without a classifier.
+
+                // Trazabilidad local: mantener lt_aveonline_guias.estado al día.
+                if ( $guias_available ) {
+                    LTMS_Business_Aveonline_Guias::update_estado_by_numguia( $guia, $estado );
+                }
+
+                $order = wc_get_order( $order_id );
+                if ( ! $order ) {
+                    $counters['exception']++;
+                    continue;
+                }
+
+                switch ( $accion ) {
+                    case 'delivered':
+                        $order->update_meta_data( '_ltms_aveonline_status', 'delivered' );
+                        $order->update_meta_data( '_ltms_shipping_status', $estado );
+                        // Idempotencia: mismo guard que webhook y cron.
+                        if ( ! $order->get_meta( '_ltms_shipping_delivered_fired' ) ) {
+                            do_action( 'ltms_shipping_delivered', $order_id, 'aveonline' );
+                            $order->update_meta_data( '_ltms_shipping_delivered_fired', current_time( 'mysql' ) );
+                        }
+                        $counters['delivered']++;
+                        break;
+
+                    case 'failed':
+                        $order->update_meta_data( '_ltms_aveonline_status', 'failed' );
+                        do_action(
+                            'ltms_shipping_failed',
+                            $order_id,
+                            'aveonline:reconciler:' . sanitize_key( $estado )
+                        );
+                        $counters['failed']++;
+                        break;
+
+                    default:
+                        // in_transit / unknown — no liberar ni congelar.
+                        $order->update_meta_data( '_ltms_aveonline_status', $accion );
+                        $counters['in_transit']++;
+                        break;
+                }
+
+                $order->save();
+            } catch ( \Throwable $e ) {
+                $counters['exception']++;
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'HOLD_RECONCILE_ORDER_ERROR',
+                        sprintf(
+                            'Order #%d: reconciliación de hold con Aveonline falló: %s',
+                            $order_id,
+                            $e->getMessage()
+                        ),
+                        [
+                            'order_id'   => $order_id,
+                            'exception'  => $e->getMessage(),
+                        ]
+                    );
+                }
+            }
+        }
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'HOLD_RECONCILE_CRON',
+                sprintf(
+                    'Reconciliador de holds Aveonline: %d revisados, %d entregados resueltos, %d fallidos, %d en tránsito, %d sin guía, %d errores API, %d excepciones.',
+                    $counters['checked'],
+                    $counters['delivered'],
+                    $counters['failed'],
+                    $counters['in_transit'],
+                    $counters['no_guia'],
+                    $counters['api_error'],
+                    $counters['exception']
+                ),
+                $counters
+            );
+        }
+    }
+
+    /**
+     * Resuelve el número de guía de Aveonline de un pedido.
+     *
+     * Prioridad: meta del pedido `_ltms_aveonline_tracking` (canónico, lo
+     * escribe webhook y generación de guía) → tabla `lt_aveonline_guias`
+     * (fallback para guías históricas sin meta).
+     *
+     * @param int $order_id ID del pedido.
+     * @return string Número de guía o '' si no hay.
+     */
+    private static function resolve_aveonline_guia( int $order_id ): string {
+        $order = wc_get_order( $order_id );
+        if ( $order ) {
+            $meta = (string) $order->get_meta( '_ltms_aveonline_tracking' );
+            if ( $meta !== '' ) {
+                return $meta;
+            }
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'lt_aveonline_guias';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $guia = $wpdb->get_var( $wpdb->prepare(
+            "SELECT numguia FROM `{$table}` WHERE order_id = %d ORDER BY id DESC LIMIT 1",
+            $order_id
+        ) );
+
+        return (string) $guia;
     }
 
     /**

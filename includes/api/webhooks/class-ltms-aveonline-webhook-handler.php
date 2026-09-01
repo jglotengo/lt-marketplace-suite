@@ -354,13 +354,38 @@ class LTMS_Aveonline_Webhook_Handler {
             return self::ESTADO_MAP[ $estado_id ];
         }
 
-        $upper = strtoupper( $nombre_estado );
+        return self::classify_by_nombre( $nombre_estado );
+    }
 
-        foreach ( self::NOMBRE_DELIVERED as $kw ) {
-            if ( str_contains( $upper, $kw ) ) return 'delivered';
+    /**
+     * Clasifica un nombre de estado crudo de Aveonline en una acción semántica.
+     *
+     * RECONCILIATION FIX: extraído de resolve_accion() para ser reutilizado
+     * por LTMS_Business_Consumer_Protection::reconcile_stuck_aveonline_holds()
+     * (el reconciliador consulta track_shipment(), que solo devuelve el nombre
+     * del estado, sin estado_id). Mantiene una única fuente de verdad para la
+     * clasificación por texto.
+     *
+     * @param string $nombre_estado Nombre crudo del estado (ej: 'Entregada').
+     * @return string 'delivered' | 'failed' | 'in_transit' | 'unknown'
+     */
+    public static function classify_by_nombre( string $nombre_estado ): string {
+        $upper = strtoupper( trim( $nombre_estado ) );
+        if ( '' === $upper ) {
+            return 'unknown';
         }
+
+        // IMPORTANTE: NOMBRE_FAILED se evalúa ANTES que NOMBRE_DELIVERED.
+        // 'NO ENTREGADA' contiene la substring 'ENTREGADA'; si delivered se
+        // evaluara primero, un envío NO ENTREGADO se clasificaría como
+        // entregado y el reconciliador de holds liberaría fondos de un envío
+        // fallido (RECONCILIATION FIX). Ningún estado entregado real contiene
+        // keywords de fallo, así que el orden es seguro.
         foreach ( self::NOMBRE_FAILED as $kw ) {
             if ( str_contains( $upper, $kw ) ) return 'failed';
+        }
+        foreach ( self::NOMBRE_DELIVERED as $kw ) {
+            if ( str_contains( $upper, $kw ) ) return 'delivered';
         }
         foreach ( self::NOMBRE_TRANSIT as $kw ) {
             if ( str_contains( $upper, $kw ) ) return 'in_transit';
@@ -387,6 +412,14 @@ class LTMS_Aveonline_Webhook_Handler {
     ): void {
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
+
+        // RECONCILIATION FIX: sincronizar la columna de trazabilidad
+        // `lt_aveonline_guias.estado` con el estado reportado por Aveonline.
+        // Antes solo la actualizaba el AJAX manual del vendor → quedaba
+        // desactualizada (display engañoso) pese a que el pedido ya avanzaba.
+        if ( $guia && class_exists( 'LTMS_Business_Aveonline_Guias' ) ) {
+            LTMS_Business_Aveonline_Guias::update_estado_by_numguia( $guia, $nombre_estado );
+        }
 
         // Meta del pedido
         $order->update_meta_data( '_ltms_aveonline_tracking',    $guia );

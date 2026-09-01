@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-08-31
 
+### Fixed — `RECONCILIATION-FIX` (holds de comisión congelados por webhook perdido + trazabilidad `lt_aveonline_guias.estado` desactualizada)
+
+> El webhook de estados de Aveonline era el ÚNICO camino para confirmar entrega → si no resolvía el
+> `order_id`, el hold de comisión quedaba congelado indefinidamente hasta liberación manual. Además, la
+> columna de trazabilidad `lt_aveonline_guias.estado` solo la actualizaba el AJAX manual del vendor y quedaba
+> desactualizada (display engañoso). Se añade un reconciliador de holds (consulta directa a la API de
+> Aveonline), sync de trazabilidad desde webhook/cron/reconciler, y se corrige un bug de clasificación por
+> keywords (`NO ENTREGADA` se clasificaba como entregada). Suite completa verde: **4,786 tests, 9,823
+> assertions OK**, 3 skips preexistentes.
+
+- **RECONC-001 (P0)** (`class-ltms-business-consumer-protection.php`): nuevo `reconcile_stuck_aveonline_holds()`
+  en `ltms_daily_cron` (prioridad 5, antes de `release_eligible_holds`). Por cada hold `held` vencido no
+  entregado: resuelve la guía (meta `_ltms_aveonline_tracking` → fallback tabla `lt_aveonline_guias`),
+  consulta `track_shipment()` y dispara `ltms_shipping_delivered` (con guard de idempotencia, respetando la
+  ventana legal de 5 días hábiles post-entrega) o `ltms_shipping_failed` (congela el hold). Antes el hold se
+  congelaba para siempre si el webhook no resolvía el order_id.
+- **RECONC-002 (P2)** (`class-ltms-business-aveonline-guias.php` + webhook handler + cron manager): nuevo
+  helper `update_estado_by_numguia()` que sincroniza `lt_aveonline_guias.estado` desde el webhook, el cron de
+  tracking y el reconciliador. La generación de guía por dashboard ahora persiste `_ltms_aveonline_tracking`
+  en el pedido (causa raíz de holds huérfanos: cron y reconciliador no localizaban la guía).
+- **RECONC-003 (P1)** (`class-ltms-aveonline-webhook-handler.php`): extraído `classify_by_nombre()` (fuente
+  única de clasificación por texto) y corregido el orden de evaluación: `NOMBRE_FAILED` ahora se evalúa ANTES
+  que `NOMBRE_DELIVERED`, porque `NO ENTREGADA` contiene la substring `ENTREGADA` → se clasificaba como
+  entregada (riesgo de liberar fondos de un envío fallido vía el reconciliador).
+- **Tests** +16 en `tests/unit/AveonlineHoldReconcilerTest.php` (entrega resuelta vía meta/tabla, skip, fallo,
+  sin-guía, idempotencia, en tránsito, gate off, clasificación) y `tests/unit/AveonlineGuiasEstadoSyncTest.php`
+  (helper + wiring estructural webhook/cron/consumer-protection).
+
+---
+
 ### Fixed — `VTEX-CREDS-AUDIT` (vendor real no conectaba: "Probar conexión" no guardaba, test no validaba credenciales, accountName sin normalizar)
 
 > Caso real: el vendor kosmetic (cuenta `dkosmetic`) con credenciales VÁLIDAS no podía conectar. Diagnóstico:
