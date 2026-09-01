@@ -584,7 +584,17 @@ final class LTMS_Api_Vtex {
         }
 
         // SKU canónico: RefId del vendor si existe, si no el itemId VTEX (único).
-        $sku = (string) ( $item['refId'] ?? '' );
+        // VTEX-SYNC-BG FIX: el Search API real NO devuelve $item['refId'] — el
+        // RefId del vendor vive en $item['referenceId'][0]['Value']. Sin esto, el
+        // SKU caía al itemId (ej. "22344898") y el marketplace no usaba el código
+        // real del vendor (ej. "3474637279400").
+        $sku = '';
+        if ( ! empty( $item['referenceId'] ) && is_array( $item['referenceId'] ) ) {
+            $sku = (string) ( $item['referenceId'][0]['Value'] ?? '' );
+        }
+        if ( '' === trim( $sku ) ) {
+            $sku = (string) ( $item['refId'] ?? '' );
+        }
         if ( '' === trim( $sku ) ) {
             $sku = (string) ( $item['itemId'] ?? '' );
         }
@@ -594,7 +604,19 @@ final class LTMS_Api_Vtex {
         $grupo     = '';
         $subgrupo  = '';
         if ( ! empty( $product['categories'] ) && is_array( $product['categories'] ) ) {
-            $cat_path = (string) end( $product['categories'] );
+            // VTEX-SYNC-BG FIX: el Search API real devuelve las rutas de la MÁS
+            // profunda (hoja) a la raíz, ej. ["/A/B/C/", "/A/B/", "/A/"]. Antes se
+            // tomaba end() (la raíz) → categoria='A', grupo='' en TODOS los
+            // productos (categoría WC equivocada). Usar la ruta con MÁS segmentos.
+            $cat_path = '';
+            $max_segs = 0;
+            foreach ( $product['categories'] as $cand ) {
+                $segs_cand = array_values( array_filter( explode( '/', (string) $cand ), static fn( $s ) => '' !== trim( $s ) ) );
+                if ( count( $segs_cand ) > $max_segs ) {
+                    $max_segs = count( $segs_cand );
+                    $cat_path = (string) $cand;
+                }
+            }
             $segs     = array_values( array_filter( explode( '/', $cat_path ), static fn( $s ) => '' !== trim( $s ) ) );
             $categoria = $segs[0] ?? '';
             $grupo     = $segs[1] ?? '';

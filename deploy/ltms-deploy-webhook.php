@@ -787,6 +787,12 @@ $files = [
     'assets/js/ltms-vtex.js',
     'assets/js/ltms-vtex.min.js',
     'tests/unit/VtexIntegrationAuditTest.php',
+    // VTEX-SYNC-BG v2.9.328 — sync en background (polling) + normalize real.
+    // El test funcional (VtexFunctionalE2ETest) faltaba en la whitelist desde
+    // VTEX-QA; el nuevo test de background se agrega para que el server pueda
+    // correrlos si se ejecuta la suite ahí.
+    'tests/unit/VtexFunctionalE2ETest.php',
+    'tests/unit/VtexSyncBackgroundTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

@@ -6,6 +6,58 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-01
 
+### Fixed — `VTEX-SYNC-BG` (sync VTEX: "Error de red" por timeout del request + filtro de categoría con "0 productos" + SKU/RefId y categoría equivocada)
+
+> La sync manual corría SÍNCRONA dentro del request AJAX (`ajax_sync_vtex_products` → `sync_vendor_products()`).
+> En SiteGround (hosting compartido) el request se mataba por `max_execution_time`/timeout del proxy a los pocos
+> minutos → el navegador mostraba "Error de red". Además, al seleccionar una sola categoría el sync podía reportar
+> "0 creados" porque (a) el filtro que se sincronizaba era el **guardado en DB** (stale), no el que el vendor veía
+> marcado en la UI (no se persistía al pulsar "Sincronizar"), y (b) con el parseo legacy del hidden input (JSON)
+> las categorías nunca quedaban pre-marcadas al recargar. Verificación con datos REALES del Search API de
+> dkosmetic: el filtro por categoría (id directo + ancestros `categoriesIds`) funciona correctamente (seleccionar
+> cat 2 → 10 SKUs, cat 8 → 3 SKUs), por lo que el "0 productos" era por filtro viejo/no guardado, no por la lógica
+> de matching. Además se corrigieron 2 bugs de parseo del payload real: el SKU usaba `itemId` en vez del `RefId`
+> real del vendor (`referenceId[0].Value`) y la categoría WC se asignaba a la RAÍZ en vez de la hoja (VTEX ordena
+> las rutas de la más profunda a la raíz). Suite completa verde: **4,808 tests, 9,901 assertions OK**, 3 skips
+> preexistentes.
+
+- **VTEX-SYNC-BG-001 (P0 — causa raíz)** (`class-ltms-dashboard-logic.php` + `assets/js/ltms-vtex.js`): el botón
+  "Sincronizar ahora" ya no ejecuta la sync en el request AJAX. Ahora `ajax_sync_vtex_products()` persiste el
+  filtro de categorías actual y **programa la sync en background** vía `LTMS_Vtex_Sync::schedule_sync()`
+  (WP-Cron → `ltms_vtex_sync_cron` → `run_scheduled_sync`, infraestructura que ya existía pero no estaba
+  conectada al botón). El frontend hace polling de un nuevo endpoint `ltms_get_vtex_sync_status` cada 8s y
+  muestra el resultado (`last_result`: creados/actualizados/omitidos/errores) cuando `in_progress` baja. Ya no
+  hay "Error de red": el navegador no espera al request largo.
+- **VTEX-SYNC-BG-002 (P1)** (`class-ltms-dashboard-logic.php`): `ajax_sync_vtex_products` persiste el filtro de
+  categorías **que el vendor ve marcado** antes de programar (lo que se selecciona es lo que se sincroniza).
+  El JS nuevo envía `category_ids` siempre (incluso vacío → deseleccionó todas → sincronizar TODO); el JS viejo
+  que no lo envía respeta el filtro guardado. Esto elimina el "0 productos" por filtro stale/no guardado.
+- **VTEX-SYNC-BG-003 (P1)** (`class-ltms-vtex-sync.php`): nuevo `LTMS_Vtex_Sync::get_sync_status()` — in_progress
+  con cutoff de 30 min (flag stale si el cron fue matado), `last_result`, `last_sync`, `last_sync_count`.
+  Alimenta el polling del frontend.
+- **VTEX-SYNC-BG-004 (P1)** (`class-ltms-api-vtex.php`): `normalize_search_item()` lee el SKU del vendor desde
+  `referenceId[0].Value` (estructura REAL del Search API). Antes leía `item['refId']` (inexistente) → el SKU
+  caía al `itemId` VTEX (ej. "22344898") en vez del código real del vendor (ej. "3474637279400").
+- **VTEX-SYNC-BG-005 (P2)** (`class-ltms-api-vtex.php`): la categoría jerárquica usa la ruta con MÁS segmentos
+  (la hoja) en vez de `end()`. VTEX devuelve las rutas de la más profunda a la raíz, así que `end()` asignaba a
+  todos los productos la categoría RAÍZ (`categoria='Belleza y Salud', grupo=''`). Ahora se asignan
+  categoria/grupo/subgrupo reales (Coloración / Cuidado Capilar / Belleza y Salud).
+- **VTEX-SYNC-BG-006 (P2)** (`class-ltms-dashboard-logic.php` + `assets/js/ltms-vtex.js`): `parse_category_ids()`
+  acepta CSV y JSON; el hidden input `ltms-vtex-category-ids` se normaliza a CSV al cargar (antes el valor JSON
+  `["3"]` se partía por coma → ninguna categoría quedaba pre-marcada al recargar).
+- **Tests** +11: `tests/unit/VtexSyncBackgroundTest.php` (grupo `audit-vtex-background`) — get_sync_status
+  (en curso / stale / last_result), ajax_sync programa en background y persiste categorías (CSV y JSON, y
+  selección vacía → limpiar filtro), guard de sync en curso, ajax_get_vtex_sync_status, parse_category_ids.
+  `VtexFunctionalE2ETest`: RefId desde `referenceId[]`, categoría hoja con paths leaf-first y root-first.
+  `VtexIntegrationAuditTest`: registro del action nuevo + scheduling + get_sync_status (source-level).
+- **Verificación en vivo**: payload REAL del Search API de dkosmetic (10 SKUs, `categoryId`/`categoriesIds`,
+  `referenceId[0].Value`, rutas leaf-first) descargado y ejecutado contra el código real: filtro por categoría
+  2→10, 4→5, 8→3, 13→2, 7→2, 99→0; SKU=RefId real; categoria/grupo/subgrupo correctos.
+
+---
+
+## [Unreleased] — 2026-09-01
+
 ### Fixed — `POSGOLD-CREDS-AUDIT` (credenciales PosGold: token corrupto crasheaba la sync + "Probar conexión" no guardaba + token visible en HTML)
 
 > Re-auditoría del módulo PosGold aplicando los mismos patrones de `VTEX-CREDS-AUDIT`. Se detectaron 4

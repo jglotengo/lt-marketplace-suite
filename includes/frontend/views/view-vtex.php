@@ -93,7 +93,7 @@ if ( empty( $seo_template ) ) {
         </div>
         <div class="ltms-card-body">
             <p style="margin:0 0 16px;color:#374151;">
-                <?php esc_html_e( 'Al sincronizar, se descargará tu catálogo de VTEX (filtrado por las categorías configuradas), se calculará el precio con tus reglas, se aplicará SEO al título, y se crearán o actualizarán los productos en el marketplace. Esto puede tardar varios minutos.', 'ltms' ); ?>
+                <?php esc_html_e( 'Al sincronizar, se descargará tu catálogo de VTEX (filtrado por las categorías seleccionadas abajo), se calculará el precio con tus reglas, se aplicará SEO al título, y se crearán o actualizarán los productos en el marketplace. La sincronización corre en segundo plano y puede tardar varios minutos — puedes seguir navegando y verás el resultado aquí.', 'ltms' ); ?>
             </p>
             <?php if ( ! $can_sync ) : ?>
                 <?php $remaining = ( 2 * MINUTE_IN_SECONDS ) - ( time() - $last_sync ); ?>

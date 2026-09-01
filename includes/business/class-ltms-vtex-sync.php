@@ -97,6 +97,36 @@ final class LTMS_Vtex_Sync {
     }
 
     /**
+     * Devuelve el estado actual de la sync de un vendor (para polling AJAX).
+     *
+     * VTEX-SYNC-BG FIX: la sync manual pasó de ejecutarse en el request AJAX
+     * (mataba el request por timeout → "Error de red") a programarse en
+     * background vía WP-Cron (schedule_sync → CRON_HOOK → run_scheduled_sync).
+     * Este método alimenta el polling del frontend: si hay una sync en curso,
+     * el último resultado conocido y cuándo terminó la última.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return array{in_progress: bool, in_progress_since: int, last_result: array|null, last_sync: int, last_sync_count: int}
+     */
+    public static function get_sync_status( int $vendor_id ): array {
+        $in_progress_raw = (int) get_user_meta( $vendor_id, '_ltms_vtex_sync_in_progress', true );
+        $stale_cutoff    = 30 * MINUTE_IN_SECONDS;
+
+        $last_result = get_user_meta( $vendor_id, '_ltms_vtex_sync_last_result', true );
+        if ( ! is_array( $last_result ) ) {
+            $last_result = null;
+        }
+
+        return [
+            'in_progress'       => $in_progress_raw > 0 && ( time() - $in_progress_raw ) < $stale_cutoff,
+            'in_progress_since' => $in_progress_raw > 0 ? $in_progress_raw : 0,
+            'last_result'       => $last_result,
+            'last_sync'         => (int) get_user_meta( $vendor_id, 'ltms_vtex_last_sync', true ),
+            'last_sync_count'   => (int) get_user_meta( $vendor_id, 'ltms_vtex_last_sync_count', true ),
+        ];
+    }
+
+    /**
      * Ejecuta la sync programada por WP-Cron (background).
      */
     public static function run_scheduled_sync( int $vendor_id ): void {

@@ -144,6 +144,56 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		$this->assertSame( 3, $normalized['stock_quantity'] );
 	}
 
+	public function test_normalize_reads_refid_from_referenceId_array(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+
+		// Payload REAL del Search API de VTEX: el RefId del vendor NO está en
+		// $item['refId'] sino en $item['referenceId'][0]['Value']. Sin este fix el
+		// SKU caía al itemId ("22344898") en vez del código real del vendor.
+		$product = $this->vtex_search_payload()[0];
+		$product['items'][0]['referenceId'] = [ [ 'Key' => 'RefId', 'Value' => '3474637279400' ] ];
+		unset( $product['items'][0]['refId'] );
+
+		$normalized = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+
+		$this->assertSame( '3474637279400', $normalized['sku'], 'Debe leer referenceId[0].Value como SKU.' );
+		$this->assertSame( '3474637279400', $normalized['codigo'] );
+	}
+
+	public function test_normalize_uses_deepest_category_path_when_leaf_first(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+
+		// Payload REAL: VTEX ordena las rutas de la MÁS profunda (hoja) a la raíz.
+		// Antes se usaba end() (la raíz) → categoria='Belleza y Salud', grupo=''
+		// en TODOS los productos (categoría WC equivocada).
+		$product = $this->vtex_search_payload()[0];
+		$product['categories'] = [
+			'/Belleza y Salud/Cuidado Capilar/Coloración/',
+			'/Belleza y Salud/Cuidado Capilar/',
+			'/Belleza y Salud/',
+		];
+
+		$normalized = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+
+		$this->assertSame( 'Belleza y Salud', $normalized['categoria'] );
+		$this->assertSame( 'Cuidado Capilar', $normalized['grupo'] );
+		$this->assertSame( 'Coloración', $normalized['subgrupo'] );
+	}
+
+	public function test_normalize_uses_deepest_category_path_when_root_first(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+
+		// Payload legacy (root-first): el fix por "más segmentos" debe funcionar
+		// con ambos ordenamientos.
+		$product = $this->vtex_search_payload()[0];
+
+		$normalized = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+
+		$this->assertSame( 'Moda', $normalized['categoria'] );
+		$this->assertSame( 'Jeans', $normalized['grupo'] );
+		$this->assertSame( '', $normalized['subgrupo'] );
+	}
+
 	// ─────────────────────────────────────────────────────────────────────────
 	// Filtro por categoría (ancestros con slashes).
 	// ─────────────────────────────────────────────────────────────────────────

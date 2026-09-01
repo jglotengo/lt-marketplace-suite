@@ -155,10 +155,30 @@ final class VtexIntegrationAuditTest extends LTMS_Unit_Test_Case {
 	public function test_ajax_actions_registered(): void {
 		$src = $this->src( 'includes/frontend/class-ltms-dashboard-logic.php' );
 
-		foreach ( [ 'ltms_save_vtex_credentials', 'ltms_test_vtex_connection', 'ltms_sync_vtex_products', 'ltms_save_vtex_categories', 'ltms_save_vtex_rules', 'ltms_save_vtex_seo', 'ltms_get_vtex_categories' ] as $action ) {
+		foreach ( [ 'ltms_save_vtex_credentials', 'ltms_test_vtex_connection', 'ltms_sync_vtex_products', 'ltms_get_vtex_sync_status', 'ltms_save_vtex_categories', 'ltms_save_vtex_rules', 'ltms_save_vtex_seo', 'ltms_get_vtex_categories' ] as $action ) {
 			$this->assertStringContainsString( 'wp_ajax_' . $action, $src, "AJAX action $action debe registrarse." );
 		}
 		$this->assertStringContainsString( 'LTMS_Vtex_Sync::init()', $src, 'El cron hook de VTEX debe inicializarse.' );
+	}
+
+	public function test_ajax_sync_schedules_in_background(): void {
+		$src = $this->src( 'includes/frontend/class-ltms-dashboard-logic.php' );
+
+		$this->assertStringContainsString( 'LTMS_Vtex_Sync::schedule_sync', $src,
+			'El handler de sync debe PROGRAMAR la sync en background (no ejecutarla en el request AJAX).' );
+		$this->assertStringContainsString( 'parse_category_ids', $src,
+			'Debe persistir el filtro de categorías actual antes de programar (evita "0 productos" por filtro viejo).' );
+		$this->assertStringContainsString( 'ajax_get_vtex_sync_status', $src,
+			'Debe existir el endpoint de polling de estado.' );
+	}
+
+	public function test_sync_engine_exposes_status(): void {
+		$src = $this->src( 'includes/business/class-ltms-vtex-sync.php' );
+
+		$this->assertStringContainsString( 'public static function get_sync_status', $src,
+			'LTMS_Vtex_Sync debe exponer get_sync_status() para el polling del frontend.' );
+		$this->assertStringContainsString( '_ltms_vtex_sync_last_result', $src,
+			'El resultado de la última sync debe persistirse en user_meta.' );
 	}
 
 	public function test_dashboard_nav_and_view_include(): void {
