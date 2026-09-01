@@ -219,12 +219,13 @@ if ( empty( $seo_template ) ) {
                             <?php
                             // v2.9.61 DEEP-AUDIT-002 P0-2 FIX: No mostrar el token completo (credencial sensible).
                             // Mostrar solo si está configurado (masked) + opción de actualizar.
+                            // POSGOLD-003 FIX: nunca revelar caracteres del valor descifrado en HTML
+                            // (mismo patrón VTEX-CONN-004). Antes se mostraban 20 chars del token real.
                             $has_token = ! empty( $creds['token'] );
-                            $masked_token = $has_token ? substr( $creds['token'], 0, 20 ) . '...' . substr( $creds['token'], -10 ) : '';
                             ?>
                             <?php if ( $has_token ) : ?>
                                 <div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;margin-bottom:8px;font-family:monospace;font-size:0.85rem;color:#166534;">
-                                    ✅ <?php esc_html_e( 'Token configurado:', 'ltms' ); ?> <code><?php echo esc_html( $masked_token ); ?></code>
+                                    ✅ <?php esc_html_e( 'Token configurado:', 'ltms' ); ?> <code><?php echo esc_html( '••••••••••••••••••••••••' ); ?></code>
                                 </div>
                                 <details style="margin-bottom:8px;">
                                     <summary style="cursor:pointer;font-size:0.85rem;color:#6b7280;"><?php esc_html_e( 'Actualizar token', 'ltms' ); ?></summary>

@@ -233,9 +233,17 @@
         var $btn = $(this);
         $btn.prop('disabled', true).text('Probando...');
 
+        // POSGOLD-002 FIX: enviar los valores del formulario (subdomain, token, IDs)
+        // para que "Probar conexión" funcione sin tener que guardar primero — mismo
+        // patrón VTEX-CONN-001. Antes solo enviaba action+nonce y leía de la DB.
         $.post(ajaxUrl, {
             action: 'ltms_test_posgold_connection',
-            nonce: nonce
+            nonce: nonce,
+            subdomain: $('#ltms-posgold-subdomain').val(),
+            token: $('#ltms-posgold-token').val(),
+            empresaid: $('#ltms-posgold-empresaid').val(),
+            usuarioid: $('#ltms-posgold-usuarioid').val(),
+            bodegaid: $('#ltms-posgold-bodegaid').val()
         }).done(function(resp){
             $btn.prop('disabled', false).html('🔍 Probar conexión');
             var $result = $('#ltms-posgold-test-result');

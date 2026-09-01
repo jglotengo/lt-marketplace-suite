@@ -374,8 +374,17 @@ final class LTMS_PosGold_Sync {
         $bodegaid   = (int)    get_user_meta( $vendor_id, 'ltms_posgold_bodegaid',  true ) ?: 1;
 
         // Desencriptar token si está cifrado.
+        // POSGOLD-001 FIX: try/catch — LTMS_Core_Security::decrypt() LANZA
+        // InvalidArgumentException/RuntimeException si el valor no es ciphertext
+        // válido (token corrupto o guardado en texto plano legacy). Sin el catch,
+        // una sync con token plano/corrupto crasheaba en lugar de degradar al raw
+        // (mismo patrón QA-VTEX aplicado a VTEX en VTEX-CREDS-AUDIT).
         if ( $token && class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'decrypt' ) ) {
-            $decrypted = LTMS_Core_Security::decrypt( $token );
+            try {
+                $decrypted = LTMS_Core_Security::decrypt( $token );
+            } catch ( \Throwable $e ) {
+                $decrypted = false;
+            }
             if ( $decrypted ) {
                 $token = $decrypted;
             }

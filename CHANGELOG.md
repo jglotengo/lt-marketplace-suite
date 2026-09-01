@@ -4,6 +4,39 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-01
+
+### Fixed — `POSGOLD-CREDS-AUDIT` (credenciales PosGold: token corrupto crasheaba la sync + "Probar conexión" no guardaba + token visible en HTML)
+
+> Re-auditoría del módulo PosGold aplicando los mismos patrones de `VTEX-CREDS-AUDIT`. Se detectaron 4
+> hallazgos: (1) `get_vendor_credentials()` llamaba a `LTMS_Core_Security::decrypt()` sin try/catch → un token
+> guardado en texto plano legacy o corrupto lanzaba `InvalidArgumentException` y crasheaba la sync; (2) el botón
+> "Probar conexión" enviaba solo `action`+`nonce` y el handler leía credenciales SOLO de la DB → un vendor que
+> acababa de escribir sus credenciales recibía "No has configurado tus credenciales." (mismo bug raíz que VTEX);
+> (3) la vista revelaba los primeros 20 caracteres del token descifrado en el HTML del panel; (4) el subdomain
+> no se normalizaba — pegar la URL completa de la tienda se rechazaba con error genérico. Suite completa verde:
+> **4,795 tests, 9,860 assertions OK**, 3 skips preexistentes.
+
+- **POSGOLD-001 (P1)** (`class-ltms-posgold-sync.php`): `get_vendor_credentials()` envuelve el decrypt en
+  `try/catch (\Throwable)` y degrada al valor raw si falla (mismo patrón QA-VTEX). Antes una sync con token
+  plano/corrupto crasheaba en lugar de degradar.
+- **POSGOLD-002 (P1 - causa raíz)** (`class-ltms-dashboard-logic.php` + `ltms-posgold.js`): "Probar conexión"
+  ahora envía las credenciales del formulario (subdomain, token, empresaid, usuarioid, bodegaid) y el handler
+  las **persiste antes de probar** vía el método compartido `persist_posgold_credentials()`. Antes solo leía de
+  la DB — mismo bug raíz VTEX-CONN-001.
+- **POSGOLD-003 (P2)** (`view-posgold.php`): el token configurado se muestra enmascarado (`••••••••••••••••••••••••`)
+  — antes se exponían los primeros 20 caracteres del valor descifrado en el HTML del panel (mismo patrón
+  VTEX-CONN-004).
+- **POSGOLD-004 (P2)** (`class-ltms-api-posgold.php` + dashboard-logic): nuevo `normalize_subdomain()` que
+  extrae el subdominio corto de URLs/dominios PosGold (ej. `https://jugueteriataiwan.goldpos.com.co/admin` →
+  `jugueteriataiwan`). Emails se rechazan con mensaje claro. El save handler y el test handler comparten la
+  normalización vía `persist_posgold_credentials()` (mismo patrón VTEX-CONN-003).
+- **Tests** +9 en `tests/unit/PosGoldCredsAuditTest.php` (grupo `audit-posgold`): decrypt de token cifrado
+  válido, token corrupto/plano sin crash (degrade al raw), no-configurado con defaults, normalize_subdomain
+  (URL/dominio/email/plain), y source-level de handler de test, JS y vista.
+
+---
+
 ## [Unreleased] — 2026-08-31
 
 ### Fixed — `RECONCILIATION-FIX` (holds de comisión congelados por webhook perdido + trazabilidad `lt_aveonline_guias.estado` desactualizada)

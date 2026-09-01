@@ -1947,8 +1947,8 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
         }
 
-        $subdomain = sanitize_text_field( $_POST['subdomain'] ?? '' );
-        $token     = sanitize_text_field( $_POST['token'] ?? '' );
+        $subdomain = sanitize_text_field( wp_unslash( $_POST['subdomain'] ?? '' ) );
+        $token     = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
         $empresaid = absint( $_POST['empresaid'] ?? 1 ) ?: 1;
         $usuarioid = absint( $_POST['usuarioid'] ?? 1 ) ?: 1;
         $bodegaid  = absint( $_POST['bodegaid']  ?? 1 ) ?: 1;
@@ -1957,33 +1957,80 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Subdominio y Token son obligatorios.', 'ltms' ) ], 400 );
         }
 
-        // v2.9.63 DEEP-AUDIT-002 P1-10: Validar subdomain para prevenir SSRF.
-        // El subdomain se usa para construir URLs de PosGold — debe ser solo
-        // caracteres alfanuméricos y guiones (formato de subdominio válido).
-        if ( ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/i', $subdomain ) ) {
-            wp_send_json_error( [ 'message' => __( 'Subdominio inválido. Usa solo letras, números y guiones.', 'ltms' ) ], 400 );
+        $persisted = $this->persist_posgold_credentials( $user_id, [
+            'subdomain' => $subdomain,
+            'token'     => $token,
+            'empresaid' => $empresaid,
+            'usuarioid' => $usuarioid,
+            'bodegaid'  => $bodegaid,
+        ] );
+        if ( is_wp_error( $persisted ) ) {
+            wp_send_json_error( [ 'message' => $persisted->get_error_message() ], 400 );
         }
-
-        // Cifrar el token antes de guardarlo (si LTMS_Core_Security está disponible).
-        $token_to_save = $token;
-        if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
-            $encrypted = LTMS_Core_Security::encrypt( $token );
-            if ( $encrypted ) {
-                $token_to_save = $encrypted;
-            }
-        }
-
-        update_user_meta( $user_id, 'ltms_posgold_subdomain', $subdomain );
-        update_user_meta( $user_id, 'ltms_posgold_token',     $token_to_save );
-        update_user_meta( $user_id, 'ltms_posgold_empresaid', $empresaid );
-        update_user_meta( $user_id, 'ltms_posgold_usuarioid', $usuarioid );
-        update_user_meta( $user_id, 'ltms_posgold_bodegaid',  $bodegaid );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info( 'POSGOLD_CREDENTIALS_SAVED', sprintf( 'Vendor #%d guardó credenciales PosGold (subdomain=%s)', $user_id, $subdomain ) );
         }
 
         wp_send_json_success( [ 'message' => __( 'Credenciales guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * Persiste credenciales PosGold de un vendor con validación y normalización.
+     *
+     * POSGOLD-004 FIX: normaliza el subdomain (URL completa / dominio goldpos.com.co
+     * → subdominio corto) antes de validar y guardar, y rechaza con mensaje claro
+     * los emails. El token se cifra con LTMS_Core_Security y se guarda en user_meta
+     * (nunca texto plano). Si un campo no viene en el formulario se conserva el
+     * valor ya guardado.
+     *
+     * POSGOLD-002: "Probar conexión" también usa este método, de modo que las
+     * credenciales del formulario se persisten antes de probar (mismo patrón
+     * VTEX-CONN-001).
+     *
+     * @param int   $user_id ID del vendor.
+     * @param array $form    Campos saneados: subdomain, token, empresaid, usuarioid, bodegaid.
+     * @return true|\WP_Error
+     */
+    private function persist_posgold_credentials( int $user_id, array $form ) {
+        $subdomain = (string) ( $form['subdomain'] ?? '' );
+        $token     = (string) ( $form['token'] ?? '' );
+        $empresaid = (int) ( $form['empresaid'] ?? 1 ) ?: 1;
+        $usuarioid = (int) ( $form['usuarioid'] ?? 1 ) ?: 1;
+        $bodegaid  = (int) ( $form['bodegaid'] ?? 1 ) ?: 1;
+
+        // Normalizar subdomain (URL/dominio → subdominio corto).
+        if ( '' !== $subdomain && class_exists( 'LTMS_Api_PosGold' ) && method_exists( 'LTMS_Api_PosGold', 'normalize_subdomain' ) ) {
+            $normalized   = LTMS_Api_PosGold::normalize_subdomain( $subdomain );
+            $subdomain = '' !== $normalized ? $normalized : $subdomain;
+        }
+        if ( '' !== $subdomain && ! preg_match( '/^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/', $subdomain ) ) {
+            return new \WP_Error(
+                'ltms_posgold_invalid_subdomain',
+                __( 'Subdominio inválido. Ingresa solo el nombre corto de tu tienda PosGold (ej. jugueteriataiwan), no la URL completa ni un email.', 'ltms' )
+            );
+        }
+
+        if ( '' !== $subdomain ) {
+            update_user_meta( $user_id, 'ltms_posgold_subdomain', $subdomain );
+        }
+
+        if ( '' !== $token ) {
+            $token_to_save = $token;
+            if ( class_exists( 'LTMS_Core_Security' ) && method_exists( 'LTMS_Core_Security', 'encrypt' ) ) {
+                $encrypted = LTMS_Core_Security::encrypt( $token );
+                if ( $encrypted ) {
+                    $token_to_save = $encrypted;
+                }
+            }
+            update_user_meta( $user_id, 'ltms_posgold_token', $token_to_save );
+        }
+
+        update_user_meta( $user_id, 'ltms_posgold_empresaid', $empresaid );
+        update_user_meta( $user_id, 'ltms_posgold_usuarioid', $usuarioid );
+        update_user_meta( $user_id, 'ltms_posgold_bodegaid',  $bodegaid );
+
+        return true;
     }
 
     /**
@@ -2005,9 +2052,29 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
         }
 
+        // POSGOLD-002 FIX: "Probar conexión" acepta las credenciales del formulario
+        // y las persiste antes de probar (mismo patrón VTEX-CONN-001). Antes solo
+        // leía de la DB: un vendor que acababa de escribir sus credenciales recibía
+        // "No has configurado tus credenciales." porque nunca se habían guardado.
+        $form = [
+            'subdomain' => sanitize_text_field( wp_unslash( $_POST['subdomain'] ?? '' ) ),
+            'token'     => sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) ),
+            'empresaid' => absint( $_POST['empresaid'] ?? 1 ) ?: 1,
+            'usuarioid' => absint( $_POST['usuarioid'] ?? 1 ) ?: 1,
+            'bodegaid'  => absint( $_POST['bodegaid'] ?? 1 ) ?: 1,
+        ];
+        $has_form_values = '' !== $form['subdomain'] || '' !== $form['token'];
+
+        if ( $has_form_values ) {
+            $persisted = $this->persist_posgold_credentials( $user_id, $form );
+            if ( is_wp_error( $persisted ) ) {
+                wp_send_json_error( [ 'message' => $persisted->get_error_message() ], 400 );
+            }
+        }
+
         $creds = LTMS_PosGold_Sync::get_vendor_credentials( $user_id );
         if ( ! $creds['configured'] ) {
-            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales.', 'ltms' ) ], 400 );
+            wp_send_json_error( [ 'message' => __( 'No has configurado tus credenciales PosGold. Completa el formulario y pulsa "Guardar credenciales".', 'ltms' ) ], 400 );
         }
 
         $result = LTMS_Api_PosGold::test_connection(

@@ -69,6 +69,56 @@ final class LTMS_Api_PosGold {
     }
 
     /**
+     * Normaliza el subdominio ingresado por un vendor.
+     *
+     * POSGOLD-004 FIX: el vendor frecuentemente pega la URL completa de su tienda
+     * (ej. "jugueteriataiwan.goldpos.com.co", "https://jugueteriataiwan.goldpos.com.co/admin")
+     * en el campo subdominio. En vez de rechazar el guardado con un error genérico,
+     * se extrae automáticamente el subdominio corto (mismo patrón VTEX-CONN-003).
+     *
+     * Un email no se puede derivar a un subdominio → se devuelve tal cual y la
+     * validación posterior lo rechaza con un mensaje claro.
+     *
+     * @param string $input Valor crudo del campo subdomain.
+     * @return string Subdominio normalizado (o '' si no es resoluble).
+     */
+    public static function normalize_subdomain( string $input ): string {
+        $value = strtolower( trim( $input ) );
+        if ( '' === $value ) {
+            return '';
+        }
+
+        // Emails no se derivan a subdominio — se dejan para que la validación los rechace.
+        if ( str_contains( $value, '@' ) ) {
+            return $value;
+        }
+
+        // Quitar protocolo.
+        if ( str_contains( $value, '://' ) ) {
+            $value = explode( '://', $value, 2 )[1];
+        }
+        // Quitar path/query/fragment.
+        $value = preg_replace( '~[/?#].*$~', '', $value );
+        if ( null === $value ) {
+            return '';
+        }
+        // Quitar prefijo www.
+        $value = preg_replace( '#^www\.#', '', $value );
+
+        // Host goldpos.com.co (con o sin sub-subdominios) → subdominio de nivel superior.
+        if ( preg_match( '#^([a-z0-9][a-z0-9-]{0,62}[a-z0-9]|[a-z0-9])\.(?:[a-z0-9][a-z0-9-]{0,62}\.)*goldpos\.com\.co$#', $value, $m ) ) {
+            return $m[1];
+        }
+        // Cualquier otro dominio → primer subdominio (el vendor pegó su URL).
+        if ( preg_match( '#^([a-z0-9][a-z0-9-]{0,62}[a-z0-9]|[a-z0-9])\.([a-z0-9][a-z0-9-]{0,62}\.)?[a-z]{2,24}$#', $value, $m ) ) {
+            return $m[1];
+        }
+
+        // Sin dots: devolver tal cual (la validación final lo valida).
+        return $value;
+    }
+
+    /**
      * Obtiene los productos del catálogo PosGold del vendor.
      *
      * @param string $subdomain Subdominio PosGold del vendor.
