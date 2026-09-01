@@ -181,6 +181,40 @@ final class VtexIntegrationAuditTest extends LTMS_Unit_Test_Case {
 			'El resultado de la última sync debe persistirse en user_meta.' );
 	}
 
+	public function test_api_full_catalog_methods(): void {
+		$src = $this->src( 'includes/api/class-ltms-api-vtex.php' );
+
+		$this->assertStringContainsString( 'public static function get_catalog_slugs', $src,
+			'Debe existir get_catalog_slugs() (sitemaps del catálogo completo).' );
+		$this->assertStringContainsString( 'public static function get_products_search_by_slug', $src,
+			'Debe existir get_products_search_by_slug() (/products/search/{slug}/p).' );
+		$this->assertStringContainsString( 'public static function fetch_raw', $src,
+			'Debe existir fetch_raw() (GET crudo para el sitemap XML).' );
+		$this->assertStringContainsString( 'product-', $src, 'Debe consultar los sitemaps product-{n}.xml.' );
+	}
+
+	public function test_sync_uses_full_catalog_phase_b(): void {
+		$src = $this->src( 'includes/business/class-ltms-vtex-sync.php' );
+
+		$this->assertStringContainsString( 'get_catalog_slugs', $src,
+			'El sync debe enumerar el catálogo completo vía sitemaps.' );
+		$this->assertStringContainsString( 'get_products_search_by_slug', $src,
+			'El sync debe fetchear cada producto faltante por slug.' );
+		$this->assertStringContainsString( 'product-example', $src,
+			'Debe saltarse el producto de ejemplo de VTEX.' );
+		$this->assertStringContainsString( 'processed_product_ids', $src,
+			'Debe deduplicar entre la Fase A (search) y la Fase B (sitemap).' );
+	}
+
+	public function test_normalize_prefers_product_name(): void {
+		$src = $this->src( 'includes/api/class-ltms-api-vtex.php' );
+
+		$this->assertStringContainsString( "pick_product_name", $src,
+			'Debe existir pick_product_name() para el nombre real del producto.' );
+		$this->assertStringContainsString( "'productName'", $src,
+			'El nombre debe priorizar productName sobre el código corto del SKU.' );
+	}
+
 	public function test_dashboard_nav_and_view_include(): void {
 		$src = $this->src( 'includes/frontend/views/dashboard-wrapper.php' );
 

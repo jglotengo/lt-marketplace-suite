@@ -194,6 +194,169 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		$this->assertSame( '', $normalized['subgrupo'] );
 	}
 
+	public function test_normalize_uses_productName_not_item_short_code(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+
+		// VTEX-CATALOGO-FIX: el item.name real es un CÓDIGO corto ("LORRB"),
+		// no el nombre del producto. El nombre real está en productName.
+		$product = $this->vtex_search_payload()[0];
+		$product['productName'] = 'Loreal Majirel Tinte Red Boster 60ml';
+		$product['items'][0]['name'] = 'LORRB';
+
+		$normalized = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+
+		$this->assertSame( 'Loreal Majirel Tinte Red Boster 60ml', $normalized['name'],
+			'Debe usar productName (nombre completo), no el código corto del SKU.' );
+	}
+
+	public function test_normalize_falls_back_to_nameComplete_and_item_name(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+
+		// Sin productName → nameComplete; sin ambos → item.name.
+		$product = $this->vtex_search_payload()[0];
+		unset( $product['productName'] );
+		$product['items'][0]['nameComplete'] = 'Jeans Azules 32';
+		$product['items'][0]['name'] = 'JA-32';
+
+		$n1 = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+		$this->assertSame( 'Jeans Azules 32', $n1['name'], 'Fallback a nameComplete.' );
+
+		unset( $product['items'][0]['nameComplete'] );
+		$n2 = \LTMS_Api_Vtex::normalize_search_item( $product, $product['items'][0] );
+		$this->assertSame( 'JA-32', $n2['name'], 'Fallback final a item.name.' );
+	}
+
+	public function test_get_catalog_slugs_parses_sitemap(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+		$this->stub_http( static fn() => [ 'response' => [ 'code' => 200 ], 'body' => wp_json_encode( [] ) ] );
+
+		Monkey\Functions\when( 'wp_remote_get' )->alias( static function ( $url ) {
+			if ( str_contains( $url, 'product-0.xml' ) ) {
+				$body = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+				$body .= '<url><loc>https://mistienda.vtexcommercestable.com.br/producto-uno/p</loc></url>';
+				$body .= '<url><loc>https://mistienda.vtexcommercestable.com.br/producto-dos/p</loc></url>';
+				$body .= '<url><loc>https://mistienda.vtexcommercestable.com.br/producto-uno/p</loc></url>';
+				$body .= '</urlset>';
+				return [ 'response' => [ 'code' => 200 ], 'body' => $body ];
+			}
+			return [ 'response' => [ 'code' => 404 ], 'body' => 'Not Found' ];
+		} );
+
+		$slugs = \LTMS_Api_Vtex::get_catalog_slugs( 'mistienda' );
+
+		sort( $slugs );
+		$this->assertSame( [ 'producto-dos', 'producto-uno' ], $slugs,
+			'Debe extraer los slugs únicos de los sitemaps de producto.' );
+	}
+
+	public function test_get_products_search_by_slug(): void {
+		$this->require_class( 'LTMS_Api_Vtex' );
+		$payload = $this->vtex_search_payload();
+		$this->stub_http( static fn() => [
+			'response' => [ 'code' => 200 ],
+			'body'     => wp_json_encode( $payload ),
+		] );
+
+		$result = \LTMS_Api_Vtex::get_products_search_by_slug( 'mistienda', 'k', 't', 'jeans-azules' );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertCount( 1, $result['data'] );
+		$this->assertSame( '1001', $result['data'][0]['productId'] );
+	}
+
+	public function test_sync_fetches_full_catalog_via_sitemap(): void {
+		$this->require_class( 'LTMS_Vtex_Sync' );
+		$this->require_class( 'LTMS_Api_Vtex' );
+		$this->require_class( 'LTMS_Vtex_Price_Calculator' );
+
+		Monkey\Functions\when( 'get_user_meta' )->alias(
+			static function ( $user_id, $key = '', $single = false ) {
+				$map = [
+					'ltms_vtex_account_name'      => 'mistienda',
+					'ltms_vtex_environment'       => 'vtexcommercestable',
+					'ltms_vtex_app_key'           => 'k',
+					'ltms_vtex_app_token'         => 't',
+					'ltms_vtex_last_sync'         => '0',
+					'ltms_vtex_category_ids_csv'  => '',
+					'ltms_vtex_seo_template'      => '',
+				];
+				return $map[ $key ] ?? '';
+			}
+		);
+		Monkey\Functions\when( 'update_user_meta' )->justReturn( true );
+
+		// Payload Fase A (Search paginado): 1 producto disponible.
+		$payload_a = $this->vtex_search_payload();
+		$payload_a[0]['items'][0]['images'] = [];
+
+		// Payload Fase B (by-slug): otro producto que NO está en el search.
+		$payload_b = [
+			[
+				'productId'     => '1002',
+				'productName'   => 'Babaria Mascarilla Cannabis',
+				'brand'         => 'Babaria',
+				'categories'    => [ '/Belleza y Salud/Cuidado Capilar/Coloración/', '/Belleza y Salud/Cuidado Capilar/', '/Belleza y Salud/' ],
+				'categoriesIds' => [ '/2/4/8/', '/2/4/', '/2/' ],
+				'categoryId'    => '8',
+				'items'         => [
+					[
+						'itemId'     => '2002',
+						'name'       => 'BA138',
+						'referenceId' => [ [ 'Key' => 'RefId', 'Value' => 'BAB-002' ] ],
+						'ean'        => '789111',
+						'images'     => [],
+						'sellers'    => [ [ 'sellerId' => '1', 'commertialOffer' => [ 'Price' => 21000, 'ListPrice' => 21000, 'AvailableQuantity' => 0, 'IsAvailable' => false ] ] ],
+					],
+				],
+			],
+		];
+
+		// Sitemap: 2 slugs (el de la Fase A + uno extra de la Fase B).
+		Monkey\Functions\when( 'wp_remote_get' )->alias( static function ( $url ) {
+			if ( str_contains( $url, 'product-0.xml' ) ) {
+				$body = '<urlset><url><loc>https://mistienda.vtexcommercestable.com.br/jeans-azules/p</loc></url>';
+				$body .= '<url><loc>https://mistienda.vtexcommercestable.com.br/babaria-mascarilla/p</loc></url></urlset>';
+				return [ 'response' => [ 'code' => 200 ], 'body' => $body ];
+			}
+			return [ 'response' => [ 'code' => 404 ], 'body' => 'Not Found' ];
+		} );
+
+		// HTTP routing: search paginado vs by-slug.
+		Monkey\Functions\when( 'wp_remote_request' )->alias( static function ( $url, $args ) use ( $payload_a, $payload_b ) {
+			if ( str_contains( $url, '/products/search/' ) ) {
+				$body = str_contains( $url, 'babaria-mascarilla' ) ? wp_json_encode( $payload_b ) : wp_json_encode( $payload_a );
+			} else {
+				$body = wp_json_encode( $payload_a );
+			}
+			return [ 'response' => [ 'code' => 200 ], 'body' => $body ];
+		} );
+		Monkey\Functions\when( 'is_wp_error' )->justReturn( false );
+		Monkey\Functions\when( 'wp_remote_retrieve_response_code' )->alias( static fn( $r ) => (int) ( $r['response']['code'] ?? 0 ) );
+		Monkey\Functions\when( 'wp_remote_retrieve_body' )->alias( static fn( $r ) => (string) ( $r['body'] ?? '' ) );
+		Monkey\Functions\when( 'wp_remote_retrieve_header' )->alias( static fn( $r, $h ) => (string) ( $r['headers'][ $h ] ?? '' ) );
+		Monkey\Functions\when( 'add_query_arg' )->alias( static fn( $args, $url ) => $url . '?' . http_build_query( $args ) );
+
+		// WooCommerce (create path).
+		Monkey\Functions\when( 'wc_get_product_id_by_sku' )->justReturn( 0 );
+		Monkey\Functions\when( 'wc_get_product' )->justReturn( null );
+		Monkey\Functions\when( 'get_post' )->justReturn( null );
+		Monkey\Functions\when( 'wp_update_post' )->justReturn( 1 );
+		Monkey\Functions\when( 'get_term_by' )->justReturn( null );
+		Monkey\Functions\when( 'wp_insert_term' )->justReturn( [ 'term_id' => 5 ] );
+		Monkey\Functions\when( 'sanitize_title' )->alias( static fn( $s ) => strtolower( str_replace( ' ', '-', (string) $s ) ) );
+		Monkey\Functions\when( 'wp_rand' )->justReturn( 1 );
+		Monkey\Functions\when( 'has_post_thumbnail' )->justReturn( false );
+		Monkey\Functions\when( 'download_url' )->justReturn( '/tmp/vtex-img.jpg' );
+		Monkey\Functions\when( 'media_handle_sideload' )->justReturn( 77 );
+		Monkey\Functions\when( 'set_post_thumbnail' )->justReturn( true );
+
+		$result = \LTMS_Vtex_Sync::sync_vendor_products( 141 );
+
+		$this->assertTrue( $result['success'], 'La sync debe tener éxito: ' . ( $result['message'] ?? '' ) );
+		$this->assertSame( 2, $result['created'],
+			'Debe crear 1 de la Fase A (search) + 1 de la Fase B (sitemap), sin duplicar el de la Fase A.' );
+	}
+
 	// ─────────────────────────────────────────────────────────────────────────
 	// Filtro por categoría (ancestros con slashes).
 	// ─────────────────────────────────────────────────────────────────────────
@@ -331,6 +494,8 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 			'response' => [ 'code' => 200 ],
 			'body'     => wp_json_encode( $payload ),
 		] );
+		// Sin sitemap (Fase B no-op) — el sync no debe romper.
+		Monkey\Functions\when( 'wp_remote_get' )->justReturn( [ 'response' => [ 'code' => 404 ], 'body' => '' ] );
 
 		// WooCommerce (create path).
 		Monkey\Functions\when( 'wc_get_product_id_by_sku' )->justReturn( 0 );
@@ -377,6 +542,8 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 			'response' => [ 'code' => 200 ],
 			'body'     => wp_json_encode( [] ),
 		] );
+		// Sin sitemap (Fase B no-op).
+		Monkey\Functions\when( 'wp_remote_get' )->justReturn( [ 'response' => [ 'code' => 404 ], 'body' => '' ] );
 
 		$result = \LTMS_Vtex_Sync::sync_vendor_products( 141 );
 

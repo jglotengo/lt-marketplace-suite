@@ -338,8 +338,61 @@ final class LTMS_Vtex_Sync {
         $errors          = [];
         $total_products  = 0;
         $filtered_out    = 0;
+        $processed_product_ids = [];
 
-        // Descargar catálogo paginado.
+        // Procesa UN producto normalizado: filtro de categoría → completitud →
+        // precio (reglas) → título SEO → sync WC. Compartido por la Fase A
+        // (Search API) y la Fase B (sitemaps / catálogo completo).
+        $handle_product = static function (
+            int $vendor_id,
+            array $product,
+            string $category_filter,
+            array $price_rules,
+            string $seo_template
+        ) use ( &$created, &$updated, &$skipped, &$skipped_incomplete, &$filtered_out, &$errors ): void {
+            // Filtro por categoría.
+            if ( ! empty( $category_filter ) ) {
+                $filtered = LTMS_Vtex_Price_Calculator::filter_by_category( [ $product ], $category_filter );
+                if ( empty( $filtered ) ) {
+                    $filtered_out++;
+                    return;
+                }
+            }
+
+            // Completitud.
+            $validation = LTMS_Vtex_Price_Calculator::validate_product_completeness( $product );
+            if ( ! $validation['complete'] ) {
+                $skipped++;
+                $skipped_incomplete++;
+                return;
+            }
+
+            // Precio final con reglas del vendor.
+            $price_calc = LTMS_Vtex_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+            $product['regular_price'] = $price_calc['price'];
+
+            // Título SEO.
+            $product['name'] = LTMS_Vtex_Price_Calculator::generate_seo_title( $product, $seo_template );
+
+            try {
+                $sync_result = self::sync_single_product( $vendor_id, $product );
+                if ( 'created' === $sync_result ) {
+                    $created++;
+                } elseif ( 'updated' === $sync_result ) {
+                    $updated++;
+                } else {
+                    $skipped++;
+                }
+            } catch ( \Throwable $e ) {
+                $errors[] = sprintf(
+                    'SKU %s: %s',
+                    $product['sku'],
+                    $e->getMessage()
+                );
+            }
+        };
+
+        // ── FASE A: Search API paginado (productos activos/disponibles) ──
         $page = 0;
         while ( $page < self::MAX_PAGES ) {
             $from = $page * self::PAGE_SIZE;
@@ -382,52 +435,14 @@ final class LTMS_Vtex_Sync {
             $total_products += count( $products );
 
             foreach ( $products as $raw_product ) {
+                $pid = (string) ( $raw_product['productId'] ?? '' );
+                if ( '' !== $pid ) {
+                    $processed_product_ids[ $pid ] = true;
+                }
                 $items = is_array( $raw_product['items'] ?? null ) ? $raw_product['items'] : [];
                 foreach ( $items as $item ) {
                     $product = LTMS_Api_Vtex::normalize_search_item( $raw_product, $item );
-
-                    // Filtro por categoría.
-                    if ( ! empty( $category_filter ) ) {
-                        $before = count( [ $product ] );
-                        $filtered = LTMS_Vtex_Price_Calculator::filter_by_category( [ $product ], $category_filter );
-                        if ( empty( $filtered ) ) {
-                            $filtered_out++;
-                            continue;
-                        }
-                        unset( $before );
-                    }
-
-                    // Completitud.
-                    $validation = LTMS_Vtex_Price_Calculator::validate_product_completeness( $product );
-                    if ( ! $validation['complete'] ) {
-                        $skipped++;
-                        $skipped_incomplete++;
-                        continue;
-                    }
-
-                    // Precio final con reglas del vendor.
-                    $price_calc = LTMS_Vtex_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
-                    $product['regular_price'] = $price_calc['price'];
-
-                    // Título SEO.
-                    $product['name'] = LTMS_Vtex_Price_Calculator::generate_seo_title( $product, $seo_template );
-
-                    try {
-                        $sync_result = self::sync_single_product( $vendor_id, $product );
-                        if ( 'created' === $sync_result ) {
-                            $created++;
-                        } elseif ( 'updated' === $sync_result ) {
-                            $updated++;
-                        } else {
-                            $skipped++;
-                        }
-                    } catch ( \Throwable $e ) {
-                        $errors[] = sprintf(
-                            'SKU %s: %s',
-                            $product['sku'],
-                            $e->getMessage()
-                        );
-                    }
+                    $handle_product( $vendor_id, $product, $category_filter, $price_rules, $seo_template );
                 }
             }
 
@@ -436,6 +451,53 @@ final class LTMS_Vtex_Sync {
                 break;
             }
             $page++;
+        }
+
+        // ── FASE B: catálogo completo vía sitemaps (VTEX-CATALOGO-FIX) ──
+        // El Search API paginado solo devuelve los productos activos/disponibles
+        // del sales channel (en dkosmetic: 10 de ~1362). Los sitemaps de producto
+        // listan el catálogo COMPLETO y cada slug se resuelve con
+        // /products/search/{slug}/p, que SÍ incluye agotados/inactivos con precio,
+        // stock e imágenes. ~15ms/request → ~1362 requests ≈ 20s.
+        $slugs = LTMS_Api_Vtex::get_catalog_slugs( $creds['account_name'], $creds['environment'] );
+        foreach ( $slugs as $slug ) {
+            // Saltar el producto de ejemplo de VTEX (ruido en el catálogo).
+            if ( 'product-example' === strtolower( $slug ) ) {
+                continue;
+            }
+
+            $by_slug = LTMS_Api_Vtex::get_products_search_by_slug(
+                $creds['account_name'],
+                $creds['app_key'],
+                $creds['app_token'],
+                $slug,
+                $creds['environment']
+            );
+
+            if ( ! $by_slug['success'] ) {
+                $errors[] = sprintf( 'Producto %s: %s', $slug, $by_slug['error'] );
+                continue;
+            }
+
+            $raw = $by_slug['data'][0] ?? null;
+            if ( ! is_array( $raw ) ) {
+                continue; // Slug sin producto (inactivo/no indexado).
+            }
+
+            $pid = (string) ( $raw['productId'] ?? '' );
+            if ( '' !== $pid && isset( $processed_product_ids[ $pid ] ) ) {
+                continue; // Ya procesado en la Fase A.
+            }
+            if ( '' !== $pid ) {
+                $processed_product_ids[ $pid ] = true;
+            }
+            $total_products++;
+
+            $items = is_array( $raw['items'] ?? null ) ? $raw['items'] : [];
+            foreach ( $items as $item ) {
+                $product = LTMS_Api_Vtex::normalize_search_item( $raw, $item );
+                $handle_product( $vendor_id, $product, $category_filter, $price_rules, $seo_template );
+            }
         }
 
         update_user_meta( $vendor_id, 'ltms_vtex_last_sync', time() );
@@ -451,6 +513,7 @@ final class LTMS_Vtex_Sync {
                 [
                     'vendor_id'          => $vendor_id,
                     'total_raw'          => $total_products,
+                    'catalog_slugs'      => count( $slugs ),
                     'filtered_out'       => $filtered_out,
                     'created'            => $created,
                     'updated'            => $updated,

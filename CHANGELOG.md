@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-01
 
+### Fixed — `VTEX-CATALOGO` (sync solo traía 10 de ~1,362 productos + nombres tipo "LORRB" en vez del nombre real)
+
+> Verificación con datos REALES de la cuenta dkosmetic: el catálogo tiene **1,362 productos activos**
+> (sitemap) / **2,643 entradas** (`GetProductAndSkuIds` total), pero el Search API `/products/search`
+> paginado solo devuelve los **10 activos/disponibles** del sales channel — los agotados/inactivos quedan
+> fuera (los Search APIs son públicos → solo devuelven activos/visibles). `GetProductAndSkuIds` (PVT)
+> está limitado a 20 en esta cuenta (ignora from/to). Además el nombre sincronizado usaba `item.name`,
+> que en el Search API real es un CÓDIGO corto ("LORRB"), no el nombre del producto (`productName` =
+> "Loreal Majirel Tinte Red Boster 60ml"). Suite completa verde: **4,8xx tests** (se confirma en la
+> verificación).
+
+- **VTEX-CATALOGO-001 (P1 — causa raíz del "solo 10 productos")** (`class-ltms-api-vtex.php` +
+  `class-ltms-vtex-sync.php`): nueva **Fase B** en `sync_vendor_products()` que completa el catálogo
+  vía los sitemaps públicos `sitemap/product-{n}.xml` (`get_catalog_slugs()` → slugs/linkText) y
+  resuelve cada slug con `GET /api/catalog_system/pub/products/search/{slug}/p`
+  (`get_products_search_by_slug()`), que SÍ devuelve productos agotados/inactivos con precio, stock e
+  imágenes (verificado en vivo: 15ms/request → ~1,362 requests ≈ 20s). Dedupe por `productId` entre la
+  Fase A (search paginado, se mantiene como fallback) y la Fase B. El producto de ejemplo de VTEX
+  (`product-example`) se omite. `fetch_raw()` hace el GET crudo del XML (el sitemap no es JSON).
+- **VTEX-CATALOGO-002 (P1 — nombres)** (`class-ltms-api-vtex.php`): `normalize_search_item()` ahora usa
+  `pick_product_name()` → prioridad `productName` → `nameComplete` → `item.name`. Antes el marketplace
+  creaba productos llamados "LORRB"/"C800" en vez del nombre real.
+- **Tests** +8 (5 funcionales en `VtexFunctionalE2ETest.php`: nombre por productName, fallbacks
+  nameComplete/item.name, parseo de sitemaps, by-slug, y sync end-to-end Fase A+Fase B con dedupe
+  → 2 creados; +3 estructurales en `VtexIntegrationAuditTest.php`: métodos nuevos, uso en el sync,
+  preferencia de productName). Los 2 tests e2e existentes stubean `wp_remote_get` (sitemap no-op).
+- **Verificación en vivo**: sitemap 1,362 URLs; `GetProductAndSkuIds` total 2,643 pero limitado a 20;
+  by-slug devuelve agotados con offer completo; 15ms/request desde SG.
+
+---
+
+## [Unreleased] — 2026-09-01
+
 ### Fixed — `VTEX-SYNC-BG` (sync VTEX: "Error de red" por timeout del request + filtro de categoría con "0 productos" + SKU/RefId y categoría equivocada)
 
 > La sync manual corría SÍNCRONA dentro del request AJAX (`ajax_sync_vtex_products` → `sync_vendor_products()`).

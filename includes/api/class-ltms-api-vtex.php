@@ -630,7 +630,7 @@ final class LTMS_Api_Vtex {
             'sku'              => $sku,
             'vtex_sku_id'      => (string) ( $item['itemId'] ?? '' ),
             'vtex_product_id'  => (string) ( $product['productId'] ?? '' ),
-            'name'             => (string) ( $item['name'] ?? $product['productName'] ?? '' ),
+            'name'             => self::pick_product_name( $product, $item ),
             'descripcion'      => (string) ( $product['description'] ?? '' ),
             'precio'           => $price,
             'regular_price'    => $price,
@@ -684,6 +684,171 @@ final class LTMS_Api_Vtex {
             }
         }
         return array_values( array_unique( $clean ) );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Catálogo completo (VTEX-CATALOGO-FIX)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Elige el nombre de producto correcto para la sync.
+     *
+     * VTEX-CATALOGO-FIX: el Search API real devuelve el item.name como un CÓDIGO
+     * corto (ej. "LORRB", "C800"), no como el nombre del producto. El nombre real
+     * está en $product['productName'] (ej. "Loreal Majirel Tinte Red Boster
+     * 60ml"). Antes se usaba item.name → el marketplace creaba productos llamados
+     * "LORRB" en vez del nombre completo. Prioridad: productName → nameComplete
+     * → item.name.
+     *
+     * @param array $product Producto (padre) del Search API.
+     * @param array $item    SKU (item) del Search API.
+     * @return string Nombre del producto.
+     */
+    private static function pick_product_name( array $product, array $item ): string {
+        $name = (string) ( $product['productName'] ?? '' );
+        if ( '' === trim( $name ) ) {
+            $name = (string) ( $item['nameComplete'] ?? '' );
+        }
+        if ( '' === trim( $name ) ) {
+            $name = (string) ( $item['name'] ?? '' );
+        }
+        return $name;
+    }
+
+    /**
+     * Hace una petición GET cruda (para XML/texto, no JSON).
+     *
+     * El Sitemap XML de VTEX no es JSON, así que no puede pasar por request().
+     *
+     * @param string $url URL completa.
+     * @return array{success: bool, body: string, error: string, status: int}
+     */
+    public static function fetch_raw( string $url ): array {
+        if ( ! function_exists( 'wp_remote_get' ) ) {
+            return [
+                'success' => false,
+                'body'    => '',
+                'error'   => 'wp_remote_get no disponible.',
+                'status'  => 0,
+            ];
+        }
+
+        $args = [
+            'timeout'   => self::HTTP_TIMEOUT,
+            // CICLO33-P1-SSL invariant: sslverify explícito (mismo que request()).
+            'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
+            'headers'   => [
+                'Accept'     => 'application/xml',
+                'User-Agent' => 'LT-Marketplace-Suite/' . ( defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '0.0.0' ),
+            ],
+        ];
+
+        $response = wp_remote_get( $url, $args );
+        if ( is_wp_error( $response ) ) {
+            return [
+                'success' => false,
+                'body'    => '',
+                'error'   => $response->get_error_message(),
+                'status'  => 0,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'body'    => (string) wp_remote_retrieve_body( $response ),
+            'error'   => '',
+            'status'  => (int) wp_remote_retrieve_response_code( $response ),
+        ];
+    }
+
+    /**
+     * Enlista los slugs (linkText) de TODOS los productos del catálogo vía los
+     * sitemaps de producto de VTEX.
+     *
+     * VTEX-CATALOGO-FIX: el Search API `/products/search` solo devuelve los
+     * productos ACTIVOS/disponibles en el sales channel (en dkosmetic: 10 de
+     * 1362). `GetProductAndSkuIds` (PVT) está limitado a 20 en esta cuenta.
+     * Los sitemaps `sitemap/product-{n}.xml` son públicos y listan el catálogo
+     * COMPLETO (activos), incluyendo agotados — cada slug se puede resolver con
+     * `/products/search/{slug}/p` que SÍ incluye los no disponibles.
+     *
+     * @param string $account_name Nombre de la cuenta VTEX.
+     * @param string $environment  Environment VTEX.
+     * @return string[] Lista de slugs únicos (sin duplicados).
+     */
+    public static function get_catalog_slugs( string $account_name, string $environment = '' ): array {
+        $base = self::build_base_url( $account_name, $environment );
+        if ( '' === $base ) {
+            return [];
+        }
+
+        $slugs = [];
+        for ( $idx = 0; $idx < 50; $idx++ ) {
+            $url = $base . '/sitemap/product-' . $idx . '.xml';
+            $raw = self::fetch_raw( $url );
+            if ( ! $raw['success'] || $raw['status'] >= 400 ) {
+                break; // No hay más sitemaps de producto.
+            }
+
+            $found = false;
+            if ( preg_match_all( '#<loc>\s*(https?://[^<]+)/p\s*</loc>#i', $raw['body'], $matches ) ) {
+                foreach ( $matches[1] as $link ) {
+                    $slug = basename( untrailingslashit( $link ) );
+                    if ( '' === $slug ) {
+                        continue;
+                    }
+                    $slugs[] = rawurldecode( $slug );
+                    $found   = true;
+                }
+            }
+            if ( ! $found ) {
+                break;
+            }
+        }
+
+        return array_values( array_unique( $slugs ) );
+    }
+
+    /**
+     * Busca UN producto del catálogo por su slug (linkText), incluyendo los
+     * agotados/inactivos que el Search API paginado omite.
+     *
+     * GET /api/catalog_system/pub/products/search/{linkText}/p
+     *
+     * @param string $account_name Nombre de la cuenta.
+     * @param string $app_key      AppKey.
+     * @param string $app_token    AppToken.
+     * @param string $slug         linkText del producto (ej. "loreal-...-60ml").
+     * @param string $environment  Environment VTEX.
+     * @return array{success: bool, data: array, error: string, status: int}
+     */
+    public static function get_products_search_by_slug(
+        string $account_name,
+        string $app_key,
+        string $app_token,
+        string $slug,
+        string $environment = ''
+    ): array {
+        $result = self::request(
+            $account_name, $app_key, $app_token,
+            '/api/catalog_system/pub/products/search/' . rawurlencode( $slug ) . '/p',
+            [],
+            'GET',
+            $environment
+        );
+
+        if ( ! $result['success'] ) {
+            return $result;
+        }
+
+        $products = is_array( $result['data'] ) ? $result['data'] : [];
+        return [
+            'success' => true,
+            'data'    => $products,
+            'error'   => '',
+            'status'  => $result['status'],
+            'raw'     => $result['data'],
+        ];
     }
 
     /**
