@@ -78,6 +78,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_save_posgold_credentials',   [ $instance, 'ajax_save_posgold_credentials' ] );
         add_action( 'wp_ajax_ltms_test_posgold_connection',     [ $instance, 'ajax_test_posgold_connection' ] );
         add_action( 'wp_ajax_ltms_sync_posgold_products',       [ $instance, 'ajax_sync_posgold_products' ] );
+        add_action( 'wp_ajax_ltms_get_posgold_sync_status',     [ $instance, 'ajax_get_posgold_sync_status' ] );
         add_action( 'wp_ajax_ltms_save_posgold_categories',     [ $instance, 'ajax_save_posgold_categories' ] );
         add_action( 'wp_ajax_ltms_save_posgold_rules',          [ $instance, 'ajax_save_posgold_rules' ] );
         add_action( 'wp_ajax_ltms_save_posgold_seo',            [ $instance, 'ajax_save_posgold_seo' ] );
@@ -2094,6 +2095,17 @@ final class LTMS_Dashboard_Logic {
 
     /**
      * v2.9.31 — AJAX: Sincronizar productos PosGold → WooCommerce.
+     *
+     * POSGOLD-SYNC-BG FIX: antes este handler ejecutaba sync_vendor_products()
+     * en el MISMO request AJAX. Con catálogos grandes el request superaba el
+     * max_execution_time/timeout del hosting (SiteGround) y el navegador
+     * mostraba "Error de red." después de varios minutos. Ahora:
+     *   1. Persiste el filtro de categorías ACTUAL del formulario (lo que el
+     *      vendor ve marcado se sincroniza — evita "0 productos" por un filtro
+     *      viejo/no guardado).
+     *   2. Programa la sync en background vía WP-Cron (LTMS_PosGold_Sync::schedule_sync)
+     *      y devuelve de inmediato. El frontend hace polling a
+     *      ltms_get_posgold_sync_status hasta que termine.
      */
     public function ajax_sync_posgold_products(): void {
         check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
@@ -2111,35 +2123,58 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
         }
 
-        // v2.9.66 DEEP-AUDIT-002 P2-19: Limitar set_time_limit al máximo permitido.
-        // Antes usaba 600s (10 min) que puede exceder max_execution_time del servidor
-        // causando que el script se corte silenciosamente sin feedback al usuario.
-        $max_exec = (int) ini_get( 'max_execution_time' );
-        $desired_limit = 600; // 10 minutos ideal
-        if ( $max_exec > 0 && $max_exec < $desired_limit ) {
-            $desired_limit = max( 30, $max_exec - 5 ); // Dejar 5s de margen
-        }
-        if ( function_exists( 'set_time_limit' ) ) {
-            @set_time_limit( $desired_limit );
+        // 1. Persistir el filtro de categorías actual (CSV o JSON) antes de
+        //    programar, para que la sync use exactamente lo que el vendor ve.
+        //    El JS NUEVO siempre envía category_ids (incluso vacío → deseleccionó
+        //    todas → sincronizar TODO). El JS viejo no lo envía: se respeta el
+        //    filtro guardado para no limpiarlo por error.
+        $has_filter_param = isset( $_POST['category_ids'] );
+        $category_csv     = sanitize_text_field( wp_unslash( $_POST['category_ids'] ?? '' ) );
+        if ( $has_filter_param ) {
+            $ids = $this->parse_category_ids( $category_csv );
+            update_user_meta( $user_id, 'ltms_posgold_category_ids', wp_json_encode( $ids ) );
+            update_user_meta( $user_id, 'ltms_posgold_category_ids_csv', implode( ',', $ids ) );
         }
 
-        $result = LTMS_PosGold_Sync::sync_vendor_products( $user_id );
+        // 2. Programar en background.
+        $result = LTMS_PosGold_Sync::schedule_sync( $user_id );
 
-        if ( $result['success'] ) {
-            wp_send_json_success( [
-                'message'      => $result['message'],
-                'created'      => $result['created'],
-                'updated'      => $result['updated'],
-                'skipped'      => $result['skipped'],
-                'duplicates'   => $result['duplicates'] ?? 0,
-                'filtered_out' => $result['filtered_out'] ?? 0,
-                'errors'       => $result['errors'],
-                // v2.9.66 P2-19: Incluir info de tiempo límite para debug.
-                'time_limit'   => $desired_limit,
-            ] );
-        } else {
+        if ( ! $result['success'] ) {
             wp_send_json_error( [ 'message' => $result['message'] ] );
         }
+
+        // Baseline del último resultado para que el polling detecte el resultado
+        // NUEVO de esta sync (completed_at distinto al que ya existía).
+        $status = LTMS_PosGold_Sync::get_sync_status( $user_id );
+
+        wp_send_json_success( [
+            'message'      => $result['message'],
+            'scheduled'    => true,
+            'baseline'     => isset( $status['last_result']['completed_at'] ) ? $status['last_result']['completed_at'] : null,
+            'category_csv' => $category_csv,
+        ] );
+    }
+
+    /**
+     * v2.9.31 — AJAX: Estado de la sync PosGold en background (polling).
+     */
+    public function ajax_get_posgold_sync_status(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_PosGold_Sync' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
+        }
+
+        wp_send_json_success( LTMS_PosGold_Sync::get_sync_status( $user_id ) );
     }
 
     /**
@@ -2159,14 +2194,9 @@ final class LTMS_Dashboard_Logic {
 
         // v2.9.70 P3-9: Guardar como JSON en vez de CSV (más robusto).
         // Mantener backward compatibility: si llega CSV, convertir a JSON.
+        // POSGOLD-SYNC-BG: aceptar también JSON (JS viejo cacheado podía enviarlo).
         $raw = sanitize_text_field( $_POST['category_ids'] ?? '' ); // phpcs:ignore
-        $ids = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
-        $sanitized = [];
-        foreach ( $ids as $id ) {
-            if ( is_numeric( $id ) ) {
-                $sanitized[] = (string) absint( $id );
-            }
-        }
+        $sanitized = $this->parse_category_ids( $raw );
         // Guardar como JSON.
         $clean_json = wp_json_encode( $sanitized );
         update_user_meta( $user_id, 'ltms_posgold_category_ids', $clean_json );

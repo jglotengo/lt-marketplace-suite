@@ -793,6 +793,8 @@ $files = [
     // correrlos si se ejecuta la suite ahí.
     'tests/unit/VtexFunctionalE2ETest.php',
     'tests/unit/VtexSyncBackgroundTest.php',
+    // POSGOLD-SYNC-BG v2.9.330 — sync PosGold en background (polling) + filtro CSV/JSON.
+    'tests/unit/PosGoldSyncBackgroundTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

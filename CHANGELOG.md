@@ -4,6 +4,38 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-02
+
+### Fixed — `POSGOLD-SYNC-BG` (botón "Sincronizar" de PosGold mataba el request AJAX por timeout → "Error de red")
+
+> Mismo patrón que el fix VTEX-SYNC-BG aplicado al día anterior: el botón "Sincronizar ahora" de PosGold
+> ejecutaba `sync_vendor_products()` de forma SÍNCRONA dentro del request AJAX. Con catálogos grandes
+> el request superaba el `max_execution_time`/timeout del hosting (SiteGround) y el navegador mostraba
+> "Error de red" tras varios minutos. Ahora se programa en background vía WP-Cron con polling de estado.
+> Suite completa verde: **4,825 tests / 9,948 assertions** (0 failures, 3 skips preexistentes).
+
+- **POSGOLD-SYNC-BG-001 (P1 — causa raíz)** (`class-ltms-dashboard-logic.php`): `ajax_sync_posgold_products()`
+  ya NO ejecuta `sync_vendor_products()` en el request. Ahora persiste el filtro de categorías ACTUAL del
+  formulario (CSV o JSON, `parse_category_ids()`) y programa la sync vía `LTMS_PosGold_Sync::schedule_sync()`
+  (WP-Cron → `ltms_posgold_sync_cron` → `run_scheduled_sync()`). El frontend hace polling cada 8s a
+  `ltms_get_posgold_sync_status` y muestra `last_result` (creados/actualizados/omitidos/errores). Se eliminó
+  el `set_time_limit` del request (ya no aplica) y el progress bar inline quedó reemplazado por el div de
+  resultado del polling.
+- **POSGOLD-SYNC-BG-002 (P1 — filtro roto)** (`class-ltms-posgold-sync.php` + `class-ltms-dashboard-logic.php`):
+  `ajax_save_posgold_categories()` guardaba el filtro como JSON en `ltms_posgold_category_ids`, pero
+  `filter_by_category()` solo entiende CSV → el filtro quedaba vacío y la sync traía TODO el catálogo.
+  Nuevo `normalize_category_filter()` (acepta CSV y JSON) en `sync_vendor_products()`, y
+  `ajax_save_posgold_categories()` ahora usa `parse_category_ids()` (robusto a JSON/CSV). El JS normaliza
+  el hidden input `#ltms-posgold-category-ids` a CSV al cargar (mismo fix que VTEX-SYNC-BG).
+- **LTMS_PosGold_Sync::get_sync_status()**: nuevo método para el polling (in_progress + flag stale de
+  >30 min + `last_result` + `last_sync_count`), mismo contrato que `LTMS_Vtex_Sync::get_sync_status()`.
+- **Tests** +8 en `PosGoldSyncBackgroundTest.php` (nuevo, grupo `audit-posgold-background`): `get_sync_status`
+  (en curso + stale), `ajax_sync_posgold_products` persiste CSV/JSON y programa (NO ejecuta), respeta el guard
+  de sync en curso, envío vacío limpia el filtro, `ajax_get_posgold_sync_status`, y `normalize_category_filter`
+  acepta JSON/CSV. `LTMS_VERSION` → 2.9.330 (cache-busting del JS). Whitelist del deploy webhook actualizada.
+
+---
+
 ## [Unreleased] — 2026-09-01
 
 ### Fixed — `VTEX-CATALOGO` (sync solo traía 10 de ~1,362 productos + nombres tipo "LORRB" en vez del nombre real)

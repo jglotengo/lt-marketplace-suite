@@ -143,6 +143,36 @@ final class LTMS_PosGold_Sync {
     }
 
     /**
+     * Devuelve el estado actual de la sync de un vendor (para polling AJAX).
+     *
+     * POSGOLD-SYNC-BG FIX: la sync manual pasó de ejecutarse en el request AJAX
+     * (mataba el request por timeout → "Error de red" con catálogos grandes) a
+     * programarse en background vía WP-Cron (schedule_sync → CRON_HOOK →
+     * run_scheduled_sync). Este método alimenta el polling del frontend: si hay
+     * una sync en curso, el último resultado conocido y cuándo terminó la última.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return array{in_progress: bool, in_progress_since: int, last_result: array|null, last_sync: int, last_sync_count: int}
+     */
+    public static function get_sync_status( int $vendor_id ): array {
+        $in_progress_raw = (int) get_user_meta( $vendor_id, '_ltms_posgold_sync_in_progress', true );
+        $stale_cutoff    = 30 * MINUTE_IN_SECONDS;
+
+        $last_result = get_user_meta( $vendor_id, '_ltms_posgold_sync_last_result', true );
+        if ( ! is_array( $last_result ) ) {
+            $last_result = null;
+        }
+
+        return [
+            'in_progress'       => $in_progress_raw > 0 && ( time() - $in_progress_raw ) < $stale_cutoff,
+            'in_progress_since' => $in_progress_raw > 0 ? $in_progress_raw : 0,
+            'last_result'       => $last_result,
+            'last_sync'         => (int) get_user_meta( $vendor_id, 'ltms_posgold_last_sync', true ),
+            'last_sync_count'   => (int) get_user_meta( $vendor_id, 'ltms_posgold_last_sync_count', true ),
+        ];
+    }
+
+    /**
      * Sincroniza todos los productos de PosGold hacia WooCommerce para un vendor.
      *
      * @param int $vendor_id ID del vendedor.
@@ -232,8 +262,14 @@ final class LTMS_PosGold_Sync {
         // 5. Filtrar por categoriaid si el vendor configuró categorías.
         $category_filter = (string) get_user_meta( $vendor_id, 'ltms_posgold_category_ids', true );
         if ( ! empty( $category_filter ) && class_exists( 'LTMS_PosGold_Price_Calculator' ) ) {
+            // POSGOLD-SYNC-BG FIX: el meta se guarda como JSON ("[8,4]") desde
+            // ajax_save_posgold_categories, pero filter_by_category espera CSV.
+            // Si no se normaliza, el filtro queda vacío y la sync trae TODO el
+            // catálogo (o "0 productos" si el JS dependía de él). Mismo patrón
+            // que el fix VTEX-SYNC-BG (parse_category_ids).
+            $filter_ids = self::normalize_category_filter( $category_filter );
             $before_count = count( $normalized );
-            $normalized = LTMS_PosGold_Price_Calculator::filter_by_category( $normalized, $category_filter );
+            $normalized = LTMS_PosGold_Price_Calculator::filter_by_category( $normalized, $filter_ids );
             $filtered_out = $before_count - count( $normalized );
         } else {
             $filtered_out = 0;
@@ -400,6 +436,43 @@ final class LTMS_PosGold_Sync {
             'usuarioid'  => $usuarioid,
             'bodegaid'   => $bodegaid,
         ];
+    }
+
+    /**
+     * Normaliza el filtro de categorías almacenado (CSV "8,4" o JSON "[8,4]")
+     * a un array de strings numéricas para filter_by_category.
+     *
+     * POSGOLD-SYNC-BG FIX: ajax_save_posgold_categories guarda JSON en
+     * ltms_posgold_category_ids, pero filter_by_category solo entiende CSV.
+     *
+     * @param string $raw Valor crudo del filtro.
+     * @return string[]
+     */
+    private static function normalize_category_filter( string $raw ): array {
+        $raw = trim( $raw );
+        if ( '' === $raw ) {
+            return [];
+        }
+
+        $parts = [];
+        if ( str_starts_with( $raw, '[' ) ) {
+            $decoded = json_decode( $raw, true );
+            if ( is_array( $decoded ) ) {
+                foreach ( $decoded as $id ) {
+                    $parts[] = (string) $id;
+                }
+            }
+        } else {
+            $parts = array_map( 'trim', explode( ',', $raw ) );
+        }
+
+        $sanitized = [];
+        foreach ( $parts as $id ) {
+            if ( is_numeric( $id ) ) {
+                $sanitized[] = (string) absint( $id );
+            }
+        }
+        return $sanitized;
     }
 
     /**

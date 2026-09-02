@@ -97,7 +97,7 @@ if ( empty( $seo_template ) ) {
         </div>
         <div class="ltms-card-body">
             <p style="margin:0 0 16px;color:#374151;">
-                <?php esc_html_e( 'Al sincronizar, se descargará tu catálogo de PosGold (filtrado por las categorías configuradas), se calculará el precio con tus reglas, se aplicará SEO al título, se depurarán duplicados, y se crearán o actualizarán los productos en el marketplace. Esto puede tardar varios minutos.', 'ltms' ); ?>
+                <?php esc_html_e( 'Al sincronizar, se descargará tu catálogo de PosGold (filtrado por las categorías configuradas), se calculará el precio con tus reglas, se aplicará SEO al título, se depurarán duplicados, y se crearán o actualizarán los productos en el marketplace. La sincronización corre en segundo plano y puedes cerrar esta página.', 'ltms' ); ?>
             </p>
             <?php if ( ! $can_sync ) : ?>
                 <?php $remaining = ( 2 * MINUTE_IN_SECONDS ) - ( time() - $last_sync ); ?>
@@ -117,18 +117,8 @@ if ( empty( $seo_template ) ) {
                     <?php echo $can_sync ? '' : 'disabled'; ?>>
                 🔄 <?php esc_html_e( 'Sincronizar ahora', 'ltms' ); ?>
             </button>
-            <!-- v2.9.77 P0-UI-6: Progress indicator para sync de larga duración -->
-            <div id="ltms-posgold-sync-progress" style="margin-top:16px;display:none;">
-                <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
-                    <div class="ltms-spinner" style="width:20px;height:20px;border:3px solid #dbeafe;border-top:3px solid #2563eb;border-radius:50%;animation:ltms-spin 1s linear infinite;flex-shrink:0;"></div>
-                    <div style="flex:1;">
-                        <div style="font-weight:600;color:#1e40af;font-size:0.85rem;" id="ltms-posgold-sync-status"><?php esc_html_e( 'Sincronizando productos...', 'ltms' ); ?></div>
-                        <div style="font-size:0.75rem;color:#3b82f6;margin-top:2px;" id="ltms-posgold-sync-hint"><?php esc_html_e( 'Esto puede tardar varios minutos. Puedes continuar navegando.', 'ltms' ); ?></div>
-                    </div>
-                </div>
-            </div>
+            <!-- POSGOLD-SYNC-BG: la sync corre en background (WP-Cron) con polling de estado. -->
             <div id="ltms-posgold-sync-result" style="margin-top:16px;display:none;"></div>
-            <style>@keyframes ltms-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
         </div>
     </div>
     <?php endif; ?>
