@@ -36,6 +36,18 @@ require_once __DIR__ . '/stubs/wc-product-simple-stub.php';
  */
 final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 
+	/**
+	 * Subclase de test: set_global_unique_id LANZA (simula el EAN duplicado/
+	 * inválido que WooCommerce rechaza). Verifica que set_barcode_safe degrada.
+	 */
+	private static function barcode_throwing_product(): \WC_Product_Simple {
+		return new class() extends \WC_Product_Simple {
+			public function set_global_unique_id( $id ) {
+				throw new \Exception( 'GTIN, UPC, EAN o ISBN no válidos o duplicados.' );
+			}
+		};
+	}
+
 	private function plugin_path( string $relative ): string {
 		return dirname( __DIR__, 2 ) . '/' . $relative;
 	}
@@ -355,6 +367,19 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		$this->assertTrue( $result['success'], 'La sync debe tener éxito: ' . ( $result['message'] ?? '' ) );
 		$this->assertSame( 2, $result['created'],
 			'Debe crear 1 de la Fase A (search) + 1 de la Fase B (sitemap), sin duplicar el de la Fase A.' );
+	}
+
+	public function test_set_barcode_safe_degrades_on_invalid_duplicate_barcode(): void {
+		$this->require_class( 'LTMS_Vtex_Sync' );
+		$this->require_class( 'WC_Product_Simple' );
+
+		$product = self::barcode_throwing_product();
+		$refl    = new \ReflectionMethod( \LTMS_Vtex_Sync::class, 'set_barcode_safe' );
+		$refl->setAccessible( true );
+
+		$refl->invoke( null, $product, '123' );
+		$this->assertTrue( true,
+			'Un barcode inválido/duplicado NO debe lanzar: el producto se crea sin él (VTEX-CATALOGO-003).' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────

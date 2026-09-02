@@ -28,10 +28,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **VTEX-CATALOGO-002 (P1 — nombres)** (`class-ltms-api-vtex.php`): `normalize_search_item()` ahora usa
   `pick_product_name()` → prioridad `productName` → `nameComplete` → `item.name`. Antes el marketplace
   creaba productos llamados "LORRB"/"C800" en vez del nombre real.
-- **Tests** +8 (5 funcionales en `VtexFunctionalE2ETest.php`: nombre por productName, fallbacks
-  nameComplete/item.name, parseo de sitemaps, by-slug, y sync end-to-end Fase A+Fase B con dedupe
-  → 2 creados; +3 estructurales en `VtexIntegrationAuditTest.php`: métodos nuevos, uso en el sync,
-  preferencia de productName). Los 2 tests e2e existentes stubean `wp_remote_get` (sitemap no-op).
+- **VTEX-CATALOGO-003 (P1 — QA en vivo)** (`class-ltms-vtex-sync.php`): tras la sync real del catálogo de
+  dkosmetic (~1,362 SKUs), ~400 SKUs FALLABAN la creación completa con "GTIN, UPC, EAN o ISBN no válidos o
+  duplicados" (WooCommerce lanza excepción al validar barcode inválido/duplicado; hay EANs repetidos y
+  formatos atípicos en el catálogo real). Fix: `set_barcode_safe()` envuelve `set_global_unique_id()` en
+  try/catch — el producto se crea sin barcode, nunca se pierde por un EAN inválido.
+- **Tests** +9 (6 funcionales en `VtexFunctionalE2ETest.php`: nombre por productName, fallbacks
+  nameComplete/item.name, parseo de sitemaps, by-slug, sync end-to-end Fase A+Fase B con dedupe
+  → 2 creados, y `set_barcode_safe` degrada ante barcode inválido/duplicado; +3 estructurales en
+  `VtexIntegrationAuditTest.php`: métodos nuevos, uso en el sync, preferencia de productName). Los 2 tests
+  e2e existentes stubean `wp_remote_get` (sitemap no-op).
 - **Verificación en vivo**: sitemap 1,362 URLs; `GetProductAndSkuIds` total 2,643 pero limitado a 20;
   by-slug devuelve agotados con offer completo; 15ms/request desde SG.
 

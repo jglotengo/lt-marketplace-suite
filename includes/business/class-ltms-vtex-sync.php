@@ -653,7 +653,7 @@ final class LTMS_Vtex_Sync {
         $wc_product->set_stock_status( $product['stock_quantity'] > 0 ? 'instock' : 'outofstock' );
 
         if ( ! empty( $product['barcode'] ) ) {
-            $wc_product->set_global_unique_id( $product['barcode'] );
+            self::set_barcode_safe( $wc_product, $product['barcode'] );
         }
 
         $wc_product->update_meta_data( self::SYNC_META_KEY, current_time( 'mysql', true ) );
@@ -703,7 +703,7 @@ final class LTMS_Vtex_Sync {
         $wc_product->set_stock_status( $product['stock_quantity'] > 0 ? 'instock' : 'outofstock' );
 
         if ( ! empty( $product['barcode'] ) ) {
-            $wc_product->set_global_unique_id( $product['barcode'] );
+            self::set_barcode_safe( $wc_product, $product['barcode'] );
         }
 
         $wc_product->update_meta_data( self::SYNC_META_KEY, current_time( 'mysql', true ) );
@@ -723,6 +723,29 @@ final class LTMS_Vtex_Sync {
 
         if ( ! empty( $product['imagen_url'] ) && ! has_post_thumbnail( $wc_product->get_id() ) ) {
             self::download_and_attach_image( $product['imagen_url'], $wc_product->get_id() );
+        }
+    }
+
+    /**
+     * Asigna el barcode (global unique ID) de forma segura.
+     *
+     * VTEX-CATALOGO-003 FIX: WooCommerce valida el GTIN/UPC/EAN al guardar y
+     * LANZA excepción si el valor es inválido O ya está en uso por otro producto
+     * ("GTIN, UPC, EAN o ISBN no válidos o duplicados"). En el catálogo real de
+     * dkosmetic ~400 SKUs comparten EANs (duplicados) o tienen formatos atípicos
+     * (UPC de 12 dígitos, ceros a la izquierda). Sin este guard, cada uno de esos
+     * SKUs FALLABA la creación completa del producto. El barcode es opcional en
+     * WC: si no pasa la validación se omite y el producto se crea igual.
+     *
+     * @param \WC_Product $wc_product Producto WC.
+     * @param string      $barcode    Valor crudo del barcode VTEX.
+     * @return void
+     */
+    private static function set_barcode_safe( \WC_Product $wc_product, string $barcode ): void {
+        try {
+            $wc_product->set_global_unique_id( $barcode );
+        } catch ( \Throwable $e ) {
+            // Barcode inválido o duplicado → el producto se crea sin él.
         }
     }
 
