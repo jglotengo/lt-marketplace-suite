@@ -7,7 +7,7 @@
     "build": "node scripts/build.js",
     "build:js": "node scripts/build.js --js-only",
     "build:css": "node scripts/build.js --css-only",
-    "lint:php": "node scripts/php_check.js $(find includes/ -name '*.php' -not -path '*/vendor/*') $(find lt-marketplace-suite.php -maxdepth 0)",
+    "lint:php": "node scripts/php_check.js",
     "lint:js": "node scripts/js_check.js",
     "lint": "npm run lint:php && npm run lint:js",
     "test": "npm run lint",
