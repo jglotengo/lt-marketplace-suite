@@ -798,6 +798,9 @@ $files = [
     // VENDOR-CARD-NAME + MATRICULA-FLEX v2.9.331 — nombre real del vendedor en
     // cards de catálogo + matrícula vencida pasa a warning (best-effort UIAF).
     'tests/unit/ProductVendorCardNameTest.php',
+    // SF-CAT-DEDUP + SF-PAGING v2.9.332 — categorías duplicadas por slug aleatorio
+    // en la sync VTEX/PosGold + paginación 24 por página en el storefront.
+    'tests/unit/StorefrontCategoryDedupTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

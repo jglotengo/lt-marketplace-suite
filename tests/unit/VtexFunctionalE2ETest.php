@@ -353,6 +353,7 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		Monkey\Functions\when( 'wc_get_product' )->justReturn( null );
 		Monkey\Functions\when( 'get_post' )->justReturn( null );
 		Monkey\Functions\when( 'wp_update_post' )->justReturn( 1 );
+		Monkey\Functions\when( 'get_terms' )->justReturn( [] );
 		Monkey\Functions\when( 'get_term_by' )->justReturn( null );
 		Monkey\Functions\when( 'wp_insert_term' )->justReturn( [ 'term_id' => 5 ] );
 		Monkey\Functions\when( 'sanitize_title' )->alias( static fn( $s ) => strtolower( str_replace( ' ', '-', (string) $s ) ) );
@@ -521,12 +522,12 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		] );
 		// Sin sitemap (Fase B no-op) — el sync no debe romper.
 		Monkey\Functions\when( 'wp_remote_get' )->justReturn( [ 'response' => [ 'code' => 404 ], 'body' => '' ] );
-
-		// WooCommerce (create path).
+// WooCommerce (create path).
 		Monkey\Functions\when( 'wc_get_product_id_by_sku' )->justReturn( 0 );
 		Monkey\Functions\when( 'wc_get_product' )->justReturn( null );
 		Monkey\Functions\when( 'get_post' )->justReturn( null );
 		Monkey\Functions\when( 'wp_update_post' )->justReturn( 1 );
+		Monkey\Functions\when( 'get_terms' )->justReturn( [] );
 		Monkey\Functions\when( 'get_term_by' )->justReturn( null );
 		Monkey\Functions\when( 'wp_insert_term' )->justReturn( [ 'term_id' => 5 ] );
 		Monkey\Functions\when( 'sanitize_title' )->alias( static fn( $s ) => strtolower( str_replace( ' ', '-', (string) $s ) ) );
@@ -539,7 +540,8 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		$result = \LTMS_Vtex_Sync::sync_vendor_products( 141 );
 
 		$this->assertTrue( $result['success'], 'La sync debe tener éxito: ' . ( $result['message'] ?? '' ) );
-		$this->assertSame( 1, $result['created'], 'Debe crear 1 producto.' );
+		$this->assertSame( 1, $result['created'],
+			'Debe crear 1 producto (catálogo pequeño de una página).' );
 		$this->assertSame( 0, $result['updated'] );
 		$this->assertSame( 0, $result['skipped'] );
 		$this->assertSame( 'LEV-001', \WC_Product_Simple::$last_sku, 'El SKU creado en WC debe ser el RefId.' );

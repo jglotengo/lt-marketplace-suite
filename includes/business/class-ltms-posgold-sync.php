@@ -692,21 +692,56 @@ final class LTMS_PosGold_Sync {
      * @return int ID de la categoría.
      */
     private static function get_or_create_category( string $name, int $parent_id = 0 ): int {
+        $name = trim( $name );
+        if ( '' === $name ) {
+            return 0;
+        }
         $slug = sanitize_title( $name );
 
-        // Buscar categoría existente por slug + parent.
+        // SF-CAT-DEDUP FIX (mismo bug que VTEX): el lookup por slug limpio fallaba
+        // porque los términos se creaban con slug aleatorio ($slug.'-'.rand) →
+        // cada sync creaba N duplicados del mismo nombre. Ahora busca por nombre
+        // exacto, fallback a slug limpio, fallback a slug prefijado legacy, y solo
+        // inserta con slug determinista cuando no existe ninguno.
+        $by_name = get_terms( [
+            'taxonomy'   => 'product_cat',
+            'name'       => $name,
+            'parent'     => $parent_id,
+            'hide_empty' => false,
+            'number'     => 1,
+            'fields'     => 'ids',
+        ] );
+        if ( is_array( $by_name ) && ! empty( $by_name ) ) {
+            return (int) $by_name[0];
+        }
+
         $existing = get_term_by( 'slug', $slug, 'product_cat' );
         if ( $existing && (int) $existing->parent === $parent_id ) {
             return (int) $existing->term_id;
         }
 
-        // Crear categoría nueva.
+        $prefix_terms = get_terms( [
+            'taxonomy'   => 'product_cat',
+            'slug'       => $slug . '-',
+            'parent'     => $parent_id,
+            'hide_empty' => false,
+            'number'     => 1,
+            'fields'     => 'ids',
+        ] );
+        if ( is_array( $prefix_terms ) && ! empty( $prefix_terms ) ) {
+            return (int) $prefix_terms[0];
+        }
+
         $result = wp_insert_term( $name, 'product_cat', [
-            'slug'   => $slug . '-' . wp_rand( 100, 999 ),
+            'slug'   => $slug,
             'parent' => $parent_id,
         ] );
 
         if ( is_wp_error( $result ) ) {
+            $existing_id = (int) ( $result->error_data['term_exists'] ?? 0 );
+            if ( $existing_id > 0 ) {
+                return $existing_id;
+            }
             return 0;
         }
 

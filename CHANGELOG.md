@@ -6,6 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-03
 
+### Fixed — `SF-CAT-DEDUP` (categorías duplicadas en el storefront tras la sync VTEX) + `SF-PAGING` (paginación 24 por página)
+
+> Verificación en vivo (SG): tras las syncs de VTEX (incluido el auto-sync diario), la taxonomía
+> `product_cat` llegó a **7,480 términos para solo 307 nombres únicos** (~7,173 duplicados, 4,487
+> huérfanos sin productos). "Coloración" tenía **508 instancias**, "Cuidado de manos y pies" 461. El
+> sidebar de categorías del storefront de Kosmetic las mostraba todas. Suite completa verde: 4,8xx tests.
+
+- **SF-CAT-DEDUP-001 (P1 — causa raíz)** (`class-ltms-vtex-sync.php` + `class-ltms-posgold-sync.php`):
+  `get_or_create_category()` creaba términos con **slug aleatorio** (`$slug.'-'.wp_rand(100,999)`) pero el
+  lookup usaba `get_term_by('slug', sanitize_title($name))` → el slug limpio nunca existía → cada sync creaba
+  N duplicados del mismo nombre. Ahora: (1) busca por **nombre exacto** (mismo parent, case-insensitive),
+  (2) fallback a slug limpio (legacy), (3) fallback a slug prefijado `$slug-*` (reutiliza duplicados legacy),
+  (4) solo inserta con **slug determinista** (`sanitize_title`, sin aleatorio). Idempotente entre syncs.
+- **SF-CAT-DEDUP-002 (P2 — defensa storefront)** (`class-ltms-vendor-storefront.php`):
+  `get_vendor_categories()` ahora **agrupa por nombre** (`GROUP BY t.name`, `MIN(term_id)` canónico) y
+  devuelve el **count real** de productos del vendor por categoría (antes `$cat->count` siempre vacío).
+  Colapsa visualmente duplicados aunque existan en DB.
+- **SF-PAGING-001 (P2 — UX)** (`class-ltms-vendor-storefront.php`): `per_page` de 8 → 24 en el render
+  inicial y de 12 → 24 en `ajax_load_more`. Con 1,826 productos, el catálogo de Kosmetic necesitaba
+  ~229 clics de "Cargar más"; ahora ~77 (4 columnas × 6 filas por página).
+- **Tests** +7 en `StorefrontCategoryDedupTest.php` (nuevo): idempotencia por nombre (VTEX + PosGold),
+  reutilización de slug legacy prefijado, slug determinista al insertar, sin `wp_rand` en el slug
+  (estructural VTEX + PosGold), y `get_vendor_categories()` agrupa por nombre con count.
+  `LTMS_VERSION` → 2.9.332. Whitelist del deploy webhook actualizada.
+- **Datos (operativo, SG)**: consolidación de los ~7,173 términos duplicados hacia el canónico por nombre
+  (reenlace de productos + borrado de huérfanos). Ver sección de ejecución.
+
+---
+
+## [Unreleased] — 2026-09-03
+
 ### Fixed — `VENDOR-CARD-NAME` (tarjetas de catálogo mostraban "Tienda Lo Tengo" en vez del nombre del vendedor)
 
 > Verificación en vivo (SG): el catálogo VTEX de dkosmetic tiene **1,364 productos únicos** (sitemap

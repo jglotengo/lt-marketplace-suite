@@ -559,7 +559,10 @@ body.ltms-storefront-page .wh-header{display:none!important}
     private static function render( object $vendor ): void {
         // ── Parámetros de filtro/orden/paginación ──
         $paged      = max( 1, (int) ( $_GET['pg'] ?? 1 ) );
-        $per_page   = 8;
+        // SF-PAGING FIX: 8 → 24 por página (con 1,826 productos el catálogo de
+        // Kosmetic necesitaba ~229 clics de "Cargar más"). 24 mantiene el
+        // balance entre carga y UX (4 columnas × 6 filas).
+        $per_page   = 24;
         $cat_slug   = sanitize_title( $_GET['cat'] ?? '' );
         $orderby    = in_array( $_GET['order'] ?? '', [ 'price', 'price-desc', 'date' ], true )
                       ? sanitize_text_field( $_GET['order'] ) : 'date';
@@ -1064,8 +1067,16 @@ body.ltms-storefront-page .wh-header{display:none!important}
 
     private static function get_vendor_categories( int $vendor_id ): array {
         global $wpdb;
+
+        // SF-CAT-DEDUP FIX: los términos product_cat quedaron DUPLICADOS por la
+        // sync VTEX/PosGold (7,480 términos para 307 nombres únicos en dkosmetic;
+        // slug aleatorio -NNN rompía la idempotencia). Esta query agrupa por
+        // nombre y devuelve el term_id más bajo como canónico, colapsando los
+        // duplicados en el sidebar. El COUNT() real por categoría (productos
+        // publicados del vendor) se incluye para que el filtro muestre el número.
         $results = $wpdb->get_results( $wpdb->prepare(
-            "SELECT DISTINCT t.term_id, t.name, t.slug
+            "SELECT MIN(t.term_id) AS term_id, t.name, MIN(t.slug) AS slug,
+                    COUNT(DISTINCT p.ID) AS product_count
              FROM {$wpdb->terms} t
              INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
              INNER JOIN {$wpdb->term_relationships} tr ON tr.term_taxonomy_id = tt.term_taxonomy_id
@@ -1074,10 +1085,24 @@ body.ltms-storefront-page .wh-header{display:none!important}
                AND p.post_type = 'product'
                AND p.post_status = 'publish'
                AND p.post_author = %d
+             GROUP BY t.name
              ORDER BY t.name ASC",
             $vendor_id
         ) );
-        return is_array( $results ) ? $results : [];
+
+        if ( ! is_array( $results ) ) {
+            return [];
+        }
+
+        // Normalizar a objetos con count (el render usa $cat->count).
+        return array_map( static function ( $row ) {
+            return (object) [
+                'term_id' => (int) $row->term_id,
+                'name'    => $row->name,
+                'slug'    => $row->slug,
+                'count'   => (int) $row->product_count,
+            ];
+        }, $results );
     }
 
     // ================================================================
@@ -1195,7 +1220,8 @@ body.ltms-storefront-page .wh-header{display:none!important}
         $args = array_merge( [
             'post_type'      => 'product',
             'post_status'    => 'publish',
-            'posts_per_page' => 12,
+            // SF-PAGING FIX: 12 → 24 por página (paridad con el render inicial).
+            'posts_per_page' => 24,
             'paged'          => $paged,
             'author'         => $vendor_id,
             'tax_query'      => $tax_query,

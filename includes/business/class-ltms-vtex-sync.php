@@ -795,21 +795,70 @@ final class LTMS_Vtex_Sync {
 
     /**
      * Obtiene o crea una categoría de WooCommerce por nombre y padre.
+     *
+     * SF-CAT-DEDUP FIX: antes el lookup usaba get_term_by('slug', sanitize_title($name))
+     * pero los términos se CREABAN con slug aleatorio ($slug.'-'.wp_rand(100,999)),
+     * por lo que el slug "limpio" nunca existía → cada sync creaba N duplicados del
+     * mismo nombre (7,480 términos para 307 nombres únicos en dkosmetic). Ahora:
+     *  1. Busca por nombre exacto (mismo parent) — idempotente entre syncs.
+     *  2. Fallback: busca por slug limpio (cubre términos legacy creados sin sufijo).
+     *  3. Fallback: busca términos con slug prefijado ($slug-*) del mismo parent
+     *     (cubre duplicados legacy) y los reutiliza en vez de crear otro.
+     *  4. Solo si ninguno existe, inserta con slug determinista (sin sufijo aleatorio).
      */
     private static function get_or_create_category( string $name, int $parent_id = 0 ): int {
+        $name = trim( $name );
+        if ( '' === $name ) {
+            return 0;
+        }
         $slug = sanitize_title( $name );
 
-        $existing = get_term_by( 'slug', $slug, 'product_cat' );
-        if ( $existing && (int) $existing->parent === $parent_id ) {
-            return (int) $existing->term_id;
+        // 1. Nombre exacto (case-insensitive) en el mismo nivel.
+        $by_name = get_terms( [
+            'taxonomy'   => 'product_cat',
+            'name'       => $name,
+            'parent'     => $parent_id,
+            'hide_empty' => false,
+            'number'     => 1,
+            'fields'     => 'ids',
+        ] );
+        if ( is_array( $by_name ) && ! empty( $by_name ) ) {
+            return (int) $by_name[0];
         }
 
+        // 2. Slug limpio exacto (términos legacy sin sufijo).
+        $by_slug = get_term_by( 'slug', $slug, 'product_cat' );
+        if ( $by_slug && (int) $by_slug->parent === $parent_id ) {
+            return (int) $by_slug->term_id;
+        }
+
+        // 3. Términos legacy con slug prefijado "slug-*" (duplicados de syncs viejas).
+        $prefix = $slug . '-';
+        $prefix_terms = get_terms( [
+            'taxonomy'   => 'product_cat',
+            'slug'       => $prefix,
+            'parent'     => $parent_id,
+            'hide_empty' => false,
+            'number'     => 1,
+            'fields'     => 'ids',
+        ] );
+        if ( is_array( $prefix_terms ) && ! empty( $prefix_terms ) ) {
+            return (int) $prefix_terms[0];
+        }
+
+        // 4. Crear con slug determinista (sin aleatorio) — idempotente.
         $result = wp_insert_term( $name, 'product_cat', [
-            'slug'   => $slug . '-' . wp_rand( 100, 999 ),
+            'slug'   => $slug,
             'parent' => $parent_id,
         ] );
 
         if ( is_wp_error( $result ) ) {
+            // Si el slug colisionó (existe con otro parent o fue creado en este
+            // mismo request), WP devuelve el término existente en error->error_data.
+            $existing_id = (int) ( $result->error_data['term_exists'] ?? 0 );
+            if ( $existing_id > 0 ) {
+                return $existing_id;
+            }
             return 0;
         }
 
