@@ -4,6 +4,56 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-03
+
+### Fixed — `VENDOR-CARD-NAME` (tarjetas de catálogo mostraban "Tienda Lo Tengo" en vez del nombre del vendedor)
+
+> Verificación en vivo (SG): el catálogo VTEX de dkosmetic tiene **1,364 productos únicos** (sitemap
+> product-0=1000 + product-1=364) / 1,359 activos (Search API). La sync trajo **1,825 productos WC**
+> (1 producto por SKU/item de cada producto VTEX → más que las URLs del sitemap). Los nombres son reales
+> ("Loreal Absolut Repair Shmpoo Sachet Refil 240Ml", ya NO "LORRB"). El ">2000" esperado viene de
+> `GetProductAndSkuIds` (2,643 SKUs totales, no productos únicos). Las tarjetas del tema WoodMart/Elementor
+> (`li.product`) NO llevan el vendor server-side y `enhanceElementorCards()` (ltms-plaza-viva.js) inyectaba
+> el literal "Tienda Lo Tengo" en TODAS. Suite completa verde: 4,8xx tests.
+
+- **VENDOR-CARD-NAME-001 (P1 — causa raíz)** (`assets/js/ltms-plaza-viva.js` + `assets/js/ltms-plaza-viva.min.js`):
+  `enhanceElementorCards()` ya NO inyecta el literal "Tienda Lo Tengo". Consulta el nombre REAL del vendedor
+  vía el endpoint público `ltms_pv_product_vendor` (cadena canónica: `ltms_store_name` → `display_name` →
+  `user_login`, misma lógica que `content-product.php`/`single-product.php`). El nombre se pinta como link a la
+  tienda del vendedor. Guard `data-pv-vendor-loading` evita re-consultas en scroll/lazy-load.
+- **VENDOR-CARD-NAME-002 (P1 — endpoint)** (`class-ltms-native-templates.php`): nuevo `ajax_product_vendor()`
+  (AJAX privado + público `ltms_pv_product_vendor`) que resuelve el nombre del vendedor por `product_id`.
+  Devuelve `vendor_id`, `vendor_name`, `vendor_url`. Nonce `ltms_plaza_viva` (mismo del quick view).
+- **Asignación de datos (operativa, SG)**: 1,815 productos VTEX bajo el UID 141 ("asistente ventas ai", sin
+  `ltms_store_name`) se reasignan al UID 223 (erickleon, tienda "Kosmetic") para que las tarjetas muestren
+  el nombre comercial correcto. El KYC del 223 se aprueba tras el cambio de política de matrícula.
+- **Tests** +5 en `ProductVendorCardNameTest.php` (nuevo): endpoint devuelve `ltms_store_name`, cae a
+  `display_name`, rechaza product_id inválido, hook registrado, y el JS fuente ya NO contiene el literal.
+  `LTMS_VERSION` → 2.9.331. Whitelist del deploy webhook actualizada.
+
+---
+
+## [Unreleased] — 2026-09-03
+
+### Fixed — `MATRICULA-FLEX` (matrícula de Cámara de Comercio vencida bloqueaba la aprobación del proveedor)
+
+> Decisión de producto (2026-09-03): la matrícula vencida deja de ser un bloqueo duro y pasa a warning
+> best-effort con log de auditoría. Fundamentación: SAGRILAFT exige KYC/screening/archivo (NO matrícula);
+> Decreto 2150/1995 exige matrícula al comerciante, pero en la práctica lo que vence es la RENOVACIÓN anual
+> y el CERTIFICADO de existencia (vigencia 90 días), no la matrícula como dato permanente. El campo de
+> vencimiento es OPCIONAL en el formulario (si el certificado no tiene fecha, se deja en blanco). El bloqueo
+> por matrícula FALTANTE (ac_cc_missing) se MANTIENE (requisito legal real). Misma doctrina best-effort que
+> la exención de persona natural (KYC-CAMARA-PN-EXEMPT-2026-08-03).
+
+- **MATRICULA-FLEX-001 (P1 — política)** (`class-ltms-authorities-compliance.php`): en `validate_rut_and_camara_comercio()`,
+  la rama `ac_cc_expired` (matrícula vencida) ya NO devuelve `WP_Error`; registra warning
+  `AC_CC_EXPIRED` con la referencia `MATRICULA-FLEX-2026-09-03` como evidencia UIAF y continúa la aprobación.
+  Caso real: erickleon (223, "Kosmetic", NIT) con matrícula `04101707` vencida 2026-05-08 ahora puede aprobarse.
+- **Tests** actualizado en `KyccCamaraPnExemptTest.php`: `test_persona_juridica_nit_camara_vencida_pasa_con_warning()`
+  reemplaza el test anterior que exigía bloqueo `ac_cc_expired`. Suite completa verde.
+
+---
+
 ## [Unreleased] — 2026-09-02
 
 ### Fixed — `POSGOLD-SYNC-BG` (botón "Sincronizar" de PosGold mataba el request AJAX por timeout → "Error de red")

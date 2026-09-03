@@ -335,6 +335,8 @@ class AdminKycApproveAuditTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
 	/**
 	 * Estructural: el filter AC-7 debe contener return WP_Error con code 'ac_cc_missing'.
+	 * MATRICULA-FLEX-2026-09-03: ac_cc_expired ya NO es un bloqueo (pasa a warning
+	 * best-effort UIAF) — la matrícula vencida se registra en log y se aprueba.
 	 */
 	public function test_ac7_filter_returns_wp_error_on_cc_missing(): void {
 		$this->require_class( 'LTMS_Authorities_Compliance' );
@@ -342,7 +344,12 @@ class AdminKycApproveAuditTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 		$body = $this->get_method_body( $rc, 'validate_rut_and_camara_comercio' );
 
 		$this->assertStringContainsString( "new \\WP_Error( 'ac_cc_missing'", $body );
-		$this->assertStringContainsString( "new \\WP_Error( 'ac_cc_expired'", $body );
+		$this->assertStringNotContainsString( "new \\WP_Error( 'ac_cc_expired'", $body,
+			'MATRICULA-FLEX: la matrícula vencida no debe seguir bloqueando la aprobación' );
+		$this->assertStringContainsString( 'AC_CC_EXPIRED', $body,
+			'MATRICULA-FLEX: la matrícula vencida debe registrar warning de auditoría' );
+		$this->assertStringContainsString( 'MATRICULA-FLEX-2026-09-03', $body,
+			'MATRICULA-FLEX: el warning debe citar la referencia de la decisión de producto' );
 		$this->assertStringContainsString( "new \\WP_Error( 'ac_rut_dian_invalid'", $body );
 	}
 

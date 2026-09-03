@@ -1098,13 +1098,42 @@
                 titleEl.parentElement.insertBefore(ratingEl, titleEl.nextSibling);
             }
 
-            // 2. Inyectar vendor name si no existe
-            if (!card.querySelector('.pv-card-vendor')) {
-                var vendorEl = document.createElement('div');
-                vendorEl.className = 'pv-card-vendor';
-                vendorEl.style.cssText = 'font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-top:6px;';
-                vendorEl.textContent = 'Tienda Lo Tengo';
-                titleEl.parentElement.insertBefore(vendorEl, titleEl);
+            // 2. Inyectar vendor name si no existe.
+            // VENDOR-CARD-NAME FIX: antes se inyectaba el literal "Tienda Lo
+            // Tengo" en TODAS las tarjetas. Ahora se consulta el nombre real
+            // del vendedor vía el endpoint ltms_pv_product_vendor (cadena
+            // canónica: ltms_store_name → display_name → user_login).
+            if (!card.querySelector('.pv-card-vendor') && !card.hasAttribute('data-pv-vendor-loading')) {
+                var vendorLinkEl = document.createElement('a');
+                vendorLinkEl.className = 'pv-card-vendor';
+                vendorLinkEl.style.cssText = 'font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-top:6px;text-decoration:none;';
+                vendorLinkEl.textContent = '…';
+                vendorLinkEl.setAttribute('href', '#');
+                vendorLinkEl.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); });
+                titleEl.parentElement.insertBefore(vendorLinkEl, titleEl);
+                card.setAttribute('data-pv-vendor-loading', '1');
+
+                try {
+                    if (window.PV && PV.ajax) {
+                        PV.ajax('ltms_pv_product_vendor', { product_id: productId })
+                            .then(function(resp) {
+                                var d = resp && resp.data ? resp.data : null;
+                                if (!d || !d.vendor_name) {
+                                    vendorLinkEl.textContent = '';
+                                    return;
+                                }
+                                vendorLinkEl.textContent = d.vendor_name;
+                                if (d.vendor_url) {
+                                    vendorLinkEl.setAttribute('href', d.vendor_url);
+                                }
+                            })
+                            .catch(function() {
+                                vendorLinkEl.textContent = '';
+                            });
+                    }
+                } catch (e) {
+                    vendorLinkEl.textContent = '';
+                }
             }
 
             // 3. Inyectar botón favoritos si no existe

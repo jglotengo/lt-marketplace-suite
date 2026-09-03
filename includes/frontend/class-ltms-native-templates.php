@@ -80,6 +80,12 @@ class LTMS_Native_Templates {
         add_action( 'wp_ajax_ltms_pv_quick_view', [ __CLASS__, 'ajax_quick_view' ] );
         add_action( 'wp_ajax_nopriv_ltms_pv_quick_view', [ __CLASS__, 'ajax_quick_view' ] );
 
+        // VENDOR-CARD-NAME FIX: endpoint público para que el JS inyecte el
+        // nombre REAL del vendedor en las cards de Elementor/WoodMart. Antes
+        // el frontend hardcodeaba "Tienda Lo Tengo" en todas las tarjetas.
+        add_action( 'wp_ajax_ltms_pv_product_vendor', [ __CLASS__, 'ajax_product_vendor' ] );
+        add_action( 'wp_ajax_nopriv_ltms_pv_product_vendor', [ __CLASS__, 'ajax_product_vendor' ] );
+
         // Body class para scope CSS.
         add_filter( 'body_class', [ __CLASS__, 'body_class' ] );
 
@@ -438,6 +444,58 @@ class LTMS_Native_Templates {
         $html = ob_get_clean();
 
         wp_send_json_success( [ 'html' => $html ] );
+    }
+
+    /**
+     * VENDOR-CARD-NAME FIX: devuelve el nombre REAL del vendedor de un producto
+     * para que el frontend lo pinte en las cards de catálogo.
+     *
+     * Antes el JS (ltms-plaza-viva.js enhanceElementorCards) inyectaba el
+     * literal "Tienda Lo Tengo" en todas las tarjetas. Este endpoint resuelve
+     * la cadena canónica: ltms_store_name → display_name → user_login (misma
+     * lógica que content-product.php y single-product.php).
+     *
+     * Endpoint: wp_ajax_(nopriv_)ltms_pv_product_vendor
+     */
+    public static function ajax_product_vendor(): void {
+        check_ajax_referer( 'ltms_plaza_viva', 'nonce' );
+
+        $product_id = (int) ( $_POST['product_id'] ?? 0 );
+        if ( ! $product_id ) {
+            wp_send_json_error( [ 'message' => 'Invalid product ID' ] );
+        }
+
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            wp_send_json_error( [ 'message' => 'Product not found' ] );
+        }
+
+        $vendor_id = (int) get_post_field( 'post_author', $product_id );
+        $vendor_name = '';
+
+        if ( $vendor_id > 0 ) {
+            $store_name = (string) get_user_meta( $vendor_id, 'ltms_store_name', true );
+            if ( '' !== $store_name ) {
+                $vendor_name = $store_name;
+            } else {
+                $vendor_user = get_userdata( $vendor_id );
+                if ( $vendor_user ) {
+                    $vendor_name = $vendor_user->display_name ?: $vendor_user->user_login;
+                }
+            }
+        }
+
+        if ( '' === $vendor_name ) {
+            wp_send_json_error( [ 'message' => 'Vendor not found' ] );
+        }
+
+        $vendor_url = apply_filters( 'ltms_vendor_store_url', home_url( '/vendor/' . $vendor_id . '/' ), $vendor_id );
+
+        wp_send_json_success( [
+            'vendor_id'   => $vendor_id,
+            'vendor_name' => $vendor_name,
+            'vendor_url'  => esc_url_raw( $vendor_url ),
+        ] );
     }
 
     /**

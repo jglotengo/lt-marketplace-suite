@@ -93,10 +93,13 @@ class KyccCamaraPnExemptTest extends LTMS_Unit_Test_Case {
         $this->assertSame( 'ac_cc_missing', $result->get_error_code() );
     }
 
-    public function test_persona_juridica_nit_camara_vencida_bloquea(): void {
+    public function test_persona_juridica_nit_camara_vencida_pasa_con_warning(): void {
+        // MATRICULA-FLEX-2026-09-03: la matrícula vencida ya NO bloquea la
+        // aprobación (pasa a warning best-effort UIAF). Decreto 2150/1995 exige
+        // matrícula al comerciante, pero lo que vence es la renovación anual y
+        // el certificado (90 días), no la matrícula como dato permanente.
         $result = $this->invoke( 'nit', '12345-6', '2020-01-01', '900123456-1' );
-        $this->assertInstanceOf( \WP_Error::class, $result );
-        $this->assertSame( 'ac_cc_expired', $result->get_error_code() );
+        $this->assertTrue( $result, 'NIT con matrícula vencida debe aprobar con warning (best-effort)' );
     }
 
     public function test_persona_juridica_nit_camara_vigente_pasa(): void {

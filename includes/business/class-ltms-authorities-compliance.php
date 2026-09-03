@@ -1011,17 +1011,26 @@ class LTMS_Authorities_Compliance {
                     $vendor_id
                 ) );
             } elseif ( ! empty( $cc_expires ) && strtotime( $cc_expires ) < time() ) {
+                // MATRICULA-FLEX-2026-09-03 (decisión de producto): la matrícula
+                // vencida deja de BLOQUEAR la aprobación y pasa a warning best-effort.
+                // Fundamentación: SAGRILAFT exige KYC/screening/archivo (no matrícula);
+                // Decreto 2150/1995 exige matrícula al comerciante, pero en la práctica
+                // lo que vence es la RENOVACIÓN anual y el CERTIFICADO de existencia
+                // (vigencia 90 días), no la matrícula como dato permanente. El campo de
+                // vencimiento es OPCIONAL en el formulario (si el certificado no tiene
+                // fecha, se deja en blanco). Se mantiene el warning en log como evidencia
+                // de auditoría UIAF (misma doctrina best-effort que la exención de
+                // persona natural, KYC-CAMARA-PN-EXEMPT-2026-08-03).
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::warning(
                         'AC_CC_EXPIRED',
-                        sprintf( 'Vendor #%d — matrícula Cámara de Comercio vencida el %s.', $vendor_id, $cc_expires )
+                        sprintf(
+                            'Vendor #%d — matrícula Cámara de Comercio vencida el %s. Aprobación proseguida (best-effort UIAF, MATRICULA-FLEX-2026-09-03).',
+                            $vendor_id,
+                            $cc_expires
+                        )
                     );
                 }
-                return new \WP_Error( 'ac_cc_expired', sprintf(
-                    /* translators: %s: expiry date */
-                    __( 'Matrícula de Cámara de Comercio vencida el %s. El vendedor debe renovarla y reenviar el KYC.', 'ltms' ),
-                    $cc_expires
-                ) );
             }
         }
 
