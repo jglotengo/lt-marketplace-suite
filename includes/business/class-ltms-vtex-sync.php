@@ -31,6 +31,9 @@ final class LTMS_Vtex_Sync {
     /** Meta key que guarda el itemId VTEX del producto. */
     const SKU_ID_META_KEY = '_ltms_vtex_sku_id';
 
+    /** Meta key que guarda el COSTO original (precio VTEX antes de reglas). */
+    const COST_META_KEY = '_ltms_vtex_cost';
+
     /** Cron hook para sync en background. */
     const CRON_HOOK = 'ltms_vtex_sync_cron';
 
@@ -369,6 +372,9 @@ final class LTMS_Vtex_Sync {
 
             // Precio final con reglas del vendor.
             $price_calc = LTMS_Vtex_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+            // PRICE-RECALC FIX: persistir el COSTO original (precio VTEX antes de
+            // reglas) para poder re-calcular precios masivamente sin re-fetch.
+            $product['_ltms_cost'] = $price_calc['cost'];
             $product['regular_price'] = $price_calc['price'];
 
             // Título SEO.
@@ -661,6 +667,9 @@ final class LTMS_Vtex_Sync {
         if ( ! empty( $product['vtex_sku_id'] ) ) {
             $wc_product->update_meta_data( self::SKU_ID_META_KEY, $product['vtex_sku_id'] );
         }
+        if ( isset( $product['_ltms_cost'] ) ) {
+            $wc_product->update_meta_data( self::COST_META_KEY, (float) $product['_ltms_cost'] );
+        }
 
         self::set_product_attributes( $wc_product, $product );
 
@@ -710,6 +719,9 @@ final class LTMS_Vtex_Sync {
         $wc_product->update_meta_data( self::CODE_META_KEY, $product['codigo'] );
         if ( ! empty( $product['vtex_sku_id'] ) ) {
             $wc_product->update_meta_data( self::SKU_ID_META_KEY, $product['vtex_sku_id'] );
+        }
+        if ( isset( $product['_ltms_cost'] ) ) {
+            $wc_product->update_meta_data( self::COST_META_KEY, (float) $product['_ltms_cost'] );
         }
 
         self::set_product_attributes( $wc_product, $product );

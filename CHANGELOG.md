@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-03
 
+### Fixed — `PROD-LIST-PAGING` (panel del vendedor solo mostraba 50 productos sin paginar) + `PRICE-RECALC` (recálculo de precios sin re-sincronizar)
+
+> Verificación en vivo (SG): el submenú "Productos" del panel del vendedor usaba
+> `wc_get_products(['limit'=>50])` SIN paginación ni búsqueda → Kosmetic (1,826
+> productos VTEX) solo veía los 50 más recientes y los otros ~1,776 eran inaccesibles.
+> Además, el costo original (precio VTEX antes de reglas) NO se persistía, por lo que
+> ajustar las reglas de precio obligaba a re-sincronizar todo el catálogo. Con reglas
+> default (margen 30%, comisión 10% gross-up, IVA 19%, redondeo 1.000) un producto de
+> 84,000 queda en 145,000 (×1.73). Suite completa verde: 4,8xx tests.
+
+- **PROD-LIST-PAGING-001 (P1 — panel)** (`includes/frontend/views/view-products.php` +
+  `assets/css/ltms-frontend.css`): el grid de "Mis Productos" ahora se puebla vía AJAX
+  (`ltms_get_products_data`, endpoint existente con paginación server-side) con **24 por
+  página**, **buscador por nombre** (debounce 350ms), contador total y paginador numérico.
+  Reusa el endpoint que ya implementaba `paged`/`per_page`/`total_pages` pero que solo
+  consumía el widget del Home. Estilos nuevos `.ltms-products-pagination`/`.ltms-pg-btn`.
+- **PRICE-RECALC-001 (P1 — precios)** (`class-ltms-vtex-sync.php` + `class-ltms-dashboard-logic.php` +
+  `view-vtex.php` + `assets/js/ltms-vtex.js`): la sync ahora persiste el **costo original**
+  (`_ltms_vtex_cost`, precio VTEX antes de reglas) en `create_product`/`update_product_fields`.
+  Nuevo botón **"Recalcular precios de productos existentes"** en el panel VTEX → AJAX
+  `ltms_recalculate_vtex_prices` re-aplica las reglas ACTUALES a los productos ya
+  sincronizados usando el costo persistido, en lotes de 100 (encadenado, sin timeout).
+  El vendedor ajusta sus reglas y re-precias todo sin re-sincronizar. Nota: los productos
+  existentes necesitan 1 re-sync para backfill del costo.
+- **Tests** +6 en `RecalcPricesTest.php` (nuevo): la sync persiste el costo antes de reglas,
+  `COST_META_KEY` en create+update, cálculo 84,000→145,000 con defaults, hook registrado +
+  botón en vista/JS, y `round_up_to_multiple` con ejemplos conocidos.
+  `LTMS_VERSION` → 2.9.333. Whitelist del deploy webhook actualizada.
+
+---
+
+## [Unreleased] — 2026-09-03
+
 ### Fixed — `SF-CAT-DEDUP` (categorías duplicadas en el storefront tras la sync VTEX) + `SF-PAGING` (paginación 24 por página)
 
 > Verificación en vivo (SG): tras las syncs de VTEX (incluido el auto-sync diario), la taxonomía

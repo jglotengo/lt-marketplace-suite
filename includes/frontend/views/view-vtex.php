@@ -403,6 +403,18 @@ if ( empty( $seo_template ) ) {
                         <button type="submit" name="ltms_vtex_action" value="save_rules" class="ltms-btn ltms-btn-primary">
                             💾 <?php esc_html_e( 'Guardar reglas de precio', 'ltms' ); ?>
                         </button>
+
+                        <!-- PRICE-RECALC FIX: recalcular precios de productos existentes
+                             sin re-sincronizar. Usa el costo persistido (_ltms_vtex_cost). -->
+                        <div style="margin-top:14px;padding:12px 14px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;">
+                            <p style="margin:0 0 8px;font-size:0.8rem;color:#854d0e;">
+                                <?php esc_html_e( '¿Cambiaste tus reglas de precio? Recalcula los precios de tus productos ya sincronizados sin re-sincronizar todo el catálogo.', 'ltms' ); ?>
+                            </p>
+                            <button type="button" id="ltms-vtex-recalc-btn" class="ltms-btn ltms-btn-outline ltms-btn-sm">
+                                🔄 <?php esc_html_e( 'Recalcular precios de productos existentes', 'ltms' ); ?>
+                            </button>
+                            <span id="ltms-vtex-recalc-status" style="margin-left:8px;font-size:0.8rem;color:#6b7280;"></span>
+                        </div>
                     </form>
                 </div>
             </div>

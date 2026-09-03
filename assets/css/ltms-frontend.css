@@ -65,6 +65,45 @@
     border-top: 1px solid #f0f0f0;
 }
 
+/* ── PROD-LIST-PAGING FIX: paginador del listado de productos del vendor ── */
+.ltms-products-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 18px;
+}
+.ltms-products-pagination .ltms-pg-btn {
+    min-width: 36px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #374151;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.ltms-products-pagination .ltms-pg-btn:hover:not(:disabled):not(.is-active) {
+    border-color: var(--ltms-primary, #e80001);
+    color: var(--ltms-primary, #e80001);
+}
+.ltms-products-pagination .ltms-pg-btn.is-active {
+    background: var(--ltms-primary, #e80001);
+    border-color: var(--ltms-primary, #e80001);
+    color: #fff;
+    font-weight: 600;
+}
+.ltms-products-pagination .ltms-pg-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.ltms-products-pagination .ltms-pg-ellipsis {
+    align-self: center;
+    color: #9ca3af;
+    padding: 0 2px;
+}
+
 /* ── Formulario de Producto ─────────────────────────────────── */
 .ltms-product-form .ltms-form-field {
     margin-bottom: 18px;

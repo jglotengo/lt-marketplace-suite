@@ -91,6 +91,7 @@ final class LTMS_Dashboard_Logic {
         add_action( 'wp_ajax_ltms_get_vtex_sync_status',     [ $instance, 'ajax_get_vtex_sync_status' ] );
         add_action( 'wp_ajax_ltms_save_vtex_categories',     [ $instance, 'ajax_save_vtex_categories' ] );
         add_action( 'wp_ajax_ltms_save_vtex_rules',          [ $instance, 'ajax_save_vtex_rules' ] );
+        add_action( 'wp_ajax_ltms_recalculate_vtex_prices',  [ $instance, 'ajax_recalculate_vtex_prices' ] );
         add_action( 'wp_ajax_ltms_save_vtex_seo',            [ $instance, 'ajax_save_vtex_seo' ] );
         add_action( 'wp_ajax_ltms_get_vtex_categories',      [ $instance, 'ajax_get_vtex_categories' ] );
 
@@ -2739,6 +2740,120 @@ final class LTMS_Dashboard_Logic {
         LTMS_Vtex_Price_Calculator::save_vendor_rules( $user_id, $rules );
 
         wp_send_json_success( [ 'message' => __( 'Reglas de precio guardadas correctamente.', 'ltms' ) ] );
+    }
+
+    /**
+     * v2.9.332 — AJAX: Recalcular precios de los productos VTEX existentes.
+     *
+     * PRICE-RECALC FIX: re-aplica las reglas de precio ACTUALES del vendor a
+     * todos sus productos sincronizados de VTEX, usando el costo original
+     * persistido en el meta _ltms_vtex_cost (precio VTEX antes de reglas).
+     * Permite al vendedor ajustar reglas y re-preciar el catálogo SIN
+     * re-descargar de la API ni tocar cada producto a mano.
+     *
+     * Procesa en lotes de 100 (offset vía $_POST['offset']) para no exceder
+     * el tiempo del request; el JS encadena llamadas hasta que
+     * remaining = 0.
+     */
+    public function ajax_recalculate_vtex_prices(): void {
+        check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 );
+        }
+
+        $user_id = get_current_user_id();
+        if ( ! LTMS_Utils::is_ltms_vendor( $user_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Acceso denegado.', 'ltms' ) ], 403 );
+        }
+
+        if ( ! class_exists( 'LTMS_Vtex_Price_Calculator' ) || ! class_exists( 'LTMS_Vtex_Sync' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Módulo VTEX no disponible.', 'ltms' ) ], 500 );
+        }
+
+        $offset    = max( 0, (int) ( $_POST['offset'] ?? 0 ) );
+        $batch     = 100;
+        $rules     = LTMS_Vtex_Price_Calculator::get_vendor_rules( $user_id );
+        $total     = 0;
+        $processed = 0;
+        $updated   = 0;
+        $errors    = [];
+
+        $query = new \WP_Query( [
+            'post_type'      => 'product',
+            'post_status'    => [ 'publish', 'draft', 'pending' ],
+            'author'         => $user_id,
+            'posts_per_page' => $batch,
+            'offset'         => $offset,
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+            'meta_query'     => [
+                [
+                    'key'     => '_ltms_vtex_synced',
+                    'compare' => 'EXISTS',
+                ],
+            ],
+            'no_found_rows'  => false,
+        ] );
+
+        $total = (int) $query->found_posts;
+
+        foreach ( $query->posts as $post ) {
+            $product = wc_get_product( $post->ID );
+            if ( ! $product ) {
+                $errors[] = sprintf( 'Producto #%d no encontrado', $post->ID );
+                $processed++;
+                continue;
+            }
+
+            $cost = (float) get_post_meta( $post->ID, '_ltms_vtex_cost', true );
+            if ( $cost <= 0 ) {
+                // Sin costo persistido: no se puede recalcular (se necesita 1
+                // re-sync para backfill del costo).
+                $errors[] = sprintf( 'Producto #%d sin costo (_ltms_vtex_cost)', $post->ID );
+                $processed++;
+                continue;
+            }
+
+            $price_calc = LTMS_Vtex_Price_Calculator::calculate( $cost, $rules );
+            $new_price  = (float) $price_calc['price'];
+
+            $product->set_regular_price( number_format( max( 0, $new_price ), 2, '.', '' ) );
+            $product->save();
+
+            $updated++;
+            $processed++;
+        }
+        wp_reset_postdata();
+
+        $processed_so_far = $offset + $processed;
+        $remaining        = max( 0, $total - $processed_so_far );
+
+        if ( ! empty( $errors ) && $processed === count( $errors ) && $updated === 0 && $remaining === 0 ) {
+            // Todos los productos del lote fallaron y no queda ninguno.
+            wp_send_json_error( [
+                'message'    => __( 'No se pudo recalcular: los productos no tienen costo persistido (_ltms_vtex_cost). Ejecuta una sincronización primero para guardar el costo.', 'ltms' ),
+                'errors'     => array_slice( $errors, 0, 10 ),
+                'total'      => $total,
+                'updated'    => $updated,
+                'remaining'  => $remaining,
+                'offset'     => $processed_so_far,
+            ], 400 );
+        }
+
+        wp_send_json_success( [
+            'message'   => sprintf(
+                /* translators: %d: productos recalculados */
+                __( 'Precios recalculados: %d productos actualizados.', 'ltms' ),
+                $updated
+            ),
+            'total'     => $total,
+            'processed' => $processed_so_far,
+            'updated'   => $updated,
+            'remaining' => $remaining,
+            'offset'    => $processed_so_far,
+            'errors'    => array_slice( $errors, 0, 10 ),
+        ] );
     }
 
     /**

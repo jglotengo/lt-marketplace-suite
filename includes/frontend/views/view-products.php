@@ -9,13 +9,18 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 $vendor_id = get_current_user_id();
-$products  = wc_get_products([
+// PROD-LIST-PAGING FIX: antes la vista usaba wc_get_products(['limit'=>50])
+// SIN paginación ni búsqueda → con catálogos grandes (Kosmetic: 1,826
+// productos VTEX) el vendedor solo veía los 50 más recientes y el resto era
+// inaccesible. Ahora el grid se puebla vía AJAX (ltms_get_products_data) con
+// paginación server-side de 24 y búsqueda. El contador total y el paginador
+// los renderiza el JS (#ltms-products-list).
+$products_total = (int) wc_get_products( [
     'author'   => $vendor_id,
-    'limit'    => 50,
-    'orderby'  => 'date',
-    'order'    => 'DESC',
+    'limit'    => 1,
+    'paginate' => true,
     'status'   => [ 'publish', 'draft', 'pending' ],
-]);
+] )->total ?? 0;
 ?>
 <div class="ltms-view-pad">
 
@@ -31,7 +36,7 @@ $products  = wc_get_products([
         </div>
     </div>
 
-    <?php if ( empty( $products ) ) : ?>
+    <?php if ( $products_total === 0 ) : ?>
     <div class="ltms-empty-state">
         <div class="ltms-empty-icon">🛍️</div>
         <h3><?php esc_html_e( 'Aún no tienes productos', 'ltms' ); ?></h3>
@@ -42,64 +47,123 @@ $products  = wc_get_products([
     </div>
     <?php else : ?>
 
-    <!-- Grid de productos -->
-    <div class="ltms-products-grid">
-        <?php foreach ( $products as $product ) : ?>
-        <div class="ltms-product-card">
-            <div class="ltms-product-img">
-                <?php if ( $product->get_image_id() ) : ?>
-                <img src="<?php echo esc_url( wp_get_attachment_image_url( $product->get_image_id(), 'medium' ) ); ?>"
-                     alt="<?php echo esc_attr( $product->get_name() ); ?>" loading="lazy">
-                <?php else : ?>
-                <span style="font-size:2rem;color:#d1d5db;">📷</span>
-                <?php endif; ?>
-            </div>
-            <div class="ltms-product-body">
-                <div class="ltms-product-name"><?php echo esc_html( $product->get_name() ); ?></div>
-                <div class="ltms-product-price">
-                    <?php echo esc_html( LTMS_Utils::format_money( (float) $product->get_price() ) ); ?>
-                </div>
-                <div style="margin-top:6px;">
-                    <span class="ltms-badge <?php echo $product->get_status() === 'publish' ? 'ltms-badge-success' : 'ltms-badge-warning'; ?>" style="font-size:0.7rem;">
-                        <?php echo esc_html( $product->get_status() === 'publish' ? __( 'Publicado', 'ltms' ) : __( 'Borrador', 'ltms' ) ); ?>
-                    </span>
-                    <?php
-                    $ltms_tipo = get_post_meta( $product->get_id(), '_ltms_product_type', true ) ?: 'physical';
-                    // CS-04: mapeo legacy 'product' → 'physical'
-                    if ( $ltms_tipo === 'product' ) { $ltms_tipo = 'physical'; }
-                    $ltms_tipo_map = [
-                        'physical' => [ 'label' => __( 'Físico',   'ltms' ), 'icon' => '📦' ],
-                        'digital'  => [ 'label' => __( 'Digital',  'ltms' ), 'icon' => '💾' ],
-                        'service'  => [ 'label' => __( 'Servicio', 'ltms' ), 'icon' => '🔧' ],
-                        'booking'  => [ 'label' => __( 'Turismo',  'ltms' ), 'icon' => '🏨' ],
-                    ];
-                    $ltms_tipo_label = $ltms_tipo_map[ $ltms_tipo ]['label'] ?? __( 'Físico', 'ltms' );
-                    $ltms_tipo_icon  = $ltms_tipo_map[ $ltms_tipo ]['icon']  ?? '📦';
-                    ?>
-                    <span class="ltms-badge ltms-badge-info" style="font-size:0.7rem;margin-left:4px;background:#e0f2fe;color:#0369a1;">
-                        <?php echo $ltms_tipo_icon . ' ' . esc_html( $ltms_tipo_label ); ?>
-                    </span>
-                </div>
-            </div>
-            <div class="ltms-product-actions">
-                <!-- CS-07: Edición inline en panel vendedor (no redirige a wp-admin) -->
-                <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-edit-product-btn"
-                        data-product-id="<?php echo esc_attr( $product->get_id() ); ?>">
-                    ✏️ <?php esc_html_e( 'Editar', 'ltms' ); ?>
-                </button>
-                <a href="<?php echo esc_url( get_permalink( $product->get_id() ) ); ?>"
-                   class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">
-                    👁 <?php esc_html_e( 'Ver', 'ltms' ); ?>
-                </a>
-                <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm ltms-delete-product-btn"
-                        data-product-id="<?php echo esc_attr( $product->get_id() ); ?>"
-                        data-product-name="<?php echo esc_attr( $product->get_name() ); ?>">
-                    🗑 <?php esc_html_e( 'Eliminar', 'ltms' ); ?>
-                </button>
-            </div>
-        </div>
-        <?php endforeach; ?>
+    <!-- PROD-LIST-PAGING FIX: buscador + grid AJAX paginado + contador -->
+    <div class="ltms-products-toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+        <input type="search" id="ltms-products-search" class="ltms-input" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;"
+               placeholder="<?php esc_attr_e( 'Buscar producto por nombre...', 'ltms' ); ?>"
+               aria-label="<?php esc_attr_e( 'Buscar producto', 'ltms' ); ?>">
+        <span class="ltms-products-count" id="ltms-products-count" style="font-size:0.85rem;color:#6b7280;white-space:nowrap;">
+            <?php echo esc_html( sprintf( __( '%d productos', 'ltms' ), $products_total ) ); ?>
+        </span>
     </div>
+
+    <!-- Grid de productos (se rellena por AJAX con paginación 24) -->
+    <div class="ltms-products-grid" id="ltms-products-grid">
+        <div style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px 0;" id="ltms-products-loading">
+            <?php esc_html_e( 'Cargando productos...', 'ltms' ); ?>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    <nav class="ltms-products-pagination" id="ltms-products-pagination" aria-label="<?php esc_attr_e( 'Paginación de productos', 'ltms' ); ?>"></nav>
+
+    <script>
+    (function () {
+        var grid     = document.getElementById('ltms-products-grid');
+        var pager    = document.getElementById('ltms-products-pagination');
+        var countEl  = document.getElementById('ltms-products-count');
+        var searchEl = document.getElementById('ltms-products-search');
+        var perPage  = 24;
+        var current  = 1;
+        var totalPages = 1;
+        var debounce;
+
+        function renderCard(p) {
+            var statusLabel = p.status === 'publish' ? 'Publicado' : 'Borrador';
+            var statusClass = p.status === 'publish' ? 'ltms-badge-success' : 'ltms-badge-warning';
+            var img = p.image
+                ? '<img src="' + p.image + '" alt="' + p.name.replace(/"/g, '&quot;') + '" loading="lazy">'
+                : '<span style="font-size:2rem;color:#d1d5db;">📷</span>';
+            var tipoMap = { physical: '📦 Físico', digital: '💾 Digital', service: '🔧 Servicio', booking: '🏨 Turismo' };
+            var tipo = tipoMap[p.product_type] || '📦 Físico';
+            return '' +
+                '<div class="ltms-product-card">' +
+                '  <div class="ltms-product-img">' + img + '</div>' +
+                '  <div class="ltms-product-body">' +
+                '    <div class="ltms-product-name">' + p.name + '</div>' +
+                '    <div class="ltms-product-price">' + (p.price ? '$' + Number(p.price).toLocaleString('es-CO') : '—') + '</div>' +
+                '    <div style="margin-top:6px;">' +
+                '      <span class="ltms-badge ' + statusClass + '" style="font-size:0.7rem;">' + statusLabel + '</span>' +
+                '      <span class="ltms-badge ltms-badge-info" style="font-size:0.7rem;margin-left:4px;background:#e0f2fe;color:#0369a1;">' + tipo + '</span>' +
+                '    </div>' +
+                '  </div>' +
+                '  <div class="ltms-product-actions">' +
+                '    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-edit-product-btn" data-product-id="' + p.id + '">✏️ Editar</button>' +
+                '    <a href="' + p.edit_url + '" class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">👁 Ver</a>' +
+                '    <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm ltms-delete-product-btn" data-product-id="' + p.id + '" data-product-name="' + p.name.replace(/"/g, '&quot;') + '">🗑 Eliminar</button>' +
+                '  </div>' +
+                '</div>';
+        }
+
+        function renderPager() {
+            if (totalPages <= 1) { pager.innerHTML = ''; return; }
+            var html = '<button type="button" class="ltms-pg-btn" data-pg="' + (current - 1) + '" ' + (current <= 1 ? 'disabled' : '') + '>‹ Anterior</button>';
+            for (var i = 1; i <= totalPages; i++) {
+                if (totalPages > 15 && i > 1 && i < totalPages && Math.abs(i - current) > 2) {
+                    if (html.indexOf('…') === -1) html += '<span class="ltms-pg-ellipsis">…</span>';
+                    continue;
+                }
+                html += '<button type="button" class="ltms-pg-btn' + (i === current ? ' is-active' : '') + '" data-pg="' + i + '">' + i + '</button>';
+            }
+            html += '<button type="button" class="ltms-pg-btn" data-pg="' + (current + 1) + '" ' + (current >= totalPages ? 'disabled' : '') + '>Siguiente ›</button>';
+            pager.innerHTML = html;
+        }
+
+        function load(page) {
+            current = page;
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px 0;">Cargando...</div>';
+            var body = new URLSearchParams();
+            body.append('action', 'ltms_get_products_data');
+            body.append('nonce', typeof ltmsDashboard !== 'undefined' ? ltmsDashboard.nonce : '');
+            body.append('page', page);
+            body.append('per_page', perPage);
+            if (searchEl.value.trim()) body.append('search', searchEl.value.trim());
+            fetch(typeof ltmsDashboard !== 'undefined' ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: body.toString()
+            }).then(function (r) { return r.json(); }).then(function (resp) {
+                if (!resp.success) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px 0;">Error al cargar productos.</div>'; return; }
+                var d = resp.data;
+                totalPages = d.total_pages || 1;
+                if (!d.products.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px 0;">Sin resultados.</div>'; }
+                else { grid.innerHTML = d.products.map(renderCard).join(''); }
+                if (countEl) countEl.textContent = d.total + ' productos';
+                renderPager();
+                // Bindear acciones de los modales (editar/eliminar) del JS existente.
+                if (window.jQuery) {
+                    jQuery(grid).find('.ltms-edit-product-btn').off('click.ltmsprods');
+                    jQuery(grid).find('.ltms-delete-product-btn').off('click.ltmsprods');
+                }
+            }).catch(function () { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px 0;">Error de red.</div>'; });
+        }
+
+        pager.addEventListener('click', function (e) {
+            var btn = e.target.closest('.ltms-pg-btn');
+            if (!btn || btn.disabled) return;
+            var pg = parseInt(btn.getAttribute('data-pg'), 10);
+            if (pg >= 1 && pg <= totalPages) load(pg);
+        });
+
+        searchEl.addEventListener('input', function () {
+            clearTimeout(debounce);
+            debounce = setTimeout(function () { load(1); }, 350);
+        });
+
+        load(1);
+    })();
+    </script>
 
     <?php endif; ?>
 

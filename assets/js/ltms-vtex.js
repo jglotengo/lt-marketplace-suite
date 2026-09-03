@@ -423,6 +423,47 @@
     $('#ltms-vtex-rules-form input, #ltms-vtex-rules-form select, #ltms-vtex-is-redi').on('input change', updatePriceExample);
     $('#ltms-vtex-seo-template').on('input', updateSeoPreview);
 
+    // PRICE-RECALC FIX: recalcular precios de productos existentes sin re-sync.
+    // El botón vive DENTRO del form de reglas → evitar que dispare el submit.
+    $('#ltms-vtex-recalc-btn').on('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        var $btn = $(this);
+        var $status = $('#ltms-vtex-recalc-status');
+        var offset = 0;
+        var updatedTotal = 0;
+        $btn.prop('disabled', true);
+        $status.text('Recalculando precios...');
+
+        function next() {
+            $.post(ajaxUrl, {
+                action: 'ltms_recalculate_vtex_prices',
+                nonce: nonce,
+                offset: offset
+            }).done(function(resp){
+                if (!resp.success) {
+                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                    $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudo recalcular.').css('color', '#dc2626');
+                    return;
+                }
+                var d = resp.data;
+                updatedTotal += d.updated || 0;
+                if (d.remaining > 0) {
+                    offset = d.offset;
+                    $status.text('Recalculando... (' + d.processed + '/' + d.total + ' productos)').css('color', '#6b7280');
+                    next();
+                } else {
+                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                    $status.text('✅ ' + updatedTotal + ' productos actualizados.').css('color', '#16a34a');
+                }
+            }).fail(function(){
+                $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                $status.text('Error de red.').css('color', '#dc2626');
+            });
+        }
+        next();
+    });
+
     // Initial render
     updatePriceExample();
     updateSeoPreview();

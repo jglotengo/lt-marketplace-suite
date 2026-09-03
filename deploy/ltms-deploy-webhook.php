@@ -801,6 +801,9 @@ $files = [
     // SF-CAT-DEDUP + SF-PAGING v2.9.332 — categorías duplicadas por slug aleatorio
     // en la sync VTEX/PosGold + paginación 24 por página en el storefront.
     'tests/unit/StorefrontCategoryDedupTest.php',
+    // PROD-LIST-PAGING + PRICE-RECALC v2.9.333 — paginación del panel de
+    // productos + recálculo masivo de precios desde el costo persistido.
+    'tests/unit/RecalcPricesTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
