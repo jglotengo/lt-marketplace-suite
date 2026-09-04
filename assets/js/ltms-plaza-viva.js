@@ -1019,8 +1019,10 @@
     var shippingInfo = document.createElement('div');
     shippingInfo.className = 'ltms-price-shipping-info';
     shippingInfo.setAttribute('data-ltms-shipping-info', '1');
-    shippingInfo.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
-    shippingInfo.innerHTML = '<span>🚚</span> <span>Envío gratis incluido</span>';
+    // PDP-HIERARCHY-001 FIX (2026-09-04): sin estilos inline apretados
+    // (antes: margin-top:4px, sin margin-bottom -> pegado al precio y al
+    // stock). El estilo vive en ltms-plaza-viva.css como pill de beneficio.
+    shippingInfo.innerHTML = '<span class="ltms-price-shipping-info__icon">🚚</span><span class="ltms-price-shipping-info__text">Envío gratis incluido</span>';
 
     // Insert after price
     if (price.parentNode) {
