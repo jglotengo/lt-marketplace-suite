@@ -1034,7 +1034,14 @@
     margin-bottom: 2px;
 }
 .pv-scope.pv-product-page .pv-product-info__stock .pv-stock-bar {
-    height: 8px;
+    /* PDP-STOCK-BAR FIX (2026-09-04): el design system define .pv-stock-bar como
+       height:6px + overflow:hidden, pero single-product.php coloca el LABEL dentro
+       del contenedor -> quedaba recortado (el componente se veia solo parcialmente
+       en desktop, justo despues de "Envio gratis incluido"). El contenedor ahora
+       crece para mostrar el label y el track mantiene su altura propia. */
+    height: auto;
+    overflow: visible;
+    background: transparent;
     margin-bottom: 4px;
 }
 

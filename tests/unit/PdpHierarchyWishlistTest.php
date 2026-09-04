@@ -112,4 +112,28 @@ final class PdpHierarchyWishlistTest extends LTMS_Unit_Test_Case {
 			'PDP-HIERARCHY-001: el bloque de precio debe tener su separador (border-bottom).'
 		);
 	}
+
+	public function test_stock_bar_not_clipped_on_pdp(): void {
+		$css = file_get_contents( self::PLAZA_CSS_PATH );
+
+		// PDP-STOCK-BAR FIX: el design system .pv-stock-bar es height:6px + overflow:hidden
+		// y single-product.php pone el LABEL dentro del contenedor -> se recortaba (el
+		// componente "Stock limitado" se veia solo parcialmente tras "Envio gratis incluido").
+		// El override del PDP debe abrir el contenedor para mostrar el label.
+		$this->assertStringContainsString(
+			'.pv-scope.pv-product-page .pv-product-info__stock .pv-stock-bar {',
+			$css,
+			'PDP-STOCK-BAR: debe existir el override PDP del contenedor .pv-stock-bar.'
+		);
+		$this->assertStringContainsString(
+			'height: auto;',
+			$css,
+			'PDP-STOCK-BAR: el contenedor debe crecer (height:auto) para no recortar el label.'
+		);
+		$this->assertStringContainsString(
+			'overflow: visible;',
+			$css,
+			'PDP-STOCK-BAR: el contenedor no debe tener overflow:hidden (label visible).'
+		);
+	}
 }

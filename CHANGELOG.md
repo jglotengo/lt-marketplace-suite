@@ -21,9 +21,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `assets/css/ltms-plaza-viva.css`): `enhancePriceDisplay()` ya no setea estilos inline
   apretados; el estilo vive en el design system como **pill de beneficio**
   (`.ltms-price-shipping-info`, fondo verde claro + borde, `margin: 6px 0 16px`). Se añade
-  separador al bloque de precio (`.pv-product-info__price { border-bottom }`) y la barra de
-  stock del PDP pasa a 8px con margen inferior. Jerarquía resultante: precio → pill
-  "Envío gratis incluido" → stock → excerpt → CTA.
+  separador al bloque de precio (`.pv-product-info__price { border-bottom }`). Jerarquía
+  resultante: precio → pill "Envío gratis incluido" → stock → excerpt → CTA.
+- **PDP-STOCK-BAR (P2 — UX)** (`assets/css/ltms-plaza-viva.css` + `.min`): el componente de
+  stock justo después del pill "Envío gratis incluido" se veía **solo parcialmente** en
+  desktop: el design system define `.pv-stock-bar` con `height:6px + overflow:hidden`, pero
+  `single-product.php` coloca el LABEL ("Stock limitado (10 unidades) 50%") DENTRO de ese
+  contenedor → el texto quedaba recortado. El override PDP ahora abre el contenedor
+  (`height:auto; overflow:visible; background:transparent`) y el track (`.pv-stock-bar__track`,
+  ​8px, ya definido en single-product.php:800) se mantiene como barra visual.
 - **PDP-WISHLIST-GUEST (P1 — funcional)** (`class-ltms-wishlist.php`): `ajax_toggle()`
   dejó de exigir login — guests persisten vía cookie `ltms_wishlist` (30d) y logged-in vía
   DB `bkr_lt_wishlists`, misma persistencia que `ajax_pv_toggle`. El nonce por-producto
