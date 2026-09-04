@@ -1,7 +1,7 @@
 # LT Marketplace Suite — Enterprise Features
 
-**Version:** 2.9.98
-**Last Updated:** 2026-07-08
+**Version:** 2.9.334
+**Last Updated:** 2026-09-04
 **Audits completed:** REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001 (all 100% resolved)
 
 ---

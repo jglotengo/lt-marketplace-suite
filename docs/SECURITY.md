@@ -1,8 +1,8 @@
 # LT Marketplace Suite — Security Policy
 
-**Version:** 2.9.98
+**Version:** 2.9.334
 **Maintained by:** LTMS Security Team
-**Last audit:** 2026-07-08 (DEEP-AUDIT-002 — 56 findings, 100% P0+P1+P2 resolved)
+**Last audit:** 2026-07-08 (DEEP-AUDIT-002 — 56 findings, 100% P0+P1+P2 resolved) · revisado 2026-09-04
 
 ---
 

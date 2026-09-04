@@ -1,6 +1,12 @@
 # LTMS Setup Notes — 2026-07-13
 
-> Notas operativas de la instancia de producción de LT Marketplace Suite v2.9.102.
+> Notas operativas de la instancia de producción de LT Marketplace Suite v2.9.334.
+>
+> **Estado actual (2026-09-04):** versión `2.9.334`. Ciclos recientes: HOME-PAGING (home con 20
+> tarjetas + paginación AJAX), PROD-LIST-PAGING + PRICE-RECALC (panel productos paginado 24 +
+> recálculo de precios desde `_ltms_vtex_cost`), REMOVE-PROMO-POPUP + CONTACT-EMAILS (banner 10% y
+> toasts social proof eliminados; correos migrados a `dircomercialcol@lo-tengo.com.co` /
+> `sellerscolombia@lo-tengo.com.co`; footer "Cámara" corregido). Suite: 4,851 tests verdes.
 >
 > **Histórico:** Este documento se actualizó desde v2.9.35 (2026-07-06) hasta v2.9.102 (2026-07-13), reflejando 3 auditorías completas (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001), 1 auditoría de seguridad (SEC-1), 1 QA completo (21/21 vistas), build pipeline + CI, y 25+ commits de mejoras.
 

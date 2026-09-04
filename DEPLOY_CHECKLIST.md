@@ -1,7 +1,13 @@
-# Deploy Checklist — LT Marketplace Suite v2.9.187
+# Deploy Checklist — LT Marketplace Suite v2.9.334
 
 Checklist paso a paso para desplegar de forma segura en producción.
 
+> **Notas v2.9.334 (2026-09-04):** REMOVE-PROMO-POPUP (banner 10% + toasts social proof eliminados),
+> CONTACT-EMAILS (migración de correos a dircomercialcol@ / sellerscolombia@), y P0-BOOT-REGRESSION
+> (docblock sin cerrar en sales-booster que abortaba el boot — login/registro de vendedores + VTEX
+> "error de Red"). Recordatorio SG: tras `git pull` SIEMPRE reset de OPcache
+> (`find ~/.opcache -type f -delete` + `find /tmp/php-opcache-* -type f -delete`) + reload del plugin.
+>
 > **Notas v2.9.187 (2026-07-17):** Cierre del ciclo Plaza Viva. 9 templates nativos WC activos en producción vía `LTMS_Native_Templates` (template_include override). Design system CSS/JS (724 + 647 líneas). 178 test methods nuevos en 9 módulos. 2 migrations formalizadas (`lt_consumer_disputes` + `lt_customs_declarations`). XCover claim listener registrado. Vendor rating calculation con peso exponencial. SiteGround WAF confirmado por Contra Cultura.
 >
 > **Notas v2.9.101 (2026-07-13):** Build pipeline + CI + security hardening. 20 commits con 9 vulnerabilidades de seguridad arregladas, QA de 21/21 vistas, GitHub Actions CI, y 4 vistas refactorizadas (inline JS → external files).

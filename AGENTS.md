@@ -20,7 +20,7 @@
   # 1) Reset OPcache si tocaste vendor/ o includes/ tras el último pull:
   find ~/.opcache -type f -delete 2>/dev/null
   find /tmp/php-opcache-* -type f -delete 2>/dev/null
-  # 2) Suite completa (3,707 tests, ~6 min):
+  # 2) Suite completa (4,851 tests, ~9:20 min):
   LTMS_UNIT_ONLY=true php -d zend.assertions=1 -d assert.active=1 vendor/bin/phpunit \
     --configuration phpunit.xml --testsuite=unit
   ```
@@ -89,7 +89,7 @@ No saltes directo a editar código, ni siquiera en tareas que parezcan simples.
   de forma aislada dentro del propio archivo de test.
 - Al terminar cada cambio, corre la suite completa de PHPUnit (no solo el test nuevo)
   y confirma explícitamente que nada existente se rompió (debe mantenerse en verde,
-  ≥ 3,283 tests) antes de dar la tarea por terminada.
+  ≥ 4,851 tests) antes de dar la tarea por terminada.
 - Validación SSH obligatoria antes de commit: `php -l`, recarga del plugin,
   `tail -n 50 error_log`, `wp cache flush`, y verificación de la clase nueva con
   `wp eval 'var_dump(class_exists("..."));'`. Ver Paso 2 completo en `CLAUDE.md`.

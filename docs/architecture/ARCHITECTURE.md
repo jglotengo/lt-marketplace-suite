@@ -1,7 +1,7 @@
 # LT Marketplace Suite — Architecture Documentation
 
-**Version:** 2.9.98
-**Last Updated:** 2026-07-08
+**Version:** 2.9.334
+**Last Updated:** 2026-09-04
 **Pattern:** Hexagonal Architecture (Ports & Adapters)
 **Audits completed:** REG-AUDIT-001 (registro vendedores), DEEP-AUDIT-002 (onboarding+panel, 56 findings 100% P0+P1+P2), UIUX-AUDIT-001 (62 findings 100% resolved)
 

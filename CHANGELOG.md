@@ -44,6 +44,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `AuditCiclo29SalesBoosterFixesTest.php` actualizado (hooks de social proof ya no
   registrados). `LTMS_VERSION` → 2.9.334.
 
+### Fixed — `P0-BOOT-REGRESSION` (login/registro de vendedores + VTEX "error de Red" + footer "Cámara")
+
+> Verificación en vivo (SG): el formulario de login/registro de vendedores mostraba el
+> shortcode literal `[ltms_vendor_login]` y el re-sync VTEX de Kosmetic daba "error de Red".
+> Causa raíz única: un docblock `/**` sin cerrar introducido en `class-ltms-sales-booster.php`
+> (reemplazo de las constantes de social proof) dejaba `init()` dentro de un comentario →
+> `Call to undefined method LTMS_Sales_Booster::init()` en `class-ltms-kernel.php:408` →
+> el boot abortaba en `boot_business_logic()` y `boot_frontend()` NUNCA corría: sin
+> shortcodes (`ltms_vendor_login`/`ltms_vendor_register`) ni AJAX (`ltms_vendor_login`,
+> `ltms_sync_vtex_products`, etc.). 415+ `KERNEL BOOT ERROR` desde 12:37 UTC del 04-Sep.
+> Los tests no lo atraparon: `php -l` pasa (sintaxis válida) y los métodos testeados
+> quedan DESPUÉS del cierre del comentario.
+
+- **P0-BOOT-REGRESSION-001 (P0 — boot)** (`includes/business/class-ltms-sales-booster.php`):
+  cerrado el docblock `/** ... */` que envolvía `init()`. Restaura `init()` como método
+  invocable → el boot completo de `boot_frontend()` vuelve a correr → login/registro de
+  vendedores y todos los endpoints AJAX (incluido el sync VTEX) quedan registrados.
+  Deploy: `git pull` + reset de OPcache + reload del plugin. Verificado en runtime:
+  `method_exists(init)=yes`, `shortcode_exists(ltms_vendor_login)=yes`,
+  `has_action(wp_ajax_ltms_sync_vtex_products)=yes`, 0 errores de boot nuevos (479→479),
+  páginas `/login-vendedor/` y `/registro-vendedor/` renderizan el formulario real.
+- **CONTACT-EMAILS-002 (P2 — contenido)** (SG, datos): corregido el footer Elementor 13743:
+  "Camara Colombiana de Comercio Electrónico" → "Cámara Colombiana de Comercio Electrónico".
+  (La dirección "Of 102C<br>Cali" NO era error — el `<br>` es un salto de línea real.)
+- **Tests** +2 en `PromoPopupRemovalTest.php` (regresión P0): `init()` existe y es
+  `public static` (`method_exists` + `ReflectionMethod`) + equilibrio de `/**` vs `*/`
+  antes de `init()` (anti-regresión del docblock sin cerrar). Suite módulo 9/9 + 3/3 + 32/32.
+
 ---
 
 ## [Unreleased] — 2026-09-03

@@ -2,10 +2,10 @@
 
 > Enterprise multi-vendor marketplace for WooCommerce — Colombia & Mexico
 
-**Version:** 2.9.102 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
+**Version:** 2.9.334 | **PHP:** 8.1+ | **WC:** 8.0+ | **WP:** 6.3+
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](https://ltmarketplace.co/eula)
-[![Version](https://img.shields.io/badge/version-2.9.102-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.9.334-blue.svg)]()
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple.svg)]()
 [![WooCommerce](https://img.shields.io/badge/WooCommerce-8.0%2B-purple.svg)]()
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-green.svg)]()

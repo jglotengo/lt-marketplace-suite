@@ -1,10 +1,10 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 2.9.187
-**Report Date:** 2026-07-17
-**Environment:** Ubuntu 22.04 · PHP 8.2.15 · MySQL 8.0.36 · WordPress 6.4.3 · WooCommerce 8.5.2
+**Version:** 2.9.334
+**Report Date:** 2026-09-04
+**Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
 **Tester:** Automated CI + Manual Review + 30+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, integrations, core security, financial business-logic, regression, Plaza Viva)
-**Commits:** 1,500+ (e6268b2 → HEAD@v2.9.187)
+**Commits:** 1,500+ (HEAD@v2.9.334)
 **Audits completed:** 30+ (all 100% resolved for P0+P1+P2)
 
 ---

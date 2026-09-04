@@ -1,8 +1,8 @@
-# UX Enhancements — LT Marketplace Suite v2.9.187
+# UX Enhancements — LT Marketplace Suite v2.9.334
 
 > **Histórico:** Este documento cubre la capa UX desde v2.9.35 (capa inicial overlay) hasta v2.9.187 (ciclo Plaza Viva completo, 9 templates nativos WC en producción).
 >
-> **Versión actual:** 2.9.187 (2026-07-17)
+> **Versión actual:** 2.9.334 (2026-09-04)
 
 Capa overlay de mejoras de experiencia de usuario aplicada a **todas las interfaces** del marketplace. A partir de v2.9.77, la capa UX se sometió a una auditoría completa (UIUX-AUDIT-001) que abarcó 25 vistas del dashboard, 4 archivos CSS y 9 clases storefront, resultando en 62 hallazgos (P0×7, P1×15, P2×25, P3×15) — **100% resueltos a v2.9.98**.
 

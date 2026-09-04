@@ -3234,6 +3234,57 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    no la escribe ningún proceso automático, es display muerto que desinforma — el sync debe ir en webhook +
    cron + reconciliador, no en el AJAX manual.
 
+---
+
+## 26. v2.9.334 - P0-BOOT-REGRESSION: un docblock `/**` sin cerrar tumbó el boot completo (login/registro de vendedores + VTEX "error de Red")
+
+> **Hallazgo (2026-09-04):** el usuario reportó que ya no se podía acceder al formulario de registro/login
+> de vendedores y que el re-sync VTEX de Kosmetic daba "error de Red". Ambos síntomas tenían UNA sola causa:
+> en el ciclo REMOVE-PROMO-POPUP, el reemplazo de las constantes de social proof dejó un docblock `/**` SIN
+> cerrar (`*/`) en `class-ltms-sales-booster.php`. Desde ahí hasta el primer `*/` posterior (el docblock del
+> método `track_cart_activity`) TODO quedó dentro de un comentario — incluido `public static function init()`.
+> El kernel llamaba `LTMS_Sales_Booster::init()` (línea 408) → `Call to undefined method` → el `boot()` en
+> try/catch abortaba en `boot_business_logic()` y **`boot_frontend()` NUNCA corría**: sin shortcodes
+> (`ltms_vendor_login`, `ltms_vendor_register`), sin AJAX (`ltms_vendor_login`, `ltms_sync_vtex_products`,
+> etc.), sin panel. 415+ `KERNEL BOOT ERROR` en `debug.log`. Ver `CHANGELOG.md` 2026-09-04
+> (P0-BOOT-REGRESSION-001).
+
+### Lección #156: un docblock sin cerrar es una bomba silenciosa — `php -l` y los tests por-archivo NO la detectan si el código roto queda ANTES del método testeado
+
+1. **Caso real:** el bug pasó TODAS las verificaciones: `php -l` (sintaxis válida — el comentario se cierra
+   en el primer `*/` posterior), suite PHPUnit del módulo verde (los tests de `SalesBoosterTest` cubrían
+   `render_viewer_count`, que queda DESPUÉS del cierre del comentario → se parsea normal), y el deploy.
+   En runtime, `init()` no existía → boot abortado en silencio (el try/catch del kernel loguea y continúa,
+   no tumba la página). La página seguía sirviendo (HTTP 200) porque Elementor/WP renderizan sin el plugin
+   booteado — pero login/registro mostraban el shortcode LITERAL `[ltms_vendor_login]` y los AJAX no
+   respondían.
+2. **Regla preventiva (para la IA y para humanos):**
+   - Todo bloque que se REEMPLAZA por un comentario (docblock o no) debe verificarse con el balance
+     `substr_count($src, '/**') === substr_count($src, '*/')` en la zona editada (o un test anti-regresión).
+   - El test de la feature debe incluir un guard de **existencia y visibilidad del método de entrada**
+     (`method_exists` + `ReflectionMethod::isPublic/isStatic`) — no solo los métodos que produce la feature.
+     Un test que verifica `render_viewer_count()` nunca detecta que `init()` desapareció.
+   - **Síntoma en producción de "boot abortado":** páginas que se sirven pero sin features del plugin
+     (shortcodes literales, AJAX muertos, paneles rotos). Diagnosticar SIEMPRE con
+     `grep 'KERNEL BOOT ERROR' debug.log` — es el primer paso, no el último.
+   - **Runtimemente:** `method_exists(Clase, 'init')` + `shortcode_exists(...)` + `has_action(...)` son la
+     verificación real post-deploy; `php -l` y tests locales NO prueban el runtime en SG.
+
+### Lección #157: SG con `opcache.validate_timestamps=0` exige reset de OPcache DESPUÉS de `git pull` — y el error_log es la fuente de verdad
+
+1. **Caso real:** tras deployar el fix vía `git pull`, `method_exists` seguía devolviendo `no` en el runtime
+   CLI mientras el archivo en disco YA tenía `init()`. El OPcache de SG (validate_timestamps=0) servía
+   bytecode stale. El reset documentado (`find ~/.opcache -type f -delete` + `find /tmp/php-opcache-* -type f
+   -delete`) + `wp plugin deactivate/activate` recompiló limpio y `method_exists` pasó a `yes`. Además, el
+   último `KERNEL BOOT ERROR` (15:14 UTC) se confirmó como previo al reset — el conteo del error_log
+   (479→479 tras requests frescos) es la prueba de que el web quedó sano.
+2. **Regla preventiva:** en SG, el orden post-deploy SIEMPRE es: `git pull` → `find ~/.opcache -type f -delete`
+   + `find /tmp/php-opcache-* -type f -delete` → `wp plugin deactivate/activate` → `wp cache flush` →
+   verificación runtime (`method_exists` + `shortcode_exists` + `has_action`) → verificación de que el
+   `KERNEL BOOT ERROR` count NO crece tras requests frescos. Un `php -r` CLI usa un OPcache distinto al
+   PHP-FPM del web — si el web sigue roto, el reset de archivos no basta y hay que revisar el conteo de
+   errores del log (no solo el CLI).
+
 
 
 
