@@ -8,7 +8,8 @@
  *  SB-2: Flash Sales con countdown timer.
  *  SB-3: Web Push Notifications.
  *  SB-4: Upsell / Cross-sell con barra de envío gratis.
- *  SB-5: Social Proof en tiempo real (toasts + viewer count).
+ *  SB-5: Viewer count (PDP). Los toasts de social proof ("X compró Y") se
+ *        eliminaron en REMOVE-PROMO-POPUP-001 FIX (2026-09-04).
  *
  * Impacto estimado: +30-50% ventas en 90 días.
  *
@@ -47,10 +48,10 @@ class LTMS_Sales_Booster {
     ];
 
     /**
-     * Productos para social proof (compras recientes para toasts).
-     */
-    public const SOCIAL_PROOF_TOAST_DURATION = 5; // segundos visible.
-    public const SOCIAL_PROOF_INTERVAL = 30; // segundos entre toasts.
+     * REMOVE-PROMO-POPUP-001 FIX: las constantes de social proof
+     * (SOCIAL_PROOF_TOAST_DURATION, SOCIAL_PROOF_INTERVAL) y la lista de
+     * productos para toasts se eliminaron junto con la feature el
+     * 2026-09-04 (ver SB-5 abajo). No re-implementar.
 
     // ================================================================
     // INIT.
@@ -78,13 +79,14 @@ class LTMS_Sales_Booster {
         add_action( 'woocommerce_after_cart_contents', [ __CLASS__, 'render_cart_cross_sell' ] );
         add_action( 'woocommerce_review_order_after_cart_contents', [ __CLASS__, 'render_checkout_cross_sell' ] );
 
-        // SB-5: Social proof.
-        add_action( 'wp_footer', [ __CLASS__, 'render_social_proof_container' ], 25 );
+        // SB-5: Viewer count (PDP). Los toasts de social proof ("X compró Y")
+        // se eliminaron en REMOVE-PROMO-POPUP-001 FIX — el container
+        // #ltms-social-proof-container y el AJAX ltms_get_social_proof ya
+        // no existen (el CSS de v2.9.278 los ocultaba con selectores que no
+        // matcheaban el markup real). Se conserva SOLO el viewer count.
+        add_action( 'wp_footer', [ __CLASS__, 'render_viewer_count' ], 25 );
         add_action( 'wp_ajax_nopriv_ltms_track_product_view', [ __CLASS__, 'ajax_track_product_view' ] );
         add_action( 'wp_ajax_ltms_track_product_view', [ __CLASS__, 'ajax_track_product_view' ] );
-        add_action( 'wp_ajax_nopriv_ltms_get_social_proof', [ __CLASS__, 'ajax_get_social_proof' ] );
-        add_action( 'wp_ajax_ltms_get_social_proof', [ __CLASS__, 'ajax_get_social_proof' ] );
-        add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'record_purchase_for_social_proof' ] );
     }
 
     // ================================================================
@@ -758,60 +760,37 @@ class LTMS_Sales_Booster {
     }
 
     // ================================================================
-    // SB-5: SOCIAL PROOF EN TIEMPO REAL.
+    // SB-5: VIEWER COUNT (PDP).
     // ================================================================
 
     /**
-     * Renderiza contenedor de toasts de social proof.
+     * Renderiza el contador de viewers en PDP.
+     *
+     * REMOVE-PROMO-POPUP-001 FIX: los toasts de social proof ("X compró Y"
+     * con el nombre del ultimo producto comprado, container
+     * #ltms-social-proof-container + AJAX ltms_get_social_proof) se
+     * eliminaron a peticion del negocio el 2026-09-04. El CSS de v2.9.278
+     * intento ocultarlos pero los selectores no matcheaban el markup real.
+     * Se conserva SOLO el viewer count (feature independiente, no pedida
+     * de eliminar).
      */
-    public static function render_social_proof_container(): void {
+    public static function render_viewer_count(): void {
         if ( is_admin() ) return;
         ?>
-        <div id="ltms-social-proof-container" style="position:fixed;bottom:20px;left:20px;z-index:99997;max-width:320px;"></div>
         <div id="ltms-viewer-count" style="display:none;position:fixed;top:80px;right:20px;background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:6px 14px;font-size:13px;z-index:99996;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
             <span style="color:#16a34a;">●</span> <span id="ltms-viewer-count-num">0</span> <?php esc_html_e( 'viendo esto ahora', 'ltms' ); ?>
         </div>
         <script>
         jQuery(function($){
-            // Social proof toasts.
-            var toastInterval = setInterval(function() {
-                // FIX 403-SOCIALPROOF: ajax_get_social_proof() exige
-                // ltms_ux_nonce desde v2.9.100 (SEC-3), pero esta llamada
-                // nunca lo mandaba -> 403 "Token inválido" en cada tick,
-                // en cada página pública. window.ltmsUX.nonce ya se
-                // inyecta globalmente vía wp_add_inline_script en
-                // jquery-core (ver class-ltms-frontend-assets.php), así
-                // que está disponible antes de que corra este script de
-                // wp_footer.
-                var spNonce = ( window.ltmsUX && window.ltmsUX.nonce ) ? window.ltmsUX.nonce : '';
-                $.post(ajaxurl, { action: 'ltms_get_social_proof', nonce: spNonce }, function(resp) {
-                    if (resp && resp.success && resp.data) {
-                        var d = resp.data;
-                        var cities = ['Bogotá', 'Medellín', 'Cali', 'CDMX', 'Guadalajara', 'Barranquilla', 'Cartagena', 'Monterrey'];
-                        var city = cities[Math.floor(Math.random() * cities.length)];
-                        var html = '<div class="ltms-toast" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,0.1);margin-bottom:8px;display:flex;gap:10px;align-items:center;animation:ltms-slide-in 0.3s ease;">';
-                        html += '<img src="' + d.image + '" width="40" height="40" style="border-radius:6px;">';
-                        html += '<div style="flex:1;font-size:12px;">';
-                        html += '<strong>' + d.name + '</strong><br>';
-                        html += '<span style="color:#6b7280;">' + d.buyer + ' en ' + city + '</span><br>';
-                        html += '<span style="color:#16a34a;font-size:11px;">✓ Compra verificada · hace ' + d.time + '</span>';
-                        html += '</div></div>';
-                        $('#ltms-social-proof-container').append(html);
-                        setTimeout(function() {
-                            $('.ltms-toast').first().fadeOut(300, function(){ $(this).remove(); });
-                        }, 5000);
-                    }
-                });
-            }, <?php echo esc_js( self::SOCIAL_PROOF_INTERVAL * 1000 ); ?>);
-
             // Viewer count (solo en PDP).
             <?php if ( is_product() ) : ?>
             var productId = <?php echo esc_js( get_the_ID() ); ?>;
+            var spNonce = ( window.ltmsUX && window.ltmsUX.nonce ) ? window.ltmsUX.nonce : '';
             // CICLO29-P1-SB-002 FIX: enviar `nonce: spNonce` (handler fail-closed).
             // Antes el JS no enviaba el nonce pero el backend lo exigia via
             // check_ajax_referer('ltms_ux_nonce', 'nonce', false) -> wp_send_json_error().
             // Resultado: la feature de viewer count estaba rota en runtime
-            // (todas las requests retornaban 403 efter handler fail-closed).
+            // (todas las requests retornaban 403 tras handler fail-closed).
             $.post(ajaxurl, { action: 'ltms_track_product_view', nonce: spNonce, product_id: productId });
             setInterval(function() {
                 $.post(ajaxurl, { action: 'ltms_track_product_view', nonce: spNonce, product_id: productId }, function(resp) {
@@ -823,12 +802,6 @@ class LTMS_Sales_Booster {
             }, 15000);
             <?php endif; ?>
         });
-        if (!document.getElementById('ltms-toast-styles')) {
-            var s = document.createElement('style');
-            s.id = 'ltms-toast-styles';
-            s.textContent = '@keyframes ltms-slide-in { from { transform:translateX(-100%); opacity:0; } to { transform:translateX(0); opacity:1; } }';
-            document.head.appendChild(s);
-        }
         </script>
         <?php
     }
@@ -873,65 +846,11 @@ class LTMS_Sales_Booster {
         wp_send_json_success( [ 'viewers' => count( $viewers ) ] );
     }
 
-    /**
-     * AJAX: get social proof data (compra reciente para toast).
-     */
-    public static function ajax_get_social_proof(): void {
-        // v2.9.100 SEC-3 FIX: add nonce to prevent PII disclosure to public.
-        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
-        }
-
-        global $wpdb;
-
-        // Buscar una orden completada recientemente con producto con imagen.
-        $order = $wpdb->get_row(
-            "SELECT p.ID, p.post_date
-             FROM {$wpdb->posts} p
-             WHERE p.post_type = 'shop_order'
-               AND p.post_status IN ('wc-completed', 'wc-processing')
-             ORDER BY p.post_date DESC
-             LIMIT 1",
-            ARRAY_A
-        );
-
-        if ( ! $order ) {
-            wp_send_json_success( null );
-            return;
-        }
-
-        $items = wc_get_order( $order['ID'] )->get_items();
-        if ( empty( $items ) ) {
-            wp_send_json_success( null );
-            return;
-        }
-
-        $item = $items[ array_key_first( $items ) ];
-        $product = $item->get_product();
-        if ( ! $product ) {
-            wp_send_json_success( null );
-            return;
-        }
-
-        $customer = wc_get_order( $order['ID'] )->get_billing_first_name() ?: 'Alguien';
-        $time_ago = human_time_diff( strtotime( $order['post_date'] ), time() );
-
-        wp_send_json_success( [
-            'name'   => $product->get_name(),
-            'image'  => wp_get_attachment_url( $product->get_image_id() ) ?: '',
-            'buyer'  => $customer,
-            'time'   => $time_ago,
-        ] );
-    }
-
-    /**
-     * Registra compra para social proof.
-     */
-    public static function record_purchase_for_social_proof( int $order_id ): void {
-        // El social proof usa directamente las órdenes de WC completadas.
-        // No requiere tabla adicional — ajax_get_social_proof consulta órdenes.
-        if ( class_exists( 'LTMS_Core_Logger' ) ) {
-            LTMS_Core_Logger::info( 'SOCIAL_PROOF_PURCHASE', sprintf( 'Order #%d registrada para social proof.', $order_id ) );
-        }
-    }
+    // ================================================================
+    // REMOVE-PROMO-POPUP-001 FIX: se eliminaron los handlers de social
+    // proof (ajax_get_social_proof + record_purchase_for_social_proof y
+    // sus hooks wp_ajax_ltms_get_social_proof / order_status_completed).
+    // El toast "X compró Y" se removio a peticion del negocio 2026-09-04.
+    // No re-implementar.
+    // ================================================================
 }

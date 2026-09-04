@@ -275,17 +275,17 @@ class AuditCiclo29SalesBoosterFixesTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
-	public function test_get_social_proof_still_sends_nonce(): void {
+	public function test_social_proof_toast_removed_after_promo_removal(): void {
 		$this->assertFileExists( self::SALES_BOOSTER_PATH );
 		$source = file_get_contents( self::SALES_BOOSTER_PATH );
 
-		// No-regresion SEC-3 FIX: ajax_get_social_proof sigue recibiendo nonce
-		// via spNonce en el JS (no se toco en C29, garantizamos sigue).
-		$this->assertStringContainsString(
-			"{ action: 'ltms_get_social_proof', nonce: spNonce }",
-			$source,
-			'SEC-3 FIX intacto: ajax_get_social_proof JS sigue enviando nonce: spNonce.'
-		);
+		// REMOVE-PROMO-POPUP-001 FIX: el toast de social proof ("X compró Y")
+		// fue eliminado a petición del negocio. No debe quedar el hook del
+		// container, el método ni el JS que consultaba el endpoint.
+		$this->assertStringNotContainsString( "add_action( 'wp_footer', [ __CLASS__, 'render_social_proof_container' ], 25 )", $source );
+		$this->assertStringNotContainsString( 'public static function render_social_proof_container(): void {', $source );
+		$this->assertStringNotContainsString( 'id="ltms-social-proof-container"', $source );
+		$this->assertStringNotContainsString( "action: 'ltms_get_social_proof'", $source );
 	}
 
 	// ====================================================================
@@ -319,12 +319,16 @@ class AuditCiclo29SalesBoosterFixesTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( "add_action( 'woocommerce_proceed_to_checkout', [ __CLASS__, 'render_free_shipping_progress_bar' ] )", $source );
 		$this->assertStringContainsString( "add_action( 'woocommerce_after_cart_contents', [ __CLASS__, 'render_cart_cross_sell' ] )", $source );
 		$this->assertStringContainsString( "add_action( 'woocommerce_review_order_after_cart_contents', [ __CLASS__, 'render_checkout_cross_sell' ] )", $source );
-		$this->assertStringContainsString( "add_action( 'wp_footer', [ __CLASS__, 'render_social_proof_container' ], 25 )", $source );
+		$this->assertStringContainsString( "add_action( 'wp_footer', [ __CLASS__, 'render_viewer_count' ], 25 )", $source );
 		$this->assertStringContainsString( "add_action( 'wp_ajax_nopriv_ltms_track_product_view', [ __CLASS__, 'ajax_track_product_view' ] )", $source );
 		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_track_product_view', [ __CLASS__, 'ajax_track_product_view' ] )", $source );
-		$this->assertStringContainsString( "add_action( 'wp_ajax_nopriv_ltms_get_social_proof', [ __CLASS__, 'ajax_get_social_proof' ] )", $source );
-		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_get_social_proof', [ __CLASS__, 'ajax_get_social_proof' ] )", $source );
-		$this->assertStringContainsString( "add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'record_purchase_for_social_proof' ] )", $source );
+
+		// REMOVE-PROMO-POPUP-001 FIX: los hooks del toast de social proof
+		// (wp_footer render_social_proof_container, AJAX ltms_get_social_proof
+		// y record_purchase_for_social_proof) NO deben estar registrados.
+		$this->assertStringNotContainsString( "add_action( 'wp_footer', [ __CLASS__, 'render_social_proof_container' ], 25 )", $source );
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_ltms_get_social_proof'", $source );
+		$this->assertStringNotContainsString( "add_action( 'woocommerce_order_status_completed', [ __CLASS__, 'record_purchase_for_social_proof' ] )", $source );
 	}
 
 	public function test_ajax_track_product_view_still_has_nonce_check(): void {
@@ -347,17 +351,16 @@ class AuditCiclo29SalesBoosterFixesTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
-	public function test_ajax_get_social_proof_still_has_nonce_check(): void {
+	public function test_ajax_get_social_proof_removed(): void {
 		$this->assertFileExists( self::SALES_BOOSTER_PATH );
 		$source = file_get_contents( self::SALES_BOOSTER_PATH );
 
-		// No-regresion SEC-3 FIX: el handler ajax_get_social_proof sigue
-		// exigiendo nonce fail-closed. C29 NO lo toco.
-		$this->assertStringContainsString(
-			'v2.9.100 SEC-3 FIX',
-			$source,
-			'Comentario SEC-3 FIX sigue presente en ajax_get_social_proof.'
-		);
+		// REMOVE-PROMO-POPUP-001 FIX: el handler ajax_get_social_proof (y su
+		// endpoint wp_ajax_ltms_get_social_proof) fue eliminado con la feature
+		// de toasts. Verificamos que la definición del handler no reaparezca.
+		$this->assertStringNotContainsString( 'public static function ajax_get_social_proof(): void {', $source );
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_ltms_get_social_proof'", $source );
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_nopriv_ltms_get_social_proof'", $source );
 	}
 
 	public function test_mark_cart_recovered_still_sanitizes_order_id(): void {

@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-04
+
+### Fixed — `REMOVE-PROMO-POPUP` (banner 10% + toast social proof eliminados) + `CONTACT-EMAILS` (correos de contacto actualizados)
+
+> Verificación en vivo (SG): al cargar las páginas públicas aparecían (1) un banner de
+> bienvenida "10% off primera compra" (`BIENVENIDO10`) y (2) un toast de social proof
+> "X compró Y" con el nombre del último producto comprado (el usuario reportó ver
+> "Abrelatas de Acero Inoxidable Multiusos..."). El CSS de v2.9.278 intentó ocultar el
+> toast pero sus selectores (`.ltms-social-proof-container`, clase) no matcheaban el
+> markup real (`#ltms-social-proof-container`, ID; `.ltms-toast` excluido de la regla).
+> Además el footer de la home (template Elementor 13743) mostraba correos obsoletos.
+
+- **REMOVE-PROMO-POPUP-001 (P2 — UX)** (`class-ltms-branding-engine.php` +
+  `class-ltms-sales-booster.php`): eliminado el banner `render_welcome_discount_banner`
+  (hook `wp_footer` pri 5) y toda la feature de toasts de social proof
+  (`render_social_proof_container`, `ajax_get_social_proof`,
+  `record_purchase_for_social_proof`, constantes de intervalo). Se conserva el
+  **viewer count** de PDP (`render_viewer_count`, feature independiente, no pedida de
+  eliminar). Los endpoints `wp_ajax_ltms_get_social_proof` ya no existen.
+- **CONTACT-EMAILS-001 (P2 — datos)** (SG, sin commit): actualizados los correos del
+  footer Elementor 13743 (widget icon-list `23c3db96`): `info@lotengo.market` →
+  `dircomercialcol@lo-tengo.com.co` y `sellers@lotengo.market` →
+  `sellerscolombia@lo-tengo.com.co`. Cache de Elementor + SG purgada.
+- **Tests** +7 en `PromoPopupRemovalTest.php` (nuevo): hook/método/markup del banner
+  eliminados, endpoint de social proof eliminado, viewer count preservado.
+  `SalesBoosterTest.php` actualizado (3 tests, ahora cubren `render_viewer_count`).
+  `AuditCiclo29SalesBoosterFixesTest.php` actualizado (hooks de social proof ya no
+  registrados). `LTMS_VERSION` → 2.9.334.
+
+---
+
 ## [Unreleased] — 2026-09-03
 
 ### Fixed — `PROD-LIST-PAGING` (panel del vendedor solo mostraba 50 productos sin paginar) + `PRICE-RECALC` (recálculo de precios sin re-sincronizar)

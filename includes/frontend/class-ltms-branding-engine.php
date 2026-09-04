@@ -137,8 +137,9 @@ class LTMS_Branding_Engine {
         // BR-6: Loss aversion en carrito.
         add_action( 'woocommerce_after_cart_totals', [ __CLASS__, 'render_loss_aversion_message' ] );
 
-        // BR-7: Reciprocidad — welcome discount banner.
-        add_action( 'wp_footer', [ __CLASS__, 'render_welcome_discount_banner' ], 5 );
+        // BR-7: Welcome discount banner — ELIMINADO (REMOVE-PROMO-POPUP-001 FIX).
+        // El banner "10% off primera compra" (render_welcome_discount_banner)
+        // se removio a peticion del negocio 2026-09-04. No re-registrar.
 
         // BR-8: Anchoring — savings display en PDP.
         add_action( 'woocommerce_single_product_summary', [ __CLASS__, 'render_savings_display' ], 15 );
@@ -576,35 +577,13 @@ class LTMS_Branding_Engine {
     }
 
     // ================================================================
-    // BR-7: RECIPROCIDAD — WELCOME DISCOUNT.
+    // BR-7: WELCOME DISCOUNT — ELIMINADO.
     // ================================================================
-
-    /**
-     * Banner de bienvenida con descuento (gatillo: reciprocidad).
-     *
-     * "Te damos 10% off en tu primera compra" → cliente se siente en deuda.
-     */
-    public static function render_welcome_discount_banner(): void {
-        if ( is_admin() || is_user_logged_in() ) return;
-        if ( isset( $_COOKIE['ltms_welcome_shown'] ) ) return;
-        ?>
-        <div id="ltms-welcome-banner" style="position:fixed;top:0;left:0;right:0;background:var(--ltms-gradient-premium);color:#fff;padding:12px 20px;text-align:center;z-index:99999;transform:translateY(-100%);transition:transform 0.5s ease;">
-            <span style="font-size:14px;">🎉 <?php esc_html_e( '¡Bienvenido! Usa el código', 'ltms' ); ?>
-            <code style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:4px;font-weight:bold;">BIENVENIDO10</code>
-            <?php esc_html_e( 'para 10% off en tu primera compra', 'ltms' ); ?></span>
-            <button id="ltms-welcome-close" style="float:right;background:none;border:none;color:#fff;cursor:pointer;font-size:18px;">×</button>
-        </div>
-        <script>
-        setTimeout(function() {
-            document.getElementById('ltms-welcome-banner').style.transform = 'translateY(0)';
-            document.cookie = 'ltms_welcome_shown=1; max-age=604800; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
-        }, 3000);
-        document.getElementById('ltms-welcome-close').onclick = function() {
-            document.getElementById('ltms-welcome-banner').style.transform = 'translateY(-100%)';
-        };
-        </script>
-        <?php
-    }
+    // REMOVE-PROMO-POPUP-001 FIX: el banner "10% off en tu primera compra"
+    // (render_welcome_discount_banner + hook wp_footer pri 5) se elimino
+    // el 2026-09-04 a peticion del negocio. El CSS legacy que lo ocultaba
+    // (class-ltms-vendor-storefront.php #ltms-welcome-banner) quedo inerte.
+    // No re-implementar.
 
     // ================================================================
     // BR-8: ANCLAJE — SAVINGS DISPLAY EN PDP.

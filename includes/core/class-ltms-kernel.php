@@ -403,7 +403,7 @@ final class LTMS_Core_Kernel {
             LTMS_TOTP_2FA::init();
         }
 
-        // v2.9.28 — Sales Booster (SB-1: carrito abandonado + SB-2: flash sales + SB-3: push notifications + SB-4: upsell/cross-sell + SB-5: social proof).
+        // v2.9.28 — Sales Booster (SB-1: carrito abandonado + SB-2: flash sales + SB-3: push notifications + SB-4: upsell/cross-sell + SB-5: viewer count PDP; toasts social proof eliminados en REMOVE-PROMO-POPUP-001 FIX).
         if ( class_exists( 'LTMS_Sales_Booster' ) ) {
             LTMS_Sales_Booster::init();
         }

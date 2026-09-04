@@ -7,15 +7,15 @@ namespace LTMS\Tests\Unit;
 use Brain\Monkey;
 
 /**
- * Unit tests for LTMS_Sales_Booster — social proof AJAX bootstrap.
+ * Unit tests for LTMS_Sales_Booster — viewer count (PDP) rendering.
  *
- * FIX 403-SOCIALPROOF: ajax_get_social_proof() exige check_ajax_referer()
- * contra 'ltms_ux_nonce' desde v2.9.100 (SEC-3), pero el $.post() inline
- * en render_social_proof_container() nunca mandaba el campo `nonce` —
- * cada tick del polling (cada SOCIAL_PROOF_INTERVAL segundos, en TODA
- * página pública) fallaba con 403 "Token inválido". Este test verifica
- * que el HTML/JS renderizado sí incluye el nonce, para evitar que la
- * regresión vuelva a colarse en un refactor futuro del template inline.
+ * REMOVE-PROMO-POPUP-001 FIX (2026-09-04): los toasts de social proof
+ * ("X compró Y", container #ltms-social-proof-container + AJAX
+ * ltms_get_social_proof) se eliminaron a petición del negocio. El CSS de
+ * v2.9.278 intentó ocultarlos con selectores de clase que no matcheaban el
+ * markup real (el container usa un ID y los toasts la clase .ltms-toast
+ * excluida explícitamente). Este test verifica que el render de la feature
+ * conservada (viewer count) NO reintroduce el toast ni su AJAX.
  */
 final class SalesBoosterTest extends LTMS_Unit_Test_Case {
 
@@ -23,41 +23,57 @@ final class SalesBoosterTest extends LTMS_Unit_Test_Case {
         parent::setUp();
         $this->require_class( '\LTMS_Sales_Booster' );
 
-        // render_social_proof_container() usa estas dos además de las ya
-        // stubbeadas en la clase base (esc_js, is_admin).
+        // render_viewer_count() usa estas además de las ya stubbeadas en la
+        // clase base (esc_js, is_admin).
         Monkey\Functions\stubs( [
             'esc_html_e'  => static function ( $text ) { echo $text; },
-            'is_product'  => false, // fuera de PDP: se omite el bloque de viewer count.
+            'is_product'  => false, // fuera de PDP: se omite el bloque JS de viewer count.
         ] );
     }
 
-    public function test_social_proof_ajax_call_includes_nonce(): void {
+    public function test_viewer_count_renders_container(): void {
         ob_start();
-        \LTMS_Sales_Booster::render_social_proof_container();
+        \LTMS_Sales_Booster::render_viewer_count();
         $html = ob_get_clean();
 
-        // El payload del $.post debe incluir un campo nonce leído de
-        // window.ltmsUX.nonce (localizado globalmente en frontend-assets).
-        $this->assertStringContainsString(
-            "action: 'ltms_get_social_proof', nonce: spNonce",
-            $html
-        );
-        $this->assertStringContainsString(
-            'window.ltmsUX && window.ltmsUX.nonce',
-            $html
-        );
+        $this->assertStringContainsString( 'id="ltms-viewer-count"', $html );
+        $this->assertStringContainsString( 'id="ltms-viewer-count-num"', $html );
+        // El JS de tracking solo se emite en PDP (test_viewer_count_js_sends_nonce_on_pdp).
     }
 
-    /**
-     * Regresión directa: la llamada original sin nonce no debe reaparecer.
-     */
-    public function test_social_proof_ajax_call_is_not_missing_nonce(): void {
+    public function test_social_proof_toast_removed_from_render(): void {
         ob_start();
-        \LTMS_Sales_Booster::render_social_proof_container();
+        \LTMS_Sales_Booster::render_viewer_count();
         $html = ob_get_clean();
 
+        // REMOVE-PROMO-POPUP-001 FIX: ni el container de toasts, ni el AJAX
+        // de social proof, ni los estilos de toast pueden existir en el render.
+        $this->assertStringNotContainsString( 'ltms-social-proof-container', $html );
+        $this->assertStringNotContainsString( 'ltms_get_social_proof', $html );
+        $this->assertStringNotContainsString( 'ltms-toast-styles', $html );
+        $this->assertStringNotContainsString( 'Compra verificada', $html );
+    }
+
+    public function test_viewer_count_js_sends_nonce_on_pdp(): void {
+        // En PDP (is_product=true) el JS del viewer count debe seguir enviando
+        // el nonce (CICLO29-P1-SB-002 FIX): handler ajax_track_product_view
+        // es fail-closed contra ltms_ux_nonce.
+        Monkey\Functions\stubs( [
+            'is_product' => true,
+            'get_the_ID' => static fn(): int => 42,
+        ] );
+
+        ob_start();
+        \LTMS_Sales_Booster::render_viewer_count();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString(
+            "{ action: 'ltms_track_product_view', nonce: spNonce, product_id: productId }",
+            $html
+        );
+        // No debe reaparecer el patrón sin nonce.
         $this->assertStringNotContainsString(
-            "{ action: 'ltms_get_social_proof' }",
+            "{ action: 'ltms_track_product_view', product_id: productId }",
             $html
         );
     }
