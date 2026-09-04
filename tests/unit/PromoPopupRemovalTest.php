@@ -91,4 +91,34 @@ class PromoPopupRemovalTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'ltms_track_product_view', $source );
 		$this->assertStringContainsString( 'ajax_track_product_view', $source );
 	}
+
+	public function test_init_method_preserved_and_public(): void {
+		$this->require_class( '\LTMS_Sales_Booster' );
+
+		// REGRESION P0 (2026-09-04): un docblock sin cerrar (/** sin */) en el
+		// reemplazo de las constantes de social proof dejaba a init() dentro de
+		// un comentario -> "Call to undefined method LTMS_Sales_Booster::init()"
+		// en class-ltms-kernel.php:408, el boot abortaba en boot_business_logic y
+		// boot_frontend() nunca corria: sin shortcodes de login/registro de
+		// vendedores, sin endpoints AJAX (VTEX -> "error de Red"), etc.
+		$this->assertTrue(
+			method_exists( '\LTMS_Sales_Booster', 'init' ),
+			'init() debe ser un método existente e invocable de LTMS_Sales_Booster.'
+		);
+		$ref = new \ReflectionMethod( '\LTMS_Sales_Booster', 'init' );
+		$this->assertTrue( $ref->isPublic(), 'init() debe ser public.' );
+		$this->assertTrue( $ref->isStatic(), 'init() debe ser static.' );
+	}
+
+	public function test_no_unclosed_docblock_in_sales_booster(): void {
+		$source = file_get_contents( self::SALES_BOOSTER_PATH );
+
+		// Anti-regresion: no debe existir un "/**" sin su "*/" correspondiente
+		// ANTES de la declaracion de init(). Contamos docblocks abiertos y
+		// cerrados en la primera mitad del archivo y exigen equilibrio.
+		$before_init = substr( $source, 0, strpos( $source, 'public static function init(): void {' ) );
+		$opens  = preg_match_all( '#/\*\*#', $before_init );
+		$closes = preg_match_all( '#\*/#', $before_init );
+		$this->assertSame( $opens, $closes, 'Todo /** antes de init() debe tener su */. Docblocks abiertos=' . $opens . ' cerrados=' . $closes );
+	}
 }

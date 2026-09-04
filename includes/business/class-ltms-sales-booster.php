@@ -52,6 +52,7 @@ class LTMS_Sales_Booster {
      * (SOCIAL_PROOF_TOAST_DURATION, SOCIAL_PROOF_INTERVAL) y la lista de
      * productos para toasts se eliminaron junto con la feature el
      * 2026-09-04 (ver SB-5 abajo). No re-implementar.
+     */
 
     // ================================================================
     // INIT.
