@@ -68,6 +68,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **CONTACT-EMAILS-002 (P2 — contenido)** (SG, datos): corregido el footer Elementor 13743:
   "Camara Colombiana de Comercio Electrónico" → "Cámara Colombiana de Comercio Electrónico".
   (La dirección "Of 102C<br>Cali" NO era error — el `<br>` es un salto de línea real.)
+- **FOOTER-MOJIBAKE-001 (P2 — contenido)** (SG, datos): el footer mostraba texto literal
+  `u00a0`/`u00e9` (mojibake de doble-escape: secuencias `\uXXXX` guardadas como texto sin el
+  backslash). Decodificadas todas las secuencias `u00XX` → carácter real (á é í ó ú ñ nbsp) en
+  11 templates de Elementor (footer 13743 + 20788, Home 13592, Checkout 8515, Carrito 8517,
+  Producto 8519, Tienda 8521, Políticas 8641, Garantías 8639, Inicio Seller 13596, Sellers 13599)
+  + 4 revisiones vía SQL directo (`update_post_meta` en revisiones es interceptado por Elementor).
+  Verificado: footer visible sin `u00xx` ("Información", "Cámara Colombiana", "a través",
+  "Síguenos", "Diseñado" correctos), body del home sin mojibake visible. Nota: los `\u003C`/
+  `u00f3` que quedan en el HTML son escapes JSON legítimos de `data-settings`/`wp_localize_script`
+  (se decodifican bien en el navegador), NO mojibake.
 - **Tests** +2 en `PromoPopupRemovalTest.php` (regresión P0): `init()` existe y es
   `public static` (`method_exists` + `ReflectionMethod`) + equilibrio de `/**` vs `*/`
   antes de `init()` (anti-regresión del docblock sin cerrar). Suite módulo 9/9 + 3/3 + 32/32.
