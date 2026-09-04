@@ -1003,6 +1003,41 @@
     display: none;
 }
 
+/* PDP-HIERARCHY-001 FIX (2026-09-04): jerarquia clara del bloque
+   precio -> "Envío gratis incluido" -> stock. Antes el elemento inyectado
+   por enhancePriceDisplay llevaba estilos inline apretados (margin-top:4px,
+   sin margin-bottom) y quedaba pegado al precio y a la barra de stock sin
+   jerarquia visual. Ahora es un pill de beneficio con margen inferior y el
+   bloque de precio se separa con un borde inferior sutil. */
+.ltms-price-shipping-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 16px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #e8faf3 0%, #f0fdf9 100%);
+    border: 1px solid #c3ecd9;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0b7a5b;
+    line-height: 1.4;
+}
+.ltms-price-shipping-info__icon {
+    font-size: 15px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.pv-scope.pv-product-page .pv-product-info__price {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2px;
+}
+.pv-scope.pv-product-page .pv-product-info__stock .pv-stock-bar {
+    height: 8px;
+    margin-bottom: 4px;
+}
+
 /* Complementary products — less dominant */
 .pv-product-page .ltms-addon-items {
     margin-top: 32px !important;

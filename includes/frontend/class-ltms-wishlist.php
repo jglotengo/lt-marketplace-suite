@@ -192,7 +192,15 @@ class LTMS_Wishlist {
      */
     public static function ajax_toggle(): void {
                 // SEC-4 FIX (v2.9.26): auth required.
-                if ( ! is_user_logged_in() ) { wp_send_json_error( [ 'message' => __( 'Login requerido.', 'ltms' ) ], 401 ); }
+                // PDP-WISHLIST-GUEST FIX (2026-09-04): se elimino el gate de login.
+                // El boton wishlist del PDP (.ltms-wishlist-btn-single) usa este
+                // handler legacy y para GUESTS retornaba 401 "Login requerido"
+                // (el JS no maneja .fail -> el boton no hacia nada). El resto del
+                // sitio (cards PV) ya soporta guests via cookie con ajax_pv_toggle.
+                // Aqui el nonce por-producto (ltms_wishlist_{pid}) sigue protegiendo
+                // contra CSRF y LTMS_Wishlist::toggle() persiste guest via cookie
+                // (ltms_wishlist, 30d) y logged-in via DB bkr_lt_wishlists — misma
+                // persistencia que ajax_pv_toggle.
         $product_id = (int) ( $_POST['product_id'] ?? 0 );
         $nonce = sanitize_text_field( $_POST['nonce'] ?? '' );
 

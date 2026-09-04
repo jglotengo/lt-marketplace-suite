@@ -6,6 +6,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `PDP-HIERARCHY` (jerarquía del bloque precio → "Envío gratis incluido" → stock en la página de producto) + `PDP-WISHLIST-GUEST` (wishlist del PDP no funcionaba para visitantes sin login)
+
+> Verificación en vivo (SG): (1) en el PDP, el texto "🚚 Envío gratis incluido" inyectado
+> por `PV.enhancePriceDisplay()` llevaba estilos inline apretados (`margin-top:4px`, sin
+> `margin-bottom`) y quedaba pegado al precio (28px) y a la barra de stock sin jerarquía
+> visual. (2) El botón "Agregar a wishlist" del PDP (`ltms-wishlist-btn-single`) usaba el
+> handler legacy `ltms_toggle_wishlist` que exigía login → para guests retornaba
+> `{"success":false,"message":"Login requerido."}` (verificado en runtime) y el JS no maneja
+> `.fail`, así que el botón no hacía nada. Los cards del storefront ya soportan guests vía
+> `ajax_pv_toggle` (cookie), el PDP quedó desalineado.
+
+- **PDP-HIERARCHY-001 (P2 — UX)** (`class-ltms-native-templates.php` +
+  `assets/css/ltms-plaza-viva.css`): `enhancePriceDisplay()` ya no setea estilos inline
+  apretados; el estilo vive en el design system como **pill de beneficio**
+  (`.ltms-price-shipping-info`, fondo verde claro + borde, `margin: 6px 0 16px`). Se añade
+  separador al bloque de precio (`.pv-product-info__price { border-bottom }`) y la barra de
+  stock del PDP pasa a 8px con margen inferior. Jerarquía resultante: precio → pill
+  "Envío gratis incluido" → stock → excerpt → CTA.
+- **PDP-WISHLIST-GUEST (P1 — funcional)** (`class-ltms-wishlist.php`): `ajax_toggle()`
+  dejó de exigir login — guests persisten vía cookie `ltms_wishlist` (30d) y logged-in vía
+  DB `bkr_lt_wishlists`, misma persistencia que `ajax_pv_toggle`. El nonce por-producto
+  (`ltms_wishlist_{pid}`) se conserva (protección CSRF intacta). Paridad de comportamiento
+  con los cards del storefront.
+- **Tests** +4 en `PdpHierarchyWishlistTest.php` (nuevo): `ajax_toggle` sin gate de login +
+  nonce CSRF conservado + tag, `enhancePriceDisplay` sin estilos inline apretados, CSS del
+  pill con margen inferior + separador del precio. `WishlistPvToggleTest` intacto (5/5).
+  `LTMS_VERSION` → 2.9.335.
+
+---
+
+## [Unreleased] — 2026-09-04
+
 ### Fixed — `REMOVE-PROMO-POPUP` (banner 10% + toast social proof eliminados) + `CONTACT-EMAILS` (correos de contacto actualizados)
 
 > Verificación en vivo (SG): al cargar las páginas públicas aparecían (1) un banner de

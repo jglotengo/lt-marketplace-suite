@@ -569,8 +569,12 @@ class LTMS_Native_Templates {
                 var info = document.createElement('div');
                 info.className = 'ltms-price-shipping-info';
                 info.setAttribute('data-ltms-shipping-info', '1');
-                info.style.cssText = 'font-size:13px;color:#0BA37F;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:4px';
-                info.innerHTML = '<span>\uD83D\uDE9A</span> <span>Envío gratis incluido</span>';
+                // PDP-HIERARCHY-001 FIX (2026-09-04): sin estilos inline apretados
+                // (antes: font-size:13px;margin-top:4px; sin margin-bottom -> quedaba
+                // pegado al precio y a la barra de stock sin jerarquia visual).
+                // El estilo vive en ltms-plaza-viva.css (.ltms-price-shipping-info)
+                // como pill de beneficio con margen inferior correcto.
+                info.innerHTML = '<span class="ltms-price-shipping-info__icon">\uD83D\uDE9A</span><span class="ltms-price-shipping-info__text">Envío gratis incluido</span>';
                 if (price.parentNode) price.parentNode.insertBefore(info, price.nextSibling);
             };
 
