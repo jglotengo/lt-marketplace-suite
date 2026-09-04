@@ -23,10 +23,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `record_purchase_for_social_proof`, constantes de intervalo). Se conserva el
   **viewer count** de PDP (`render_viewer_count`, feature independiente, no pedida de
   eliminar). Los endpoints `wp_ajax_ltms_get_social_proof` ya no existen.
-- **CONTACT-EMAILS-001 (P2 — datos)** (SG, sin commit): actualizados los correos del
-  footer Elementor 13743 (widget icon-list `23c3db96`): `info@lotengo.market` →
-  `dircomercialcol@lo-tengo.com.co` y `sellers@lotengo.market` →
-  `sellerscolombia@lo-tengo.com.co`. Cache de Elementor + SG purgada.
+- **CONTACT-EMAILS-001 (P2 — datos)** (SG, sin commit): migrados los correos
+  obsoletos a los nuevos en todo el proyecto donde aplica:
+  `info@lotengo.market` → `dircomercialcol@lo-tengo.com.co` y
+  `sellers@lotengo.market` → `sellerscolombia@lo-tengo.com.co`. Aplicado en:
+  footer Elementor 13743 (widget icon-list `23c3db96`, `_elementor_data` +
+  post_content), revisiones del footer 14502/14503/14504 (vía SQL directo,
+  `update_post_meta` es interceptado por Elementor en revisiones), y 3
+  recipients de notificaciones WooCommerce (`commissions_unpaid`,
+  `commissions_paid`, `new_vendor_registration`). NO se tocaron: `marco@`
+  y `juanguillermo@` (usuarios + credenciales de gateways de pago) ni
+  emails de billing de órdenes (datos de clientes). El código del plugin ya
+  usaba los correos nuevos. Cache de Elementor + SG purgada. GOTCHA: si se
+  edita el footer en Elementor, el save re-corrompe `_elementor_data`
+  (desescapa comillas en `mailto: "x"`); reparar con `preg_replace` de
+  `mailto: "..."` → `mailto:...` y validar JSON.
 - **Tests** +7 en `PromoPopupRemovalTest.php` (nuevo): hook/método/markup del banner
   eliminados, endpoint de social proof eliminado, viewer count preservado.
   `SalesBoosterTest.php` actualizado (3 tests, ahora cubren `render_viewer_count`).

@@ -566,6 +566,7 @@ $files = [
     'includes/frontend/class-ltms-frontend-live-search.php',
     'includes/frontend/class-ltms-rating-summary.php',
     'includes/frontend/class-ltms-frontend-notifications.php',
+    'includes/frontend/class-ltms-branding-engine.php',
     'includes/admin/views/html-admin-kyc.php',
     'includes/admin/views/html-admin-payouts.php',
     'includes/admin/views/html-admin-orders.php',
@@ -804,6 +805,9 @@ $files = [
     // PROD-LIST-PAGING + PRICE-RECALC v2.9.333 — paginación del panel de
     // productos + recálculo masivo de precios desde el costo persistido.
     'tests/unit/RecalcPricesTest.php',
+    // REMOVE-PROMO-POPUP + CONTACT-EMAILS v2.9.334 — banner 10% + toasts
+    // social proof eliminados; viewer count PDP preservado.
+    'tests/unit/PromoPopupRemovalTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
