@@ -102,7 +102,12 @@ class LTMS_SEO_Enhanced {
         add_action( 'wp_head', [ __CLASS__, 'inject_website_search_schema' ], 8 );
         add_action( 'wp_head', [ __CLASS__, 'inject_speakable_markup' ], 9 );
         add_action( 'woocommerce_after_single_product', [ __CLASS__, 'inject_aggregate_rating_schema' ], 20 );
-        add_action( 'woocommerce_shop_loop', [ __CLASS__, 'inject_item_list_schema' ], 10 );
+        // SHOP-ARCHIVE-EMPTY FIX (2026-09-05): inject_item_list_schema estaba en
+        // woocommerce_shop_loop (se dispara POR CADA producto del loop) y dentro
+        // hacia have_posts()/the_post() que CONSUMIA el loop principal y
+        // reconstruia el ItemList N veces -> el shop se quedaba vacio y agotaba
+        // memoria. Se mueve a woocommerce_after_shop_loop (una sola vez).
+        add_action( 'woocommerce_after_shop_loop', [ __CLASS__, 'inject_item_list_schema' ], 10 );
 
         // llms.txt.
         add_action( 'init', [ __CLASS__, 'register_llms_txt_rewrite' ] );
@@ -647,6 +652,12 @@ class LTMS_SEO_Enhanced {
         global $products_loop;
         // Se renderiza al final del loop en categorías/tienda.
         if ( ! is_shop() && ! is_product_category() && ! is_product_tag() ) return;
+
+        // SHOP-ARCHIVE-EMPTY FIX: rewind del loop principal (el hook ahora corre
+        // en woocommerce_after_shop_loop, cuando el loop ya se consumio).
+        wp_reset_query();
+        global $wp_query;
+        $wp_query->rewind_posts();
 
         $items = [];
         $i = 1;

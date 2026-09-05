@@ -72,7 +72,7 @@ if ( WC()->cart->is_empty() ) {
             $pv_empty_q = new WP_Query( [
                 'post_type'      => 'product',
                 'post_status'    => 'publish',
-                'posts_per_page' => 4,
+                'posts_per_page' => 8,
                 'orderby'        => 'date',
                 'order'          => 'DESC',
                 'no_found_rows'  => true,
