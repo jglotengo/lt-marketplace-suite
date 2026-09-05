@@ -344,6 +344,24 @@ body.admin-bar .pv-scope.pv-cart .pv-cart__summary[data-pv-sticky]{top:52px;}
 .pv-scope.pv-cart .pv-cart-empty-grid li.product{
     float:none;width:100% !important;max-width:none;margin:0;min-width:0;
 }
+/* CART-EMPTY-CARD-STD (2026-09-05): cards compactas tipo home. El markup usa
+   woocommerce-loop-product__link/__title + price (igual que el home) para que
+   enhanceElementorCards() las mejore identicamente (pv-enhanced + rating +
+   vendor + fav). Estas reglas cubren el estado base pre-JS. */
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .woocommerce-loop-product__link{
+    display:block;text-decoration:none;color:inherit;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product img{
+    width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;
+    display:block;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .woocommerce-loop-product__title{
+    font-size:14px;font-weight:600;line-height:1.35;margin:10px 0 4px;
+    color:#1a1a2e;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .price{
+    color:#E80001;font-weight:700;font-size:15px;
+}
 @media (max-width:1100px){
     .pv-scope.pv-cart .pv-cart-empty-grid{grid-template-columns:repeat(2,1fr);}
 }

@@ -46,10 +46,13 @@ final class CartEmptyUxTest extends LTMS_Unit_Test_Case {
 			$src,
 			'CART-EMPTY-PRODUCTS: el carrito vacio debe mostrar el titulo "Productos para ti".'
 		);
+		// CART-EMPTY-CARD-STD: usa el markup compacto del home
+		// (woocommerce-loop-product__title) para que enhanceElementorCards las
+		// mejore igual que las del home.
 		$this->assertStringContainsString(
-			"wc_get_template_part( 'content', 'product' )",
+			'woocommerce-loop-product__title',
 			$src,
-			'CART-EMPTY-PRODUCTS: debe renderizar las cards de producto via content-product.php.'
+			'CART-EMPTY-CARD-STD: las cards del carrito vacio deben usar el markup compacto del home.'
 		);
 		$this->assertStringContainsString(
 			'new WP_Query(',

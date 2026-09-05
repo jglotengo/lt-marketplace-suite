@@ -63,9 +63,12 @@ if ( WC()->cart->is_empty() ) {
             <?php
             // CART-EMPTY-PRODUCTS (2026-09-05): mostrar productos directamente
             // en el carrito vacio (4 recientes) para que el usuario no quede
-            // con una pantalla muerta. Reusa el template nativo content-product.php.
-            // La seccion va FUERA de la card angosta (max-width 520px) para que
-            // el grid use el ancho completo de la pagina.
+            // con una pantalla muerta.
+            // CART-EMPTY-CARD-STD FIX (2026-09-05): usar el MISMO markup compacto
+            // del home (woocommerce-loop-product__link + __title + price) en vez
+            // de content-product.php (card PV completa, mas alta 287x732 vs
+            // 264x472 del home). Asi enhanceElementorCards() las mejora igual
+            // que las del home (agrega .pv-enhanced + rating + vendor + fav).
             $pv_empty_q = new WP_Query( [
                 'post_type'      => 'product',
                 'post_status'    => 'publish',
@@ -82,7 +85,19 @@ if ( WC()->cart->is_empty() ) {
                         <?php
                         while ( $pv_empty_q->have_posts() ) :
                             $pv_empty_q->the_post();
-                            wc_get_template_part( 'content', 'product' );
+                            $_p = wc_get_product( get_the_ID() );
+                            if ( ! $_p ) {
+                                continue;
+                            }
+                            ?>
+                            <li class="product type-product">
+                                <a href="<?php echo esc_url( $_p->get_permalink() ); ?>" class="woocommerce-loop-product__link">
+                                    <?php echo $_p->get_image( 'woocommerce_thumbnail' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                                    <h2 class="woocommerce-loop-product__title"><?php echo esc_html( $_p->get_name() ); ?></h2>
+                                    <span class="price"><?php echo wp_kses_post( $_p->get_price_html() ); ?></span>
+                                </a>
+                            </li>
+                            <?php
                         endwhile;
                         ?>
                     </ul>
