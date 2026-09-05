@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `SHOP-ARCHIVE-EMPTY` (la tienda /tienda/ no mostraba los productos; el botón "Explorar productos" llevaba a página vacía)
+
+> Reporte del usuario: al vaciar el carrito, 4 productos dejaban espacios en blanco (ajustar
+> cantidad); el botón azul "Explorar productos" llevaba a una página vacía; la página tienda no
+> tenía los productos registrados; eliminar los productos del vendedor "marco morales".
+
+- **SHOP-ARCHIVE-EMPTY (P0 — funcional)** (`class-ltms-seo-enhanced.php` +
+  `class-ltms-native-templates.php`): `/tienda/` y `?post_type=product` se renderizaban vacíos
+  (header+footer sin main). Causa raíz: `inject_item_list_schema` estaba en `woocommerce_shop_loop`
+  (se dispara por cada producto) y hacía `have_posts()`/`the_post()` que **consumía el loop
+  principal** y reconstruía el ItemList N veces → el shop se quedaba vacío + fatal de memoria
+  (seo-enhanced.php:685). Fix: hook movido a `woocommerce_after_shop_loop` + `rewind_posts()`, y
+  `archive-product.php` (MINIMAL SAFE) re-habilitado para `is_shop()`/`is_product_taxonomy()`.
+- **CART-EMPTY-COUNT (P2 — UX)** (`cart.php`): el carrito vacío muestra **8 productos** (antes 4)
+  en 2 filas de 4, mejor distribución.
+- **DATA (SG)**: eliminados permanentemente los **221 productos** del vendedor "marco morales"
+  (user ID 19). Backup de IDs en `/tmp/marco_product_ids.txt`.
+- **Tests** +3 en `ShopArchiveFixTest.php` (nuevo): hook del ItemList en `after_shop_loop` (no en
+  `shop_loop`), `rewind_posts()`, archive-product.php re-habilitado. `LTMS_VERSION` → 2.9.339.
+
+---
+
 ### Fixed — `CART-EMPTY` (el botón "Explorar productos" del carrito vacío tenía el texto invisible; se muestran productos directamente)
 
 > Reporte del usuario: al vaciar el carrito aparece un botón "Explorar productos" pero no se ve la
