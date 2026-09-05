@@ -480,7 +480,9 @@ class AuthReAuditFixTest extends LTMS_Unit_Test_Case {
 		$src  = file_get_contents( $file );
 		$start = strpos( $src, 'function ajax_vendor_login' );
 		$this->assertNotFalse( $start );
-		$body = substr( $src, $start, 3500 );
+		// LOGIN-ERR-CLARITY (2026-09-04): se anadio un comentario de trazabilidad
+		// al inicio de ajax_vendor_login, desplazando el throttle; aumentar slice.
+		$body = substr( $src, $start, 5000 );
 		$this->assertStringContainsString( 'ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1', $body,
 			'No-regresión: login throttle debe seguir usando INSERT...ON DUPLICATE KEY atomic (no regresar a get_transient).' );
 	}

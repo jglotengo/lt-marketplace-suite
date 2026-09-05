@@ -140,6 +140,10 @@ final class LTMS_Public_Auth_Handler {
      * Renderiza el formulario de inicio de sesión para vendedores.
      */
     public function render_login_form( array $atts = [] ): string {
+        // LOGIN-ERR-CLARITY FIX (2026-09-04): no-cache en la pagina de login para que
+        // SG no sirva un HTML cacheado con un ltmsAuth.nonce stale (si el nonce no
+        // valida, ajax_vendor_login responde "Sesion expirada" y el JS lo muestra).
+        nocache_headers();
         // Solo bloquear si el user actual ya es vendor (no necesita login). Admins
         // y otros roles pueden ver el form (útil para QA, soporte, demo).
         if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
@@ -226,7 +230,15 @@ final class LTMS_Public_Auth_Handler {
     }
 
     public function ajax_vendor_login(): void {
-        check_ajax_referer( 'ltms_auth_nonce', 'nonce' );
+        // LOGIN-ERR-CLARITY FIX (2026-09-04): check_ajax_referer con die=false +
+        // mensaje claro. Antes, si el nonce fallaba (p. ej. pagina cacheada por SG
+        // con un nonce stale, o el usuario logueado en otra pestana cargaba la pagina
+        // con nonce de guest) WP devolvia "-1" y el JS (ltms-login-register.js) caia
+        // al mensaje generico "Usuario o contrasena incorrectos." aunque las
+        // credenciales fueran correctas. Ahora se devuelve el motivo real en JSON.
+        if ( ! check_ajax_referer( 'ltms_auth_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'La sesión expiró. Recarga la página e inténtalo de nuevo.', 'ltms' ) ], 403 );
+        }
 
         // Throttle: máximo 5 intentos por IP en 15 minutos.
         // INTEGRATIONS-AUDIT P0 FIX: migrated from non-atomic get_transient/set_transient
