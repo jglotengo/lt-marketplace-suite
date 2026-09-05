@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `CART-EMPTY` (el botón "Explorar productos" del carrito vacío tenía el texto invisible; se muestran productos directamente)
+
+> Reporte del usuario: al vaciar el carrito aparece un botón "Explorar productos" pero no se ve la
+> letra contenida; sugiere mostrar los productos directamente.
+
+- **CART-EMPTY-CTA (P1 — UX)** (`assets/css/ltms-cart.css` + `.min`): el botón `.pv-btn` del carrito
+  vacío tenía `color: var(--primary)` (azul) sobre fondo azul — una regla del tema `a { color:
+  var(--primary) }` sobreescribía el `color:#fff` del design system. Fix: `color:#fff !important` en
+  `.pv-cart__empty-card a.pv-btn` (+ hover/focus).
+- **CART-EMPTY-PRODUCTS (P2 — UX)** (`includes/frontend/templates/cart.php` +
+  `assets/css/ltms-cart.css`): el carrito vacío ahora muestra **4 productos recientes
+  directamente** (via `content-product.php`, el card nativo del design system) en un grid 4→2→1,
+  además del botón "Explorar productos". El usuario ve productos sin salir de la página.
+- **Tests** +4 en `CartEmptyUxTest.php` (nuevo): botón con color blanco `!important`, carrito vacío
+  muestra productos (WP_Query + content-product), grid CSS 4 columnas, `.min` regenerados.
+  `LTMS_VERSION` → 2.9.339.
+
+---
+
 ### Fixed — `SELLERS-LANDING` (la página /sellers/ se veía alineada a la izquierda en desktop) + `WELCOME-POPUP-TEXT` (el popup de bienvenida ofrecía descuento)
 
 > Reporte del usuario: (1) la página /sellers/ en desktop se veía todo a la izquierda;
