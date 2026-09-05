@@ -46,6 +46,10 @@ class LTMS_Cart_Drawer {
         // Hook into WC add_to_cart fragments (inofensivo, mantiene contador).
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'add_drawer_fragment' ] );
 
+        // CART-UX-001 FIX (2026-09-04): barra de progreso de envío gratis dentro del
+        // mini-cart / side-cart de Elementor (menu-cart). Reusa get_shipping_bar_data().
+        add_action( 'woocommerce_before_mini_cart', [ __CLASS__, 'render_mini_cart_shipping_bar' ], 5 );
+
         // v2.9.208: NO desactivar el redirect de WC — usar setting nativo
         // (WooCommerce > Settings > Products > Add to cart > "Redirect to the
         // cart page after successful addition"). Si está activado en WP admin,
@@ -652,6 +656,36 @@ JS;
                 ? sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), wc_price( $remaining ) )
                 : __( '&#x1F389; ¡Tienes envío gratis!', 'ltms' ),
         ];
+    }
+
+    /**
+     * CART-UX-001 FIX: barra de progreso de envío gratis dentro del mini-cart
+     * / side-cart de Elementor (woocommerce_before_mini_cart). Reusa
+     * get_shipping_bar_data() para mostrar cuánto falta para el umbral.
+     */
+    public static function render_mini_cart_shipping_bar(): void {
+        if ( null === WC()->cart || WC()->cart->is_empty() ) {
+            return;
+        }
+
+        $data = self::get_shipping_bar_data( WC()->cart );
+        if ( empty( $data['show'] ) ) {
+            return;
+        }
+
+        $pct = (float) $data['percentage'];
+        $done = $pct >= 100;
+
+        echo '<div class="ltms-mini-cart-shipping" data-ltms-mini-shipping="1">';
+        echo '<div class="ltms-mini-cart-shipping__msg">';
+        if ( $done ) {
+            echo '<span>' . esc_html__( '&#x1F389; ¡Tienes envío gratis!', 'ltms' ) . '</span>';
+        } else {
+            echo '<span>' . esc_html( sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), wp_kses_post( $data['remaining_formatted'] ) ) ) . '</span>';
+        }
+        echo '</div>';
+        echo '<div class="ltms-mini-cart-shipping__track"><div class="ltms-mini-cart-shipping__fill" style="width:' . esc_attr( min( 100, $pct ) ) . '%"></div></div>';
+        echo '</div>';
     }
 
     /**

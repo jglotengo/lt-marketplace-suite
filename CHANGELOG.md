@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `CART-DRAWER-OVERLAP` (el carrito lateral se sobreponía con el botón "Vender gratis" del header) + `CART-UX-001` (mejoras UX/UI del carrito)
+
+> Verificación en vivo (firecrawl interact): al abrir el drawer del carrito (Elementor
+> menu-cart side-cart, z-index 9998), los botones "Vender gratis" / "Mi Cuenta" del header
+> (`#ltms-floating-access`, z-index 100002) se sobreponían al drawer. Causa: el floating
+> access del header tiene un z-index superior al contenedor del carrito.
+
+- **CART-DRAWER-OVERLAP-001 (P1 — UX)** (`assets/css/ltms-header-nav.css` + `.min`): el
+  contenedor del carrito de Elementor (`.elementor-menu-cart__container`, z-index 9998) y su
+  panel (`.elementor-menu-cart__main`) ahora quedan por encima del floating access del header
+  (z-index 100003/100004 vs 100002). El carrito es un modal → cubre todo.
+- **CART-UX-001 (P2 — UX)** (`class-ltms-cart-drawer.php` + `assets/css/ltms-header-nav.css`):
+  barra de progreso de **envío gratis** dentro del mini-cart / side-cart de Elementor
+  (hook `woocommerce_before_mini_cart`, reusa `get_shipping_bar_data()`) + pulido del side-cart:
+  botón "Finalizar compra" más prominente (verde), padding de items, mensaje de carrito vacío.
+- **Tests** +4 en `CartDrawerUxFixTest.php` (nuevo): z-index del contenedor sobre 100002,
+  hook `woocommerce_before_mini_cart` registrado, método `render_mini_cart_shipping_bar` existe
+  y reusa `get_shipping_bar_data`, CSS del side-cart. `LTMS_VERSION` → 2.9.336.
+
+---
+
 ### Fixed — `PDP-HIERARCHY` (jerarquía del bloque precio → "Envío gratis incluido" → stock en la página de producto) + `PDP-WISHLIST-GUEST` (wishlist del PDP no funcionaba para visitantes sin login)
 
 > Verificación en vivo (SG): (1) en el PDP, el texto "🚚 Envío gratis incluido" inyectado

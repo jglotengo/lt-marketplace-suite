@@ -262,6 +262,66 @@
   .ltms-user-dropdown { min-width: 180px; }
 }
 
+/* ── CART-DRAWER-OVERLAP FIX (2026-09-04) ────────────────────
+   El drawer del carrito de Elementor (menu-cart side-cart, z-index 9998)
+   quedaba DEBAJO del #ltms-floating-access (z-index 100002) y del
+   .ltms-header-access (z-index 99999): al abrir el carrito, los botones
+   "Vender gratis" / "Mi Cuenta" se sobreponian al drawer. El carrito es un
+   modal de pantalla completa -> debe quedar por encima de todo. */
+.elementor-menu-cart__container {
+  z-index: 100003 !important;
+}
+.elementor-menu-cart__main {
+  z-index: 100004 !important;
+}
+
+/* ── MINI-CART / SIDE-CART UX (CART-UX-001, 2026-09-04) ──────
+   Barra de progreso de envío gratis + pulido del side-cart de Elementor. */
+.ltms-mini-cart-shipping {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #065f46;
+  line-height: 1.5;
+}
+.ltms-mini-cart-shipping__msg { display: flex; align-items: center; gap: 6px; }
+.ltms-mini-cart-shipping__track {
+  height: 6px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 7px;
+}
+.ltms-mini-cart-shipping__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.elementor-menu-cart__main .elementor-menu-cart__products {
+  padding: 0 16px !important;
+}
+.elementor-menu-cart__main .woocommerce-mini-cart__empty-message {
+  text-align: center;
+  color: #6b7280;
+  padding: 24px 0;
+}
+.elementor-menu-cart__main .elementor-menu-cart__footer-buttons a.checkout,
+.elementor-menu-cart__main .elementor-menu-cart__footer-buttons .button.checkout {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+.elementor-menu-cart__main .elementor-menu-cart__footer-buttons a {
+  border-radius: 8px !important;
+  padding: 12px 14px !important;
+}
+
 @media (max-width: 768px) {
   .ltms-header-access { gap: 6px; }
 
