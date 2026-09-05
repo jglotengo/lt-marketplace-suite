@@ -6,6 +6,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `SELLERS-LANDING` (la página /sellers/ se veía alineada a la izquierda en desktop) + `WELCOME-POPUP-TEXT` (el popup de bienvenida ofrecía descuento)
+
+> Reporte del usuario: (1) la página /sellers/ en desktop se veía todo a la izquierda;
+> (2) ajustar el texto del popup de bienvenida para que no ofrezca descuento.
+
+- **SELLERS-LANDING-CENTER (P1 — UX)** (`assets/css/ltms-frontend-extensions.css` + `.min`): un
+  reset global `*{margin:0;padding:0}` (cargado después) ganaba sobre `margin:0 auto` del
+  contenedor `.ltms-sellers-landing` → quedaba alineado a la izquierda con padding 0 en desktop.
+  Fix: `margin-left/right: auto !important` + `padding-left/right: 20px !important` (scoped a
+  `#ltms-sellers-main .ltms-sellers-landing`).
+- **WELCOME-POPUP-TEXT (P1 — UX)** (`assets/js/ltms-ux-enhancements.js` + `.min`): el modal de
+  bienvenida (newsletter) ofrecía "10% de descuento" y mostraba el código `BIENVENIDO10` al
+  suscribirse. Fix: el texto ahora ofrece **ofertas exclusivas, novedades y acceso anticipado**;
+  el éxito confirma la suscripción sin código ni botón "Copiar código". (El código `QUEDATE10`
+  de otra feature no se toca.)
+- **SELLERS-LANDING-UX (P2 — UX)** (`view-sellers-landing.php` +
+  `assets/css/ltms-frontend-extensions.css`): trust bar del hero ("Sin mensualidades / Pago
+  directo / Soporte dedicado"), iconos de cards en círculos de color y calculadora de ganancias
+  más limpia (max-width 480px centrada).
+- **Tests** +5 en `SellersLandingUxTest.php` (nuevo): centrado con !important, trust bar en el
+  template, popup de bienvenida sin descuento (acotado a `initNewsletterSignup`), copy actualizado,
+  `.min` regenerados. `LTMS_VERSION` → 2.9.338.
+
+---
+
 ### Fixed — `HEADER-NAV` (el botón "Vender" y los demás se ocultaban; el menú desplegable del usuario logueado no navegaba)
 
 > Reporte del usuario: (1) el botón "Vender" (y "Mi Cuenta") dejaron de verse; (2) al loguearse,

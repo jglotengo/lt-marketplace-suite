@@ -12431,12 +12431,12 @@
                         <div class="ltms-newsletter-icon">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                         </div>
-                        <h2 id="ltms-nl-title">¡Bienvenido! 🎁</h2>
-                        <p>Suscríbete y recibe <strong>10% de descuento</strong> en tu primera compra + ofertas exclusivas.</p>
+                        <h2 id="ltms-nl-title">¡Bienvenido a Lo Tengo! 👋</h2>
+                        <p>Suscríbete y recibe <strong>ofertas exclusivas</strong>, novedades y acceso anticipado a promociones.</p>
                         <form id="ltms-newsletter-form" class="ltms-newsletter-form">
                             <input type="email" id="ltms-nl-email" placeholder="tu@email.com" required aria-label="Email" data-validate="required|email">
                             <button type="submit" class="ltms-btn ltms-btn-primary">
-                                Quiero mi descuento
+                                Suscribirme
                             </button>
                         </form>
                         <div class="ltms-newsletter-terms">
@@ -12445,7 +12445,7 @@
                         <div class="ltms-newsletter-trust">
                             <span>🔒 Spam-free</span>
                             <span>✓ Sin compromiso</span>
-                            <span>🎁 Descuento inmediato</span>
+                            <span>🔔 Novedades y ofertas</span>
                         </div>
                     </div>
                 </div>
@@ -12487,12 +12487,9 @@
                             <div class="ltms-newsletter-success-icon">
                                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </div>
-                            <h2>¡Listo! 🎉</h2>
-                            <p>Tu código de descuento es <strong class="ltms-newsletter-code">BIENVENIDO10</strong></p>
-                            <p class="ltms-newsletter-success-hint">Úsalo al finalizar tu compra para obtener 10% off.</p>
-                            <button type="button" class="ltms-btn ltms-btn-primary" onclick="navigator.clipboard.writeText('BIENVENIDO10'); LTMS.UX.toastSuccess('Copiado', 'Código copiado al portapapeles')">
-                                Copiar código
-                            </button>
+                            <h2>¡Suscripción confirmada! 🎉</h2>
+                            <p>Gracias por unirte a Lo Tengo. Recibirás novedades y ofertas exclusivas directamente en tu correo.</p>
+                            <p class="ltms-newsletter-success-hint">Puedes darte de baja cuando quieras.</p>
                         </div>
                     `;
 

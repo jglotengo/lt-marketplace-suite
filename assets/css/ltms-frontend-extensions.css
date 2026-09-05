@@ -733,6 +733,17 @@
     padding: 0 20px;
 }
 
+/* SELLERS-LANDING-CENTER FIX (2026-09-04): un reset global `*{margin:0;padding:0}`
+   (cargado despues) ganaba sobre margin:0 auto del contenedor -> en desktop la
+   landing quedaba alineada a la izquierda con padding 0. Forzar centrado y padding. */
+#ltms-sellers-main .ltms-sellers-landing,
+.ltms-sellers-landing {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+}
+
 /* Hero */
 .ltms-sl-hero {
     background: linear-gradient(135deg, #c0392b 0%, #6d28d9 100%);
@@ -795,6 +806,42 @@
     font-weight: 800;
     margin-bottom: 40px;
     color: #1a1a2e;
+}
+
+/* SELLERS-LANDING UX (2026-09-04): trust bar del hero con checks + iconos de
+   cards en circulos de color + calculadora mas limpia. */
+.ltms-sl-hero__trust {
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.ltms-sl-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+}
+.ltms-sl-card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    font-size: 1.6rem;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    border: 1px solid #e0e7ff;
+    margin-bottom: 14px;
+}
+.ltms-sl-calc-box {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 28px;
 }
 
 /* Grid */

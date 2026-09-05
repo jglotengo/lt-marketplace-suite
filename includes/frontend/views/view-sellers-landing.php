@@ -38,6 +38,13 @@ $vendor_earn  = 100 - $vendor_fee;
                     Ya soy vendedor
                 </a>
             </div>
+            <div class="ltms-sl-hero__trust">
+                <span class="ltms-sl-check">✓ Sin mensualidades</span>
+                <span class="ltms-sl-trust-divider"></span>
+                <span class="ltms-sl-check">✓ Pago directo a tu cuenta</span>
+                <span class="ltms-sl-trust-divider"></span>
+                <span class="ltms-sl-check">✓ Soporte dedicado</span>
+            </div>
         </div>
     </section>
 
