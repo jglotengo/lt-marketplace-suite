@@ -58,37 +58,39 @@ if ( WC()->cart->is_empty() ) {
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h14M11 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <?php esc_html_e( 'Explorar productos', 'ltms' ); ?>
                 </a>
+            </div><!-- /.pv-cart__empty-card -->
 
-                <?php
-                // CART-EMPTY-PRODUCTS (2026-09-05): mostrar productos directamente
-                // en el carrito vacio (4 recientes) para que el usuario no quede
-                // con una pantalla muerta. Reusa el template nativo content-product.php.
-                $pv_empty_q = new WP_Query( [
-                    'post_type'      => 'product',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => 4,
-                    'orderby'        => 'date',
-                    'order'          => 'DESC',
-                    'no_found_rows'  => true,
-                ] );
-                if ( $pv_empty_q->have_posts() ) :
-                    ?>
-                    <section class="pv-cart__empty-products" aria-label="<?php esc_attr_e( 'Productos para ti', 'ltms' ); ?>">
-                        <h2 class="pv-cart__empty-products-title"><?php esc_html_e( 'Productos para ti', 'ltms' ); ?></h2>
-                        <ul class="products pv-cart-empty-grid">
-                            <?php
-                            while ( $pv_empty_q->have_posts() ) :
-                                $pv_empty_q->the_post();
-                                wc_get_template_part( 'content', 'product' );
-                            endwhile;
-                            ?>
-                        </ul>
-                    </section>
-                    <?php
-                    wp_reset_postdata();
-                endif;
+            <?php
+            // CART-EMPTY-PRODUCTS (2026-09-05): mostrar productos directamente
+            // en el carrito vacio (4 recientes) para que el usuario no quede
+            // con una pantalla muerta. Reusa el template nativo content-product.php.
+            // La seccion va FUERA de la card angosta (max-width 520px) para que
+            // el grid use el ancho completo de la pagina.
+            $pv_empty_q = new WP_Query( [
+                'post_type'      => 'product',
+                'post_status'    => 'publish',
+                'posts_per_page' => 4,
+                'orderby'        => 'date',
+                'order'          => 'DESC',
+                'no_found_rows'  => true,
+            ] );
+            if ( $pv_empty_q->have_posts() ) :
                 ?>
-            </div>
+                <section class="pv-cart__empty-products" aria-label="<?php esc_attr_e( 'Productos para ti', 'ltms' ); ?>">
+                    <h2 class="pv-cart__empty-products-title"><?php esc_html_e( 'Productos para ti', 'ltms' ); ?></h2>
+                    <ul class="products pv-cart-empty-grid">
+                        <?php
+                        while ( $pv_empty_q->have_posts() ) :
+                            $pv_empty_q->the_post();
+                            wc_get_template_part( 'content', 'product' );
+                        endwhile;
+                        ?>
+                    </ul>
+                </section>
+                <?php
+                wp_reset_postdata();
+            endif;
+            ?>
         </main>
     </div>
     <?php
