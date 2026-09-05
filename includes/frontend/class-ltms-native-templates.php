@@ -212,6 +212,21 @@ class LTMS_Native_Templates {
                 }
             }
 
+            // SHOP-ARCHIVE-EMPTY FIX (2026-09-05): el archive de productos
+            // (/tienda/ y ?post_type=product) se renderizaba vacio (header+footer
+            // sin main) porque el override nativo estaba deshabilitado por un
+            // fatal historico con Elementor, y el template de archivo de Elementor
+            // (8521) no se aplicaba. Re-habilitamos SOLO para el shop/archive de
+            // productos con la version MINIMAL SAFE (guards function_exists).
+            // Si el usuario quiere restaurar el template de archivo de Elementor,
+            // desactivar ltms_native_templates_enabled.
+            if ( is_shop() || is_product_taxonomy() ) {
+                $native = self::$template_dir . 'archive-product.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+
             // For ALL other pages (shop, category, tag, account, etc.),
             // return the original template — let Elementor handle it.
             return $template;
