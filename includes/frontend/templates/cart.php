@@ -90,7 +90,7 @@ if ( WC()->cart->is_empty() ) {
                                 continue;
                             }
                             ?>
-                            <li class="product type-product">
+                            <li class="<?php echo esc_attr( implode( ' ', get_post_class( 'product' ) ) ); ?>">
                                 <a href="<?php echo esc_url( $_p->get_permalink() ); ?>" class="woocommerce-loop-product__link">
                                     <?php echo $_p->get_image( 'woocommerce_thumbnail' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                                     <h2 class="woocommerce-loop-product__title"><?php echo esc_html( $_p->get_name() ); ?></h2>
