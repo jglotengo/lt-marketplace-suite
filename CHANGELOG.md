@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-04
 
+### Fixed — `HEADER-NAV` (el botón "Vender" y los demás se ocultaban; el menú desplegable del usuario logueado no navegaba)
+
+> Reporte del usuario: (1) el botón "Vender" (y "Mi Cuenta") dejaron de verse; (2) al loguearse,
+> el chip de cuenta abre un menú cuyas opciones "no llevan a nada". Causas: (a) para vendors
+> logueados `buildSellerBtn()` reemplazaba el botón "Vender" por el chip (lo ocultaba);
+> (b) el dropdown del chip podía quedar recortado por `overflow:hidden` de menús de Elementor
+> (nav-menu/icon-list) → el click caía en el overlay y la opción no navegaba.
+
+- **HEADER-NAV-001 (P1 — UX)** (`assets/js/ltms-header-nav.js` + `.min`): el botón **"Vender"**
+  ahora es **siempre visible** para todos (guest, cliente y vendor). El chip de cuenta (con su
+  menú por rol) se construye en `buildClienteBtn()` cuando hay sesión: vendor → Mi Panel, Mis
+  Pedidos, Mi Billetera, Mis Productos, Configuración, Verificación KYC, Cerrar Sesión; cliente
+  → Mi Cuenta, Mis Pedidos, Cerrar Sesión. URLs con fallback a `/panel-vendedor/` etc.
+- **HEADER-NAV-002 (P2 — UX)** (`assets/css/ltms-header-nav.css` + `.min`): anti-clipping —
+  `overflow: visible !important` en `li.ltms-menu-item`, `.ltms-user-dropdown-wrap`,
+  `.ltms-header-access`, `#ltms-floating-access`, `#ltms-hello-access`, `#ltms-header-access` y
+  sus ancestros de Elementor (`ul.elementor-nav-menu`, `li.menu-item`, `.elementor-icon-list-items`,
+  `.elementor-icon-list-item`). Dropdown del usuario a z-index 100003.
+- **Tests** +4 en `HeaderNavFixTest.php` (nuevo): `buildSellerBtn` siempre devuelve Vender (sin
+  rama is_vendor que lo oculte), chip de cuenta en `buildClienteBtn` con menú por rol, CSS
+  anti-clipping, `.min` regenerados. `LTMS_VERSION` → 2.9.337.
+
+---
+
 ### Fixed — `CART-DRAWER-OVERLAP` (el carrito lateral se sobreponía con el botón "Vender gratis" del header) + `CART-UX-001` (mejoras UX/UI del carrito)
 
 > Verificación en vivo (firecrawl interact): al abrir el drawer del carrito (Elementor

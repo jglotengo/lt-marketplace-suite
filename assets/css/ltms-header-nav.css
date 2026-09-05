@@ -224,6 +224,29 @@
 .ltms-dropdown-logout { color: var(--ltms-red) !important; }
 .ltms-dropdown-logout:hover { background: #fef2f2 !important; color: var(--ltms-red-dark) !important; }
 
+/* HEADER-NAV-FIX (2026-09-04): menus de Elementor (nav-menu / icon-list) pueden
+   tener overflow:hidden y recortan los botones LTMS (Vender/Mi Cuenta) y el
+   dropdown del usuario logueado (opciones que "no llevan a nada" porque el click
+   caia en el overlay al estar el menu recortado). Forzar overflow visible en los
+   contenedores LTMS y sus ancestros de menu. */
+li.ltms-menu-item,
+.ltms-user-dropdown-wrap,
+.ltms-header-access,
+#ltms-hello-access,
+#ltms-floating-access,
+#ltms-header-access {
+  overflow: visible !important;
+}
+.elementor-nav-menu--main ul.elementor-nav-menu,
+.elementor-nav-menu--main ul.elementor-nav-menu li.menu-item,
+.elementor-icon-list-items,
+.elementor-icon-list-items .elementor-icon-list-item {
+  overflow: visible !important;
+}
+.ltms-user-dropdown {
+  z-index: 100003 !important;
+}
+
 /* Overlay invisible para cerrar dropdown al click afuera */
 .ltms-dropdown-overlay {
   display: none;

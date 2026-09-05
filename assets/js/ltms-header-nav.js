@@ -27,26 +27,10 @@
     }
 
     function buildSellerBtn(url) {
-        var d = ltmsHeaderNav;
-        if (d.is_vendor) {
-            return '<div class="ltms-user-dropdown-wrap" id="ltms-vendor-chip-wrap">' +
-                '<button class="ltms-user-chip" type="button" aria-haspopup="true" aria-expanded="false">' +
-                    '<span class="ltms-avatar-initials">' + getInitials(d.display_name) + '</span>' +
-                    '<span class="ltms-chip-name">' + d.display_name + '</span>' +
-                    '<svg class="ltms-chip-arrow" viewBox="0 0 24 24" width="12" height="12" style="fill:currentColor;margin-left:2px;transition:transform .2s"><path d="M7 10l5 5 5-5z"/></svg>' +
-                '</button>' +
-                '<div class="ltms-user-dropdown" role="menu">' +
-                    '<a href="' + d.dashboard_url + '">' + ICONS.dashboard + ' Mi Panel</a>' +
-                    '<a href="' + d.orders_url + '">' + ICONS.orders + ' Mis Pedidos</a>' +
-                    '<a href="' + d.wallet_url + '">' + ICONS.wallet + ' Mi Billetera</a>' +
-                    '<a href="' + (d.products_url || '/panel-vendedor/?view=products') + '">' + ICONS.products + ' Mis Productos</a>' +
-                    '<a href="' + (d.settings_url || '/panel-vendedor/?view=settings') + '">' + ICONS.settings + ' Configuración</a>' +
-                    '<a href="' + (d.kyc_url || '/panel-vendedor/?view=kyc') + '">' + ICONS.kyc + ' Verificación KYC</a>' +
-                    '<div class="ltms-dropdown-divider"></div>' +
-                    '<a href="' + d.logout_url + '" class="ltms-dropdown-logout">' + ICONS.logout + ' Cerrar Sesión</a>' +
-                '</div>' +
-            '</div>';
-        }
+        // HEADER-NAV-FIX (2026-09-04): el boton VENDER siempre visible para TODOS
+        // (antes, para vendors logueados se reemplazaba por el chip -> el usuario
+        // reportaba "se oculto el boton vender"). El chip de cuenta va aparte via
+        // buildClienteBtn() cuando hay sesion.
         return '<a href="' + url + '" class="ltms-nav-btn ltms-btn-seller">' +
             ICONS.seller + '<span class="ltms-btn-label">Vender</span>' +
             '<span class="ltms-badge">GRATIS</span>' +
@@ -55,19 +39,32 @@
 
     function buildClienteBtn(url) {
         var d = ltmsHeaderNav;
-        if (d.is_vendor) return '';
+        // HEADER-NAV-FIX: si hay sesion (vendor O cliente), el boton "Mi Cuenta"
+        // se convierte en el chip de cuenta con menu. El menu incluye los enlaces
+        // del rol (vendor: panel/pedidos/billetera/productos/config/kyc; cliente:
+        // cuenta/pedidos). Todos con URL de ltmsHeaderNav o fallback del panel.
         if (d.is_logged_in) {
-            return '<div class="ltms-user-dropdown-wrap" id="ltms-cliente-chip-wrap">' +
+            var links = '';
+            if (d.is_vendor) {
+                links += '<a href="' + (d.dashboard_url || '/panel-vendedor/') + '">' + ICONS.dashboard + ' Mi Panel</a>' +
+                    '<a href="' + (d.orders_url || '/mis-pedidos/') + '">' + ICONS.orders + ' Mis Pedidos</a>' +
+                    '<a href="' + (d.wallet_url || '/mi-billetera/') + '">' + ICONS.wallet + ' Mi Billetera</a>' +
+                    '<a href="' + (d.products_url || '/panel-vendedor/?view=products') + '">' + ICONS.products + ' Mis Productos</a>' +
+                    '<a href="' + (d.settings_url || '/panel-vendedor/?view=settings') + '">' + ICONS.settings + ' Configuración</a>' +
+                    '<a href="' + (d.kyc_url || '/panel-vendedor/?view=kyc') + '">' + ICONS.kyc + ' Verificación KYC</a>';
+            } else {
+                links += '<a href="' + (url || '/mi-cuenta/') + '">' + ICONS.account + ' Mi Cuenta</a>' +
+                    '<a href="' + (d.orders_url || '/mis-pedidos/') + '">' + ICONS.orders + ' Mis Pedidos</a>';
+            }
+            return '<div class="ltms-user-dropdown-wrap">' +
                 '<button class="ltms-user-chip" type="button" aria-haspopup="true" aria-expanded="false">' +
                     '<span class="ltms-avatar-initials">' + getInitials(d.display_name) + '</span>' +
                     '<span class="ltms-chip-name">' + d.display_name + '</span>' +
                     '<svg class="ltms-chip-arrow" viewBox="0 0 24 24" width="12" height="12" style="fill:currentColor;margin-left:2px;transition:transform .2s"><path d="M7 10l5 5 5-5z"/></svg>' +
                 '</button>' +
-                '<div class="ltms-user-dropdown" role="menu">' +
-                    '<a href="' + url + '">' + ICONS.account + ' Mi Cuenta</a>' +
-                    '<a href="' + d.orders_url + '">' + ICONS.orders + ' Mis Pedidos</a>' +
+                '<div class="ltms-user-dropdown" role="menu">' + links +
                     '<div class="ltms-dropdown-divider"></div>' +
-                    '<a href="' + d.logout_url + '" class="ltms-dropdown-logout">' + ICONS.logout + ' Cerrar Sesión</a>' +
+                    '<a href="' + (d.logout_url || '/wp-login.php?action=logout') + '" class="ltms-dropdown-logout">' + ICONS.logout + ' Cerrar Sesión</a>' +
                 '</div>' +
             '</div>';
         }
