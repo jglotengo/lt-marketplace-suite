@@ -73,6 +73,30 @@ final class CartEmptyUxTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	public function test_empty_products_cards_fill_grid_cell(): void {
+		$css = file_get_contents( self::CART_CSS_PATH );
+
+		// CART-EMPTY-OVERFLOW FIX: las li.product traen el estilo default de WC
+		// (float:left + width pequeña) que chocaba con el grid -> las cards se
+		// colapsaban a ~35px y desbordaban. El override debe desactivar el float
+		// y forzar width:100% para llenar la celda.
+		$this->assertStringContainsString(
+			'.pv-cart-empty-grid li.product',
+			$css,
+			'CART-EMPTY-OVERFLOW: debe existir el override de li.product en el grid.'
+		);
+		$this->assertStringContainsString(
+			'float:none;',
+			$css,
+			'CART-EMPTY-OVERFLOW: li.product no debe flotar (float:none).'
+		);
+		$this->assertStringContainsString(
+			'width:100% !important;',
+			$css,
+			'CART-EMPTY-OVERFLOW: li.product debe llenar la celda (width:100% !important).'
+		);
+	}
+
 	public function test_min_css_regenerated(): void {
 		$min = file_get_contents( __DIR__ . '/../../assets/css/ltms-cart.min.css' );
 
