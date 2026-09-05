@@ -320,6 +320,35 @@ body.admin-bar .pv-scope.pv-cart .pv-cart__summary[data-pv-sticky]{top:52px;}
 .pv-scope.pv-cart .pv-cart__empty-title{font-family:var(--display);font-weight:800;font-size:26px;}
 .pv-scope.pv-cart .pv-cart__empty-sub{color:var(--text-2);font-size:15px;line-height:1.5;margin:0;}
 
+/* CART-EMPTY-CTA FIX (2026-09-05): el texto del boton "Explorar productos"
+   del carrito vacio se veia azul-sobre-azul (una regla del tema `a { color:
+   var(--primary) }` sobreescribia el color:#fff de .pv-btn). Forzar blanco. */
+.pv-scope.pv-cart .pv-cart__empty-card a.pv-btn,
+.pv-scope.pv-cart .pv-cart__empty-card a.pv-btn:hover,
+.pv-scope.pv-cart .pv-cart__empty-card a.pv-btn:focus {
+    color: #fff !important;
+}
+
+/* CART-EMPTY-PRODUCTS (2026-09-05): grid de productos destacados en el
+   carrito vacio (4 columnas desktop -> 2 -> 1). */
+.pv-scope.pv-cart .pv-cart__empty-products{
+    max-width:1200px;margin:48px auto 0;width:100%;text-align:center;
+}
+.pv-scope.pv-cart .pv-cart__empty-products-title{
+    font-family:var(--display);font-weight:800;font-size:20px;margin-bottom:24px;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid{
+    list-style:none;margin:0;padding:0;display:grid;
+    grid-template-columns:repeat(4,1fr);gap:18px;text-align:left;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product{margin:0;}
+@media (max-width:1100px){
+    .pv-scope.pv-cart .pv-cart-empty-grid{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:560px){
+    .pv-scope.pv-cart .pv-cart-empty-grid{grid-template-columns:1fr;}
+}
+
 /* ============================================================================
    RESPONSIVE
    ========================================================================== */
