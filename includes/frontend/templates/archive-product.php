@@ -41,7 +41,25 @@ do_action( 'woocommerce_before_main_content' );
         </h1>
     <?php endif; ?>
 
-    <?php do_action( 'woocommerce_archive_description' ); ?>
+    <?php
+    /**
+     * SHOP-VENDOR-GATE FIX (2026-09-06): woocommerce_archive_description
+     * renderiza el contenido de la shop page (WC lo imprime como descripción
+     * del catálogo). Si ese contenido incluye un shortcode del dashboard del
+     * vendedor (ej. [ltms_vendor_store]), para compradores/guests el
+     * shortcode renderiza el gate "Debes iniciar sesión como vendedor" —
+     * exactamente lo que veía un comprador al pulsar "Explorar productos"
+     * del carrito vacío. Se captura el output y se omite cualquier bloque
+     * .ltms-empty-state-login (login gate) para que el catálogo jamás
+     * muestre un gate de vendedor en un contexto público.
+     */
+    ob_start();
+    do_action( 'woocommerce_archive_description' );
+    $pv_archive_desc = (string) ob_get_clean();
+    if ( false === strpos( $pv_archive_desc, 'ltms-empty-state-login' ) ) {
+        echo $pv_archive_desc; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+    }
+    ?>
 
     <div class="pv-shop__layout">
         <?php if ( is_active_sidebar( 'shop-sidebar' ) ) : ?>

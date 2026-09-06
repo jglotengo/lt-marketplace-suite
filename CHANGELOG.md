@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-06
+
+### Fixed — `SHOP-CARD-PARITY` + `SHOP-VENDOR-GATE` (las cards de /tienda/ distintas a las del home; "Explorar productos" del carrito vacío pedía login de vendedor)
+
+> Reporte del usuario: las tarjetas de productos en la página de tienda son distintas a las
+> oficiales del home; al vaciar el carrito, la opción "Explorar productos" pedía loguearse como
+> vendedor cuando el E2E es un comprador.
+
+- **SHOP-CARD-PARITY (P1 - UX)** (`assets/css/ltms-homepage-fixes.css` + `.min`,
+  `assets/js/ltms-homepage-fixes.js` + `.min`): las cards del home se estilizaban con selectores
+  scoped a `.elementor-wc-products` (wrapper del widget de Elementor) y el shop usa `.pv-shop`
+  (wrapper de archive-product.php) → las cards de /tienda/ no recibían imagen cuadrada 1:1, título
+  clamp, precio rojo ni botón outline. Fix: selectores ampliados a `.pv-shop ul.products li.product`
+  (card base, imagen, título, precio, botón, badge) + grid responsive del shop (4 → 3 → 2 cols,
+  NO carrusel como el home) + `fixProductCardImages()` y listener `lazyloaded` cubren `.pv-shop`.
+- **SHOP-VENDOR-GATE (P0 - funcional)** (`includes/frontend/templates/archive-product.php` +
+  **DATA SG**): la página Tienda (id 5, shop page) tenía el shortcode `[ltms_vendor_store]` en su
+  contenido. `woocommerce_archive_description` lo renderizaba dentro del catálogo y, para
+  compradores/guests, el shortcode mostraba el gate "Debes iniciar sesión como vendedor" → un
+  comprador que pulsaba "Explorar productos" en el carrito vacío veía ese gate. Fix: (1) DATA —
+  contenido de la página Tienda limpiado en SG; (2) defensa en `archive-product.php` — el output de
+  `woocommerce_archive_description` se captura y cualquier bloque `.ltms-empty-state-login`
+  (login gate) se omite, para que el catálogo jamás muestre un gate de vendedor en contexto público.
+- **Tests** +4 en `ShopCardsHomeParityTest.php` (nuevo): selectores CSS de card cubren `.pv-shop`,
+  grid responsive del shop (4/2 cols), selector JS `CARD_SELECTOR` incluye `.pv-shop`, y el guard
+  anti login-gate en archive-product.php. `LTMS_VERSION` → 2.9.340.
+
+---
+
 ## [Unreleased] — 2026-09-04
 
 ### Fixed — `SHOP-ARCHIVE-EMPTY` (la tienda /tienda/ no mostraba los productos; el botón "Explorar productos" llevaba a página vacía)

@@ -281,10 +281,14 @@
     /* ── HF-08: Product Card Image Fix ───────────────────────────── */
     /* Fuerza que las imágenes del loop de productos llenen el card.   */
     /* lazysizes.js de SiteGround restringe tamaño con el attr sizes.  */
+    /* SHOP-CARD-PARITY FIX (2026-09-06): tambien cubre el archive de  */
+    /* /tienda/ (.pv-shop) — antes solo aplicaba al home (Elementor).  */
+    var CARD_SELECTOR = '.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product';
+
     function fixProductCardImages() {
         var imgs = document.querySelectorAll(
-            '.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img, ' +
-            '.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img'
+            CARD_SELECTOR + ' .woocommerce-LoopProduct-link img, ' +
+            CARD_SELECTOR + ' a.woocommerce-loop-product__link img'
         );
         imgs.forEach(function (img) {
             // Eliminar restricción de sizes que limita a 300px
@@ -307,8 +311,7 @@
         // Aplicar después de que lazysizes carga cada imagen
         document.addEventListener('lazyloaded', function (e) {
             var img = e.target;
-            if (img && img.closest &&
-                img.closest('.elementor-wc-products ul.products li.product')) {
+            if (img && img.closest && img.closest(CARD_SELECTOR)) {
                 img.removeAttribute('sizes');
                 img.style.setProperty('width', '100%', 'important');
                 img.style.setProperty('height', 'auto', 'important');
