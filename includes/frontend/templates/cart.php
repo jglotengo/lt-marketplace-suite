@@ -96,6 +96,11 @@ if ( WC()->cart->is_empty() ) {
                                     <h2 class="woocommerce-loop-product__title"><?php echo esc_html( $_p->get_name() ); ?></h2>
                                     <span class="price"><?php echo wp_kses_post( $_p->get_price_html() ); ?></span>
                                 </a>
+                                <?php if ( $_p->is_purchasable() && $_p->is_in_stock() ) : ?>
+                                    <div class="woocommerce-loop-product__buttons">
+                                        <a href="<?php echo esc_url( $_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                                    </div>
+                                <?php endif; ?>
                             </li>
                             <?php
                         endwhile;

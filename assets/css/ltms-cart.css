@@ -341,26 +341,71 @@ body.admin-bar .pv-scope.pv-cart .pv-cart__summary[data-pv-sticky]{top:52px;}
     list-style:none;margin:0;padding:0;display:grid;
     grid-template-columns:repeat(4,1fr);gap:18px;text-align:left;
 }
-.pv-scope.pv-cart .pv-cart-empty-grid li.product{
-    float:none;width:100% !important;max-width:none;margin:0;min-width:0;
-}
 /* CART-EMPTY-CARD-STD (2026-09-05): cards compactas tipo home. El markup usa
    woocommerce-loop-product__link/__title + price (igual que el home) para que
    enhanceElementorCards() las mejore identicamente (pv-enhanced + rating +
    vendor + fav). Estas reglas cubren el estado base pre-JS. */
+/* SHOP-CARD-PARITY FIX (2026-09-06): paridad visual con las cards del home
+   (.elementor-wc-products). Antes las cards del carrito vacio tenian imagen
+   y precio pero SIN card blanca/border-radius/shadow ni boton outline -> se
+   veian distintas al home. Tambien: WC define .woocommerce ul.products::before
+   {content:" ";display:table} (clearfix de floats); al ser el ul display:grid,
+   ese ::before es un grid item FANTASMA que ocupa la primera celda -> quedaba
+   un espacio blanco donde debia ir la primera card (mismo bug que el shop). */
+.pv-scope.pv-cart .pv-cart-empty-grid::before,
+.pv-scope.pv-cart .pv-cart-empty-grid::after{
+    content:none !important;display:none !important;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product{
+    float:none;width:100% !important;max-width:none;margin:0;min-width:0;
+    background:#ffffff !important;border-radius:12px !important;
+    overflow:hidden !important;box-shadow:0 2px 8px rgba(0,0,0,.07) !important;
+    display:flex !important;flex-direction:column !important;padding:0 !important;
+    position:relative !important;
+    transition:box-shadow .22s ease, transform .22s ease !important;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product:hover{
+    box-shadow:0 6px 24px rgba(0,0,0,.13) !important;
+    transform:translateY(-3px) !important;
+}
 .pv-scope.pv-cart .pv-cart-empty-grid li.product .woocommerce-loop-product__link{
-    display:block;text-decoration:none;color:inherit;
+    display:flex !important;flex-direction:column !important;
+    text-decoration:none !important;color:inherit !important;flex:1 !important;
 }
 .pv-scope.pv-cart .pv-cart-empty-grid li.product img{
-    width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;
-    display:block;
+    width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:0;
+    display:block;padding:10px !important;box-sizing:border-box !important;
+    background:#F7F7F7 !important;
 }
 .pv-scope.pv-cart .pv-cart-empty-grid li.product .woocommerce-loop-product__title{
-    font-size:14px;font-weight:600;line-height:1.35;margin:10px 0 4px;
-    color:#1a1a2e;
+    font-size:13px;font-weight:600;line-height:1.35;margin:10px 12px 6px;
+    padding:0;color:#1a1a1a;text-align:left;display:-webkit-box;
+    -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    min-height:2.7em;
 }
 .pv-scope.pv-cart .pv-cart-empty-grid li.product .price{
-    color:#E80001;font-weight:700;font-size:15px;
+    color:#E80001;font-weight:700;font-size:15px;margin:0 12px 10px;
+    padding:0;text-align:left;line-height:1.2;display:block;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .woocommerce-loop-product__buttons{
+    padding:0 12px 12px;margin-top:auto;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .button.add_to_cart_button,
+.pv-scope.pv-cart .pv-cart-empty-grid li.product a.button{
+    display:block !important;width:100% !important;box-sizing:border-box !important;
+    text-align:center !important;padding:9px 10px !important;
+    background:#ffffff !important;color:#E80001 !important;
+    border:1.5px solid #E80001 !important;border-radius:8px !important;
+    font-size:12px !important;font-weight:700 !important;
+    text-transform:uppercase !important;letter-spacing:.04em !important;
+    text-decoration:none !important;transition:background .18s, color .18s !important;
+    box-shadow:none !important;cursor:pointer !important;
+    white-space:nowrap !important;overflow:hidden !important;
+    text-overflow:ellipsis !important;line-height:1.2 !important;min-height:36px !important;
+}
+.pv-scope.pv-cart .pv-cart-empty-grid li.product .button.add_to_cart_button:hover,
+.pv-scope.pv-cart .pv-cart-empty-grid li.product a.button:hover{
+    background:#E80001 !important;color:#ffffff !important;text-decoration:none !important;
 }
 @media (max-width:1100px){
     .pv-scope.pv-cart .pv-cart-empty-grid{grid-template-columns:repeat(2,1fr);}

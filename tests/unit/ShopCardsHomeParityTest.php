@@ -21,6 +21,12 @@
  *      breadcrumb del theme removido del hook (evita duplicado) y
  *      ::before/::after del ul.products neutralizados (el clearfix de WC se
  *      convertía en grid item fantasma en la primera celda del grid).
+ *  (4) el usuario reportó que /carrito/ tenía el MISMO problema: cards
+ *      distintas al home y espacio blanco al comienzo. Fix: botón "Añadir al
+ *      carrito" añadido a las cards del carrito vacío (paridad con home),
+ *      estilos de card del home aplicados al .pv-cart-empty-grid (card
+ *      blanca/shadow/border-radius, imagen cuadrada, botón outline) y
+ *      clearfix fantasma neutralizado.
  *
  * Tests source-based (patrón C20-C29): file_get_contents + asserts.
  *
@@ -34,8 +40,10 @@ namespace LTMS\Tests\Unit;
 final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 
 	private const CSS_PATH = __DIR__ . '/../../assets/css/ltms-homepage-fixes.css';
+	private const CART_CSS = __DIR__ . '/../../assets/css/ltms-cart.css';
 	private const JS_PATH  = __DIR__ . '/../../assets/js/ltms-homepage-fixes.js';
 	private const ARCHIVE  = __DIR__ . '/../../includes/frontend/templates/archive-product.php';
+	private const CART     = __DIR__ . '/../../includes/frontend/templates/cart.php';
 
 	public function test_shop_card_styles_cover_pv_shop_scope(): void {
 		$src = file_get_contents( self::CSS_PATH );
@@ -115,11 +123,75 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 			$src,
 			'SHOP-BREADCRUMB-DUP: el breadcrumb del theme debe restaurarse tras renderizar el nuestro.'
 		);
-		// Nuestro breadcrumb del design system sigue presente.
+// Nuestro breadcrumb del design system sigue presente.
 		$this->assertStringContainsString(
 			'pv-shop__breadcrumb',
 			$src,
 			'SHOP-BREADCRUMB-DUP: el breadcrumb del design system (pv-shop__breadcrumb) debe seguir.'
+		);
+	}
+
+	public function test_empty_cart_cards_match_home(): void {
+		$cart_src = file_get_contents( self::CART );
+
+		// CART-EMPTY-CARD-PARITY: las cards del carrito vacio deben incluir el
+		// boton "Añadir al carrito" (paridad con el home).
+		$this->assertStringContainsString(
+			'add_to_cart_button ajax_add_to_cart',
+			$cart_src,
+			'CART-EMPTY-CARD-PARITY: las cards del carrito vacio deben tener el boton add-to-cart AJAX.'
+		);
+		$this->assertStringContainsString(
+			'woocommerce-loop-product__buttons',
+			$cart_src,
+			'CART-EMPTY-CARD-PARITY: el boton debe envolverse en .woocommerce-loop-product__buttons (markup del home).'
+		);
+	}
+
+	public function test_empty_cart_grid_neutralizes_ghost_and_matches_home_style(): void {
+		$css = file_get_contents( self::CART_CSS );
+
+		// SHOP-CARD-PARITY: el clearfix fantasma de WC (::before del ul con
+		// clase products) debe neutralizarse tambien en el grid del carrito.
+		$this->assertStringContainsString(
+			'.pv-cart-empty-grid::before,',
+			$css,
+			'CART-EMPTY-CARD-PARITY: el ::before del grid del carrito vacio debe neutralizarse.'
+		);
+		$this->assertStringContainsString(
+			'content:none !important;display:none !important;',
+			$css,
+			'CART-EMPTY-CARD-PARITY: el clearfix fantasma debe quedar sin content.'
+		);
+		// Paridad visual con el home: card blanca con shadow/border-radius.
+		$this->assertStringContainsString(
+			'border-radius:12px !important',
+			$css,
+			'CART-EMPTY-CARD-PARITY: las cards del carrito vacio deben tener border-radius como el home.'
+		);
+		// Boton outline rojo (mismo estilo que home).
+		$this->assertStringContainsString(
+			'border:1.5px solid #E80001 !important',
+			$css,
+			'CART-EMPTY-CARD-PARITY: el boton de las cards del carrito vacio debe ser outline rojo.'
+		);
+		// Imagen cuadrada con aspect-ratio y fondo neutro (como el home).
+		$this->assertStringContainsString(
+			'aspect-ratio:1/1',
+			$css,
+			'CART-EMPTY-CARD-PARITY: la imagen de las cards del carrito vacio debe ser cuadrada.'
+		);
+	}
+
+	public function test_js_card_selector_covers_empty_cart_grid(): void {
+		$src = file_get_contents( self::JS_PATH );
+
+		// SHOP-CARD-PARITY: el CARD_SELECTOR del JS debe incluir el grid del
+		// carrito vacio (lazysizes de SG restringe el tamaño de las imagenes).
+		$this->assertStringContainsString(
+			'.pv-cart-empty-grid li.product',
+			$src,
+			'CART-EMPTY-CARD-PARITY: el CARD_SELECTOR del JS debe incluir .pv-cart-empty-grid.'
 		);
 	}
 
@@ -128,9 +200,9 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 
 		// SHOP-CARD-PARITY: fixProductCardImages() debe cubrir .pv-shop.
 		$this->assertStringContainsString(
-			"'.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product'",
+			"'.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product, .pv-cart-empty-grid li.product'",
 			$src,
-			'SHOP-CARD-PARITY: el selector CARD_SELECTOR del JS debe incluir .pv-shop.'
+			'SHOP-CARD-PARITY: el selector CARD_SELECTOR del JS debe incluir .pv-shop y .pv-cart-empty-grid.'
 		);
 		$this->assertStringContainsString(
 			'img.closest(CARD_SELECTOR)',

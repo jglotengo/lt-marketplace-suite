@@ -282,8 +282,9 @@
     /* Fuerza que las imágenes del loop de productos llenen el card.   */
     /* lazysizes.js de SiteGround restringe tamaño con el attr sizes.  */
     /* SHOP-CARD-PARITY FIX (2026-09-06): tambien cubre el archive de  */
-    /* /tienda/ (.pv-shop) — antes solo aplicaba al home (Elementor).  */
-    var CARD_SELECTOR = '.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product';
+    /* /tienda/ (.pv-shop) y el carrito vacio (.pv-cart-empty-grid) —   */
+    /* antes solo aplicaba al home (Elementor).                        */
+    var CARD_SELECTOR = '.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product, .pv-cart-empty-grid li.product';
 
     function fixProductCardImages() {
         var imgs = document.querySelectorAll(

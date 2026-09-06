@@ -6,6 +6,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `CART-EMPTY-CARD-PARITY` (las cards del carrito vacío /carrito/ se veían distintas al home y quedaba espacio en blanco al comienzo)
+
+> Reporte del usuario: en la página lo-tengo.com.co/carrito/ también pasa lo mismo — el diseño de
+> las tarjetas es diferente a las del home y queda el espacio en blanco al comienzo.
+
+- **CART-EMPTY-CARD-PARITY (P1 - UX)** (`includes/frontend/templates/cart.php` +
+  `assets/css/ltms-cart.css` + `.min` + `assets/js/ltms-homepage-fixes.js` + `.min`): las cards
+  de productos del carrito vacío usaban el markup compacto del home (CART-EMPTY-CARD-STD) pero
+  NO recibían los estilos de card del home: sin card blanca/border-radius/shadow, sin botón
+  "Añadir al carrito", e imagen con object-fit distinto. Además el `ul.products` del grid
+  (`pv-cart-empty-grid`) tiene la clase `products` de WC cuyo clearfix
+  `.woocommerce ul.products::before { content:" "; display:table }` se convertía en un **grid
+  item fantasma** en la primera celda → espacio blanco al comienzo (mismo bug que /tienda/).
+  Fix: (1) botón add-to-cart AJAX envuelto en `.woocommerce-loop-product__buttons` añadido a
+  cada card del carrito vacío; (2) estilos de card del home aplicados a `.pv-cart-empty-grid`
+  (card blanca, border-radius 12px, shadow, imagen cuadrada con padding/fondo neutro, título
+  clamp, precio rojo, botón outline); (3) `::before`/`::after` del grid neutralizados
+  (`content:none;display:none`); (4) `CARD_SELECTOR` del JS ampliado a `.pv-cart-empty-grid`
+  (lazysizes de SG restringe el tamaño de las imágenes).
+- **Tests** +3 en `ShopCardsHomeParityTest.php` (8 total): botón ATC en cart.php, clearfix
+  fantasma neutralizado + card blanca/botón outline/imagen cuadrada en ltms-cart.css, y
+  `CARD_SELECTOR` del JS cubre el carrito. `LTMS_VERSION` → 2.9.342.
+
+---
+
 ### Fixed — `SHOP-PAGE-CLEANUP` (breadcrumb "Inicio / Tienda" repetido en /tienda/ y espacio blanco donde debía ir la primera tarjeta)
 
 > Reporte del usuario: en la página tienda, donde debe ir la primera tarjeta de producto hay un
