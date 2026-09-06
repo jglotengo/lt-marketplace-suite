@@ -232,4 +232,33 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 			'SHOP-VENDOR-GATE: el gate se detecta en el output capturado.'
 		);
 	}
+
+	public function test_shop_loop_renders_home_compact_card_with_button_wrapper(): void {
+		$src = file_get_contents( self::ARCHIVE );
+
+		// SHOP-CARD-PARITY: el loop del shop debe renderizar el MISMO markup
+		// compacto del home (con post_class + wrapper .woocommerce-loop-product__buttons),
+		// no el content-product.php del theme (boton sin wrapper -> card distinta).
+		$this->assertStringContainsString(
+			'wc_product_class( \'product\', $_pv_p )',
+			$src,
+			'SHOP-CARD-PARITY: el li del shop debe usar wc_product_class (incluye post-{ID} para enhanceElementorCards).'
+		);
+		$this->assertStringContainsString(
+			'woocommerce-loop-product__buttons',
+			$src,
+			'SHOP-CARD-PARITY: el boton del shop debe envolverse en .woocommerce-loop-product__buttons (markup del home).'
+		);
+		$this->assertStringContainsString(
+			'add_to_cart_button ajax_add_to_cart',
+			$src,
+			'SHOP-CARD-PARITY: el boton del shop debe ser add-to-cart AJAX.'
+		);
+		// No debe seguir usando content-product.php del theme (que rompe el layout).
+		$this->assertStringNotContainsString(
+			"wc_get_template_part( 'content', 'product' );",
+			$src,
+			'SHOP-CARD-PARITY: el loop del shop NO debe usar content-product.php del theme.'
+		);
+	}
 }

@@ -95,10 +95,39 @@ do_action( 'woocommerce_before_main_content' );
 
                 <?php if ( function_exists( 'woocommerce_product_loop_start' ) ) woocommerce_product_loop_start(); ?>
 
-                <?php while ( have_posts() ) : the_post(); ?>
-                    <?php do_action( 'woocommerce_shop_loop' ); ?>
-                    <?php wc_get_template_part( 'content', 'product' ); ?>
-                <?php endwhile; ?>
+                <?php
+                /*
+                 * SHOP-CARD-PARITY FIX (2026-09-06): renderizar las cards del
+                 * shop con el MISMO markup compacto del home (widget de
+                 * Elementor). Antes el loop usaba wc_get_template_part('content',
+                 * 'product') -> content-product.php del theme que NO envuelve
+                 * el boton en .woocommerce-loop-product__buttons ni fuerza la
+                 * post_class completa -> las cards del shop se veian distintas
+                 * al home (boton pegado al precio, sin margin-top:auto).
+                 * Mismo patron que CART-EMPTY-CARD-STD en cart.php.
+                 */
+                while ( have_posts() ) : the_post();
+                    do_action( 'woocommerce_shop_loop' );
+                    $_pv_p = wc_get_product( get_the_ID() );
+                    if ( ! $_pv_p || ! $_pv_p->is_visible() ) {
+                        continue;
+                    }
+                    ?>
+                    <li <?php echo wc_product_class( 'product', $_pv_p ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+                        <a href="<?php echo esc_url( $_pv_p->get_permalink() ); ?>" class="woocommerce-loop-product__link">
+                            <?php echo $_pv_p->get_image( 'woocommerce_thumbnail' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                            <h2 class="woocommerce-loop-product__title"><?php echo esc_html( $_pv_p->get_name() ); ?></h2>
+                            <span class="price"><?php echo wp_kses_post( $_pv_p->get_price_html() ); ?></span>
+                        </a>
+                        <?php if ( $_pv_p->is_purchasable() && $_pv_p->is_in_stock() ) : ?>
+                            <div class="woocommerce-loop-product__buttons">
+                                <a href="<?php echo esc_url( $_pv_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_pv_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_pv_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_pv_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                            </div>
+                        <?php endif; ?>
+                    </li>
+                    <?php
+                endwhile;
+                ?>
 
                 <?php if ( function_exists( 'woocommerce_product_loop_end' ) ) woocommerce_product_loop_end(); ?>
 

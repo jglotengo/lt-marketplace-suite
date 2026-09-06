@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `SHOP-CARD-MARKUP` (las cards de /tienda/ se veían distintas a las demás y el botón "Añadir al carrito" no se mostraba bien)
+
+> Reporte del usuario: revisa porque en tienda las tarjetas de los productos son diferentes a las
+> demás, no se ve el botón agregar a carrito entre otras diferencias.
+
+- **SHOP-CARD-MARKUP (P1 - funcional)** (`includes/frontend/templates/archive-product.php`): el
+  loop del shop usaba `wc_get_template_part('content','product')` → `content-product.php` del theme,
+  que renderiza el botón ATC **directo en el `<li>`** (sin wrapper `.woocommerce-loop-product__buttons`),
+  por lo que quedaba pegado al precio sin `margin-top:auto` ni padding — la card se veía distinta al
+  home (donde el botón va envuelto) y el botón podía quedar cortado por el `overflow:hidden` de la
+  card + `float` residual de WC. Fix: el loop renderiza ahora el MISMO markup compacto del home
+  (patrón CART-EMPTY-CARD-STD en cart.php): `<li>` con `wc_product_class('product', $p)` (incluye
+  `post-{ID}` para que `enhanceElementorCards()` lo mejore) + `woocommerce-loop-product__link` +
+  botón AJAX envuelto en `.woocommerce-loop-product__buttons`. Se conservan los hooks
+  `woocommerce_before_shop_loop` / `woocommerce_shop_loop` / `woocommerce_after_shop_loop`.
+- **Tests** +1 en `ShopCardsHomeParityTest.php` (9 total): el loop del shop usa `wc_product_class` +
+  wrapper `.woocommerce-loop-product__buttons` y ya NO usa `wc_get_template_part('content','product')`.
+  `LTMS_VERSION` → 2.9.344.
+
+---
+
 ### Fixed — `SHOP-GRID-COLS` (las cards de /tienda/ se veían más anchas que las del home)
 
 > Reporte del usuario: ahora en la página /tienda/ las tarjetas ya cambiaron, no son iguales a las
