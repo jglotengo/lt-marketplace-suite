@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `SHOP-ATC-VISIBLE` (el botón "Añadir al carrito" de /tienda/ aparecía y luego desaparecía al recargar)
+
+> Reporte del usuario: al recargar la página tienda por unos segundos se alcanzan a ver las tarjetas
+> con los botones agregar a carrito pero luego desaparecen y se ven solo las tarjetas con las
+> imágenes.
+
+- **SHOP-ATC-VISIBLE (P1 - visual)** (`assets/css/ltms-homepage-fixes.css` + `.min`): el bloque del
+  botón del shop compartía con el home `white-space:nowrap; overflow:hidden; text-overflow:ellipsis`
+  (necesario en el carrusel mobile del home). En las cards del shop (grid de 5 columnas, cards
+  angostas) el texto "AÑADIR AL CARRITO" no cabía en una línea → el botón se veía como una caja casi
+  vacía y, al re-render de las imágenes (lazyloaded/lazysizes a los ~2s, `aspect-ratio:1/1` forzado),
+  el `overflow:hidden` de la card + `margin-top:auto` del wrapper dejaban el botón fuera del área
+  visible → "desaparecía". Fix: override scoped `.pv-shop` con `white-space:normal`,
+  `overflow:visible`, `visibility:visible`, `opacity:1`, `z-index:1` en el botón, y
+  `margin-top:auto + flex-shrink:0 + z-index:1` en `.woocommerce-loop-product__buttons` para que el
+  botón nunca colapse ni se recorte.
+- **Tests** +4 asserts en `ShopCardsHomeParityTest.php` (9 tests): override scoped del botón del shop
+  con `white-space:normal`, `visibility:visible`, y wrapper con `flex-shrink:0`. `LTMS_VERSION` →
+  2.9.345.
+
+---
+
 ### Fixed — `SHOP-CARD-MARKUP` (las cards de /tienda/ se veían distintas a las demás y el botón "Añadir al carrito" no se mostraba bien)
 
 > Reporte del usuario: revisa porque en tienda las tarjetas de los productos son diferentes a las

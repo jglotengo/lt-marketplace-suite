@@ -105,6 +105,29 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 			$src,
 			'SHOP-CARD-PARITY: el clearfix debe quedar sin content para no ocupar celda del grid.'
 		);
+		// SHOP-CARD-MARKUP: el boton ATC del shop debe quedar SIEMPRE visible
+		// (white-space:normal en vez de nowrap que cortaba el texto en cards
+		// angostas de 5 columnas -> el boton se veia vacio o desaparecia).
+		$this->assertStringContainsString(
+			'.pv-shop ul.products li.product .button.add_to_cart_button,',
+			$src,
+			'SHOP-CARD-MARKUP: debe existir un override scoped al boton del shop.'
+		);
+		$this->assertStringContainsString(
+			'white-space: normal !important;',
+			$src,
+			'SHOP-CARD-MARKUP: el texto del boton del shop debe fluir (no nowrap) para no cortarse.'
+		);
+		$this->assertStringContainsString(
+			'visibility: visible !important;',
+			$src,
+			'SHOP-CARD-MARKUP: el boton del shop debe ser siempre visible.'
+		);
+		$this->assertStringContainsString(
+			'.pv-shop ul.products li.product .woocommerce-loop-product__buttons',
+			$src,
+			'SHOP-CARD-MARKUP: el wrapper del boton del shop debe tener margin-top:auto + flex-shrink:0.'
+		);
 	}
 
 	public function test_archive_avoids_duplicate_breadcrumb(): void {

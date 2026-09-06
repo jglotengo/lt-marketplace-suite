@@ -417,6 +417,34 @@ html.wp-toolbar {
     text-decoration: none !important;
 }
 
+/* SHOP-CARD-MARKUP FIX (2026-09-06): el boton ATC del shop debe quedar
+   SIEMPRE visible. El bloque agrupado arriba usa white-space:nowrap +
+   overflow:hidden (necesario en el carrusel del home), pero en las cards del
+   shop (grid de 5 columnas, cards angostas) eso cortaba el texto
+   "AÑADIR AL CARRITO" -> el boton se veia como una caja vacia o desaparecia.
+   En el shop el texto debe fluir en 2 lineas si hace falta y el boton nunca
+   colapsar. */
+.pv-shop ul.products li.product .button.add_to_cart_button,
+.pv-shop ul.products li.product a.button {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* SHOP-CARD-MARKUP FIX: asegurar que el boton queda dentro del area visible
+   de la card (flex column + margin-top:auto en el wrapper) y que la card
+   crece con el contenido (nunca corta el boton). */
+.pv-shop ul.products li.product .woocommerce-loop-product__buttons {
+    margin-top: auto !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
 .elementor-wc-products ul.products li.product .button.loading::after,
 .pv-shop ul.products li.product .button.loading::after {
     border-color: #E80001 transparent #E80001 transparent !important;
