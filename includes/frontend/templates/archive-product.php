@@ -22,6 +22,20 @@ if ( ! function_exists( 'woocommerce_content' ) ) {
 get_header( 'shop' );
 
 /**
+ * SHOP-BREADCRUMB-DUP FIX (2026-09-06): evitar breadcrumb duplicado en
+ * /tienda/. El theme (Hello Elementor / WC) engancha woocommerce_breadcrumb
+ * en 'woocommerce_before_main_content' (prioridad 20), y nuestro template
+ * imprime su PROPIO breadcrumb con el design system dentro de
+ * .pv-shop__breadcrumb. Sin este remove_action el usuario veía "Inicio /
+ * Tienda" DOS veces consecutivas. Mismo patrón que cart.php (remueve el
+ * hook, renderiza el nuestro, y restaura el hook al final del template).
+ */
+$pv_shop_breadcrumb_was_hooked = has_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb' );
+if ( $pv_shop_breadcrumb_was_hooked ) {
+    remove_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+}
+
+/**
  * Hook: woocommerce_before_main_content
  */
 do_action( 'woocommerce_before_main_content' );
@@ -122,5 +136,11 @@ do_action( 'woocommerce_before_main_content' );
  * Hook: woocommerce_after_main_content
  */
 do_action( 'woocommerce_after_main_content' );
+
+// SHOP-BREADCRUMB-DUP FIX: restaurar el breadcrumb en el hook para no
+// afectar al resto del sitio (paridad con cart.php:712-720).
+if ( ! empty( $pv_shop_breadcrumb_was_hooked ) ) {
+    add_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+}
 
 get_footer( 'shop' );

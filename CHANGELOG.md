@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `SHOP-PAGE-CLEANUP` (breadcrumb "Inicio / Tienda" repetido en /tienda/ y espacio blanco donde debía ir la primera tarjeta)
+
+> Reporte del usuario: en la página tienda, donde debe ir la primera tarjeta de producto hay un
+> espacio blanco vacío y al comienzo se repite el texto "Inicio / Tienda".
+
+- **SHOP-BREADCRUMB-DUP (P1 - UX)** (`includes/frontend/templates/archive-product.php`): el
+  breadcrumb aparecía DOS veces en /tienda/ ("Inicio / Tienda" consecutivo) porque el theme
+  (Hello Elementor / WC) engancha `woocommerce_breadcrumb` en `woocommerce_before_main_content`
+  (prioridad 20) y el template nativo imprime su PROPIO breadcrumb del design system dentro de
+  `.pv-shop__breadcrumb`. Fix: `remove_action` del breadcrumb del theme antes del `do_action`,
+  render del breadcrumb nuestro, y `add_action` de restauración al final del template (mismo
+  patrón que cart.php:712-720).
+- **SHOP-GRID-GHOST (P1 - visual)** (`assets/css/ltms-homepage-fixes.css` + `.min`): el `ul.products`
+  del shop es `display:grid` (SHOP-CARD-PARITY) pero WC define
+  `.woocommerce ul.products::before { content:" "; display:table }` (clearfix de floats). En un
+  grid, ese `::before` se convierte en un **grid item fantasma** que ocupa la primera celda → la
+  primera tarjeta empezaba en la columna 2 (left=484px) y quedaba un espacio blanco vacío donde
+  debía ir la primera card. Fix: `content:none + display:none` para `::before`/`::after` del
+  `ul.products` dentro de `.pv-scope.pv-shop`.
+- **Tests** +1 en `ShopCardsHomeParityTest.php` (5 total): neutralización del clearfix fantasma y
+  remove/restore del breadcrumb del theme. `LTMS_VERSION` → 2.9.341.
+
+---
+
 ### Fixed — `SHOP-CARD-PARITY` + `SHOP-VENDOR-GATE` (las cards de /tienda/ distintas a las del home; "Explorar productos" del carrito vacío pedía login de vendedor)
 
 > Reporte del usuario: las tarjetas de productos en la página de tienda son distintas a las

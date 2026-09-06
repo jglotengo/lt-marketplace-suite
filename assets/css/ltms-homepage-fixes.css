@@ -583,6 +583,18 @@ html.wp-toolbar {
     margin: 0 0 24px !important;
 }
 
+/* SHOP-CARD-PARITY FIX: el ul.products del shop es display:grid, pero WC
+   define .woocommerce ul.products::before { content:" "; display:table }
+   (clearfix de floats). En un grid ese ::before se convierte en un grid
+   item FANTASMA que ocupa la primera celda -> la primera tarjeta empezaba
+   en la columna 2 (left=484) y quedaba un espacio blanco donde debía ir
+   la primera card. Se neutralizan ambos pseudo-elementos. */
+.pv-scope.pv-shop ul.products::before,
+.pv-scope.pv-shop ul.products::after {
+    content: none !important;
+    display: none !important;
+}
+
 .pv-scope.pv-shop ul.products li.product {
     min-width: 0 !important;
 }

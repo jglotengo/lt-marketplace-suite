@@ -16,6 +16,11 @@
  *      (renderizado vía woocommerce_archive_description). Fix defensivo en
  *      archive-product.php: se omite cualquier bloque .ltms-empty-state-login
  *      del archive description (además del fix de datos en SG).
+ *  (3) el usuario reportó además: breadcrumb "Inicio / Tienda" repetido al
+ *      comienzo y un espacio blanco donde debía ir la primera tarjeta. Fix:
+ *      breadcrumb del theme removido del hook (evita duplicado) y
+ *      ::before/::after del ul.products neutralizados (el clearfix de WC se
+ *      convertía en grid item fantasma en la primera celda del grid).
  *
  * Tests source-based (patrón C20-C29): file_get_contents + asserts.
  *
@@ -78,6 +83,43 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 			'grid-template-columns: repeat(2, 1fr) !important;',
 			$src,
 			'SHOP-CARD-PARITY: grid mobile de 2 columnas.'
+		);
+		// SHOP-CARD-PARITY: el clearfix ::before/::after de WC crea un grid item
+		// fantasma en la primera celda -> primera tarjeta desplazada a la col 2
+		// (espacio blanco donde debía ir la primera card). Deben neutralizarse.
+		$this->assertStringContainsString(
+			'.pv-scope.pv-shop ul.products::before,',
+			$src,
+			'SHOP-CARD-PARITY: el ::before del ul.products del shop debe neutralizarse.'
+		);
+		$this->assertStringContainsString(
+			'content: none !important;',
+			$src,
+			'SHOP-CARD-PARITY: el clearfix debe quedar sin content para no ocupar celda del grid.'
+		);
+	}
+
+	public function test_archive_avoids_duplicate_breadcrumb(): void {
+		$src = file_get_contents( self::ARCHIVE );
+
+		// SHOP-BREADCRUMB-DUP: el breadcrumb del theme se remueve del hook
+		// woocommerce_before_main_content para evitar "Inicio / Tienda" doble.
+		$this->assertStringContainsString(
+			"remove_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );",
+			$src,
+			'SHOP-BREADCRUMB-DUP: el breadcrumb del theme debe removerse antes del do_action.'
+		);
+		// Se restaura al final del template para no afectar al resto del sitio.
+		$this->assertStringContainsString(
+			"add_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );",
+			$src,
+			'SHOP-BREADCRUMB-DUP: el breadcrumb del theme debe restaurarse tras renderizar el nuestro.'
+		);
+		// Nuestro breadcrumb del design system sigue presente.
+		$this->assertStringContainsString(
+			'pv-shop__breadcrumb',
+			$src,
+			'SHOP-BREADCRUMB-DUP: el breadcrumb del design system (pv-shop__breadcrumb) debe seguir.'
 		);
 	}
 
