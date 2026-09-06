@@ -6,6 +6,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `SHOP-GRID-COLS` (las cards de /tienda/ se veían más anchas que las del home)
+
+> Reporte del usuario: ahora en la página /tienda/ las tarjetas ya cambiaron, no son iguales a las
+> del home.
+
+- **SHOP-GRID-COLS (P2 - visual)** (`assets/css/ltms-homepage-fixes.css` + `.min`): el home usa el
+  grid de Elementor de **5 columnas** (`ul.products.elementor-grid.columns-5`, cards angostas) y el
+  shop usaba **4 columnas** (`repeat(4,1fr)`, cards anchas) → las tarjetas del shop se veían más
+  grandes que las del home. Fix: `.pv-scope.pv-shop ul.products` pasa a `repeat(5,1fr)` con `gap:20px`
+  (paridad con el widget de Elementor del home) y responsive 5 → 4 (≤1200px) → 3 (≤1024px) → 2
+  (≤767px). El resto de la card (imagen cuadrada, título clamp, precio rojo, botón outline) ya era
+  idéntico al home (SHOP-CARD-PARITY).
+- **Tests** actualizado en `ShopCardsHomeParityTest.php` (8 tests): grid desktop 5 columnas en vez de
+  4. `LTMS_VERSION` → 2.9.343.
+
+---
+
 ### Fixed — `CART-EMPTY-CARD-PARITY` (las cards del carrito vacío /carrito/ se veían distintas al home y quedaba espacio en blanco al comienzo)
 
 > Reporte del usuario: en la página lo-tengo.com.co/carrito/ también pasa lo mismo — el diseño de

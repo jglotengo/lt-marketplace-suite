@@ -76,16 +76,16 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 	public function test_shop_grid_responsive_defined(): void {
 		$src = file_get_contents( self::CSS_PATH );
 
-		// Grid del shop: 4 columnas desktop -> 3 -> 2 (no carrusel como el home).
+		// Grid del shop: 5 columnas desktop (paridad con home) -> 4 -> 3 -> 2.
 		$this->assertStringContainsString(
 			'.pv-scope.pv-shop ul.products {',
 			$src,
 			'SHOP-CARD-PARITY: debe existir grid scoped para el shop.'
 		);
 		$this->assertStringContainsString(
-			'grid-template-columns: repeat(4, 1fr) !important;',
+			'grid-template-columns: repeat(5, 1fr) !important;',
 			$src,
-			'SHOP-CARD-PARITY: grid desktop de 4 columnas.'
+			'SHOP-CARD-PARITY: grid desktop de 5 columnas (igual que el home).'
 		);
 		$this->assertStringContainsString(
 			'grid-template-columns: repeat(2, 1fr) !important;',

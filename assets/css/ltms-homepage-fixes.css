@@ -572,12 +572,16 @@ html.wp-toolbar {
    SHOP-CARD-PARITY FIX (2026-09-06): grid responsive del shop
    (/tienda/ y taxonomias). El grid del home es un carrusel mobile
    (scroll-snap) porque es una vitrina; el shop es un archive con
-   paginacion -> mantiene grid normal 4 -> 2 -> 1.
+   paginacion -> mantiene grid normal 5 -> 3 -> 2 -> 1.
+   SHOP-GRID-COLS FIX (2026-09-06): el home usa 5 columnas
+   (elementor-grid columns-5) y el shop usaba 4 -> las cards del shop
+   se veian mas anchas que las del home. Se alinea a 5 columnas con
+   gap 20px (paridad con el widget de Elementor del home).
    ═══════════════════════════════════════════════════════════════ */
 .pv-scope.pv-shop ul.products {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 16px !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 20px !important;
     list-style: none !important;
     padding: 0 !important;
     margin: 0 0 24px !important;
@@ -597,6 +601,12 @@ html.wp-toolbar {
 
 .pv-scope.pv-shop ul.products li.product {
     min-width: 0 !important;
+}
+
+@media (max-width: 1200px) {
+    .pv-scope.pv-shop ul.products {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
 }
 
 @media (max-width: 1024px) {
