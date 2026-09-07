@@ -85,6 +85,57 @@ final class LTMS_Public_Auth_Handler {
         // estándar de WC terminaba en /mi-cuenta/ (vista de cliente) en vez de
         // /panel-vendedor/.
         add_filter( 'woocommerce_login_redirect', [ $instance, 'vendor_login_redirect' ], 10, 3 );
+
+        // PASSWORD-RESET-RETURN FIX (2026-09-07): tras restablecer la contraseña,
+        // el vendor vuelve a /login-vendedor/ en vez de caer en wp-login.php.
+        // WooCommerce descarta el redirect_to que wp_lostpassword_url() (con
+        // $ltms_login_self_url) pasaba al enlace "¿Olvidaste tu contraseña?"
+        // (filtro lostpassword_url -> wc_lostpassword_url devuelve el endpoint sin
+        // query args), y el email de reset de WP core no lleva redirect_to. Este
+        // filtro agrega redirect_to=<página de login LTMS> al link action=rp del
+        // email SOLO cuando el usuario es vendor; tras el reset, WP hace
+        // wp_safe_redirect(redirect_to) -> el vendor aterriza en su login.
+        add_filter( 'retrieve_password_message', [ $instance, 'vendor_reset_email_redirect' ], 10, 4 );
+    }
+
+    /**
+     * PASSWORD-RESET-RETURN FIX (2026-09-07): agrega redirect_to=<página de login
+     * del vendor> al link action=rp del email de recuperación, solo si el usuario
+     * tiene rol ltms_vendor / ltms_vendor_premium. Para clientes/otros roles se
+     * deja el email de WP core intacto.
+     *
+     * @param string $message    Body del email.
+     * @param string $key        Clave de reset.
+     * @param string $user_login Login del usuario.
+     * @param WP_User $user_data Objeto del usuario.
+     * @return string
+     */
+    public function vendor_reset_email_redirect( $message, $key, $user_login, $user_data ) {
+        if ( ! ( $user_data instanceof \WP_User ) ) {
+            return $message;
+        }
+        $roles = (array) $user_data->roles;
+        if ( ! in_array( 'ltms_vendor', $roles, true ) && ! in_array( 'ltms_vendor_premium', $roles, true ) ) {
+            return $message;
+        }
+
+        $pages        = get_option( 'ltms_installed_pages', [] );
+        $login_id     = $pages['ltms-login'] ?? 0;
+        $login_url    = $login_id ? get_permalink( $login_id ) : home_url( '/login-vendedor/' );
+        if ( ! $login_url ) {
+            return $message;
+        }
+
+        // El link del reset es texto plano: wp-login.php?action=rp&key=...&login=...
+        // (o la URL custom de sg-security). Agregarle redirect_to del mismo host.
+        if ( preg_match( '#(https?://[^\s<]+action=rp[^\s<]*)#', $message, $m ) ) {
+            $url     = $m[1];
+            $sep     = ( strpos( $url, '?' ) !== false ) ? '&' : '?';
+            $new_url = $url . $sep . 'redirect_to=' . rawurlencode( $login_url );
+            $message = str_replace( $url, $new_url, $message );
+        }
+
+        return $message;
     }
 
     /**

@@ -159,4 +159,39 @@ final class LoginErrorClarityTest extends LTMS_Unit_Test_Case {
 			'LOGIN-NONCE-FRESH: el reenvio usa el endpoint ltms_auth_nonce.'
 		);
 	}
+
+	public function test_password_reset_email_returns_vendor_to_vendor_login(): void {
+		$src = file_get_contents( self::HANDLER_PATH );
+
+		// PASSWORD-RESET-RETURN (2026-09-07): el email de recuperacion del vendor
+		// debe llevar redirect_to=<página de login LTMS> para que tras el reset el
+		// vendor aterrice en /login-vendedor/ y no en wp-login.php (WC descarta el
+		// redirect_to del enlace "¿Olvidaste tu contraseña?").
+		$this->assertStringContainsString(
+			"add_filter( 'retrieve_password_message', [ \$instance, 'vendor_reset_email_redirect' ], 10, 4 );",
+			$src,
+			'PASSWORD-RESET-RETURN: debe registrarse el filtro retrieve_password_message.'
+		);
+		$this->assertStringContainsString(
+			'public function vendor_reset_email_redirect( $message, $key, $user_login, $user_data )',
+			$src,
+			'PASSWORD-RESET-RETURN: debe existir el metodo vendor_reset_email_redirect.'
+		);
+		$this->assertStringContainsString(
+			"in_array( 'ltms_vendor', \$roles, true ) && ! in_array( 'ltms_vendor_premium', \$roles, true )",
+			$src,
+			'PASSWORD-RESET-RETURN: solo debe aplicar a vendors (rol-aware).'
+		);
+		// El link action=rp del email debe recibir redirect_to del mismo host.
+		$this->assertStringContainsString(
+			'#(https?://[^\s<]+action=rp[^\s<]*)#',
+			$src,
+			'PASSWORD-RESET-RETURN: el metodo debe localizar el link action=rp en el email.'
+		);
+		$this->assertStringContainsString(
+			"'redirect_to=' . rawurlencode( \$login_url )",
+			$src,
+			'PASSWORD-RESET-RETURN: debe anexar redirect_to=<login_url> al link de reset.'
+		);
+	}
 }

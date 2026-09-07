@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `PASSWORD-RESET-RETURN` (tras restablecer la contraseña, el vendedor volvía a wp-login.php en vez de a /login-vendedor/)
+
+> Reporte del usuario: auditar el proceso de recuperación de contraseña ("¿Olvidaste tu contraseña?"),
+> verificar que sea el correcto y hacer pruebas QA.
+
+- **E2E + QA en SG (2026-09-07):** flujo completo verificado de punta a punta — el enlace
+  "¿Olvidaste tu contraseña?" apunta a `/mi-cuenta/lost-password/` (WooCommerce, no cacheado por SG);
+  el form POSTea a la misma URL y WooCommerce (`WC_Form_Handler::process_lost_password` en `wp_loaded`)
+  llama `retrieve_password()` con nonce válido; el email de reset llega con el link
+  `wp-login.php?action=rp&key=...&login=...` (sg-security exime la action `rp`); `reset_password()` funciona
+  (la key es válida, single-use, login con la nueva password SUCCESS y la vieja falla); deliverabilidad
+  OK (SPF `+a +mx include:dnssmarthost` cubre el IP de SG). **No hay bug funcional en la recuperación.**
+- **PASSWORD-RESET-RETURN (P2 - UX)** (`class-ltms-public-auth-handler.php` + test): WooCommerce
+  descarta el `redirect_to` que `wp_lostpassword_url( $ltms_login_self_url )` (form-login.php:199) pasaba
+  al enlace "¿Olvidaste tu contraseña?" (filtro `lostpassword_url` → `wc_lostpassword_url` devuelve el
+  endpoint sin query args), y el email de reset de WP core no lleva `redirect_to`. Consecuencia: tras
+  restablecer la contraseña, el vendor aterrizaba en `wp-login.php` (redirigido a `/acceder` por
+  sg-security) en vez de en su página de login. Fix: filtro `retrieve_password_message` que agrega
+  `&redirect_to=<página de login LTMS>` al link `action=rp` del email SOLO cuando el usuario es vendor
+  (rol-aware); tras el reset, WP hace `wp_safe_redirect(redirect_to)` → el vendor vuelve a
+  `/login-vendedor/`.
+- **Verificación:** LoginErrorClarityTest 7 tests (24 assertions, +1 test / +5 asserts). Suite completa
+  PHPUnit: 4,896 tests / 10,149 assertions, 0 failures, 3 skips. `LTMS_VERSION` → 2.9.348.
+
+---
+
 ### Fixed — `LOGIN-NONCE-FRESH` (el login de vendedor mostraba un error rojo con credenciales correctas)
 
 > Reporte del usuario: al iniciar sesión como vendedor con el formulario respectivo, con las
