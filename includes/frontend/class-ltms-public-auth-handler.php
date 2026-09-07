@@ -41,6 +41,16 @@ final class LTMS_Public_Auth_Handler {
         // AJAX handlers. M-57: registrar también la variante priv para que admins
         // (y otros roles no-vendor) puedan probar el flujo desde wp-admin sin obtener
         // 0/HTTP-200 que el JS interpreta como "Error de conexión".
+        // LOGIN-NONCE-FRESH FIX (2026-09-07): endpoint de nonce fresco. La pagina de
+        // login puede servir un ltmsAuth.nonce stale (pagina servida desde algun cache,
+        // o el usuario logueado en otra pestana cargo la pagina con nonce de guest), y
+        // check_ajax_referer rechaza el login con "Sesion expirada" aunque las
+        // credenciales sean correctas (mismo caso que documento LOGIN-ERR-CLARITY).
+        // El JS (ltms-login-register.js) obtiene un nonce fresco de este endpoint
+        // justo antes de enviar el form de login/registro/resend, y lo usa si el
+        // request devuelve success (fallback al nonce del localize si falla).
+        add_action( 'wp_ajax_nopriv_ltms_auth_nonce',    [ $instance, 'ajax_fresh_auth_nonce' ] );
+        add_action( 'wp_ajax_ltms_auth_nonce',           [ $instance, 'ajax_fresh_auth_nonce' ] );
         add_action( 'wp_ajax_nopriv_ltms_vendor_login',    [ $instance, 'ajax_vendor_login' ] );
         add_action( 'wp_ajax_ltms_vendor_login',           [ $instance, 'ajax_vendor_login' ] );
         add_action( 'wp_ajax_nopriv_ltms_vendor_register', [ $instance, 'ajax_vendor_register' ] );
@@ -227,6 +237,19 @@ final class LTMS_Public_Auth_Handler {
         }
         $roles = (array) $user->roles;
         return in_array( 'ltms_vendor', $roles, true ) || in_array( 'ltms_vendor_premium', $roles, true );
+    }
+
+    /**
+     * LOGIN-NONCE-FRESH FIX (2026-09-07): devuelve un nonce ltms_auth_nonce RECIEN
+     * generado para el usuario/sesion actual. El JS lo obtiene justo antes de enviar
+     * el form de login/registro/resend para no depender de un ltmsAuth.nonce que
+     * pueda estar stale (pagina servida desde cache, o user logueado en otra pestana
+     * con nonce de guest). Este endpoint es una request AJAX (nunca cacheada).
+     *
+     * @return void
+     */
+    public function ajax_fresh_auth_nonce(): void {
+        wp_send_json_success( [ 'nonce' => wp_create_nonce( 'ltms_auth_nonce' ) ] );
     }
 
     public function ajax_vendor_login(): void {

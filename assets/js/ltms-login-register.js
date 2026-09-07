@@ -79,9 +79,49 @@
     //    form check (if (!form) return) because on the login page there is
     //    no registration form, and the early return would skip this handler.
     // ════════════════════════════════════════════════════════════════
+    // LOGIN-NONCE-FRESH FIX (2026-09-07): obtiene un nonce ltms_auth_nonce RECIEN
+    // generado justo antes de enviar el form. El ltmsAuth.nonce del HTML puede estar
+    // stale (pagina servida desde algun cache, o user logueado en otra pestana con
+    // nonce de guest) y check_ajax_referer rechaza el login con "Sesion expirada"
+    // aunque las credenciales sean correctas. Si el endpoint falla, usa el nonce del
+    // localize como fallback (comportamiento original).
+    function ltmsGetAuthNonce() {
+        var fallback = (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '';
+        var url = (typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php';
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: 'action=ltms_auth_nonce'
+        })
+        .then(function (r) { return r.json().catch(function () { return null; }); })
+        .then(function (d) { return (d && d.success && d.data && d.data.nonce) ? d.data.nonce : fallback; })
+        .catch(function () { return fallback; });
+    }
+
+    // AJAX-FALLBACK FIX (2026-09-07): el WAF de SG puede bloquear la request al
+    // endpoint primario (?ltms_ajax=1) devolviendo HTML 403 (no JSON). En ese caso
+    // se reintenta contra /wp-admin/admin-ajax.php como ultimo recurso. Solo se
+    // reintenta si el primario NO devolvio una respuesta JSON valida (el error real
+    // del backend — credenciales invalidas, rate limit, email no verificado — SI es
+    // JSON y no debe reintentarse).
+    function ltmsPostJson(urls, body) {
+        function attempt(i) {
+            if (i >= urls.length) return Promise.resolve(null);
+            return fetch(urls[i], { method: 'POST', body: body, credentials: 'same-origin' })
+                .then(function (r) { return r.json().catch(function () { return null; }); })
+                .then(function (d) {
+                    if (d && typeof d.success !== 'undefined') return d; // JSON valido del backend
+                    return attempt(i + 1); // HTML/WAF/red -> siguiente URL
+                })
+                .catch(function () { return attempt(i + 1); });
+        }
+        return attempt(0);
+    }
+
     var loginForm = document.getElementById('ltms-login-form');
     if (loginForm) {
-        loginForm.addEventListener('submit', function (e) {
+        loginForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
             var loginNotice = document.getElementById('ltms-login-notice');
@@ -95,6 +135,11 @@
                 if (!loginNotice) return;
                 loginNotice.style.display = 'none';
                 loginNotice.innerHTML = '';
+            }
+            function restoreButton() {
+                if (submitBtn) submitBtn.disabled = false;
+                if (btnText) btnText.style.display = '';
+                if (btnSpinner) btnSpinner.style.display = 'none';
             }
 
             clearLoginNotice();
@@ -120,65 +165,60 @@
             loginData.append('username', username.value);
             loginData.append('password', password.value);
             loginData.append('remember', remember && remember.checked ? '1' : '0');
-            loginData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
+            loginData.append('nonce', await ltmsGetAuthNonce());
 
-            fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
-                method: 'POST',
-                body: loginData,
-                credentials: 'same-origin'
-            })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (submitBtn) submitBtn.disabled = false;
-                if (btnText) btnText.style.display = '';
-                if (btnSpinner) btnSpinner.style.display = 'none';
+            var urls = [];
+            if (typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) urls.push(ltmsAuth.ajax_url);
+            urls.push('/wp-admin/admin-ajax.php');
 
-                if (data.success) {
-                    showLoginNotice('<strong>¡Bienvenido!</strong> Redirigiendo…', 'success');
-                    if (data.data && data.data.redirect) {
-                        setTimeout(function () { window.location.href = data.data.redirect; }, 1000);
-                    }
-                } else {
-                    // UX-004 (P2) UX-AUDIT-LOGIN FIX: el backend de login retorna
-                    // data.data como string en varios casos: credenciales inválidas
-                    // ("Usuario o contraseña incorrectos."), campos vacíos
-                    // ("Usuario y contraseña son requeridos."), rate limit 429, etc.
-                    // El ternario data.data.message accedía a .message de un string
-                    // (=> undefined) y caía al fallback genérico, OCULTANDO el mensaje
-                    // real del server. Ahora detectamos string-vs-object para extraer
-                    // el mensaje correcto en ambos formatos.
-                    var loginMsg = 'Usuario o contraseña incorrectos.';
-                    if (data.data) {
-                        if (typeof data.data === 'string') {
-                            loginMsg = data.data;
-                        } else if (data.data.message) {
-                            loginMsg = data.data.message;
-                        }
-                    }
-                    showLoginNotice(loginMsg, 'error');
-                    // AUTH-RA4 (P1) RE-AUDIT-AUTH FIX: seguir data.data.redirect en
-                    // branch error. El backend (ajax_vendor_login, AUTH-01) retorna
-                    // HTTP 403 con message + redirect cuando el vendor tiene email
-                    // no verificado — el redirect apunta a la página de login con
-                    // ?resend_verification=1 que muestra el mini-form de reenvío.
-                    // Antes el JS solo mostraba el message e ignoraba el redirect,
-                    // rompiendo la UX del fix AUTH-01: el vendor veia el mensaje
-                    // "verifica tu email" pero NO era llevado al form de reenvío.
-                    // Pequeño delay (1.2s) para que el usuario lea el message antes
-                    // del redirect automatico (mismo patron que el branch success).
-                    if (data.data && typeof data.data === 'object' && data.data.redirect) {
-                        var redirectUrl = data.data.redirect;
-                        if (submitBtn) submitBtn.disabled = true;
-                        setTimeout(function () { window.location.href = redirectUrl; }, 1200);
+            var data = await ltmsPostJson(urls, loginData);
+
+            restoreButton();
+
+            if (!data) {
+                showLoginNotice('Error de conexión. Intenta de nuevo.', 'error');
+                return;
+            }
+
+            if (data.success) {
+                showLoginNotice('<strong>¡Bienvenido!</strong> Redirigiendo…', 'success');
+                if (data.data && data.data.redirect) {
+                    setTimeout(function () { window.location.href = data.data.redirect; }, 1000);
+                }
+            } else {
+                // UX-004 (P2) UX-AUDIT-LOGIN FIX: el backend de login retorna
+                // data.data como string en varios casos: credenciales inválidas
+                // ("Usuario o contraseña incorrectos."), campos vacíos
+                // ("Usuario y contraseña son requeridos."), rate limit 429, etc.
+                // El ternario data.data.message accedía a .message de un string
+                // (=> undefined) y caía al fallback genérico, OCULTANDO el mensaje
+                // real del server. Ahora detectamos string-vs-object para extraer
+                // el mensaje correcto en ambos formatos.
+                var loginMsg = 'Usuario o contraseña incorrectos.';
+                if (data.data) {
+                    if (typeof data.data === 'string') {
+                        loginMsg = data.data;
+                    } else if (data.data.message) {
+                        loginMsg = data.data.message;
                     }
                 }
-            })
-            .catch(function (err) {
-                if (submitBtn) submitBtn.disabled = false;
-                if (btnText) btnText.style.display = '';
-                if (btnSpinner) btnSpinner.style.display = 'none';
-                showLoginNotice('Error de conexión. Intenta de nuevo.', 'error');
-            });
+                showLoginNotice(loginMsg, 'error');
+                // AUTH-RA4 (P1) RE-AUDIT-AUTH FIX: seguir data.data.redirect en
+                // branch error. El backend (ajax_vendor_login, AUTH-01) retorna
+                // HTTP 403 con message + redirect cuando el vendor tiene email
+                // no verificado — el redirect apunta a la página de login con
+                // ?resend_verification=1 que muestra el mini-form de reenvío.
+                // Antes el JS solo mostraba el message e ignoraba el redirect,
+                // rompiendo la UX del fix AUTH-01: el vendor veia el mensaje
+                // "verifica tu email" pero NO era llevado al form de reenvío.
+                // Pequeño delay (1.2s) para que el usuario lea el message antes
+                // del redirect automatico (mismo patron que el branch success).
+                if (data.data && typeof data.data === 'object' && data.data.redirect) {
+                    var redirectUrl = data.data.redirect;
+                    if (submitBtn) submitBtn.disabled = true;
+                    setTimeout(function () { window.location.href = redirectUrl; }, 1200);
+                }
+            }
         });
     }
 
@@ -339,7 +379,7 @@
     // ════════════════════════════════════════════════════════════════
     // 4. Form submit via AJAX (ltms_register_vendor action).
     // ════════════════════════════════════════════════════════════════
-    form.addEventListener('submit', function (e) {
+    form.addEventListener('submit', async function (e) {
         e.preventDefault();
         clearNotice();
 
@@ -373,7 +413,7 @@
         var formData = new FormData(form);
         var isCompleteProfile = window.location.search.indexOf('complete_profile=1') > -1;
         formData.append('action', isCompleteProfile ? 'ltms_complete_profile' : 'ltms_vendor_register');
-        formData.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
+        formData.append('nonce', await ltmsGetAuthNonce());
 
         fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
             method: 'POST',

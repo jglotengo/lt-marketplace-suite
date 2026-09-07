@@ -6,6 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `LOGIN-NONCE-FRESH` (el login de vendedor mostraba un error rojo con credenciales correctas)
+
+> Reporte del usuario: al iniciar sesión como vendedor con el formulario respectivo, con las
+> credenciales correctas, al pulsar "Iniciar Sesión" sale un mensaje rojo de error en el mismo
+> formulario.
+
+- **E2E + QA en SG (2026-09-07):** se probó el flujo completo en producción — el handler real
+  `ajax_vendor_login()` devuelve `{"success":true,"redirect":"/panel-vendedor/"}` con credenciales
+  correctas + nonce fresco; `wp_signon` autentica correctamente (hash `$wp$2y$` válido en WP 7.1);
+  la página de login NO está cacheada por SG (`nocache_headers()` en `render_login_form`, sin archivo
+  en sgo-cache); sin bloqueos de throttle reales (0 `LOGIN_THROTTLE` en 3 días). Las causas
+  identificadas del "error rojo con credenciales correctas" son: nonce stale (página servida desde
+  cache u otra pestaña con sesión → "La sesión expiró"), WAF de SG bloqueando el POST a `?ltms_ajax=1`
+  (devuelve HTML 403 → el JS caía a "Error de conexión"), email sin verificar (gate AUTH-01), o
+  password real distinta.
+- **LOGIN-NONCE-FRESH (P1 - resiliencia)** (`class-ltms-public-auth-handler.php` +
+  `ltms-login-register.js` + `.min` + `form-login.php`): endpoint `ltms_auth_nonce`
+  (`wp_ajax_{nopriv_}ltms_auth_nonce` → `ajax_fresh_auth_nonce()`) que devuelve un nonce recién
+  generado. El JS obtiene el nonce fresco justo antes de enviar el form de login/registro/reenvío de
+  verificación (fallback al `ltmsAuth.nonce` del localize si el endpoint falla). Así el login no
+  depende del nonce del HTML servido (que puede estar stale) — mismo caso que documentó
+  LOGIN-ERR-CLARITY pero atacado en origen.
+- **AJAX-FALLBACK (P1 - resiliencia)** (`ltms-login-register.js` + `.min`): si el POST primario a
+  `?ltms_ajax=1` no devuelve JSON válido (WAF/HTML 403/red), se reintenta contra
+  `/wp-admin/admin-ajax.php` como último recurso. Los errores reales del backend (credenciales
+  inválidas, rate limit, email no verificado) SÍ son JSON y no se reintentan.
+- **Verificación:** LoginErrorClarityTest 6 tests (19 assertions). Suite completa PHPUnit: 4,895
+  tests / 10,145 assertions, 0 failures, 3 skips. `LTMS_VERSION` → 2.9.347.
+- **Nota QA para el reporte del usuario:** si el mensaje rojo es "Usuario o contraseña incorrectos",
+  la password real no coincide (usar "¿Olvidaste tu contraseña?"); si es "Debes verificar tu email",
+  la cuenta está pendiente de verificación (AUTH-01, el form redirige al reenvío).
+
+---
+
 ### Fixed — `CARD-IMG-SELECTOR` (en todas las páginas las cards de productos mostraban solo la imagen; el título/precio/botón se veían ~2s y luego desaparecían)
 
 > Reporte del usuario: las tarjetas de los productos en todas las páginas solo muestran la imagen

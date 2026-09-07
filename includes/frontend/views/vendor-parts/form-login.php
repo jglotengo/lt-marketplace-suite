@@ -57,12 +57,25 @@ if ( isset( $_GET['ltms_error'] ) ) { // phpcs:ignore WordPress.Security.NonceVe
         var body = new URLSearchParams();
         body.append('action', 'ltms_resend_verification');
         body.append('email', email.value.trim());
-        body.append('nonce', (typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
+        // LOGIN-NONCE-FRESH FIX (2026-09-07): pedir nonce fresco al endpoint antes de
+        // enviar (el ltmsAuth.nonce del HTML puede estar stale si la pagina se sirvio
+        // desde cache). Si el endpoint falla, usar el nonce del localize como fallback.
         fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
             method:'POST', credentials:'same-origin',
             headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
-            body: body.toString()
-        }).then(function(r){ return r.json(); })
+            body:'action=ltms_auth_nonce'
+        }).then(function(r){ return r.json().catch(function(){ return null; }); })
+        .then(function(fn){
+            var nonce = (fn && fn.success && fn.data && fn.data.nonce) ? fn.data.nonce
+                : ((typeof ltmsAuth !== 'undefined' && ltmsAuth.nonce) ? ltmsAuth.nonce : '');
+            body.append('nonce', nonce);
+            return fetch((typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) ? ltmsAuth.ajax_url : '/wp-admin/admin-ajax.php', {
+                method:'POST', credentials:'same-origin',
+                headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: body.toString()
+            });
+        })
+        .then(function(r){ return r.json(); })
           .then(function(data){
             btn.disabled = false; if (txt) txt.style.display=''; if (spin) spin.style.display='none';
             if (msg) {
