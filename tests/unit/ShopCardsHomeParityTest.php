@@ -284,4 +284,55 @@ final class ShopCardsHomeParityTest extends LTMS_Unit_Test_Case {
 			'SHOP-CARD-PARITY: el loop del shop NO debe usar content-product.php del theme.'
 		);
 	}
+
+	public function test_js_card_image_selector_never_matches_the_card_element(): void {
+		$src = file_get_contents( self::JS_PATH );
+
+		// CARD-IMG-SELECTOR FIX (2026-09-07): fixProductCardImages() NO debe
+		// concatenar CARD_SELECTOR (lista separada por comas) con el descendiente
+		// de imagen. Esa concatenacion rompe el selector en grupos sueltos que
+		// matchean el <li> de la card (CARD-SELECTOR-CONCAT bug): el JS aplicaba
+		// los estilos de imagen (aspect-ratio:1/1 + display:block + position:static)
+		// sobre la card, forzandola a un cuadrado y recortando el contenido
+		// (titulo/precio/boton) con overflow:hidden -> solo se veia la imagen.
+		$this->assertStringNotContainsString(
+			"CARD_SELECTOR + ' .woocommerce-LoopProduct-link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: no debe concatenarse CARD_SELECTOR con el selector de imagen.'
+		);
+		$this->assertStringNotContainsString(
+			"CARD_SELECTOR + ' a.woocommerce-loop-product__link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: no debe concatenarse CARD_SELECTOR con a.woocommerce-loop-product__link img.'
+		);
+		// El selector de imagenes debe ser EXPLICITO por scope (cada grupo del
+		// selector termina en 'img' y por tanto solo matchea la imagen, nunca el li).
+		$this->assertStringContainsString(
+			"'.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: scope home/Elementor con imagen explicita.'
+		);
+		$this->assertStringContainsString(
+			"'.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: scope home/Elementor (a.woocommerce-loop-product__link) con imagen explicita.'
+		);
+		$this->assertStringContainsString(
+			"'.pv-shop ul.products li.product a.woocommerce-loop-product__link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: scope shop con imagen explicita.'
+		);
+		$this->assertStringContainsString(
+			"'.pv-cart-empty-grid li.product .woocommerce-LoopProduct-link img'",
+			$src,
+			'CARD-IMG-SELECTOR FIX: scope carrito vacio con imagen explicita.'
+		);
+		// CARD_SELECTOR (lista con comas) sigue siendo valido SOLO para
+		// img.closest() dentro del listener lazyloaded (ahi el listado es correcto).
+		$this->assertStringContainsString(
+			'img.closest(CARD_SELECTOR)',
+			$src,
+			'CARD-IMG-SELECTOR FIX: CARD_SELECTOR sigue usandose para closest() en el listener lazyloaded.'
+		);
+	}
 }

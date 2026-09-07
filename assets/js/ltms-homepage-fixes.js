@@ -286,11 +286,30 @@
     /* antes solo aplicaba al home (Elementor).                        */
     var CARD_SELECTOR = '.elementor-wc-products ul.products li.product, .pv-shop ul.products li.product, .pv-cart-empty-grid li.product';
 
+    /* CARD-IMG-SELECTOR FIX (2026-09-07): CARD_SELECTOR es una lista separada
+       por comas. Concatenarla con ' .woocommerce-LoopProduct-link img' producia
+       un selector roto (CARD-SELECTOR-CONCAT bug): los grupos
+       ', .pv-shop ul.products li.product' y ', .pv-cart-empty-grid li.product'
+       quedaban sueltos dentro del selector compuesto y matcheaban los <li> de
+       las cards, por lo que fixProductCardImages() aplicaba los estilos de
+       imagen (aspect-ratio:1/1 + display:block + position:static + height:auto)
+       sobre el <li> en vez de la imagen. El aspect-ratio:1/1 forzaba la card a
+       un cuadrado (alto = ancho) y el contenido (titulo/precio/boton) quedaba
+       recortado por overflow:hidden -> solo se veia la imagen despues del
+       primer render (~2s). Se genera el selector de imagenes EXPLICITO por
+       cada scope de card (cada grupo termina en 'img', nunca matchea el <li>).
+       CARD_SELECTOR sigue usandose SOLO para img.closest() (correcto). */
+    var CARD_IMG_SELECTOR = [
+        '.elementor-wc-products ul.products li.product .woocommerce-LoopProduct-link img',
+        '.elementor-wc-products ul.products li.product a.woocommerce-loop-product__link img',
+        '.pv-shop ul.products li.product .woocommerce-LoopProduct-link img',
+        '.pv-shop ul.products li.product a.woocommerce-loop-product__link img',
+        '.pv-cart-empty-grid li.product .woocommerce-LoopProduct-link img',
+        '.pv-cart-empty-grid li.product a.woocommerce-loop-product__link img'
+    ].join(', ');
+
     function fixProductCardImages() {
-        var imgs = document.querySelectorAll(
-            CARD_SELECTOR + ' .woocommerce-LoopProduct-link img, ' +
-            CARD_SELECTOR + ' a.woocommerce-loop-product__link img'
-        );
+        var imgs = document.querySelectorAll(CARD_IMG_SELECTOR);
         imgs.forEach(function (img) {
             // Eliminar restricción de sizes que limita a 300px
             img.removeAttribute('sizes');

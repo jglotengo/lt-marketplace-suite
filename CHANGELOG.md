@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-06
 
+### Fixed — `CARD-IMG-SELECTOR` (en todas las páginas las cards de productos mostraban solo la imagen; el título/precio/botón se veían ~2s y luego desaparecían)
+
+> Reporte del usuario: las tarjetas de los productos en todas las páginas solo muestran la imagen
+> del producto; la demás información de la tarjeta se puede visualizar por 2 segundos y luego
+> desaparece.
+
+- **CARD-IMG-SELECTOR (P1 - visual, regresión de SHOP-CARD-PARITY)** (`assets/js/ltms-homepage-fixes.js` + `.min`):
+  `fixProductCardImages()` construía su `querySelectorAll` concatenando `CARD_SELECTOR` (lista
+  separada por comas, ampliada en v2.9.340 a `.pv-shop` y en v2.9.342 a `.pv-cart-empty-grid`) con
+  `' .woocommerce-LoopProduct-link img'`. La concatenación rompía el selector: los grupos
+  `, .pv-shop ul.products li.product` y `, .pv-cart-empty-grid li.product` quedaban sueltos dentro
+  del selector compuesto y matcheaban los `<li>` de las cards. El JS aplicaba entonces los estilos
+  de imagen (`aspect-ratio:1/1`, `display:block`, `position:static`, `height:auto` — todos
+  `!important` inline) sobre la card en vez de la imagen. `aspect-ratio:1/1` forzaba la card a un
+  cuadrado (alto = ancho de la columna) y, con el `overflow:hidden` de la card base, el
+  título/precio/botón quedaban recortados fuera del área visible → "solo se veía la imagen" tras el
+  primer render (~2s). Fix: selector de imágenes EXPLÍCITO por scope de card (cada grupo termina en
+  `img`, nunca matchea el `<li>`). `CARD_SELECTOR` se conserva únicamente para `img.closest()` en el
+  listener `lazyloaded` (donde el listado con comas sí es correcto).
+- **Verificación**: repro local con el combined CSS/JS reales de SG — antes las cards colapsaban a
+  la altura de la imagen (226px) y el contenido quedaba recortado; después del fix crecen con el
+  contenido (445px) y nada se recorta tras el lazyload (~2s).
+- **Tests** +1 test / +7 asserts en `ShopCardsHomeParityTest.php` (10 tests): prohibición del patrón
+  de concatenación roto + presencia de los selectores de imagen explícitos por scope. Suite completa
+  PHPUnit: 4,891 tests / 10,132 assertions, 0 failures, 3 skips. `LTMS_VERSION` → 2.9.346.
+
+---
+
 ### Fixed — `SHOP-ATC-VISIBLE` (el botón "Añadir al carrito" de /tienda/ aparecía y luego desaparecía al recargar)
 
 > Reporte del usuario: al recargar la página tienda por unos segundos se alcanzan a ver las tarjetas
