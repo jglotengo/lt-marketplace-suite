@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-08-31
-> **Versión del plugin:** 2.9.x
-> **Total de lecciones:** 155 (…+ 1 del fix CI-RED-BASELINE v2.9.305 — suite verde por primera vez tras 73 tests falsos en rojo + 2 del ciclo RECONCILIATION-FIX Aveonline v2.9.x #154-155)
+> **Última actualización:** 2026-09-07
+> **Versión del plugin:** 2.9.346
+> **Total de lecciones:** 158 (…+ 1 del ciclo CARD-IMG-SELECTOR v2.9.346 #158 — concatenar un selector en lista con un descendiente)
 
 ---
 
@@ -819,6 +819,16 @@ En SiteGround, el optimizador puede modificar assets. Antes de `git pull`, hacer
 
 ### REGLA #15: Borrar artefactos de tests del tracking
 `coverage/` y `.phpunit.cache/` NO deben estar tracked en git. Añadir a `.gitignore` y `git rm --cached`.
+
+### REGLA #16: NUNCA concatenar un selector CSS en lista (con comas) con un descendiente usando strings
+`var s = 'A, B, C'` es una LISTA de selectores. `s + ' .img'` NO aplica el descendiente a A, B y C:
+la coma separa grupos al TOP LEVEL, y el resultado es `A, B, C .img` — matchea también los elementos
+A y B (sin el descendiente). Si el selector cubre múltiples scopes (ej. `.elementor-wc-products ...`,
+`.pv-shop ...`, `.pv-cart-empty-grid ...`), generar los selectores COMPLETOS explícitos por scope en
+un array + `.join(', ')` (cada grupo termina en el elemento objetivo), o usar `closest(lista)` cuando
+se parte desde un elemento hijo. Un `querySelectorAll` con un selector así de roto aplica los estilos
+al elemento equivocado (ej. estilos de imagen sobre el `<li>` de la card → card cuadrada por
+`aspect-ratio:1/1` + contenido recortado por `overflow:hidden`). Ver Lección #158.
 
 ---
 
@@ -3284,6 +3294,47 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    `KERNEL BOOT ERROR` count NO crece tras requests frescos. Un `php -r` CLI usa un OPcache distinto al
    PHP-FPM del web — si el web sigue roto, el reset de archivos no basta y hay que revisar el conteo de
    errores del log (no solo el CLI).
+
+## 27. v2.9.346 - CARD-IMG-SELECTOR: concatenar un selector en lista con un descendiente aplicó estilos de imagen sobre las cards de producto (todas las páginas)
+
+> **Hallazgo (2026-09-07):** el usuario reportó que "las tarjetas de los productos en todas las páginas
+> solo muestran imágenes; la demás información se ve por ~2s y luego desaparece". Causa raíz en
+> `assets/js/ltms-homepage-fixes.js` `fixProductCardImages()`: el selector se construía concatenando
+> `CARD_SELECTOR` (lista separada por comas: `.elementor-wc-products ul.products li.product,
+> .pv-shop ul.products li.product, .pv-cart-empty-grid li.product`) con `' .woocommerce-LoopProduct-link img'`.
+> La concatenación rompe la lista: los grupos `, .pv-shop ul.products li.product` y
+> `, .pv-cart-empty-grid li.product` quedaban sueltos dentro del selector compuesto y matcheaban los `<li>`
+> de las cards (además de los grupos del home). El JS aplicaba entonces los estilos de imagen
+> (`aspect-ratio:1/1`, `display:block`, `position:static`, `height:auto` — todos `!important` inline)
+> sobre el `<li>` en vez de la imagen. `aspect-ratio:1/1` forzaba la card a un cuadrado (alto = ancho de
+> columna) y, con el `overflow:hidden` de la card base, el título/precio/botón quedaban recortados fuera
+> del área visible → solo se veía la imagen tras el primer render. Regresión introducida por `ace45e25`
+> (v2.9.340, CARD_SELECTOR pasó de selector único a lista) y agravada por `79c5d583` (v2.9.342,
+> `.pv-cart-empty-grid`). Fix: `CARD_IMG_SELECTOR` — array con los selectores de imagen COMPLETOS por
+> scope (cada grupo termina en `img`, nunca matchea el `<li>`); `CARD_SELECTOR` se conserva solo para
+> `img.closest()` en el listener `lazyloaded` (ahí el listado con comas sí es correcto). Verificado con
+> repro local usando los combined CSS/JS reales de SG: antes la card colapsaba a 226px (solo imagen);
+> después crece a 445px y nada se recorta tras el lazyload. Ver `CHANGELOG.md` 2026-09-07.
+
+### Lección #158: un selector en lista concatenado con un descendiente NO aplica el descendiente a cada grupo — matchea el ancestro y aplica los estilos al elemento equivocado
+
+1. **Caso real:** `querySelectorAll(CARD_SELECTOR + ' .img, ' + CARD_SELECTOR + ' a.img')` con
+   `CARD_SELECTOR = 'A li.product, B li.product, C li.product'` produce 6 grupos top-level, de los
+   cuales `A li.product`, `B li.product` y `C li.product` (los que no tienen el descendiente) matchean
+   los `<li>`. El `forEach` aplicó los estilos de imagen a los `<li>`: `aspect-ratio:1/1 !important`
+   (card cuadrada) + `display:block !important` + `position:static !important`. El síntoma visible
+   ("la info de la card desaparece y solo queda la imagen") coincidía con el del fix anterior
+   (SHOP-ATC-VISIBLE, solo el botón), pero el mecanismo era distinto y GLOBAL (todas las páginas).
+   El timing de ~2s correspondía al listener `lazyloaded` que re-ejecuta `fixProductCardImages()`.
+2. **Diagnóstico:** los estilos inline en el elemento equivocado no se ven en el HTML servido (los pone
+   el JS en runtime). La pista fue el repro local: el `getComputedStyle`/`style` del `<li>` tenía los
+   estilos de imagen inline. Verificar SIEMPRE el `style` attribute del elemento (no solo del hijo
+   esperado) cuando el JS inyecta estilos inline.
+3. **Regla preventiva:** al construir selectores a partir de una lista con comas, NUNCA concatenar con
+   un descendiente mediante strings. Generar los selectores completos por scope en un array +
+   `.join(', ')`, o usar `closest()`/`matches()` con la lista cuando se parte de un hijo. Añadir un
+   test source-based que PROHIBA el patrón de concatenación (assertStringNotContainsString de
+   `"CARD_SELECTOR + ' ...'"`) y verifique la presencia de los selectores explícitos por scope.
 
 
 

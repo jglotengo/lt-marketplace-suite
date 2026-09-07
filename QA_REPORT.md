@@ -1,11 +1,34 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 2.9.334
-**Report Date:** 2026-09-04
+**Version:** 2.9.346
+**Report Date:** 2026-09-07
 **Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
-**Tester:** Automated CI + Manual Review + 30+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, integrations, core security, financial business-logic, regression, Plaza Viva)
-**Commits:** 1,500+ (HEAD@v2.9.334)
+**Tester:** Automated CI + Manual Review + 30+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
+**Commits:** 1,500+ (HEAD@v2.9.346)
 **Audits completed:** 30+ (all 100% resolved for P0+P1+P2)
+
+---
+
+## 0.5. v2.9.340–346 — Shop/Cart Cards UX cycle (SHOP-CARD-PARITY → CARD-IMG-SELECTOR)
+
+**Scope:** Paridad de las cards de producto entre home (Elementor), /tienda/ (.pv-shop) y /carrito/ vacío (.pv-cart-empty-grid). Breadcrumb duplicado, grid de 5 columnas, markup compacto del loop, botón ATC visible y fix de la regresión global CARD-IMG-SELECTOR.
+**Cycles:** SHOP-CARD-PARITY + SHOP-VENDOR-GATE (v2.9.340), SHOP-PAGE-CLEANUP (v2.9.341), CART-EMPTY-CARD-PARITY (v2.9.342), SHOP-GRID-COLS (v2.9.343), SHOP-CARD-MARKUP (v2.9.344), SHOP-ATC-VISIBLE (v2.9.345), CARD-IMG-SELECTOR (v2.9.346).
+**Bugs cerrados:** 7 hallazgos P1 visuales/funcionales (cards distintas al home, breadcrumb repetido, espacio blanco por clearfix fantasma, botón ATC oculto, botón ATC intermitente, y la regresión global: cards mostraban solo la imagen con la info recortada ~2s).
+**Tests:** 4,891 tests / 10,132 assertions, 0 failures, 3 skips. `ShopCardsHomeParityTest` 10 tests (40 assertions). Todos los fixes verificados con repro local usando los combined CSS/JS reales de SG + deploy manual en SG (OPcache + purge + cache flush + reload) + RE-AUDIT runtime del combined servido.
+**Regresión clave resuelta (CARD-IMG-SELECTOR):** `fixProductCardImages()` concatenaba `CARD_SELECTOR` (lista con comas) con el descendiente de imagen → selector roto que matcheaba los `<li>` y les aplicaba `aspect-ratio:1/1` + `display:block` + `position:static` inline → card cuadrada + contenido recortado por `overflow:hidden` (solo imagen visible). Fix: selectores de imagen explícitos por scope. Lección #158 / REGLA #16.
+
+### 0.5.1 Test Coverage Summary (shop/cart cards)
+
+| Ciclo | Fix | Tests | Asserts |
+|-------|-----|-------|---------|
+| v2.9.340 | SHOP-CARD-PARITY + SHOP-VENDOR-GATE | +4 | — |
+| v2.9.341 | SHOP-PAGE-CLEANUP | +1 | — |
+| v2.9.342 | CART-EMPTY-CARD-PARITY | +3 | — |
+| v2.9.343 | SHOP-GRID-COLS | +1 | — |
+| v2.9.344 | SHOP-CARD-MARKUP | +1 | — |
+| v2.9.345 | SHOP-ATC-VISIBLE | +1 | +4 |
+| v2.9.346 | CARD-IMG-SELECTOR | +1 | +7 |
+| **Total** | `ShopCardsHomeParityTest` | **10** | **40** |
 
 ---
 
