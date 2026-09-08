@@ -684,4 +684,32 @@ class ProductsAuditFixTest extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString( 'if (data.minNights > 1)', $js,
 			'booking-calendar.js no debe conservar la validación antigua data.minNights > 1 (P1-B fix).' );
 	}
+
+	/**
+	 * PANEL-PRODUCTS-NET FIX (2026-09-08): el grid de productos del panel
+	 * (view-products.php) usaba fetch() nativo contra el router ?ltms_ajax=1
+	 * sin el header X-Requested-With que jQuery envía y sin fallback a
+	 * /wp-admin/admin-ajax.php. El WAF de SiteGround puede devolver HTML 403
+	 * en ese caso → r.json() falla → "Error de red." (reportado por Kosmetic
+	 * tras sincronizar catálogo VTEX). El resto del panel usa $.post (con el
+	 * header) y no falla. Fix: enviar el header y reintentar contra
+	 * admin-ajax.php si el primario no devuelve JSON válido.
+	 */
+	public function test_products_grid_has_waf_fallback_and_requested_with_header(): void {
+		$view_path = dirname( __DIR__, 2 ) . '/includes/frontend/views/view-products.php';
+		$this->assertFileExists( $view_path );
+		$src = file_get_contents( $view_path );
+
+		$this->assertStringContainsString( 'PANEL-PRODUCTS-NET FIX (2026-09-08)', $src,
+			'El grid debe documentar el fix PANEL-PRODUCTS-NET.' );
+		$this->assertStringContainsString( "'X-Requested-With': 'XMLHttpRequest'", $src,
+			'El fetch del grid debe enviar el header X-Requested-With (como jQuery).' );
+		$this->assertStringContainsString( "urls.push('/wp-admin/admin-ajax.php')", $src,
+			'El grid debe reintentar contra /wp-admin/admin-ajax.php si el primario falla.' );
+		$this->assertStringContainsString( "function attempt(i) {", $src,
+			'El grid debe implementar el reintento multi-URL (patrón ltmsPostJson).' );
+		// El endpoint consultado debe seguir siendo ltms_get_products_data.
+		$this->assertStringContainsString( "'ltms_get_products_data'", $src,
+			'El grid debe seguir consultando action=ltms_get_products_data.' );
+	}
 }

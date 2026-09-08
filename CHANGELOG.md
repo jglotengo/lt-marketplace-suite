@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-08
 
+### Fixed — `PANEL-PRODUCTS-NET` (el grid de Productos del panel de vendedor mostraba "Error de red." tras sincronizar catálogos grandes)
+
+> Reporte del usuario: el proveedor Kosmetic reporta que después de sincronizar sus productos,
+> en el panel de vendedor (submenú Productos) dice "error de red" y no puede ver los productos.
+
+- **E2E + diagnóstico en SG (2026-09-08):** el handler server-side `ltms_get_products_data`
+  responde correctamente para Kosmetic (usuario 223, 1,892 productos: query 25-31ms por página,
+  JSON `success:true`, total 1892, 79 páginas; count 17ms). El fallo es del lado del navegador:
+  `view-products.php` usaba `fetch()` nativo contra el router `?ltms_ajax=1` SIN el header
+  `X-Requested-With` que jQuery envía por defecto y SIN fallback. El resto del panel usa `$.post`
+  (con ese header) y funciona. El WAF de SG puede devolver HTML 403 (no JSON) ante el POST sin
+  el header → `r.json()` falla → `.catch()` → "Error de red.".
+- **PANEL-PRODUCTS-NET (P1 - resiliencia)** (`includes/frontend/views/view-products.php` +
+  `tests/unit/ProductsAuditFixTest.php`): el fetch del grid ahora envía
+  `X-Requested-With: XMLHttpRequest` (igual que jQuery) y, si el endpoint primario no devuelve
+  JSON válido, reintenta contra `/wp-admin/admin-ajax.php` (patrón `ltmsPostJson` del login,
+  v2.9.347). Solo se reintenta si el primario NO devolvió JSON del backend (un error real del
+  handler no se reintenta).
+- **Verificación:** ProductsAuditFixTest 23 tests / 95 assertions (+1 test / +6 asserts).
+  Smoke test `--filter test_products_grid_has_waf_fallback`: PASS. Suite completa PHPUnit
+  pendiente en deploy. `LTMS_VERSION` → 2.9.352.
+
+---
+
 ### Fixed — `PASSWORD-RESET-DESTINATION` (tras guardar la nueva contraseña, el vendor caía en /panel-vendedor/ sin sesión en vez de en su login)
 
 > Reporte del usuario: "cuando se guarda la nueva contraseña y le das acceder te lleva a una

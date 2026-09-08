@@ -128,13 +128,40 @@ $products_total = (int) wc_get_products( [
             body.append('page', page);
             body.append('per_page', perPage);
             if (searchEl.value.trim()) body.append('search', searchEl.value.trim());
-            fetch(typeof ltmsDashboard !== 'undefined' ? ltmsDashboard.ajax_url : '/wp-admin/admin-ajax.php', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                body: body.toString()
-            }).then(function (r) { return r.json(); }).then(function (resp) {
-                if (!resp.success) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px 0;">Error al cargar productos.</div>'; return; }
+
+            // PANEL-PRODUCTS-NET FIX (2026-09-08): el WAF de SiteGround puede
+            // bloquear el POST al router ?ltms_ajax=1 (HTML 403) cuando la request
+            // no lleva el header X-Requested-With que jQuery envía por defecto —
+            // el resto del panel usa $.post (con ese header) y el grid usaba
+            // fetch() nativo sin él ni fallback. Resultado: "Error de red." en el
+            // grid de Productos tras sincronizar catálogos grandes (Kosmetic).
+            // Fix: enviar el header y, si el primario no devuelve JSON válido,
+            // reintentar contra /wp-admin/admin-ajax.php (patrón ltmsPostJson).
+            var primaryUrl = (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url)
+                ? ltmsDashboard.ajax_url
+                : '/wp-admin/admin-ajax.php';
+            var urls = [primaryUrl];
+            if (urls[urls.length - 1].indexOf('admin-ajax.php') === -1) {
+                urls.push('/wp-admin/admin-ajax.php');
+            }
+            function attempt(i) {
+                if (i >= urls.length) { throw new Error('all_endpoints_failed'); }
+                return fetch(urls[i], {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: body.toString()
+                }).then(function (r) { return r.json().catch(function () { return null; }); })
+                .then(function (resp) {
+                    if (resp && typeof resp.success !== 'undefined') return resp;
+                    return attempt(i + 1);
+                }).catch(function () { return attempt(i + 1); });
+            }
+            attempt(0).then(function (resp) {
+                if (!resp || !resp.success) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px 0;">Error al cargar productos.</div>'; return; }
                 var d = resp.data;
                 totalPages = d.total_pages || 1;
                 if (!d.products.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px 0;">Sin resultados.</div>'; }
