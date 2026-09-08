@@ -1277,6 +1277,18 @@ final class LTMS_Public_Auth_Handler {
             return $redirect_to;
         }
 
+        // PASSWORD-RESET-RETURN + PASSWORD-RESET-DESTINATION FIX (2026-09-08):
+        // WP core aplica login_redirect también al RENDERIZAR el form de reset
+        // (wp-login.php case 'rp'): el resultado va al campo hidden redirect_to
+        // del form y es el destino final tras guardar la contraseña. En ese
+        // flujo el usuario todavía NO está logueado y el redirect_to del email
+        // (/login-vendedor/) debe respetarse. Si forzamos el dashboard aquí, el
+        // vendor cae en /panel-vendedor/ sin sesión -> "Acceso restringido".
+        // Solo forzar dashboard en login normal (usuario ya autenticado).
+        if ( ! is_user_logged_in() ) {
+            return $redirect_to;
+        }
+
         if ( in_array( 'ltms_vendor', (array) $user->roles, true ) ||
              in_array( 'ltms_vendor_premium', (array) $user->roles, true ) ) {
 

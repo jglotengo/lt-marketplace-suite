@@ -199,6 +199,38 @@ final class LoginErrorClarityTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	public function test_reset_form_redirect_respects_email_redirect_to(): void {
+		$src = file_get_contents( self::HANDLER_PATH );
+
+		// PASSWORD-RESET-DESTINATION FIX (2026-09-08): WP core aplica el filtro
+		// login_redirect al RENDERIZAR el form de reset (wp-login.php case 'rp') y
+		// usa el resultado como campo hidden redirect_to -> destino final tras guardar
+		// la contraseña. Antes vendor_login_redirect forzaba /panel-vendedor/ en ese
+		// punto y el vendor caía en el dashboard sin sesión ("Acceso restringido").
+		// El guard is_user_logged_in() distingue: reset (no logueado) respeta el
+		// redirect_to del email; login normal (logueado) sigue forzando dashboard.
+		$pos = strpos( $src, 'public function vendor_login_redirect( string $redirect_to, string $requested, $user ): string' );
+		$this->assertNotFalse( $pos, 'vendor_login_redirect debe existir.' );
+		$block = substr( $src, $pos, 1200 );
+
+		$this->assertStringContainsString(
+			"if ( ! is_user_logged_in() ) {",
+			$block,
+			'PASSWORD-RESET-DESTINATION: vendor_login_redirect debe respetar el redirect_to cuando el usuario no esta logueado (form de reset).'
+		);
+		$this->assertStringContainsString(
+			"return \$redirect_to;",
+			$block,
+			'PASSWORD-RESET-DESTINATION: debe devolver el redirect_to original en el flujo de reset.'
+		);
+		// En login normal (logueado) el dashboard sigue forzándose para vendors.
+		$this->assertStringContainsString(
+			"'ltms-dashboard'] ?? 0",
+			$block,
+			'PASSWORD-RESET-DESTINATION: en login normal el vendor debe seguir yendo al dashboard.'
+		);
+	}
+
 	public function test_lost_password_page_shortcode_and_ajax_registered(): void {
 		$src = file_get_contents( self::HANDLER_PATH );
 

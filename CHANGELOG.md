@@ -6,6 +6,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-08
 
+### Fixed — `PASSWORD-RESET-DESTINATION` (tras guardar la nueva contraseña, el vendor caía en /panel-vendedor/ sin sesión en vez de en su login)
+
+> Reporte del usuario: "cuando se guarda la nueva contraseña y le das acceder te lleva a una
+> página que no es la correcta para el inicio de sesión".
+
+- **PASSWORD-RESET-DESTINATION (P1 - UX)** (`class-ltms-public-auth-handler.php` +
+  `tests/unit/LoginErrorClarityTest.php`): WP core aplica el filtro `login_redirect` también al
+  RENDERIZAR el form de reset (`wp-login.php` case `rp`) y usa el resultado como campo hidden
+  `redirect_to` — que es el destino final tras guardar la contraseña. Nuestro
+  `vendor_login_redirect` (registrado en `login_redirect`) forzaba `/panel-vendedor/` (dashboard)
+  para todo vendor en ese punto, pisando el `redirect_to=/login-vendedor/` del email
+  (PASSWORD-RESET-RETURN). Como tras el reset el usuario NO está logueado, aterrizaba en
+  `/panel-vendedor/` → pantalla "Acceso restringido / Iniciar sesión" en vez del login del vendor.
+  Fix: guard `is_user_logged_in()` en `vendor_login_redirect` — el flujo de reset (no logueado)
+  respeta el `redirect_to` del email; el login normal (logueado) sigue forzando el dashboard.
+  Verificado en SG: `apply_filters('login_redirect', '/login-vendedor/', '', vendor)` ANTES devolvía
+  `/panel-vendedor/` (bug confirmado) → DESPUÉS devuelve `/login-vendedor/`.
+- **Verificación:** LoginErrorClarityTest 16 tests / 55 assertions (+1 test / +4 asserts).
+  Smoke test `--filter test_reset_form_redirect`: PASS. Suite completa PHPUnit pendiente en deploy.
+  `LTMS_VERSION` → 2.9.351.
+
+---
+
 ### Fixed — `LEGACY-CSS` (bloques CSS inertes de features eliminadas)
 
 > Continuación del backlog de auditoría (14 items P2). Se limpió CSS muerto de dos
