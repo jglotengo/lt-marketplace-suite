@@ -19,6 +19,7 @@ $key_to_slug = [
     'ltms-sellers'         => 'sellers',           // landing captación vendedores (M-55)
     'ltms-dashboard'       => 'panel-vendedor',
     'ltms-login'           => 'login-vendedor',
+    'ltms-lost-password'   => 'recuperar-contrasena', // LOST-PASSWORD-PAGE FIX (2026-09-07)
     'ltms-register'        => 'registro-vendedor',  // clave canónica (era ltms-vendor-register)
     'ltms-vendor-register' => 'registro-vendedor',  // alias legacy — mismo slug
     'ltms-store'           => 'tienda',

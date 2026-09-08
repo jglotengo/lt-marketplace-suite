@@ -764,6 +764,15 @@ final class LTMS_Core_Activator {
                 'content' => '[ltms_vendor_login]',
                 'slug'    => 'login-vendedor',
             ],
+            // LOST-PASSWORD-PAGE FIX (2026-09-07): página propia de recuperación de
+            // contraseña con el diseño del login de vendedor. Sin esta página el enlace
+            // "¿Olvidaste tu contraseña?" (form-login.php) caía al fallback de WooCommerce
+            // y el shortcode [ltms_vendor_lost_password] nunca se usaba en producción.
+            'ltms-lost-password'   => [
+                'title'   => 'Recuperar Contraseña',
+                'content' => '[ltms_vendor_lost_password]',
+                'slug'    => 'recuperar-contrasena',
+            ],
             'ltms-store'           => [
                 'title'   => 'Tienda del Vendedor',
                 'content' => '[ltms_vendor_store]',

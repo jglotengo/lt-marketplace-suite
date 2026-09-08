@@ -37,6 +37,11 @@ final class LTMS_Public_Auth_Handler {
         add_shortcode( 'ltms_vendor_login',     [ $instance, 'render_login_form' ] );
         add_shortcode( 'ltms_vendor_register',  [ $instance, 'render_register_form' ] );
         add_shortcode( 'ltms_sellers_landing',  [ $instance, 'render_sellers_landing' ] );
+        // LOST-PASSWORD-PAGE FIX (2026-09-07): pagina propia de recuperacion de
+        // contrasena con el diseno del login de vendedor. Antes el enlace
+        // "¿Olvidaste tu contraseña?" llevaba a /mi-cuenta/lost-password/ (WooCommerce),
+        // un form desnudo sin opciones ni coherencia visual con el login LTMS.
+        add_shortcode( 'ltms_vendor_lost_password', [ $instance, 'render_lost_password_form' ] );
 
         // AJAX handlers. M-57: registrar también la variante priv para que admins
         // (y otros roles no-vendor) puedan probar el flujo desde wp-admin sin obtener
@@ -55,6 +60,10 @@ final class LTMS_Public_Auth_Handler {
         add_action( 'wp_ajax_ltms_vendor_login',           [ $instance, 'ajax_vendor_login' ] );
         add_action( 'wp_ajax_nopriv_ltms_vendor_register', [ $instance, 'ajax_vendor_register' ] );
         add_action( 'wp_ajax_ltms_vendor_register',        [ $instance, 'ajax_vendor_register' ] );
+        // LOST-PASSWORD-PAGE FIX (2026-09-07): endpoint de recuperacion de contrasena.
+        // Mismo nonce ltms_auth_nonce que login/registro (el JS pide nonce fresco).
+        add_action( 'wp_ajax_nopriv_ltms_vendor_lost_password', [ $instance, 'ajax_vendor_lost_password' ] );
+        add_action( 'wp_ajax_ltms_vendor_lost_password',        [ $instance, 'ajax_vendor_lost_password' ] );
         add_action( 'wp_ajax_ltms_vendor_logout',          [ $instance, 'ajax_vendor_logout' ] );
         // v2.9.60 MISSING-08: Endpoint para reenviar email de verificación.
         add_action( 'wp_ajax_ltms_resend_verification',    [ $instance, 'ajax_resend_verification' ] );
@@ -175,6 +184,7 @@ final class LTMS_Public_Auth_Handler {
             'ltms_sellers_landing',
             'ltms_vendor_register',
             'ltms_vendor_login',
+            'ltms_vendor_lost_password',
             'ltms_vendor_dashboard',
         ];
 
@@ -275,6 +285,74 @@ final class LTMS_Public_Auth_Handler {
                 . '</p></div>';
         }
         return ob_get_clean();
+    }
+
+    /**
+     * LOST-PASSWORD-PAGE FIX (2026-09-07): shortcode [ltms_vendor_lost_password].
+     * Pagina propia de recuperacion de contrasena con el diseno del login de
+     * vendedor (antes iba a /mi-cuenta/lost-password/ de WooCommerce, un form
+     * desnudo). El form se procesa via ajax_vendor_lost_password() y en exito
+     * muestra la pantalla "Revisa tu correo" con opcion de reenviar.
+     *
+     * @param array $atts Atributos del shortcode.
+     * @return string
+     */
+    public function render_lost_password_form( array $atts = [] ): string {
+        // No cachear esta pagina: el form se envia con nonce (mismo patron que
+        // render_login_form) y una pagina cacheada con nonce stale romperia el envio.
+        nocache_headers();
+
+        // Usuario ya logueado (vendor) no necesita recuperar contrasena.
+        if ( is_user_logged_in() && $this->current_user_is_vendor() ) {
+            return $this->render_already_logged_in();
+        }
+
+        ob_start();
+        $view = LTMS_INCLUDES_DIR . 'frontend/views/vendor-parts/form-lost-password.php';
+        if ( file_exists( $view ) ) {
+            include $view;
+        } else {
+            echo '<div class="ltms-notice ltms-notice-error"><p>'
+                . esc_html__( 'Error: plantilla de recuperación no encontrada. Contacta al soporte.', 'ltms' )
+                . '</p></div>';
+        }
+        return ob_get_clean();
+    }
+
+    /**
+     * LOST-PASSWORD-PAGE FIX (2026-09-07): AJAX de recuperacion de contrasena.
+     * Llama retrieve_password() con el identificador (email o username). La
+     * respuesta es GENERICA ("si la cuenta existe, revisa tu email") para no
+     * enumerar cuentas, incluso si el email no existe.
+     *
+     * @return void
+     */
+    public function ajax_vendor_lost_password(): void {
+        if ( ! check_ajax_referer( 'ltms_auth_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'La sesión expiró. Recarga la página e inténtalo de nuevo.', 'ltms' ) ], 403 );
+        }
+
+        // Rate limit por IP (3 solicitudes / 15 min) — evita email-bombing de
+        // retrieve_password(). Mismo patron que el login/register throttle.
+        $ip           = LTMS_Core_Security::get_client_ip_safe();
+        $limit_key    = 'ltms_lostpw_' . md5( $ip );
+        $current      = (int) get_transient( $limit_key );
+        if ( $current >= 3 ) {
+            wp_send_json_error( [ 'message' => __( 'Demasiadas solicitudes. Espera 15 minutos e inténtalo de nuevo.', 'ltms' ) ], 429 );
+        }
+        set_transient( $limit_key, $current + 1, 15 * MINUTE_IN_SECONDS );
+
+        $identifier = sanitize_text_field( wp_unslash( $_POST['email'] ?? '' ) ); // phpcs:ignore
+        if ( empty( $identifier ) ) {
+            wp_send_json_error( [ 'message' => __( 'Ingresa tu email o usuario.', 'ltms' ) ] );
+        }
+
+        // Respuesta generica sin importar el resultado: no revelar si la cuenta
+        // existe (anti-enumeracion). retrieve_password() internamente ya envia el
+        // email solo si la cuenta existe.
+        retrieve_password( $identifier );
+
+        wp_send_json_success( [ 'message' => __( 'Si la cuenta existe, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada y la carpeta de spam.', 'ltms' ) ] );
     }
 
     /**

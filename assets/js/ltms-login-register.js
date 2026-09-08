@@ -223,6 +223,104 @@
     }
 
     // ════════════════════════════════════════════════════════════════
+    // LOST-PASSWORD-PAGE FIX (2026-09-07): handler del form de recuperacion
+    // de contrasena (#ltms-lost-password-form). Usa nonce fresco (mismo
+    // helper del login), POST a ltms_auth_nonce endpoint y en exito muestra
+    // la pantalla "Revisa tu correo" con opcion de reenviar.
+    // ════════════════════════════════════════════════════════════════
+    var lostPasswordForm = document.getElementById('ltms-lost-password-form');
+    if (lostPasswordForm) {
+        var lostNotice = document.getElementById('ltms-lost-password-notice');
+        var lostSuccess = document.getElementById('ltms-lost-password-success');
+        var lostSuccessMsg = document.getElementById('ltms-lost-password-success-msg');
+
+        function showLostNotice(message, type) {
+            if (!lostNotice) return;
+            lostNotice.className = 'ltms-notice ltms-notice-' + (type || 'info');
+            lostNotice.innerHTML = '<p>' + message + '</p>';
+            lostNotice.style.display = 'block';
+        }
+
+        function setLostButton(btn, busy) {
+            if (!btn) return;
+            var txt = btn.querySelector('.ltms-btn-text, .ltms-resend-btn-text');
+            var spin = btn.querySelector('.ltms-btn-spinner, .ltms-resend-btn-spinner');
+            btn.disabled = busy;
+            if (txt) txt.style.display = busy ? 'none' : '';
+            if (spin) spin.style.display = busy ? 'inline-block' : 'none';
+        }
+
+        function lostSubmit(email) {
+            var btn = document.getElementById('ltms-lost-password-btn');
+            setLostButton(btn, true);
+            if (lostNotice) lostNotice.style.display = 'none';
+            return ltmsGetAuthNonce().then(function (nonce) {
+                var body = new FormData();
+                body.append('action', 'ltms_vendor_lost_password');
+                body.append('email', email);
+                body.append('nonce', nonce);
+                var urls = [];
+                if (typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) urls.push(ltmsAuth.ajax_url);
+                urls.push('/wp-admin/admin-ajax.php');
+                return ltmsPostJson(urls, body);
+            }).then(function (data) {
+                setLostButton(btn, false);
+                if (!data) {
+                    showLostNotice('Error de conexión. Intenta de nuevo.', 'error');
+                    return;
+                }
+                if (data.success) {
+                    var msg = (data.data && data.data.message) ? data.data.message : '';
+                    if (lostSuccessMsg && msg) lostSuccessMsg.textContent = msg;
+                    if (lostPasswordForm) lostPasswordForm.style.display = 'none';
+                    if (lostSuccess) lostSuccess.style.display = 'block';
+                } else {
+                    var emsg = 'Ocurrió un error. Intenta de nuevo.';
+                    if (data.data) {
+                        if (typeof data.data === 'string') emsg = data.data;
+                        else if (data.data.message) emsg = data.data.message;
+                    }
+                    showLostNotice(emsg, 'error');
+                }
+            });
+        }
+
+        lostPasswordForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var emailInput = document.getElementById('ltms-lost-password-email');
+            if (!emailInput || !emailInput.value.trim()) {
+                showLostNotice('Ingresa tu email o usuario.', 'error');
+                return;
+            }
+            lostSubmit(emailInput.value.trim());
+        });
+
+        var resendBtn = document.getElementById('ltms-lost-password-resend');
+        if (resendBtn) {
+            resendBtn.addEventListener('click', function () {
+                var emailInput = document.getElementById('ltms-lost-password-email');
+                var email = emailInput ? emailInput.value.trim() : '';
+                setLostButton(resendBtn, true);
+                ltmsGetAuthNonce().then(function (nonce) {
+                    var body = new FormData();
+                    body.append('action', 'ltms_vendor_lost_password');
+                    body.append('email', email);
+                    body.append('nonce', nonce);
+                    var urls = [];
+                    if (typeof ltmsAuth !== 'undefined' && ltmsAuth.ajax_url) urls.push(ltmsAuth.ajax_url);
+                    urls.push('/wp-admin/admin-ajax.php');
+                    return ltmsPostJson(urls, body);
+                }).then(function (data) {
+                    setLostButton(resendBtn, false);
+                    var msg = (data && data.data && data.data.message) ? data.data.message
+                        : 'Te reenviamos el enlace. Revisa tu correo.';
+                    if (lostSuccessMsg) lostSuccessMsg.textContent = msg;
+                });
+            });
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // 4. UX-REG-01 FIX: Wizard navigation handler (registration page only).
     // ════════════════════════════════════════════════════════════════
     var form = document.getElementById('ltms-register-form');

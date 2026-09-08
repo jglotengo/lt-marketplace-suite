@@ -193,10 +193,17 @@ if ( current_user_can( 'manage_options' ) && class_exists( 'LTMS_Google_OAuth' )
                 <?php esc_html_e( 'Recordarme', 'ltms' ); ?>
             </label>
             <?php
-            $ltms_pages_login    = get_option( 'ltms_installed_pages', [] );
-            $ltms_login_page_id  = $ltms_pages_login['ltms-login'] ?? 0;
-            $ltms_login_self_url = $ltms_login_page_id ? get_permalink( $ltms_login_page_id ) : home_url( '/login-vendedor/' );
-            $lost_password_url   = wp_lostpassword_url( $ltms_login_self_url );
+            $ltms_pages_login      = get_option( 'ltms_installed_pages', [] );
+            $ltms_login_page_id    = $ltms_pages_login['ltms-login'] ?? 0;
+            $ltms_login_self_url   = $ltms_login_page_id ? get_permalink( $ltms_login_page_id ) : home_url( '/login-vendedor/' );
+            // LOST-PASSWORD-PAGE FIX (2026-09-07): el enlace "¿Olvidaste tu
+            // contraseña?" ahora va a la pagina propia de recuperacion de LTMS
+            // (diseno del login de vendedor, form + pantalla "Revisa tu correo").
+            // Fallback a la pagina de WooCommerce si la pagina LTMS no existe.
+            $ltms_lost_password_id = $ltms_pages_login['ltms-lost-password'] ?? 0;
+            $lost_password_url     = $ltms_lost_password_id
+                ? get_permalink( $ltms_lost_password_id )
+                : wp_lostpassword_url( $ltms_login_self_url );
             ?>
             <a href="<?php echo esc_url( $lost_password_url ); ?>" class="ltms-forgot-link">
                 <?php esc_html_e( '¿Olvidaste tu contraseña?', 'ltms' ); ?>

@@ -4,6 +4,36 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-08
+
+### Fixed — `LOST-PASSWORD-PAGE` (página propia de recuperación de contraseña con el diseño del login de vendedor)
+
+> Continuación del reporte: auditar el proceso de recuperación de contraseña. Los ciclos
+> `PASSWORD-RESET-RETURN` (v2.9.348) y `LOGIN-NONCE-FRESH` (v2.9.347) ya cerraron el flujo
+> funcional; este ciclo cierra el gap de UX: antes el enlace "¿Olvidaste tu contraseña?" llevaba
+> a `/mi-cuenta/lost-password/` de WooCommerce (un form desnudo sin coherencia visual con el
+> login LTMS).
+
+- **LOST-PASSWORD-PAGE (P2 - UX)** (`class-ltms-public-auth-handler.php`, `form-lost-password.php`
+  nuevo, `form-login.php`, `class-ltms-frontend-assets.php`, `ltms-login-register.js` + `.min`):
+  página propia de recuperación `[ltms_vendor_lost_password]` con el diseño del login de vendedor.
+  El form se procesa vía AJAX (`ajax_vendor_lost_password`) con nonce fresco, rate-limit por IP
+  (3 solicitudes / 15 min, anti email-bombing) y respuesta genérica "si la cuenta existe, revisa
+  tu email" (anti-enumeración de cuentas). En éxito muestra la pantalla "Revisa tu correo" con
+  opción de reenviar. El enlace del login apunta a la página LTMS con fallback a WooCommerce si
+  la página no existe. La página entra al bypass de template (`maybe_serve_sellers_template` +
+  `template-sellers-page.php`) que enqueue el JS con nonce localizado.
+- **Gap de infra cerrado:** `LTMS_Activator::create_required_pages()` no creaba la página
+  `ltms-lost-password` → `ltms_installed_pages['ltms-lost-password']` siempre era 0 y el enlace
+  caía al fallback de WooCommerce (shortcode nunca usado en producción). Ahora la crea
+  (`Recuperar Contraseña`, slug `recuperar-contrasena`) y `bin/ltms-repair-pages.php` +
+  `html-admin-pages.php` la mapean/registran para recreación manual.
+- **Verificación:** LoginErrorClarityTest 12 tests / 45 assertions (6 tests nuevos
+  LOST-PASSWORD-PAGE). Smoke test `--filter LoginErrorClarityTest`: 12/12 PASS. Suite completa
+  PHPUnit pendiente en deploy. `LTMS_VERSION` → 2.9.349.
+
+---
+
 ## [Unreleased] — 2026-09-06
 
 ### Fixed — `PASSWORD-RESET-RETURN` (tras restablecer la contraseña, el vendedor volvía a wp-login.php en vez de a /login-vendedor/)

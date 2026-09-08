@@ -13,6 +13,7 @@ $required_pages = [
     'ltms-vendor-register' => [ 'title' => __( 'Registro de Vendedor',      'ltms' ), 'slug' => 'registro-vendedor',    'icon' => '📝' ],
     'ltms-dashboard'       => [ 'title' => __( 'Panel del Vendedor',        'ltms' ), 'slug' => 'panel-vendedor',       'icon' => '📊' ],
     'ltms-login'           => [ 'title' => __( 'Iniciar Sesion',            'ltms' ), 'slug' => 'login-vendedor',       'icon' => '🔐' ],
+    'ltms-lost-password'   => [ 'title' => __( 'Recuperar Contrasena',      'ltms' ), 'slug' => 'recuperar-contrasena',  'icon' => '🔑' ],
     'ltms-store'           => [ 'title' => __( 'Tienda del Vendedor',       'ltms' ), 'slug' => 'tienda',               'icon' => '🏪' ],
     'ltms-orders'          => [ 'title' => __( 'Mis Pedidos',               'ltms' ), 'slug' => 'mis-pedidos',          'icon' => '📦' ],
     'ltms-wallet'          => [ 'title' => __( 'Mi Billetera',              'ltms' ), 'slug' => 'mi-billetera',         'icon' => '💳' ],
@@ -152,7 +153,7 @@ $ok      = $total - $missing_count;
             <?php endif; ?>
         </form>
         <p style="margin-top:10px;font-size:0.8rem;color:#9ca3af;">
-            <?php esc_html_e( 'LTMS crea estas 10 páginas automáticamente al activarse. Si alguna fue borrada, usa el botón para recrearla. Las páginas Mis Reservas y RNT / Turismo se crearon en la versión 2.8.0 — si no aparecen como "Existe", haz clic en Recrear.', 'ltms' ); ?>
+            <?php esc_html_e( 'LTMS crea estas páginas automáticamente al activarse. Si alguna fue borrada, usa el botón para recrearla. Las páginas Mis Reservas, RNT / Turismo y Recuperar Contraseña se crearon en versiones posteriores — si no aparecen como "Existe", haz clic en Recrear.', 'ltms' ); ?>
         </p>
     </div>
 

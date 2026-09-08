@@ -28,6 +28,10 @@ final class LoginErrorClarityTest extends LTMS_Unit_Test_Case {
 	private const HANDLER_PATH = __DIR__ . '/../../includes/frontend/class-ltms-public-auth-handler.php';
 	private const JS_PATH      = __DIR__ . '/../../assets/js/ltms-login-register.js';
 	private const FORM_LOGIN   = __DIR__ . '/../../includes/frontend/views/vendor-parts/form-login.php';
+	private const FORM_LOST_PASSWORD = __DIR__ . '/../../includes/frontend/views/vendor-parts/form-lost-password.php';
+	private const ACTIVATOR_PATH     = __DIR__ . '/../../includes/core/services/class-ltms-activator.php';
+	private const ADMIN_PAGES_PATH   = __DIR__ . '/../../includes/admin/views/html-admin-pages.php';
+	private const REPAIR_PAGES_PATH  = __DIR__ . '/../../bin/ltms-repair-pages.php';
 
 	public function test_login_nonce_failure_returns_clear_json_error(): void {
 		$src = file_get_contents( self::HANDLER_PATH );
@@ -192,6 +196,185 @@ final class LoginErrorClarityTest extends LTMS_Unit_Test_Case {
 			"'redirect_to=' . rawurlencode( \$login_url )",
 			$src,
 			'PASSWORD-RESET-RETURN: debe anexar redirect_to=<login_url> al link de reset.'
+		);
+	}
+
+	public function test_lost_password_page_shortcode_and_ajax_registered(): void {
+		$src = file_get_contents( self::HANDLER_PATH );
+
+		// LOST-PASSWORD-PAGE (2026-09-07): pagina propia de recuperacion con diseno
+		// del login de vendedor (antes iba a /mi-cuenta/lost-password/ de WooCommerce).
+		$this->assertStringContainsString(
+			"add_shortcode( 'ltms_vendor_lost_password', [ \$instance, 'render_lost_password_form' ] );",
+			$src,
+			'LOST-PASSWORD-PAGE: debe registrarse el shortcode ltms_vendor_lost_password.'
+		);
+		$this->assertStringContainsString(
+			"'wp_ajax_nopriv_ltms_vendor_lost_password', [ \$instance, 'ajax_vendor_lost_password' ]",
+			$src,
+			'LOST-PASSWORD-PAGE: el AJAX de recuperacion debe registrarse para nopriv.'
+		);
+		$this->assertStringContainsString(
+			"'wp_ajax_ltms_vendor_lost_password',        [ \$instance, 'ajax_vendor_lost_password' ]",
+			$src,
+			'LOST-PASSWORD-PAGE: el AJAX de recuperacion debe registrarse para priv.'
+		);
+		// La pagina debe renderizarse con el bypass de template de Hello Elementor.
+		$this->assertStringContainsString(
+			"'ltms_vendor_lost_password',",
+			$src,
+			'LOST-PASSWORD-PAGE: la pagina debe entrar en maybe_serve_sellers_template.'
+		);
+		// El render no debe cachearse (nonce fresco).
+		$this->assertStringContainsString(
+			'public function render_lost_password_form( array $atts = [] ): string',
+			$src,
+			'LOST-PASSWORD-PAGE: debe existir render_lost_password_form.'
+		);
+		$this->assertStringContainsString(
+			'nocache_headers();',
+			$src,
+			'LOST-PASSWORD-PAGE: el render debe enviar nocache_headers() (nonce fresco).'
+		);
+	}
+
+	public function test_lost_password_ajax_uses_generic_response_no_enumeration(): void {
+		$src = file_get_contents( self::HANDLER_PATH );
+
+		$pos = strpos( $src, 'public function ajax_vendor_lost_password(): void' );
+		$this->assertNotFalse( $pos, 'ajax_vendor_lost_password debe existir.' );
+		$block = substr( $src, $pos, 1600 );
+
+		$this->assertStringContainsString(
+			"check_ajax_referer( 'ltms_auth_nonce', 'nonce', false )",
+			$block,
+			'LOST-PASSWORD-PAGE: el AJAX debe verificar el nonce ltms_auth_nonce.'
+		);
+		$this->assertStringContainsString(
+			'retrieve_password( $identifier );',
+			$block,
+			'LOST-PASSWORD-PAGE: debe llamar retrieve_password() con el identificador.'
+		);
+		$this->assertStringContainsString(
+			'Si la cuenta existe, te enviamos un enlace',
+			$block,
+			'LOST-PASSWORD-PAGE: la respuesta debe ser generica (sin enumerar cuentas).'
+		);
+		// Rate limit por IP (evita email-bombing).
+		$this->assertStringContainsString(
+			"'ltms_lostpw_' . md5( \$ip )",
+			$block,
+			'LOST-PASSWORD-PAGE: debe existir rate limit por IP.'
+		);
+	}
+
+	public function test_lost_password_view_has_form_and_success_screen(): void {
+		$src = file_get_contents( self::FORM_LOST_PASSWORD );
+
+		$this->assertStringContainsString(
+			'id="ltms-lost-password-form"',
+			$src,
+			'LOST-PASSWORD-PAGE: la vista debe tener el form de recuperacion.'
+		);
+		$this->assertStringContainsString(
+			'id="ltms-lost-password-email"',
+			$src,
+			'LOST-PASSWORD-PAGE: la vista debe tener el campo email/usuario.'
+		);
+		$this->assertStringContainsString(
+			'id="ltms-lost-password-success"',
+			$src,
+			'LOST-PASSWORD-PAGE: la vista debe tener la pantalla de exito.'
+		);
+		$this->assertStringContainsString(
+			'id="ltms-lost-password-resend"',
+			$src,
+			'LOST-PASSWORD-PAGE: la vista debe tener el boton de reenviar.'
+		);
+		$this->assertStringContainsString(
+			'ltms-auth-card',
+			$src,
+			'LOST-PASSWORD-PAGE: la vista debe usar el diseno del login de vendedor.'
+		);
+	}
+
+	public function test_lost_password_js_handler_present(): void {
+		$src = file_get_contents( self::JS_PATH );
+
+		$this->assertStringContainsString(
+			"document.getElementById('ltms-lost-password-form')",
+			$src,
+			'LOST-PASSWORD-PAGE: el JS debe enganchar el form de recuperacion.'
+		);
+		$this->assertStringContainsString(
+			"'action', 'ltms_vendor_lost_password'",
+			$src,
+			'LOST-PASSWORD-PAGE: el JS debe enviar action=ltms_vendor_lost_password.'
+		);
+		$this->assertStringContainsString(
+			'ltmsGetAuthNonce()',
+			$src,
+			'LOST-PASSWORD-PAGE: el JS debe usar nonce fresco.'
+		);
+	}
+
+	public function test_login_forgot_link_points_to_ltms_page(): void {
+		$src = file_get_contents( self::FORM_LOGIN );
+
+		$this->assertStringContainsString(
+			"['ltms-lost-password'] ?? 0",
+			$src,
+			'LOST-PASSWORD-PAGE: el enlace "¿Olvidaste tu contraseña?" debe apuntar a la pagina LTMS (ltms-lost-password).'
+		);
+		$this->assertStringContainsString(
+			'ltms-forgot-link',
+			$src,
+			'LOST-PASSWORD-PAGE: el enlace del login debe conservar la clase ltms-forgot-link.'
+		);
+	}
+
+	public function test_lost_password_page_created_by_activator(): void {
+		$src = file_get_contents( self::ACTIVATOR_PATH );
+
+		$this->assertStringContainsString(
+			"'ltms-lost-password'   => [",
+			$src,
+			'LOST-PASSWORD-PAGE: create_required_pages() debe crear la pagina ltms-lost-password.'
+		);
+		$this->assertStringContainsString(
+			"[ltms_vendor_lost_password]",
+			$src,
+			'LOST-PASSWORD-PAGE: la pagina debe contener el shortcode ltms_vendor_lost_password.'
+		);
+		$this->assertStringContainsString(
+			"'slug'    => 'recuperar-contrasena'",
+			$src,
+			'LOST-PASSWORD-PAGE: el slug de la pagina debe ser recuperar-contrasena.'
+		);
+	}
+
+	public function test_lost_password_page_registered_in_admin_pages_panel(): void {
+		$src = file_get_contents( self::ADMIN_PAGES_PATH );
+
+		$this->assertStringContainsString(
+			"'ltms-lost-password'   => [",
+			$src,
+			'LOST-PASSWORD-PAGE: el panel de paginas del admin debe listar ltms-lost-password.'
+		);
+		$this->assertStringContainsString(
+			'recuperar-contrasena',
+			$src,
+			'LOST-PASSWORD-PAGE: el panel de paginas del admin debe mapear el slug recuperar-contrasena.'
+		);
+	}
+
+	public function test_lost_password_page_mapped_in_repair_script(): void {
+		$src = file_get_contents( self::REPAIR_PAGES_PATH );
+
+		$this->assertStringContainsString(
+			"'ltms-lost-password'   => 'recuperar-contrasena'",
+			$src,
+			'LOST-PASSWORD-PAGE: bin/ltms-repair-pages.php debe mapear ltms-lost-password -> recuperar-contrasena.'
 		);
 	}
 }
