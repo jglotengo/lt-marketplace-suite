@@ -26,6 +26,7 @@ class PromoPopupRemovalTest extends LTMS_Unit_Test_Case {
 
 	private const BRANDING_ENGINE_PATH = __DIR__ . '/../../includes/frontend/class-ltms-branding-engine.php';
 	private const SALES_BOOSTER_PATH   = __DIR__ . '/../../includes/business/class-ltms-sales-booster.php';
+	private const VENDOR_STOREFRONT_PATH = __DIR__ . '/../../includes/frontend/class-ltms-vendor-storefront.php';
 
 	public function test_branding_engine_file_exists(): void {
 		$this->assertFileExists( self::BRANDING_ENGINE_PATH );
@@ -68,6 +69,41 @@ class PromoPopupRemovalTest extends LTMS_Unit_Test_Case {
 
 		$this->assertStringContainsString( 'REMOVE-PROMO-POPUP-001 FIX', $branding );
 		$this->assertStringContainsString( 'REMOVE-PROMO-POPUP-001 FIX', $booster );
+	}
+
+	public function test_social_proof_toast_css_removed(): void {
+		$source = file_get_contents( self::BRANDING_ENGINE_PATH );
+
+		// LEGACY-CSS FIX (2026-09-08): el bloque "PRUEBA SOCIAL: toast slide-in"
+		// (.ltms-social-proof-toast + @keyframes ltms-slide-in-left) es CSS muerto
+		// — los toasts de social proof fueron eliminados (REMOVE-PROMO-POPUP-001) y
+		// el JS que los creaba quedó con early return. Sin consumidor, no debe existir
+		// como regla CSS (el comentario de trazabilidad sí puede nombrar la clase).
+		$this->assertStringNotContainsString(
+			'.ltms-social-proof-toast {',
+			$source,
+			'El selector .ltms-social-proof-toast es CSS inerte (social proof eliminado).'
+		);
+		$this->assertStringNotContainsString(
+			'@keyframes ltms-slide-in-left',
+			$source,
+			'El keyframe ltms-slide-in-left solo lo usaba el toast de social proof eliminado.'
+		);
+	}
+
+	public function test_welcome_banner_selector_removed_from_storefront(): void {
+		$source = file_get_contents( self::VENDOR_STOREFRONT_PATH );
+
+		// LEGACY-CSS FIX (2026-09-08): el selector body.ltms-storefront-page
+		// #ltms-welcome-banner ocultaba el banner de bienvenida ya eliminado
+		// (REMOVE-PROMO-POPUP-001). Su selector no matchea nada y se removió
+		// del bloque HEADER OVERLAP FIX (el comentario de trazabilidad sí lo
+		// nombra; la regla CSS no debe existir).
+		$this->assertStringNotContainsString(
+			'body.ltms-storefront-page #ltms-welcome-banner',
+			$source,
+			'El selector #ltms-welcome-banner es CSS inerte (banner eliminado).'
+		);
 	}
 
 	public function test_social_proof_ajax_endpoint_removed(): void {

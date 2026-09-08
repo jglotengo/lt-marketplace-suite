@@ -6,6 +6,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-08
 
+### Fixed — `LEGACY-CSS` (bloques CSS inertes de features eliminadas)
+
+> Continuación del backlog de auditoría (14 items P2). Se limpió CSS muerto de dos
+> features eliminadas en REMOVE-PROMO-POPUP-001 (2026-09-04).
+
+- **LEGACY-CSS (P2 - limpieza)** (`class-ltms-branding-engine.php`,
+  `class-ltms-vendor-storefront.php`, `tests/unit/PromoPopupRemovalTest.php`):
+  1. Bloque "PRUEBA SOCIAL: toast slide-in" (`.ltms-social-proof-toast` +
+     `@keyframes ltms-slide-in-left`) en el CSS inline de mental triggers: los toasts de
+     social proof fueron eliminados (REMOVE-PROMO-POPUP-001) y el JS que los creaba
+     quedó con early return — CSS sin consumidor. Eliminado.
+  2. Selector `body.ltms-storefront-page #ltms-welcome-banner` del bloque HEADER
+     OVERLAP FIX en la vitrina: el banner de bienvenida fue eliminado y el selector
+     no matcheaba nada. Eliminado + comentario actualizado.
+  - **NO se tocó** el bloque defensivo de `ltms-frontend-extensions.css` (v2.9.278/283)
+    que oculta popups de social proof de terceros (`[class*="social-proof"]`,
+    NotificationX, Fomo, TrustPulse, etc.) — es defensa activa, no CSS inerte.
+- **Verificación:** PromoPopupRemovalTest 11 tests / 25 assertions (+2 tests / +2 asserts).
+  Smoke test `--filter PromoPopupRemovalTest`: 11/11 PASS. Suite completa PHPUnit pendiente
+  en deploy. `LTMS_VERSION` → 2.9.350.
+
+---
+
+## [Unreleased] — 2026-09-08
+
 ### Fixed — `LOST-PASSWORD-PAGE` (página propia de recuperación de contraseña con el diseño del login de vendedor)
 
 > Continuación del reporte: auditar el proceso de recuperación de contraseña. Los ciclos

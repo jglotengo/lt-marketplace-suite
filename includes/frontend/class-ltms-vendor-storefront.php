@@ -486,15 +486,15 @@ window.elementor=window.elementor||{modules:{}};
    1. #ltms-floating-access (ltms-header-nav.js) — botones VENDER / MI CUENTA
       con position:fixed z-index:99997, se appenda a <body> cuando no hay
       .site-header del tema.
-   2. #ltms-welcome-banner — banner azul "¡Bienvenido!" con position:fixed
-      z-index:99999 top:0, tapa la storefront topbar (z-index:9999).
-   Solución: ocultar ambos en la vitrina (la vitrina tiene su propio topbar
-   con logo, volver y carrito), más selectores del tema por defensa. */
+   Solución: ocultar el acceso flotante en la vitrina (la vitrina tiene su
+   propio topbar con logo, volver y carrito), más selectores del tema por
+   defensa. LEGACY-CSS FIX (2026-09-08): #ltms-welcome-banner se removió —
+   el banner fue eliminado (REMOVE-PROMO-POPUP-001) y su selector no
+   matcheaba nada. */
 body.ltms-storefront-page #ltms-floating-access,
 body.ltms-storefront-page #ltms-hello-access,
 body.ltms-storefront-page #ltms-header-access,
 body.ltms-storefront-page .ltms-header-access,
-body.ltms-storefront-page #ltms-welcome-banner,
 body.ltms-storefront-page .ltms-live-chat-header,
 body.ltms-storefront-page .ltms-live-chat-header-info,
 body.ltms-storefront-page .whb-header,

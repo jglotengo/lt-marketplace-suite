@@ -412,15 +412,6 @@ class LTMS_Branding_Engine {
         .ltms-scarcity-bar.low { background: var(--ltms-color-danger); animation: ltms-scarcity-blink 1s infinite; }
         @keyframes ltms-scarcity-blink { 50% { opacity: 0.5; } }
 
-        /* PRUEBA SOCIAL: toast slide-in */
-        .ltms-social-proof-toast {
-            animation: ltms-slide-in-left 0.4s cubic-bezier(0.68,-0.55,0.265,1.55);
-        }
-        @keyframes ltms-slide-in-left {
-            from { transform: translateX(-120%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
         /* AUTORIDAD: badge con check verde */
         .ltms-authority-badge {
             display: inline-flex;
@@ -582,8 +573,9 @@ class LTMS_Branding_Engine {
     // REMOVE-PROMO-POPUP-001 FIX: el banner "10% off en tu primera compra"
     // (render_welcome_discount_banner + hook wp_footer pri 5) se elimino
     // el 2026-09-04 a peticion del negocio. El CSS legacy que lo ocultaba
-    // (class-ltms-vendor-storefront.php #ltms-welcome-banner) quedo inerte.
-    // No re-implementar.
+    // (class-ltms-vendor-storefront.php #ltms-welcome-banner) y el bloque de
+    // social proof (.ltms-social-proof-toast) se limpiaron en LEGACY-CSS FIX
+    // (2026-09-08). No re-implementar.
 
     // ================================================================
     // BR-8: ANCLAJE — SAVINGS DISPLAY EN PDP.
