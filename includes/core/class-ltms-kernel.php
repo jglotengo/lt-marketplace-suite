@@ -988,6 +988,12 @@ final class LTMS_Core_Kernel {
         if ( class_exists( 'LTMS_Frontend_Assets' ) ) {
             LTMS_Frontend_Assets::init();
         }
+        // HOME-SLIDER FIX (2026-09-08): carrusel de banners del home gestionado
+        // por LTMS (reemplaza el widget Slides de Elementor). Admin panel en
+        // LT Marketplace → Home Slider.
+        if ( class_exists( 'LTMS_Frontend_Home_Slider' ) ) {
+            LTMS_Frontend_Home_Slider::init();
+        }
         if ( class_exists( 'LTMS_Dashboard_Logic' ) ) {
             LTMS_Dashboard_Logic::init();
         }

@@ -6,6 +6,35 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-08
 
+### Feat — `HOME-SLIDER` (carrusel de banners del home gestionado por LTMS, reemplaza el widget Slides de Elementor)
+
+> Reporte del usuario: el banner rotador del home (div.swiper-slide-inner, widget "Slides" de
+> Elementor sobre Swiper.js) debe poder actualizarse cargando imágenes con las dimensiones
+> correctas, para móvil y escritorio, sin depender de Elementor — gestión 100% del plugin.
+
+- **Estado previo:** el home es una página de Elementor (ID 30). El slider usa el widget "Slides"
+  (Swiper.js) con 3 slides (OFERTAS / A JUGAR / DEPORTES, autoplay 5s, flechas, CTA). El plugin
+  no tenía slider propio; `ltms_home_template_enabled` no está seteado (el template home.php
+  nativo no se usa). El padding `50px 100px` de `.swiper-slide-inner` causa recorte en móvil.
+- **HOME-SLIDER (feat)** (`includes/frontend/class-ltms-frontend-home-slider.php` nuevo,
+  `includes/admin/views/html-admin-home-slider.php` nuevo, `assets/css/ltms-home-slider.css`
+  nuevo, `assets/js/ltms-home-slider.js` + `.min` nuevos, `class-ltms-kernel.php`,
+  `deploy/ltms-deploy-webhook.php`):
+  - **Admin panel** (LT Marketplace → Home Slider): carga banners con imagen desktop
+    (1920×600-800, 16:5/16:6) + imagen mobile opcional (600×600, 1:1), texto CTA + URL, orden,
+    activo/inactivo. Guía de dimensiones en la vista. Persistencia en option `ltms_home_slides`.
+  - **Frontend**: shortcode `[ltms_home_slider]` + inyección automática en `is_front_page()`
+    (oculta el widget Slides de Elementor con CSS). Carrusel propio vanilla JS (autoplay, flechas,
+    dots, swipe táctil, pausa al hover), `<picture>` para imagen mobile distinta, `aspect-ratio`
+    responsive (16:5 desktop, 1:1 mobile).
+  - **Seguridad**: todos los AJAX con `check_ajax_referer('ltms_home_slider_nonce')` +
+    capability `ltms_manage_platform_settings`; sanitización con `esc_url_raw`/`sanitize_text_field`;
+    validación de MIME y tamaño (≤2MB, JPG/PNG/GIF/WebP) en upload.
+- **Verificación:** HomeSliderTest 11 tests / 26 assertions (+1 skip de smoke UNIT_ONLY).
+  Suite completa PHPUnit pendiente en deploy. `LTMS_VERSION` → 2.9.354.
+
+---
+
 ### Fixed — `PANEL-PRODUCTS-TIMING` + `PRICE-RECALC-SAVE` (Kosmetic: grid de Productos solo se ve al buscar; reglas de precio VTEX no aplicaban cambios)
 
 > Reporte del usuario (Kosmetic): (1) en el submenú Productos del panel debe darle "buscar" para

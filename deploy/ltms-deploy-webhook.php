@@ -713,6 +713,13 @@ $files = [
     'includes/frontend/class-ltms-native-templates.php',
     'includes/frontend/templates/single-product.php',
     'includes/frontend/templates/home.php',
+    // HOME-SLIDER FIX (2026-09-08): carrusel de banners del home gestionado por LTMS
+    // (reemplaza el widget Slides de Elementor). Clase + view admin + assets.
+    'includes/frontend/class-ltms-frontend-home-slider.php',
+    'includes/admin/views/html-admin-home-slider.php',
+    'assets/css/ltms-home-slider.css',
+    'assets/js/ltms-home-slider.js',
+    'assets/js/ltms-home-slider.min.js',
     'includes/frontend/templates/archive-product.php',
     'includes/frontend/templates/cart.php',
     'includes/frontend/templates/checkout.php',

@@ -1,0 +1,196 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LTMS Home Slider — carrusel de banners del home (HOME-SLIDER FIX 2026-09-08)
+   Reemplaza el widget Slides de Elementor. Vanilla JS + CSS.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Contenedor principal ───────────────────────────────────────── */
+.ltms-hs {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background: #f3f4f6;
+}
+
+.ltms-hs__track {
+    display: flex;
+    transition: transform 0.5s ease;
+    will-change: transform;
+}
+
+.ltms-hs__slide {
+    flex: 0 0 100%;
+    position: relative;
+    min-width: 0;
+}
+
+.ltms-hs__media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 5; /* ratio panorámico desktop */
+    overflow: hidden;
+}
+
+.ltms-hs__media img,
+.ltms-hs__media picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── CTA ─────────────────────────────────────────────────────────── */
+.ltms-hs__cta {
+    position: absolute;
+    z-index: 2;
+    left: 6%;
+    bottom: 18%;
+}
+
+.ltms-hs__btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 28px;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.ltms-hs__btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    color: #fff;
+    text-decoration: none;
+}
+
+/* ── Flechas de navegación ──────────────────────────────────────── */
+.ltms-hs__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    color: #1e293b;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: background 0.2s ease;
+}
+
+.ltms-hs__nav:hover {
+    background: #fff;
+}
+
+.ltms-hs__nav--prev { left: 14px; }
+.ltms-hs__nav--next { right: 14px; }
+
+/* ── Dots / paginación ──────────────────────────────────────────── */
+.ltms-hs__dots {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 3;
+}
+
+.ltms-hs__dots button {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s ease, width 0.2s ease;
+}
+
+.ltms-hs__dots button.is-active {
+    background: #2563eb;
+    width: 24px;
+    border-radius: 999px;
+}
+
+/* ── Responsive: mobile ─────────────────────────────────────────── */
+@media (max-width: 767px) {
+    .ltms-hs__media {
+        aspect-ratio: 1 / 1; /* si hay imagen mobile, usa su ratio; si no, 1:1 */
+    }
+    .ltms-hs__cta {
+        left: 5%;
+        bottom: 12%;
+    }
+    .ltms-hs__btn {
+        padding: 10px 20px;
+        font-size: 13px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Admin — tarjetas del gestor de banners
+   ═══════════════════════════════════════════════════════════════════ */
+.ltms-hs-card {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    align-items: flex-start;
+}
+
+.ltms-hs-card__thumb {
+    width: 180px;
+    min-height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.ltms-hs-card__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#ltms-hs-notice.success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+}
+
+#ltms-hs-notice.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+@media (max-width: 782px) {
+    .ltms-hs-card {
+        flex-direction: column;
+    }
+    .ltms-hs-card__thumb {
+        width: 100%;
+    }
+    .ltms-hs-card__fields {
+        grid-template-columns: 1fr !important;
+    }
+}
