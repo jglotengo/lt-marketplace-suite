@@ -296,4 +296,29 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 			'El load(1) directo en el parse inicial debe reemplazarse por whenDashboardReady.'
 		);
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PRICE-RECALC-NET (2026-09-09): el recálculo debe reintentar contra
+	// admin-ajax.php si el endpoint primario (?ltms_ajax=1) falla por el WAF.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_recalc_js_has_network_fallback(): void {
+		$js_src = file_get_contents( __DIR__ . '/../../assets/js/ltms-vtex.js' );
+
+		$this->assertStringContainsString(
+			'PRICE-RECALC-NET FIX (2026-09-09)',
+			$js_src,
+			'El recálculo debe documentar el fix PRICE-RECALC-NET.'
+		);
+		$this->assertStringContainsString(
+			"urls.push('/wp-admin/admin-ajax.php')",
+			$js_src,
+			'El recálculo debe reintentar contra admin-ajax.php si el primario falla.'
+		);
+		$this->assertStringContainsString(
+			'function postRecalc(offsetVal)',
+			$js_src,
+			'El recálculo debe implementar postRecalc multi-URL.'
+		);
+	}
 }

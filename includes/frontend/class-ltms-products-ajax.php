@@ -64,6 +64,11 @@ class LTMS_Products_Ajax {
                 'price'    => $product ? (float) $product->get_price() : 0,
                 'stock'    => $product ? $product->get_stock_quantity() : null,
                     'image'        => ( $product && $product->get_image_id() ) ? wp_get_attachment_image_url( $product->get_image_id(), 'thumbnail' ) : '',
+                    // PANEL-PRODUCTS-VIEW FIX (2026-09-09): el botón "Ver" del grid usaba
+                    // get_edit_post_link() que devuelve null en contexto AJAX/frontend
+                    // → href="null" → no llevaba a la página del producto. Ahora se
+                    // devuelve el permalink público real.
+                    'permalink'    => get_permalink( $p->ID ),
                     'edit_url'     => get_edit_post_link( $p->ID, 'raw' ),
                     'product_type' => get_post_meta( $p->ID, '_ltms_product_type', true ) ?: 'product',
             ];

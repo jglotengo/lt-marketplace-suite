@@ -4,7 +4,39 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-08
+## [Unreleased] — 2026-09-09
+
+### Fixed — `PANEL-PRODUCTS-VIEW/RELOAD` + `PRICE-RECALC-NET` (Kosmetic: "Ver producto" no llevaba a la página; grid quedaba en blanco al salir de editar; recálculo de precios no se reflejaba)
+
+> Reporte del usuario (Kosmetic): (1) el recálculo de reglas ya persiste pero el precio no cambia
+> con los nuevos valores al revisarlo en el submenu Productos y catálogo público; (2) en el
+> submenu Productos, "Ver producto" no lleva a la página del producto; (3) al editar un producto
+> y salir, el grid vuelve a ponerse en blanco — hay que volver al submenu para que se
+> previsualicen.
+
+- **E2E + diagnóstico en SG (2026-09-09):** el backend del recálculo funciona correctamente —
+  aplicando reglas nuevas (transport 15, margin 55) los precios de productos de Kosmetic (223)
+  cambiaron en DB: 14571 37,000→54,000; 14574 55,000→81,000; 14577 43,000→64,500 (regular +
+  _price). El problema no es el cálculo: es que el grid del submenu no recargaba al volver a la
+  vista (BUG-C) y el flujo de red podía fallar.
+- **PANEL-PRODUCTS-VIEW (P1 - funcional)** (`class-ltms-products-ajax.php` +
+  `view-products.php`): el botón "👁 Ver" usaba `get_edit_post_link()` que devuelve `null` en
+  contexto AJAX → `href="null"` → no llevaba a la página. El handler ahora devuelve
+  `permalink` (get_permalink) y el JS lo usa con fallback.
+- **PANEL-PRODUCTS-RELOAD (P1 - UX)** (`view-products.php` + `ltms-dashboard.js` + `.min`): el
+  grid de productos vivía en un script inline que solo cargaba en el parse inicial; el SPA solo
+  mostraba la sección al volver al submenu o tras guardar una edición, dejando el grid en blanco.
+  El inline ahora expone `window.ltmsProductsReload` y `loadProductsView` lo invoca al mostrar la
+  vista — así el grid se recarga y refleja precios/nombres actualizados (incluye los del recálculo
+  VTEX).
+- **PRICE-RECALC-NET (P1 - resiliencia)** (`assets/js/ltms-vtex.js` + `.min`): el recálculo en
+  lotes usa `postRecalc` multi-URL — reintenta contra `/wp-admin/admin-ajax.php` si el endpoint
+  primario (`?ltms_ajax=1`) falla por el WAF de SG (patrón ltmsPostJson del login).
+- **Verificación:** ProductsAuditFixTest 25 tests / 105 assertions (+2 tests / +10 asserts),
+  RecalcPricesTest 9 tests / 27 assertions (+1 test / +3 asserts). Suite completa PHPUnit
+  pendiente en deploy. `LTMS_VERSION` → 2.9.355.
+
+---
 
 ### Feat — `HOME-SLIDER` (carrusel de banners del home gestionado por LTMS, reemplaza el widget Slides de Elementor)
 

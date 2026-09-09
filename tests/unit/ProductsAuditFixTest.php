@@ -712,4 +712,68 @@ class ProductsAuditFixTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( "'ltms_get_products_data'", $src,
 			'El grid debe seguir consultando action=ltms_get_products_data.' );
 	}
+
+	/**
+	 * PANEL-PRODUCTS-VIEW FIX (2026-09-09): el botón "Ver" del grid usaba
+	 * get_edit_post_link() que devuelve null en contexto AJAX → href="null"
+	 * → no llevaba a la página del producto. Ahora el handler devuelve el
+	 * permalink público y el JS lo usa con fallback.
+	 */
+	public function test_products_grid_view_button_uses_permalink(): void {
+		$view_path = dirname( __DIR__, 2 ) . '/includes/frontend/views/view-products.php';
+		$ajax_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-products-ajax.php';
+		$this->assertFileExists( $view_path );
+		$this->assertFileExists( $ajax_path );
+
+		$view = file_get_contents( $view_path );
+		$ajax = file_get_contents( $ajax_path );
+
+		$this->assertStringContainsString(
+			"(p.permalink || p.edit_url || '#')",
+			$view,
+			'PANEL-PRODUCTS-VIEW: el botón Ver debe usar permalink con fallback.'
+		);
+		$this->assertStringContainsString(
+			"'permalink'    => get_permalink( \$p->ID )",
+			$ajax,
+			'PANEL-PRODUCTS-VIEW: el handler debe devolver el permalink del producto.'
+		);
+		$this->assertStringContainsString(
+			'PANEL-PRODUCTS-VIEW FIX (2026-09-09)',
+			$ajax,
+			'PANEL-PRODUCTS-VIEW: el handler debe documentar el fix.'
+		);
+	}
+
+	/**
+	 * PANEL-PRODUCTS-RELOAD FIX (2026-09-09): el grid solo cargaba en el parse
+	 * inicial; al volver al submenu o tras guardar una edición quedaba en
+	 * blanco. Ahora el inline expone window.ltmsProductsReload y el SPA lo
+	 * invoca en loadProductsView.
+	 */
+	public function test_products_grid_reload_on_view_show(): void {
+		$view_path = dirname( __DIR__, 2 ) . '/includes/frontend/views/view-products.php';
+		$dash_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-dashboard.js';
+		$this->assertFileExists( $view_path );
+		$this->assertFileExists( $dash_path );
+
+		$view = file_get_contents( $view_path );
+		$dash = file_get_contents( $dash_path );
+
+		$this->assertStringContainsString(
+			'PANEL-PRODUCTS-RELOAD FIX (2026-09-09)',
+			$view,
+			'PANEL-PRODUCTS-RELOAD: el inline debe documentar el fix.'
+		);
+		$this->assertStringContainsString(
+			'window.ltmsProductsReload = function ()',
+			$view,
+			'PANEL-PRODUCTS-RELOAD: el inline debe exponer ltmsProductsReload.'
+		);
+		$this->assertStringContainsString(
+			'window.ltmsProductsReload()',
+			$dash,
+			'PANEL-PRODUCTS-RELOAD: loadProductsView debe invocar ltmsProductsReload.'
+		);
+	}
 }

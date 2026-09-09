@@ -99,7 +99,7 @@ $products_total = (int) wc_get_products( [
                 '  </div>' +
                 '  <div class="ltms-product-actions">' +
                 '    <button type="button" class="ltms-btn ltms-btn-outline ltms-btn-sm ltms-edit-product-btn" data-product-id="' + p.id + '">✏️ Editar</button>' +
-                '    <a href="' + p.edit_url + '" class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">👁 Ver</a>' +
+                '    <a href="' + (p.permalink || p.edit_url || '#') + '" class="ltms-btn ltms-btn-outline ltms-btn-sm" target="_blank">👁 Ver</a>' +
                 '    <button type="button" class="ltms-btn ltms-btn-danger ltms-btn-sm ltms-delete-product-btn" data-product-id="' + p.id + '" data-product-name="' + p.name.replace(/"/g, '&quot;') + '">🗑 Eliminar</button>' +
                 '  </div>' +
                 '</div>';
@@ -206,6 +206,15 @@ $products_total = (int) wc_get_products( [
             }
             check();
         }
+        // PANEL-PRODUCTS-RELOAD FIX (2026-09-09): exponer una función global para
+        // que el SPA (loadProductsView) pueda re-cargar el grid al volver al
+        // submenu o tras guardar una edición — antes el grid solo cargaba en el
+        // parse inicial y quedaba en blanco al re-mostrar la sección.
+        window.ltmsProductsReload = function () {
+            if (typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url) {
+                load(1);
+            }
+        };
         whenDashboardReady(function () { load(1); });
     })();
     </script>

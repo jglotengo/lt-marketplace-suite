@@ -1637,10 +1637,17 @@
             const self = this;
             // v2.9.99 FIX: mostrar la vista PHP directamente (loadGenericView) en lugar de
             // sobreescribirla con renderProductsView(). La vista PHP tiene pagination,
-            // search, gallery upload, ReDi toggle, etc. â€” el JS render era una versiÃ³n
-            // simplificada que perdÃ­a todas esas features.
+            // search, gallery upload, ReDi toggle, etc. — el JS render era una versión
+            // simplificada que perdía todas esas features.
             self.showSection('#ltms-view-products');
-            // La vista PHP ya tiene su propia lógica de carga via AJAX inline.
+            // PANEL-PRODUCTS-RELOAD FIX (2026-09-09): el grid vive en view-products.php
+            // con su propio script inline que solo carga en el parse inicial. Al volver
+            // al submenu (o tras guardar una edición), quedaba en blanco porque la
+            // sección solo se mostraba sin re-cargar el grid. Ahora se invoca la
+            // función expuesta por el inline script para recargar los datos.
+            if (typeof window.ltmsProductsReload === 'function') {
+                window.ltmsProductsReload();
+            }
         },
         // v2.9.99 FIX confirmed: renderProductsView removed — the PHP view (view-products.php)
         // is the single source of truth for the product list and modals.

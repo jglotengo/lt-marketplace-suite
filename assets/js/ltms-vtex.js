@@ -455,13 +455,28 @@
                 $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudieron guardar las reglas.').css('color', '#dc2626');
                 return;
             }
-            // 2) Ejecutar el recálculo en lotes.
+            // 2) Ejecutar el recálculo en lotes. PRICE-RECALC-NET FIX (2026-09-09):
+            //    reintentar contra /wp-admin/admin-ajax.php si el endpoint primario
+            //    (?ltms_ajax=1) falla por el WAF de SG (patrón ltmsPostJson del login).
+            function postRecalc(offsetVal) {
+                var urls = [ajaxUrl];
+                if (ajaxUrl.indexOf('admin-ajax.php') === -1) urls.push('/wp-admin/admin-ajax.php');
+                var tries = 0;
+                function attempt() {
+                    if (tries >= urls.length) return $.Deferred().reject();
+                    return $.post(urls[tries], {
+                        action: 'ltms_recalculate_vtex_prices',
+                        nonce: nonce,
+                        offset: offsetVal
+                    }).fail(function () {
+                        tries++;
+                        return attempt();
+                    });
+                }
+                return attempt();
+            }
             function next() {
-                $.post(ajaxUrl, {
-                    action: 'ltms_recalculate_vtex_prices',
-                    nonce: nonce,
-                    offset: offset
-                }).done(function(resp){
+                postRecalc(offset).done(function(resp){
                     if (!resp.success) {
                         $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
                         $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudo recalcular.').css('color', '#dc2626');
