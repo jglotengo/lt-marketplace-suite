@@ -425,43 +425,79 @@
 
     // PRICE-RECALC FIX: recalcular precios de productos existentes sin re-sync.
     // El botón vive DENTRO del form de reglas → evitar que dispare el submit.
+    // PRICE-RECALC-SAVE FIX (2026-09-08): el recálculo usaba las reglas
+    // GUARDADAS (get_vendor_rules → user_meta), no los valores actuales del
+    // form. Si el vendor cambiaba valores y daba "Recalcular" sin guardar antes,
+    // se recalculaba con las reglas viejas y al volver los campos mostraban los
+    // valores de la primera sync. Ahora el recálculo PRIMERO guarda las reglas
+    // del form (ltms_save_vtex_rules) y luego encadena el recálculo.
+    function collectRules() {
+        return {
+            is_redi: $('#ltms-vtex-is-redi').is(':checked') ? 'yes' : 'no',
+            transport_pct: $('input[name="transport_pct"]').val(),
+            advertising_pct: $('input[name="advertising_pct"]').val(),
+            returns_pct: $('input[name="returns_pct"]').val(),
+            margin_pct: $('input[name="margin_pct"]').val(),
+            lotengo_commission_pct: $('input[name="lotengo_commission_pct"]').val(),
+            iva_pct: $('select[name="iva_pct"]').val(),
+            redi_cost_pct: $('input[name="redi_cost_pct"]').val(),
+            round_multiple: $('select[name="round_multiple"]').val()
+        };
+    }
+
+    function saveRulesThenRecalc($btn, $status, updatedTotal, offset) {
+        // 1) Guardar las reglas ACTUALES del form para que el recálculo use los
+        //    valores nuevos (antes usaba el meta viejo).
+        $.post(ajaxUrl, $.extend({ action: 'ltms_save_vtex_rules', nonce: nonce }, collectRules()))
+        .done(function(resp){
+            if (!resp.success) {
+                $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudieron guardar las reglas.').css('color', '#dc2626');
+                return;
+            }
+            // 2) Ejecutar el recálculo en lotes.
+            function next() {
+                $.post(ajaxUrl, {
+                    action: 'ltms_recalculate_vtex_prices',
+                    nonce: nonce,
+                    offset: offset
+                }).done(function(resp){
+                    if (!resp.success) {
+                        $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                        $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudo recalcular.').css('color', '#dc2626');
+                        return;
+                    }
+                    var d = resp.data;
+                    updatedTotal += d.updated || 0;
+                    if (d.remaining > 0) {
+                        offset = d.offset;
+                        $status.text('Recalculando... (' + d.processed + '/' + d.total + ' productos)').css('color', '#6b7280');
+                        next();
+                    } else {
+                        $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                        $status.text('✅ ' + updatedTotal + ' productos actualizados.').css('color', '#16a34a');
+                        updatePriceExample();
+                    }
+                }).fail(function(){
+                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                    $status.text('Error de red.').css('color', '#dc2626');
+                });
+            }
+            next();
+        }).fail(function(){
+            $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+            $status.text('Error de red.').css('color', '#dc2626');
+        });
+    }
+
     $('#ltms-vtex-recalc-btn').on('click', function(e){
         e.preventDefault();
         e.stopPropagation();
         var $btn = $(this);
         var $status = $('#ltms-vtex-recalc-status');
-        var offset = 0;
-        var updatedTotal = 0;
         $btn.prop('disabled', true);
-        $status.text('Recalculando precios...');
-
-        function next() {
-            $.post(ajaxUrl, {
-                action: 'ltms_recalculate_vtex_prices',
-                nonce: nonce,
-                offset: offset
-            }).done(function(resp){
-                if (!resp.success) {
-                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
-                    $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudo recalcular.').css('color', '#dc2626');
-                    return;
-                }
-                var d = resp.data;
-                updatedTotal += d.updated || 0;
-                if (d.remaining > 0) {
-                    offset = d.offset;
-                    $status.text('Recalculando... (' + d.processed + '/' + d.total + ' productos)').css('color', '#6b7280');
-                    next();
-                } else {
-                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
-                    $status.text('✅ ' + updatedTotal + ' productos actualizados.').css('color', '#16a34a');
-                }
-            }).fail(function(){
-                $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
-                $status.text('Error de red.').css('color', '#dc2626');
-            });
-        }
-        next();
+        $status.text('Guardando reglas y recalculando precios...');
+        saveRulesThenRecalc($btn, $status, 0, 0);
     });
 
     // Initial render

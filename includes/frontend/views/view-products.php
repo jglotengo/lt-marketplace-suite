@@ -188,7 +188,25 @@ $products_total = (int) wc_get_products( [
             debounce = setTimeout(function () { load(1); }, 350);
         });
 
-        load(1);
+        // PANEL-PRODUCTS-TIMING FIX (2026-09-08): el grid se poblaba solo al
+        // buscar. Causa: este script inline corre durante el parse del body,
+        // ANTES de que wp_localize_script inyecte ltmsDashboard (footer) —
+        // el load(1) inicial usaba nonce vacío y fallaba; al buscar (350ms
+        // después) ltmsDashboard ya existía y funcionaba. Esperar a que el
+        // objeto esté disponible antes del primer load (máx 5s).
+        function whenDashboardReady(cb) {
+            var tries = 0;
+            function check() {
+                tries++;
+                if ((typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url) || tries > 50) {
+                    cb();
+                    return;
+                }
+                setTimeout(check, 100);
+            }
+            check();
+        }
+        whenDashboardReady(function () { load(1); });
     })();
     </script>
 

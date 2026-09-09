@@ -225,4 +225,75 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( 145000.0, \LTMS_Vtex_Price_Calculator::round_up_to_multiple( 144386, 1000 ),
 			'84,000 con defaults (margen 30%, comisión 10%, IVA 19%) da 144,386 → redondeado 145,000.' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PRICE-RECALC-SAVE (2026-09-08): el recálculo debe guardar primero las
+	// reglas del form y luego recalcular (antes usaba el meta viejo).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_recalc_js_saves_rules_before_recalculate(): void {
+		$js_src = file_get_contents( __DIR__ . '/../../assets/js/ltms-vtex.js' );
+
+		$this->assertStringContainsString(
+			'PRICE-RECALC-SAVE FIX (2026-09-08)',
+			$js_src,
+			'El JS debe documentar el fix PRICE-RECALC-SAVE.'
+		);
+		$this->assertStringContainsString(
+			"action: 'ltms_save_vtex_rules'",
+			$js_src,
+			'El recálculo debe guardar las reglas del form ANTES de recalcular.'
+		);
+		$this->assertStringContainsString(
+			"action: 'ltms_recalculate_vtex_prices'",
+			$js_src,
+			'El recálculo debe ejecutar ltms_recalculate_vtex_prices en cadena.'
+		);
+		$this->assertStringContainsString(
+			'function collectRules()',
+			$js_src,
+			'El JS debe recolectar los valores actuales del form de reglas.'
+		);
+		$this->assertStringContainsString(
+			"$('input[name=\"margin_pct\"]').val()",
+			$js_src,
+			'collectRules debe leer margin_pct del form.'
+		);
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PANEL-PRODUCTS-TIMING (2026-09-08): el grid debe esperar a ltmsDashboard
+	// antes del primer load (antes solo se poblaba al buscar).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_products_grid_waits_for_dashboard_localize(): void {
+		$view_src = file_get_contents( __DIR__ . '/../../includes/frontend/views/view-products.php' );
+
+		$this->assertStringContainsString(
+			'PANEL-PRODUCTS-TIMING FIX (2026-09-08)',
+			$view_src,
+			'El grid debe documentar el fix PANEL-PRODUCTS-TIMING.'
+		);
+		$this->assertStringContainsString(
+			'function whenDashboardReady(cb)',
+			$view_src,
+			'El grid debe implementar whenDashboardReady.'
+		);
+		$this->assertStringContainsString(
+			"typeof ltmsDashboard !== 'undefined' && ltmsDashboard.ajax_url",
+			$view_src,
+			'El grid debe esperar a que ltmsDashboard esté disponible.'
+		);
+		$this->assertStringContainsString(
+			'whenDashboardReady(function () { load(1); })',
+			$view_src,
+			'El load inicial debe dispararse solo cuando ltmsDashboard exista.'
+		);
+		// El load(1) directo del parse inicial no debe existir (antes corría con nonce vacío).
+		$this->assertStringNotContainsString(
+			"\n        load(1);\n    })();",
+			$view_src,
+			'El load(1) directo en el parse inicial debe reemplazarse por whenDashboardReady.'
+		);
+	}
 }

@@ -6,6 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-08
 
+### Fixed — `PANEL-PRODUCTS-TIMING` + `PRICE-RECALC-SAVE` (Kosmetic: grid de Productos solo se ve al buscar; reglas de precio VTEX no aplicaban cambios)
+
+> Reporte del usuario (Kosmetic): (1) en el submenú Productos del panel debe darle "buscar" para
+> ver los productos — no se ven solos; (2) en la sección Reglas VTEX, al cambiar valores y dar
+> "Recalcular" y luego "Guardar", al volver los campos muestran los valores de la primera
+> sincronización y los precios no cambian.
+
+- **E2E + diagnóstico en SG (2026-09-08):**
+  - **BUG1 (grid):** `view-products.php` llamaba `load(1)` en el parse inicial del body, pero
+    `ltmsDashboard` se inyecta vía `wp_localize_script` en el footer → el primer load usaba nonce
+    vacío y fallaba; al buscar (debounce 350ms) `ltmsDashboard` ya existía y funcionaba. Por eso
+    "solo se ven buscándolos".
+  - **BUG2 (reglas):** el user_meta de Kosmetic (223) tenía las reglas en DEFAULTS
+    (margin 30, commission 10, iva 19). El botón "Recalcular precios" usaba
+    `get_vendor_rules()` (el meta guardado) y NO los valores del form — si el vendor cambiaba
+    valores y daba "Recalcular" sin guardar antes, se recalculaba con las reglas viejas y al
+    volver los campos mostraban los valores de la primera sync.
+- **PANEL-PRODUCTS-TIMING (P1 - UX)** (`includes/frontend/views/view-products.php` +
+  `tests/unit/RecalcPricesTest.php`): el primer `load(1)` ahora espera a que `ltmsDashboard`
+  esté disponible (`whenDashboardReady`, poller 100ms máx 5s) antes de disparar.
+- **PRICE-RECALC-SAVE (P1 - funcional)** (`assets/js/ltms-vtex.js` + `.min` +
+  `tests/unit/RecalcPricesTest.php`): el botón "Recalcular" ahora PRIMERO guarda las reglas
+  actuales del form (`ltms_save_vtex_rules` con `collectRules()`) y LUEGO encadena el recálculo
+  (`ltms_recalculate_vtex_prices`), de modo que usa los valores nuevos del form y quedan
+  persistidos al volver a la sección.
+- **Verificación:** RecalcPricesTest 8 tests / 24 assertions (+2 tests / +8 asserts),
+  ProductsAuditFixTest 23/23 (sin regresión). Suite completa PHPUnit pendiente en deploy.
+  `LTMS_VERSION` → 2.9.353.
+
+---
+
 ### Fixed — `PANEL-PRODUCTS-NET` (el grid de Productos del panel de vendedor mostraba "Error de red." tras sincronizar catálogos grandes)
 
 > Reporte del usuario: el proveedor Kosmetic reporta que después de sincronizar sus productos,
