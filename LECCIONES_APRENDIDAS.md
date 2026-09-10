@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-09-07
-> **Versión del plugin:** 2.9.346
-> **Total de lecciones:** 158 (…+ 1 del ciclo CARD-IMG-SELECTOR v2.9.346 #158 — concatenar un selector en lista con un descendiente)
+> **Última actualización:** 2026-09-10
+> **Versión del plugin:** 2.9.356
+> **Total de lecciones:** 160 (…+ 2 del ciclo VTEX-PRICE-RECALC / dedup de huérfanos v2.9.356 #159-160)
 
 ---
 
@@ -3335,6 +3335,55 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    `.join(', ')`, o usar `closest()`/`matches()` con la lista cuando se parte de un hijo. Añadir un
    test source-based que PROHIBA el patrón de concatenación (assertStringNotContainsString de
    `"CARD_SELECTOR + ' ...'"`) y verifique la presencia de los selectores explícitos por scope.
+
+## 28. v2.9.356 - VTEX-PRICE-RECALC: "sin costo" era en realidad duplicados huérfanos del bug de SKU; cron automático congelado por DISABLE_WP_CRON
+
+> **Hallazgo (2026-09-10):** Kosmetic reportaba que el recálculo de precios VTEX "no se refleja" y que el
+> catálogo conserva "los valores de la integración inicial". El backend resultó CORRECTO
+> (`_regular_price` == `_price` en 100%, 0 mismatch). La causa real eran 537 productos duplicados huérfanos
+> creados por un sync antiguo con SKU=itemId, más un cron de re-sync automático congelado. Ver
+> `CHANGELOG.md` 2026-09-10 (VTEX-PRICE-RECALC backend).
+
+### Lección #159: un producto VTEX "sin costo" que el re-sync no backfillea suele ser un duplicado huérfano de un bug de SKU anterior — matchear por `_ltms_vtex_sku_id`, no solo por `_sku`
+
+1. **Caso real:** 550 productos de Kosmetic estaban `publish`/`visible` con `_ltms_vtex_synced` pero SIN
+   `_ltms_vtex_cost`. Un re-sync completo (30 creados, 1,337 actualizados, 0 errores) NO los tocó y solo
+   backfilleó ~13. Causa: fueron creados con el SKU=itemId (`22344898`, títulos cortos `LORRB`) ANTES del
+   `VTEX-SYNC-BG FIX` que empeñó el SKU canónico a refId (`3474637279400`, título completo). Hoy
+   `wc_get_product_id_by_sku(refId)` no los matchea → el sync crea/actualiza el hermano CORRECTO y deja el
+   huérfano. El recálculo los omite por diseño ("sin costo no se puede calcular"), pero el usuario solo ve
+   "el precio no cambia".
+2. **Diagnóstico correcto:** ante "el recálculo no se aplica a N productos", NO asumir bug de cálculo.
+   Cross-check por `_ltms_vtex_sku_id` (itemId inmutable) con un `LEFT JOIN` buscando si existe un hermano
+   CON costo para el mismo itemId → eso clasifica duplicados-huérfanos vs verdaderos productos sin costo.
+   En el caso real: 529 duplicados con hermano + 8 huérfanos reales (muertos). La `_sku` puede cambiar
+   (itemId→refId); el `_ltms_vtex_sku_id` (itemId VTEX) es el identificador estable para deduplicar.
+3. **Regla preventiva:**
+   - Antes de borrar/trash products sincronizados, verificar SIEMPRE 0 pedidos
+     (`wc_order_product_lookup`) y 0 reviews/comments que los referencien.
+   - Para dedup de VTEX, agrupar por `_ltms_vtex_sku_id` (no por `_sku`) y conservar el ejemplar CON costo +
+     nombre completo.
+   - `wp_trash_post()` (reversible 30 días) es el cuchillo de seguridad; nunca `wp_delete_post(force=true)`
+     en un cleanup masivo sin backup.
+
+### Lección #160: con `DISABLE_WP_CRON=true`, un evento de cron con timestamp en el pasado queda congelado para siempre — `wp_next_scheduled()` sigue devolviendo truthy
+
+1. **Caso real:** `ltms_vtex_auto_sync` quedó programado en `2026-09-01 03:00` y nunca volvió a correr
+   (estamos a 09-10). El guard de `LTMS_Vtex_Sync::init()` hace `if (!wp_next_scheduled(AUTO_SYNC_CRON_HOOK))
+   schedule(...)`; como el evento stale sigue en `_get_cron_array()` con timestamp pasado,
+   `wp_next_scheduled()` devuelve truthy → `init()` nunca re-programa. Con `DISABLE_WP_CRON=true`
+   (SiteGround), WP no dispara cron en requests; si no hay un cron real del sistema apuntando a
+   `wp-cron.php`, el evento queda eternamente en el pasado. Por eso los duplicados-huérfanos nunca se
+   auto-limpiaron.
+2. **Regla preventiva:**
+   - Si algo que depende de cron periódico (backfill, re-sync, cleanup) no sucede, diagnosticar con
+     `_get_cron_array()` + `defined('DISABLE_WP_CRON')`: buscar eventos con timestamp EN EL PASADO (stuck),
+     no solo `wp_next_scheduled()`.
+   - En hosts con `DISABLE_WP_CRON=true`, no confiar en cron para correctivos/backfill de datos en
+     producción: proveer un trigger manual/AJAX verificable (ej. el botón "Sincronizar" del panel) y
+     verificar su efecto de punta a punta.
+   - El guard "programar si no está programado" debe re-armar también los eventos stuck:
+     `$next = wp_next_scheduled(hook); if (!$next || $next < time()) { desprogramar y reprogramar; }`.
 
 
 

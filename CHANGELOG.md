@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `VTEX-PRICE-RECALC` backend (Kosmetic: la causa raíz de "precios de la integración inicial" era 537 productos duplicados huérfanos sin costo, no un bug de recálculo)
+
+> Tras el fix JS v2.9.356, Kosmetic confirmó que el recálculo seguía sin reflejarse. Diagnóstico backend
+> read-only en SG (2026-09-10) + re-sync completo + limpieza de duplicados. Sin cambio de código (datos/ops),
+> sin bump de versión.
+
+- **Diagnóstico (read-only):** el backend del recálculo está CORRECTO — `_regular_price` == `_price` en
+  100% de los productos (0 mismatch); `set_regular_price()` + `save()` SÍ sincroniza `_price`. Los 1,341
+  productos CON `_ltms_vtex_cost` recalculan bien. La hipótesis "set_regular_price no actualiza _price"
+  quedó refutada.
+- **Causa raíz (datos):** los 550 productos "sin costo" eran en realidad **537 duplicados huérfanos** de
+  una época con el bug de SKU ya corregido (`VTEX-SYNC-BG FIX`): SKU = itemId (`22344898`), título corto
+  (`LORRB`), sin `_ltms_vtex_cost`, `publish`/`visible`. Cada huérfano tiene un hermano correcto (SKU =
+  refId real, título completo, costo) identificable por `_ltms_vtex_sku_id`. El re-sync ya no los alcanza
+  porque su `_sku` difiere (itemId vs refId) → nunca se reprocesan y el recálculo los descarta (sin costo).
+- **Fix (operacional):**
+  1. Re-sync VTEX completo de Kosmetic (223): 30 creados, 1,337 actualizados, 0 errores (~7 min) → backfill
+     de costo en los productos correctos.
+  2. `wp_trash_post()` a los 537 huérfanos (529 duplicados con hermano + 8 muertos). Seguridad previa: 0
+     pedidos (`wc_order_product_lookup`) y 0 reviews referencian los huérfanos. Reversible 30 días.
+- **Estado final:** 1,384 productos, 100% con `_ltms_vtex_cost` (`REMAINING_NO_COST=0`) → el recálculo
+  cubre todo el catálogo. Catálogo/público sin duplicados rotos. Sin fatals en `error_log`.
+- **Pendiente (documentado, no tratado):** `ltms_vtex_auto_sync` congelado en `2026-09-01` con
+  `DISABLE_WP_CRON=true` (el re-sync diario nunca se re-programa) — causa de que los duplicados no se
+  auto-limpiaran. Margen objetivo de Kosmetic sigue en default (30%).
+
+---
+
 ### Fixed — `PRICE-RECALC-NET` (Kosmetic: el recálculo de precios sigue sin reflejarse — la cadena de reintento descartaba el resultado de la retry y detenía el encadenado de lotes)
 
 > Reporte del usuario (Kosmetic): sigue reportando que el recálculo de precios de la integración
