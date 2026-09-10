@@ -5,8 +5,7 @@
  * Página pública de seguimiento de orden con timeline vertical Rappi-style.
  * Reemplaza al template por defecto vía `template_include` (ver
  * LTMS_Native_Templates::maybe_override() — integra order-tracking.php
- * cuando is_page('seguimiento') || is_page('tracking') o query var
- * ltms_page = 'tracking').
+ * cuando is_page('seguimiento') || is_page('tracking')).
  *
  * Características:
  *  - Header con número de orden, fecha y total.

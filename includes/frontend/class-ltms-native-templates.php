@@ -89,26 +89,16 @@ class LTMS_Native_Templates {
         // Body class para scope CSS.
         add_filter( 'body_class', [ __CLASS__, 'body_class' ] );
 
-        // v2.9.191 — Rewrite rules for custom pages (tracking, help).
-        // Disabled temporarily — causing shop page crash. Needs flush_rewrite_rules.
-        // add_action( 'init', [ __CLASS__, 'register_rewrites' ] );
-        // add_filter( 'query_vars', [ __CLASS__, 'register_query_vars' ] );
-    }
-
-    /**
-     * Registra rewrite rules para páginas custom del plugin.
-     */
-    public static function register_rewrites(): void {
-        add_rewrite_rule( '^seguimiento/?$', 'index.php?ltms_page=tracking', 'top' );
-        add_rewrite_rule( '^ayuda/?$', 'index.php?ltms_page=help', 'top' );
-    }
-
-    /**
-     * Registra query vars custom.
-     */
-    public static function register_query_vars( array $vars ): array {
-        $vars[] = 'ltms_page';
-        return $vars;
+        // DEAD-CODE FIX (2026-09-10): las rewrite rules custom (seguimiento/ayuda)
+        // + el query var 'ltms_page' + is_vendor_store_page() quedaron
+        // deshabilitados desde 2026-07-18 ("causing shop page crash") y nunca se
+        // re-habilitaron — eran wiring muerto. Se eliminaron los métodos
+        // register_rewrites()/register_query_vars() y las ramas inalcanzables de
+        // vendor-store.php en maybe_override(). Los templates order-tracking.php y
+        // help-center.php se sirven vía is_page() (no via ltms_page). La plantilla
+        // vendor-store.php (design system Plaza Viva, @since 3.0.0) queda
+        // "declared, awaiting wiring" (sin runtime consumer; la vitrina viva es
+        // LTMS_Vendor_Storefront en /vendedor/{slug}/). Ver LECCIONES #161.
     }
 
     /**
@@ -203,14 +193,11 @@ class LTMS_Native_Templates {
                 }
             }
 
-            // VS-FIX: Vendor store SIEMPRE usa el template nativo de Plaza Viva
-            // (con stats, tabs, reseñas, grid mejorado) — incluso con Elementor activo.
-            if ( self::is_vendor_store_page() ) {
-                $native = self::$template_dir . 'vendor-store.php';
-                if ( file_exists( $native ) ) {
-                    return $native;
-                }
-            }
+            // DEAD-CODE FIX (2026-09-10): la rama vendor-store.php (design system
+            // Plaza Viva) fue eliminada — is_vendor_store_page() era siempre false
+            // (CPT 'ltms_vendor_store' nunca registrado, query var 'ltms_page'
+            // nunca registrado). La vitrina viva es LTMS_Vendor_Storefront en
+            // /vendedor/{slug}/. Ver LECCIONES #161.
 
             // SHOP-ARCHIVE-EMPTY FIX (2026-09-05): el archive de productos
             // (/tienda/ y ?post_type=product) se renderizaba vacio porque el
@@ -287,12 +274,9 @@ class LTMS_Native_Templates {
         }
 
         // Vendor store (custom).
-        if ( self::is_vendor_store_page() ) {
-            $native = self::$template_dir . 'vendor-store.php';
-            if ( file_exists( $native ) ) {
-                return $native;
-            }
-        }
+        // DEAD-CODE FIX (2026-09-10): rama eliminada — vendor-store.php no tiene
+        // runtime consumer (ver comentario DEAD-CODE en init()). Se conserva la
+        // plantilla física como "declared, awaiting wiring". Ver LECCIONES #161.
 
         // Help center (custom).
         if ( self::is_help_page() ) {
@@ -880,24 +864,18 @@ class LTMS_Native_Templates {
      * Detecta si es la página de tracking de orden.
      */
     private static function is_order_tracking_page(): bool {
-        return is_page( 'seguimiento' ) || is_page( 'tracking' ) ||
-               ( get_query_var( 'ltms_page' ) === 'tracking' );
-    }
-
-    /**
-     * Detecta si es la página pública de vendor store.
-     */
-    private static function is_vendor_store_page(): bool {
-        return is_singular( 'ltms_vendor_store' ) ||
-               ( get_query_var( 'ltms_page' ) === 'vendor-store' );
+        // DEAD-CODE FIX (2026-09-10): la condición get_query_var('ltms_page')
+        // era inalcanzable (query var nunca registrado). Solo is_page() resuelve.
+        return is_page( 'seguimiento' ) || is_page( 'tracking' );
     }
 
     /**
      * Detecta si es la página de ayuda/soporte.
      */
     private static function is_help_page(): bool {
-        return is_page( 'ayuda' ) || is_page( 'help' ) ||
-               ( get_query_var( 'ltms_page' ) === 'help' );
+        // DEAD-CODE FIX (2026-09-10): la condición get_query_var('ltms_page')
+        // era inalcanzable (query var nunca registrado). Solo is_page() resuelve.
+        return is_page( 'ayuda' ) || is_page( 'help' );
     }
 }
 

@@ -34,6 +34,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+### Removed — `DEAD-CODE` (vendor-store.php "declared, awaiting wiring" — wiring muerto eliminado; la vitrina viva es LTMS_Vendor_Storefront)
+
+> Auditoría del backlog P2 "DEAD-CODE - vendor-store.php código muerto (rewrite deshabilitada)". La
+> plantilla `templates/vendor-store.php` (design system "Plaza Viva", `@since 3.0.0`) no tenía runtime
+> consumer: `is_vendor_store_page()` retornaba siempre false (CPT `ltms_vendor_store` nunca registrado +
+> query var `ltms_page` nunca registrado). Decisión de producto: eliminar el wiring muerto + documentar
+> (NO borrar la plantilla, que ~6 suites de test usan como gold standard de paridad CSP).
+
+- **`includes/frontend/class-ltms-native-templates.php`:** eliminados `register_rewrites()` +
+  `register_query_vars()` (comentados/deshabilitados desde 2026-07-18 por "causing shop page crash"), las
+  dos ramas inalcanzables de `vendor-store.php` en `maybe_override()` (rama Elementor + rama no-Elementor),
+  `is_vendor_store_page()` (predicado siempre-false) y las condiciones muertas `get_query_var('ltms_page')`
+  de `is_order_tracking_page()`/`is_help_page()` (estas páginas se sirven vía `is_page()`). Se añade
+  comentario traceable `DEAD-CODE FIX` documentando el estado y la ruta futura de reactivación.
+- **`templates/vendor-store.php`:** header actualizado a "declared, awaiting wiring" (se conserva por
+  decisión de producto; referencia de paridad CSP/design-system). `templates/order-tracking.php` docblock
+  corregido (ya no menciona `ltms_page`).
+- **Sin cambio de runtime funcional:** la vitrina pública `/vendedor/{slug}/` sigue servida por
+  `LTMS_Vendor_Storefront` (sin alteración). Sin bump de versión (no toca assets).
+- **Test:** nueva suite `tests/unit/DeadCodeVendorStoreTest.php` (4 tests / 9 assertions, grupo
+  `audit-deadcode`) — verifica la ausencia de las declaraciones de método muertas, la ausencia del query
+  var `ltms_page` y la conservación marcada de `vendor-store.php`. Suite unit completa: 4,929 tests /
+  10,255 assertions, 0 failures, 3 skipped.
+
+---
+
 ### Fixed — `PRICE-RECALC-NET` (Kosmetic: el recálculo de precios sigue sin reflejarse — la cadena de reintento descartaba el resultado de la retry y detenía el encadenado de lotes)
 
 > Reporte del usuario (Kosmetic): sigue reportando que el recálculo de precios de la integración

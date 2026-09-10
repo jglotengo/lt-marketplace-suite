@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-09-10
 > **Versión del plugin:** 2.9.356
-> **Total de lecciones:** 160 (…+ 2 del ciclo VTEX-PRICE-RECALC / dedup de huérfanos v2.9.356 #159-160)
+> **Total de lecciones:** 161 (…+ 1 del ciclo DEAD-CODE vendor-store.php "declared, awaiting wiring" #161)
 
 ---
 
@@ -3384,6 +3384,43 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      verificar su efecto de punta a punta.
    - El guard "programar si no está programado" debe re-armar también los eventos stuck:
      `$next = wp_next_scheduled(hook); if (!$next || $next < time()) { desprogramar y reprogramar; }`.
+
+## 29. v2.9.356 - DEAD-CODE: vendor-store.php (Plaza Viva) era código muerto no conectado — wiring deshabilitado desde 2026-07-18; la vitrina viva es LTMS_Vendor_Storefront
+
+> **Hallazgo (2026-09-10):** la plantilla `templates/vendor-store.php` (design system "Plaza Viva",
+> `@since 3.0.0`) no tenía runtime consumer: `is_vendor_store_page()` retornaba siempre false (CPT
+> `ltms_vendor_store` nunca registrado + query var `ltms_page` nunca registrado). La vitrina pública real
+> es `LTMS_Vendor_Storefront` (`class-ltms-vendor-storefront.php`) sirviendo `/vendedor/{slug}/` con un
+> diseño distinto (`ltms-sf-*`). Decisión de producto: "eliminar wiring muerto + documentar" (no borrar la
+> plantilla, que ~6 suites de test usan como gold standard de paridad CSP). Ver `CHANGELOG.md` 2026-09-10.
+
+### Lección #161: un template "activo" en la documentación puede ser código muerto no conectado — verificar el wiring (rewrite/CPT/query var), no solo que el archivo exista y pase tests estructurales
+
+1. **Caso real:** `vendor-store.php` parecía "activo": estaba en `CLAUDE.md` como uno de los "9 templates
+   nativos WC ... Activado en producción", tenía ~20 fixes documentados, sección CSS completa
+   (`.pv-vendor-store` en `ltms-plaza-viva.css`) y ~6 suites de test que lo validaban como "100%
+   CSP-compliant" (gold standard de paridad). Pero NINGUNA de esas validaciones ejercía el wiring que lo
+   sirve. Sus rewrites (`register_rewrites()`/`register_query_vars()`) estaban comentados desde 2026-07-18
+   ("Disabled temporarily — causing shop page crash"), el CPT `ltms_vendor_store` nunca se registró, y
+   `is_vendor_store_page()` (última puerta en `maybe_override()`) devolvía siempre false. Resultado:
+   inversión mantenida en un template que jamás se renderizaba; la vitrina viva era otra implementación
+   (`LTMS_Vendor_Storefront`).
+2. **Diagnóstico correcto:** ante "¿este template/clase se usa?", NO basta con `grep` del nombre del archivo
+   (los tests de paridad lo leen vía `file_get_contents` y falsean positivos). Trazar la CADENA DE SERVICIO
+   completa: `template_include`/`shortcode`/`rewrite` → `is_*_page()`/`get_query_var()` → `register_post_type`
+   /`register_query_vars`/`add_rewrite_rule`. Si cualquiera de los eslabones está deshabilitado o no
+   registrado, todo lo que cuelga de él es dead-code-by-wiring (aunque el archivo exista y compile).
+3. **Regla preventiva:**
+   - Desconfiar de documentación (`CLAUDE.md`, headers "Activado en producción", `@since`) sin verificar el
+     código que la ejecuta (AGENTS.md "Desconfía de comentarios/documentación que describen una intención sin
+     código real").
+   - Cuando un "template del design system" no aparece en producción, verificar DOS vitrinas paralelas: puede
+     existir una implementación legacy viva (ej. `LTMS_Vendor_Storefront` con su propio `print_head()`) y la
+     "nueva" muerta. No asumir que la más nueva reemplazó a la vieja.
+   - Para decidir borrar vs conservar código muerto con consumidores de paridad (tests), es decisión de
+     producto: documentar el estado "declared, awaiting wiring" con un tag traceable (`DEAD-CODE FIX`) en vez
+     de borrar a ciegas, salvo que exista una decisión explícita. Si se borra, actualizar/eliminar en el MISMO
+     commit todos los tests que lo leen (AGENTS.md test huérfano, LECCIÓN #119).
 
 
 

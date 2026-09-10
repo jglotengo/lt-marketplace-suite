@@ -2,9 +2,19 @@
 /**
  * Template: Vendor Store — Plaza Viva Design System
  *
- * Página pública de tienda del vendedor. Se sirve vía `template_include`
- * cuando la página actual corresponde a una vendor store
- * (ver LTMS_Native_Templates::is_vendor_store_page()).
+ * Página pública de tienda del vendedor (design system "Plaza Viva").
+ *
+ * DEAD-CODE (2026-09-10): esta plantilla está "declared, awaiting wiring" —
+ * NO tiene runtime consumer hoy. La vitrina pública viva es
+ * LTMS_Vendor_Storefront (class-ltms-vendor-storefront.php), que sirve
+ * /vendedor/{slug}/ con su propio diseño (ltms-sf-*). El wiring que debía
+ * servir esta plantilla (register_rewrites() + register_query_vars() +
+ * is_vendor_store_page() en class-ltms-native-templates.php) fue removido
+ * porque estaba deshabilitado desde 2026-07-18 y nunca se re-habilitó: no
+ * existe CPT 'ltms_vendor_store' ni query var 'ltms_page'. Se conserva como
+ * referencia de paridad CSP/design-system y para una futura reactivación
+ * (registrar CPT o rewrite + query var + fallback is_page()). No borrar sin
+ * decisión de producto (hay ~6 suites de test que la usan como gold standard).
  *
  * Secciones:
  *  - Banner gradiente (azul #2563EB + gold #D4A857) con avatar, nombre,
