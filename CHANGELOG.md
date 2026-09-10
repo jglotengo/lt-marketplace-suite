@@ -4,7 +4,33 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-09
+## [Unreleased] — 2026-09-10
+
+### Fixed — `PRICE-RECALC-NET` (Kosmetic: el recálculo de precios sigue sin reflejarse — la cadena de reintento descartaba el resultado de la retry y detenía el encadenado de lotes)
+
+> Reporte del usuario (Kosmetic): sigue reportando que el recálculo de precios de la integración
+> VTEX no se refleja. Cambia los valores de las reglas, consulta el submenu Productos del panel
+> vendedor y siguen apareciendo los mismos valores de la integración inicial, incluso tras Ctrl+F5.
+
+- **Causa raíz (JS):** el `postRecalc` de `assets/js/ltms-vtex.js` reencadenaba la retry contra
+  `/wp-admin/admin-ajax.php` con `.fail(...)` y **descartaba su resultado** (el reintento se
+  disparaba pero su respuesta se perdía). Cualquier fallo transitorio del endpoint primario
+  (`?ltms_ajax=1`, bloqueado intermitentemente por el WAF de SiteGround) terminaba en
+  "Error de red." y **detenía el encadenado de lotes** (`next()` era terminal ante cualquier
+  `.fail`). Resultado: con ~1,892 productos (~19 lotes), el recálculo abortaba en el primer lote
+  fallido y la mayoría del catálogo quedaba con el precio de la integración inicial — el backend
+  nunca llegaba a reprocesarlos.
+- **Fix (`assets/js/ltms-vtex.js` + `.min`):** nuevo helper `vtexAjax(urls, data)` que usa un
+  `$.Deferred` y resuelve con la primera respuesta JSON real (éxito o error del backend), y solo
+  reintenta en fallo de red/HTML (WAF 403 sin JSON). `postRecalc` y el guardado de reglas
+  (`ltms_save_vtex_rules`) ahora usan `vtexAjax` con retry multi-URL (`urls` construido por
+  `buildVtexUrls()`), de modo que el resultado de la retry propaga y el encadenado de lotes ya no
+  se detiene ante un fallo transitorio.
+- **Verificación:** RecalcPricesTest 10 tests / 31 assertions (+1 test / +4 asserts —
+  `test_recalc_js_fallback_propagates_retry_result`). Suite completa PHPUnit 4,925 tests /
+  10,246 assertions, 0 failures, 3 skipped. `LTMS_VERSION` → 2.9.356 (cache-busting del `.min`).
+
+---
 
 ### Fixed — `PANEL-PRODUCTS-VIEW/RELOAD` + `PRICE-RECALC-NET` (Kosmetic: "Ver producto" no llevaba a la página; grid quedaba en blanco al salir de editar; recálculo de precios no se reflejaba)
 

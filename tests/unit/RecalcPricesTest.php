@@ -321,4 +321,38 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 			'El recálculo debe implementar postRecalc multi-URL.'
 		);
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// PRICE-RECALC-NET FIX de reintento (2026-09-10): el patrón anterior
+	// reencadenaba la retry con .fail(...) y DESCARTABA su resultado (el intento
+	// a admin-ajax.php se disparaba pero su respuesta se perdía), de modo que
+	// cualquier fallo transitorio del endpoint primario detenía el encadenado de
+	// lotes. El fix usa un Deferred que resuelve/rechaza según la retry.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_recalc_js_fallback_propagates_retry_result(): void {
+		$js_src = file_get_contents( __DIR__ . '/../../assets/js/ltms-vtex.js' );
+
+		$this->assertStringContainsString(
+			'function vtexAjax(urls, data)',
+			$js_src,
+			'Debe existir el helper vtexAjax con reintento multi-URL.'
+		);
+		$this->assertStringContainsString(
+			'dfd.resolve(resp)',
+			$js_src,
+			'El helper debe resolver el Deferred con la respuesta real de la retry (no descartarla).'
+		);
+		$this->assertStringContainsString(
+			'dfd.reject()',
+			$js_src,
+			'El helper debe rechazar solo cuando se agotan todos los endpoints.'
+		);
+		// El patrón roto (contador 'tries' + retry descartada dentro de .fail) no debe seguir.
+		$this->assertStringNotContainsString(
+			'tries++',
+			$js_src,
+			'No debe persistir el patrón roto que descartaba el resultado de la retry.'
+		);
+	}
 }

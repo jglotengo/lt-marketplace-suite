@@ -445,35 +445,59 @@
         };
     }
 
+    // PRICE-RECALC-NET FIX (2026-09-09): POST con reintento multi-URL que SÍ
+    // propaga el resultado de la retry. El patrón anterior reencadenaba la retry
+    // con .fail(...) y DESCARTABA su respuesta (el intento a /wp-admin/admin-ajax.php
+    // se disparaba pero su resultado se perdía): cualquier fallo transitorio del
+    // endpoint primario (?ltms_ajax=1, bloqueado intermitentemente por el WAF de
+    // SiteGround) terminaba en "Error de red." y DETENÍA el encadenado de lotes,
+    // dejando la mayoría del catálogo con el precio de la integración inicial.
+    // Este helper resuelve el Deferred con la primera respuesta JSON (éxito o
+    // error real del backend) y solo reintenta en fallo de red/HTML (WAF 403 sin JSON).
+    function vtexAjax(urls, data) {
+        var dfd = $.Deferred();
+        var i = 0;
+        (function attempt() {
+            if (i >= urls.length) { dfd.reject(); return; }
+            $.post(urls[i++], data)
+                .done(function (resp) { dfd.resolve(resp); })
+                .fail(function (xhr) {
+                    // Un error real del backend devuelve JSON (xhr.responseJSON)
+                    // aunque el HTTP sea 4xx; en ese caso NO reintentamos y
+                    // resolvemos con ese JSON para mostrar el mensaje real.
+                    if (xhr && xhr.responseJSON && typeof xhr.responseJSON.success !== 'undefined') {
+                        dfd.resolve(xhr.responseJSON);
+                        return;
+                    }
+                    attempt();
+                });
+        })();
+        return dfd.promise();
+    }
+
+    function buildVtexUrls() {
+        var urls = [ajaxUrl];
+        if (ajaxUrl.indexOf('admin-ajax.php') === -1) urls.push('/wp-admin/admin-ajax.php');
+        return urls;
+    }
+
+    function postRecalc(offsetVal) {
+        return vtexAjax(buildVtexUrls(), {
+            action: 'ltms_recalculate_vtex_prices',
+            nonce: nonce,
+            offset: offsetVal
+        });
+    }
+
     function saveRulesThenRecalc($btn, $status, updatedTotal, offset) {
         // 1) Guardar las reglas ACTUALES del form para que el recálculo use los
-        //    valores nuevos (antes usaba el meta viejo).
-        $.post(ajaxUrl, $.extend({ action: 'ltms_save_vtex_rules', nonce: nonce }, collectRules()))
+        //    valores nuevos (antes usaba el meta viejo). Con reintento multi-URL.
+        vtexAjax(buildVtexUrls(), $.extend({ action: 'ltms_save_vtex_rules', nonce: nonce }, collectRules()))
         .done(function(resp){
             if (!resp.success) {
                 $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
                 $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudieron guardar las reglas.').css('color', '#dc2626');
                 return;
-            }
-            // 2) Ejecutar el recálculo en lotes. PRICE-RECALC-NET FIX (2026-09-09):
-            //    reintentar contra /wp-admin/admin-ajax.php si el endpoint primario
-            //    (?ltms_ajax=1) falla por el WAF de SG (patrón ltmsPostJson del login).
-            function postRecalc(offsetVal) {
-                var urls = [ajaxUrl];
-                if (ajaxUrl.indexOf('admin-ajax.php') === -1) urls.push('/wp-admin/admin-ajax.php');
-                var tries = 0;
-                function attempt() {
-                    if (tries >= urls.length) return $.Deferred().reject();
-                    return $.post(urls[tries], {
-                        action: 'ltms_recalculate_vtex_prices',
-                        nonce: nonce,
-                        offset: offsetVal
-                    }).fail(function () {
-                        tries++;
-                        return attempt();
-                    });
-                }
-                return attempt();
             }
             function next() {
                 postRecalc(offset).done(function(resp){
