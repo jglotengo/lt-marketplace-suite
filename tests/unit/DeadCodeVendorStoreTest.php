@@ -21,13 +21,19 @@
  * clases del plugin ni invocación WP — deterministas en LTMS_UNIT_ONLY=true.
  *
  * @package LTMS\Tests\Unit
- * @group audit-deadcode
  */
 
 declare( strict_types=1 );
 
 namespace LTMS\Tests\Unit;
 
+/**
+ * Class DeadCodeVendorStoreTest
+ *
+ * Ejecutar con: LTMS_UNIT_ONLY=true ./vendor/bin/phpunit --group audit-deadcode
+ *
+ * @group audit-deadcode
+ */
 final class DeadCodeVendorStoreTest extends LTMS_Unit_Test_Case {
 
     /**
