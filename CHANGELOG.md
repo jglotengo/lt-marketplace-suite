@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `PANEL-CONTRAST` (contraste de texto del panel del vendedor)
+
+> El sidebar/topbar azul (`#1a5276`) del dashboard SPA del vendedor mostraba los items de navegación en gris
+> (`.ltms-nav-label { color:#9ca3af }`) y las etiquetas de sección muy tenues (`rgba(255,255,255,.4)`), ilegibles.
+
+- **`assets/css/ltms-dashboard.css` (+ `.min`):** `.ltms-nav-label` pasa a `#fff` (se elimina `#9ca3af` y el
+  `margin-top`/`padding` heredados que desalineaban) y `.ltms-nav-section-label` sube de `.4` a `.72` de opacidad.
+- **`includes/frontend/views/dashboard-wrapper.php`:** refuerzo en el bloque inline `ltms-dash-critical`
+  (`.ltms-nav-item .ltms-nav-label { color:#fff !important }`) con prioridad sobre el CSS externo cacheado.
+- **Test:** nueva suite `tests/unit/PanelContrastFixTest.php` (4 tests, grupo `audit-panel-contrast`).
+
+### Fixed — `PANEL-CONTRAST-2` (submenús del panel aún en gris sobre azul)
+
+> Tras PANEL-CONTRAST, la etiqueta del item ya era blanca pero los **títulos de submenú** (`.ltms-nav-section-label`
+> en `rgba(255,255,255,.72)`) y el **color base del item** (`.ltms-sidebar-nav .ltms-nav-item` en
+> `rgba(255,255,255,.8)`) seguían leyéndose gris sobre el fondo azul `#1a5276`, dificultando la lectura.
+
+- **`assets/css/ltms-dashboard.css` (+ `.min`):** `.ltms-nav-section-label` y el color base de `.ltms-nav-item`
+  pasan a blanco pleno (`#fff`). La jerarquía se conserva por tamaño/tracking, no por bajar el contraste.
+- **`includes/frontend/views/dashboard-wrapper.php`:** el bloque inline `ltms-dash-critical` ahora fuerza también
+  `.ltms-nav-item { color:#fff !important }` y `.ltms-nav-section-label { color:#fff !important }`.
+- **Test:** extendida `tests/unit/PanelContrastFixTest.php` (de 4 → 6 tests, `PANEL-CONTRAST-2`).
+
+### Fixed — `SHOP-LIST-BTN` (botón "Añadir al carrito" desbordado en vista lista)
+
+> En `/tienda/?view=list` el botón de añadir al carrito se desbordaba/recortaba en algunas cards: el link y el
+> título no eran encogibles (`min-width:auto`) y el botón heredaba `width:100%` + `white-space:normal`.
+
+- **`assets/css/ltms-plaza-viva.css` (+ `.min`):** en `.pv-shop--list` se fuerza `min-width:0` al link/título (para
+  que encogen en vez de empujar el botón), precio en una línea (`nowrap`), y el botón con `display:inline-flex` +
+  `white-space:nowrap` de ancho contenido. En móvil la card envuelve el botón a fila propia.
+- **Test:** extendida `tests/unit/ShopFiltersTest.php` (2 tests nuevos, `SHOP-LIST-BTN`).
+
 ### Added — `SHOP-FILTERS` (filtros y herramientas de UX en /tienda/)
 
 > /tienda/ no tenía filtros (solo productos + orden nativo). Se añade un sidebar de filtros + toolbar,

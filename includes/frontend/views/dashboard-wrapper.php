@@ -206,11 +206,23 @@ if ( $_show_drivers ) {
     color:#fff!important;
 }
 .ltms-dashboard-container .ltms-nav-item,#ltms-dashboard-container .ltms-nav-item{
-    color:rgba(255,255,255,0.85)!important;
+    color:#fff!important;
     background:transparent!important;
 }
 .ltms-dashboard-container .ltms-nav-item.active,#ltms-dashboard-container .ltms-nav-item.active{
     background:rgba(255,255,255,0.15)!important;
+    color:#fff!important;
+}
+/* PANEL-CONTRAST-2 FIX (2026-09-11): forzar blanco pleno en la etiqueta del
+   item, en el item (icono) y en la etiqueta de sección del sidebar. Antes
+   .ltms-nav-label quedaba gris #9ca3af y la etiqueta de sección en
+   rgba(255,255,255,0.72) — ilegibles sobre el azul #1a5276. */
+.ltms-dashboard-container .ltms-nav-item .ltms-nav-label,
+#ltms-dashboard-container .ltms-nav-item .ltms-nav-label{
+    color:#fff!important;
+}
+.ltms-dashboard-container .ltms-nav-section-label,
+#ltms-dashboard-container .ltms-nav-section-label{
     color:#fff!important;
 }
 .ltms-dashboard-container h1,.ltms-dashboard-container h2,.ltms-dashboard-container h3,

@@ -77,12 +77,15 @@
     flex: 1;
 }
 
+/* PANEL-CONTRAST-2 FIX (2026-09-11): el color base del item (y por herencia su
+   icono) usaba rgba(255,255,255,0.8) — gris apagado sobre el azul #1a5276.
+   Se fuerza blanco pleno para que todo texto/icono del submenú sea legible. */
 .ltms-sidebar-nav .ltms-nav-item {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 11px 20px;
-    color: rgba(255,255,255,0.8);
+    color: #fff;
     text-decoration: none;
     font-size: 0.9rem;
     transition: background 0.15s, color 0.15s;
@@ -1081,14 +1084,17 @@ select.ltms-form-control   { cursor: pointer; }
 .ltms-logout-btn:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
 
 /* ── Etiqueta de nav ── */
+/* PANEL-CONTRAST FIX (2026-09-11): la etiqueta del item de navegación usaba
+   color #9ca3af (gris) sobre el fondo azul #1a5276 del sidebar, dejando el
+   texto del menú ilegible. Se fuerza blanco de alto contraste. */
 .ltms-nav-label {
     font-size: 0.75rem;
-    color: #9ca3af;
-    font-weight: 500;
+    color: #fff;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-top: 12px;
-    padding: 0 12px;
+    margin-top: 0;
+    padding: 0;
 }
 
 /* ── Aviso de error inline ── */
@@ -1135,10 +1141,14 @@ select.ltms-form-control   { cursor: pointer; }
 }
 
 /* Secciones del sidebar (separadores visuales) */
+/* PANEL-CONTRAST-2 FIX (2026-09-11): rgba(255,255,255,0.72) seguía leyéndose gris
+   sobre el azul #1a5276 en los títulos de submenú ("Vender/Logística/Finanzas…").
+   Se sube a blanco pleno; la jerarquía se conserva por tamaño (0.65rem) y tracking,
+   no por reducir el contraste. */
 .ltms-nav-section-label {
     font-size: 0.65rem;
     font-weight: 700;
-    color: rgba(255,255,255,0.4);
+    color: #fff;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 12px 20px 4px;
