@@ -532,7 +532,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
             <span class="ltms-sf-wishlist-count" id="ltms-sf-wishlist-count">0</span>
         </button>
         <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
-           class="ltms-sf-topbar-cart" aria-label="Ver carrito">
+           class="ltms-sf-topbar-cart" aria-label="Ver carrito" data-ltms-open-cart>
             🛒 <span class="ltms-sf-cart-count"><?php
                 echo function_exists( 'WC' ) && WC()->cart ? (int) WC()->cart->get_cart_contents_count() : 0;
             ?></span>

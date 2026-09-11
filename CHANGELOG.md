@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CART-UX-NEXT` (mini-cart: scroll al agregar items + apertura desde el icono del carrito en todas las páginas)
+
+- **Scroll roto (flexbox):** `.ltms-minicart__body` era `flex:1` sin `min-height:0` → al agregar items
+  crecía sin límite, empujando el footer fuera de vista y sin poder scrollear. Fix: `min-height:0` +
+  `flex:1 1 0%` en el body, `flex-shrink:0` en header/footer, `height:100dvh` + `overflow:hidden` en el
+  contenedor.
+- **Icono del carrito:** el drawer ahora se abre también desde el icono del carrito (`.elementor-menu-cart__toggle`
+  de Elementor + `.ltms-sf-topbar-cart`, vía `data-ltms-open-cart`), frenando el panel nativo de Elementor
+  para que solo se vea el mini-cart LTMS. Cubre todas las páginas donde esté el icono.
+- **Cache-busting:** `LTMS_VERSION` 2.9.358 → 2.9.359. Test `CartDrawerNextTest` ampliado (+2 asserts).
+
+---
+
 ### Added — `CART-UX-NEXT` (mini-cart lateral reimplementado, robusto — se abre al añadir al carrito)
 
 > El drawer se había desactivado en v2.9.208 tras 4 versiones fallidas en SiteGround. Se

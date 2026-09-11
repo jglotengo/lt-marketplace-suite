@@ -1,10 +1,12 @@
 /* =============================================================================
- * LTMS Cart Drawer Ã¢â‚¬â€ JS autÃƒÂ³nomo (vanilla + XHR, sin dependencia de jQuery).
+ * LTMS Cart Drawer — JS autónomo (vanilla + XHR, sin dependencia de jQuery).
  *
- * CART-UX-NEXT (2026-09-10, v2.9.357): reimplementaciÃƒÂ³n robusta del mini-cart.
- * Usa XMLHttpRequest (no fetch) porque mod_security de SiteGround ha soltado
- * requests fetch() POST; y NO inyecta script inline (el HTML lo renderiza PHP
- * en wp_footer y la config viaja por wp_localize_script). Ver
+ * CART-UX-NEXT (2026-09-10): reimplementación robusta del mini-cart. Usa
+ * XMLHttpRequest (no fetch) porque mod_security de SiteGround ha soltado
+ * requests fetch() POST; NO inyecta script inline (el HTML lo renderiza PHP en
+ * wp_footer y la config viaja por wp_localize_script). Abre/actualiza el drawer
+ * al añadir al carrito (evento added_to_cart de WC + data-pv-add-to-cart) y
+ * desde el icono del carrito (Elementor menu-cart + topbar). Ver
  * includes/frontend/class-ltms-cart-drawer.php.
  * ========================================================================== */
 (function () {
@@ -39,19 +41,15 @@
             if (xhr.status >= 200 && xhr.status < 300) {
                 var json = null;
                 try { json = JSON.parse(xhr.responseText); } catch (e) {}
-                if (json && json.success) { onDone && onDone(json.data || {}); }
-                else { onFail && onFail(); }
-            } else { onFail && onFail(); }
+                if (json && json.success) { if (onDone) onDone(json.data || {}); }
+                else { if (onFail) onFail(); }
+            } else { if (onFail) onFail(); }
         };
-        xhr.onerror = function () { onFail && onFail(); };
-        var body = new URLSearchParams();
-        body.append('nonce', nonce);
-        for (var k in params) { body.append(k, params[k]); }
-        xhr.send(body.toString());
-    }
-
-    function refreshCount() {
-        // Se actualiza dentro de refresh() con el count real del server.
+        xhr.onerror = function () { if (onFail) onFail(); };
+        var form = new URLSearchParams();
+        form.append('nonce', nonce);
+        for (var k in params) { form.append(k, params[k]); }
+        xhr.send(form.toString());
     }
 
     function renderItems(items) {
@@ -59,7 +57,7 @@
         if (!items || !items.length) {
             body.innerHTML = '<div class="ltms-minicart__empty">' +
                 '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' +
-                '<div>Tu carrito estÃƒÂ¡ vacÃƒÂ­o</div></div>';
+                '<div>Tu carrito está vacío</div></div>';
             return;
         }
         var html = '';
@@ -102,7 +100,7 @@
             if (continueBtn) continueBtn.setAttribute('href', data.cart_url || cartUrl);
             if (data.count != null) {
                 var counters = document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count, [data-cart-count]');
-                for (var i = 0; i < counters.length; i++) counters[i].textContent = String(data.count);
+                for (var j = 0; j < counters.length; j++) counters[j].textContent = String(data.count);
             }
         });
     }
@@ -125,8 +123,8 @@
     function openAndRefresh() {
         open();
         refresh();
-        // Re-refresh a los 500ms para capturar el item reciÃƒÂ©n agregado por el
-        // path PV (data-pv-add-to-cart) cuyo AJAX puede aÃƒÂºn estar en vuelo.
+        // Re-refresh a los 500ms para capturar el item recién agregado por el
+        // path PV (data-pv-add-to-cart) cuyo AJAX puede aún estar en vuelo.
         if (openTimer) clearTimeout(openTimer);
         openTimer = setTimeout(refresh, 500);
     }
@@ -137,12 +135,21 @@
         body = $('.ltms-minicart__body');
     }
 
+    // Selectores de "icono del carrito" que deben abrir el drawer (no navegar):
+    //  - [data-ltms-open-cart] : opt-in explícito (topbar del storefront, etc.)
+    //  - .ltms-sf-topbar-cart  : icono del storefront LTMS
+    //  - .elementor-menu-cart__toggle : icono del menú-cart de Elementor (header)
+    function isCartIcon(el) {
+        if (!el || typeof el.closest !== 'function') return null;
+        return el.closest('[data-ltms-open-cart], .ltms-sf-topbar-cart, .elementor-menu-cart__toggle');
+    }
+
     function bind() {
+        // Bubble: acciones internas del drawer (qty / remove / close).
         document.addEventListener('click', function (e) {
             var el = e.target;
             if (!el || typeof el.closest !== 'function') return;
 
-            // Qty +/-
             var qtyBtn = el.closest('[data-ltms-qty]');
             if (qtyBtn) {
                 e.preventDefault();
@@ -156,7 +163,6 @@
                 return;
             }
 
-            // Remove
             var removeBtn = el.closest('[data-ltms-remove]');
             if (removeBtn) {
                 e.preventDefault();
@@ -164,19 +170,21 @@
                 return;
             }
 
-            // Close
             if (el.closest('.ltms-minicart__close') || el.closest('.ltms-minicart-overlay')) {
                 close();
                 return;
             }
-
-            // Open (cart icon / links marcados)
-            if (el.closest('[data-ltms-open-cart]')) {
-                e.preventDefault();
-                openAndRefresh();
-                return;
-            }
         });
+
+        // Capture: icono del carrito -> abrir drawer (y frenar el panel de cart
+        // nativo de Elementor para que solo se vea el nuestro).
+        document.addEventListener('click', function (e) {
+            var icon = isCartIcon(e.target);
+            if (!icon) return;
+            e.preventDefault();
+            e.stopPropagation();
+            openAndRefresh();
+        }, true);
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') close();
@@ -184,7 +192,7 @@
 
         // Path 1: WC native add-to-cart (PDP form submit + archive ajax_add_to_cart)
         document.addEventListener('added_to_cart', openAndRefresh);
-        if (window.jQuery) {
+        if (window.jQuery && window.jQuery(document.body)) {
             window.jQuery(document.body).on('added_to_cart', openAndRefresh);
         }
 

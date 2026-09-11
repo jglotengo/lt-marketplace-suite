@@ -84,6 +84,7 @@ final class CartDrawerNextTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( '.ltms-minicart__checkout', $css, 'CART-UX-NEXT: CTA checkout CSS presente.' );
 		$this->assertStringContainsString( '#E80001', $css, 'CART-UX-NEXT: el CTA checkout debe ser brand red.' );
 		$this->assertStringContainsString( 'body.ltms-minicart-locked{overflow:hidden;}', $css, 'CART-UX-NEXT: lock de scroll al abrir.' );
+		$this->assertStringContainsString( 'min-height:0', $css, 'CART-UX-NEXT: el body del drawer debe tener min-height:0 para poder scrollear (fix flexbox).' );
 		$this->assertStringNotContainsString( '.ltms-cart-drawer{', $css, 'CART-UX-NEXT: el CSS no debe definir el selector .ltms-cart-drawer (collision legacy).' );
 	}
 
@@ -92,6 +93,7 @@ final class CartDrawerNextTest extends LTMS_Unit_Test_Case {
 
 		$this->assertStringContainsString( 'added_to_cart', $js, 'CART-UX-NEXT: el JS debe abrir en el evento added_to_cart de WC.' );
 		$this->assertStringContainsString( 'data-pv-add-to-cart', $js, 'CART-UX-NEXT: el JS debe abrir en el click de data-pv-add-to-cart (design system).' );
+		$this->assertStringContainsString( '.elementor-menu-cart__toggle', $js, 'CART-UX-NEXT: el JS debe abrir el drawer desde el icono del carrito (Elementor menu-cart).' );
 		$this->assertStringContainsString( 'ltms_get_cart', $js, 'CART-UX-NEXT: el JS debe hidratar el drawer con ltms_get_cart.' );
 		$this->assertStringContainsString( 'ltms_drawer_update_qty', $js, 'CART-UX-NEXT: el JS debe usar ltms_drawer_update_qty para cantidad.' );
 		$this->assertStringContainsString( 'ltms_drawer_remove_item', $js, 'CART-UX-NEXT: el JS debe usar ltms_drawer_remove_item para eliminar.' );
