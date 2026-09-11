@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CART-CTA-CONTRAST` (botón "Finalizar compra" con texto azul sobre fondo rojo — bajo contraste)
+
+> El CTA del carrito es un `<a class="pv-btn--brand">` (fondo `--brand` #E80001). La regla del tema
+> `a { color: var(--primary) }` (azul #2563EB) sobreescribe el `color:#fff` de `.pv-btn--brand`, dejando
+> texto azul-sobre-rojo. Mismo patrón que `CART-EMPTY-CTA` (2026-09-05), que solo cubría el botón del
+> carrito vacío.
+
+- **Fix (`assets/css/ltms-cart.css` + `.min`):** regla `.pv-scope.pv-cart .pv-cart__cta a.pv-btn--brand
+  { color:#fff !important }` (+ `:hover/:focus/:visited`); el icono `currentColor` también pasa a blanco.
+  `ltms-cart.min.css` regenerado (`npm run build:css`).
+- **Cache-busting:** `LTMS_VERSION` 2.9.356 → 2.9.357.
+- **Test:** nueva suite `tests/unit/CartCtaContrastTest.php` (2 tests / 5 assertions, grupo
+  `audit-cart-cta`). Suite unit completa: 4,931 tests / 10,261 assertions, 0 failures, 3 skipped.
+
+---
+
 ### Fixed — `VTEX-PRICE-RECALC` backend (Kosmetic: la causa raíz de "precios de la integración inicial" era 537 productos duplicados huérfanos sin costo, no un bug de recálculo)
 
 > Tras el fix JS v2.9.356, Kosmetic confirmó que el recálculo seguía sin reflejarse. Diagnóstico backend
