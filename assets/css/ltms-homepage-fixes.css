@@ -232,7 +232,7 @@ html.wp-toolbar {
 
 /* ═══════════════════════════════════════════════════════════════
    HF-08: Product Cards — UX/UI mejorado para el loop del homepage
-   v3.0.0 — Carrusel scroll-snap en móvil, grid en desktop
+   v3.0.1 — Grid 2 columnas en móvil, grid en desktop
 
    HTML real del loop WooCommerce + WoodMart:
    <li class="product">
@@ -244,15 +244,14 @@ html.wp-toolbar {
      <div class="woocommerce-loop-product__buttons">...</div>
    </li>
 
-   ESTRATEGIA MÓVIL:
-   - El <ul.products> se convierte en contenedor de scroll horizontal
-     con scroll-snap-type para que cada card encaje perfectamente.
-   - Cada <li.product> tiene ancho fijo (42vw) y scroll-snap-align:start.
-   - El JS (HF-08-CAR) inyecta un hint visual "desliza →" la primera vez.
-   - Sin librerías externas, sin JS para el scroll, CSS puro.
+   ESTRATEGIA MÓVIL (HOME-PRODUCTS-2COL FIX, 2026-09-11):
+   - El <ul.products> es un grid de 2 columnas (paridad con el shop). Antes
+     era un carrusel horizontal scroll-snap (cards 42vw) que mostraba una sola
+     fila; se reemplazó por 2 columnas para que los productos hagan wrap.
+   - Sin librerías externas.
 
    ESTRATEGIA DESKTOP:
-   - Grid de 4 columnas estándar, sin cambios respecto a v2.
+   - Grid de 5 columnas estándar (elementor-grid columns-5), sin cambios.
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── DESKTOP: card base (igual que antes) ───────────────────────
@@ -468,20 +467,15 @@ html.wp-toolbar {
     min-width: unset !important;
 }
 
-/* ── MÓVIL: carrusel horizontal scroll-snap ────────────────────
-   HF-08-CAR: En pantallas ≤767px el grid de 2 columnas se
-   convierte en un carrusel deslizable con scroll-snap.
-
-   El truco clave: el <ul.products> necesita display:flex +
-   overflow-x:scroll para que los <li> se dispongan en fila.
-   Pero Elementor y WooCommerce inyectan display:grid o display:flex
-   con flex-wrap:wrap — hay que forzar con !important en TODOS
-   los selectores posibles que el tema pueda usar.
+/* ── MÓVIL: grid 2 columnas ──────────────────────────────────────
+   HOME-PRODUCTS-2COL FIX (2026-09-11): en pantallas ≤767px el loop de
+   productos del home se muestra como grid de 2 columnas (paridad con
+   el shop .pv-shop). Se reemplaza el carrusel horizontal scroll-snap
+   (cards 42vw) que mostraba una sola fila deslizable.
    ─────────────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
 
-    /* Wrapper: necesita overflow visible para que el carrusel
-       desborde horizontalmente más allá del padding del tema */
+    /* Wrapper: overflow normal (ya no desborda horizontalmente) */
     .elementor-wc-products,
     .elementor-wc-products .elementor-widget-container {
         overflow: visible !important;
@@ -489,55 +483,31 @@ html.wp-toolbar {
         padding-right: 0 !important;
     }
 
-    /* El <ul> se convierte en scroll container horizontal */
+    /* El <ul> es un grid de 2 columnas (no un scroll container) */
     .elementor-wc-products ul.products,
     .elementor-wc-products ul.products.columns-2,
     .elementor-wc-products ul.products.columns-4,
     .elementor-wc-products ul.products.elementor-grid {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-        overflow-y: visible !important;
-        scroll-snap-type: x mandatory !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important; /* Firefox */
-        -ms-overflow-style: none !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
         gap: 10px !important;
-        padding: 8px 16px 12px !important;
-        margin: 0 -16px !important; /* Sangría negativa para llegar al borde */
-        width: calc(100% + 32px) !important;
+        padding: 0 16px 12px !important;
+        margin: 0 !important;
+        width: 100% !important;
         box-sizing: border-box !important;
-        /* Anular grid del tema */
-        grid-template-columns: unset !important;
         list-style: none !important;
         align-items: stretch !important;
     }
 
-    /* Ocultar scrollbar en WebKit */
-    .elementor-wc-products ul.products::-webkit-scrollbar {
-        display: none !important;
-    }
-
-    /* Cada card: ancho fijo para que se vean 2.3 cards (el .3 da
-       el "peek" que indica que hay más para deslizar) */
+    /* Cada card ocupa su celda del grid (sin ancho fijo de carrusel) */
     .elementor-wc-products ul.products li.product {
-        flex: 0 0 42vw !important;
-        min-width: 42vw !important;
-        max-width: 42vw !important;
-        width: 42vw !important;
-        scroll-snap-align: start !important;
-        scroll-snap-stop: normal !important;
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
         border-radius: 10px !important;
-        /* Anular cualquier width que venga del tema */
         float: none !important;
         margin: 0 !important;
         padding: 0 !important;
-    }
-
-    /* Última card: padding-right extra para que no quede pegada al borde */
-    .elementor-wc-products ul.products li.product:last-child {
-        margin-right: 6px !important;
     }
 
     /* Card: imagen más compacta en cards angostas */
@@ -560,9 +530,7 @@ html.wp-toolbar {
         margin: 0 8px 8px !important;
     }
 
-    /* Botón: nowrap para que quepa en 1 línea dentro de la card de 42vw.
-       "AÑADIR AL CARRITO" a 11px cabe en ~160px (42vw de ~390px = ~164px).
-       Si el texto fuera más largo, el ellipsis lo corta limpiamente. */
+    /* Botón: nowrap para que quepa en 1 línea dentro de la card de 2 col */
     .elementor-wc-products ul.products li.product .button.add_to_cart_button,
     .elementor-wc-products ul.products li.product a.button {
         font-size: 11px !important;
@@ -576,23 +544,6 @@ html.wp-toolbar {
 
     .elementor-wc-products ul.products li.product .woocommerce-loop-product__buttons {
         padding: 0 8px 10px !important;
-    }
-
-    /* Hint visual "desliza →" — inyectado por JS (HF-08-CAR) */
-    .ltms-carousel-hint {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-        font-size: 11px !important;
-        color: #767676 !important;
-        padding: 4px 16px 0 !important;
-        margin-top: 2px !important;
-    }
-
-    .ltms-carousel-hint svg {
-        width: 14px !important;
-        height: 14px !important;
-        flex-shrink: 0 !important;
     }
 }
 

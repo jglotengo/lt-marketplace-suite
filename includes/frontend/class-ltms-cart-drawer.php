@@ -59,17 +59,23 @@ class LTMS_Cart_Drawer {
      */
     public static function enqueue_assets(): void {
         $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.0.0';
+        // ?v= adicional en la URL: SiteGround Optimizer remueve el ?ver= estándar
+        // de WP, así que forzamos el cache-bust con un query param que no toca
+        // (patrón de ltms-ux-enhancements). Sin esto, el navegador sirve la
+        // versión vieja del drawer tras un bump de LTMS_VERSION.
+        $css_url = LTMS_ASSETS_URL . 'css/ltms-cart-drawer.css?v=' . rawurlencode( $ver );
+        $js_url  = ltms_asset_url( 'js/ltms-cart-drawer' ) . '?v=' . rawurlencode( $ver );
 
         wp_enqueue_style(
             'ltms-cart-drawer',
-            LTMS_ASSETS_URL . 'css/ltms-cart-drawer.css',
+            $css_url,
             [],
             $ver
         );
 
         wp_enqueue_script(
             'ltms-cart-drawer',
-            ltms_asset_url( 'js/ltms-cart-drawer' ),
+            $js_url,
             [],
             $ver,
             true

@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Changed — `HOME-PRODUCTS-2COL` (home móvil: loop de productos de 1-fila carrusel a 2 columnas)
+
+> En móvil, el widget de productos del home (`.elementor-wc-products`) se mostraba como carrusel horizontal
+> scroll-snap (cards `42vw`, una sola fila). Se reemplaza por un grid de 2 columnas (paridad con el shop).
+
+- **`assets/css/ltms-homepage-fixes.css`:** el bloque móvil `HF-08` (≤767px) pasa de `display:flex + overflow-x`
+  a `display:grid + grid-template-columns:repeat(2,1fr)`; se eliminan `scroll-snap` y el ancho fijo `42vw`.
+- **`assets/js/ltms-homepage-fixes.js` + `.min`:** eliminado `injectCarouselHint()` y el hint "Desliza para ver
+  más" (ya no hay carrusel).
+- **`includes/frontend/class-ltms-cart-drawer.php`:** cache-busting robusto del mini-cart — `?v=` manual en la
+  URL de CSS/JS (SG Optimizer remueve el `?ver=` estándar de WP), para que el navegador no sirva la versión vieja.
+- **Test:** nueva suite `tests/unit/HomeProductsTwoColTest.php` (3 tests / 8 assertions, grupo `audit-home-2col`).
+  Suite unit completa: 4,939 tests / 10,291 assertions, 0 failures, 3 skipped.
+
+---
+
 ### Fixed — `CART-UX-NEXT` (mini-cart: scroll al agregar items + apertura desde el icono del carrito en todas las páginas)
 
 - **Scroll roto (flexbox):** `.ltms-minicart__body` era `flex:1` sin `min-height:0` → al agregar items
