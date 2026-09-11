@@ -276,6 +276,19 @@ body.admin-bar .pv-scope.pv-cart .pv-cart__summary[data-pv-sticky]{top:52px;}
 .pv-scope.pv-cart .pv-cart__checkout-cta{height:56px;font-size:16px;font-weight:800;letter-spacing:.01em;}
 .pv-scope.pv-cart .pv-cart__continue-cta{height:46px;font-size:14px;font-weight:600;}
 
+/* CART-CTA-CONTRAST FIX (2026-09-10): el CTA "Finalizar compra" es un
+   <a class="pv-btn--brand"> (fondo rojo --brand #E80001). La regla del tema
+   `a { color: var(--primary) }` (azul #2563EB) sobreescribe el color:#fff de
+   .pv-btn--brand, dejando texto azul-sobre-rojo (bajo contraste). Forzar
+   blanco — paridad con CART-EMPTY-CTA FIX (ver abajo). :hover/:focus/:visited
+   incluidos para empatar la especificidad del tema. */
+.pv-scope.pv-cart .pv-cart__cta a.pv-btn--brand,
+.pv-scope.pv-cart .pv-cart__cta a.pv-btn--brand:hover,
+.pv-scope.pv-cart .pv-cart__cta a.pv-btn--brand:focus,
+.pv-scope.pv-cart .pv-cart__cta a.pv-btn--brand:visited {
+    color: #fff !important;
+}
+
 /* AUDIT-FE-CART-009 FIX: botón "Vaciar carrito" en el header.
  * Variante danger del ghost button (rojo sutil para indicar acción
  * destructiva). Estados: hover refuerza brand-danger, is-loading
