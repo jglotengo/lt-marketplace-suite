@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Added — `SHOP-FILTERS` (filtros y herramientas de UX en /tienda/)
+
+> /tienda/ no tenía filtros (solo productos + orden nativo). Se añade un sidebar de filtros + toolbar,
+> reutilizando las clases del design system v2.9.191 ("SHOP PAGE IMPROVEMENTS") que ya existían en CSS
+> pero nunca se renderizaban en el template.
+
+- **`includes/frontend/templates/archive-product.php`:** sidebar de filtros (Categoría por `product_cat` con
+  conteo, Precio `min_price`/`max_price`, Disponibilidad "Solo en stock") + toolbar con conteo de resultados,
+  orden (WC) y **toggle de vista grid/list** + **chips de filtros activos** ("Limpiar todo"). Cada link preserva
+  los demás parámetros activos.
+- **`includes/frontend/class-ltms-native-templates.php`:** nuevo `apply_shop_filters()` enganchado a
+  `woocommerce_product_query` — aplica `product_cat` (solo shop), `min_price`/`max_price` (meta `_price`,
+  NUMERIC) e `instock` (meta `_stock_status`), con sanitización.
+- **`assets/css/ltms-plaza-viva.css` (+ `.min`):** layout grid sidebar+main, toolbar, toggle de vista, chips,
+  links de filtro y vista **lista** (1 col, imagen a la izquierda). Móvil: sidebar slide-in + botón "Filtros".
+- **`assets/js/ltms-homepage-fixes.js` (+ `.min`):** `initShopFilters()` (toggle móvil abrir/cerrar + `Escape`).
+- **Test:** nueva suite `tests/unit/ShopFiltersTest.php` (5 tests / 23 assertions, grupo `audit-shop-filters`).
+  Suite unit completa: 4,944 tests / 10,314 assertions, 0 failures, 3 skipped.
+
+---
+
 ### Changed — `HOME-PRODUCTS-2COL` (home móvil: loop de productos de 1-fila carrusel a 2 columnas)
 
 > En móvil, el widget de productos del home (`.elementor-wc-products`) se mostraba como carrusel horizontal

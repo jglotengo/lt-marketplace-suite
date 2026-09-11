@@ -89,6 +89,10 @@ class LTMS_Native_Templates {
         // Body class para scope CSS.
         add_filter( 'body_class', [ __CLASS__, 'body_class' ] );
 
+        // SHOP-FILTERS FIX (2026-09-11): aplicar los filtros de /tienda/
+        // (categoría, precio, stock) al query principal del catálogo.
+        add_action( 'woocommerce_product_query', [ __CLASS__, 'apply_shop_filters' ], 10, 1 );
+
         // DEAD-CODE FIX (2026-09-10): las rewrite rules custom (seguimiento/ayuda)
         // + el query var 'ltms_page' + is_vendor_store_page() quedaron
         // deshabilitados desde 2026-07-18 ("causing shop page crash") y nunca se
@@ -99,6 +103,61 @@ class LTMS_Native_Templates {
         // vendor-store.php (design system Plaza Viva, @since 3.0.0) queda
         // "declared, awaiting wiring" (sin runtime consumer; la vitrina viva es
         // LTMS_Vendor_Storefront en /vendedor/{slug}/). Ver LECCIONES #161.
+    }
+
+    /**
+     * SHOP-FILTERS FIX (2026-09-11): aplica los filtros del sidebar de /tienda/
+     * al query del catálogo. WC ya maneja `orderby` y `s`; aquí se añaden:
+     *  - `product_cat` (tax query, solo en la shop page — las taxonomías ya
+     *    filtran por su cuenta en is_product_taxonomy).
+     *  - `min_price` / `max_price` (meta query NUMERIC sobre `_price`).
+     *  - `instock` (meta query sobre `_stock_status` = instock).
+     * Se registra en init() vía woocommerce_product_query (prioridad 10).
+     *
+     * @param \WP_Query $q Query principal del loop de productos.
+     */
+    public static function apply_shop_filters( \WP_Query $q ): void {
+        if ( is_admin() ) return;
+        if ( ! $q->is_main_query() ) return;
+        if ( ! ( is_shop() || is_product_taxonomy() ) ) return;
+        if ( 'product' !== $q->get( 'post_type' ) ) return;
+
+        $meta_query = (array) $q->get( 'meta_query' );
+        $tax_query  = (array) $q->get( 'tax_query' );
+
+        // Categoría (solo shop page con ?product_cat=).
+        if ( is_shop() && ! empty( $_GET['product_cat'] ) ) {
+            $cat_slug = sanitize_title( wp_unslash( $_GET['product_cat'] ) );
+            if ( '' !== $cat_slug ) {
+                $tax_query[] = [
+                    'taxonomy' => 'product_cat',
+                    'field'    => 'slug',
+                    'terms'    => $cat_slug,
+                ];
+            }
+        }
+
+        // Precio (>= min, <= max).
+        if ( isset( $_GET['min_price'] ) && '' !== $_GET['min_price'] ) {
+            $min = (float) sanitize_text_field( wp_unslash( $_GET['min_price'] ) );
+            $meta_query[] = [ 'key' => '_price', 'value' => $min, 'compare' => '>=', 'type' => 'NUMERIC' ];
+        }
+        if ( isset( $_GET['max_price'] ) && '' !== $_GET['max_price'] ) {
+            $max = (float) sanitize_text_field( wp_unslash( $_GET['max_price'] ) );
+            $meta_query[] = [ 'key' => '_price', 'value' => $max, 'compare' => '<=', 'type' => 'NUMERIC' ];
+        }
+
+        // Stock ("En stock").
+        if ( ! empty( $_GET['instock'] ) ) {
+            $meta_query[] = [ 'key' => '_stock_status', 'value' => 'instock' ];
+        }
+
+        if ( ! empty( $meta_query ) ) {
+            $q->set( 'meta_query', $meta_query );
+        }
+        if ( ! empty( $tax_query ) ) {
+            $q->set( 'tax_query', $tax_query );
+        }
     }
 
     /**

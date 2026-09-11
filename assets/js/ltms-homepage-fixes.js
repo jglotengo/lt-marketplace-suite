@@ -218,11 +218,54 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
+       SHOP-FILTERS (2026-09-11): toggle móvil del sidebar de filtros
+       de /tienda/ (abrir/cerrar el panel slide-in). Se auto-deshabilita
+       si no existen los elementos (data-pv-open-filters).
+       ══════════════════════════════════════════════════════════════ */
+    function initShopFilters() {
+        var sidebar = document.getElementById('pv-shop-filters');
+        if (!sidebar) return;
+        var overlay = document.querySelector('.pv-shop__filters-overlay');
+
+        function open() {
+            sidebar.classList.add('is-open');
+            if (overlay) overlay.classList.add('is-open');
+            document.body.classList.add('ltms-filters-open');
+        }
+        function close() {
+            sidebar.classList.remove('is-open');
+            if (overlay) overlay.classList.remove('is-open');
+            document.body.classList.remove('ltms-filters-open');
+        }
+
+        document.addEventListener('click', function (e) {
+            var t = e.target;
+            if (!t || typeof t.closest !== 'function') return;
+            if (t.closest('[data-pv-open-filters]')) {
+                e.preventDefault();
+                open();
+                return;
+            }
+            if (t.closest('[data-pv-close-filters]')) {
+                close();
+                return;
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') close();
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        Init — ejecutar todo en DOMContentLoaded
        ══════════════════════════════════════════════════════════════ */
     ready(function () {
         // YouTube facade — aplica en todas las páginas (hay videos en varias)
         fixYouTube();
+
+        // Sidebar de filtros del shop (toggle móvil) — se auto-guarda.
+        initShopFilters();
 
         // Resto solo en homepage
         if (isHomePage()) {
