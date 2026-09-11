@@ -2093,12 +2093,30 @@ body.ltms-filters-open{overflow:hidden;}
 .pv-shop__active-filter--clear:hover{background:var(--text-2);color:#fff;}
 
 /* Vista lista: 1 columna, imagen izquierda */
+/* SHOP-LIST-BTN FIX (2026-09-11): el botón "Añadir al carrito" se desbordaba
+   de la card en vista lista. Causa raíz: el link y el título no eran
+   encogibles (sin min-width:0) y el botón heredaba width:100% +
+   white-space:normal, enrollándose en 2 líneas o quedando recortado por el
+   overflow:hidden de la card. Se fuerza: link/título encogibles, precio en una
+   línea, botón con ancho de contenido (nowrap) y wrap a fila propia en móvil. */
 .pv-shop--list ul.products{grid-template-columns:1fr !important;}
-.pv-shop--list ul.products li.product{flex-direction:row !important;align-items:center;}
-.pv-shop--list ul.products li.product .woocommerce-loop-product__link{flex:1 1 auto !important;flex-direction:row !important;align-items:center;}
+.pv-shop--list ul.products li.product{flex-direction:row !important;align-items:center !important;}
+.pv-shop--list ul.products li.product .woocommerce-loop-product__link{flex:1 1 auto !important;min-width:0 !important;flex-direction:row !important;align-items:center !important;gap:16px !important;}
 .pv-shop--list ul.products li.product .woocommerce-loop-product__link img{width:120px !important;height:120px !important;flex:0 0 120px !important;aspect-ratio:unset !important;object-fit:contain !important;}
-.pv-shop--list ul.products li.product .woocommerce-loop-product__title{min-height:unset !important;}
-.pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{flex:0 0 auto !important;width:auto !important;min-width:150px;}
+.pv-shop--list ul.products li.product .woocommerce-loop-product__title{flex:1 1 auto !important;min-width:0 !important;min-height:unset !important;margin:0 !important;-webkit-line-clamp:2 !important;}
+.pv-shop--list ul.products li.product .price{flex:0 0 auto !important;margin:0 !important;white-space:nowrap !important;}
+.pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{flex:0 0 auto !important;width:auto !important;min-width:0 !important;margin:0 0 0 16px !important;padding:0 !important;}
+.pv-shop--list ul.products li.product .button.add_to_cart_button,
+.pv-shop--list ul.products li.product a.button{display:inline-flex !important;align-items:center !important;justify-content:center !important;width:auto !important;min-width:150px !important;margin:0 !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;}
+
+/* SHOP-LIST-BTN FIX (2026-09-11): en móvil la card lista envuelve a 2 filas
+   (link arriba, botón abajo a ancho completo) para que el botón nunca
+   desborde horizontalmente con imágenes de 120px + título. */
+@media (max-width:767px){
+    .pv-shop--list ul.products li.product{flex-wrap:wrap !important;}
+    .pv-shop--list ul.products li.product .woocommerce-loop-product__link{flex:1 1 100% !important;}
+    .pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{flex:1 1 100% !important;margin:10px 0 0 0 !important;}
+}
 
 /* Overlay de filtros (móvil) */
 .pv-shop__filters-overlay{display:none;}
