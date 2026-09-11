@@ -1,0 +1,109 @@
+/* =============================================================================
+ * LTMS Cart Drawer — mini-cart lateral (slide-in) autónomo.
+ *
+ * CART-UX-NEXT (2026-09-10, v2.9.357): reimplementación ROBUSTA del drawer que
+ * v2.9.208 había desactivado. A diferencia del intento anterior (que inyectaba
+ * <script> inline vía output-buffer y dependía de jQuery legacy), este CSS es
+ * autocontenido (no usa tokens de .pv-scope) y acompaña a un HTML estático
+ * renderizado en wp_footer + JS versionado (ver class-ltms-cart-drawer.php).
+ *
+ * Namespace .ltms-minicart-* (NO .ltms-cart-drawer-*): el drawer legacy de
+ * ltms-ux-enhancements.js y sus hojas (ltms-ux-enhancements.css /
+ * ltms-frontend-extensions.css) ya definen .ltms-cart-drawer* — usar el mismo
+ * nombre colisiona (cascada según orden de carga, doble render si openCartDrawer
+ * legacy llegara a dispararse). .ltms-minicart-* es único y autocontenido.
+ * ========================================================================== */
+
+body.ltms-minicart-locked{overflow:hidden;}
+
+.ltms-minicart-overlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,.5);
+    opacity:0;visibility:hidden;
+    transition:opacity .25s ease,visibility .25s ease;
+    z-index:999998;
+}
+.ltms-minicart-overlay.is-open{opacity:1;visibility:visible;}
+
+.ltms-minicart{
+    position:fixed;top:0;right:0;bottom:0;
+    width:100%;max-width:420px;
+    background:#fff;
+    transform:translateX(100%);
+    transition:transform .28s ease;
+    z-index:999999;
+    display:flex;flex-direction:column;
+    box-shadow:-8px 0 28px rgba(0,0,0,.16);
+}
+.ltms-minicart.is-open{transform:translateX(0);}
+
+.ltms-minicart__header{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:16px 20px;border-bottom:1px solid #ececec;
+}
+.ltms-minicart__title{
+    display:flex;align-items:center;gap:8px;margin:0;font-size:17px;font-weight:800;color:#1a1f2e;
+}
+.ltms-minicart__title svg{color:#1a1f2e;}
+.ltms-minicart__count{font-size:12.5px;color:#6b7280;font-weight:600;}
+.ltms-minicart__close{
+    background:transparent;border:none;cursor:pointer;padding:6px;color:#6b7280;
+    display:flex;align-items:center;justify-content:center;border-radius:8px;
+}
+.ltms-minicart__close:hover{background:#f3f4f6;color:#1a1f2e;}
+
+.ltms-minicart__body{flex:1;overflow-y:auto;padding:0 20px;}
+
+.ltms-minicart__item{
+    display:flex;gap:12px;padding:14px 0;border-bottom:1px solid #f0f0f0;align-items:flex-start;
+}
+.ltms-minicart__item-img{width:60px;height:60px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#f8f8f8;}
+.ltms-minicart__item-img img{width:100%;height:100%;object-fit:contain;}
+.ltms-minicart__item-info{flex:1;min-width:0;}
+.ltms-minicart__item-name{
+    font-size:13.5px;font-weight:600;color:#1a1f2e;line-height:1.35;margin:0 0 2px;
+    text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ltms-minicart__item-name:hover{color:#E80001;}
+.ltms-minicart__item-meta{font-size:12px;color:#8a8f98;margin:0 0 6px;}
+.ltms-minicart__item-line{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ltms-minicart__item-price{font-size:13.5px;font-weight:700;color:#1a1f2e;}
+.ltms-minicart__qty{display:inline-flex;align-items:center;gap:0;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;}
+.ltms-minicart__qty button{
+    width:30px;height:30px;border:none;background:#fafafa;color:#1a1f2e;font-size:16px;font-weight:700;cursor:pointer;
+}
+.ltms-minicart__qty button:hover{background:#f0f0f0;}
+.ltms-minicart__qty span{min-width:30px;text-align:center;font-size:13.5px;font-weight:700;color:#1a1f2e;}
+.ltms-minicart__item-remove{
+    background:transparent;border:none;color:#c9cdd4;cursor:pointer;font-size:18px;line-height:1;padding:0;
+}
+.ltms-minicart__item-remove:hover{color:#E80001;}
+
+.ltms-minicart__empty{padding:48px 16px;text-align:center;color:#8a8f98;font-size:14px;}
+.ltms-minicart__empty svg{color:#d1d5db;margin-bottom:10px;}
+
+.ltms-minicart__footer{
+    padding:16px 20px;border-top:1px solid #ececec;display:flex;flex-direction:column;gap:10px;
+}
+.ltms-minicart__subtotal{
+    display:flex;align-items:center;justify-content:space-between;font-size:14.5px;
+}
+.ltms-minicart__subtotal-label{color:#565c66;font-weight:600;}
+.ltms-minicart__subtotal-value{font-size:18px;font-weight:800;color:#1a1f2e;}
+.ltms-minicart__actions{display:flex;flex-direction:column;gap:8px;}
+.ltms-minicart__checkout{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    height:52px;border-radius:10px;font-size:15px;font-weight:800;
+    background:#E80001;color:#fff !important;text-decoration:none;
+}
+.ltms-minicart__checkout:hover{background:#C70001;color:#fff !important;}
+.ltms-minicart__continue{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    height:44px;border-radius:10px;font-size:14px;font-weight:600;
+    background:transparent;border:1px solid #e5e7eb;color:#1a1f2e;text-decoration:none;
+}
+.ltms-minicart__continue:hover{border-color:#1a1f2e;}
+
+@media (max-width:480px){
+    .ltms-minicart{max-width:100%;}
+}

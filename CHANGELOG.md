@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Added — `CART-UX-NEXT` (mini-cart lateral reimplementado, robusto — se abre al añadir al carrito)
+
+> El drawer se había desactivado en v2.9.208 tras 4 versiones fallidas en SiteGround. Se
+> reimplementó evitando los 3 puntos de fallo históricos: (1) HTML estático en `wp_footer`
+> (sin `<script>` inline que SG strips), (2) JS external versionado con config vía
+> `wp_localize_script`, (3) AJAX vía `XMLHttpRequest` (no `fetch()`). Namespace `.ltms-minicart-*`
+> para no colisionar con el drawer legacy de `ltms-ux-enhancements.js`.
+
+- **`includes/frontend/class-ltms-cart-drawer.php`:** `init()` re-agrega `add_action('wp_footer',
+  render_drawer_html', 30)` + `add_action('wp_enqueue_scripts', enqueue_assets)`; nuevo
+  `enqueue_assets()` encola `ltms-cart-drawer.css` + `ltms-cart-drawer.js` (vía `ltms_asset_url`,
+  `.min`) y expone `ltmsCartDrawer` (ajaxUrl/nonce `ltms_ux_nonce`/cartUrl/checkoutUrl) con
+  `wp_localize_script`. `render_drawer_html()` reescrito como skeleton estático `.ltms-minicart-*`
+  (overlay + aside + body + footer con "Finalizar compra"/"Ver carrito"), sin estilos inline ni
+  `<script>`.
+- **`assets/css/ltms-cart-drawer.css`:** hoja autocontenida `.ltms-minicart-*` (no depende de tokens
+  `.pv-scope`). CTA "Finalizar compra" brand red `#E80001` con `color:#fff !important` (paridad con
+  CART-CTA-CONTRAST).
+- **`assets/js/ltms-cart-drawer.js` + `.min`:** vanilla + XHR; abre/actualiza el drawer en `added_to_cart`
+  (WC) y en click de `[data-pv-add-to-cart]`; hidrata contenido con `ltms_get_cart`; cantidad/eliminar
+  con `ltms_drawer_update_qty`/`ltms_drawer_remove_item`; cierre con overlay, botón y `Escape`.
+- **Cache-busting:** `LTMS_VERSION` 2.9.357 → 2.9.358.
+- **Test:** nueva suite `tests/unit/CartDrawerNextTest.php` (5 tests / 19 assertions, grupo
+  `audit-minicart`). Suite unit completa: 4,936 tests / 10,281 assertions, 0 failures, 3 skipped.
+
+---
+
 ### Fixed — `CART-CTA-CONTRAST` (botón "Finalizar compra" con texto azul sobre fondo rojo — bajo contraste)
 
 > El CTA del carrito es un `<a class="pv-btn--brand">` (fondo `--brand` #E80001). La regla del tema

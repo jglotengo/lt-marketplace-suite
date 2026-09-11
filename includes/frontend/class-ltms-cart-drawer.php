@@ -1,13 +1,13 @@
 <?php
 /**
- * LTMS Cart Drawer — Carrito lateral (slide-in) con upsells + free shipping bar.
+ * LTMS Cart Drawer â€” Carrito lateral (slide-in) con upsells + free shipping bar.
  *
  * Reemplaza el redirect a /cart con un drawer AJAX que se desliza desde la derecha.
  * Incluye:
- *  - Barra de progreso de envío gratis (conecta con MODE_HYBRID threshold).
- *  - Upsells: productos del mismo vendor que ya están en el carrito.
- *  - Countdown timer: "Tu carrito está reservado por X minutos".
- *  - Integración con WooCommerce AJAX fragments.
+ *  - Barra de progreso de envÃ­o gratis (conecta con MODE_HYBRID threshold).
+ *  - Upsells: productos del mismo vendor que ya estÃ¡n en el carrito.
+ *  - Countdown timer: "Tu carrito estÃ¡ reservado por X minutos".
+ *  - IntegraciÃ³n con WooCommerce AJAX fragments.
  *
  * @package LTMS
  * @version 2.9.2
@@ -18,24 +18,22 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 class LTMS_Cart_Drawer {
 
     public static function init(): void {
-        // v2.9.208 — DECISIÓN ARQUITECTÓNICA: Eliminar el cart drawer.
-        // Después de 4 versiones fallidas (v2.9.204 → v2.9.207) intentando
-        // estabilizar el drawer en el entorno hostil de SiteGround (HTML cache
-        // strips inline scripts, mod_security bloquea AJAX, múltiples capas
-        // de cache causan stale JS), el costo de mantenimiento supera el
-        // beneficio. La página /cart nativa de WC funciona confiablemente y ya
-        // tiene steppers +/- vía PV.enhanceCartPage() desde v2.9.204.
-        //
-        // Lo que se mantiene activo:
-        //  - AJAX endpoints (backward compat para JS cacheado)
-        //  - add_drawer_fragment (WC fragments, no rompe nada)
-        //
-        // Lo que se desactiva:
-        //  - render_drawer_html (no dibuja el drawer estático)
-        //  - start_output_buffer (no inyecta inline JS)
-        //  - disable_cart_redirect (WC usa su setting nativo → redirect a /cart)
+        // CART-UX-NEXT (2026-09-10, v2.9.357): REACTIVACIÃ“N ROBUSTA del mini-cart.
+        // El drawer se desactivÃ³ en v2.9.208 tras 4 versiones fallidas porque (1)
+        // inyectaba <script> inline vÃ­a output-buffer (SG strips inline scripts),
+        // (2) dependÃ­a de fetch() (mod_security soltaba POST), y (3) jQuery legacy.
+        // El enfoque nuevo evita esos 3 puntos:
+        //   1. HTML estÃ¡tico renderizado en wp_footer (render_drawer_html, SIN
+        //      <script> inline).
+        //   2. JS external versionado (ltms-cart-drawer.js, vÃ­a ltms_asset_url) +
+        //      config por wp_localize_script (mecanismo estÃ¡ndar que SG no strips).
+        //   3. AJAX vÃ­a XMLHttpRequest (no fetch) contra los endpoints ya
+        //      existentes (ltms_get_cart / ltms_drawer_update_qty /
+        //      ltms_drawer_remove_item), nonce ltms_ux_nonce.
+        // El redirect a /cart de WC queda intacto (setting nativo): si estÃ¡ ON,
+        // WC redirige; el drawer no interfiere con esa decisiÃ³n.
 
-        // AJAX: mantener endpoints por compatibilidad con JS cacheado.
+        // AJAX: endpoints de datos (backward compat + fuente del drawer nuevo).
         add_action( 'wp_ajax_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
         add_action( 'wp_ajax_nopriv_ltms_refresh_drawer', [ __CLASS__, 'ajax_refresh_drawer' ] );
         add_action( 'wp_ajax_ltms_drawer_remove_item', [ __CLASS__, 'ajax_remove_item' ] );
@@ -46,15 +44,43 @@ class LTMS_Cart_Drawer {
         // Hook into WC add_to_cart fragments (inofensivo, mantiene contador).
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'add_drawer_fragment' ] );
 
-        // CART-UX-001 FIX (2026-09-04): barra de progreso de envío gratis dentro del
+        // CART-UX-001 FIX (2026-09-04): barra de progreso de envÃ­o gratis dentro del
         // mini-cart / side-cart de Elementor (menu-cart). Reusa get_shipping_bar_data().
         add_action( 'woocommerce_before_mini_cart', [ __CLASS__, 'render_mini_cart_shipping_bar' ], 5 );
 
-        // v2.9.208: NO desactivar el redirect de WC — usar setting nativo
-        // (WooCommerce > Settings > Products > Add to cart > "Redirect to the
-        // cart page after successful addition"). Si está activado en WP admin,
-        // WC redirige a /cart después de add-to-cart. Es lo más confiable.
-        // add_filter( 'woocommerce_cart_redirect_after_add', [ __CLASS__, 'disable_cart_redirect' ] );
+        // CART-UX-NEXT (2026-09-10): renderizar skeleton + assets del drawer.
+        add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ], 30 );
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+    }
+
+    /**
+     * CART-UX-NEXT (2026-09-10): encola CSS + JS del drawer y expone la config
+     * al JS vÃ­a wp_localize_script (no script inline). Ver el comment de init().
+     */
+    public static function enqueue_assets(): void {
+        $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.0.0';
+
+        wp_enqueue_style(
+            'ltms-cart-drawer',
+            LTMS_ASSETS_URL . 'css/ltms-cart-drawer.css',
+            [],
+            $ver
+        );
+
+        wp_enqueue_script(
+            'ltms-cart-drawer',
+            ltms_asset_url( 'js/ltms-cart-drawer' ),
+            [],
+            $ver,
+            true
+        );
+
+        wp_localize_script( 'ltms-cart-drawer', 'ltmsCartDrawer', [
+            'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+            'nonce'       => wp_create_nonce( 'ltms_ux_nonce' ),
+            'cartUrl'     => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
+            'checkoutUrl' => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '',
+        ] );
     }
 
     /**
@@ -71,7 +97,7 @@ class LTMS_Cart_Drawer {
     }
 
     /**
-     * v2.9.59: Callback del output buffer — inyecta el script inline
+     * v2.9.59: Callback del output buffer â€” inyecta el script inline
      * antes de </head> o al inicio de <body>.
      */
     public static function inject_cart_script_into_html( string $html ): string {
@@ -88,7 +114,7 @@ class LTMS_Cart_Drawer {
             return substr( $html, 0, $pos ) . $script . substr( $html, $pos );
         }
 
-        // Fallback: inyectar después de <body>
+        // Fallback: inyectar despuÃ©s de <body>
         $pos = stripos( $html, '<body' );
         if ( $pos !== false ) {
             $close_tag = stripos( $html, '>', $pos );
@@ -115,7 +141,7 @@ class LTMS_Cart_Drawer {
     }
 
     /**
-     * v2.9.59: Devuelve el código JS del script inline.
+     * v2.9.59: Devuelve el cÃ³digo JS del script inline.
      */
     private static function get_cart_script_js( string $ajax_url, string $nonce ): string {
         $ajax_url_js = esc_js( $ajax_url );
@@ -188,12 +214,12 @@ window.LTMS_CART.ajax = function(body, onSuccess, onError) {
             } catch (parseErr) {
                 window.LTMS_CART.err('AJAX response not JSON', xhr.responseText.substring(0, 200));
                 if (onError) onError(null, xhr.status);
-                else LTMS_CART.notify('Error de red — ver consola');
+                else LTMS_CART.notify('Error de red â€” ver consola');
             }
         } else {
             window.LTMS_CART.err('AJAX HTTP ' + xhr.status, xhr.responseText.substring(0, 200));
             if (onError) onError(null, xhr.status);
-            else LTMS_CART.notify('HTTP ' + xhr.status + ' — ver consola');
+            else LTMS_CART.notify('HTTP ' + xhr.status + ' â€” ver consola');
         }
     };
     xhr.onerror = function() {
@@ -339,16 +365,16 @@ JS;
     }
 
     /**
-     * v2.9.208: Desactiva el redirect a /cart después de add-to-cart.
+     * v2.9.208: Desactiva el redirect a /cart despuÃ©s de add-to-cart.
      *
-     * Este método existía para que el cart drawer maneje el add-to-cart en
-     * vez de redirigir. Como el drawer se eliminó en v2.9.208, este filtro
+     * Este mÃ©todo existÃ­a para que el cart drawer maneje el add-to-cart en
+     * vez de redirigir. Como el drawer se eliminÃ³ en v2.9.208, este filtro
      * ya NO se registra en init(). WC usa su setting nativo:
      * WooCommerce > Settings > Products > Add to cart >
-     *   ☑ Redirect to the cart page after successful addition
+     *   â˜‘ Redirect to the cart page after successful addition
      *
-     * Si quieres forzar el redirect por código (ignorando el setting),
-     * descomenta la línea en init() que devuelve true:
+     * Si quieres forzar el redirect por cÃ³digo (ignorando el setting),
+     * descomenta la lÃ­nea en init() que devuelve true:
      *   add_filter( 'woocommerce_cart_redirect_after_add', '__return_true' );
      */
     public static function disable_cart_redirect(): bool {
@@ -356,7 +382,7 @@ JS;
     }
 
     /**
-     * Añade un fragment para que el JS sepa que el carrito cambió.
+     * AÃ±ade un fragment para que el JS sepa que el carrito cambiÃ³.
      */
     public static function add_drawer_fragment( array $fragments ): array {
         $fragments['div.ltms-drawer-fragments'] = '<div class="ltms-drawer-fragments" data-cart-count="' . esc_attr( WC()->cart ? WC()->cart->get_cart_contents_count() : 0 ) . '"></div>';
@@ -364,51 +390,48 @@ JS;
     }
 
     /**
-     * Renderiza el HTML del drawer en el footer.
+     * Renderiza el skeleton del drawer en el footer.
+     *
+     * CART-UX-NEXT (2026-09-10): skeleton estÃ¡tico y SIN <script> inline
+     * (CSP-compliant). El estado visible/oculto se controla por CSS
+     * (.is-open) y el contenido se hidrata vÃ­a ltms_get_cart en el JS.
      */
     public static function render_drawer_html(): void {
+        $cart_url     = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' );
+        $checkout_url = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/finalizar-compra/' );
         ?>
-        <!-- Drawer Overlay -->
-        <div id="ltms-cart-drawer-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99998;opacity:0;transition:opacity 0.3s;"></div>
-
-        <!-- Cart Drawer -->
-        <div id="ltms-cart-drawer" style="position:fixed;top:0;right:-450px;width:100%;max-width:420px;height:100vh;background:#fff;z-index:99999;box-shadow:-4px 0 20px rgba(0,0,0,0.15);transition:right 0.3s ease-in-out;display:flex;flex-direction:column;">
-
-            <!-- Header -->
-            <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:#fff;">
-                <h3 style="margin:0;font-size:16px;font-weight:700;">
-                    &#x1F6D2; <?php esc_html_e( 'Tu carrito', 'ltms' ); ?>
-                    <span id="ltms-drawer-count" style="font-size:13px;color:#6b7280;font-weight:400;"></span>
-                </h3>
-                <button type="button" id="ltms-drawer-close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
-            </div>
-
-            <!-- Free Shipping Progress Bar -->
-            <div id="ltms-drawer-shipping-bar" style="padding:12px 20px;background:#f0fdf4;border-bottom:1px solid #d1fae5;"></div>
-
-            <!-- Countdown Timer -->
-            <div id="ltms-drawer-countdown" style="padding:8px 20px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e;text-align:center;display:none;"></div>
-
-            <!-- Cart Items (scrollable) -->
-            <div id="ltms-drawer-items" style="flex:1;overflow-y:auto;padding:0 20px;"></div>
-
-            <!-- Upsells -->
-            <div id="ltms-drawer-upsells" style="padding:12px 20px;border-top:1px solid #e5e7eb;background:#f9fafb;display:none;"></div>
-
-            <!-- Footer -->
-            <div id="ltms-drawer-footer" style="padding:16px 20px;border-top:1px solid #e5e7eb;background:#fff;"></div>
+<div class="ltms-minicart-overlay" aria-hidden="true"></div>
+<aside class="ltms-minicart" role="dialog" aria-modal="true" aria-label="<?php esc_attr_e( 'Carrito de compras', 'ltms' ); ?>">
+    <header class="ltms-minicart__header">
+        <h3 class="ltms-minicart__title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <?php esc_html_e( 'Tu carrito', 'ltms' ); ?>
+            <span class="ltms-minicart__count"></span>
+        </h3>
+        <button type="button" class="ltms-minicart__close" aria-label="<?php esc_attr_e( 'Cerrar carrito', 'ltms' ); ?>">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </header>
+    <div class="ltms-minicart__body"></div>
+    <footer class="ltms-minicart__footer">
+        <div class="ltms-minicart__subtotal">
+            <span class="ltms-minicart__subtotal-label"><?php esc_html_e( 'Subtotal', 'ltms' ); ?></span>
+            <span class="ltms-minicart__subtotal-value"></span>
         </div>
+        <div class="ltms-minicart__actions">
+            <a href="<?php echo esc_url( $checkout_url ); ?>" class="ltms-minicart__checkout"><?php esc_html_e( 'Finalizar compra', 'ltms' ); ?></a>
+            <a href="<?php echo esc_url( $cart_url ); ?>" class="ltms-minicart__continue"><?php esc_html_e( 'Ver carrito', 'ltms' ); ?></a>
+        </div>
+    </footer>
+</aside>
         <?php
-        // v2.9.54: El script inline ahora se registra con add_action('wp_footer', 1)
-        // para que se renderice con prioridad alta. No se llama aquí para evitar
-        // doble renderizado.
     }
 
     /**
-     * v2.9.59: Método legacy eliminado — ahora se usa output buffering.
-     * El script se inyecta vía inject_cart_script_into_html() que SiteGround
-     * no puede remover porque modifica el HTML final después de todos los
-     * plugins de optimización.
+     * v2.9.59: MÃ©todo legacy eliminado â€” ahora se usa output buffering.
+     * El script se inyecta vÃ­a inject_cart_script_into_html() que SiteGround
+     * no puede remover porque modifica el HTML final despuÃ©s de todos los
+     * plugins de optimizaciÃ³n.
      */
 
     /**
@@ -418,14 +441,14 @@ JS;
      * ?full=1 para obtener upsells y badges.
      *
      * v2.9.52: Guests permitidos (carrito funciona sin login).
-     * Nonce: ltms_ux_nonce (el que el JS ltms-ux-enhancements envía).
+     * Nonce: ltms_ux_nonce (el que el JS ltms-ux-enhancements envÃ­a).
      */
     public static function ajax_refresh_drawer(): void {
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Token invÃ¡lido.', 'ltms' ) ], 403 );
         }
         // v2.9.123 CHECKOUT-AUDIT P1-1 FIX: rate limit drawer refresh.
-        // Before, bots could spam this endpoint → high CPU from get_drawer_data.
+        // Before, bots could spam this endpoint â†’ high CPU from get_drawer_data.
         // Now capped at 30 per IP per minute.
         $ip = method_exists( 'LTMS_Core_Security', 'get_client_ip_safe' ) ? LTMS_Core_Security::get_client_ip_safe() : ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
         $rl_key = 'ltms_drawer_rl_' . md5( $ip );
@@ -446,7 +469,7 @@ JS;
      */
     public static function ajax_remove_item(): void {
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Token invÃ¡lido.', 'ltms' ) ], 403 );
         }
         // v2.9.207: Ensure WC()->cart is initialized for guests in AJAX context.
         if ( function_exists( 'WC' ) && WC()->cart && method_exists( WC()->cart, 'get_cart' ) && empty( WC()->cart->get_cart() ) && WC()->session ) {
@@ -472,7 +495,7 @@ JS;
      */
     public static function ajax_update_qty(): void {
         if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Token inválido.', 'ltms' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Token invÃ¡lido.', 'ltms' ) ], 403 );
         }
         // v2.9.207: Ensure WC()->cart is initialized for guests in AJAX context.
         if ( function_exists( 'WC' ) && WC()->cart && method_exists( WC()->cart, 'get_cart' ) && empty( WC()->cart->get_cart() ) && WC()->session ) {
@@ -500,9 +523,9 @@ JS;
      * Construye todos los datos del drawer para AJAX.
      *
      * PERF v2.9.49: $skip_heavy_data = true omite los upsells (WP_Query costosa)
-     * y los badges de pago. Usar en el flujo de add-to-cart para respuesta rápida.
-     * El drawer completo se carga después con $skip_heavy_data = false si el
-     * usuario lo solicita explícitamente.
+     * y los badges de pago. Usar en el flujo de add-to-cart para respuesta rÃ¡pida.
+     * El drawer completo se carga despuÃ©s con $skip_heavy_data = false si el
+     * usuario lo solicita explÃ­citamente.
      */
     private static function get_drawer_data( bool $skip_heavy_data = false ): array {
         $cart = WC()->cart;
@@ -539,8 +562,8 @@ JS;
         // Free shipping bar data (liviana, siempre se calcula).
         $shipping_bar = self::get_shipping_bar_data( $cart );
 
-        // v2.9.49: Skip upsells si es un refresco rápido (add-to-cart).
-        // Los upsells hacen 1 WP_Query por vendor (hasta 3) — muy costoso.
+        // v2.9.49: Skip upsells si es un refresco rÃ¡pido (add-to-cart).
+        // Los upsells hacen 1 WP_Query por vendor (hasta 3) â€” muy costoso.
         $upsells = $skip_heavy_data ? [] : self::get_upsell_products( array_keys( $vendor_ids ), $cart );
 
         return [
@@ -560,8 +583,8 @@ JS;
     }
 
     /**
-     * F6: Obtiene los badges de métodos de pago activos.
-     * Muestra iconos de Visa, Mastercard, PSE, Nequi, etc. según gateways activos.
+     * F6: Obtiene los badges de mÃ©todos de pago activos.
+     * Muestra iconos de Visa, Mastercard, PSE, Nequi, etc. segÃºn gateways activos.
      */
     private static function get_payment_badges(): array {
         $badges = [];
@@ -574,7 +597,7 @@ JS;
             $badges[] = [ 'name' => 'Amex', 'icon' => '&#x1F4B3;' ];
         }
 
-        // Openpay (México + Colombia).
+        // Openpay (MÃ©xico + Colombia).
         if ( LTMS_Core_Config::get( 'ltms_openpay_enabled', 'no' ) === 'yes' ) {
             $badges[] = [ 'name' => 'Openpay', 'icon' => '&#x1F4F1;' ];
         }
@@ -590,12 +613,12 @@ JS;
             $badges[] = [ 'name' => 'Daviplata', 'icon' => '&#x1F4F1;' ];
         }
 
-        // Addi (BNPL Colombia + México).
+        // Addi (BNPL Colombia + MÃ©xico).
         if ( LTMS_Core_Config::get( 'ltms_addi_enabled', 'no' ) === 'yes' ) {
             $badges[] = [ 'name' => 'Addi', 'icon' => '&#x1F4B5;' ];
         }
 
-        // PayPal (si está activo via Stripe).
+        // PayPal (si estÃ¡ activo via Stripe).
         if ( LTMS_Core_Config::get( 'ltms_stripe_enabled', 'no' ) === 'yes' ) {
             $badges[] = [ 'name' => 'PayPal', 'icon' => '&#x1F4B3;' ];
         }
@@ -604,17 +627,17 @@ JS;
     }
 
     /**
-     * F5: Obtiene el note informativo debajo del botón de checkout.
+     * F5: Obtiene el note informativo debajo del botÃ³n de checkout.
      */
     private static function get_checkout_note(): string {
         $country = LTMS_Core_Config::get_country();
         $currency = LTMS_Core_Config::get_currency();
 
         if ( $country === 'MX' ) {
-            return __( 'Impuestos incluidos. Envío calculado al finalizar la compra.', 'ltms' );
+            return __( 'Impuestos incluidos. EnvÃ­o calculado al finalizar la compra.', 'ltms' );
         }
 
-        return __( 'IVA incluido. Envío calculado al finalizar la compra.', 'ltms' );
+        return __( 'IVA incluido. EnvÃ­o calculado al finalizar la compra.', 'ltms' );
     }
 
     /**
@@ -627,12 +650,12 @@ JS;
     }
 
     /**
-     * Datos de la barra de envío gratis.
+     * Datos de la barra de envÃ­o gratis.
      */
     private static function get_shipping_bar_data( \WC_Cart $cart ): array {
         $subtotal = (float) $cart->get_cart_subtotal();
 
-        // Obtener threshold de envío gratis.
+        // Obtener threshold de envÃ­o gratis.
         $threshold = 0;
         if ( class_exists( 'LTMS_Shipping_Mode' ) ) {
             $threshold = (float) LTMS_Core_Config::get( 'ltms_shipping_hybrid_threshold', 100000 );
@@ -653,15 +676,15 @@ JS;
             'threshold_formatted' => wc_price( $threshold ),
             'remaining_formatted' => wc_price( $remaining ),
             'message' => $remaining > 0
-                ? sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), wc_price( $remaining ) )
-                : __( '&#x1F389; ¡Tienes envío gratis!', 'ltms' ),
+                ? sprintf( __( 'Te faltan %s para envÃ­o gratis', 'ltms' ), wc_price( $remaining ) )
+                : __( '&#x1F389; Â¡Tienes envÃ­o gratis!', 'ltms' ),
         ];
     }
 
     /**
-     * CART-UX-001 FIX: barra de progreso de envío gratis dentro del mini-cart
+     * CART-UX-001 FIX: barra de progreso de envÃ­o gratis dentro del mini-cart
      * / side-cart de Elementor (woocommerce_before_mini_cart). Reusa
-     * get_shipping_bar_data() para mostrar cuánto falta para el umbral.
+     * get_shipping_bar_data() para mostrar cuÃ¡nto falta para el umbral.
      */
     public static function render_mini_cart_shipping_bar(): void {
         if ( null === WC()->cart || WC()->cart->is_empty() ) {
@@ -679,9 +702,9 @@ JS;
         echo '<div class="ltms-mini-cart-shipping" data-ltms-mini-shipping="1">';
         echo '<div class="ltms-mini-cart-shipping__msg">';
         if ( $done ) {
-            echo '<span>' . esc_html__( '&#x1F389; ¡Tienes envío gratis!', 'ltms' ) . '</span>';
+            echo '<span>' . esc_html__( '&#x1F389; Â¡Tienes envÃ­o gratis!', 'ltms' ) . '</span>';
         } else {
-            echo '<span>' . esc_html( sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), wp_kses_post( $data['remaining_formatted'] ) ) ) . '</span>';
+            echo '<span>' . esc_html( sprintf( __( 'Te faltan %s para envÃ­o gratis', 'ltms' ), wp_kses_post( $data['remaining_formatted'] ) ) ) . '</span>';
         }
         echo '</div>';
         echo '<div class="ltms-mini-cart-shipping__track"><div class="ltms-mini-cart-shipping__fill" style="width:' . esc_attr( min( 100, $pct ) ) . '%"></div></div>';
@@ -689,7 +712,7 @@ JS;
     }
 
     /**
-     * Obtiene productos de upsell: del mismo vendor, no en carrito, mismo categoría.
+     * Obtiene productos de upsell: del mismo vendor, no en carrito, mismo categorÃ­a.
      */
     private static function get_upsell_products( array $vendor_ids, \WC_Cart $cart ): array {
         if ( empty( $vendor_ids ) ) return [];
