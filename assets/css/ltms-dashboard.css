@@ -340,8 +340,13 @@
 .ltms-mobile-menu-btn { display: none; }
 
 /* Scroll horizontal para tablas */
+/* PANEL-TABLES-RESPONSIVE FIX (2026-09-12): .ltms-table-responsive (usado por
+   view-drivers, view-insurance y view-redi) no tenía overflow-x y sus tablas
+   desbordaban la card sin scroll en móvil. Se unifica con los wrappers que sí
+   scrollean (.ltms-table-scroll / .ltms-table-wrap). */
 .ltms-table-scroll,
-.ltms-table-wrap {
+.ltms-table-wrap,
+.ltms-table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     width: 100%;

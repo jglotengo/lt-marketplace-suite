@@ -136,7 +136,7 @@ $has_bank_data     = ! empty( $saved_bank_acc );
                 + <?php esc_html_e( 'Nuevo depósito', 'ltms' ); ?>
             </button>
         </div>
-        <div class="ltms-card-body" style="padding:0;">
+        <div class="ltms-card-body ltms-table-scroll" style="padding:0;">
             <?php if ( empty( $my_deposits ) ) : ?>
             <p style="text-align:center;padding:24px;color:#9ca3af;margin:0;">
                 <?php esc_html_e( 'Aún no tienes depósitos registrados.', 'ltms' ); ?>

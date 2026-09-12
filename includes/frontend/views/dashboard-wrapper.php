@@ -225,12 +225,19 @@ if ( $_show_drivers ) {
 #ltms-dashboard-container .ltms-nav-section-label{
     color:#fff!important;
 }
-.ltms-dashboard-container h1,.ltms-dashboard-container h2,.ltms-dashboard-container h3,
-.ltms-dashboard-container h4,.ltms-dashboard-container h5,.ltms-dashboard-container p,
-.ltms-dashboard-container span,.ltms-dashboard-container div,.ltms-dashboard-container label,
-.ltms-dashboard-container a,.ltms-dashboard-container button,.ltms-dashboard-container input,
-.ltms-dashboard-container select,.ltms-dashboard-container textarea{
-    color:inherit!important;
+/* PANEL-CONTRAST-3 FIX (2026-09-12): el blanket `color:inherit!important` sobre
+   h/p/span/div/label/a/button/input/... forzaba a heredar #2c3e50 incluso en
+   banners y contenedores de COLOR (ReDi #1A1A4E, wallet, balance), grisando el
+   texto blanco y dejándolo ilegible sobre fondo azul. Se elimina el sledgehammer
+   y se oscurece explícitamente SOLO el texto estructural de las zonas claras;
+   el color:#fff (inline o de clase) de elementos con fondo azul vuelve a aplicar. */
+.ltms-dashboard-container .ltms-main-content h1,
+.ltms-dashboard-container .ltms-main-content h2,
+.ltms-dashboard-container .ltms-main-content h3,
+.ltms-dashboard-container .ltms-main-content h4,
+.ltms-dashboard-container .ltms-main-content h5,
+.ltms-dashboard-container .ltms-main-content h6{
+    color:#2c3e50;
 }
 .ltms-dashboard-container .ltms-metric-value,
 .ltms-dashboard-container .ltms-metric-label,

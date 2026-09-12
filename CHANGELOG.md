@@ -6,6 +6,46 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `PANEL-CONTRAST-3` (texto gris de banners/contenedores de color en el panel vendedor)
+
+> El bloque crítico inline (`ltms-dash-critical`) tenía un blanket `color:inherit!important` sobre
+> `h/p/span/div/button/...` que forzaba a heredar `#2c3e50` incluso en banners de COLOR (ej. "¡Programa ReDi
+> disponible!" `#1A1A4E`, wallet, balance), grisando el texto blanco y dejándolo ilegible sobre fondo azul.
+
+- **`includes/frontend/views/dashboard-wrapper.php`:** eliminado el sledgehammer `color:inherit!important`;
+  ahora solo se oscurece el texto estructural (`h1-h6`) de `.ltms-main-content`. El `color:#fff` (inline/clase)
+  de elementos con fondo azul vuelve a aplicar.
+- **Test:** `PanelContrastTableResponsiveTest` (grupo `audit-panel-mobile`).
+
+### Fixed — `PANEL-TABLES-RESPONSIVE` (tablas de submenús no responsivas en móvil)
+
+> `.ltms-table-responsive` (drivers/insurance/redi) no tenía `overflow-x`, así que sus tablas desbordaban la card
+> sin scroll; y la tabla "Mis Depósitos" de Billetera no estaba en un contenedor scrolleable.
+
+- **`assets/css/ltms-dashboard.css` (+ `.min`):** `.ltms-table-responsive` se unifica con `.ltms-table-scroll/`
+  `.ltms-table-wrap` (`overflow-x:auto` + `-webkit-overflow-scrolling:touch`).
+- **`includes/frontend/views/view-wallet.php`:** "Mis Depósitos" envuelta en `.ltms-card-body.ltms-table-scroll`.
+- **Test:** `PanelContrastTableResponsiveTest` (grupo `audit-panel-mobile`).
+
+### Fixed — `SHOP-SEARCH-MOBILE` (lupa del widget "Buscar" solapada en /tienda/ móvil)
+
+> El widget "Buscar" de WooCommerce (`.woocommerce-product-search`) en la columna de filtros solapaba el botón
+> (lupa) con el input en móvil.
+
+- **`assets/css/ltms-plaza-viva.css` (+ `.min`):** layout flex + `gap` para `.woocommerce-product-search` /
+  `.wp-block-search`; el input crece (`flex:1;min-width:0`) y el botón no se monta encima.
+- **Test:** `ShopSearchProductPageMobileTest` (grupo `audit-mobile-frontend`).
+
+### Fixed — `PDP-MOBILE-SPACING` (cantidad / botón ATC / wishlist amontonados en producto móvil)
+
+> En la página de producto los controles de compra del `form.cart` se veían uno sobre otro sin espacio y sin
+> jerarquía en móvil.
+
+- **`includes/frontend/templates/single-product.php`:** en `≤560px` cada control (cantidad, botón ATC) separado con
+  `margin-bottom:12px`; la wishlist pasa a fila propia a ancho completo centrada. Sin `display:flex` en `form.cart`
+  (preserva variations/upsell/gift).
+- **Test:** `ShopSearchProductPageMobileTest` (grupo `audit-mobile-frontend`).
+
 ### Fixed — `HEADER-ACCOUNT-MENU-CLICK` (el menú de cuenta no era clickeable/linkeable)
 
 > El menú de cuenta del vendor se abría pero sus enlaces no navegaban: un overlay a pantalla completa

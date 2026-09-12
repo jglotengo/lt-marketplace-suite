@@ -889,6 +889,30 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 @media (max-width:400px){
     .pv-scope.pv-product-page .pv-related ul.products{grid-template-columns:1fr;}
 }
+
+/* PDP-MOBILE-SPACING FIX (2026-09-12): en móvil los controles de compra del
+   form.cart (cantidad, botón "Añadir al carrito" y wishlist) se amontonaban
+   uno sobre otro sin espacio. Se separa cada control con margin inferior, la
+   wishlist pasa a fila propia a ancho completo centrada, y se mantiene la
+   jerarquía: cantidad compacta, botón ATC prominente, wishlist secundaria.
+   No se hace display:flex en form.cart (rompería variations/upsell/gift). */
+@media (max-width:560px){
+    .pv-scope.pv-product-page .pv-product-actions form.cart .quantity,
+    .pv-scope.pv-product-page .pv-product-actions form.cart > .button,
+    .pv-scope.pv-product-page .pv-product-actions form.cart > button.single_add_to_cart_button{
+        margin-bottom:12px;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart .quantity{
+        margin-right:8px;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart .ltms-wishlist-btn-single{
+        margin:0 0 12px !important;
+        display:flex;
+        width:100%;
+        justify-content:center;
+        box-sizing:border-box;
+    }
+}
 </style>
 
 <?php

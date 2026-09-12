@@ -2125,3 +2125,29 @@ body.ltms-filters-open{overflow:hidden;}
     .pv-shop__filters-overlay{display:block;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:999980;opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s;}
     .pv-shop__filters-overlay.is-open{opacity:1;visibility:visible;}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SHOP-SEARCH-MOBILE FIX (2026-09-12): el widget "Buscar" de WooCommerce
+   (.woocommerce-product-search) en la columna de filtros solapaba el botón
+   (lupa) con el input en móvil. Se fuerza un layout flex con gap; el input
+   crece y el botón no se monta encima. También cubre el bloque de búsqueda
+   de WordPress (.wp-block-search) por si el tema usa ese widget.
+   ═══════════════════════════════════════════════════════════════ */
+.pv-scope .woocommerce-product-search,
+.pv-shop .woocommerce-product-search,
+.pv-scope .wp-block-search,
+.pv-shop .wp-block-search{
+    display:flex;align-items:stretch;gap:8px;
+}
+.pv-scope .woocommerce-product-search input.search-field,
+.pv-shop .woocommerce-product-search input.search-field{
+    flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;
+}
+.pv-scope .woocommerce-product-search button[type="submit"],
+.pv-shop .woocommerce-product-search button[type="submit"]{
+    flex:0 0 auto;margin:0;
+}
+.pv-scope .wp-block-search__input,
+.pv-shop .wp-block-search__input{
+    flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;
+}
