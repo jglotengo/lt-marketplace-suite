@@ -38,7 +38,7 @@
         init() {
             window.ltmsDashboardInstance = this;
             this.bindNavigation();
-            this.loadView('home');
+            this.loadView(this.getInitialView());
             this.startNotificationPolling();
             this.initMobileMenu();
             this.bindLogout();
@@ -50,6 +50,28 @@
             this.initKeyboardShortcuts(); // v2.9.91 P3
             this.initNonceRefresh();    // FIX-403-NONCE
             this.initResilience();      // AUDIT-DASH-NET-01
+        },
+
+        /**
+         * HEADER-ACCOUNT-MENU FIX (2026-09-12): deep-link ?view=X.
+         *
+         * Los enlaces del menú de cuenta del header (Mis Pedidos, Billetera,
+         * Productos, Configuración) apuntan al panel con ?view=X. Antes el SPA
+         * siempre cargaba 'home' y esos enlaces "no llevaban al submenú". Ahora
+         * se lee ?view= y se valida contra los data-view del sidebar/bottom-nav
+         * (sin match → 'home'), para abrir la subvista correcta.
+         */
+        getInitialView() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const view = params.get('view');
+                if (view &&
+                    (document.querySelector('.ltms-nav-item[data-view="' + view + '"]') ||
+                     document.querySelector('.ltms-bottom-nav-item[data-view="' + view + '"]'))) {
+                    return view;
+                }
+            } catch (e) {}
+            return 'home';
         },
 
         /**

@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HEADER-ACCOUNT-MENU` (menú del icono de cuenta del vendor desactualizado y sin submenús)
+
+> Al pulsar el icono de cuenta (vendor logueado), el menú apuntaba a páginas de CLIENTE (`/mis-pedidos/`,
+> `/mi-billetera/`) o a fallbacks hardcodeados, y no abría el submenú del panel: el SPA del dashboard siempre
+> cargaba `home` (no había deep-link `?view=`).
+
+- **`includes/frontend/class-ltms-frontend-assets.php`:** `enqueue_header_nav()` localiza URLs de subvista del
+  vendor derivadas del dashboard real + `?view=` (`v_orders_url`, `v_wallet_url`, `v_products_url`,
+  `v_settings_url`, `kyc_url`).
+- **`assets/js/ltms-header-nav.js` (+ `.min`):** `buildClienteBtn()` usa esas URLs deep-link para Mis Pedidos /
+  Mi Billetera / Mis Productos / Configuración, y `/verificacion-identidad/` para KYC.
+- **`assets/js/ltms-dashboard.js` (+ `.min`):** nuevo `getInitialView()` lee `?view=` y `init()` arranca en la
+  subvista solicitada (validada contra los `data-view` del sidebar; fallback `home`).
+- **Test:** nueva suite `tests/unit/HeaderAccountMenuTest.php` (4 tests, grupo `audit-header-account`).
+
 ### Fixed — `BACK-TO-TOP-OVERLAP` (botón "volver arriba" se sobreponía al botón de soporte)
 
 > En escritorio, el botón flotante de subir (`.ltms-back-to-top`) y el botón de soporte (`.ltms-live-chat`)

@@ -47,11 +47,11 @@
             var links = '';
             if (d.is_vendor) {
                 links += '<a href="' + (d.dashboard_url || '/panel-vendedor/') + '">' + ICONS.dashboard + ' Mi Panel</a>' +
-                    '<a href="' + (d.orders_url || '/mis-pedidos/') + '">' + ICONS.orders + ' Mis Pedidos</a>' +
-                    '<a href="' + (d.wallet_url || '/mi-billetera/') + '">' + ICONS.wallet + ' Mi Billetera</a>' +
-                    '<a href="' + (d.products_url || '/panel-vendedor/?view=products') + '">' + ICONS.products + ' Mis Productos</a>' +
-                    '<a href="' + (d.settings_url || '/panel-vendedor/?view=settings') + '">' + ICONS.settings + ' Configuración</a>' +
-                    '<a href="' + (d.kyc_url || '/panel-vendedor/?view=kyc') + '">' + ICONS.kyc + ' Verificación KYC</a>';
+                    '<a href="' + (d.v_orders_url || '/panel-vendedor/?view=orders') + '">' + ICONS.orders + ' Mis Pedidos</a>' +
+                    '<a href="' + (d.v_wallet_url || '/panel-vendedor/?view=wallet') + '">' + ICONS.wallet + ' Mi Billetera</a>' +
+                    '<a href="' + (d.v_products_url || '/panel-vendedor/?view=products') + '">' + ICONS.products + ' Mis Productos</a>' +
+                    '<a href="' + (d.v_settings_url || '/panel-vendedor/?view=settings') + '">' + ICONS.settings + ' Configuración</a>' +
+                    '<a href="' + (d.kyc_url || '/verificacion-identidad/') + '">' + ICONS.kyc + ' Verificación KYC</a>';
             } else {
                 links += '<a href="' + (url || '/mi-cuenta/') + '">' + ICONS.account + ' Mi Cuenta</a>' +
                     '<a href="' + (d.orders_url || '/mis-pedidos/') + '">' + ICONS.orders + ' Mis Pedidos</a>';

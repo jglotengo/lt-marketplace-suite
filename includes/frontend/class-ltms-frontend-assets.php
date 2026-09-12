@@ -151,16 +151,32 @@ final class LTMS_Frontend_Assets {
         $orders_url    = ! empty( $pages['ltms-orders'] )    ? get_permalink( $pages['ltms-orders'] )    : home_url( '/mis-pedidos/' );
         $my_account    = wc_get_page_permalink( 'myaccount' ) ?: home_url( '/mi-cuenta/' );
 
+        // HEADER-ACCOUNT-MENU FIX (2026-09-12): el menú del vendor apuntaba a
+        // páginas de CLIENTE (/mis-pedidos/, /mi-billetera/) o a fallbacks
+        // hardcodeados que no abren el submenú correcto del panel SPA. Ahora cada
+        // subvista se deriva del URL real del dashboard + ?view=X (deep-link);
+        // el SPA lo lee vía getInitialView().
+        $vend_orders_url   = add_query_arg( 'view', 'orders',   $dashboard_url );
+        $vend_wallet_url   = add_query_arg( 'view', 'wallet',   $dashboard_url );
+        $vend_products_url = add_query_arg( 'view', 'products', $dashboard_url );
+        $vend_settings_url = add_query_arg( 'view', 'settings', $dashboard_url );
+        $kyc_url           = home_url( '/verificacion-identidad/' );
+
         wp_localize_script( 'ltms-header-nav', 'ltmsHeaderNav', [
-            'is_logged_in'   => $is_logged,
-            'is_vendor'      => $is_vendor,
-            'display_name'   => $name,
-            'sellers_url'    => home_url( '/sellers/' ),
-            'mi_cuenta_url'  => $my_account,
-            'dashboard_url'  => $dashboard_url,
-            'orders_url'     => $orders_url,
-            'wallet_url'     => $wallet_url,
-            'logout_url'     => wp_logout_url( home_url() ),
+            'is_logged_in'    => $is_logged,
+            'is_vendor'       => $is_vendor,
+            'display_name'    => $name,
+            'sellers_url'     => home_url( '/sellers/' ),
+            'mi_cuenta_url'   => $my_account,
+            'dashboard_url'   => $dashboard_url,
+            'orders_url'      => $orders_url,
+            'wallet_url'      => $wallet_url,
+            'v_orders_url'    => $vend_orders_url,
+            'v_wallet_url'    => $vend_wallet_url,
+            'v_products_url'  => $vend_products_url,
+            'v_settings_url'  => $vend_settings_url,
+            'kyc_url'         => $kyc_url,
+            'logout_url'      => wp_logout_url( home_url() ),
         ] );
 
         // CSS inline eliminado — los estilos del flotante están en ltms-header-nav.css (M-118)
