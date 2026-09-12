@@ -75,4 +75,15 @@ final class HeaderAccountMenuTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'v_orders_url', $min, 'HEADER-ACCOUNT-MENU: el .min.js debe regenerar v_orders_url.' );
 		$this->assertStringContainsString( 'verificacion-identidad', $min, 'HEADER-ACCOUNT-MENU: el .min.js debe regenerar el enlace KYC.' );
 	}
+
+	public function test_dropdown_clickable_without_blocking_overlay(): void {
+		$js = file_get_contents( self::HEADER_JS );
+
+		// El overlay a pantalla completa atrapaba los clicks de los <a> del menú.
+		$this->assertStringNotContainsString( 'ltms-dd-overlay', $js, 'HEADER-ACCOUNT-MENU: no debe existir el overlay a pantalla completa que bloquea los enlaces.' );
+		// Idempotencia: evita doble bind (handler duplicado cerraba el menú al abrirlo).
+		$this->assertStringContainsString( 'dropdownBound', $js, 'HEADER-ACCOUNT-MENU: initDropdowns() debe ser idempotente (guard).' );
+		// Cierre por click fuera sin overlay.
+		$this->assertStringContainsString( "closest('.ltms-user-dropdown-wrap')", $js, 'HEADER-ACCOUNT-MENU: debe cerrar por click fuera usando closest() (no overlay).' );
+	}
 }

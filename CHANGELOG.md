@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HEADER-ACCOUNT-MENU-CLICK` (el menú de cuenta no era clickeable/linkeable)
+
+> El menú de cuenta del vendor se abría pero sus enlaces no navegaban: un overlay a pantalla completa
+> (`#ltms-dd-overlay`) se interponía sobre el dropdown en headers sticky/Elementor, atrapando el click
+> (que caía en el overlay → cerraba el menú sin navegar). Además `initDropdowns()` se llamaba 2 veces
+> (desde `injectButtons()` y desde el handler de resize), duplicando bindings y cerrando el menú justo al abrirlo.
+
+- **`assets/js/ltms-header-nav.js` (+ `.min`):** eliminado el overlay full-screen; cierre por click-fuera con
+  `closest('.ltms-user-dropdown-wrap')`; `initDropdowns()` idempotente (`dropdownBound`). Los `<a>` del menú
+  vuelven a ser clickeables.
+- **Test:** `HeaderAccountMenuTest::test_dropdown_clickable_without_blocking_overlay` (sin overlay, guard idempotente).
+
 ### Fixed — `HEADER-ACCOUNT-MENU` (menú del icono de cuenta del vendor desactualizado y sin submenús)
 
 > Al pulsar el icono de cuenta (vendor logueado), el menú apuntaba a páginas de CLIENTE (`/mis-pedidos/`,

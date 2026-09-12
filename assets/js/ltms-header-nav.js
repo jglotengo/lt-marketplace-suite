@@ -73,24 +73,26 @@
         '</a>';
     }
 
+    var dropdownBound = false;
     function initDropdowns() {
-        var $overlay = $('<div id="ltms-dd-overlay"></div>').css({
-            position:'fixed', inset:0, zIndex:99998, display:'none'
-        }).appendTo('body');
+        // HEADER-ACCOUNT-MENU FIX (2026-09-12): idempotente — initDropdowns() se
+        // llamaba desde injectButtons() y desde el handler de resize, duplicando
+        // handlers/overlays (y cerrando el menú justo al abrirlo). Además se
+        // elimina el overlay a pantalla completa: en headers sticky/Elementor
+        // atrapaba los clicks de los <a> del menú y los enlaces "no eran
+        // linkeables" (el click caía en el overlay y cerraba el menú).
+        if (dropdownBound) return;
+        dropdownBound = true;
 
         function closeAll() {
             $('.ltms-user-dropdown-wrap.is-open').removeClass('is-open')
                 .find('.ltms-user-chip').attr('aria-expanded','false')
                 .find('.ltms-chip-arrow').css('transform','');
-            $overlay.hide();
         }
 
-        $overlay.on('click', function(e) { e.preventDefault(); closeAll(); });
-
-        // v2.9.283 FIX: solo 'click' (no 'touchstart') para evitar double-fire
-        // en mobile que cerraba el dropdown inmediatamente.
+        // Abrir/cerrar el chip de cuenta.
         $(document).on('click', '.ltms-user-chip', function(e) {
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault();
             var $wrap = $(this).closest('.ltms-user-dropdown-wrap');
             var wasOpen = $wrap.hasClass('is-open');
             closeAll();
@@ -98,12 +100,18 @@
                 $wrap.addClass('is-open')
                     .find('.ltms-user-chip').attr('aria-expanded','true')
                     .find('.ltms-chip-arrow').css('transform','rotate(180deg)');
-                $overlay.show();
+            }
+        });
+
+        // Cerrar al hacer click fuera del menú (sin overlay). Los enlaces del
+        // menú siguen siendo clickeables y navegan.
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.ltms-user-dropdown-wrap').length) {
+                closeAll();
             }
         });
 
         $(document).on('keydown', function(e) { if (e.key === 'Escape') closeAll(); });
-        $(document).on('click', '.ltms-user-dropdown', function(e) { e.stopPropagation(); });
     }
 
     function injectButtons() {
