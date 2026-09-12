@@ -61,6 +61,33 @@ final class CartEmptyUxTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	public function test_empty_cart_products_ordered_by_popularity(): void {
+		$src = file_get_contents( self::CART_PATH );
+
+		// CART-EMPTY-POPULARITY FIX (2026-09-12): en vez de 'date' DESC (que
+		// parecía aleatorio), mostrar los MÁS VENDIDOS de VARIOS vendedores.
+		$this->assertStringContainsString(
+			'CART-EMPTY-POPULARITY FIX',
+			$src,
+			'CART-EMPTY-POPULARITY: el fix debe tener su marcador traceable en cart.php.'
+		);
+		$this->assertStringContainsString(
+			"'orderby'        => 'popularity'",
+			$src,
+			'CART-EMPTY-POPULARITY: el query debe ordenar por popularidad (más vendidos), no por fecha.'
+		);
+		$this->assertStringNotContainsString(
+			"'orderby'        => 'date'",
+			$src,
+			'CART-EMPTY-POPULARITY: no debe ordenar por fecha (parecía aleatorio).'
+		);
+		$this->assertStringContainsString(
+			"'taxonomy' => 'product_visibility'",
+			$src,
+			'CART-EMPTY-POPULARITY: debe excluir productos ocultos y agotados vía product_visibility.'
+		);
+	}
+
 	public function test_empty_products_grid_css(): void {
 		$css = file_get_contents( self::CART_CSS_PATH );
 

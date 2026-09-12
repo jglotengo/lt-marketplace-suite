@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CART-EMPTY-POPULARITY` (productos del carrito vacío parecían aleatorios)
+
+> En `/carrito/` vacío se mostraban los 8 productos «más recientes» (`orderby=date DESC`), que el
+> usuario percibía como aleatorios y de bajo interés.
+
+- **`includes/frontend/templates/cart.php`:** `orderby=popularity` (más vendidos, `total_sales`) de
+  **varios** vendedores + `tax_query product_visibility NOT IN (exclude-from-catalog,
+  exclude-from-search, outofstock)`. En carrito vacío no hay vendedor ancla, así que se prioriza
+  popularidad global; el upsell del mini-cart con items sigue siendo del mismo vendedor.
+- **Test:** `CartEmptyUxTest::test_empty_cart_products_ordered_by_popularity`.
+
+### Fixed — `PDP-MOBILE-SPACING` (cantidad / ATC / «Comprar ahora» / wishlist amontonados en móvil)
+
+> El fix anterior no cubría el botón «Comprar ahora» (`.ltms-buy-now-btn`, inyectado por
+> `PV.injectBuyNow`) ni el stepper ±, así que seguían apilándose sin espacio.
+
+- **`includes/frontend/templates/single-product.php`:** en `≤560px`, `form.cart:not(.variations_form)`
+  pasa a columna flex con `gap:12px`: cantidad compacta → ATC a ancho completo → «Comprar ahora» →
+  wishlist. Scope con `:not(.variations_form)` para no romper variaciones/gift.
+- **Test:** `ShopSearchProductPageMobileTest::test_pdp_mobile_spacing_fix_present`.
+
 ### Fixed — `PANEL-CONTRAST-3` (texto gris de banners/contenedores de color en el panel vendedor)
 
 > El bloque crítico inline (`ltms-dash-critical`) tenía un blanket `color:inherit!important` sobre

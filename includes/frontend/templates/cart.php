@@ -73,9 +73,21 @@ if ( WC()->cart->is_empty() ) {
                 'post_type'      => 'product',
                 'post_status'    => 'publish',
                 'posts_per_page' => 8,
-                'orderby'        => 'date',
+                // CART-EMPTY-POPULARITY FIX (2026-09-12): mostrar los MÁS VENDIDOS
+                // (total_sales) de VARIOS vendedores, no los "más recientes" (que
+                // parecían aleatorios). En un carrito vacío no hay vendedor ancla,
+                // así que lo relevante es popularidad global del marketplace.
+                'orderby'        => 'popularity',
                 'order'          => 'DESC',
                 'no_found_rows'  => true,
+                'tax_query'      => [
+                    [
+                        'taxonomy' => 'product_visibility',
+                        'field'    => 'name',
+                        'terms'    => [ 'exclude-from-catalog', 'exclude-from-search', 'outofstock' ],
+                        'operator' => 'NOT IN',
+                    ],
+                ],
             ] );
             if ( $pv_empty_q->have_posts() ) :
                 ?>

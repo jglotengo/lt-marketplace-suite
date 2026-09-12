@@ -90,14 +90,24 @@ final class ShopSearchProductPageMobileTest extends LTMS_Unit_Test_Case {
 			'PDP-MOBILE-SPACING: el botón de wishlist debe estilarse en móvil.'
 		);
 		$this->assertStringContainsString(
-			'margin-bottom:12px',
+			'.ltms-buy-now-btn',
 			$src,
-			'PDP-MOBILE-SPACING: los controles de compra deben separarse con margen en móvil.'
+			'PDP-MOBILE-SPACING: el botón "Comprar ahora" (inyectado por PV.injectBuyNow) debe cubrirse en móvil.'
+		);
+		$this->assertStringContainsString(
+			'flex-direction:column',
+			$src,
+			'PDP-MOBILE-SPACING: los controles deben apilarse en columna con gap (sin amontonarse).'
+		);
+		$this->assertStringContainsString(
+			':not(.variations_form)',
+			$src,
+			'PDP-MOBILE-SPACING: el apilado debe scope a productos simples para no romper variaciones/gift.'
 		);
 		$this->assertStringContainsString(
 			'width:100%',
 			$src,
-			'PDP-MOBILE-SPACING: la wishlist debe pasar a fila propia a ancho completo.'
+			'PDP-MOBILE-SPACING: los botones deben ocupar ancho completo en móvil.'
 		);
 	}
 }

@@ -891,23 +891,38 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 }
 
 /* PDP-MOBILE-SPACING FIX (2026-09-12): en móvil los controles de compra del
-   form.cart (cantidad, botón "Añadir al carrito" y wishlist) se amontonaban
-   uno sobre otro sin espacio. Se separa cada control con margin inferior, la
-   wishlist pasa a fila propia a ancho completo centrada, y se mantiene la
-   jerarquía: cantidad compacta, botón ATC prominente, wishlist secundaria.
-   No se hace display:flex en form.cart (rompería variations/upsell/gift). */
+   form.cart —cantidad (± stepper), "Añadir al carrito", "Comprar ahora"
+   (.ltms-buy-now-btn inyectado por PV.injectBuyNow) y wishlist— se amontonaban
+   uno sobre otro sin espacio. Se apilan en columna con gap uniforme y ancho
+   completo para una jerarquía clara: cantidad compacta arriba, ATC prominente,
+   "Comprar ahora" secundario y wishlist ghost. Scoped a productos simples
+   (:not(.variations_form)) para no romper el layout de variaciones/gift. */
 @media (max-width:560px){
-    .pv-scope.pv-product-page .pv-product-actions form.cart .quantity,
-    .pv-scope.pv-product-page .pv-product-actions form.cart > .button,
-    .pv-scope.pv-product-page .pv-product-actions form.cart > button.single_add_to_cart_button{
-        margin-bottom:12px;
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form){
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        align-items:stretch;
     }
     .pv-scope.pv-product-page .pv-product-actions form.cart .quantity{
-        margin-right:8px;
+        margin:0 !important;
+        align-self:flex-start;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart > .button,
+    .pv-scope.pv-product-page .pv-product-actions form.cart > button.single_add_to_cart_button{
+        margin:0 !important;
+        width:100%;
+        min-width:0;
+        max-width:none;
+        box-sizing:border-box;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart .ltms-buy-now-btn{
+        margin:0 !important;
+        width:100%;
+        box-sizing:border-box;
     }
     .pv-scope.pv-product-page .pv-product-actions form.cart .ltms-wishlist-btn-single{
-        margin:0 0 12px !important;
-        display:flex;
+        margin:0 !important;
         width:100%;
         justify-content:center;
         box-sizing:border-box;
