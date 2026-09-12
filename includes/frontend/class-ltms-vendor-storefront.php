@@ -250,9 +250,14 @@ class LTMS_Vendor_Storefront {
     public static function enqueue_assets(): void {
         if ( ! self::detect_request_slug() ) return;
 
+        // HEADER-UX CACHE-BUST (2026-09-11): SiteGround Optimizer remueve el
+        // ?ver= estándar de WP, así que el .css quedaba sin versionar y el
+        // navegador/CDN servía la hoja vieja tras un bump de LTMS_VERSION.
+        // Forzamos ?v= manual (mismo patrón que el mini-cart) para que cada
+        // bump invalide la caché de navegador, CDN y SiteGround.
         wp_enqueue_style(
             'ltms-storefront',
-            LTMS_ASSETS_URL . 'css/ltms-storefront.css',
+            LTMS_ASSETS_URL . 'css/ltms-storefront.css?v=' . rawurlencode( LTMS_VERSION ),
             [],
             LTMS_VERSION
         );
@@ -271,7 +276,7 @@ class LTMS_Vendor_Storefront {
 
         wp_enqueue_script(
             'ltms-storefront',
-            ltms_asset_url( 'js/ltms-storefront' ),
+            ltms_asset_url( 'js/ltms-storefront' ) . '?v=' . rawurlencode( LTMS_VERSION ),
             [ 'jquery', 'wc-add-to-cart' ],
             LTMS_VERSION,
             true

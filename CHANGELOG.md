@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HEADER-UX-CACHEBUST` (los cambios del topbar no se veían en el navegador)
+
+> Tras desplegar HEADER-UX, el navegador seguía mostrando la hoja/JS vieja: `ltms-storefront`
+> se encolaba solo con `?ver=` (que SiteGround Optimizer remueve) y el CDN/navegador servía el
+> `.css`/`.js` cacheado sin versionar. Se aplica el mismo cache-bust `?v=` manual del mini-cart.
+
+- **`includes/frontend/class-ltms-vendor-storefront.php`:** `enqueue_assets()` encola
+  `ltms-storefront.css` y `ltms-storefront.js` con `?v=<LTMS_VERSION>` manual.
+- **Test:** `StorefrontTopbarTest::test_enqueue_has_manual_cache_bust()` (1 test nuevo).
+
 ### Changed — `HEADER-UX` (topbar de la vitrina del vendedor, escritorio + móvil)
 
 > El topbar de `/vendedor/{slug}` (`ltms-sf-topbar`) era crudo: el carrito usaba un emoji,

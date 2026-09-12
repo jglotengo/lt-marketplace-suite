@@ -69,4 +69,21 @@ final class StorefrontTopbarTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( '.ltms-sf-topbar-start', $min, 'HEADER-UX: el .min.css debe estar regenerado con la zona start.' );
 		$this->assertStringContainsString( '.ltms-sf-topbar-actions', $min, 'HEADER-UX: el .min.css debe estar regenerado con la zona actions.' );
 	}
+
+	public function test_enqueue_has_manual_cache_bust(): void {
+		$src = file_get_contents( self::PHP_PATH );
+
+		// SiteGround Optimizer remueve el ?ver= estándar de WP; sin ?v= manual el
+		// navegador/CDN sirve un .css/.js viejo tras bump de LTMS_VERSION.
+		$this->assertStringContainsString(
+			"css/ltms-storefront.css?v=' . rawurlencode( LTMS_VERSION )",
+			$src,
+			'HEADER-UX: el CSS debe encolarse con ?v= manual (cache-bust).'
+		);
+		$this->assertStringContainsString(
+			"ltms_asset_url( 'js/ltms-storefront' ) . '?v=' . rawurlencode( LTMS_VERSION )",
+			$src,
+			'HEADER-UX: el JS debe encolarse con ?v= manual (cache-bust).'
+		);
+	}
 }
