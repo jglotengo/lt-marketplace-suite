@@ -43,10 +43,24 @@
                 $body.toggleClass('is-collapsed', expanded);
         });
 
-        /* ── Toggle sidebar en mobile ── */
-        $(document).on('click', '#ltms-sf-sidebar-toggle', function () {
-                $('#ltms-sf-sidebar').toggleClass('is-open');
-        });
+/* ── Toggle sidebar en mobile + drawer (STORE-FILTERS-MOBILE) ── */
+function sfSetSidebar(open) {
+        var $sb = $('#ltms-sf-sidebar');
+        $sb.toggleClass('is-open', open);
+        $('#ltms-sf-sidebar-overlay').toggleClass('is-open', open);
+        $('#ltms-sf-sidebar-toggle').attr('aria-expanded', String(open));
+        $('#ltms-sf-sidebar-overlay').attr('aria-hidden', String(!open));
+        $('body').toggleClass('ltms-storefront-filters-open', open);
+}
+$(document).on('click', '#ltms-sf-sidebar-toggle', function () {
+        sfSetSidebar(!$('#ltms-sf-sidebar').hasClass('is-open'));
+});
+$(document).on('click', '#ltms-sf-sidebar-close', function () {
+        sfSetSidebar(false);
+});
+$(document).on('click', '#ltms-sf-sidebar-overlay', function () {
+        sfSetSidebar(false);
+});
 
         /* ── Reactivar imágenes lazy al volver con botón Atrás (bfcache) ── */
         window.addEventListener('pageshow', function (e) {

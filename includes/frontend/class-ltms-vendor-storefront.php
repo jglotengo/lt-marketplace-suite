@@ -723,10 +723,18 @@ body.ltms-storefront-page .wh-header{display:none!important}
             </div>
 
             <!-- LAYOUT PRINCIPAL: sidebar + contenido -->
+            <!-- STORE-FILTERS-MOBILE: overlay del drawer de filtros (solo móvil) -->
+            <div class="ltms-sf-sidebar-overlay" id="ltms-sf-sidebar-overlay" aria-hidden="true"></div>
             <div class="ltms-sf-layout">
 
                 <!-- SIDEBAR DE FILTROS -->
                 <aside class="ltms-sf-sidebar" id="ltms-sf-sidebar" aria-label="Filtros">
+
+                    <!-- STORE-FILTERS-MOBILE: cabecera del drawer (solo móvil) -->
+                    <div class="ltms-sf-sidebar-head">
+                        <span class="ltms-sf-sidebar-title"><?php esc_html_e( 'Filtros', 'ltms' ); ?></span>
+                        <button type="button" class="ltms-sf-sidebar-close" id="ltms-sf-sidebar-close" aria-label="<?php esc_attr_e( 'Cerrar filtros', 'ltms' ); ?>">&times;</button>
+                    </div>
 
                     <!-- Categoría -->
                     <div class="ltms-sf-filter-group">
@@ -817,6 +825,11 @@ body.ltms-storefront-page .wh-header{display:none!important}
 
                     <!-- BARRA SUPERIOR: conteo + orden + toggle vista -->
                     <div class="ltms-sf-topbar-content">
+                        <!-- STORE-FILTERS-MOBILE: toggle "Filtros" (solo móvil) -->
+                        <button type="button" class="ltms-sf-sidebar-toggle" id="ltms-sf-sidebar-toggle" aria-controls="ltms-sf-sidebar" aria-expanded="false">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
+                            <?php esc_html_e( 'Filtros', 'ltms' ); ?>
+                        </button>
                         <span class="ltms-sf-result-count">
                             <?php echo esc_html( number_format_i18n( $total ) ); ?>
                             <?php echo 1 === $total ? 'producto' : 'productos'; ?>

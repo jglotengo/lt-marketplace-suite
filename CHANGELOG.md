@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `STORE-FILTERS-MOBILE` (filtros del storefront del vendedor ocultos en móvil)
+
+> La sidebar de filtros de `/vendedor/{slug}` estaba `display:none` en móvil **sin botón para abrirla**:
+> el JS ya escuchaba `#ltms-sf-sidebar-toggle` pero ese elemento no existía en el markup, así que los
+> filtros eran inaccesibles. Paridad con el slide-in de `/tienda/`.
+
+- **`includes/frontend/class-ltms-vendor-storefront.php`:** toggle "Filtros" en la barra superior (solo
+  móvil), cabecera "Filtros" + botón cerrar dentro del drawer, y overlay.
+- **`assets/css/ltms-storefront.css` (+ `.min`):** drawer slide-in desde la izquierda
+  (`transform:translateX(-100%)` → `0`) + overlay + bloqueo de scroll.
+- **`assets/js/ltms-storefront.js` (+ `.min`):** helper `sfSetSidebar` (abrir/cerrar + overlay + aria +
+  scroll lock) conectado a toggle, botón cerrar y overlay.
+- **Test:** `StorefrontFiltersMobileTest` (5 tests, grupo `audit-storefront-filters`).
+
 ### Fixed — `CART-EMPTY-POPULARITY` (productos del carrito vacío parecían aleatorios)
 
 > En `/carrito/` vacío se mostraban los 8 productos «más recientes» (`orderby=date DESC`), que el
