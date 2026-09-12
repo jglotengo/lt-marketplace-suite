@@ -512,31 +512,42 @@ body.ltms-storefront-page .wh-header{display:none!important}
 </style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
+<!-- HEADER-UX (2026-09-11): topbar de la vitrina reorganizado en start/actions,
+     carrito con SVG (antes un emoji), botón volver con chevron y touch targets
+     40x40. El markup y los estilos (ltms-storefront.css) se sincronizan. -->
 <header class="ltms-sf-topbar">
     <div class="ltms-sf-topbar-inner">
-        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
-            <?php
-            $logo_id = get_theme_mod( 'custom_logo' );
-            $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
-            if ( $logo_url ) {
-                echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
-            } else {
-                echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
-            }
-            ?>
-        </a>
-        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back">&larr; Volver a la tienda</a>
-        <!-- P2-2: Wishlist icon in topbar -->
-        <button type="button" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos" id="ltms-sf-topbar-wishlist-btn" style="background:none;border:none;cursor:pointer;font-family:inherit;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span class="ltms-sf-wishlist-count" id="ltms-sf-wishlist-count">0</span>
-        </button>
-        <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
-           class="ltms-sf-topbar-cart" aria-label="Ver carrito" data-ltms-open-cart>
-            🛒 <span class="ltms-sf-cart-count"><?php
-                echo function_exists( 'WC' ) && WC()->cart ? (int) WC()->cart->get_cart_contents_count() : 0;
-            ?></span>
-        </a>
+        <div class="ltms-sf-topbar-start">
+            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back" aria-label="<?php esc_attr_e( 'Volver a la tienda', 'ltms' ); ?>">
+                <svg class="ltms-sf-topbar-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                <span class="ltms-sf-topbar-back-label"><?php esc_html_e( 'Volver a la tienda', 'ltms' ); ?></span>
+            </a>
+            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
+                <?php
+                $logo_id = get_theme_mod( 'custom_logo' );
+                $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+                if ( $logo_url ) {
+                    echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
+                } else {
+                    echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
+                }
+                ?>
+            </a>
+        </div>
+        <div class="ltms-sf-topbar-actions">
+            <!-- P2-2: Wishlist icon in topbar -->
+            <button type="button" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos" id="ltms-sf-topbar-wishlist-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span class="ltms-sf-wishlist-count" id="ltms-sf-wishlist-count">0</span>
+            </button>
+            <a href="<?php echo esc_url( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' ) ); ?>"
+               class="ltms-sf-topbar-cart" aria-label="Ver carrito" data-ltms-open-cart>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span class="ltms-sf-cart-count"><?php
+                    echo function_exists( 'WC' ) && WC()->cart ? (int) WC()->cart->get_cart_contents_count() : 0;
+                ?></span>
+            </a>
+        </div>
     </div>
 </header>
         <?php

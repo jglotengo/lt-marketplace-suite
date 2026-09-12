@@ -24,10 +24,15 @@
 }
 
 /* ============================================================
-   TOPBAR
+   TOPBAR — HEADER-UX (2026-09-11)
+   Reorganizado en 3 zonas: start (volver + logo) / actions (wishlist + carrito).
+   Iconos SVG (el carrito antes era un emoji 🛒), touch targets 40×40 y badge
+   absoluto. El "back" colapsa a chevron solo en móvil/compact.
    ============================================================ */
 .ltms-sf-topbar {
-  background: var(--sf-white);
+  background: rgba(255,255,255,0.94);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--sf-border);
   position: sticky;
   top: 0;
@@ -38,11 +43,34 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 16px;
-  height: 56px;
+  height: 60px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 12px;
+  transition: height 0.2s;
 }
+.ltms-sf-topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ltms-sf-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sf-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.ltms-sf-topbar-back:hover { color: var(--sf-brand); background: #FFF0F0; }
+.ltms-sf-topbar-back-icon { width: 18px; height: 18px; flex-shrink: 0; }
 .ltms-sf-topbar-logo {
   display: flex;
   align-items: center;
@@ -52,31 +80,41 @@
   font-size: 16px;
   flex-shrink: 0;
 }
-.ltms-sf-topbar-logo img { max-height: 28px; width: auto; display: block; }
-.ltms-sf-topbar-back {
-  color: var(--sf-muted);
-  text-decoration: none;
-  font-size: 13px;
-  flex: 1;
-  white-space: nowrap;
-}
-.ltms-sf-topbar-back:hover { color: var(--sf-brand); }
-.ltms-sf-topbar-cart {
+.ltms-sf-topbar-logo img { max-height: 30px; width: auto; display: block; }
+.ltms-sf-topbar-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  text-decoration: none;
-  color: var(--sf-text);
-  font-size: 20px;
+  gap: 4px;
   flex-shrink: 0;
+}
+.ltms-sf-topbar-wishlist,
+.ltms-sf-topbar-cart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--sf-text);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 6px;
-  border-radius: 8px;
-  transition: background 0.15s;
+  border-radius: 10px;
+  padding: 0;
+  position: relative;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
 }
-.ltms-sf-topbar-cart:hover { background: var(--sf-border); }
+.ltms-sf-topbar-wishlist:hover,
+.ltms-sf-topbar-cart:hover { background: var(--sf-border); color: var(--sf-brand); }
+.ltms-sf-topbar-wishlist svg,
+.ltms-sf-topbar-cart svg { width: 22px; height: 22px; }
+.ltms-sf-topbar-back:focus-visible,
+.ltms-sf-topbar-logo:focus-visible,
+.ltms-sf-topbar-wishlist:focus-visible,
+.ltms-sf-topbar-cart:focus-visible {
+  outline: 2px solid var(--sf-brand);
+  outline-offset: 2px;
+}
 .ltms-sf-cart-count {
   background: var(--sf-brand);
   color: var(--sf-white);
@@ -90,6 +128,12 @@
   font-weight: 700;
   padding: 0 4px;
   font-family: var(--font-body);
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(2px, -2px);
+  box-shadow: 0 2px 8px rgba(232,0,1,0.35);
+  pointer-events: none;
 }
 
 /* ============================================================
@@ -782,7 +826,9 @@
   .ltms-sf-meta-row { gap: 6px; margin-bottom: 0; }
   .ltms-sf-city, .ltms-sf-rnt, .ltms-sf-count { font-size: 11px; }
   .ltms-sf-description { display: none; }
-  .ltms-sf-topbar-back { display: none; }
+  .ltms-sf-topbar-back-label { display: none; }
+  .ltms-sf-topbar-back { padding: 8px; }
+  .ltms-sf-topbar-logo { font-size: 15px; }
 
   .ltms-sf-topbar-content {
     flex-direction: column;
@@ -875,8 +921,9 @@
 .ltms-sf-banner-cta:hover{transform:scale(1.05)}
 
 /* ── P1-4: Sticky header compact ── */
-.ltms-sf-topbar.is-compact{height:48px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
-.ltms-sf-topbar.is-compact .ltms-sf-topbar-back{display:none}
+.ltms-sf-topbar.is-compact{box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.ltms-sf-topbar.is-compact .ltms-sf-topbar-inner{height:48px}
+.ltms-sf-topbar.is-compact .ltms-sf-topbar-back-label{display:none}
 .ltms-sf-topbar.is-compact .ltms-sf-topbar-logo{font-size:14px}
 .ltms-sf-topbar-search-mini{display:none;flex:1;max-width:400px;margin:0 auto}
 .ltms-sf-topbar.is-compact .ltms-sf-topbar-search-mini{display:flex}
@@ -912,9 +959,9 @@
 .ltms-sf-ac-section{padding:8px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;background:#F9FAFB}
 
 /* ── P2-2: Wishlist counter in topbar ── */
-.ltms-sf-topbar-wishlist{display:flex;align-items:center;gap:4px;text-decoration:none;color:#242424;font-size:18px;padding:6px;border-radius:8px;flex-shrink:0;position:relative}
-.ltms-sf-topbar-wishlist:hover{background:var(--sf-border)}
-.ltms-sf-wishlist-count{background:#E80001;color:#fff;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;padding:0 4px;font-family:var(--font-body);position:absolute;top:0;right:0}
+/* HEADER-UX (2026-09-11): el botón wishlist ya se estiliza arriba (40×40, SVG);
+   aquí solo el badge contador, alineado al de carrito. */
+.ltms-sf-wishlist-count{background:#E80001;color:#fff;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;padding:0 4px;font-family:var(--font-body);position:absolute;top:0;right:0;transform:translate(2px,-2px);box-shadow:0 2px 8px rgba(232,0,1,0.35);pointer-events:none}
 
 /* ── P2-3: Load more button ── */
 .ltms-sf-load-more-wrap{display:flex;justify-content:center;padding:24px 0}

@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Changed — `HEADER-UX` (topbar de la vitrina del vendedor, escritorio + móvil)
+
+> El topbar de `/vendedor/{slug}` (`ltms-sf-topbar`) era crudo: el carrito usaba un emoji,
+> "Volver a la tienda" era texto gris suelto y desaparecía por completo en móvil, y los
+> touch targets eran pequeños. Reorganizado en dos zonas con iconos SVG y estados de foco.
+
+- **`includes/frontend/class-ltms-vendor-storefront.php`:** markup del topbar reorganizado en
+  `.ltms-sf-topbar-start` (volver + logo) y `.ltms-sf-topbar-actions` (wishlist + carrito); el
+  carrito pasa de emoji a SVG; "Volver a la tienda" con chevron SVG + label (`esc_html_e`).
+- **`assets/css/ltms-storefront.css` (+ `.min`):** touch targets 40×40, hover + `:focus-visible`,
+  badge de carrito absoluto con sombra de marca, backdrop-filter (glass), y `back` colapsa a
+  chevron solo en móvil/compact (antes `display:none`). La altura la controla
+  `.ltms-sf-topbar-inner` (el `.is-compact` encoje el inner, no el header).
+- **Test:** nueva suite `tests/unit/StorefrontTopbarTest.php` (4 tests, grupo `audit-topbar`).
+
 ### Added — `CART-UX-NEXT-UPSells` (upsells del mismo vendor en el mini-cart)
 
 > El mini-cart nuevo (`.ltms-minicart-*`) abría/scrolleaba/contaba, pero NO mostraba upsells:
