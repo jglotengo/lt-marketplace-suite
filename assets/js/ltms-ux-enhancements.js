@@ -670,10 +670,11 @@
         btn.className = 'ltms-back-to-top';
         btn.setAttribute('aria-label', 'Volver arriba');
         btn.innerHTML = '↑';
+        // BACK-TO-TOP-OVERLAP FIX (2026-09-12): la posición (right/bottom) vive
+        // en ltms-ux-enhancements.css para poder apilarlo POR ENCIMA del botón de
+        // soporte (.ltms-live-chat) y no sobreponerse, con su variante móvil.
         btn.style.cssText = `
             position: fixed;
-            bottom: 24px;
-            right: 24px;
             width: 44px;
             height: 44px;
             border-radius: 50%;

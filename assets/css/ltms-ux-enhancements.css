@@ -7900,6 +7900,25 @@ kbd {
     }
 }
 
+/* BACK-TO-TOP-OVERLAP FIX (2026-09-12): .ltms-back-to-top se apila POR ENCIMA del
+   botón de soporte (.ltms-live-chat) en vez de sobreponerse en la misma esquina.
+   Desktop: chat en bottom:24px (56px alto) → back-to-top en bottom:88px.
+   Móvil: chat sube a bottom:88px (sticky cart) → back-to-top en bottom:152px.
+   La posición se sacó del inline-style del JS a esta hoja para poder hacerla
+   responsive sin !important. */
+.ltms-back-to-top {
+    position: fixed;
+    right: 24px;
+    bottom: 88px;
+}
+
+@media (max-width: 480px) {
+    .ltms-back-to-top {
+        right: 16px;
+        bottom: 152px;
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    10.93 STICKY ADD-TO-CART — Barra fija móvil
    ═══════════════════════════════════════════════════════════════ */

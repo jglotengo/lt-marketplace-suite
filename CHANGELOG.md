@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `BACK-TO-TOP-OVERLAP` (botón "volver arriba" se sobreponía al botón de soporte)
+
+> En escritorio, el botón flotante de subir (`.ltms-back-to-top`) y el botón de soporte (`.ltms-live-chat`)
+> estaban ambos en `bottom:24px; right:24px`, por lo que la flecha ↑ tapaba el chat.
+
+- **`assets/js/ltms-ux-enhancements.js` (+ `.min`):** la posición (`right`/`bottom`) del back-to-top se saca del
+  inline-style a la hoja CSS (se eliminan `bottom:24px`/`right:24px` del `cssText`) para poder apilarlo responsivo.
+- **`assets/css/ltms-ux-enhancements.css` (+ `.min`):** `.ltms-back-to-top` pasa a `bottom:88px` (desktop, por encima
+  del chat de 56px en 24px) y `bottom:152px` en móvil (por encima del chat, que sube a 88px por la sticky cart).
+- **Test:** nueva suite `tests/unit/BackToTopOverlapTest.php` (3 tests, grupo `audit-backtotop`).
+
 ### Fixed — `SHOP-FILTERS-MOBILE` (hueco en blanco y filtros ocultos en /tienda/ móvil)
 
 > En móvil, `/tienda/` dejaba un hueco en blanco grande antes de las cards y los filtros no se veían.
