@@ -3422,6 +3422,32 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      de borrar a ciegas, salvo que exista una decisión explícita. Si se borra, actualizar/eliminar en el MISMO
      commit todos los tests que lo leen (AGENTS.md test huérfano, LECCIÓN #119).
 
+## 30. v2.9.366 - HEADER-UX-CACHEBUST: SG Optimizer "querystring" rompe el cache-bust de assets (incluso el ?v= manual)
+
+### Lección #162: la optimización "Eliminar cadenas de consulta" de SiteGround Optimizer (`querystring`) borra TODO query string de las URLs de assets, no solo el `?ver=` de WP
+
+1. **Caso real:** tras desplegar el rediseño del topbar de la vitrina (`HEADER-UX`), el usuario reportó
+   "no veo los cambios". El markup nuevo SÍ estaba vivo (SVG del carrito, zonas `start`/`actions` — verificado
+   con `curl` al HTML, `emoji=0`), pero el `.css`/`.js` se servían viejos. La causa fue doble: (a) SG Optimizer
+   tiene activa la optimización `querystring` ("Remove query strings from static resources"), que reescribe el
+   HTML de salida y borra **todo** `?x=y` de `<link>`/`<script>` de assets — incluyendo el `?v=` manual que este
+   proyecto daba por inmune (la nota del checkpoint "SG remueve el ?ver=, usar ?v= manual" era **incorrecta** con
+   esa optimización activa); (b) con URL sin query, el navegador/CDN no revalida y sirve el archivo viejo.
+2. **Diagnóstico correcto:** `curl` a la página viva y comparar el `href`/`src` real contra el enqueue. En este
+   caso el HTML servía `ltms-storefront.css` y `.min.js` SIN ningún query, pese a que `enqueue_assets()` ya
+   concatenaba `?v=` (confirmado con `wp sg optimize querystring` = enabled). No asumir que "no hay ?v= en el HTML"
+   es culpa de no haberlo agregado en el código: verificar qué optimización lo está borrando.
+3. **Fix:** `wp sg optimize querystring disable` (+ `wp sg purge` para vaciar assets/file/dynamic cache) restaura
+   el cache-bust versionado, incluido el `?ver=` estándar de WP/WooCommerce en TODO el sitio. Alternativa robusta
+   sin tocar config: versionar el **nombre de archivo** (query-string-independent), que sobrevive a cualquier CDN.
+4. **Regla preventiva:**
+   - Ante "el usuario no ve los cambios de CSS/JS": (1) confirmar con `curl` (no con navegador) si el HTML sirve
+     el asset versionado y si el origen devuelve el contenido nuevo; (2) si el query-string está ausente, revisar
+     `wp sg optimize querystring` antes de culpar al enqueue; (3) el navegador del usuario necesita un hard refresh
+     (Ctrl+Shift+R) una sola vez tras fijar el cache-bust.
+   - No dar por bueno `?v=` como cache-bust en SG sin verificar que `querystring` esté desactivada; con ella activa,
+     NINGÚN query-string cache-bustea (afecta WP core, WooCommerce y todos los plugins por igual).
+
 
 
 
