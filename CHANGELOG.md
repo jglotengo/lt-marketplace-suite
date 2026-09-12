@@ -6,6 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SHOP-FILTERS-MOBILE` (hueco en blanco y filtros ocultos en /tienda/ móvil)
+
+> En móvil, `/tienda/` dejaba un hueco en blanco grande antes de las cards y los filtros no se veían.
+> Causa raíz: el bloque v2.9.191 `@media(max-width:760px){ .pv-shop .pv-shop__sidebar{ position:static!important } }`
+> (mayor especificidad + `!important`) sobrescribía el slide-in de SHOP-FILTERS (`position:fixed`), dejando un sidebar
+> de ancho completo invisible (`translateX(-100%)`) que ocupaba espacio en el flujo.
+
+- **`assets/css/ltms-plaza-viva.css` (+ `.min`):** eliminado el bloque `position:static!important` obsoleto; el sidebar
+  móvil usa el slide-in `position:fixed` del bloque SHOP-FILTERS (mismo breakpoint canónico 760px).
+- **Test:** `PlazaVivaDesignSystemAuditTest::test_006_breakpoints_canonicos_sin_leaks_768` actualizado (assert slide-in
+  `position:fixed` + assert de que `position:static!important` no reaparece).
+
+### Fixed — `CART-COUNT-SYNC` (contador del carrito del header no se actualizaba al eliminar en el mini-cart)
+
+> Al eliminar un producto (o cambiar cantidad) desde el mini-cart, el valor del contador junto al icono del carrito del
+> header (Elementor menu-cart / topbar) quedaba viejo porque el drawer solo refrescaba su propio listado y contadores
+> `.ltms-sf-cart-count`, pero no disparaba el refresh de fragmentos de WooCommerce.
+
+- **`assets/js/ltms-cart-drawer.js` (+ `.min`):** nuevo `refreshWcFragments()` que dispara
+  `$(document.body).trigger('wc_fragment_refresh')` tras `ltms_drawer_remove_item` y `ltms_drawer_update_qty`, para que
+  WC actualice todos los badges de carrito (menu-cart de Elementor incluido).
+- **Test:** `CartDrawerNextTest::test_js_syncs_header_cart_count_on_remove` (assert `wc_fragment_refresh` en `.js` y `.min`).
+
+### Changed — `HEADER-UX-DESKTOP` (topbar de la vitrina en 3 zonas para escritorio)
+
+> El topbar quedaba desbalanceado en escritorio (volver+logo apretados a la izquierda y un hueco grande antes de las
+> acciones). Se reorganiza en 3 zonas simétricas.
+
+- **`includes/frontend/class-ltms-vendor-storefront.php`:** el topbar pasa a 3 hijos directos de `.ltms-sf-topbar-inner`
+  (volver / logo / acciones), sin wrapper intermedio.
+- **`assets/css/ltms-storefront.css` (+ `.min`):** `.ltms-sf-topbar-inner` usa `grid-template-columns:1fr auto 1fr`
+  (volver a la izquierda, logo centrado, acciones a la derecha) con `justify-self` por zona.
+- **Test:** `StorefrontTopbarTest::test_topbar_three_zone_layout` (reemplaza el assert del wrapper `start`).
+
 ### Fixed — `HEADER-UX-CACHEBUST` (los cambios del topbar no se veían en el navegador)
 
 > Tras desplegar HEADER-UX, el navegador seguía mostrando la hoja/JS vieja: `ltms-storefront`

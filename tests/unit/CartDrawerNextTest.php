@@ -106,4 +106,21 @@ final class CartDrawerNextTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'ltms_get_cart', $min, 'CART-UX-NEXT: el .min.js debe estar regenerado (contiene ltms_get_cart).' );
 		$this->assertStringContainsString( 'added_to_cart', $min, 'CART-UX-NEXT: el .min.js debe contener el trigger added_to_cart.' );
 	}
+
+	public function test_js_syncs_header_cart_count_on_remove(): void {
+		$js = file_get_contents( self::JS_PATH );
+
+		$this->assertStringContainsString(
+			'wc_fragment_refresh',
+			$js,
+			'CART-COUNT-SYNC: el JS debe disparar wc_fragment_refresh tras qty/remove para actualizar el contador del carrito del header.'
+		);
+
+		$min = file_get_contents( self::JS_MIN );
+		$this->assertStringContainsString(
+			'wc_fragment_refresh',
+			$min,
+			'CART-COUNT-SYNC: el .min.js debe estar regenerado con el fragment refresh.'
+		);
+	}
 }

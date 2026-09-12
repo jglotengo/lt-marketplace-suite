@@ -136,6 +136,16 @@
         ajax(params, renderCart);
     }
 
+    // CART-COUNT-SYNC FIX (2026-09-11): tras eliminar/cambiar cantidad, además
+    // de refrescar el drawer también disparamos el refresh de fragmentos de WC
+    // para que el contador del carrito del header (Elementor menu-cart, topbar,
+    // etc.) se actualice. Sin esto, el valor "al lado del carrito" quedaba viejo.
+    function refreshWcFragments() {
+        if (window.jQuery && window.jQuery(document.body)) {
+            window.jQuery(document.body).trigger('wc_fragment_refresh');
+        }
+    }
+
     function open() {
         if (!overlay || !drawer) return;
         overlay.classList.add('is-open');
@@ -190,14 +200,14 @@
                 var cur = span ? parseInt(span.textContent, 10) || 1 : 1;
                 var next = Math.max(1, cur + parseInt(qtyBtn.getAttribute('data-ltms-qty'), 10));
                 if (span) span.textContent = next;
-                ajax({ action: 'ltms_drawer_update_qty', cart_item_key: key, qty: String(next) }, function () { refresh(false); }, function () { refresh(false); });
+                ajax({ action: 'ltms_drawer_update_qty', cart_item_key: key, qty: String(next) }, function () { refresh(false); refreshWcFragments(); }, function () { refresh(false); });
                 return;
             }
 
             var removeBtn = el.closest('[data-ltms-remove]');
             if (removeBtn) {
                 e.preventDefault();
-                ajax({ action: 'ltms_drawer_remove_item', cart_item_key: removeBtn.getAttribute('data-ltms-remove') }, function () { refresh(false); }, function () { refresh(false); });
+                ajax({ action: 'ltms_drawer_remove_item', cart_item_key: removeBtn.getAttribute('data-ltms-remove') }, function () { refresh(false); refreshWcFragments(); }, function () { refresh(false); });
                 return;
             }
 

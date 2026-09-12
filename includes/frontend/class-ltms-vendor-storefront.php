@@ -517,28 +517,27 @@ body.ltms-storefront-page .wh-header{display:none!important}
 </style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
-<!-- HEADER-UX (2026-09-11): topbar de la vitrina reorganizado en start/actions,
-     carrito con SVG (antes un emoji), botón volver con chevron y touch targets
-     40x40. El markup y los estilos (ltms-storefront.css) se sincronizan. -->
+<!-- HEADER-UX (2026-09-11/12): topbar de la vitrina en 3 zonas (volver / logo /
+     acciones). Desktop: volver a la izquierda, logo centrado, acciones a la
+     derecha (grid 1fr auto 1fr en ltms-storefront.css). Carrito con SVG (antes un
+     emoji) y touch targets 40x40. -->
 <header class="ltms-sf-topbar">
     <div class="ltms-sf-topbar-inner">
-        <div class="ltms-sf-topbar-start">
-            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back" aria-label="<?php esc_attr_e( 'Volver a la tienda', 'ltms' ); ?>">
-                <svg class="ltms-sf-topbar-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-                <span class="ltms-sf-topbar-back-label"><?php esc_html_e( 'Volver a la tienda', 'ltms' ); ?></span>
-            </a>
-            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
-                <?php
-                $logo_id = get_theme_mod( 'custom_logo' );
-                $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
-                if ( $logo_url ) {
-                    echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
-                } else {
-                    echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
-                }
-                ?>
-            </a>
-        </div>
+        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back" aria-label="<?php esc_attr_e( 'Volver a la tienda', 'ltms' ); ?>">
+            <svg class="ltms-sf-topbar-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+            <span class="ltms-sf-topbar-back-label"><?php esc_html_e( 'Volver a la tienda', 'ltms' ); ?></span>
+        </a>
+        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
+            <?php
+            $logo_id = get_theme_mod( 'custom_logo' );
+            $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+            if ( $logo_url ) {
+                echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
+            } else {
+                echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
+            }
+            ?>
+        </a>
         <div class="ltms-sf-topbar-actions">
             <!-- P2-2: Wishlist icon in topbar -->
             <button type="button" class="ltms-sf-topbar-wishlist" aria-label="Lista de deseos" id="ltms-sf-topbar-wishlist-btn">

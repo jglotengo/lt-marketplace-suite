@@ -5,7 +5,7 @@
  * Mejora del topbar de la vitrina del vendedor (class-ltms-vendor-storefront.php
  * + assets/css/ltms-storefront.css):
  *  - El carrito pasa de emoji 🛒 a SVG (consistente con el mini-cart .ltms-minicart).
- *  - Topbar reorganizado en 3 zonas: start (volver + logo) / actions (wishlist + carrito).
+ *  - Topbar reorganizado en 3 zonas (grid 1fr auto 1fr): volver / logo centrado / acciones.
  *  - Botón "Volver a la tienda" con chevron SVG + label; colapsa a chevron solo en
  *    móvil/compact (antes desaparecía por completo en móvil).
  *  - Touch targets 40×40, hover + focus-visible, badge de carrito absoluto.
@@ -43,11 +43,15 @@ final class StorefrontTopbarTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( '<svg', $src, 'HEADER-UX: el carrito debe usar un SVG.' );
 	}
 
-	public function test_topbar_restructured_start_actions_back(): void {
+	public function test_topbar_three_zone_layout(): void {
 		$src = file_get_contents( self::PHP_PATH );
 
-		$this->assertStringContainsString( 'class="ltms-sf-topbar-start"', $src, 'HEADER-UX: debe existir la zona start (volver + logo).' );
+		// Las 3 zonas son hijos directos de litms-sf-topbar-inner (volver / logo / acciones),
+		// sin un wrapper intermedio "start".
+		$this->assertStringContainsString( 'class="ltms-sf-topbar-back"', $src, 'HEADER-UX: debe existir el botón volver (zona izquierda).' );
+		$this->assertStringContainsString( 'class="ltms-sf-topbar-logo"', $src, 'HEADER-UX: debe existir el logo (zona central).' );
 		$this->assertStringContainsString( 'class="ltms-sf-topbar-actions"', $src, 'HEADER-UX: debe existir la zona actions (wishlist + carrito).' );
+		$this->assertStringNotContainsString( 'ltms-sf-topbar-start', $src, 'HEADER-UX: el wrapper start debe eliminarse (3 zonas directas).' );
 		$this->assertStringContainsString( 'ltms-sf-topbar-back-icon', $src, 'HEADER-UX: el botón volver debe tener chevron SVG.' );
 		$this->assertStringContainsString( 'ltms-sf-topbar-back-label', $src, 'HEADER-UX: el botón volver debe tener label (se oculta en móvil).' );
 		$this->assertStringContainsString( 'HEADER-UX', $src, 'HEADER-UX: la traza del fix debe estar en el markup.' );
@@ -56,7 +60,7 @@ final class StorefrontTopbarTest extends LTMS_Unit_Test_Case {
 	public function test_css_has_zones_touch_targets_and_focus(): void {
 		$css = file_get_contents( self::CSS_PATH );
 
-		$this->assertStringContainsString( '.ltms-sf-topbar-start', $css, 'HEADER-UX: el CSS debe estilar la zona start.' );
+		$this->assertStringContainsString( 'grid-template-columns: 1fr auto 1fr', $css, 'HEADER-UX: el inner debe ser grid de 3 zonas (volver/logo/acciones).' );
 		$this->assertStringContainsString( '.ltms-sf-topbar-actions', $css, 'HEADER-UX: el CSS debe estilar la zona actions.' );
 		$this->assertStringContainsString( 'width: 40px', $css, 'HEADER-UX: wishlist/carrito deben tener touch target de 40px.' );
 		$this->assertStringContainsString( 'focus-visible', $css, 'HEADER-UX: debe existir estilo focus-visible en los controles del topbar.' );
@@ -66,7 +70,7 @@ final class StorefrontTopbarTest extends LTMS_Unit_Test_Case {
 	public function test_min_css_regenerated_with_zones(): void {
 		$min = file_get_contents( self::CSS_MIN );
 
-		$this->assertStringContainsString( '.ltms-sf-topbar-start', $min, 'HEADER-UX: el .min.css debe estar regenerado con la zona start.' );
+		$this->assertStringContainsString( 'grid-template-columns:1fr auto 1fr', $min, 'HEADER-UX: el .min.css debe regenerar el grid de 3 zonas.' );
 		$this->assertStringContainsString( '.ltms-sf-topbar-actions', $min, 'HEADER-UX: el .min.css debe estar regenerado con la zona actions.' );
 	}
 

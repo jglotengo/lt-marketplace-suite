@@ -24,9 +24,9 @@
 }
 
 /* ============================================================
-   TOPBAR — HEADER-UX (2026-09-11)
-   Reorganizado en 3 zonas: start (volver + logo) / actions (wishlist + carrito).
-   Iconos SVG (el carrito antes era un emoji 🛒), touch targets 40×40 y badge
+   TOPBAR — HEADER-UX (2026-09-11/12)
+   Layout de 3 zonas (grid 1fr auto 1fr): volver (izquierda), logo (centrado),
+   acciones wishlist+carrito (derecha). Iconos SVG, touch targets 40×40 y badge
    absoluto. El "back" colapsa a chevron solo en móvil/compact.
    ============================================================ */
 .ltms-sf-topbar {
@@ -44,20 +44,15 @@
   margin: 0 auto;
   padding: 0 16px;
   height: 60px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   transition: height 0.2s;
 }
-.ltms-sf-topbar-start {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
 .ltms-sf-topbar-back {
   display: inline-flex;
+  justify-self: start;
   align-items: center;
   gap: 6px;
   color: var(--sf-muted);
@@ -73,6 +68,7 @@
 .ltms-sf-topbar-back-icon { width: 18px; height: 18px; flex-shrink: 0; }
 .ltms-sf-topbar-logo {
   display: flex;
+  justify-self: center;
   align-items: center;
   text-decoration: none;
   color: var(--sf-text);
@@ -83,6 +79,7 @@
 .ltms-sf-topbar-logo img { max-height: 30px; width: auto; display: block; }
 .ltms-sf-topbar-actions {
   display: flex;
+  justify-self: end;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;

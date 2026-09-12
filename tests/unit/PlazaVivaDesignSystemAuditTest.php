@@ -305,11 +305,18 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-PV-DS-004 fix: ltms-plaza-viva.css no debe contener max-width:768px (variación sin espacio) — usar 760px'
 		);
 
-		// El breakpoint canónico del sidebar shop sigue presente.
-		$this->assertMatchesRegularExpression(
-			'/@media \(max-width:\s?760px\)\s?\{[^}]*pv-shop-sidebar/s',
+		// El sidebar de shop en móvil debe ser un slide-in (SHOP-FILTERS, v2.9.366+).
+		// El bloque v2.9.191 que forzaba `position:static !important` fue eliminado
+		// (sobrescribía el slide-in y dejaba un hueco en blanco al inicio de /tienda/).
+		$this->assertStringContainsString(
+			'.pv-shop__sidebar{position:fixed;top:0;left:0;bottom:0',
 			$css,
-			'AUDIT-FE-PV-DS-004: la regla mobile del pv-shop-sidebar debe existir bajo el breakpoint canónico 760px'
+			'AUDIT-FE-PV-DS-004: el sidebar shop en móvil debe ser slide-in (position:fixed) bajo el breakpoint canónico 760px'
+		);
+		$this->assertStringNotContainsString(
+			'position: static !important',
+			$css,
+			'AUDIT-FE-PV-DS-004: el viejo .pv-shop__sidebar position:static no debe reaparecer (causaba hueco en blanco en móvil)'
 		);
 	}
 
