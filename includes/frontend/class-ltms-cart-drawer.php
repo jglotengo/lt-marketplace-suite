@@ -419,6 +419,10 @@ JS;
         </button>
     </header>
     <div class="ltms-minicart__body"></div>
+    <section class="ltms-minicart__upsells" aria-label="<?php esc_attr_e( 'También te puede interesar', 'ltms' ); ?>" hidden>
+        <h4 class="ltms-minicart__upsells-title"><?php esc_html_e( 'También te puede interesar', 'ltms' ); ?></h4>
+        <div class="ltms-minicart__upsells-list"></div>
+    </section>
     <footer class="ltms-minicart__footer">
         <div class="ltms-minicart__subtotal">
             <span class="ltms-minicart__subtotal-label"><?php esc_html_e( 'Subtotal', 'ltms' ); ?></span>
@@ -755,6 +759,44 @@ JS;
                 if ( count( $upsells ) >= 5 ) break 2;
             }
         }
+
+        return $upsells;
+    }
+
+    /**
+     * CART-UX-NEXT-UPSells (2026-09-11): calcula los upsells (productos del
+     * mismo vendor que ya está en el carrito) para el carrito actual.
+     *
+     * El drawer nuevo (ltms-cart-drawer.js) hidrata vía ltms_get_cart
+     * (ajax_get_cart en class-ltms-frontend-checkout-handler.php), que no
+     * conoce el vendor-id por item. Este wrapper reusa get_upsell_products()
+     * (privado) para que ambos endpoints (ltms_refresh_drawer legacy y
+     * ltms_get_cart nuevo) sirvan la misma lógica de upsells sin duplicar la
+     * WP_Query por vendor.
+     */
+    public static function get_upsells_for_cart( \WC_Cart $cart ): array {
+        $vendor_ids = [];
+        foreach ( $cart->get_cart() as $item ) {
+            $vendor_ids[ (int) get_post_field( 'post_author', $item['product_id'] ) ] = true;
+        }
+        if ( empty( $vendor_ids ) ) {
+            return [];
+        }
+        $upsells = self::get_upsell_products( array_keys( $vendor_ids ), $cart );
+
+        // get_upsell_products() devuelve `image`/`price` como HTML (pensado para
+        // el drawer legacy que los pinta por innerHTML). El drawer nuevo los
+        // consume como texto/imagen-URL y los escapa, así que normalizamos aquí:
+        // precio a texto plano y `image` al src real de la etiqueta <img>.
+        foreach ( $upsells as &$u ) {
+            $u['price'] = trim( html_entity_decode( wp_strip_all_tags( (string) $u['price'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+            if ( empty( $u['image'] ) || 1 !== preg_match( '/\bsrc=["\']([^"\']+)["\']/', (string) $u['image'], $m ) ) {
+                $u['image'] = '';
+            } else {
+                $u['image'] = $m[1];
+            }
+        }
+        unset( $u );
 
         return $upsells;
     }

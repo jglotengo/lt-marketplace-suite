@@ -313,6 +313,11 @@ final class LTMS_Frontend_Checkout_Handler {
         // provided to harden against CSRF on logged-in sessions.
         check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
 
+        // CART-UX-NEXT-UPSells (2026-09-11): el drawer nuevo pide full=1 al abrir
+        // para recibir también los upsells del mismo vendor. Los refrescos rápidos
+        // (quantities/remove) no lo mandan para no pagar la WP_Query por vendor.
+        $full = isset( $_POST['full'] ) && '1' === $_POST['full'];
+
         if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
             wp_send_json_success( [
                 'items'           => [],
@@ -320,6 +325,7 @@ final class LTMS_Frontend_Checkout_Handler {
                 'count'           => 0,
                 'cart_url'        => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
                 'checkout_url'    => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '',
+                'upsells'         => [],
             ] );
         }
 
@@ -380,12 +386,21 @@ final class LTMS_Frontend_Checkout_Handler {
         }
         unset( $item_ref );
 
+        // CART-UX-NEXT-UPSells (2026-09-11): sirve upsells del mismo vendor solo
+        // cuando el cliente los pide (full=1). Reusa LTMS_Cart_Drawer para no
+        // duplicar la lógica de get_upsell_products().
+        $upsells = [];
+        if ( $full && class_exists( 'LTMS_Cart_Drawer' ) && method_exists( 'LTMS_Cart_Drawer', 'get_upsells_for_cart' ) ) {
+            $upsells = LTMS_Cart_Drawer::get_upsells_for_cart( $cart );
+        }
+
         wp_send_json_success( [
             'items'           => $items,
             'total_formatted' => $total_formatted,
             'count'           => $cart->get_cart_contents_count(),
             'cart_url'        => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
             'checkout_url'    => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '',
+            'upsells'         => $upsells,
         ] );
     }
 

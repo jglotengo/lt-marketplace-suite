@@ -6,6 +6,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Added — `CART-UX-NEXT-UPSells` (upsells del mismo vendor en el mini-cart)
+
+> El mini-cart nuevo (`.ltms-minicart-*`) abría/scrolleaba/contaba, pero NO mostraba upsells:
+> `get_upsell_products()` existía en `LTMS_Cart_Drawer` pero solo lo servía el endpoint legacy
+> `ltms_refresh_drawer`; el drawer nuevo hidrata vía `ltms_get_cart` (`ajax_get_cart`), que no
+> devolvía `upsells`.
+
+- **`includes/frontend/class-ltms-cart-drawer.php`:** nuevo wrapper público
+  `LTMS_Cart_Drawer::get_upsells_for_cart()` (reusa el `get_upsell_products()` privado, sin
+  duplicar la WP_Query por vendor) + `<section class="ltms-minicart__upsells">` en
+  `render_drawer_html()`.
+- **`includes/frontend/class-ltms-frontend-checkout-handler.php`:** `ajax_get_cart` lee `full=1`
+  y sirve `upsells` solo cuando se pide (los refrescos de qty/remove no pagan la query).
+- **`assets/js/ltms-cart-drawer.js` (+ `.min`):** `renderUpsells()` + `refresh(full)`; al abrir se
+  pide `full=1`, los refrescos rápidos no.
+- **`assets/css/ltms-cart-drawer.css`:** tira horizontal de cards de upsell (`.ltms-minicart__upsell-*`).
+- **Test:** nueva suite `tests/unit/CartUpsellsTest.php` (6 tests, grupo `audit-cart-upsells`).
+
 ### Fixed — `PANEL-CONTRAST` (contraste de texto del panel del vendedor)
 
 > El sidebar/topbar azul (`#1a5276`) del dashboard SPA del vendedor mostraba los items de navegación en gris

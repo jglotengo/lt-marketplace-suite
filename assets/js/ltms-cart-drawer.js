@@ -86,23 +86,54 @@
         body.innerHTML = html;
     }
 
-    function refresh() {
+    // CART-UX-NEXT-UPSells (2026-09-11): render de upsells (mismo vendor) en el
+    // drawer. Se piden solo al abrir (full=1); qty/remove refrescan sin upsells.
+    function renderUpsells(upsells) {
+        var host = $('.ltms-minicart__upsells');
+        if (!host) return;
+        var list = host.querySelector('.ltms-minicart__upsells-list');
+        if (!list) return;
+        if (!upsells || !upsells.length) {
+            host.setAttribute('hidden', '');
+            list.innerHTML = '';
+            return;
+        }
+        host.removeAttribute('hidden');
+        var html = '';
+        for (var i = 0; i < upsells.length; i++) {
+            var u = upsells[i];
+            var img = u.image ? '<img src="' + esc(u.image) + '" alt="' + esc(u.name) + '" loading="lazy">' : '';
+            html += '<a class="ltms-minicart__upsell" href="' + esc(u.permalink || '#') + '">' +
+                '<span class="ltms-minicart__upsell-img">' + img + '</span>' +
+                '<span class="ltms-minicart__upsell-name">' + esc(u.name) + '</span>' +
+                '<span class="ltms-minicart__upsell-price">' + esc(u.price || '') + '</span>' +
+                '</a>';
+        }
+        list.innerHTML = html;
+    }
+
+    function renderCart(data) {
+        renderItems(data.items || []);
+        renderUpsells(data.upsells);
+        var countEl = $('.ltms-minicart__count');
+        if (countEl) countEl.textContent = data.count != null ? String(data.count) : '';
+        var totalEl = $('.ltms-minicart__subtotal-value');
+        if (totalEl) totalEl.textContent = data.total_formatted || '';
+        var checkoutBtn = $('.ltms-minicart__checkout');
+        if (checkoutBtn) checkoutBtn.setAttribute('href', data.checkout_url || checkoutUrl);
+        var continueBtn = $('.ltms-minicart__continue');
+        if (continueBtn) continueBtn.setAttribute('href', data.cart_url || cartUrl);
+        if (data.count != null) {
+            var counters = document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count, [data-cart-count]');
+            for (var j = 0; j < counters.length; j++) counters[j].textContent = String(data.count);
+        }
+    }
+
+    function refresh(full) {
         if (!body) return;
-        ajax({ action: 'ltms_get_cart' }, function (data) {
-            renderItems(data.items || []);
-            var countEl = $('.ltms-minicart__count');
-            if (countEl) countEl.textContent = data.count != null ? String(data.count) : '';
-            var totalEl = $('.ltms-minicart__subtotal-value');
-            if (totalEl) totalEl.textContent = data.total_formatted || '';
-            var checkoutBtn = $('.ltms-minicart__checkout');
-            if (checkoutBtn) checkoutBtn.setAttribute('href', data.checkout_url || checkoutUrl);
-            var continueBtn = $('.ltms-minicart__continue');
-            if (continueBtn) continueBtn.setAttribute('href', data.cart_url || cartUrl);
-            if (data.count != null) {
-                var counters = document.querySelectorAll('.ltms-sf-cart-count, .ltms-cart-count, .cart-count, [data-cart-count]');
-                for (var j = 0; j < counters.length; j++) counters[j].textContent = String(data.count);
-            }
-        });
+        var params = { action: 'ltms_get_cart' };
+        if (full) params.full = '1';
+        ajax(params, renderCart);
     }
 
     function open() {
@@ -122,11 +153,11 @@
     var openTimer = null;
     function openAndRefresh() {
         open();
-        refresh();
+        refresh(true);
         // Re-refresh a los 500ms para capturar el item recién agregado por el
         // path PV (data-pv-add-to-cart) cuyo AJAX puede aún estar en vuelo.
         if (openTimer) clearTimeout(openTimer);
-        openTimer = setTimeout(refresh, 500);
+        openTimer = setTimeout(function () { refresh(true); }, 500);
     }
 
     function cacheDom() {
@@ -159,14 +190,14 @@
                 var cur = span ? parseInt(span.textContent, 10) || 1 : 1;
                 var next = Math.max(1, cur + parseInt(qtyBtn.getAttribute('data-ltms-qty'), 10));
                 if (span) span.textContent = next;
-                ajax({ action: 'ltms_drawer_update_qty', cart_item_key: key, qty: String(next) }, refresh, refresh);
+                ajax({ action: 'ltms_drawer_update_qty', cart_item_key: key, qty: String(next) }, function () { refresh(false); }, function () { refresh(false); });
                 return;
             }
 
             var removeBtn = el.closest('[data-ltms-remove]');
             if (removeBtn) {
                 e.preventDefault();
-                ajax({ action: 'ltms_drawer_remove_item', cart_item_key: removeBtn.getAttribute('data-ltms-remove') }, refresh, refresh);
+                ajax({ action: 'ltms_drawer_remove_item', cart_item_key: removeBtn.getAttribute('data-ltms-remove') }, function () { refresh(false); }, function () { refresh(false); });
                 return;
             }
 
