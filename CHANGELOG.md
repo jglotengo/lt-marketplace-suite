@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HOME-SLOW-DEFER` (home ~13.4s: scripts site-wide pesados cargados síncronos)
+
+> Medición en vivo (curl desde SG, localhost): TTFB 0.17s (el servidor NO es el cuello de botella) y
+> ~1.11MB de JS+CSS en 12 archivos, de los cuales el plugin aporta ~400KB en 7 scripts separados tras
+> SG-COMBINE-EXCLUDE. El dominante es `ltms-ux-enhancements` (~320KB min, 13K líneas, ~130 init()) encolado
+> síncrono en toda página no-admin, seguido de `ltms-plaza-viva` (~44KB min). Fase 1 (bajo riesgo): cargar
+> ambos con `strategy => 'defer'`. Fase 2 (split del monolito) en backlog.
+
+- **`includes/frontend/class-ltms-frontend-assets.php`:** `ltms-ux-enhancements` → `[ 'in_footer' => true, 'strategy' => 'defer' ]`.
+- **`includes/frontend/class-ltms-native-templates.php`:** `ltms-plaza-viva` → `[ 'in_footer' => true, 'strategy' => 'defer' ]`.
+- Args-array degradan a `in_footer=true` en WP < 6.3 (sin defer, sin romper nada).
+- **Test:** `HomeSlowDeferTest` (3 tests, grupo `home-slow`).
+
 ### Fixed — `CHECKOUT-PHONE-PREFIX-COUNTRIES` (prefijo +57 hardcodeado; faltaba México)
 
 > El addon de prefijo del teléfono en checkout estaba hardcodeado a `+57` (solo Colombia). Ahora es

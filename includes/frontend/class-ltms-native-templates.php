@@ -403,7 +403,13 @@ class LTMS_Native_Templates {
         // SG Optimizer strips query params and caches by filename.
         // Solution: use wp_add_inline_script to inject critical PV functions
         // directly in the HTML, bypassing SG JS cache entirely.
-        wp_enqueue_script( 'ltms-plaza-viva', ltms_asset_url( 'js/ltms-plaza-viva' ), [], $ver, true );
+        //
+        // HOME-SLOW-DEFER FIX (2026-09-13): este design system (~44KB min) se
+        // descargaba/ejecutaba síncrono en TODA página (incluida la home), junto
+        // con ltms-ux-enhancements. Se encola con strategy 'defer' (WP 6.3+) para
+        // no bloquear parse/primer paint; ejecuta tras el parse. Los args-array
+        // degradan a in_footer=true en WP < 6.3 (sin defer, sin romper nada).
+        wp_enqueue_script( 'ltms-plaza-viva', ltms_asset_url( 'js/ltms-plaza-viva' ), [], $ver, [ 'in_footer' => true, 'strategy' => 'defer' ] );
 
         // v2.9.202 — Inline PV patch: inject critical functions that may not
         // be in the cached version of ltms-plaza-viva.js. This runs AFTER

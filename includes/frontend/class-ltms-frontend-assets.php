@@ -517,12 +517,21 @@ final class LTMS_Frontend_Assets {
         // porque SiteGround Optimizer remueve el ?ver= estándar de WP.
         // El ?v= adicional es un query parameter que SiteGround no toca.
         $js_url = $url . 'js/ltms-ux-enhancements' . $min . '.js?v=' . $ver;
+
+        // HOME-SLOW-DEFER FIX (2026-09-13): este monolito de ~13K líneas (~320KB
+        // min) se descargaba/ejecutaba de forma síncrona en TODA página no-admin
+        // (incluida la home), generando un "long task" en DOMContentLoaded con
+        // ~130 init() (≈40 solo-dashboard + ≈90 storefront) y retrasando
+        // interactividad/TBT. Se encola con strategy 'defer' (WP 6.3+) para no
+        // bloquear el parse ni el primer paint; ejecuta tras el parse, después de
+        // jQuery. Los args-array degradan a in_footer=true en WP < 6.3 (sin defer,
+        // pero sin romper nada).
         wp_enqueue_script(
             'ltms-ux-enhancements',
             $js_url,
             [ 'jquery' ],
             $ver,
-            true
+            [ 'in_footer' => true, 'strategy' => 'defer' ]
         );
 
         // Localize AJAX endpoint + nonce + i18n for the JS layer.
