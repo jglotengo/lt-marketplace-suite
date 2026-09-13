@@ -115,8 +115,6 @@
     }
 
     function injectButtons() {
-        // DIAG (temporal): ver dónde se corta la inyección.
-        console.log('[ltms-header-nav] injectButtons start. flo=', $('#ltms-floating-access').length, 'access=', $('.ltms-header-access').length, 'ltmsHeaderNav=', typeof ltmsHeaderNav);
         if ($('#ltms-floating-access').length || $('.ltms-header-access').length) return;
 
         var d          = ltmsHeaderNav;
@@ -145,9 +143,6 @@
                     text === 'mi cuenta' || text === 'my account') &&
                    !$(this).closest('#ltms-header-access, .ltms-header-access, #ltms-hello-access').length;
         }).first();
-
-        // DIAG (temporal)
-        console.log('[ltms-header-nav] sellerEl=', $sellerEl.length, 'visible=', $sellerEl.length ? $sellerEl.is(':visible') : 'n/a', 'clienteEl=', $clienteEl.length);
 
         // Zonas de header de temas conocidos
         var $headerZone = $(
@@ -219,11 +214,9 @@
         }
 
         initDropdowns();
-        console.log('[ltms-header-nav] injectButtons done. seller visible now=', $('.ltms-btn-seller').is(':visible'));
     }
 
     $(document).ready(function() {
-        console.log('[ltms-header-nav] ready. ltmsHeaderNav=', typeof ltmsHeaderNav);
         if (typeof ltmsHeaderNav === 'undefined') return;
         injectButtons();
     });
