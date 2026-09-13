@@ -1314,9 +1314,9 @@ final class LTMS_Frontend_Checkout_Handler {
     }
 
     /**
-     * CHECKOUT-PHONE-PREFIX FIX (2026-09-12): normaliza billing_phone a
-     * +57XXXXXXXXXX cuando el usuario ingresó solo sus 10 dígitos (el prefijo
-     * ahora es un addon visual fijo y no viaja en el input).
+     * CHECKOUT-PHONE-PREFIX FIX (2026-09-12): normaliza billing_phone cuando el
+     * usuario ingresó solo sus 10 dígitos (el prefijo es un addon visual y no
+     * viaja en el input). El prefijo es dinámico por país (CO +57 / MX +52).
      *
      * @param array $data Datos POST del checkout (billing/shipping).
      * @return array Datos con billing_phone normalizado.
@@ -1328,14 +1328,17 @@ final class LTMS_Frontend_Checkout_Handler {
 
         $phone = trim( (string) $data['billing_phone'] );
 
-        // Si ya trae prefijo internacional (+ o 2 dígitos de país), no tocar.
+        // Si ya trae prefijo internacional (+), no tocar.
         if ( strpos( $phone, '+' ) !== false ) {
             return $data;
         }
 
-        // Colombiano de 10 dígitos (celular 3XX + operador) → anteponer +57.
-        if ( LTMS_Core_Config::get_country() === 'CO' && preg_match( '/^\d{10}$/', $phone ) ) {
-            $data['billing_phone'] = '+57' . $phone;
+        // 10 dígitos sin prefijo → anteponer el código de país (CO +57 / MX +52).
+        if ( preg_match( '/^\d{10}$/', $phone ) ) {
+            $dial = class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'phone_dial_code' )
+                ? LTMS_Utils::phone_dial_code()
+                : '57';
+            $data['billing_phone'] = '+' . $dial . $phone;
         }
 
         return $data;

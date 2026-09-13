@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-PHONE-PREFIX-COUNTRIES` (prefijo +57 hardcodeado; faltaba México)
+
+> El addon de prefijo del teléfono en checkout estaba hardcodeado a `+57` (solo Colombia). Ahora es
+> dinámico según el país de operación: CO `+57`, MX `+52`.
+
+- **`includes/core/utils/class-ltms-utils.php`:** nuevo helper `phone_dial_code()` (CO→57, MX→52).
+- **`includes/frontend/templates/checkout.php`:** el addon `.pv-phone-prefix` y el placeholder se
+  derivan de `phone_dial_code()` (placeholder MX `55 0000 0000`, CO `300 000 0000`).
+- **`includes/frontend/class-ltms-frontend-checkout-handler.php`:** `normalize_checkout_phone()` antepone
+  el prefijo por país (no solo `+57`).
+- **Test:** `CheckoutPhonePrefixTest` (+1 test).
+
 ### Fixed — `SG-COMBINE-EXCLUDE` (botones Vender/Cuenta y mini-cart "muertos" por SG Optimizer)
 
 > SiteGround Optimizer combinaba TODOS los JS del frontend en un único

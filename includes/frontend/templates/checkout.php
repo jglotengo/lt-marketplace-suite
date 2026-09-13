@@ -245,18 +245,22 @@ get_header( 'shop' );
 
                                     <?php
                                     // Phone field.
-                                    // CHECKOUT-PHONE-PREFIX FIX (2026-09-12): el +57
-                                    // se separa visualmente del número para que el usuario
-                                    // solo escriba sus 10 dígitos (sabe el operador, no el
-                                    // prefijo). El valor se muestra sin el prefijo de país.
+                                    // CHECKOUT-PHONE-PREFIX FIX (2026-09-12): el prefijo de país
+                                    // se separa visualmente del número para que el usuario solo
+                                    // escriba sus dígitos. El prefijo ahora es dinámico por país
+                                    // de operación (CO=+57, MX=+52) — antes estaba hardcodeado +57.
                                     $phone_value = $checkout->get_value( 'billing_phone' );
-                                    $phone_display = preg_replace( '/^\s*\+?\s*57/', '', (string) $phone_value );
+                                    $phone_dial  = class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'phone_dial_code' )
+                                        ? LTMS_Utils::phone_dial_code()
+                                        : '57';
+                                    $phone_display = preg_replace( '/^\s*\+?\s*' . preg_quote( $phone_dial, '/' ) . '/', '', (string) $phone_value );
+                                    $phone_placeholder = '52' === $phone_dial ? __( '55 0000 0000', 'ltms' ) : __( '300 000 0000', 'ltms' );
                                     ?>
                                     <div class="pv-field pv-checkout__field">
                                         <label for="billing_phone"><?php esc_html_e( 'Teléfono / WhatsApp', 'ltms' ); ?> <span class="pv-checkout__req" aria-hidden="true">*</span></label>
                                         <div class="pv-input-group">
-                                            <span class="pv-phone-prefix" aria-hidden="true">+57</span>
-                                            <input type="tel" id="billing_phone" name="billing_phone" class="pv-input input-text" value="<?php echo esc_attr( $phone_display ); ?>" placeholder="<?php esc_attr_e( '300 000 0000', 'ltms' ); ?>" autocomplete="tel" inputmode="tel" maxlength="10" required />
+                                            <span class="pv-phone-prefix" aria-hidden="true">+<?php echo esc_html( $phone_dial ); ?></span>
+                                            <input type="tel" id="billing_phone" name="billing_phone" class="pv-input input-text" value="<?php echo esc_attr( $phone_display ); ?>" placeholder="<?php echo esc_attr( $phone_placeholder ); ?>" autocomplete="tel" inputmode="tel" maxlength="10" required />
                                         </div>
                                         <span class="pv-field__hint"><?php esc_html_e( 'Lo usaremos para coordinar la entrega con el repartidor.', 'ltms' ); ?></span>
                                     </div>

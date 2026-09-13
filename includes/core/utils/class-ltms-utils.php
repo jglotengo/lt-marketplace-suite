@@ -115,6 +115,21 @@ final class LTMS_Utils {
     }
 
     /**
+     * Devuelve el código de marcado internacional (sin el '+') según el país de
+     * operación. Usado para el addon de prefijo del teléfono en checkout y para
+     * normalizar el billing_phone (CO=57, MX=52).
+     *
+     * @param string $country_code Código de país ('CO' o 'MX'); vacío = auto.
+     * @return string Código de marcado (ej: '57', '52').
+     */
+    public static function phone_dial_code( string $country_code = '' ): string {
+        if ( '' === $country_code ) {
+            $country_code = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+        }
+        return strtoupper( $country_code ) === 'MX' ? '52' : '57';
+    }
+
+    /**
      * Genera un número de referencia único para pedidos/transacciones.
      *
      * @param string $prefix Prefijo (ej: 'PAY', 'COMM', 'REF').

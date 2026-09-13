@@ -29,8 +29,29 @@ final class CheckoutPhonePrefixTest extends LTMS_Unit_Test_Case {
 
 	private const CHECKOUT_PATH = __DIR__ . '/../../includes/frontend/templates/checkout.php';
 	private const HANDLER_PATH = __DIR__ . '/../../includes/frontend/class-ltms-frontend-checkout-handler.php';
+	private const UTILS_PATH   = __DIR__ . '/../../includes/core/utils/class-ltms-utils.php';
 	private const CSS_PATH     = __DIR__ . '/../../assets/css/ltms-plaza-viva.css';
 	private const CSS_MIN      = __DIR__ . '/../../assets/css/ltms-plaza-viva.min.css';
+
+	public function test_phone_dial_code_helper_country_aware(): void {
+		$src = file_get_contents( self::UTILS_PATH );
+
+		$this->assertStringContainsString(
+			'function phone_dial_code',
+			$src,
+			'CHECKOUT-PHONE-PREFIX: debe existir el helper phone_dial_code() en LTMS_Utils.'
+		);
+		$this->assertStringContainsString(
+			"'MX' ? '52'",
+			$src,
+			'CHECKOUT-PHONE-PREFIX: phone_dial_code() debe devolver 52 para México.'
+		);
+$this->assertStringContainsString(
+			"? '52' : '57'",
+			$src,
+			'CHECKOUT-PHONE-PREFIX: phone_dial_code() debe devolver 57 por defecto (Colombia).'
+		);
+	}
 
 	public function test_phone_prefix_addon_in_markup(): void {
 		$src = file_get_contents( self::CHECKOUT_PATH );
@@ -82,9 +103,14 @@ final class CheckoutPhonePrefixTest extends LTMS_Unit_Test_Case {
 			'CHECKOUT-PHONE-PREFIX: debe existir el método normalize_checkout_phone().'
 		);
 		$this->assertStringContainsString(
-			"] = '+57'",
+			"'] = '+' . \$dial . \$phone",
 			$src,
-			'CHECKOUT-PHONE-PREFIX: un celular de 10 dígitos debe guardarse como +57XXXXXXXXXX.'
+			'CHECKOUT-PHONE-PREFIX: un número de 10 dígitos debe guardarse con el prefijo del país (dinámico, no fijo +57).'
+		);
+		$this->assertStringContainsString(
+			'phone_dial_code',
+			$src,
+			'CHECKOUT-PHONE-PREFIX: debe usar el helper phone_dial_code() para el prefijo por país.'
 		);
 	}
 
