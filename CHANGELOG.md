@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SG-COMBINE-EXCLUDE` (botones Vender/Cuenta y mini-cart "muertos" por SG Optimizer)
+
+> SiteGround Optimizer combinaba TODOS los JS del frontend en un único
+> `siteground-optimizer-combined-js-*.js` (cargado `defer`), rompiendo la dependencia de jQuery y el
+> orden de ejecución de `ltms-header-nav` (botones Vender/Cuenta) y `ltms-cart-drawer` (mini-cart): sin
+> error de consola, pero nunca se ejecutaban.
+
+- **`includes/frontend/class-ltms-frontend-assets.php`:** excluye todos los handles `ltms-*` de la
+  combinación y minificación de SG (`sgo_javascript_combine_exclude`, `sgo_css_combine_exclude`,
+  `sgo_js_minify_exclude`, `sgo_css_minify_exclude`) en todas las páginas.
+- **Test:** `SgCombineExcludeTest` (2 tests, grupo `audit-sg-combine`).
+
 ### Fixed — `HEADER-SELECTOR` (botones Vender/Cuenta no aparecían en header Elementor Pro)
 
 > El fallback de inyección de `ltms-header-nav.js` apuntaba a `.site-header` (Hello Elementor), pero el

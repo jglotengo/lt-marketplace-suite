@@ -47,6 +47,19 @@ final class LTMS_Frontend_Assets {
         add_action( 'wp_head',            [ $instance, 'inject_ajaxurl' ], 1 );
         add_action( 'wp_footer',          [ $instance, 'inject_localized_data' ] );
 
+        // SG-COMBINE-EXCLUDE FIX (2026-09-12): SiteGround Optimizer combina TODOS
+        // los JS del frontend en un único siteground-optimizer-combined-js-*.js
+        // (cargado defer). Esa combinación rompe la dependencia de jQuery y el
+        // orden de ejecución de nuestros scripts de cabecera (Vender/Cuenta) y
+        // del mini-cart, dejándolos "muertos" (sin error de consola, pero sin
+        // ejecutarse). Excluimos todos los handles ltms-* de la combinación y
+        // minificación de SG en todas las páginas (paridad con la vitrina, que ya
+        // se auto-excluía vía class-ltms-vendor-storefront.php).
+        add_filter( 'sgo_javascript_combine_exclude', [ __CLASS__, 'sg_exclude_ltms_assets' ] );
+        add_filter( 'sgo_css_combine_exclude',        [ __CLASS__, 'sg_exclude_ltms_assets' ] );
+        add_filter( 'sgo_js_minify_exclude',          [ __CLASS__, 'sg_exclude_ltms_assets' ] );
+        add_filter( 'sgo_css_minify_exclude',         [ __CLASS__, 'sg_exclude_ltms_assets' ] );
+
         // FIX-403-NONCE: el nonce del dashboard se generaba una sola vez al
         // renderizar la página (ver localize_dashboard_script()) y nunca se
         // refrescaba. Sesiones largas sin recargar (ej. cuentas operadas por
@@ -65,6 +78,32 @@ final class LTMS_Frontend_Assets {
         // sin problema, porque lo registramos nosotros mismos. El JS
         // consumidor está en ltms-dashboard.js -> initNonceRefresh().
         add_action( 'wp_ajax_ltms_refresh_dashboard_nonce', [ $instance, 'ajax_refresh_dashboard_nonce' ] );
+    }
+
+    /**
+     * SG-COMBINE-EXCLUDE FIX (2026-09-12): excluye todos los handles ltms-* de la
+     * combinación/minificación de SiteGround Optimizer. Iteramos los registros de
+     * scripts y estilos ya registrados para no tener que enumerar ~30 handles a mano.
+     *
+     * @param array $exclude_list Lista de handles/ids que SG no debe combinar/minificar.
+     * @return array Lista ampliada con los handles ltms-*.
+     */
+    public static function sg_exclude_ltms_assets( array $exclude_list ): array {
+        if ( is_admin() ) {
+            return $exclude_list;
+        }
+        global $wp_scripts, $wp_styles;
+        foreach ( [ $wp_scripts, $wp_styles ] as $registry ) {
+            if ( empty( $registry->registered ) ) {
+                continue;
+            }
+            foreach ( array_keys( $registry->registered ) as $handle ) {
+                if ( strpos( $handle, 'ltms-' ) === 0 || strpos( $handle, 'ltms_' ) === 0 ) {
+                    $exclude_list[] = $handle;
+                }
+            }
+        }
+        return array_values( array_unique( $exclude_list ) );
     }
 
     /**
