@@ -153,7 +153,11 @@
 
         // Hello Elementor: menú principal
         var $helloMenu = $('.elementor-nav-menu--main > .elementor-nav-menu').first();
-        var $helloHeader = $('.site-header').first();
+        // HEADER-SELECTOR FIX (2026-09-12): este sitio usa un header de Elementor
+        // Pro (`<header class="elementor-location-header">`), NO Hello Elementor's
+        // `.site-header`. El fallback solo apuntaba a `.site-header` (inexistente),
+        // así que en móvil/fallback los botones Vender/Cuenta no se re-inyectaban.
+        var $helloHeader = $('.elementor-location-header, .site-header, header').first();
 
         function wrapInLi(html) {
             return $('<li class="menu-item ltms-menu-item" style="list-style:none;display:flex;align-items:center;"></li>').append(html);
@@ -237,8 +241,16 @@
                     var cHTML = buildClienteBtn(ltmsHeaderNav.mi_cuenta_url);
                     if (cHTML) $combined.append(cHTML);
                     $container.append($combined);
-                    $access.each(function(){ $(this).closest('li.ltms-menu-item, li').hide(); });
-                    $('.site-header').first().append($container);
+                    // HEADER-SELECTOR FIX (2026-09-12): target real del header
+                    // (Elementor Pro `.elementor-location-header`; antes solo
+                    // `.site-header`, inexistente aquí).
+                    var $target = $('.elementor-location-header, .site-header, header').first();
+                    // Solo ocultar los <li> originales si hay un header real donde
+                    // reubicar; si no, dejarlos para no dejar al usuario sin botones.
+                    if ($target.length) {
+                        $access.each(function(){ $(this).closest('li.ltms-menu-item, li').hide(); });
+                        $target.append($container);
+                    }
                     initDropdowns();
                 }
             }

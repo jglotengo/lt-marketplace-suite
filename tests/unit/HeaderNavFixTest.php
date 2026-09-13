@@ -88,4 +88,37 @@ final class HeaderNavFixTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'ltms-btn-seller', $min_js, 'HEADER-NAV-FIX: el .min.js debe contener ltms-btn-seller.' );
 		$this->assertStringContainsString( 'ltms-user-dropdown', $min_css, 'HEADER-NAV-FIX: el .min.css debe contener ltms-user-dropdown.' );
 	}
+
+	public function test_header_selector_fallback_covers_elementor_pro(): void {
+		$src = file_get_contents( self::JS_PATH );
+
+		// HEADER-SELECTOR FIX: el sitio usa Elementor Pro (`elementor-location-header`),
+		// no Hello Elementor `.site-header`. El fallback debe incluir esa clase.
+		$this->assertStringContainsString(
+			'HEADER-SELECTOR FIX',
+			$src,
+			'HEADER-SELECTOR: el fix debe tener su marcador traceable en ltms-header-nav.js.'
+		);
+		$this->assertStringContainsString(
+			'.elementor-location-header',
+			$src,
+			'HEADER-SELECTOR: el fallback debe apuntar a .elementor-location-header (Elementor Pro).'
+		);
+		// En el resize handler, solo se ocultan los <li> originales si hay un header real.
+		$this->assertStringContainsString(
+			'if ($target.length)',
+			$src,
+			'HEADER-SELECTOR: no debe ocultar los li originales si no hay header donde reubicar (evita botones desaparecidos).'
+		);
+	}
+
+	public function test_min_js_regenerated_with_elementor_selector(): void {
+		$min = file_get_contents( __DIR__ . '/../../assets/js/ltms-header-nav.min.js' );
+
+		$this->assertStringContainsString(
+			'.elementor-location-header',
+			$min,
+			'HEADER-SELECTOR: el .min.js debe regenerarse con el selector .elementor-location-header.'
+		);
+	}
 }

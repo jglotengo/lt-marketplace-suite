@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HEADER-SELECTOR` (botones Vender/Cuenta no aparecían en header Elementor Pro)
+
+> El fallback de inyección de `ltms-header-nav.js` apuntaba a `.site-header` (Hello Elementor), pero el
+> sitio usa un `<header class="elementor-location-header">` de Elementor Pro. En móvil/fallback los botones
+> "Vender"/"Mi Cuenta" se ocultaban sin re-inyectarse.
+
+- **`assets/js/ltms-header-nav.js` (+ `.min`):** el fallback y el resize-handler ahora usan
+  `.elementor-location-header, .site-header, header`, y solo ocultan los `<li>` originales si hay un
+  header real donde reubicar (evita dejar al usuario sin botones).
+- **Test:** `HeaderNavFixTest` (+2 tests, grupo `audit-header-nav`).
+
 ### Fixed — `CHECKOUT-PHONE-PREFIX` (el `+57` iba dentro del mismo campo de teléfono)
 
 > El input de teléfono mostraba el `+57` en el placeholder, obligando a escribir el prefijo. Ahora el
