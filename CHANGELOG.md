@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-PHONE-PREFIX` (el `+57` iba dentro del mismo campo de teléfono)
+
+> El input de teléfono mostraba el `+57` en el placeholder, obligando a escribir el prefijo. Ahora el
+> `+57` es un addon fijo y el usuario escribe solo sus 10 dígitos (más fácil para quien no recuerda el
+> prefijo, solo conoce su operador).
+
+- **`includes/frontend/templates/checkout.php`:** addon `.pv-phone-prefix` (fijo `+57`) + input acotado a
+  10 dígitos (`maxlength=10`, placeholder `300 000 0000`); el valor precargado se muestra sin el prefijo.
+- **`assets/css/ltms-plaza-viva.css` (+ `.min`):** estilo `.pv-phone-prefix` (addon del `pv-input-group`).
+- **`includes/frontend/class-ltms-frontend-checkout-handler.php`:** `normalize_checkout_phone()` en
+  `woocommerce_checkout_posted_data` → celular de 10 dígitos se guarda como `+57XXXXXXXXXX` (pedido +
+  Aveonline/ZapSign/SAGRILAFT reciben el número completo).
+- **Test:** `CheckoutPhonePrefixTest` (4 tests, grupo `audit-phone-prefix`).
+
 ### Fixed — `STORE-FILTERS-MOBILE` (filtros del storefront del vendedor ocultos en móvil)
 
 > La sidebar de filtros de `/vendedor/{slug}` estaba `display:none` en móvil **sin botón para abrirla**:

@@ -291,6 +291,16 @@
 .pv-input-group > :last-child{border-top-right-radius:var(--r-md);border-bottom-right-radius:var(--r-md);}
 .pv-input-group .pv-btn{border-radius:0;height:48px;}
 .pv-input-group .pv-btn:last-child{border-top-right-radius:var(--r-md);border-bottom-right-radius:var(--r-md);}
+/* CHECKOUT-PHONE-PREFIX FIX (2026-09-12): prefijo de país (+57) como addon
+   fijo del input de teléfono — el usuario escribe solo sus 10 dígitos. */
+.pv-phone-prefix{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:48px;padding:0 14px;flex-shrink:0;
+  background:var(--bg-2);color:var(--text-2);
+  font-size:15px;font-weight:700;
+  border:2px solid var(--border);border-right:none;
+  border-top-left-radius:var(--r-md);border-bottom-left-radius:var(--r-md);
+}
 
 /* ── 3.3 BADGES ────────────────────────────────────────────────────────────── */
 .pv-badge{

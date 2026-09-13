@@ -84,6 +84,12 @@ final class LTMS_Frontend_Checkout_Handler {
         add_action( 'woocommerce_checkout_process',            [ __CLASS__, 'validate_privacy_consent' ] );
         add_action( 'woocommerce_checkout_order_created',      [ __CLASS__, 'save_privacy_consent' ] );
 
+        // CHECKOUT-PHONE-PREFIX FIX (2026-09-12): el input de teléfono ahora llega
+        // sin el +57 (solo 10 dígitos). Normalizamos al formato +57XXXXXXXXXX en
+        // el POST para que el pedido y los integradores (Aveonline, ZapSign,
+        // SAGRILAFT) reciban el número completo.
+        add_filter( 'woocommerce_checkout_posted_data', [ __CLASS__, 'normalize_checkout_phone' ], 10, 1 );
+
         // v2.9.287: Optimizar campos del checkout — eliminar redundantes
         // v2.9.288: prioridad 10000 para sobreescribir WOOCCM (que corre a 1000-2000)
         add_filter( 'woocommerce_billing_fields', [ __CLASS__, 'optimize_checkout_fields' ], 10000, 1 );
@@ -1305,6 +1311,34 @@ final class LTMS_Frontend_Checkout_Handler {
             $order->update_meta_data( '_ltms_privacy_consent_ip', sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ) ); // phpcs:ignore
             $order->save();
         }
+    }
+
+    /**
+     * CHECKOUT-PHONE-PREFIX FIX (2026-09-12): normaliza billing_phone a
+     * +57XXXXXXXXXX cuando el usuario ingresó solo sus 10 dígitos (el prefijo
+     * ahora es un addon visual fijo y no viaja en el input).
+     *
+     * @param array $data Datos POST del checkout (billing/shipping).
+     * @return array Datos con billing_phone normalizado.
+     */
+    public static function normalize_checkout_phone( array $data ): array {
+        if ( empty( $data['billing_phone'] ) ) {
+            return $data;
+        }
+
+        $phone = trim( (string) $data['billing_phone'] );
+
+        // Si ya trae prefijo internacional (+ o 2 dígitos de país), no tocar.
+        if ( strpos( $phone, '+' ) !== false ) {
+            return $data;
+        }
+
+        // Colombiano de 10 dígitos (celular 3XX + operador) → anteponer +57.
+        if ( LTMS_Core_Config::get_country() === 'CO' && preg_match( '/^\d{10}$/', $phone ) ) {
+            $data['billing_phone'] = '+57' . $phone;
+        }
+
+        return $data;
     }
 
     /**
