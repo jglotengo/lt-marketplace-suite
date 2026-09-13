@@ -35,7 +35,7 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.376' );
+define( 'LTMS_VERSION', '2.9.377' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

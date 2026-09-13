@@ -247,8 +247,11 @@
 
     function init() {
         cacheDom();
+        // DIAG (temporal): ver si el drawer se cachea y bindea.
+        console.log('[ltms-cart-drawer] init. overlay=', !!overlay, 'drawer=', !!drawer, 'body=', !!body);
         if (!overlay || !drawer) return;
         bind();
+        console.log('[ltms-cart-drawer] bound ok');
     }
 
     if (document.readyState === 'loading') {
