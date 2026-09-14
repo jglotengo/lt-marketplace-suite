@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `HOME-SLOW-F2` (split del monolito UX: −74KB min en storefront, −138KB en el panel)
+
+> El monolito `assets/js/ltms-ux-enhancements.js` (~13K líneas, ~320KB min) se descargaba
+> en TODA página no-admin. La fase 1 (HOME-SLOW-DEFER) lo cargaba con `defer`. La fase 2 lo
+> parte en 3 bundles generados por `bin/build-ux-bundles.js` (el monolito sigue siendo la
+> fuente de verdad; el script es re-ejecutable tras cada cambio):
+>   - `ltms-ux-shared` → secciones compartidas (todas las páginas frontend)
+>   - `ltms-ux-dashboard` → panel del vendedor + mi-cuenta (`is_account_page` / shortcode `ltms_vendor_*`)
+>   - `ltms-ux-storefront` → tienda pública
+> El storefront ahorra ~74KB min y el panel ~138KB min por página (shared+dashboard vs el
+> monolito completo). Los cruces dashboard↔storefront (`celebrateConfetti`, `showOrderSuccess`)
+> se movieron al shared; los bundles resuelven las funciones compartidas vía aliases a
+> `LTMS.UX.*` generados por análisis estático; cada bundle tiene su propio `initAll`.
+
+- **`bin/build-ux-bundles.js`:** script Node de generación de los 3 bundles (mapa de secciones, movimiento de cruces, aliases por análisis estático, initAll por bundle).
+- **`assets/js/ltms-ux-shared.js` / `ltms-ux-dashboard.js` / `ltms-ux-storefront.js` (+ `.min`):** bundles generados.
+- **`includes/frontend/class-ltms-frontend-assets.php`:** el monolito ya no se encola como script; se encolan shared (siempre) + dashboard (mi-cuenta/vendor) o storefront, todos con `strategy => 'defer'`. El CSS `ltms-ux-enhancements.css` se mantiene.
+- **Test:** `HomeSlowSplitTest` (6 tests, grupo `home-slow`); `HomeSlowDeferTest` actualizado (fase 1 → verifica los bundles con defer).
+
 ### Fixed — `CHECKOUT-CTA-VISIBLE` (botón "Confirmar pedido" no visible en /checkout/ — fatal por función WC 11.x removida)
 
 > WooCommerce 11.x removió la función `woocommerce_checkout_order_review()` (solo queda el hook del mismo

@@ -512,30 +512,44 @@ final class LTMS_Frontend_Assets {
             $ver
         );
 
-        // JS — load in the footer so the DOM is ready when initAll() runs.
-        // v2.9.55: Añadir parámetro de cache-bust manual (?v=2.9.55) además del $ver
-        // porque SiteGround Optimizer remueve el ?ver= estándar de WP.
-        // El ?v= adicional es un query parameter que SiteGround no toca.
-        $js_url = $url . 'js/ltms-ux-enhancements' . $min . '.js?v=' . $ver;
-
-        // HOME-SLOW-DEFER FIX (2026-09-13): este monolito de ~13K líneas (~320KB
-        // min) se descargaba/ejecutaba de forma síncrona en TODA página no-admin
-        // (incluida la home), generando un "long task" en DOMContentLoaded con
-        // ~130 init() (≈40 solo-dashboard + ≈90 storefront) y retrasando
-        // interactividad/TBT. Se encola con strategy 'defer' (WP 6.3+) para no
-        // bloquear el parse ni el primer paint; ejecuta tras el parse, después de
-        // jQuery. Los args-array degradan a in_footer=true en WP < 6.3 (sin defer,
-        // pero sin romper nada).
+        // HOME-SLOW-DEFER FASE 2 (2026-09-14): el monolito ltms-ux-enhancements
+        // (~13K líneas, ~320KB min) se partió en 3 bundles generados por
+        // bin/build-ux-bundles.js (el monolito sigue siendo la fuente de verdad):
+        //   - ltms-ux-shared      → secciones compartidas (todas las páginas frontend)
+        //   - ltms-ux-dashboard   → panel del vendedor + mi-cuenta
+        //   - ltms-ux-storefront  → tienda pública
+        // El storefront ya no descarga ~74KB de módulos dashboard y el panel ya
+        // no descarga ~130KB de módulos storefront. El JS se auto-desactiva por
+        // selectores, por lo que cada bundle solo registra listeners donde aplica.
         wp_enqueue_script(
-            'ltms-ux-enhancements',
-            $js_url,
+            'ltms-ux-shared',
+            $url . 'js/ltms-ux-shared' . $min . '.js?v=' . $ver,
             [ 'jquery' ],
             $ver,
             [ 'in_footer' => true, 'strategy' => 'defer' ]
         );
 
-        // Localize AJAX endpoint + nonce + i18n for the JS layer.
-        wp_localize_script( 'ltms-ux-enhancements', 'ltmsUX', [
+        $is_dashboard_page = ( function_exists( 'is_account_page' ) && is_account_page() );
+        if ( ! $is_dashboard_page ) {
+            $pv_page_id = get_queried_object_id();
+            $pv_post    = $pv_page_id ? get_post( $pv_page_id ) : null;
+            if ( $pv_post && preg_match( '/\[ltms_vendor_[a-z_]+\]/', $pv_post->post_content ) ) {
+                $is_dashboard_page = true;
+            }
+        }
+
+        $ux_bundle = $is_dashboard_page ? 'ltms-ux-dashboard' : 'ltms-ux-storefront';
+        wp_enqueue_script(
+            $ux_bundle,
+            $url . 'js/' . $ux_bundle . $min . '.js?v=' . $ver,
+            [ 'jquery', 'ltms-ux-shared' ],
+            $ver,
+            [ 'in_footer' => true, 'strategy' => 'defer' ]
+        );
+
+        // Localize AJAX endpoint + nonce + i18n for the JS layer (shared bundle;
+        // los bundles dashboard/storefront lo leen como global ltmsUX).
+        wp_localize_script( 'ltms-ux-shared', 'ltmsUX', [
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'ltms_ux_nonce' ),
             'is_admin' => false,
