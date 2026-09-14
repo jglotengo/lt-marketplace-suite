@@ -592,11 +592,17 @@ get_header( 'shop' );
 
                             <?php
                             /**
-                             * woocommerce_checkout_order_review()
-                             * Renderiza la tabla de items + totals nativa de WC.
-                             * Internamente invoca woocommerce_order_review hook.
+                             * CHECKOUT-CTA-VISIBLE FIX (2026-09-14): WooCommerce 11.x
+                             * removió la función woocommerce_checkout_order_review().
+                             * La llamada directa producía un fatal "Call to undefined
+                             * function" que cortaba el render (~198KB, HTTP 500), dejando
+                             * el checkout roto a mitad de página. Se reemplaza por
+                             * woocommerce_order_review(), la función vigente que renderiza
+                             * checkout/review-order.php (tabla de items + totales). El hook
+                             * woocommerce_checkout_order_review (mismo nombre) sigue
+                             * disparándose en form-checkout.php nativo de WC 11.x.
                              */
-                            woocommerce_checkout_order_review();
+                            woocommerce_order_review();
                             ?>
 
                             <!-- Cupón (en checkout también disponible) -->

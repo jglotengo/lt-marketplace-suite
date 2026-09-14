@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-CTA-VISIBLE` (botón "Confirmar pedido" no visible en /checkout/ — fatal por función WC 11.x removida)
+
+> WooCommerce 11.x removió la función `woocommerce_checkout_order_review()` (solo queda el hook del mismo
+> nombre). El template nativo LTMS la llamaba como función en la columna de resumen del pedido, produciendo
+> un fatal "Call to undefined function" que cortaba el render a ~198KB y devolvía HTTP 500 en /checkout/ —
+> el usuario reportaba que el botón "Confirmar pedido" no se veía (la página moría justo después del CTA).
+> Se reemplaza por `woocommerce_order_review()`, la función vigente que renderiza `checkout/review-order.php`
+> (tabla de items + totales). El hook `woocommerce_checkout_order_review` (mismo nombre) sigue
+> disparándose en form-checkout.php nativo de WC 11.x.
+
+- **`includes/frontend/templates/checkout.php`:** `woocommerce_checkout_order_review()` 󰀀 `woocommerce_order_review()`.
+- **Test:** `CheckoutOrderReviewWc11Test` (3 tests, grupo `checkout`).
+
 ### Security — `ROTAR-TOKEN-GITHUB` (quitada contraseña SSH en texto plano del script de deploy)
 
 > `bin/deploy-and-test.ps1` tenía la contraseña SSH de SG hardcodeada (`$SSH_PASS = '...'`) y la rama
