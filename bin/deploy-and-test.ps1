@@ -6,7 +6,10 @@
 $SSH_HOST = "ssh.lo-tengo.com.co"
 $SSH_PORT = 18765
 $SSH_USER = "u1549-ruo8hvwpk9dt"
-$SSH_PASS = 'sT6v>2@1,@11'
+# ROTAR-TOKEN-GITHUB FIX (2026-09-13): se elimina la contraseña SSH en texto
+# plano. El despliegue usa la llave privada local (id_ed25519), que ya funciona
+# contra ssh.lo-tengo.com.co sin password (verificado con -o BatchMode=yes).
+$SSH_KEY  = "$env:USERPROFILE\.ssh\id_ed25519"
 $WP_PATH  = "/home/customer/www/lo-tengo.com.co/public_html"
 $PLUGIN_DIR = "$WP_PATH/wp-content/plugins/lt-marketplace-suite"
 
@@ -34,12 +37,11 @@ $SSH   = Get-Command ssh   -ErrorAction SilentlyContinue
 
 if ($PLINK) {
     Write-Host "Usando plink (PuTTY)..." -ForegroundColor Yellow
-    echo y | & plink -ssh -P $SSH_PORT -pw $SSH_PASS "${SSH_USER}@${SSH_HOST}" $COMMANDS
+    echo y | & plink -ssh -P $SSH_PORT -i $SSH_KEY "${SSH_USER}@${SSH_HOST}" $COMMANDS
 } elseif ($SSH) {
     Write-Host "Usando ssh nativo..." -ForegroundColor Yellow
-    # Guardar contraseña temporalmente para SSH
-    $env:SSHPASS = $SSH_PASS
-    & ssh -o StrictHostKeyChecking=no -p $SSH_PORT "${SSH_USER}@${SSH_HOST}" $COMMANDS
+    # Auth por llave privada (sin contraseña en texto plano)
+    & ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=no -p $SSH_PORT "${SSH_USER}@${SSH_HOST}" $COMMANDS
 } else {
     Write-Host "ERROR: No se encontró ssh ni plink." -ForegroundColor Red
     Write-Host "Instala PuTTY o activa OpenSSH en Windows." -ForegroundColor Red

@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Security — `ROTAR-TOKEN-GITHUB` (quitada contraseña SSH en texto plano del script de deploy)
+
+> `bin/deploy-and-test.ps1` tenía la contraseña SSH de SG hardcodeada (`$SSH_PASS = '...'`) y la rama
+> plink la usaba con `-pw`. Se reemplaza por llave privada local (`id_ed25519`), verificada contra
+> ssh.lo-tengo.com.co con `-o BatchMode=yes` (sin password). Queda pendiente (acción del dueño): rotar el
+> PAT de GitHub expuesto, cambiar la contraseña SSH de SG, y mover el token del webhook a `LTMS_GH_TOKEN`.
+
+- **`bin/deploy-and-test.ps1`:** eliminado `$SSH_PASS` y `$env:SSHPASS`; ssh usa `-i $SSH_KEY -o BatchMode=yes`.
+- **Test:** `RotarTokenGithubTest` (2 tests, grupo `security`).
+
 ### Fixed — `HOME-SLOW-DEFER` (home ~13.4s: scripts site-wide pesados cargados síncronos)
 
 > Medición en vivo (curl desde SG, localhost): TTFB 0.17s (el servidor NO es el cuello de botella) y
