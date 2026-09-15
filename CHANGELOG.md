@@ -6,9 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
-### Fixed — `HOME-SLOW-F2` (split del monolito UX: −74KB min en storefront, −138KB en el panel)
+### Fixed — `HOME-SLOW-F2` (split del monolito UX — REVERTIDO el 2026-09-14)
 
-> El monolito `assets/js/ltms-ux-enhancements.js` (~13K líneas, ~320KB min) se descargaba
+> ⚠️ **REVERTIDO**: el split en 3 bundles (shared/dashboard/storefront) se
+> revirtió el 14-Sep tras reporte del usuario de checkout "en proceso de carga"
+> con campos bloqueados. Se vuelve al monolito único con defer (fase 1). Los
+> bundles generados, `bin/build-ux-bundles.js` y `bin/smoke-ux-bundles.js`
+> quedaron documentados en el historial git para reintentar el split con
+> verificación en navegador real antes de reactivarlo.
+>
+> Registro original (revertido): el monolito `assets/js/ltms-ux-enhancements.js` (~13K líneas, ~320KB min) se descargaba
 > en TODA página no-admin. La fase 1 (HOME-SLOW-DEFER) lo cargaba con `defer`. La fase 2 lo
 > parte en 3 bundles generados por `bin/build-ux-bundles.js` (el monolito sigue siendo la
 > fuente de verdad; el script es re-ejecutable tras cada cambio):
