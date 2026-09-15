@@ -35,7 +35,9 @@ if ( defined( 'LTMS_LOADED' ) ) {
 define( 'LTMS_LOADED', true );
 
 // CONSTANTES GLOBALES DEL PLUGIN
-define( 'LTMS_VERSION', '2.9.379' );
+// CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
+// de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
+define( 'LTMS_VERSION', '2.9.380' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
