@@ -512,44 +512,24 @@ final class LTMS_Frontend_Assets {
             $ver
         );
 
-        // HOME-SLOW-DEFER FASE 2 (2026-09-14): el monolito ltms-ux-enhancements
-        // (~13K líneas, ~320KB min) se partió en 3 bundles generados por
-        // bin/build-ux-bundles.js (el monolito sigue siendo la fuente de verdad):
-        //   - ltms-ux-shared      → secciones compartidas (todas las páginas frontend)
-        //   - ltms-ux-dashboard   → panel del vendedor + mi-cuenta
-        //   - ltms-ux-storefront  → tienda pública
-        // El storefront ya no descarga ~74KB de módulos dashboard y el panel ya
-        // no descarga ~130KB de módulos storefront. El JS se auto-desactiva por
-        // selectores, por lo que cada bundle solo registra listeners donde aplica.
+        // HOME-SLOW-DEFER FIX (2026-09-13): monolito cargado con strategy defer.
+        // HOME-SLOW-F2 REVERT (2026-09-14): el split en 3 bundles (shared/
+        // dashboard/storefront) se revierte por reporte del usuario de checkout
+        // "en proceso de carga" / campos bloqueados tras el split. Se vuelve al
+        // monolito único como medida de aislamiento; los bundles generados y el
+        // script bin/build-ux-bundles.js quedan en el repo para reintentar el
+        // split con verificación en navegador antes de volver a activarlo.
+        $js_url = $url . 'js/ltms-ux-enhancements' . $min . '.js?v=' . $ver;
         wp_enqueue_script(
-            'ltms-ux-shared',
-            $url . 'js/ltms-ux-shared' . $min . '.js?v=' . $ver,
+            'ltms-ux-enhancements',
+            $js_url,
             [ 'jquery' ],
             $ver,
             [ 'in_footer' => true, 'strategy' => 'defer' ]
         );
 
-        $is_dashboard_page = ( function_exists( 'is_account_page' ) && is_account_page() );
-        if ( ! $is_dashboard_page ) {
-            $pv_page_id = get_queried_object_id();
-            $pv_post    = $pv_page_id ? get_post( $pv_page_id ) : null;
-            if ( $pv_post && preg_match( '/\[ltms_vendor_[a-z_]+\]/', $pv_post->post_content ) ) {
-                $is_dashboard_page = true;
-            }
-        }
-
-        $ux_bundle = $is_dashboard_page ? 'ltms-ux-dashboard' : 'ltms-ux-storefront';
-        wp_enqueue_script(
-            $ux_bundle,
-            $url . 'js/' . $ux_bundle . $min . '.js?v=' . $ver,
-            [ 'jquery', 'ltms-ux-shared' ],
-            $ver,
-            [ 'in_footer' => true, 'strategy' => 'defer' ]
-        );
-
-        // Localize AJAX endpoint + nonce + i18n for the JS layer (shared bundle;
-        // los bundles dashboard/storefront lo leen como global ltmsUX).
-        wp_localize_script( 'ltms-ux-shared', 'ltmsUX', [
+        // Localize AJAX endpoint + nonce + i18n for the JS layer.
+        wp_localize_script( 'ltms-ux-enhancements', 'ltmsUX', [
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'ltms_ux_nonce' ),
             'is_admin' => false,
