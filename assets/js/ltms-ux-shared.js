@@ -4476,10 +4476,6 @@
     // ── Exports públicos para bundles dependientes ──────────────
     Object.assign(LTMS.UX, {
         toast,
-        toastSuccess,
-        toastError,
-        toastWarning,
-        toastInfo,
         trapFocus,
         announce,
         escapeHtml,
@@ -4495,10 +4491,6 @@
         renderStockIndicator,
         createStarRating,
         openPrintPreview,
-        toggle,
-        handleKeydown,
-        close,
-        update,
     });
 
     // Re-init compartido para el SPA del dashboard (elementos inyectados).
@@ -4566,7 +4558,6 @@
             initToggleSwitches();
             initReadingProgress();
             initLiveChat();
-            initPushNotifications();
 
 
             LTMS.UX.ready = true;

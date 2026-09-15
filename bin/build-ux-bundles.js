@@ -102,21 +102,28 @@ function extractBlock(startLine1, endLine1) {
 
 function collectInitNames(blockLines) {
   const names = [];
-  const reFn    = /function\s+(init[A-Za-z_$][\w$]*)\s*\(/g;
-  const reConst = /(?:const|let|var)\s+(init[A-Za-z_$][\w$]*)\s*=\s*(?:function|async|\(|\w+\s*=>)/g;
+  // Solo funciones INIT top-level del IIFE (indentación de exactamente 4
+  // espacios). Las funciones anidadas (ej. initCropBox dentro de
+  // openImageCropper) NO deben llamarse desde initAll.
+  const reFn    = /^ {4}function\s+(init[A-Za-z_$][\w$]*)\s*\(/g;
+  const reConst = /^ {4}(?:const|let|var)\s+(init[A-Za-z_$][\w$]*)\s*=\s*(?:function|async|\(|\w+\s*=>)/g;
   for (const line of blockLines) {
     for (const m of line.matchAll(reFn)) names.push(m[1]);
     for (const m of line.matchAll(reConst)) names.push(m[1]);
   }
-  if (blockLines.join('\n').includes('loadNotifSettings')) names.push('loadNotifSettings');
-  if (blockLines.join('\n').includes('telemetryInit')) names.push('telemetryInit');
+  if (blockLines.join('\n').includes('function loadNotifSettings')) names.push('loadNotifSettings');
+  if (blockLines.join('\n').includes('function telemetryInit')) names.push('telemetryInit');
   return names;
 }
 
 function collectDefinedFunctions(blockLines) {
   const defs = new Set();
-  const reFn    = /function\s+([A-Za-z_$][\w$]*)\s*\(/g;
-  const reConst = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:function|async|\(|new|\w+\s*=>)/g;
+  // Solo funciones/const top-level del IIFE (indentación 4 espacios). Funciones
+  // anidadas (ej. toggle, initCropBox dentro de otras funciones) NO son
+  // visibles en el scope top-level y no deben considerarse "definidas" para
+  // aliases ni exports.
+  const reFn    = /^ {4}function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+  const reConst = /^ {4}(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:function|async|\(|new|\w+\s*=>)/g;
   for (const line of blockLines) {
     for (const m of line.matchAll(reFn)) defs.add(m[1]);
     for (const m of line.matchAll(reConst)) defs.add(m[1]);
@@ -311,13 +318,17 @@ if (unresolved.length) {
   process.exit(1);
 }
 
-/* ── Exports del shared (todas las funciones que los bundles alián) ─────── */
-const sharedExports = new Set([...CORE_SHARED_FNS]);
-for (const id of [...dashboardUsed, ...storefrontUsed]) {
+/* ── Exports del shared (solo funciones REALMENTE definidas en el scope) ── */
+const sharedExports = new Set();
+for (const id of [...CORE_SHARED_FNS, ...dashboardUsed, ...storefrontUsed]) {
   if (sharedDefs.has(id)) sharedExports.add(id);
 }
 sharedExports.delete('loadNotifSettings'); // vive solo en dashboard
 sharedExports.delete('telemetryInit');     // vive solo en shared (se llama ahí)
+
+// El Object.assign solo puede referenciar variables del scope del shared.
+// toastSuccess/Error/Warning/Info son propiedades LTMS.UX.* (no variables) y
+// se definen inline en la sección 1 — por eso se excluyen aquí.
 
 const exportsBlock = `    // ── Exports públicos para bundles dependientes ──────────────
     Object.assign(LTMS.UX, {

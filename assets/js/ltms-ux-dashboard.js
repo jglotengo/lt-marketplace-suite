@@ -3061,7 +3061,6 @@
 
     function initAll() {
         try {
-            initCropBox();
             initKeyboardShortcuts();
             initSidebarOverlay();
             initTopbarClock();
