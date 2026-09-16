@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `WC-11.1.0-DOWNGRADE` (checkout bloqueado en navegador — revertido WooCommerce a 11.0.1)
+
+> El 12-Sep WooCommerce se actualizó de **11.0.1 a 11.1.0** y el checkout dejó de funcionar
+> en el navegador (formulario sin interacción, "página en proceso de carga", imposible abrir
+> consola). El template LTMS (checkout clásico) resultó incompatible con el `checkout.js` de
+> 11.1.0. Se revirtió WooCommerce a **11.0.1** (la versión que funcionaba el 11-Sep, confirmada
+> por el backup de BD del 3-Sep: `woocommerce_version=11.0.1`). Downgrade menor (misma rama 11.x).
+>
+> ⚠️ Al desactivar/reactivar WooCommerce cambió el orden de carga y LTMS tiraba
+> `Class "WC_Payment_Gateway" not found` (sus gateways cargan en `plugins_loaded` antes de que WC
+> cargue sus abstracts). Se resolvió reordenando: activar WooCommerce **antes** que LTMS.
+>
+> Salvaguardas en servidor (para rollback): `ltms-backup-pre-wc-downgrade.sql` (BD),
+> `woocommerce-backup-11.1.0` (archivos 11.1.0), `woocommerce-11.1.0-live` (copia live del 11.1.0).
+
 ### Fixed — `HOME-SLOW-F2` (split del monolito UX — REVERTIDO el 2026-09-14)
 
 > ⚠️ **REVERTIDO**: el split en 3 bundles (shared/dashboard/storefront) se
