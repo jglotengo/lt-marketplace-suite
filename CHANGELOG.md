@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `WC-ORDER-LOAD-ERR` (Class "WC_Payment_Gateway" not found)
+
+> Error "Call to undefined function" o "Class not found" ocurrió cuando LTMS
+> intentaba registrar sus gateways (Openpay, Addi, Stripe, PSE) pero WooCommerce
+> no estaba cargado aún (plugins en orden incorrecto o WooCommerce desactivado).
+> Se agregó verificación explícita de `class_exists( 'WC_Payment_Gateway' )` al
+> inicio de `ltms_run()` para saltear la inicialización si WC no está disponible.
+> Esto previene el fatal y deja el plugin en un estado seguro para debugging.
+>
+> **IMPORTANTE:** WooCommerce DEBE estar activo ANTES que LTMS. Verificar en:
+> WordPress Admin → Plugins → active plugins → orden de plugins.
+
 ### Fixed — `WC-11.1.0-DOWNGRADE` (checkout bloqueado en navegador — revertido WooCommerce a 11.0.1)
 
 > El 12-Sep WooCommerce se actualizó de **11.0.1 a 11.1.0** y el checkout dejó de funcionar

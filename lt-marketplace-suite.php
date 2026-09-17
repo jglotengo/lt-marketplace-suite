@@ -883,6 +883,14 @@ add_filter( 'woocommerce_prevent_admin_access', function( $prevent ) {
     }, 1 );
 
 
+    // VERIFICAR WC DISPONIBLE — fix WC-ORDER-LOAD-ERR (PHP Fatal: Class "WC_Payment_Gateway" not found)
+    // Si WooCommerce no está cargado (plugin desactivado o en orden incorrecto),
+    // no intentamos registrar gateways ni usar clases de WC. Esto previene fatal.
+    if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+        error_log( 'LTMS: WooCommerce no está cargado. Skipping initialization. Activa WooCommerce ANTES que LTMS.' );
+        return;
+    }
+
     // Inicializar el Kernel principal
     if ( class_exists( 'LTMS_Core_Kernel' ) ) {
         try {
