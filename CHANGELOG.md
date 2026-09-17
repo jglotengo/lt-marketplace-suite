@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-HANG-MUTATION` (bucle infinito del MutationObserver bloqueaba el checkout en el navegador)
+
+> Chrome mostraba "la página no responde, esperar o salir" y el formulario de
+> checkout quedaba sin poder diligenciar. Causa raíz: `fixFieldLabels()` en el
+> scope CHECKOUT de `ltms-plaza-viva.js` reescribía los labels del formulario
+> (`innerHTML=''` + `appendChild`) en CADA llamada SIN guard idempotente. El
+> MutationObserver (`childList+subtree+characterData`) detectaba la mutación del
+> rewrite y volvía a llamar `fixFieldLabels()` → loop infinito que saturaba el
+> hilo principal. El observer tenía `setTimeout(disconnect, 5000)` como
+> cortafuego, pero 5s de hilo saturado bastan para que Chrome ofrezca
+> "esperar o salir".
+>
+> Nota: el mismo patrón ya existía en `ltms-checkout-fixes.js` con el guard
+> `data-ltms-label-fixed` — `ltms-plaza-viva.js` tenía el bucle por no tenerlo.
+>
+> Fix: guard `data-ltms-label-fixed` en `fixFieldLabels()` de plaza-viva
+> (early-return tras el primer rewrite). Se regeneró `ltms-plaza-viva.min.js`.
+> Server-side ya se había saneado antes (orden de plugins + guard
+> `WC_Payment_Gateway`, ver `WC-ORDER-LOAD-ERR`).
+
+- **`assets/js/ltms-plaza-viva.js`:** guard `data-ltms-label-fixed` antes de reescribir cada label.
+- **`assets/js/ltms-plaza-viva.min.js`:** regenerado con terser.
+- **Test:** `PlazaVivaCheckoutMutationLoopTest` (5 tests, source-based, grupo default unit).
+
 ### Fixed — `WC-ORDER-LOAD-ERR` (Class "WC_Payment_Gateway" not found)
 
 > Error "Call to undefined function" o "Class not found" ocurrió cuando LTMS

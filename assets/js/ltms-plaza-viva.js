@@ -1513,6 +1513,14 @@
           // Buscar el label por 'for' attribute.
           var labelEl = scope.querySelector('label[for="' + fieldKey + '"]');
           if (!labelEl) return;
+          // CHECKOUT-HANG-MUTATION FIX (2026-09-17): guard idempotente para
+          // frenar el bucle infinito MutationObserver → fixFieldLabels → DOM.
+          // Sin este guard, cada rewrite del label dispara una mutación que
+          // vuelve a llamar fixFieldLabels() (observer en childList+subtree+
+          // characterData, plaza-viva.js:1561) → satura el hilo principal y
+          // Chrome muestra "la página no responde, esperar o salir". Mismo
+          // patrón que ltms-checkout-fixes.js ya usaba (data-ltms-label-fixed).
+          if (labelEl.getAttribute('data-ltms-label-fixed') === '1') return;
           // Preservar el <abbr class="required"> o <span class="optional"> si existe.
           var abbr = labelEl.querySelector('abbr.required, abbr');
           var optionalSpan = labelEl.querySelector('span.optional, .optional');
@@ -1527,6 +1535,7 @@
             labelEl.appendChild(document.createTextNode(' '));
             labelEl.appendChild(optionalSpan);
           }
+          labelEl.setAttribute('data-ltms-label-fixed', '1');
         });
         // Ocultar campos duplicados: billing_phone y billing_email en step 2
         // (ya están en step 1). FIX #10 (CHECKOUT-AUDIT): contamos cuántos
