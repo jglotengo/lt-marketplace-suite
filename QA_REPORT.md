@@ -9,6 +9,26 @@
 
 ---
 
+## 0.6. v2.9.382–383 — Checkout hang cycle cierre + UX polish (CHECKOUT-HANG-HEADINGS → CHECKOUT-UX-FIXES)
+
+**Scope:** Cierre del diagnóstico del checkout congelado (mu-plugin `?ltms_diag=`), fix del segundo loop del MutationObserver, y pulido UX post-fix (botón, comparador de envíos, tabla de review).
+**Cycles:** CHECKOUT-HANG-HEADINGS (v2.9.382) + CHECKOUT-UX-FIXES (v2.9.383).
+**Bugs cerrados:** 3.
+1. **CHECKOUT-HANG-HEADINGS** (P0): el fix de labels (2.9.381) dejó descubierto el rewrite de headings (`.textContent`) que seguía disparando el MutationObserver → bucle de 5s. Verificado con mu-plugin `?ltms_diag=noplaza` (solo plaza-viva off → cargaba). Fix: guard comparativo `textContent !== PV.i18n.<clave>`.
+2. **CHECKOUT-SUBMIT-VISIBLE** (P1): botón "Confirmar pedido" invisible salvo hover — CSS `!important` vivía en script inline de output buffer sin hook (código muerto). Trasladado a `ltms-checkout-fixes.js`. Lección #163.
+3. **SHIPPING-HIDE-UNAVAILABLE** (P1): comparador mostraba "No disponible" con opacidad 0.5 para carriers sin cotización → ahora se ocultan (decisión de producto: ocultar por completo). Lección #164.
+**Tests:** 5,018 tests / 10,514 assertions, 0 failures, 3 skips. `PlazaVivaCheckoutMutationLoopTest` 5→8 tests (+3), `CheckoutUxPolishTest` 8 tests (13 assertions) nuevo. Suite completa 5,018 = 5,010 previos + 8 nuevos.
+**Verificación punta a punta:** curl al checkout real (add-to-cart → checkout) confirmó marker del inline ausente (count 0), CSS de plaza-viva servido con `--brand:#E80001`, y guards de headings en el `.min` servido (HTTP 200 con `?v=2.9.382`). mu-plugin `ltms-diag.php` eliminado del servidor tras confirmación del usuario.
+
+### 0.6.1 Test Coverage Summary (checkout)
+
+| Ciclo | Fix | Archivo | Tests |
+|-------|-----|---------|-------|
+| v2.9.382 | CHECKOUT-HANG-HEADINGS | `PlazaVivaCheckoutMutationLoopTest` | +3 |
+| v2.9.383 | CHECKOUT-UX-FIXES | `CheckoutUxPolishTest` (nuevo) | +8 |
+
+---
+
 ## 0.5. v2.9.340–346 — Shop/Cart Cards UX cycle (SHOP-CARD-PARITY → CARD-IMG-SELECTOR)
 
 **Scope:** Paridad de las cards de producto entre home (Elementor), /tienda/ (.pv-shop) y /carrito/ vacío (.pv-cart-empty-grid). Breadcrumb duplicado, grid de 5 columnas, markup compacto del loop, botón ATC visible y fix de la regresión global CARD-IMG-SELECTOR.

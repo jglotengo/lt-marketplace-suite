@@ -14,6 +14,10 @@
         var style = document.createElement('style');
         style.id = 'ltms-checkout-fixes-css';
         style.textContent = [
+            '.pv-scope.pv-checkout .pv-btn--brand{background:#E80001 !important;color:#fff !important;border:1px solid #E80001 !important;font-weight:800 !important;letter-spacing:.01em;}',
+            '.pv-scope.pv-checkout .pv-btn--brand:hover{background:#B80001 !important;border-color:#B80001 !important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(232,0,1,0.28) !important;}',
+            '.pv-scope.pv-checkout .pv-btn--brand:active{transform:translateY(0);box-shadow:0 2px 6px rgba(232,0,1,0.20) !important;}',
+            '.pv-scope.pv-checkout .pv-checkout__submit{height:60px !important;font-size:17px !important;}',
             '.pv-scope.pv-checkout .woocommerce-shipping-fields{display:none !important;}',
             '.pv-scope.pv-checkout .woocommerce-shipping-fields.shipping-fields--visible{display:block !important;}',
             '.pv-scope.pv-checkout #billing_address_1_field label .optional,' +

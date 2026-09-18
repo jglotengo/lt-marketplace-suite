@@ -3448,6 +3448,61 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - No dar por bueno `?v=` como cache-bust en SG sin verificar que `querystring` esté desactivada; con ella activa,
      NINGÚN query-string cache-bustea (afecta WP core, WooCommerce y todos los plugins por igual).
 
+## 31. v2.9.383 - CHECKOUT-UX-FIXES: botón invisible + carriers fantasma + tabla de review
+
+### Lección #163: el CSS inyectado por un output buffer desenganchado es código muerto — el fallback que "salvaba" el botón no corre
+
+1. **Caso real:** tras el fix del hang (2.9.382), el usuario confirmó que el checkout cargaba pero el botón
+   "Confirmar pedido" solo se veía al hacer hover sobre el texto. El CSS `!important` que lo pintaba de rojo
+   (`#E80001`) vivía en el script inline que `LTMS_Frontend_Checkout_Script_Injector::inject_script_into_html()`
+   inyectaba vía output buffer. Verificación con `curl` al checkout real: el marker `LTMS-CHECKOUT-SCRIPT` tiene
+   count **0** en el HTML servido. La función existía pero **nunca estuvo enganchada a un hook** (`add_action`/
+   `ob_start` ausentes) — la migración a JS externo (v2.9.228) la dejó huérfana y nadie lo notó porque la regla
+   `.pv-btn--brand` del CSS global *parecía* cubrirla.
+2. **Por qué se veía solo en hover:** sin `!important`, la regla del combined CSS de SG/Elementor (especificidad
+   0,2,0, ej. `.elementor-* .button`) ganaba sobre `.pv-btn--brand` (0,1,0) → fondo transparente. En hover,
+   `.pv-btn--brand:hover` (0,2,0) empataba en especificidad y ganaba por orden de carga → fondo rojo solo al
+   pasar el cursor. Diagnóstico por especificidad, no por "el color no aplica".
+3. **Regla preventiva:**
+   - **El fallback de un hook no puede vivir en una función sin hook.** Todo código inyectado vía output buffer
+     necesita su `ob_start()` registrado en `init`/`template_redirect` — si no, es código muerto. Verificar con
+     `curl` el marker en el HTML real antes de dar por cubierto un estilo crítico.
+   - Al migrar de inline → JS externo, migrar TODAS las reglas del bloque, no solo las del bug reportado. El
+     inline muerto de checkout tenía 7 reglas (`!important` del botón, height, shipping-fields, optional) — el
+     JS externo solo recibió 4, dejando el botón sin su `!important`.
+   - Un bug de "solo se ve en hover" es señal de **pérdida de especificidad/`!important`**, no de "el tema lo
+     borra": medir especificidad del selector base vs. la regla competidora del theme/combined.
+
+### Lección #164: mostrar "No disponible" con opacidad 0.5 es una opción fantasma — ocultar el carrier que no cotizó
+
+1. **Caso real:** en el checkout, el bloque "Comparar opciones de envío" (`ltms-shipping-selector.js`) renderizaba
+   4 tarjetas fijas (Uber, Aveonline, Heka, Recogida). Para carriers que no cotizaron al destino mostraba
+   "No disponible" con opacidad 0.5. El usuario reportó "se muestran opciones de envío que no están disponibles"
+   y al preguntarle la decisión de producto eligió **ocultarlas por completo**.
+2. **Contexto técnico:** las tarjetas del comparador son UI propia de LTMS (no las rates de WC); WC solo devuelve
+   en `$package['rates']` los métodos que realmente cotizaron (verificado: la zona Colombia solo tiene
+   `free_shipping` → 1 rate). El bloque del comparador mostraba 4 cards de forma especulativa y degradaba a
+   "No disponible" las que no tenían cotización.
+3. **Fix:** `card.hide()` cuando `quote.price === undefined`, y si **ninguna** card quedó visible, ocultar el bloque
+   entero (`container.parent().hide()`). Mantener `show()` cuando al menos una cotizó.
+4. **Regla preventiva:** ante "se muestran opciones que no aplican", distinguir primero si la UI es propia
+   (comparador con cards fijas) o nativa de WC (rates ya filtradas por cobertura). En UI propia, lo correcto es no
+   renderizar lo que no aplica (o ocultarlo), no mostrarlo degradado — una opción fantasma con "No disponible"
+   aumenta la fricción de decisión. La decisión ocultar-vs-deshabilitar es de producto: preguntar al usuario.
+
+### Lección #165: el diagnóstico de envío "server-side" no reproduce lo que ve el usuario si la UI la dibuja el JS
+
+1. **Caso real:** para investigar "carriers sin cobertura", la simulación PHP server-side
+   (`WC()->shipping->calculate_shipping()` con destinos variados) devolvía SIEMPRE solo `free_shipping` — los
+   métodos LTMS no están en ninguna zona. El usuario seguía viendo 4 opciones. La discrepancia: las opciones que
+   ve el usuario NO salen de `get_packages()` sino del bloque "Comparar opciones" que `ltms-shipping-selector.js`
+   renderiza por AJAX (`ltms_get_shipping_quotes`) con cards fijas. El HTML server-side (curl) tampoco lo muestra
+   porque el bloque se inyecta en el navegador tras el AJAX.
+2. **Regla preventiva:** cuando "el servidor no reproduce lo que el usuario ve en el checkout", buscar primero
+   JS/UI que se dibuje post-carga (comparadores, skeletons, tabs). Verificar si existe un archivo
+   `ltms-shipping-selector.js` o un bloque con cards de providers antes de concluir que es un problema de rates de
+   WC. El AJAX `ltms_get_shipping_quotes` es la fuente real de las cards, no `woocommerce_package_rates`.
+
 
 
 

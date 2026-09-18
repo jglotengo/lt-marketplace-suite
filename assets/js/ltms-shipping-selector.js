@@ -90,6 +90,7 @@
 
         renderCards: function(data) {
             var providers = ['uber', 'aveonline', 'heka', 'pickup'];
+            var anyVisible = false;
             providers.forEach(function(provider) {
                 var card  = $('#ltms-shipping-cards .ltms-shipping-card[data-provider="' + provider + '"]');
                 var quote = data[provider];
@@ -105,11 +106,24 @@
                     card.on('click', function() {
                         LTMS.ShippingSelector.selectProvider(provider, quote);
                     });
+                    card.show();
+                    anyVisible = true;
                 } else if ( provider !== 'pickup' ) {
-                    card.find('.ltms-price').html('<small style="color:#999;">No disponible</small>');
-                    card.css('opacity', '0.5').css('cursor', 'default');
+                    // SHIPPING-HIDE-UNAVAILABLE FIX (2026-09-17): antes se mostraba
+                    // "sin cotización" con opacidad 0.5 — un carrier que no cotizó
+                    // para el destino es una opción fantasma que confunde. Ahora se
+                    // oculta la tarjeta por completo. Si ninguna queda visible, el
+                    // bloque "Comparar opciones" se oculta entero (ver abajo).
+                    card.hide();
                 }
             });
+            // Si ningún carrier quedó con precio, no tiene sentido mostrar el bloque.
+            var container = $('#ltms-shipping-cards');
+            if ( ! anyVisible ) {
+                container.parent().hide();
+            } else {
+                container.parent().show();
+            }
         },
 
         renderError: function() {

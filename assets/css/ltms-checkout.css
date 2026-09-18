@@ -387,21 +387,56 @@ body.admin-bar .pv-scope.pv-checkout .pv-checkout__review[data-pv-sticky]{top:52
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table{
     width:100%;border-collapse:collapse;
 }
+/* REVIEW-TABLE-UI FIX (2026-09-17): jerarquía visual de la tabla "Tu pedido".
+   - thead con fondo suave + uppercase para separar del cuerpo.
+   - filas de producto con más aire (padding vertical) y nombre semibold.
+   - .product-quantity como badge sutil (antes texto plano "× 1").
+   - subtotales con separadores punteados suaves.
+   - el order-total en card brand-50 con el monto más grande y --brand. */
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table thead th{
+    padding:10px 2px;border-bottom:2px solid var(--border);
+    font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);
+}
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table th,
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table td{
-    padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;text-align:right;
+    padding:12px 2px;border-bottom:1px solid var(--border);font-size:13.5px;text-align:right;
 }
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table th{text-align:left;font-weight:600;color:var(--text-2);}
-.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .product-name{text-align:left;color:var(--text);}
-.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .product-quantity{color:var(--text-3);font-size:12px;font-weight:400;}
-.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .cart-subtotal td,
-.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total td{font-weight:700;color:var(--text);}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tbody .product-name{
+    text-align:left;color:var(--text);font-weight:600;line-height:1.4;
+}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .product-quantity{
+    display:inline-flex;align-items:center;margin-left:6px;padding:2px 8px;
+    background:var(--primary-50);border:1px solid var(--primary-100);
+    border-radius:999px;color:var(--primary-700);font-size:11px;font-weight:700;
+}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tfoot tr:last-child td,
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tfoot tr:last-child th{border-bottom:0;}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .cart-subtotal th,
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .cart-subtotal td{
+    color:var(--text-2);font-weight:600;
+}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total th,
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total td{
+    padding:16px 2px;margin-top:4px;font-weight:800;color:var(--text);
+    border-top:2px solid var(--border);border-bottom:0;
+}
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .order-total td .woocommerce-Price-amount{
     /* AUDIT-FE-UIUX2-D13 FIX: el total va SIEMPRE en --brand (paridad con
        el total del carrito); el azul --primary queda para montos secundarios. */
-    font-family:var(--display);font-weight:800;font-size:20px;color:var(--brand);
+    font-family:var(--display);font-weight:800;font-size:22px;color:var(--brand);
 }
 .pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table .shipping td{color:var(--accent);font-weight:700;}
+/* Hilo del escrow bajo el total: separación clara del pie de la tabla. */
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tr.ltms-aveonline-office-row th,
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tr.ltms-aveonline-office-row td{
+    border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);
+    font-size:12.5px;color:var(--text-2);
+}
+.pv-scope.pv-checkout .pv-checkout__review table.woocommerce-checkout-review-order-table tr.ltms-aveonline-office-row select{
+    width:100%;max-width:220px;height:36px;padding:0 10px;margin-top:4px;
+    border:2px solid var(--border);border-radius:var(--r-sm);font-size:12.5px;background:#fff;
+}
 
 /* Coupon en review */
 .pv-scope.pv-checkout .pv-checkout__review-coupon{border-top:1px dashed var(--border);padding-top:12px;}

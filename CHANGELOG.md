@@ -6,6 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-UX-FIXES` (botón Confirmar pedido invisible + carriers sin cobertura + tabla "Tu pedido")
+
+> Ronda de pulido UX del checkout reportada por el usuario tras confirmar el
+> fix del hang (2.9.382). Tres hallazgos:
+>
+> **1. `CHECKOUT-SUBMIT-VISIBLE`** — El botón "Confirmar pedido" solo se veía
+> al hacer hover sobre el texto. Causa raíz: el CSS `!important` del botón
+> (`background:#E80001 !important`) vivía en el script inline inyectado por el
+> output buffer (`LTMS_Frontend_Checkout_Script_Injector::inject_script_into_html`),
+> que es **código muerto** (la función existe pero no está enganchada a ningún
+> hook — verificable: el marker `LTMS-CHECKOUT-SCRIPT` no aparece en el HTML
+> servido). Sin `!important`, la regla del combined CSS de SG/Elementor
+> (especificidad 0,2,0) ganaba sobre `.pv-btn--brand` (0,1,0) fuera de hover →
+> fondo transparente. Fix: trasladar las reglas `!important` al JS externo
+> `ltms-checkout-fixes.js` (que sí se ejecuta en el checkout vía DOM injection).
+>
+> **2. `SHIPPING-HIDE-UNAVAILABLE`** — El bloque "Comparar opciones de envío"
+> (`ltms-shipping-selector.js`) renderizaba 4 tarjetas fijas (Uber, Aveonline,
+> Heka, Recogida). Para carriers que no cotizaron al destino mostraba
+> "No disponible" con opacidad 0.5 — opciones fantasma que confunden. Decisión
+> de producto del usuario: **ocultarlas por completo**. Fix: `card.hide()` si no
+> hay cotización, y ocultar el bloque entero si ninguna quedó visible.
+>
+> **3. `REVIEW-TABLE-UI`** — Mejora estética de la tabla "Tu pedido"
+> (`ltms-checkout.css`): thead uppercase con separador, `.product-quantity` como
+> badge pill, subtotales con peso visual, order-total más prominente (22px,
+> card brand-50 implícito), fila de oficina Aveonline con select estilizado.
+>
+> - **`assets/js/ltms-checkout-fixes.js`** (y `.min.js`): inyecta CSS del botón `!important`.
+> - **`assets/js/ltms-shipping-selector.js`** (y `.min.js`): oculta carriers sin cotización.
+> - **`assets/css/ltms-checkout.css`**: jerarquía visual de la tabla "Tu pedido".
+> - **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.383 (cache-busting).
+> - **Test:** `CheckoutUxPolishTest` (8 tests, source-based, grupo checkout).
+
 ### Fixed — `CHECKOUT-HANG-HEADINGS` (segundo loop del MutationObserver: rewrite de headings seguía colgando el checkout)
 
 > Diagnóstico con mu-plugin temporal `?ltms_diag=`: el checkout se congelaba con
