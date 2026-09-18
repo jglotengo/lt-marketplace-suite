@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CHECKOUT-HANG-HEADINGS` (segundo loop del MutationObserver: rewrite de headings seguía colgando el checkout)
+
+> Diagnóstico con mu-plugin temporal `?ltms_diag=`: el checkout se congelaba con
+> todos los scripts LTMS activos (`nomonolith` no desbloqueaba) pero cargaba al
+> desactivar **solo `ltms-plaza-viva`** (`noplaza` → A). El fix
+> `CHECKOUT-HANG-MUTATION` (2.9.381) ya cubría el rewrite de **labels**, pero los
+> **headings** de billing/shipping (`.textContent = PV.i18n.billingHeading` /
+> `.textContent = PV.i18n.shippingHeadingAlt`) se ejecutaban en CADA llamada a
+> `fixFieldLabels()` SIN guard. Asignar `.textContent` SIEMPRE dispara una
+> mutación `childList` en el MutationObserver (aunque el string sea idéntico) →
+> `fixFieldLabels()` → `.textContent` → bucle infinito de 5s (hasta el
+> `disconnect` del observer) → Chrome muestra "la página no responde, esperar o
+> salir".
+>
+> Fix: guard comparativo `textContent !== PV.i18n.<clave>` en la condición del
+> mismo `if` que asigna — solo se escribe cuando el texto realmente cambió, así
+> las llamadas subsecuentes del observer no mutan el DOM y el loop se corta en la
+> primera pasada. Se regeneró `ltms-plaza-viva.min.js` con terser (mismas opciones
+> de `scripts/build.js`).
+>
+> El mu-plugin `ltms-diag.php` es TEMPORAL — debe eliminarse del servidor al
+> confirmar el fix en producción.
+
+- **`assets/js/ltms-plaza-viva.js`:** guard comparativo en `billingHeading`/`shippingHeading` antes de asignar `.textContent`.
+- **`assets/js/ltms-plaza-viva.min.js`:** regenerado con terser.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.382 (cache-busting).
+- **Test:** `PlazaVivaCheckoutMutationLoopTest` ampliado de 5 → 8 tests (guards de headings en src y min).
+
 ### Fixed — `CHECKOUT-HANG-MUTATION` (bucle infinito del MutationObserver bloqueaba el checkout en el navegador)
 
 > Chrome mostraba "la página no responde, esperar o salir" y el formulario de

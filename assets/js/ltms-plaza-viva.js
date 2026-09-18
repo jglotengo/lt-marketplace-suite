@@ -1500,12 +1500,18 @@
         // entrega) via i18n — antes era un hack CSS font-size:0 + ::before
         // que leía el heading DOBLE en lectores de pantalla y atrapaba el
         // string en CSS. Idempotente (fixFieldLabels corre varias veces).
+        // CHECKOUT-HANG-HEADINGS FIX (2026-09-17): guard de texto comparativo.
+        // Asignar .textContent SIEMPRE dispara una mutación childList en el
+        // observer (aunque el string sea idéntico) → fixFieldLabels → textContent
+        // → bucle infinito que satura el hilo principal (5s hasta disconnect).
+        // El guard data-ltms-label-fixed de CHECKOUT-HANG-MUTATION solo cubría
+        // los labels; estos headings quedaron descubiertos y mantenían el loop.
         var billingHeading = scope.querySelector('.woocommerce-billing-fields h3');
-        if (billingHeading && PV.i18n && PV.i18n.billingHeading) {
+        if (billingHeading && PV.i18n && PV.i18n.billingHeading && billingHeading.textContent !== PV.i18n.billingHeading) {
           billingHeading.textContent = PV.i18n.billingHeading;
         }
         var shippingHeading = scope.querySelector('.woocommerce-shipping-fields h3');
-        if (shippingHeading && PV.i18n && PV.i18n.shippingHeadingAlt) {
+        if (shippingHeading && PV.i18n && PV.i18n.shippingHeadingAlt && shippingHeading.textContent !== PV.i18n.shippingHeadingAlt) {
           shippingHeading.textContent = PV.i18n.shippingHeadingAlt;
         }
         Object.keys(labelMap).forEach(function (fieldKey) {

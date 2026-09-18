@@ -105,4 +105,68 @@ final class PlazaVivaCheckoutMutationLoopTest extends LTMS_Unit_Test_Case {
             'la config del observer no debe cambiar sin revisar el contrato del fix'
         );
     }
+
+    /**
+     * CHECKOUT-HANG-HEADINGS FIX (2026-09-17): los headings de billing/shipping
+     * se reescribían con .textContent en CADA llamada a fixFieldLabels() SIN
+     * guard. Asignar .textContent SIEMPRE dispara una mutación childList en el
+     * observer (aunque el string sea idéntico) → fixFieldLabels → textContent →
+     * bucle infinito de 5s (hasta disconnect) que Chrome reporta como "la página
+     * no responde". El guard comparativo solo escribe si el texto cambió.
+     */
+    public function test_heading_textcontent_has_comparative_guard(): void {
+        $src = (string) file_get_contents( self::JS_PATH );
+        $this->assertStringContainsString(
+            'billingHeading.textContent !== PV.i18n.billingHeading',
+            $src,
+            'billingHeading DEBE comparar el texto antes de asignar .textContent (evita la mutación en cada llamada)'
+        );
+        $this->assertStringContainsString(
+            'shippingHeading.textContent !== PV.i18n.shippingHeadingAlt',
+            $src,
+            'shippingHeading DEBE comparar el texto antes de asignar .textContent'
+        );
+    }
+
+    /**
+     * El guard comparativo de los headings DEBE estar evaluado dentro del mismo
+     * if que asigna textContent (mismo bloque), no en un if separado después.
+     */
+    public function test_heading_guard_is_inline_with_assign(): void {
+        $src = (string) file_get_contents( self::JS_PATH );
+
+        $this->assertMatchesRegularExpression(
+            '/billingHeading\.textContent !== PV\.i18n\.billingHeading\s*\)\s*\{\s*billingHeading\.textContent = PV\.i18n\.billingHeading;/',
+            $src,
+            'el guard comparativo de billingHeading DEBE estar en la condición del if que asigna textContent'
+        );
+        $this->assertMatchesRegularExpression(
+            '/shippingHeading\.textContent !== PV\.i18n\.shippingHeadingAlt\s*\)\s*\{\s*shippingHeading\.textContent = PV\.i18n\.shippingHeadingAlt;/',
+            $src,
+            'el guard comparativo de shippingHeading DEBE estar en la condición del if que asigna textContent'
+        );
+    }
+
+    /**
+     * El min desplegado incluye el guard comparativo de los headings (producción
+     * sirve el .min, no el src). NOTA: terser manglea los nombres de variables
+     * locales (billingHeading→e, shippingHeading→a), así que el assert valida el
+     * patrón que sobrevive al mangle: `.textContent!==PV.i18n.<clave>`.
+     */
+    public function test_min_contains_heading_guard(): void {
+        if ( ! file_exists( self::MIN_PATH ) ) {
+            $this->markTestSkipped( 'ltms-plaza-viva.min.js no existe' );
+        }
+        $min = (string) file_get_contents( self::MIN_PATH );
+        $this->assertMatchesRegularExpression(
+            '/\.textContent!==PV\.i18n\.billingHeading/',
+            $min,
+            'el .min desplegado DEBE incluir la comparación de billingHeading antes de asignar'
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.textContent!==PV\.i18n\.shippingHeadingAlt/',
+            $min,
+            'el .min desplegado DEBE incluir la comparación de shippingHeading antes de asignar'
+        );
+    }
 }
