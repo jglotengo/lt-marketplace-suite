@@ -2098,24 +2098,24 @@ body.ltms-filters-open{overflow:hidden;}
 .pv-shop__active-filter--clear:hover{background:var(--text-2);color:#fff;}
 
 /* Vista lista: 1 columna, imagen izquierda */
-/* SHOP-LIST-BTN FIX (2026-09-11): el botón "Añadir al carrito" se desbordaba
-   de la card en vista lista. Causa raíz: el link y el título no eran
-   encogibles (sin min-width:0) y el botón heredaba width:100% +
-   white-space:normal, enrollándose en 2 líneas o quedando recortado por el
-   overflow:hidden de la card. Se fuerza: link/título encogibles, precio en una
-   línea, botón con ancho de contenido (nowrap) y wrap a fila propia en móvil.
-   SHOP-LIST-UI FIX (2026-09-18): rediseño del layout lista. Antes imagen
+/* SHOP-LIST-UI FIX (2026-09-18): rediseño del layout lista. Antes imagen
    (120px) + título + precio + botón quedaban apretados en una sola fila sin
    jerarquía. Ahora: grid 160px|1fr dentro del link (imagen a la izquierda,
    título arriba + precio debajo a la derecha), botón ATC como columna derecha
-   de la card con altura completa y ancho cómodo. */
+   de la card con altura completa y ancho cómodo.
+   NOTA de especificidad (2026-09-19): los selectores INCLUYEN el elemento
+   `a.` en el link (igual que ltms-homepage-fixes.css:292) para ganar la
+   cascada — sin el `a.`, homepage-fixes (a.woocommerce-loop-product__link,
+   especificidad 0,3,2) gana sobre .pv-shop--list (0,3,1) aunque cargue antes
+   y fuerza display:flex column, rompiendo el layout lista y ocultando la
+   imagen. */
 .pv-shop--list ul.products{grid-template-columns:1fr !important;gap:16px !important;}
 .pv-shop--list ul.products li.product{
     flex-direction:row !important;align-items:stretch !important;
     border:1px solid var(--border) !important;border-radius:12px !important;
 }
 .pv-shop--list ul.products li.product:hover{box-shadow:0 6px 20px rgba(0,0,0,.09) !important;}
-.pv-shop--list ul.products li.product .woocommerce-loop-product__link{
+.pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
     flex:1 1 auto !important;min-width:0 !important;
     display:grid !important;
     grid-template-columns:160px 1fr !important;
@@ -2123,7 +2123,7 @@ body.ltms-filters-open{overflow:hidden;}
     column-gap:18px !important;align-items:start !important;
     padding:16px !important;
 }
-.pv-shop--list ul.products li.product .woocommerce-loop-product__link img{
+.pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
     width:160px !important;height:160px !important;
     grid-row:1 / 3 !important;grid-column:1 !important;
     flex:0 0 160px !important;aspect-ratio:unset !important;object-fit:contain !important;
@@ -2156,12 +2156,27 @@ body.ltms-filters-open{overflow:hidden;}
    para no comprimir el título; en móvil todo a una columna. */
 @media (max-width:900px){
     .pv-shop--list ul.products li.product{flex-wrap:wrap !important;}
-    .pv-shop--list ul.products li.product .woocommerce-loop-product__link{flex:1 1 100% !important;}
+    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link{flex:1 1 100% !important;}
     .pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{
         flex:1 1 100% !important;justify-content:flex-start !important;padding:0 16px 16px !important;
     }
     .pv-shop--list ul.products li.product .button.add_to_cart_button,
     .pv-shop--list ul.products li.product a.button{width:100% !important;}
+}
+
+/* SHOP-LIST-UI FIX (2026-09-19): en móvil la imagen se reduce a 100px para
+   dejar más aire al título/precio; la card sigue en fila (imagen izquierda). */
+@media (max-width:600px){
+    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
+        grid-template-columns:100px 1fr !important;column-gap:12px !important;padding:12px !important;
+    }
+    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
+        width:100px !important;height:100px !important;flex:0 0 100px !important;
+    }
+    .pv-shop--list ul.products li.product .woocommerce-loop-product__title{font-size:13px !important;}
+    .pv-shop--list ul.products li.product .price{font-size:14px !important;margin:4px 0 0 !important;}
+    .pv-shop--list ul.products li.product .button.add_to_cart_button,
+    .pv-shop--list ul.products li.product a.button{min-width:0 !important;height:44px !important;}
 }
 
 /* Overlay de filtros (móvil) */

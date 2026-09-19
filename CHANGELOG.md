@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SHOP-LIST-UI-SPEC` (vista lista rota por conflicto de especificidad CSS)
+
+> Tras el rediseño SHOP-LIST-UI (2.9.386), el usuario reportó que la vista lista
+> `/tienda/?view=list` quedó rota: "no se ve en formato lista, no se ve la
+> imagen". Causa raíz: **conflicto de especificidad CSS**.
+>
+> `ltms-homepage-fixes.css` define el link de la card con
+> `.pv-shop ul.products li.product a.woocommerce-loop-product__link`
+> (especificidad 0,3,2 — incluye el elemento `a.`) forzando
+> `display:flex; flex-direction:column`. Mi regla de vista lista usaba
+> `.pv-shop--list ul.products li.product .woocommerce-loop-product__link`
+> (0,3,1 — sin el `a.`), **menor especificidad** → aunque plaza-viva carga
+> después, homepage-fixes ganaba con `display:flex column`, apilando todo y
+> ocultando la imagen (el grid 160px|1fr nunca aplicaba).
+>
+> Fix: los selectores de vista lista ahora incluyen el elemento `a.`
+> (`a.woocommerce-loop-product__link`) para empatar la especificidad 0,3,2 y
+> ganar por orden de carga. Además se agrega responsive móvil (≤600px): imagen
+> 100px, título/precio más compactos, botón a ancho completo.
+>
+> Verificado con la cadena de especificidad: link (0,3,2), imagen (0,3,3),
+> botón (0,3,1) — todos empatan o superan a homepage-fixes y ganan por carga.
+
+- **`assets/css/ltms-plaza-viva.css`:** selectores de vista lista con `a.woocommerce-loop-product__link`; media query móvil ≤600px (imagen 100px).
+- **`assets/css/ltms-plaza-viva.min.css`:** regenerado con clean-css.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.387 (cache-busting).
+- **Test:** `ShopListViewUiTest` actualizado (selector con `a.`); `ShopFiltersTest` actualizado (marcador `SHOP-LIST-UI FIX`).
+
 ### Fixed — `SHOP-LIST-UI` (rediseño UX/UI de la vista lista del shop: imagen, contenido y botón ATC)
 
 > El usuario pidió mejorar la distribución de `/tienda/?view=list`. El layout

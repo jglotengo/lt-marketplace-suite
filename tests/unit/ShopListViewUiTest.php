@@ -33,10 +33,15 @@ final class ShopListViewUiTest extends LTMS_Unit_Test_Case {
 	public function test_list_link_is_grid_160px_plus_1fr(): void {
 		$css = (string) file_get_contents( self::CSS_PATH );
 
+		// SPECIFICITY FIX (2026-09-19): el selector DEBE incluir el elemento
+		// `a.` (a.woocommerce-loop-product__link) para empatar la especificidad
+		// de ltms-homepage-fixes.css:292 (0,3,2) y ganar por orden de carga.
+		// Sin el `a.` (0,3,1) homepage-fixes gana y fuerza display:flex column,
+		// rompiendo el layout lista y ocultando la imagen.
 		$this->assertMatchesRegularExpression(
-			'/\.pv-shop--list ul\.products li\.product \.woocommerce-loop-product__link\s*\{[^}]*grid-template-columns:160px 1fr !important;/s',
+			'/\.pv-shop--list ul\.products li\.product a\.woocommerce-loop-product__link\s*\{[^}]*display:grid !important;[^}]*grid-template-columns:160px 1fr !important;/s',
 			$css,
-			'SHOP-LIST-UI: el link de la card en vista lista DEBE ser grid 160px|1fr (imagen izquierda + contenido derecha).'
+			'SHOP-LIST-UI: el link de la card en vista lista DEBE ser grid 160px|1fr CON el selector a. (especificidad correcta contra homepage-fixes).'
 		);
 	}
 
@@ -44,7 +49,7 @@ final class ShopListViewUiTest extends LTMS_Unit_Test_Case {
 		$css = (string) file_get_contents( self::CSS_PATH );
 
 		$this->assertMatchesRegularExpression(
-			'/\.pv-shop--list ul\.products li\.product \.woocommerce-loop-product__link img\s*\{[^}]*width:160px !important;[^}]*grid-row:1 \/ 3 !important;[^}]*grid-column:1 !important;/s',
+			'/\.pv-shop--list ul\.products li\.product a\.woocommerce-loop-product__link img\s*\{[^}]*width:160px !important;[^}]*grid-row:1 \/ 3 !important;[^}]*grid-column:1 !important;/s',
 			$css,
 			'SHOP-LIST-UI: la imagen DEBE ser 160px y ocupar las dos filas de la columna izquierda del grid.'
 		);

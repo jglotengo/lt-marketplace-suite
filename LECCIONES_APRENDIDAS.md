@@ -3598,6 +3598,31 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Los tests source-based de CSS con archivos en CRLF (Windows) fallan con `\s*\{\s*` estricto: usar
      `.*?` entre el selector y la llave cuando hay saltos de línea con `\r\n`.
 
+### Lección #170: el "orden de carga" NO gana si tu selector tiene menor especificidad — el elemento `a.` del selector ajeno decide
+
+1. **Caso real:** el rediseño de la vista lista (`SHOP-LIST-UI`, 2.9.386) quedó roto en producción: "no se ve en
+   formato lista, no se ve la imagen". El CSS correcto se servía (verificado con curl) y el orden de carga
+   favorecía a plaza-viva (carga después de homepage-fixes). PERO el layout no aplicaba. Causa:
+   `ltms-homepage-fixes.css` define el link con
+   `.pv-shop ul.products li.product a.woocommerce-loop-product__link` = **(0,3,2)** (tres clases + el elemento
+   `a`), mientras mi regla de vista lista usaba `.pv-shop--list ul.products li.product .woocommerce-loop-product__link`
+   = **(0,3,1)** (tres clases, sin `a`). Con `!important` en ambos, la regla de MAYOR especificidad gana SIN
+   importar el orden de carga → homepage-fixes forzaba `display:flex; flex-direction:column` (todo apilado,
+   imagen oculta por `flex-shrink`), y mi `display:grid; grid-template-columns:160px 1fr` nunca se aplicaba.
+2. **Por qué importa:** asumí que "plaza-viva carga después → gana" sin medir especificidad. En CSS con
+   `!important` en ambos lados, el orden de carga solo desempata especificidades IGUALES; nunca supera una
+   mayor. El elemento de tipo (`a`) en el selector ajeno es fácil de pasar por alto al contar clases.
+3. **Fix:** usar el MISMO selector (con `a.`) en la regla de override:
+   `.pv-shop--list ul.products li.product a.woocommerce-loop-product__link` (0,3,2) → empata y gana por carga.
+   Verificar también la imagen (0,3,3 vs 0,3,3 empate → gana por carga) y el botón (0,3,1 vs 0,3,1).
+4. **Regla preventiva:**
+   - Ante "el CSS correcto se sirve pero no se ve": medir la **especificidad de AMBOS selectores** (clases +
+     elementos), no solo el orden de carga. Herramienta: contar clases (0,a,b,c) de cada regla en conflicto.
+   - Cuando el CSS ajeno usa `a.woocommerce-loop-product__link`, tu override DEBE replicar el `a.` — cualquier
+     selector sin el elemento de tipo queda por debajo.
+   - El "bug" de la imagen invisible en column-flex suele ser `flex-shrink` + imagen sin ancho fijo: al pasar a
+     grid/fila, verificar `flex:0 0 <px>` o `width` explícita en el hijo.
+
 
 
 

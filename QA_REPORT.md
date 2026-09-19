@@ -9,6 +9,21 @@
 
 ---
 
+## 0.10. v2.9.387 — SHOP-LIST-UI-SPEC (vista lista rota por especificidad CSS)
+
+**Scope:** Fix de la vista lista `/tienda/?view=list` rota tras SHOP-LIST-UI (2.9.386). Causa: selectores de vista lista con especificidad 0,3,1 vs homepage-fixes 0,3,2 (que incluye `a.`) → homepage-fixes ganaba con `display:flex column`, ocultando la imagen. Fix: selectores con `a.woocommerce-loop-product__link` (0,3,2) + responsive móvil ≤600px (imagen 100px).
+**Verificación:** cadena de especificidad verificada (link 0,3,2, imagen 0,3,3, botón 0,3,1); tests actualizados (`ShopListViewUiTest` selector `a.`, `ShopFiltersTest` marcador nuevo).
+**Tests:** 5,034 tests / 10,561 assertions, 0 failures, 3 skips (sin cambio en conteo — tests actualizados, no agregados).
+
+### 0.10.1 Test Coverage Summary (SHOP-LIST-UI-SPEC)
+
+| Fix | Archivo de test | Cambio |
+|-----|-----------------|--------|
+| SHOP-LIST-UI-SPEC | `ShopListViewUiTest` | selector actualizado a `a.` |
+| SHOP-LIST-UI-SPEC | `ShopFiltersTest` | marcador actualizado a `SHOP-LIST-UI FIX` |
+
+---
+
 ## 0.9. v2.9.386 — SHOP-LIST-UI (rediseño de la vista lista del shop)
 
 **Scope:** `/tienda/?view=list` — layout anterior (imagen 120px + título + precio + botón ATC en fila apretada) rediseñado: link = grid `160px 1fr` (imagen izquierda 2 filas, título arriba + precio debajo), botón ATC como columna derecha de 46px/170px, responsive ≤900px (botón a ancho completo). Card con borde + hover. Vista cuadrícula y home NO se tocan.

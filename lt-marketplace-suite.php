@@ -37,11 +37,13 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// SHOP-LIST-UI (2026-09-18): bump a 2.9.386. Rediseño UX/UI de la vista lista
-// del shop (/tienda/?view=list): grid 160px|1fr dentro del link (imagen
-// izquierda, título arriba + precio debajo), botón ATC como columna derecha con
-// altura cómoda, responsive a 900px. Antes todo quedaba apretado en una fila.
-define( 'LTMS_VERSION', '2.9.386' );
+// SHOP-LIST-UI-SPEC (2026-09-19): bump a 2.9.387. Fix de especificidad CSS en
+// la vista lista (/tienda/?view=list): los selectores del link ahora incluyen
+// el elemento `a.` (a.woocommerce-loop-product__link) para ganar la cascada
+// contra ltms-homepage-fixes.css (0,3,2). Sin el `a.` (0,3,1) homepage-fixes
+// ganaba con display:flex column, rompiendo el layout lista y ocultando la
+// imagen. Se agrega tambien responsive movil (imagen 100px).
+define( 'LTMS_VERSION', '2.9.387' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

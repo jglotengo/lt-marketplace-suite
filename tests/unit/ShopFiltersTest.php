@@ -99,18 +99,21 @@ final class ShopFiltersTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'data-pv-close-filters', $js, 'SHOP-FILTERS: el JS debe escuchar data-pv-close-filters.' );
 	}
 
-	/* ── SHOP-LIST-BTN FIX (2026-09-11): botón de añadir al carrito desbordado
-	   en la vista lista (?view=list). El link/título debían ser encogibles y el
-	   botón no enrollarse/recortarse. ─────────────────────────────────────── */
+	/* ── SHOP-LIST-BTN FIX (2026-09-11) → SHOP-LIST-UI FIX (2026-09-18/19):
+	   botón de añadir al carrito desbordado en la vista lista (?view=list).
+	   El link/título debían ser encogibles y el botón no enrollarse/recortarse.
+	   Rediseño posterior (SHOP-LIST-UI): grid 160px|1fr en el link + botón como
+	   columna derecha. Selectores con `a.` (2026-09-19) para ganar la cascada
+	   contra homepage-fixes (especificidad 0,3,2). ──────────────────────── */
 
 	public function test_list_view_button_no_overflow_fix(): void {
 		$css = file_get_contents( self::CSS_PATH );
 
-		$this->assertStringContainsString( 'SHOP-LIST-BTN FIX', $css, 'SHOP-LIST-BTN: el fix debe tener su marcador traceable.' );
-		$this->assertStringContainsString( '.pv-shop--list ul.products li.product .woocommerce-loop-product__link', $css, 'SHOP-LIST-BTN: debe estilarse el link en vista lista.' );
-		$this->assertStringContainsString( 'min-width:0 !important', $css, 'SHOP-LIST-BTN: el link debe ser encogible (min-width:0) para no empujar el botón.' );
-		$this->assertStringContainsString( '.pv-shop--list ul.products li.product .button.add_to_cart_button', $css, 'SHOP-LIST-BTN: debe existir el override del botón en vista lista.' );
-		$this->assertStringContainsString( 'white-space:nowrap !important', $css, 'SHOP-LIST-BTN: el botón debe ir en una línea (nowrap) para no enrollarse.' );
+		$this->assertStringContainsString( 'SHOP-LIST-UI FIX', $css, 'SHOP-LIST-UI: el fix debe tener su marcador traceable.' );
+		$this->assertStringContainsString( '.pv-shop--list ul.products li.product a.woocommerce-loop-product__link', $css, 'SHOP-LIST-UI: debe estilarse el link en vista lista (con selector a. para especificidad).' );
+		$this->assertStringContainsString( 'min-width:0 !important', $css, 'SHOP-LIST-UI: el link debe ser encogible (min-width:0) para no empujar el botón.' );
+		$this->assertStringContainsString( '.pv-shop--list ul.products li.product .button.add_to_cart_button', $css, 'SHOP-LIST-UI: debe existir el override del botón en vista lista.' );
+		$this->assertStringContainsString( 'white-space:nowrap !important', $css, 'SHOP-LIST-UI: el botón debe ir en una línea (nowrap) para no enrollarse.' );
 	}
 
 	public function test_list_view_button_overrides_min_css(): void {
