@@ -3503,6 +3503,57 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    `ltms-shipping-selector.js` o un bloque con cards de providers antes de concluir que es un problema de rates de
    WC. El AJAX `ltms_get_shipping_quotes` es la fuente real de las cards, no `woocommerce_package_rates`.
 
+### Lección #166: un revert por "correlación temporal" revierte el cambio equivocado — el culpable se confirma con bisect, no con timing
+
+1. **Caso real:** el split del monolito UX (`HOME-SLOW-F2`, 4f2228f1) se revirtió (059c047a) porque el usuario
+   reportó checkout "en proceso de carga" el mismo día. Tres días después, el diagnóstico `?ltms_diag=` demostró
+   que el checkout congelado **no era del monolito**: `nomonolith` (monolito off) seguía congelado, pero `noplaza`
+   (solo `ltms-plaza-viva` off) cargaba → el culpable era el bucle del MutationObserver de `fixFieldLabels()` en
+   plaza-viva. El revert se hizo por **correlación temporal** (el split coincidió con el reporte), no por
+   **causalidad** (nunca se demostró que el monolito causara el bloqueo).
+2. **Por qué importa:** el revert costó la optimización (−74KB min storefront, −138KB panel) durante 3 días de
+   forma innecesaria, y metió código revertido que debía reintentarse "con verificación". La lección #163 se
+   relaciona: un inline de output buffer desenganchado (checkout) parecía roto por el split cuando en realidad era
+   otro script (plaza-viva) con un loop.
+3. **La verificación antes de re-aplicar (lo que HAY que hacer):**
+   - Confirmar que el source del monolito NO cambió desde el split (`git log -- <monolito>` entre split y revert)
+     → si no cambió, los bundles del historial siguen sincronizados.
+   - Regenerar los bundles con `bin/build-ux-bundles.js` y comparar → **sin diff** = sincronización exacta.
+   - Correr `bin/smoke-ux-bundles.js` → ningún alias/init sin resolver (errores de initAll = ruido del stub DOM).
+   - Correr los tests del split (`HomeSlowSplitTest`, `HomeSlowDeferTest`) + suite completa.
+4. **Regla preventiva:**
+   - **Nunca revertir un cambio de performance por un bug reportado sin confirmar la causalidad con bisect.**
+     El patrón `?ltms_diag=` (mu-plugin que deshabilita scripts selectivamente) es la herramienta correcta:
+     `noall` → `nomonolith` → `noplaza` aísla el culpable en 3 pruebas.
+   - Si un revert se hace igualmente por presión de tiempo, dejar en el CHANGELOG un plan de reintento con
+     verificación (como se hizo), y NO asumir que el cambio revertido era el bug.
+   - Un revert sin causa demostrada es deuda técnica: reinténtalo cuando tengas el diagnóstico, con la
+     verificación de arriba, en vez de esperar a que "vuelva a pasar".
+
+### Lección #167: un test que asume `time()` sin cruzar el borde de segundo es un flaky latente — la suite completa lo destapa al cargar más clases
+
+1. **Caso real:** al re-aplicar el split del monolito (HOME-SLOW-F2, v2.9.384), la suite completa (5,024 tests)
+   falló en `VtexAutoSyncTest::test_run_auto_sync_schedules_staggered_events_per_configured_vendor` con
+   "Failed asserting that 6 is identical to 5". El test aislado pasaba 8/8. La causa: `run_auto_sync()` del
+   global namespace llama `time()` real en cada iteración del escalonado (`time()+5`, `time()+10`); si la 2ª
+   llamada cruza el borde de segundo, `events[1][0] - events[0][0]` da 6 en vez de 5. Con la suite completa
+   (más clases cargadas → más tiempo entre iteraciones) la probabilidad de cruzar el segundo aumenta. **No era
+   una regresión del split** — era un flaky latente que el split solo volvió más probable.
+2. **Por qué Brain Monkey no puede stubear `time()`:** la clase `LTMS_Vtex_Sync` está en el **global namespace**
+   (sin `namespace` declarado), así que su `time()` se resuelve a la función interna de PHP; `Monkey\Functions\when('time')`
+   solo intercepta llamadas dentro de un namespace. Intentar stubearlo en global no aplica — el fix correcto es
+   tolerancia en la aserción, no stub.
+3. **Fix:** capturar `$t0 = time()` justo antes de correr, y verificar que cada evento esté en `[t0+5*i, t0+5*i+i]`
+   (tolerancia de 1s por iteración por el cruce de segundo), en vez de `assertSame(5, diff)`. El `diff` se valida
+   en rango `[5,6]`. Esto preserva la intención del test (escalonado +5s) sin depender del reloj.
+4. **Regla preventiva:**
+   - Un `assertSame` sobre diferencias de `time()`/`microtime()` en código no mockeable es un flaky latente.
+     Usar rangos (`assertGreaterThanOrEqual` + `assertLessThanOrEqual`) o `assertContains` con tolerancia.
+   - Cuando la suite completa falla en un test que pasa aislado: sospechar **contaminación de estado global
+     (LECCIONES #148)** o **flaky de timing** — en ambos casos el fallo no es necesariamente tu cambio; pero
+     hay que arreglarlo de raíz (no re-correr hasta que "toque verde") porque el siguiente commit ajeno lo
+     destapará de nuevo.
+
 
 
 

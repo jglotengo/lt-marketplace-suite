@@ -6,6 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Reverted-revert — `HOME-SLOW-F2` (re-aplicado el split del monolito UX: shared/dashboard/storefront)
+
+> El 14-Sep el split del monolito `ltms-ux-enhancements.js` (~320KB min) en 3
+> bundles (shared/dashboard/storefront, −74KB min storefront / −138KB panel) se
+> revirtió por reporte del usuario de checkout "en proceso de carga" con campos
+> bloqueados. **El 17-Sep el diagnóstico `?ltms_diag=` demostró que el checkout
+> bloqueado NO era del monolito**: `nomonolith` (monolito off) seguía congelado,
+> pero `noplaza` (solo `ltms-plaza-viva` off) cargaba → el culpable era el bucle
+> del MutationObserver en `fixFieldLabels()` de plaza-viva, arreglado en
+> 2.9.381 (`CHECKOUT-HANG-MUTATION`) + 2.9.382 (`CHECKOUT-HANG-HEADINGS`).
+> El revert del monolito fue por **correlación, no causalidad**.
+>
+> Re-aplicado el 18-Sep (v2.9.384) con verificación:
+> - `bin/build-ux-bundles.js` regenera los 3 bundles desde el monolito fuente
+>   (que NO cambió desde el split) → **sin diff** contra el historial original.
+> - `bin/smoke-ux-bundles.js`: **ningún alias/init sin resolver** (errores de
+>   initAll = ruido del stub DOM, no del split).
+> - `HomeSlowSplitTest` + `HomeSlowDeferTest` verdes (9 tests, grupo home-slow).
+> - Suite completa 5,018 tests verdes.
+>
+> Detalle del split: `ltms-ux-shared` (todas las páginas) + `ltms-ux-dashboard`
+> (panel/mi-cuenta) o `ltms-ux-storefront` (tienda pública), todos con `defer`.
+> Los cruces dashboard↔storefront (`celebrateConfetti`, `showOrderSuccess`) viven
+> en shared con aliases `LTMS.UX.*`.
+
+- **`includes/frontend/class-ltms-frontend-assets.php`:** re-activa enqueue de bundles en vez del monolito.
+- **`assets/js/ltms-ux-shared.js` / `ltms-ux-dashboard.js` / `ltms-ux-storefront.js` (+ `.min`):** restaurados desde historial, regenerados sin diff.
+- **`bin/build-ux-bundles.js` / `bin/smoke-ux-bundles.js`:** restaurados.
+- **`tests/unit/HomeSlowSplitTest.php` / `HomeSlowDeferTest.php`:** restaurados (9 tests verdes).
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.384 (cache-busting).
+
 ### Fixed — `CHECKOUT-UX-FIXES` (botón Confirmar pedido invisible + carriers sin cobertura + tabla "Tu pedido")
 
 > Ronda de pulido UX del checkout reportada por el usuario tras confirmar el

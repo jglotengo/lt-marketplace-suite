@@ -13,8 +13,11 @@
  *     <10 min) o con rate-limit reciente (ltms_vtex_last_sync <2 min).
  *   - Filtros: omite non-vendors y vendors sin credenciales completas.
  *
- * NOTA: NO se stubea time() — las comparaciones de los guards usan time()
- * real del test para que sean consistentes con el time() que ejecuta la clase.
+ * NOTA: time() se usa real (global namespace — Brain Monkey no puede stubbear
+ * funciones internas llamadas sin namespace). El test de escalonado captura el
+ * base $t0 y tolera +1s de deriva por iteración (TIME-FLAKY FIX 2026-09-18)
+ * para que la aserción sea determinista; los guards usan time() real del test
+ * para que sean consistentes con el time() que ejecuta la clase.
  *
  * @package LTMS\Tests\Unit
  *
@@ -169,6 +172,14 @@ final class VtexAutoSyncTest extends LTMS_Unit_Test_Case {
 	public function test_run_auto_sync_schedules_staggered_events_per_configured_vendor(): void {
 		$this->require_sync_class();
 
+		// TIME-FLAKY FIX (2026-09-18): la clase (global namespace) llama time()
+		// real en cada iteración del escalonado; si la 2ª llamada cruza el borde
+		// de segundo, events[1][0]-events[0][0] daba 6 en vez de 5 → fallo
+		// intermitente en la suite completa (pre-existente, no del split; Brain
+		// Monkey no puede stubear time() en el global namespace). Se captura el
+		// base $t0 justo antes de correr y se acepta +1s de deriva por iteración.
+		$t0 = time();
+
 		Monkey\Functions\when( 'get_users' )->alias( static fn( $args = [] ) => [ 111, 222 ] );
 		$this->stub_userdata( [ 111, 222 ] );
 		$this->stub_user_meta( [
@@ -187,7 +198,14 @@ final class VtexAutoSyncTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( 'ltms_vtex_sync_cron', $events[0][1], 'Reusa CRON_HOOK (run_scheduled_sync).' );
 		$this->assertSame( [ 111 ], $events[0][2], 'Vendor 111 como argumento.' );
 		$this->assertSame( [ 222 ], $events[1][2], 'Vendor 222 como argumento.' );
-		$this->assertSame( 5, $events[1][0] - $events[0][0], 'Eventos escalonados +5s.' );
+		// Escalonado +5s por vendor con tolerancia de 1s (time() real puede cruzar
+		// el borde de segundo entre iteraciones). NO assertSame(5) exacto.
+		$this->assertGreaterThanOrEqual( $t0 + 5, $events[0][0], 'Vendor 111 programado a t0+5 o posterior.' );
+		$this->assertLessThanOrEqual( $t0 + 6, $events[0][0], 'Vendor 111 no puede derivar >1s del t0+5.' );
+		$this->assertGreaterThanOrEqual( $t0 + 10, $events[1][0], 'Vendor 222 programado a t0+10 o posterior.' );
+		$this->assertLessThanOrEqual( $t0 + 12, $events[1][0], 'Vendor 222 no puede derivar >2s del t0+10.' );
+		$this->assertGreaterThanOrEqual( 5, $events[1][0] - $events[0][0], 'Eventos escalonados >= +5s.' );
+		$this->assertLessThanOrEqual( 6, $events[1][0] - $events[0][0], 'Eventos escalonados <= +6s (deriva por borde de segundo).' );
 
 		$this->assertSame( 111, $updates[0][0], 'Marca in-progress del vendor 111.' );
 		$this->assertSame( '_ltms_vtex_sync_in_progress', $updates[0][1] );

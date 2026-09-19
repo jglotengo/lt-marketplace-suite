@@ -35,7 +35,7 @@ final class HomeSlowDeferTest extends LTMS_Unit_Test_Case {
 
 	private const DEFER_ARGS = "[ 'in_footer' => true, 'strategy' => 'defer' ]";
 
-	public function test_ux_enhancements_enqueued_with_defer(): void {
+	public function test_ux_bundles_enqueued_with_defer(): void {
 		$src = file_get_contents( self::ASSETS_PATH );
 
 		$this->assertStringContainsString(
@@ -44,18 +44,21 @@ final class HomeSlowDeferTest extends LTMS_Unit_Test_Case {
 			'HOME-SLOW-DEFER: el fix debe tener su marcador traceable en class-ltms-frontend-assets.php.'
 		);
 
-		// HOME-SLOW-F2 REVERT (2026-09-14): el split en bundles se revirtió por
-		// reporte de checkout bloqueado; el monolito vuelve a encolarse con defer.
+		// HOME-SLOW-F2 (split del monolito): el monolito ltms-ux-enhancements ya
+		// no se encola; en su lugar se encolan 3 bundles (shared/dashboard/
+		// storefront), todos con strategy defer (continuidad de la fase 1).
+		foreach ( [ 'ltms-ux-shared', 'ltms-ux-dashboard', 'ltms-ux-storefront' ] as $handle ) {
+			$this->assertStringContainsString(
+				"'" . $handle . "'",
+				$src,
+				'HOME-SLOW-DEFER: el handle ' . $handle . ' debe seguir registrándose.'
+			);
+		}
+
 		$this->assertStringContainsString(
 			self::DEFER_ARGS,
 			$src,
-			'HOME-SLOW-DEFER: el monolito ltms-ux-enhancements debe encolarse con strategy defer (y seguir en footer).'
-		);
-
-		$this->assertStringContainsString(
-			"'ltms-ux-enhancements'",
-			$src,
-			'HOME-SLOW-DEFER: el handle ltms-ux-enhancements debe seguir registrándose.'
+			'HOME-SLOW-DEFER: los bundles UX deben encolarse con strategy defer (y seguir en footer).'
 		);
 	}
 

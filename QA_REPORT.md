@@ -9,6 +9,24 @@
 
 ---
 
+## 0.7. v2.9.384 — HOME-SLOW-F2 re-aplicado (revert del revert del split del monolito UX)
+
+**Scope:** Re-aplicación del split del monolito `ltms-ux-enhancements.js` (shared/dashboard/storefront), revertido el 14-Sep por correlación temporal con el checkout bloqueado.
+**Decisión:** El diagnóstico `?ltms_diag=` (17-Sep) demostró que el checkout congelado NO era del monolito — el culpable fue `ltms-plaza-viva` (bucle del MutationObserver, arreglado en 2.9.381/2.9.382). Revert era por correlación, no causalidad. Lección #166.
+**Verificación pre-deploy:** bundles regenerados con `bin/build-ux-bundles.js` → **sin diff** contra historial original (monolito sin cambios desde el split); `bin/smoke-ux-bundles.js` → ningún alias/init sin resolver; `HomeSlowSplitTest` + `HomeSlowDeferTest` verdes.
+**Tests:** 5,024 tests / 10,547 assertions, 0 failures, 3 skips (5,018 previos + 6 del `HomeSlowSplitTest` restaurado). Durante la verificación la suite completa destapó un flaky latente pre-existente en `VtexAutoSyncTest` (time() real cruza el borde de segundo → diff 6 en vez de 5) — arreglado con tolerancia de 1s en la aserción (TIME-FLAKY FIX, Lección #167). No era regresión del split.
+**Beneficio:** −74KB min en storefront, −138KB en panel del vendedor por página (defer).
+
+### 0.7.1 Test Coverage Summary (HOME-SLOW-F2 re-aplicado)
+
+| Fix | Archivo de test | Tests | Asserts |
+|-----|-----------------|-------|---------|
+| HOME-SLOW-F2 split | `HomeSlowSplitTest` | 6 | — |
+| HOME-SLOW-DEFER | `HomeSlowDeferTest` | 3 | — |
+| **Total (grupo home-slow)** | | **9** | **29** |
+
+---
+
 ## 0.6. v2.9.382–383 — Checkout hang cycle cierre + UX polish (CHECKOUT-HANG-HEADINGS → CHECKOUT-UX-FIXES)
 
 **Scope:** Cierre del diagnóstico del checkout congelado (mu-plugin `?ltms_diag=`), fix del segundo loop del MutationObserver, y pulido UX post-fix (botón, comparador de envíos, tabla de review).

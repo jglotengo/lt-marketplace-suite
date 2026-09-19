@@ -37,12 +37,12 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// CHECKOUT-UX-FIXES (2026-09-17): bump a 2.9.383 para cache-busting de
-// ltms-checkout-fixes.min.js (botón Confirmar pedido visible — el CSS
-// !important vivía en un script inline muerto, ahora via JS externo),
-// ltms-shipping-selector.min.js (ocultar carriers sin cobertura) y
-// ltms-checkout.css (tabla "Tu pedido" con mejor jerarquía visual).
-define( 'LTMS_VERSION', '2.9.383' );
+// HOME-SLOW-F2 RE-APLICADO (2026-09-18): bump a 2.9.384. El split del monolito
+// UX (shared/dashboard/storefront) se revierte-revierte tras demostrar con
+// diagnostico ?ltms_diag= que el checkout bloqueado NO era del monolito (culpable:
+// ltms-plaza-viva, arreglado en 2.9.381/2.9.382). Bundles idénticos al source
+// (verificado: regeneración sin diff, smoke test sin aliases rotos).
+define( 'LTMS_VERSION', '2.9.384' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
