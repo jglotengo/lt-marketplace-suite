@@ -3554,6 +3554,30 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      hay que arreglarlo de raíz (no re-correr hasta que "toque verde") porque el siguiente commit ajeno lo
      destapará de nuevo.
 
+### Lección #168: un grid "de paridad" con 5 columnas ignora el sidebar del archive — la card se desborda aunque el CSS se vea "correcto"
+
+1. **Caso real:** el usuario reportó tarjetas de producto desbordadas en `/tienda/?view_list` (escritorio). El
+   CSS `ltms-homepage-fixes.css` forzaba `grid-template-columns: repeat(5, 1fr) !important` en el shop por
+   "paridad con el home" (que usa 5 columnas Elementor SIN sidebar). Pero el archive de LTMS tiene
+   `.pv-shop__sidebar` (filtros) + `.pv-shop__main`, así que el área de productos real es ~75% del ancho →
+   cada card ~180px en vez de los ~230px del home → el contenido (título 2 líneas + precio + botón ATC) se
+   desbordaba. El CSS "se veía bien" en el home; estaba mal en el contexto del archive.
+2. **Diagnóstico:** con curl el markup era idéntico en `?view_list`, `?view=grid` y sin query (el toggle usa
+   `?view=list`, `view_list` no activa nada server-side). El problema NO era la URL sino el grid del shop en
+   general — el usuario lo notó en esa URL. El CSS individual de LTMS sí se enqueúa y gana con `!important`;
+   el combined de SG no incluye las reglas `.pv-shop`.
+3. **Fix:** media query `<=1600px` → 4 columnas (cards más anchas), 5 solo en >1600px (donde cabe sin sidebar
+   apretado), y `min-width:0` + `max-width:100%` + `overflow-wrap:break-word` en card y link para que el grid
+   defina el ancho, nunca el texto. El home/carrusel NO se toca (override scopeado a `.pv-scope.pv-shop`).
+4. **Regla preventiva:**
+   - **Un grid "de paridad" no es paridad si el contenedor difiere.** Comparar el ancho real del área de
+     contenido (con sidebar vs sin sidebar), no solo el número de columnas. 5 columnas Elementor en full-width
+     ≠ 5 columnas con sidebar del 25%.
+   - Ante "solo se ve mal en URL X": verificar con curl si el HTML/CSS difiere entre URLs antes de culpar al
+     query string. Si son idénticos, el problema es el layout general (o cache del navegador).
+   - En grids con contenido de texto variable, proteger SIEMPRE con `min-width:0` en las cards/links — es el
+     guard que evita que el contenido empuje el grid (clásico de flex/grid: el mínimo contenido no comprimible).
+
 
 
 

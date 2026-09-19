@@ -566,6 +566,19 @@ html.wp-toolbar {
     margin: 0 0 24px !important;
 }
 
+/* SHOP-GRID-DESKTOP FIX (2026-09-18): en desktop con sidebar el shop forzaba
+   5 columnas (paridad con el home) pero las cards quedaban ~180px y el
+   contenido (titulo 2 lineas + precio + boton ATC) se desbordaba de la card
+   (usuario lo reporto como "imagenes y texto desbordados" en /tienda/).
+   Se baja a 4 columnas en el rango desktop tipico (hasta 1600px) y 5 solo en
+   pantallas muy anchas, donde cabe sin apretar. El home (carrusel/Elementor)
+   NO se toca — este override es exclusivo del archive .pv-shop. */
+@media (max-width: 1600px) {
+    .pv-scope.pv-shop ul.products {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+}
+
 /* SHOP-CARD-PARITY FIX: el ul.products del shop es display:grid, pero WC
    define .woocommerce ul.products::before { content:" "; display:table }
    (clearfix de floats). En un grid ese ::before se convierte en un grid
@@ -580,6 +593,16 @@ html.wp-toolbar {
 
 .pv-scope.pv-shop ul.products li.product {
     min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+/* SHOP-GRID-DESKTOP FIX (2026-09-18): el link de la card no debe poder
+   forzar el ancho del grid (contenido largo empujaba la card). min-width:0
+   + max-width:100% garantizan que el grid define el ancho, nunca el texto. */
+.pv-scope.pv-shop ul.products li.product a.woocommerce-loop-product__link {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
 }
 
 @media (max-width: 1200px) {

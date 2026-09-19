@@ -37,12 +37,11 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// HOME-SLOW-F2 RE-APLICADO (2026-09-18): bump a 2.9.384. El split del monolito
-// UX (shared/dashboard/storefront) se revierte-revierte tras demostrar con
-// diagnostico ?ltms_diag= que el checkout bloqueado NO era del monolito (culpable:
-// ltms-plaza-viva, arreglado en 2.9.381/2.9.382). Bundles idénticos al source
-// (verificado: regeneración sin diff, smoke test sin aliases rotos).
-define( 'LTMS_VERSION', '2.9.384' );
+// SHOP-GRID-DESKTOP (2026-09-18): bump a 2.9.385. El shop forzaba 5 columnas
+// en desktop con sidebar -> cards ~180px con contenido desbordado (reporte
+// usuario /tienda/?view_list). Se baja a 4 columnas en <=1600px + min-width:0
+// en card/link para que el grid defina el ancho, nunca el texto.
+define( 'LTMS_VERSION', '2.9.385' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

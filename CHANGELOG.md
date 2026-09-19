@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SHOP-GRID-DESKTOP` (cards del shop desbordadas en desktop — 5 columnas con sidebar)
+
+> El usuario reportó que en `/tienda/?view_list` (escritorio) las imágenes y el
+> texto de las tarjetas de producto se veían desbordados. Diagnóstico:
+> `ltms-homepage-fixes.css` forzaba `grid-template-columns: repeat(5, 1fr) !important`
+> en el shop (paridad con el home de 5 columnas, SHOP-GRID-COLS 2026-09-06).
+> Con sidebar (`.pv-shop__sidebar` + `.pv-shop__main`) cada card quedaba ~180px
+> y el contenido (título 2 líneas + precio + botón "Añadir al carrito") se
+> desbordaba de la card.
+>
+> El markup del shop es el nativo de LTMS (`archive-product.php` renderiza
+> cards WooCommerce compactas, verificado con curl: `ul.products.columns-4`,
+> clases `woocommerce-loop-product__*`); el CSS correcto es `ltms-homepage-fixes.css`,
+> que sí se enqueúa (el combined de SG no incluye las reglas `.pv-shop`).
+>
+> Fix: 4 columnas en `<=1600px` (cards más anchas), 5 solo en pantallas muy
+> anchas (>1600px), y `min-width:0` + `max-width:100%` + `overflow-wrap:break-word`
+> en card y link para que el grid defina el ancho, nunca el texto. El home
+> (carrusel / `.elementor-wc-products`) NO se toca — el override es exclusivo
+> de `.pv-scope.pv-shop`.
+
+- **`assets/css/ltms-homepage-fixes.css`:** media query `<=1600px` → 4 columnas; `min-width:0`/`max-width:100%`/`overflow-wrap` en card y link.
+- **`assets/css/ltms-homepage-fixes.min.css`:** regenerado con clean-css.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.385 (cache-busting).
+- **Test:** `ShopGridDesktopTest` (4 tests, source-based, grupo default unit).
+
 ### Reverted-revert — `HOME-SLOW-F2` (re-aplicado el split del monolito UX: shared/dashboard/storefront)
 
 > El 14-Sep el split del monolito `ltms-ux-enhancements.js` (~320KB min) en 3

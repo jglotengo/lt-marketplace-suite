@@ -9,6 +9,20 @@
 
 ---
 
+## 0.8. v2.9.385 — SHOP-GRID-DESKTOP (cards del shop desbordadas en desktop)
+
+**Scope:** Grid del shop `/tienda/` — 5 columnas forzadas con sidebar dejaban cards ~180px con contenido desbordado (reportado en `?view_list`). Fix: 4 columnas en `<=1600px`, 5 solo en pantallas muy anchas, `min-width:0`/`max-width:100%`/`overflow-wrap` en card y link. El home/carrusel NO se toca (override scopeado a `.pv-scope.pv-shop`).
+**Verificación:** curl confirmó HTML idéntico entre `?view_list`/`?view=grid`/sin query (el toggle usa `?view=list`; `view_list` no activa nada server-side); CSS individual de LTMS sí enqueuado y ganando con `!important`; combined de SG no incluye reglas `.pv-shop`. Fix verificado en `ltms-homepage-fixes.css` + `.min.css` regenerado.
+**Tests:** 5,028 tests / 10,553 assertions, 0 failures, 3 skips (5,024 previos + 4 de `ShopGridDesktopTest`).
+
+### 0.8.1 Test Coverage Summary (SHOP-GRID-DESKTOP)
+
+| Fix | Archivo de test | Tests |
+|-----|-----------------|-------|
+| SHOP-GRID-DESKTOP | `ShopGridDesktopTest` (nuevo) | 4 |
+
+---
+
 ## 0.7. v2.9.384 — HOME-SLOW-F2 re-aplicado (revert del revert del split del monolito UX)
 
 **Scope:** Re-aplicación del split del monolito `ltms-ux-enhancements.js` (shared/dashboard/storefront), revertido el 14-Sep por correlación temporal con el checkout bloqueado.
