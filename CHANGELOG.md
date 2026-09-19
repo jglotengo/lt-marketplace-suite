@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SHOP-LIST-UI` (rediseño UX/UI de la vista lista del shop: imagen, contenido y botón ATC)
+
+> El usuario pidió mejorar la distribución de `/tienda/?view=list`. El layout
+> anterior (SHOP-LIST-BTN FIX 2026-09-11) ponía imagen 120px + título + precio +
+> botón ATC apretados en una sola fila, sin jerarquía visual. Rediseño:
+>
+> - **Link de la card = grid `160px 1fr`**: imagen 160px a la izquierda
+>   (ocupando las 2 filas, con fondo + padding), título arriba (fila 1, col 2)
+>   y precio debajo (fila 2, col 2) a la derecha.
+> - **Botón ATC como columna derecha de la card**: altura 46px, ancho mínimo
+>   170px, padding cómodo, centrado verticalmente (hermano del link, no
+>   apretado dentro del título).
+> - **Responsive <=900px**: el botón pasa debajo del contenido a ancho completo
+>   (evita comprimir el título en tablet).
+> - Card con borde + hover suave.
+>
+> El grid de la vista lista sigue siendo `1fr` (una columna). La vista cuadrícula
+> y el home/carrusel NO se tocan.
+
+- **`assets/css/ltms-plaza-viva.css`:** bloque `pv-shop--list` rediseñado (grid 160px|1fr, imagen 160px, botón 46px, responsive 900px).
+- **`assets/css/ltms-plaza-viva.min.css`:** regenerado con clean-css.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.386 (cache-busting).
+- **Test:** `ShopListViewUiTest` (6 tests, source-based, grupo default unit).
+
 ### Fixed — `SHOP-GRID-DESKTOP` (cards del shop desbordadas en desktop — 5 columnas con sidebar)
 
 > El usuario reportó que en `/tienda/?view_list` (escritorio) las imágenes y el

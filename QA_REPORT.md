@@ -9,6 +9,20 @@
 
 ---
 
+## 0.9. v2.9.386 — SHOP-LIST-UI (rediseño de la vista lista del shop)
+
+**Scope:** `/tienda/?view=list` — layout anterior (imagen 120px + título + precio + botón ATC en fila apretada) rediseñado: link = grid `160px 1fr` (imagen izquierda 2 filas, título arriba + precio debajo), botón ATC como columna derecha de 46px/170px, responsive ≤900px (botón a ancho completo). Card con borde + hover. Vista cuadrícula y home NO se tocan.
+**Verificación:** CSS individual `ltms-plaza-viva.css` + `.min.css` regenerado; tests source-based sobre el bloque `pv-shop--list`.
+**Tests:** 5,034 tests / 10,561 assertions, 0 failures, 3 skips (5,028 previos + 6 de `ShopListViewUiTest`).
+
+### 0.9.1 Test Coverage Summary (SHOP-LIST-UI)
+
+| Fix | Archivo de test | Tests |
+|-----|-----------------|-------|
+| SHOP-LIST-UI | `ShopListViewUiTest` (nuevo) | 6 |
+
+---
+
 ## 0.8. v2.9.385 — SHOP-GRID-DESKTOP (cards del shop desbordadas en desktop)
 
 **Scope:** Grid del shop `/tienda/` — 5 columnas forzadas con sidebar dejaban cards ~180px con contenido desbordado (reportado en `?view_list`). Fix: 4 columnas en `<=1600px`, 5 solo en pantallas muy anchas, `min-width:0`/`max-width:100%`/`overflow-wrap` en card y link. El home/carrusel NO se toca (override scopeado a `.pv-scope.pv-shop`).

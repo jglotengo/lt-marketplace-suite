@@ -3578,6 +3578,26 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - En grids con contenido de texto variable, proteger SIEMPRE con `min-width:0` en las cards/links — es el
      guard que evita que el contenido empuje el grid (clásico de flex/grid: el mínimo contenido no comprimible).
 
+### Lección #169: un layout de card en fila (flex row) sin grid explícito aprieta título+precio+botón — el grid de columnas resuelve la jerarquía sin cambiar el markup
+
+1. **Caso real:** rediseño UX/UI de `/tienda/?view=list`. El markup del shop es fijo
+   (`a.woocommerce-loop-product__link[img, h2.title, span.price]` + `div.woocommerce-loop-product__buttons[button]`,
+   generado por `archive-product.php` — no hay wrapper interno para título+precio). El CSS anterior usaba
+   `flex-direction:row` en el link con todo inline → imagen 120px, título y precio apretados en la misma línea,
+   y el botón flotando. Sin poder cambiar el PHP fácilmente, la jerarquía se logra con **grid explícito**:
+   `grid-template-columns:160px 1fr` + `grid-template-rows:auto 1fr`, imagen en `grid-row:1/3;grid-column:1`
+   (ocupa 2 filas), título en `grid-row:1;grid-column:2`, precio en `grid-row:2;grid-column:2`. El botón es
+   hermano del link → se alinea como columna derecha de la card.
+2. **Regla preventiva:**
+   - Cuando el markup no permite envolver contenido (imagen + texto en el mismo `<a>`), **grid explícito** con
+     `grid-row`/`grid-column` posiciona hijos hermanos sin tocar el HTML — es la alternativa a flex cuando
+     necesitas "imagen izquierda, columna derecha apilada".
+   - En una card de lista, el botón CTA debe tener tamaño de touch (≥44px), ancho cómodo y separación del texto;
+     en fila apretada pierde jerarquía. Si no cabe en la fila, bajarlo a su propia fila en el breakpoint
+     adecuado (≤900px) antes de que el texto se comprima.
+   - Los tests source-based de CSS con archivos en CRLF (Windows) fallan con `\s*\{\s*` estricto: usar
+     `.*?` entre el selector y la llave cuando hay saltos de línea con `\r\n`.
+
 
 
 

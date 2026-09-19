@@ -37,11 +37,11 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// SHOP-GRID-DESKTOP (2026-09-18): bump a 2.9.385. El shop forzaba 5 columnas
-// en desktop con sidebar -> cards ~180px con contenido desbordado (reporte
-// usuario /tienda/?view_list). Se baja a 4 columnas en <=1600px + min-width:0
-// en card/link para que el grid defina el ancho, nunca el texto.
-define( 'LTMS_VERSION', '2.9.385' );
+// SHOP-LIST-UI (2026-09-18): bump a 2.9.386. Rediseño UX/UI de la vista lista
+// del shop (/tienda/?view=list): grid 160px|1fr dentro del link (imagen
+// izquierda, título arriba + precio debajo), botón ATC como columna derecha con
+// altura cómoda, responsive a 900px. Antes todo quedaba apretado en una fila.
+define( 'LTMS_VERSION', '2.9.386' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
