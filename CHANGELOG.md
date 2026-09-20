@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `SHOP-LIST-2COL` (vista lista rediseñada: botón ATC debajo, 2 columnas desktop)
+
+> Tras SHOP-LIST-UI-SPEC (2.9.387) el usuario reportó que en `/tienda/?view=list`
+> los botones "Añadir al carrito" **tapaban la imagen** y el texto/precio se
+> cortaban dentro de la tarjeta. Causa raíz (segundo bug de especificidad):
+>
+> - El `ul.products` de la vista lista usaba `.pv-shop--list ul.products`
+>   (0,2,1), pero `ltms-homepage-fixes.css` fuerza el grid del shop con
+>   `.pv-scope.pv-shop ul.products` (0,3,1) — **mayor especificidad** → el grid
+>   quedaba en 4 columnas angostas (no en modo lista), comprimiendo cada card y
+>   haciendo que el botón (columna derecha de 170px) tapara la imagen.
+> - El fix anterior solo corrigió el `a.woocommerce-loop-product__link`, no el
+>   `ul.products`.
+>
+> Fix (2.9.388):
+> - **TODOS** los selectores de vista lista usan el scope completo
+>   `.pv-scope.pv-shop.pv-shop--list` (0,4,1) → ganan la cascada contra
+>   homepage-fixes (0,3,1).
+> - **2 columnas en desktop** (cards más anchas), 1 columna en ≤1100px.
+> - **Card en columna**: link (grid 110px|1fr: imagen izquierda + título arriba
+>   + precio debajo) y **botón ATC debajo del contenido** con padding propio —
+>   ya no está a la derecha tapando la imagen.
+> - Imagen 110px (antes 160px) para dejar más aire al contenido; responsive
+>   móvil ≤600px con imagen 90px y botón full-width.
+
+- **`assets/css/ltms-plaza-viva.css`:** bloque `pv-shop--list` reescrito con scope completo, 2 columnas, card columna, botón debajo.
+- **`assets/css/ltms-plaza-viva.min.css`:** regenerado con clean-css.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.388 (cache-busting).
+- **Test:** `ShopListViewUiTest` reescrito (8 tests, scope completo + botón debajo).
+
 ### Fixed — `SHOP-LIST-UI-SPEC` (vista lista rota por conflicto de especificidad CSS)
 
 > Tras el rediseño SHOP-LIST-UI (2.9.386), el usuario reportó que la vista lista

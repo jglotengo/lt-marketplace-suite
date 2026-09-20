@@ -9,6 +9,20 @@
 
 ---
 
+## 0.11. v2.9.388 — SHOP-LIST-2COL (vista lista: botón debajo + 2 columnas desktop)
+
+**Scope:** `/tienda/?view=list` — segundo bug de especificidad: el `ul.products` de la vista lista (0,2,1) perdía contra homepage-fixes (0,3,1) → grid en 4 columnas angostas, botón ATC tapando la imagen. Fix: scope completo `.pv-scope.pv-shop.pv-shop--list` (0,4,1) en TODOS los selectores, card en columna con botón DEBAJO del contenido, 2 columnas desktop (≤1100px 1 columna), imagen 110px, móvil 90px.
+**Verificación:** cadena de especificidad por capa (ul 0,4,1 > 0,3,1; link 0,4,2 > 0,3,2; botón 0,4,1) verificada; tests reescritos con scope completo.
+**Tests:** 5,034 tests / 10,561 assertions, 0 failures, 3 skips (sin cambio en conteo — `ShopListViewUiTest` reescrito de 6→8 tests).
+
+### 0.11.1 Test Coverage Summary (SHOP-LIST-2COL)
+
+| Fix | Archivo de test | Tests |
+|-----|-----------------|-------|
+| SHOP-LIST-2COL | `ShopListViewUiTest` | 8 |
+
+---
+
 ## 0.10. v2.9.387 — SHOP-LIST-UI-SPEC (vista lista rota por especificidad CSS)
 
 **Scope:** Fix de la vista lista `/tienda/?view=list` rota tras SHOP-LIST-UI (2.9.386). Causa: selectores de vista lista con especificidad 0,3,1 vs homepage-fixes 0,3,2 (que incluye `a.`) → homepage-fixes ganaba con `display:flex column`, ocultando la imagen. Fix: selectores con `a.woocommerce-loop-product__link` (0,3,2) + responsive móvil ≤600px (imagen 100px).

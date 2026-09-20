@@ -2097,86 +2097,83 @@ body.ltms-filters-open{overflow:hidden;}
 .pv-shop__active-filter--clear{background:transparent;color:var(--text-2);border-color:var(--border-2);}
 .pv-shop__active-filter--clear:hover{background:var(--text-2);color:#fff;}
 
-/* Vista lista: 1 columna, imagen izquierda */
-/* SHOP-LIST-UI FIX (2026-09-18): rediseño del layout lista. Antes imagen
-   (120px) + título + precio + botón quedaban apretados en una sola fila sin
-   jerarquía. Ahora: grid 160px|1fr dentro del link (imagen a la izquierda,
-   título arriba + precio debajo a la derecha), botón ATC como columna derecha
-   de la card con altura completa y ancho cómodo.
-   NOTA de especificidad (2026-09-19): los selectores INCLUYEN el elemento
-   `a.` en el link (igual que ltms-homepage-fixes.css:292) para ganar la
-   cascada — sin el `a.`, homepage-fixes (a.woocommerce-loop-product__link,
-   especificidad 0,3,2) gana sobre .pv-shop--list (0,3,1) aunque cargue antes
-   y fuerza display:flex column, rompiendo el layout lista y ocultando la
-   imagen. */
-.pv-shop--list ul.products{grid-template-columns:1fr !important;gap:16px !important;}
-.pv-shop--list ul.products li.product{
-    flex-direction:row !important;align-items:stretch !important;
-    border:1px solid var(--border) !important;border-radius:12px !important;
+/* Vista lista: 2 columnas desktop, 1 en tablet/móvil. Imagen izquierda. */
+/* SHOP-LIST-UI FIX (2026-09-18): rediseño del layout lista.
+   SHOP-LIST-UI-SPEC FIX (2026-09-19): TODOS los selectores usan el scope
+   completo `.pv-scope.pv-shop.pv-shop--list` (0,4,1) para ganar la cascada
+   contra ltms-homepage-fixes.css:
+     - ul.products  : homepage-fixes usa `.pv-scope.pv-shop ul.products`
+       (0,3,1) que GANA sobre `.pv-shop--list ul.products` (0,2,1) -> sin el
+       scope completo el grid quedaba en 4 columnas angostas y el botón
+       tapaba la imagen. Con 0,4,1 gana el modo lista.
+     - link         : incluye `a.` (igual que homepage-fixes:292).
+   Layout: card en columna (link con grid imagen|contenido + botón debajo),
+   2 columnas en desktop para cards más anchas sin desborde. */
+.pv-scope.pv-shop.pv-shop--list ul.products{
+    grid-template-columns:repeat(2, 1fr) !important;
+    gap:16px !important;
 }
-.pv-shop--list ul.products li.product:hover{box-shadow:0 6px 20px rgba(0,0,0,.09) !important;}
-.pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
-    flex:1 1 auto !important;min-width:0 !important;
+.pv-scope.pv-shop.pv-shop--list ul.products li.product{
+    flex-direction:column !important;align-items:stretch !important;
+    border:1px solid var(--border) !important;border-radius:12px !important;
+    overflow:hidden !important;
+}
+.pv-scope.pv-shop.pv-shop--list ul.products li.product:hover{box-shadow:0 6px 20px rgba(0,0,0,.09) !important;}
+.pv-scope.pv-shop.pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
+    flex:1 1 auto !important;min-width:0 !important;max-width:100% !important;
     display:grid !important;
-    grid-template-columns:160px 1fr !important;
+    grid-template-columns:110px 1fr !important;
     grid-template-rows:auto 1fr !important;
-    column-gap:18px !important;align-items:start !important;
+    column-gap:14px !important;align-items:start !important;
     padding:16px !important;
 }
-.pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
-    width:160px !important;height:160px !important;
+.pv-scope.pv-shop.pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
+    width:110px !important;height:110px !important;
     grid-row:1 / 3 !important;grid-column:1 !important;
-    flex:0 0 160px !important;aspect-ratio:unset !important;object-fit:contain !important;
-    background:#F7F7F7 !important;border-radius:8px !important;padding:8px !important;
+    flex:0 0 110px !important;aspect-ratio:unset !important;object-fit:contain !important;
+    background:#F7F7F7 !important;border-radius:8px !important;padding:6px !important;
+    box-sizing:border-box !important;display:block !important;max-width:100% !important;
 }
-.pv-shop--list ul.products li.product .woocommerce-loop-product__title{
+.pv-scope.pv-shop.pv-shop--list ul.products li.product .woocommerce-loop-product__title{
     flex:1 1 auto !important;min-width:0 !important;min-height:unset !important;margin:0 !important;
     grid-row:1 !important;grid-column:2 !important;
-    font-size:15px !important;font-weight:600 !important;line-height:1.4 !important;
-    -webkit-line-clamp:2 !important;
+    font-size:14px !important;font-weight:600 !important;line-height:1.4 !important;
+    -webkit-line-clamp:2 !important;overflow:hidden !important;overflow-wrap:break-word !important;
 }
-.pv-shop--list ul.products li.product .price{
+.pv-scope.pv-shop.pv-shop--list ul.products li.product .price{
     flex:0 0 auto !important;margin:6px 0 0 !important;white-space:nowrap !important;
     grid-row:2 !important;grid-column:2 !important;
-    font-size:16px !important;font-weight:700 !important;
+    font-size:15px !important;font-weight:700 !important;
 }
-.pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{
-    flex:0 0 auto !important;width:auto !important;min-width:0 !important;margin:0 !important;padding:0 16px 0 0 !important;
-    display:flex !important;align-items:center !important;
+.pv-scope.pv-shop.pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{
+    flex:0 0 auto !important;width:auto !important;min-width:0 !important;margin:0 !important;
+    padding:0 16px 16px !important;
+    display:flex !important;align-items:center !important;justify-content:flex-start !important;
 }
-.pv-shop--list ul.products li.product .button.add_to_cart_button,
-.pv-shop--list ul.products li.product a.button{
+.pv-scope.pv-shop.pv-shop--list ul.products li.product .button.add_to_cart_button,
+.pv-scope.pv-shop.pv-shop--list ul.products li.product a.button{
     display:inline-flex !important;align-items:center !important;justify-content:center !important;
-    width:auto !important;min-width:170px !important;height:46px !important;margin:0 !important;
-    padding:0 22px !important;white-space:nowrap !important;overflow:hidden !important;
-    text-overflow:ellipsis !important;font-size:13px !important;
+    width:auto !important;min-width:0 !important;height:44px !important;margin:0 !important;
+    padding:0 20px !important;white-space:nowrap !important;overflow:hidden !important;
+    text-overflow:ellipsis !important;font-size:13px !important;flex:0 0 auto !important;
 }
 
-/* SHOP-LIST-UI FIX (2026-09-18): en tablet el botón pasa debajo del contenido
-   para no comprimir el título; en móvil todo a una columna. */
-@media (max-width:900px){
-    .pv-shop--list ul.products li.product{flex-wrap:wrap !important;}
-    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link{flex:1 1 100% !important;}
-    .pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{
-        flex:1 1 100% !important;justify-content:flex-start !important;padding:0 16px 16px !important;
-    }
-    .pv-shop--list ul.products li.product .button.add_to_cart_button,
-    .pv-shop--list ul.products li.product a.button{width:100% !important;}
+/* SHOP-LIST-UI FIX: en tablet y móvil una sola columna (cards más anchas). */
+@media (max-width:1100px){
+    .pv-scope.pv-shop.pv-shop--list ul.products{grid-template-columns:1fr !important;}
 }
-
-/* SHOP-LIST-UI FIX (2026-09-19): en móvil la imagen se reduce a 100px para
-   dejar más aire al título/precio; la card sigue en fila (imagen izquierda). */
 @media (max-width:600px){
-    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
-        grid-template-columns:100px 1fr !important;column-gap:12px !important;padding:12px !important;
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product a.woocommerce-loop-product__link{
+        grid-template-columns:90px 1fr !important;column-gap:12px !important;padding:12px !important;
     }
-    .pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
-        width:100px !important;height:100px !important;flex:0 0 100px !important;
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product a.woocommerce-loop-product__link img{
+        width:90px !important;height:90px !important;flex:0 0 90px !important;
     }
-    .pv-shop--list ul.products li.product .woocommerce-loop-product__title{font-size:13px !important;}
-    .pv-shop--list ul.products li.product .price{font-size:14px !important;margin:4px 0 0 !important;}
-    .pv-shop--list ul.products li.product .button.add_to_cart_button,
-    .pv-shop--list ul.products li.product a.button{min-width:0 !important;height:44px !important;}
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product .woocommerce-loop-product__title{font-size:13px !important;}
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product .price{font-size:14px !important;margin:4px 0 0 !important;}
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product .woocommerce-loop-product__buttons{padding:0 12px 12px !important;}
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product .button.add_to_cart_button,
+    .pv-scope.pv-shop.pv-shop--list ul.products li.product a.button{width:100% !important;height:44px !important;}
 }
 
 /* Overlay de filtros (móvil) */

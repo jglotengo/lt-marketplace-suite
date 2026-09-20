@@ -3623,6 +3623,32 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - El "bug" de la imagen invisible en column-flex suele ser `flex-shrink` + imagen sin ancho fijo: al pasar a
      grid/fila, verificar `flex:0 0 <px>` o `width` explícita en el hijo.
 
+### Lección #171: un bug de especificidad puede estar en el CONTENEDOR (ul.products), no en el elemento que ves roto (el botón)
+
+1. **Caso real:** tras arreglar la especificidad del link (`a.woocommerce-loop-product__link`, Lección #170), el
+   usuario reportó que en `/tienda/?view=list` el botón "Añadir al carrito" tapaba la imagen y el texto se
+   cortaba. El fix anterior había corregido los selectores del **link** y la **imagen**, pero el
+   `ul.products` de la vista lista seguía con `.pv-shop--list ul.products` (0,2,1), mientras
+   `ltms-homepage-fixes.css` usa `.pv-scope.pv-shop ul.products` (0,3,1) → **el contenedor perdía la cascada**:
+   el grid quedaba en 4 columnas angostas (no en modo lista), cada card comprimida, y el botón de columna
+   derecha (170px) tapaba la imagen.
+2. **Por qué importa:** el síntoma visible (botón tapando imagen) apuntaba al botón, pero la causa estaba una
+   capa arriba: el `ul.products` que no ganaba la cascada y dejaba el grid equivocado. Fix del elemento sin
+   corregir el contenedor = el bug muta de forma (antes "no se veía nada", ahora "todo apretado").
+3. **Fix:** usar el **scope completo** `.pv-scope.pv-shop.pv-shop--list` (0,4,1) en TODOS los selectores del
+   modo lista (ul.products, card, link, imagen, botón) — no solo en los que se ven rotos. Con 0,4,1 gana
+   contra `.pv-scope.pv-shop ul.products` (0,3,1) de homepage-fixes. Además rediseño: card en columna con
+   botón DEBAJO del contenido (no a la derecha), y 2 columnas desktop para cards más anchas.
+4. **Regla preventiva:**
+   - Al corregir especificidad de un componente (card), verificar TODOS los ancestros en el árbol: el
+     contenedor (`ul.products`), el item (`li.product`), el link y los hijos. Un bug de cascada en el grid
+     padre se manifiesta en los hijos aunque los hijos estén bien.
+   - Contar especificidad por CAPA: el selector más alto (scope del wrapper) debe ser el más específico de
+     todos los que compiten sobre ese elemento.
+   - Un CTA a la derecha de la card en fila es frágil: si la card se encoge (grid equivocado, viewport
+     estrecho), el botón se superpone al contenido. Diseño más robusto: botón en fila propia debajo del
+     contenido (card en columna) — no puede tapar nada en ningún ancho.
+
 
 
 
