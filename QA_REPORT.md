@@ -9,6 +9,20 @@
 
 ---
 
+## 0.12. v2.9.389 — CONSOLE-CLEAN (logs de debug/perf silenciados en producción)
+
+**Scope:** Consola de Chrome limpia en páginas públicas. Gate `CONFIG.debug` (default false) en el monolito UX + bundles (perf warns, init debug, AJAX error interceptor) y `PV.config.debug` en plaza-viva (warn de chat). Los `console.error` de errores reales (catch) se conservan.
+**Verificación:** edits al monolito SIN cambio de líneas (SECTION_MAP intacto — lección #172); bundles regenerados sin cruces; gates confirmados en `ltms-ux-shared.js`.
+**Tests:** 5,042 tests / 10,572 assertions, 0 failures, 3 skips (5,036 previos + 6 de `ConsoleCleanTest`).
+
+### 0.12.1 Test Coverage Summary (CONSOLE-CLEAN)
+
+| Fix | Archivo de test | Tests |
+|-----|-----------------|-------|
+| CONSOLE-CLEAN | `ConsoleCleanTest` (nuevo) | 6 |
+
+---
+
 ## 0.11. v2.9.388 — SHOP-LIST-2COL (vista lista: botón debajo + 2 columnas desktop)
 
 **Scope:** `/tienda/?view=list` — segundo bug de especificidad: el `ul.products` de la vista lista (0,2,1) perdía contra homepage-fixes (0,3,1) → grid en 4 columnas angostas, botón ATC tapando la imagen. Fix: scope completo `.pv-scope.pv-shop.pv-shop--list` (0,4,1) en TODOS los selectores, card en columna con botón DEBAJO del contenido, 2 columnas desktop (≤1100px 1 columna), imagen 110px, móvil 90px.

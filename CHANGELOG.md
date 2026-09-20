@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `CONSOLE-CLEAN` (logs de debug/perf silenciados en consola de producción)
+
+> El usuario reportó que en la consola de Chrome salían mensajes en TODAS las
+> páginas públicas. Diagnóstico: el monolito UX (`ltms-ux-enhancements.js`,
+> fuente de los bundles shared/dashboard/storefront) logueaba avisos informativos
+> sin gate:
+> - `console.warn('[LTMS.UX] Página lenta: Nms')` — perf monitor (`loadTime > 3000`)
+> - `console.warn('[LTMS.UX] AJAX lento: url Nms')` — perf monitor (`duration > 5000`)
+> - `console.debug('[LTMS.UX] Inicializado v2.0.0')` — init
+> - `console.error('[LTMS.UX] AJAX error: ...')` — interceptor global AJAX
+> - `console.warn('[PV] Chat no disponible...')` — fallback de chat en plaza-viva
+>
+> Fix: gate con `CONFIG.debug` (default `false`) en el monolito y `PV.config.debug`
+> en plaza-viva. Los `console.error` de errores REALES (catch de excepciones,
+> handlers) se MANTIENEN sin gate — solo se silencian los avisos informativos.
+>
+> **Integridad del split:** los edits al monolito se hicieron EN LA MISMA LÍNEA
+> (sin insertar/borrar líneas) para no deslizar el `SECTION_MAP` de
+> `bin/build-ux-bundles.js` (basado en líneas hardcodeadas) — un deslizamiento
+> reclasifica secciones y rompe el build con "CRUCES NO RESUELTOS".
+
+- **`assets/js/ltms-ux-enhancements.js`:** `debug:false` en CONFIG + gates en perf/init/AJAX error.
+- **`assets/js/ltms-ux-shared.js` (+`.min`) / `ltms-ux-dashboard.js` (+`.min`) / `ltms-ux-storefront.js` (+`.min`):** regenerados desde el monolito.
+- **`assets/js/ltms-plaza-viva.js` (+`.min`):** warn de chat gateado con `PV.config.debug`.
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` a 2.9.389 (cache-busting).
+- **Test:** `ConsoleCleanTest` (6 tests, source-based, grupo default unit).
+
 ### Fixed — `SHOP-LIST-2COL` (vista lista rediseñada: botón ATC debajo, 2 columnas desktop)
 
 > Tras SHOP-LIST-UI-SPEC (2.9.387) el usuario reportó que en `/tienda/?view=list`

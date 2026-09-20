@@ -37,12 +37,12 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// SHOP-LIST-2COL (2026-09-19): bump a 2.9.388. Vista lista /tienda/?view=list
-// rediseñada: 2 columnas desktop (<=1100px 1 columna), card en columna con
-// botón ATC DEBAJO del contenido (antes a la derecha tapaba la imagen).
-// Scope completo .pv-scope.pv-shop.pv-shop--list (0,4,1) para ganar la
-// cascada contra homepage-fixes que dejaba el grid en 4 columnas angostas.
-define( 'LTMS_VERSION', '2.9.388' );
+// CONSOLE-CLEAN (2026-09-19): bump a 2.9.389. Silenciar logs de debug/perf en
+// produccion (ltms-ux-enhancements.js + bundles + plaza-viva): los console.warn
+// de 'Pagina lenta'/'AJAX lento' y el debug 'Inicializado' ahora se gatean con
+// CONFIG.debug=false. Los console.error de errores reales (catch) se mantienen.
+// Sin cambio de lineas en el monolito (SECTION_MAP del split intacto).
+define( 'LTMS_VERSION', '2.9.389' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

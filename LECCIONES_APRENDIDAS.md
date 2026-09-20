@@ -3649,6 +3649,29 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      estrecho), el botón se superpone al contenido. Diseño más robusto: botón en fila propia debajo del
      contenido (card en columna) — no puede tapar nada en ningún ancho.
 
+### Lección #172: un build generador con líneas hardcodeadas (SECTION_MAP) se rompe si editas el fuente en medio — editar sin cambiar el número de líneas
+
+1. **Caso real:** al silenciar logs de debug del monolito UX (`ltms-ux-enhancements.js`), el primer intento
+   agregó un bloque de comentarios multi-línea en el CONFIG (+14 líneas netas). Al regenerar los bundles con
+   `bin/build-ux-bundles.js` falló con `[build-ux-bundles] CRUCES NO RESUELTOS: ['updateCurrencySwitchers']`
+   y `process.exit(1)`. Causa: el script usa un `SECTION_MAP` con **números de línea hardcodeados** (cada
+   sección del monolito tiene su línea de inicio). Cualquier inserción de líneas en medio del archivo desliza
+   el mapa → el analizador estático reclasifica secciones → una función (updateCurrencySwitchers) que antes
+   vivía en shared ahora queda asignada a otro bundle → cruce sin resolver.
+2. **Diagnóstico:** el error apuntaba a `updateCurrencySwitchers` (currency switcher), nada que ver con logs.
+   La pista estaba en el diff: mi edit había agregado líneas antes de la sección de esa función. Con
+   `git stash` + `node bin/build-ux-bundles.js` confirmé que el monolito ORIGINAL (sin el edit) sí compilaba.
+3. **Fix:** aplicar los gates EN LA MISMA LÍNEA (reemplazar `console.warn(...)` por `if (CONFIG.debug) console.warn(...)`
+   en la misma línea, sin insertar/borrar líneas). Resultado: 5 insertions / 5 deletions = mismo conteo de
+   líneas (13013 antes y después) → el SECTION_MAP no se desliza → el build compila sin cruces.
+4. **Regla preventiva:**
+   - Antes de editar un archivo que es insumo de un build con coordenadas de línea (SECTION_MAP, extractores
+     por offset), verificar si el generador usa líneas hardcodeadas. Si sí, los edits deben preservar el
+     número total de líneas (o actualizar el mapa en el mismo commit).
+   - Verificación rápida: `git diff --stat` debe mostrar insertions == deletions para ese archivo.
+   - Un error del generador tipo "CRUCES NO RESUELTOS" tras un edit inocuo (logs, comentarios) casi siempre
+     es un deslizamiento de línea del mapa, no una deuda real de la función reportada.
+
 
 
 

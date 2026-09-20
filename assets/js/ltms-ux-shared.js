@@ -25,7 +25,7 @@
         toastAnimationDuration: 350,
         scrollOffset: 80,
         debounceMs: 150,
-        pollNotifications: true,
+        pollNotifications: true, debug: false, // CONSOLE-CLEAN: debug=false en producción (consola limpia).
     };
 
 
@@ -495,7 +495,7 @@
 
         jQuery(document).ajaxError((event, jqXHR, settings, error) => {
             // Siempre loguear a consola para debug
-            console.error('[LTMS.UX] AJAX error:', settings.url, jqXHR.status, jqXHR.statusText);
+            if (CONFIG.debug) console.error('[LTMS.UX] AJAX error:', settings.url, jqXHR.status, jqXHR.statusText); // CONSOLE-CLEAN
 
             if (!SHOW_AJAX_ERROR_TOASTS) return;
 
@@ -1322,7 +1322,7 @@
                 perfMetrics.pageLoad = loadTime;
 
                 if (loadTime > 3000) {
-                    console.warn('[LTMS.UX] Página lenta:', loadTime + 'ms');
+                    if (CONFIG.debug) console.warn('[LTMS.UX] Página lenta:', loadTime + 'ms'); // CONSOLE-CLEAN
                 }
             }, 0);
         });
@@ -1349,7 +1349,7 @@
 
                 // Alertar si una petición tarda mucho
                 if (duration > 5000) {
-                    console.warn('[LTMS.UX] AJAX lento:', settings.url, duration + 'ms');
+                    if (CONFIG.debug) console.warn('[LTMS.UX] AJAX lento:', settings.url, duration + 'ms'); // CONSOLE-CLEAN
                 }
             });
         }

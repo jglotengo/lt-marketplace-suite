@@ -1894,7 +1894,8 @@
         if (PV.toast) {
           var msg = (PV.i18n && PV.i18n.chat_unavailable) || 'El chat no está disponible en este momento.';
           PV.toast(msg, { type: 'warning', duration: 3000 });
-        } else if (window.console && window.console.warn) {
+        } else if (PV.config.debug && window.console && window.console.warn) {
+          // CONSOLE-CLEAN FIX (2026-09-19): el fallback de chat solo loguea en debug.
           window.console.warn('[PV] Chat no disponible — PV.toast no cargado.');
         }
       });
