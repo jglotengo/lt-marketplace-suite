@@ -3672,6 +3672,37 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Un error del generador tipo "CRUCES NO RESUELTOS" tras un edit inocuo (logs, comentarios) casi siempre
      es un deslizamiento de línea del mapa, no una deuda real de la función reportada.
 
+### Lección #173: un TypeError de consola puede venir de `WP_DEBUG=true` en producción (DependencyDetection de WC sin proxy)
+
+1. **Caso real:** el usuario reportó `Uncaught TypeError: Cannot read properties of undefined (reading
+   'wcUpdateDependencyRegistry')` en `/carrito/`. El inline del footer
+   (`#wc-dependency-detection-registry`) de WooCommerce accede a
+   `window.wc.wcUpdateDependencyRegistry` **sin chequear `window.wc`**. El proxy que define `window.wc`
+   (`#wc-dependency-detection`, en `wp_head`) solo corre si la página tiene bloques tracked
+   (cart/checkout/mini-cart Gutenberg) — y el carrito clásico de LTMS no los usa. Resultado: registry sin
+   proxy → `window.wc` undefined → TypeError.
+2. **Causa raíz:** `wp-config.php` tenía `WP_DEBUG = true` en producción. El `DependencyDetection` de WC
+   (woocommerce/src/Blocks/DependencyDetection.php, desde WC 10.5.0) corre SOLO con WP_DEBUG. Es un detector
+   para desarrolladores, y además tiene el bug de no validar `window.wc` antes de acceder a la función.
+   En producción con `WP_DEBUG=false` el detector no se instancia (early return en `init()`) → no hay inline,
+   no hay error.
+3. **Diagnóstico:** curl al HTML del carrito mostró el registry del footer (posición 108998) PERO NO el proxy
+   del head (count 0). Con el class_exists + hooks check confirmé el proxy hookeado pero con guard
+   `page_has_tracked_blocks()` falso para el carrito clásico. La inconsistencia "registry sin proxy" se
+   explicó por el early-return: `output_script_registry` depende de `$this->proxy_output`, pero en páginas
+   cacheadas por SG el head (con proxy) se sirvió cacheado mientras el footer se regeneró — de cualquier
+   forma, la solución fue apagar la causa (WP_DEBUG), no parchear el inline.
+4. **Fix:** `wp-config.php` → `WP_DEBUG=false` (manteniendo `WP_DEBUG_LOG=true`). Verificado con curl en las
+   4 páginas públicas: el inline desaparece (count 0).
+5. **Regla preventiva:**
+   - **En producción, `WP_DEBUG` DEBE ser `false`.** Un `true` activa features de desarrollo con bugs
+     (como este detector de WC) y overhead. Revisar `wp-config.php` al diagnosticar TypeErrors de consola
+     que no se reproducen en local.
+   - Un inline del footer que accede a `window.wc.*` sin validar `window.wc` es un bug conocido de WC 11.x
+     con WP_DEBUG — no parchear el inline, apagar el flag que lo activa.
+   - Diagnóstico de "error solo en página X": extraer el HTML con curl y verificar si el script culpable
+     tiene su dependencia definida ANTES en el documento (proxy vs registry, combined-defer vs inline).
+
 
 
 

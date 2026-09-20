@@ -9,6 +9,15 @@
 
 ---
 
+## 0.13. v2.9.389 — WC-DEPENDENCY-DETECT-ERR (TypeError de consola en carrito: WP_DEBUG activo)
+
+**Scope:** `Uncaught TypeError: Cannot read properties of undefined (reading 'wcUpdateDependencyRegistry')` en `/carrito/`. Causa: `WP_DEBUG=true` en producción activaba el `DependencyDetection` de WC (detector para devs desde WC 10.5.0), que emite un registry del footer accediendo a `window.wc.wcUpdateDependencyRegistry` sin validar `window.wc` (bug de WC); el proxy del head que define `window.wc` no corre en el carrito clásico de LTMS (sin bloques Gutenberg).
+**Fix (servidor):** `wp-config.php` → `WP_DEBUG=false` (mantiene `WP_DEBUG_LOG=true`). Backup en `/tmp/wp-config.php.bak.20260919`.
+**Verificación:** curl en home/tienda/carrito/checkout — el inline `wc-dependency-detection-registry` desaparece (count 0) en todas. Lección #173.
+**Tests:** sin cambios en repo (corrección de configuración). Suite previa 5,042 tests verde.
+
+---
+
 ## 0.12. v2.9.389 — CONSOLE-CLEAN (logs de debug/perf silenciados en producción)
 
 **Scope:** Consola de Chrome limpia en páginas públicas. Gate `CONFIG.debug` (default false) en el monolito UX + bundles (perf warns, init debug, AJAX error interceptor) y `PV.config.debug` en plaza-viva (warn de chat). Los `console.error` de errores reales (catch) se conservan.

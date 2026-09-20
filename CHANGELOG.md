@@ -6,6 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `WC-DEPENDENCY-DETECT-ERR` (TypeError en consola del carrito: WP_DEBUG activo en producción)
+
+> El usuario reportó `Uncaught TypeError: Cannot read properties of undefined
+> (reading 'wcUpdateDependencyRegistry')` en la consola del carrito
+> (`/carrito/`). Causa raíz: `wp-config.php` tenía **`WP_DEBUG = true` en
+> producción**, lo que activa el `DependencyDetection` de WooCommerce
+> (`woocommerce/src/Blocks/DependencyDetection.php`, desde WC 10.5.0) — un
+> detector para desarrolladores de dependencias de scripts que:
+>
+> 1. Emite un proxy en `wp_head` (`id="wc-dependency-detection"`) que define
+>    `window.wc`, SOLO si la página tiene bloques tracked
+>    (`woocommerce/cart`, `woocommerce/checkout`, `woocommerce/mini-cart`).
+> 2. Emite un registry en `wp_print_footer_scripts`
+>    (`id="wc-dependency-detection-registry"`) que accede a
+>    `window.wc.wcUpdateDependencyRegistry` **sin chequear que `window.wc`
+>    exista** — bug de WC.
+>
+> El carrito/checkout clásico de LTMS NO usa bloques Gutenberg (`has_block`
+> devolvió false), así que el proxy de head no corría, pero el registry del
+> footer igual se emitía → `window.wc` undefined → TypeError.
+>
+> Fix (servidor): `wp-config.php` `WP_DEBUG` → `false` (se mantiene
+> `WP_DEBUG_LOG=true` para no perder logs; `WP_DEBUG_DISPLAY` ya era false).
+> Backup en `/tmp/wp-config.php.bak.20260919`. Verificado con curl: el inline
+> `wc-dependency-detection-registry` ya no aparece en home, tienda, carrito ni
+> checkout.
+>
+> **Nota:** en producción `WP_DEBUG` debe estar en `false`. Este detector de
+> WooCommerce es solo para desarrollo y además tiene el bug de no chequear
+> `window.wc`.
+
+- **`wp-config.php` (servidor):** `WP_DEBUG` → `false` (+ backup).
+- (Sin cambios en el repo — corrección de configuración del sitio.)
+
 ### Fixed — `CONSOLE-CLEAN` (logs de debug/perf silenciados en consola de producción)
 
 > El usuario reportó que en la consola de Chrome salían mensajes en TODAS las
