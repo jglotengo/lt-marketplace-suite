@@ -9,6 +9,15 @@
 
 ---
 
+## 0.14. v2.9.389 — ELEMENTOR-MODULES-ERR (ReferenceError: elementorModules al añadir al carrito)
+
+**Scope:** `Uncaught ReferenceError: elementorModules is not defined` en `frontend.min.js` (Elementor Pro 4.2.3). Causa: SG Optimizer combinaba el JS de Elementor; el módulo que define `window.elementorModules` (`frontend-modules.min.js`, handle `elementor-frontend-modules`) quedaba en el combined que cargaba DESPUÉS de `elementor-pro/frontend.min.js`.
+**Fix (servidor):** `siteground_optimizer_combine_javascript_exclude` ampliado con los handles de Elementor (frontend-modules, frontend, common, pro-frontend, runtimes, app). Orden nativo restaurado.
+**Verificación:** `frontend-modules.min.js` ahora individual (antes count 0) definiendo `window.elementorModules` (4 ocurrencias); orden correcto antes de Pro. Lección #174.
+**Tests:** sin cambios en repo (configuración SG).
+
+---
+
 ## 0.13. v2.9.389 — WC-DEPENDENCY-DETECT-ERR (TypeError de consola en carrito: WP_DEBUG activo)
 
 **Scope:** `Uncaught TypeError: Cannot read properties of undefined (reading 'wcUpdateDependencyRegistry')` en `/carrito/`. Causa: `WP_DEBUG=true` en producción activaba el `DependencyDetection` de WC (detector para devs desde WC 10.5.0), que emite un registry del footer accediendo a `window.wc.wcUpdateDependencyRegistry` sin validar `window.wc` (bug de WC); el proxy del head que define `window.wc` no corre en el carrito clásico de LTMS (sin bloques Gutenberg).

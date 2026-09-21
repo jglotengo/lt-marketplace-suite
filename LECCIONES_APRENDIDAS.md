@@ -3703,6 +3703,34 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Diagnóstico de "error solo en página X": extraer el HTML con curl y verificar si el script culpable
      tiene su dependencia definida ANTES en el documento (proxy vs registry, combined-defer vs inline).
 
+### Lección #174: un combine de SG Optimizer rompe el orden de webpacks de Elementor Pro (`elementorModules is not defined`)
+
+1. **Caso real:** `Uncaught ReferenceError: elementorModules is not defined` en `frontend.min.js` (Elementor Pro
+   4.2.3) al añadir al carrito. El webpack de Pro hace `__webpack_require__` que resuelve `elementorModules`
+   como global. El script que lo define es `frontend-modules.min.js` (handle `elementor-frontend-modules`).
+   Con el combine JS de SG activo (`siteground_optimizer_combine_javascript=1`), ese módulo quedaba incrustado
+   en el combined que se cargaba AL FINAL de la página, DESPUÉS de `elementor-pro/frontend.min.js` → Pro corría
+   sin `window.elementorModules` → ReferenceError.
+2. **Diagnóstico:** el HTML servido mostró los webpacks de Elementor dentro del combined único
+   (`combined-js-*.js`), sin `frontend-modules.min.js` individual (count 0). Al extraer los scripts de
+   Elementor del combined (exclusión), `frontend-modules.min.js` apareció y confirmé que define
+   `window.elementorModules` (4 ocurrencias). El handle que faltaba excluir era `elementor-frontend-modules`
+   (no `elementor-frontend`, que solo saca el frontend principal).
+3. **Fix:** ampliar `siteground_optimizer_combine_javascript_exclude` con los handles de Elementor:
+   `elementor-frontend-modules`, `elementor-frontend`, `elementor-common`, `elementor-pro-frontend`,
+   `elementor-webpack-runtime`, `elementor-pro-webpack-runtime`, `elementor-app-loader`, `elementor-app`.
+   Orden nativo restaurado: webpack.runtime → frontend-modules (define `window.elementorModules`) → frontend
+   core → webpack-pro.runtime → frontend Pro.
+4. **Regla preventiva:**
+   - **Los plugins que usan webpack/JS modules (Elementor, WPML, WooCommerce Blocks) NO deben combinarse
+     por SG Optimizer** — el concatenador rompe el orden de los chunks y los externals globales. Excluirlos
+     del combine es la configuración estándar.
+   - Al diagnosticar "X is not defined" en un script de plugin, buscar qué archivo define X (`grep -rl "window.X"`
+     en el plugin) y verificar su handle en el HTML: si no aparece individual y el combine está activo, es un
+     problema de exclusión, no del código del plugin.
+   - El handle de la definición suele diferir del handle del consumidor: para Elementor el que define
+     `elementorModules` es `elementor-frontend-modules`, no `elementor-frontend`.
+
 
 
 

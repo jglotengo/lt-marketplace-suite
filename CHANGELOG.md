@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `ELEMENTOR-MODULES-ERR` (Uncaught ReferenceError: elementorModules is not defined al añadir al carrito)
+
+> El usuario reportó `Uncaught ReferenceError: elementorModules is not defined`
+> en `frontend.min.js` (Elementor Pro 4.2.3) al añadir al carrito desde una
+> página de producto. Causa raíz: **SG Optimizer combinaba el JS de Elementor
+> en un solo archivo**, concatenando los webpacks de Elementor core y Pro en
+> orden incorrecto (o incrustando el módulo que define `window.elementorModules`
+> — `frontend-modules.min.js` — en el combined que se cargaba al final, DESPUÉS
+> de `elementor-pro/frontend.min.js`).
+>
+> El webpack de Elementor Pro ejecuta `__webpack_require__` que resuelve
+> `elementorModules` como global; si el script que lo define (`frontend-modules.js`)
+> no corrió antes, lanza `ReferenceError`.
+>
+> Fix (servidor): agregar los handles de Elementor a la exclusión de combine JS
+> de SG (`siteground_optimizer_combine_javascript_exclude`):
+> `elementor-frontend-modules`, `elementor-frontend`, `elementor-common`,
+> `elementor-pro-frontend`, `elementor-webpack-runtime`,
+> `elementor-pro-webpack-runtime`, `elementor-app-loader`, `elementor-app`.
+> Así Elementor carga sus scripts individualmente en el orden nativo:
+> webpack.runtime → frontend-modules (define `window.elementorModules`) →
+> frontend (core) → webpack-pro.runtime → frontend (Pro).
+>
+> Verificado con curl: `frontend-modules.min.js` ahora se sirve individualmente
+> (antes count 0 en el HTML) y define `window.elementorModules`; el orden es
+> correcto antes de Pro. Cache de SG purgado.
+
+- **`wp_options` (servidor):** `siteground_optimizer_combine_javascript_exclude` ampliado con los handles de Elementor.
+- (Sin cambios en el repo — corrección de configuración de SG Optimizer.)
+
 ### Fixed — `WC-DEPENDENCY-DETECT-ERR` (TypeError en consola del carrito: WP_DEBUG activo en producción)
 
 > El usuario reportó `Uncaught TypeError: Cannot read properties of undefined
