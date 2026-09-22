@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-10
 
+### Fixed — `ELEMENTOR-MODULES-ERR-2` (persistía ReferenceError: Elementor core con defer, Pro sin defer)
+
+> Tras excluir Elementor del combine JS de SG (ELEMENTOR-MODULES-ERR), el error
+> `elementorModules is not defined` persistía. Segunda causa raíz: **conflicto de
+> estrategias de carga**. Elementor core enqueuea sus scripts frontend con
+> `strategy => 'defer'` (`webpack.runtime`, `frontend-modules`, `frontend`), pero
+> Elementor Pro NO (`webpack-pro.runtime`, `pro/frontend.min.js`) → los scripts de
+> Pro se ejecutan SÍNCRONOS en su posición del DOM, ANTES de que
+> `frontend-modules` (defer, tras DOMContentLoaded) defina `window.elementorModules`
+> → ReferenceError al ejecutar el webpack de Pro.
+>
+> Fix: mu-plugin `ltms-elementor-defer.php` que agrega `defer` a los scripts de
+> Elementor Pro (`elementor-pro-frontend`, `elementor-pro-webpack-runtime`) vía
+> `script_loader_tag`. Así core y Pro corren ambos tras DOMContentLoaded, en
+> orden de documento: `frontend-modules` (define `window.elementorModules`) antes
+> de `pro/frontend.min.js`.
+>
+> Verificado con curl: los 5 scripts de Elementor ahora llevan `defer`.
+
+- **`wp-content/mu-plugins/ltms-elementor-defer.php` (servidor):** nuevo mu-plugin con el fix de defer.
+- (Sin cambios en el repo — configuración del sitio, patrón como `ltms-opcache-fix.php`.)
+
 ### Fixed — `ELEMENTOR-MODULES-ERR` (Uncaught ReferenceError: elementorModules is not defined al añadir al carrito)
 
 > El usuario reportó `Uncaught ReferenceError: elementorModules is not defined`

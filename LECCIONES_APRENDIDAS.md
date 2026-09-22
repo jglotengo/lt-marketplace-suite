@@ -3731,6 +3731,29 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - El handle de la definición suele diferir del handle del consumidor: para Elementor el que define
      `elementorModules` es `elementor-frontend-modules`, no `elementor-frontend`.
 
+### Lección #175: un plugin que enqueuea con `defer` y otro que no, rompe el orden — el fix es alinear la estrategia, no mover el script
+
+1. **Caso real:** tras excluir Elementor del combine JS de SG (Lección #174), el `ReferenceError: elementorModules
+   is not defined` PERSISTÍA. Verificación del HTML mostró que Elementor core enqueuea `frontend-modules.min.js`
+   (que define `window.elementorModules`) con `strategy => 'defer'`, pero Elementor Pro enqueuea
+   `webpack-pro.runtime.min.js` + `frontend.min.js` SÍNCRONOS. En el navegador, los scripts `defer` se ejecutan
+   DESPUÉS del parseo del DOM (DOMContentLoaded), mientras los síncronos se ejecutan en su posición inmediata →
+   el webpack de Pro corría antes de que existiera `window.elementorModules`.
+2. **Por qué el orden en el HTML engaña:** el HTML mostraba core (defer) ANTES de Pro (síncrono), pareciendo
+   correcto. Pero el atributo `defer` cambia el momento de ejecución: "defer core" ≠ "síncrono Pro" aunque
+   estén en el orden visual correcto. El orden en el DOM solo importa entre scripts del MISMO modo (defer-defer
+   o sync-sync).
+3. **Fix:** mu-plugin `ltms-elementor-defer.php` que agrega `defer` a los handles de Elementor Pro
+   (`elementor-pro-frontend`, `elementor-pro-webpack-runtime`) vía filtro `script_loader_tag`. Resultado: los 5
+   scripts de Elementor corren con defer, en orden de documento: `frontend-modules` → `pro/frontend`.
+4. **Regla preventiva:**
+   - Al diagnosticar "X is not defined" entre dos scripts del mismo ecosistema, verificar el ATRIBUTO de carga
+     (defer/async/sync) de cada uno, no solo el orden en el HTML. defer vs sync = órdenes de ejecución distintos.
+   - El filtro `script_loader_tag` es la vía correcta para alinear estrategias de scripts de terceros sin
+     tocar el plugin (se pierde en actualizaciones).
+   - Misma clase de problema que #173/#174: siempre sospechar del "momento de ejecución" cuando el orden en el
+     documento parece correcto pero el runtime falla.
+
 
 
 
