@@ -593,6 +593,30 @@
 @media (max-width: 480px) {
     .ltms-metrics-grid { grid-template-columns: 1fr !important; }
     .ltms-wallet-balance { font-size: 1.5rem; }
+    
+    /* Envios view responsive */
+    .ltms-envios-stats { grid-template-columns: repeat(2, 1fr) !important; }
+    
+    /* Booking tabs vertical in mobile */
+    .ltms-booking-tab {
+        display: block;
+        text-align: center;
+        width: 100%;
+    }
+    
+    /* Smaller table cells in mobile */
+    .ltms-dtable th,
+    .ltms-dtable td,
+    .ltms-table th,
+    .ltms-table td {
+        padding: 6px 8px !important;
+        font-size: 0.78rem !important;
+    }
+    
+    /* Form rows stack in mobile */
+    .ltms-form-row {
+        flex-direction: column !important;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -793,9 +817,83 @@ select.ltms-form-control   { cursor: pointer; }
 .ltms-view-orders,
 .ltms-view-products,
 .ltms-view-settings,
-.ltms-view-wallet {
+.ltms-view-wallet,
+.ltms-view-envios,
+.ltms-view-bookings,
+.ltms-view-shipping-statement,
+.ltms-view-redi,
+.ltms-view-insurance,
+.ltms-view-marketing,
+.ltms-view-security,
+.ltms-view-donations,
+.ltms-view-posgold,
+.ltms-view-incidents,
+.ltms-view-kitchen,
+.ltms-view-ordenes-compra,
+.ltms-view-drivers {
     display: none;
     animation: ltmsFadeIn .2s ease;
+}
+
+/* ── Booking tabs styling ── */
+.ltms-booking-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #e5e7eb;
+}
+.ltms-booking-tab {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+.ltms-booking-tab:hover {
+    color: #1a5276;
+}
+.ltms-booking-tab.ltms-booking-tab-active {
+    color: #1a5276;
+    border-bottom-color: #1a5276;
+}
+
+/* ── Envios view cards ── */
+.ltms-envios-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.ltms-envios-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.ltms-envios-stat-label {
+    font-size: 0.7rem;
+    color: #666;
+}
+
+/* Card colors for shipping stats */
+.ltms-card:nth-child(1) .ltms-envios-stat-value { color: #1a5276; }
+.ltms-card:nth-child(2) .ltms-envios-stat-value { color: #dc2626; }
+.ltms-card:nth-child(3) .ltms-envios-stat-value { color: #7c3aed; }
+.ltms-card:nth-child(4) .ltms-envios-stat-value { color: #111; }
+.ltms-card:nth-child(5) .ltms-envios-stat-value { color: #16a34a; }
+.ltms-card:nth-child(6) .ltms-envios-stat-value { color: #d97706; }
+
+/* ── Calendar table responsive ── */
+#ltms-cal-table {
+    table-layout: auto;
+}
+#ltms-cal-table th,
+#ltms-cal-table td {
+    min-width: 40px;
+    padding: 4px 8px;
 }
 @keyframes ltmsFadeIn {
     from { opacity: 0; transform: translateY(6px); }

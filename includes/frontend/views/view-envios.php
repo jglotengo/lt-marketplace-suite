@@ -77,30 +77,30 @@ $carriers = class_exists( 'LTMS_Business_Aveonline_Carriers' )
         }
     }
     ?>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:20px;">
+    <div class="ltms-envios-stats">
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#1a5276;"><?php echo $ship_stats['aveonline']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">📦 Aveonline</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['aveonline']; ?></div>
+            <div class="ltms-envios-stat-label">📦 Aveonline</div>
         </div>
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#dc2626;"><?php echo $ship_stats['deprisa']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">📮 Deprisa</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['deprisa']; ?></div>
+            <div class="ltms-envios-stat-label">📮 Deprisa</div>
         </div>
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#7c3aed;"><?php echo $ship_stats['heka']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">🚀 Heka</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['heka']; ?></div>
+            <div class="ltms-envios-stat-label">🚀 Heka</div>
         </div>
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#111;"><?php echo $ship_stats['uber']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">🚗 Uber</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['uber']; ?></div>
+            <div class="ltms-envios-stat-label">🚗 Uber</div>
         </div>
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#16a34a;"><?php echo $ship_stats['pickup']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">🏪 Pickup</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['pickup']; ?></div>
+            <div class="ltms-envios-stat-label">🏪 Pickup</div>
         </div>
         <div class="ltms-card" style="padding:12px;text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:#d97706;"><?php echo $ship_stats['own']; ?></div>
-            <div style="font-size:0.7rem;color:#666;">🛵 Domiciliario</div>
+            <div class="ltms-envios-stat-value"><?php echo $ship_stats['own']; ?></div>
+            <div class="ltms-envios-stat-label">🛵 Domiciliario</div>
         </div>
     </div>
 

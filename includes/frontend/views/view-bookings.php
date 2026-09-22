@@ -14,30 +14,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 <div class="ltms-view-pad">
 
     <!-- M-BOOKING-PLAN-02/03: tabs ──────────────────────────────── -->
-    <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid #e5e7eb;">
+    <div class="ltms-booking-tabs">
         <button type="button" class="ltms-booking-tab ltms-booking-tab-active"
-                data-target="ltms-bk-reservas"
-                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
-                       cursor:pointer;color:#1a5276;border-bottom:2px solid #1a5276;margin-bottom:-2px;">
+                data-target="ltms-bk-reservas">
             📅 <?php esc_html_e( 'Mis Reservas', 'ltms' ); ?>
         </button>
         <button type="button" class="ltms-booking-tab"
-                data-target="ltms-bk-seasons"
-                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
-                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+                data-target="ltms-bk-seasons">
             🌤 <?php esc_html_e( 'Temporadas', 'ltms' ); ?>
         </button>
         <button type="button" class="ltms-booking-tab"
-                data-target="ltms-bk-policies"
-                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
-                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+                data-target="ltms-bk-policies">
             📋 <?php esc_html_e( 'Políticas', 'ltms' ); ?>
         </button>
         <!-- v2.9.93 P2: Calendar tab -->
         <button type="button" class="ltms-booking-tab"
-                data-target="ltms-bk-calendar"
-                style="background:none;border:none;padding:10px 20px;font-size:.88rem;font-weight:600;
-                       cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;">
+                data-target="ltms-bk-calendar">
             🗓️ <?php esc_html_e( 'Calendario', 'ltms' ); ?>
         </button>
     </div>
