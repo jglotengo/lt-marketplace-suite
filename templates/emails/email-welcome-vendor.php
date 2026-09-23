@@ -3,7 +3,7 @@
  * Email Template: Bienvenida al Vendedor
  *
  * @package    LTMS\Templates\Emails
- * @var array  $data   { vendor_name, store_name, referral_code, dashboard_url, kyc_url, site_name, country }
+ * @var array  $data   { vendor_name, username, login_url, store_name, referral_code, dashboard_url, site_name, country }
  * @version    1.5.0
  */
 
@@ -32,6 +32,16 @@ $country = $data['country'] ?? 'CO';
         .step-card .step-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 4px; }
         .step-card .step-desc { font-size: 12px; color: #6b7280; line-height: 1.4; }
         .referral-box { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px; }
+        /* CICLO33-P1-AUTH-EMAIL-FLOW FIX (2026-09-23): caja de datos de acceso —
+           el vendor no conocía su usuario ni el flujo de login (evidencia: vendor
+           #246, LOGIN_THROTTLE con credenciales correctas). Se muestra el username
+           y los 2 pasos del acceso ANTES de cualquier mención de KYC. */
+        .access-box { background: #fefce8; border: 1.5px solid #f59e0b; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; }
+        .access-title { font-size: 14px; color: #92400e; font-weight: 700; margin: 0 0 10px; }
+        .access-credential { font-size: 14px; color: #374151; margin: 0 0 6px; line-height: 1.5; }
+        .access-username { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 800; color: #92400e; background: #fff; border: 1.5px dashed #f59e0b; border-radius: 6px; padding: 3px 10px; display: inline-block; }
+        .access-steps { font-size: 13.5px; color: #374151; line-height: 1.7; margin: 10px 0 0; }
+        .access-steps a { color: #1a5276; word-break: break-all; }
         .referral-title { font-size: 14px; color: #1e40af; font-weight: 600; margin-bottom: 8px; }
         .referral-code { font-family: 'Courier New', monospace; font-size: 22px; font-weight: 800; color: #1d4ed8; letter-spacing: .12em; background: #fff; border: 1.5px dashed #bfdbfe; border-radius: 8px; padding: 10px 20px; display: inline-block; margin-bottom: 8px; }
         .referral-desc { font-size: 13px; color: #3b82f6; }
@@ -61,22 +71,59 @@ $country = $data['country'] ?? 'CO';
     <div class="body">
         <p class="welcome-msg">
             <?php printf(
-                esc_html__( 'Hola %s, ¡nos alegra que te hayas unido! Ahora eres parte de la red de vendedores de %s. Aquí te explicamos los primeros pasos para comenzar a vender.', 'ltms' ),
+                esc_html__( 'Hola %s, ¡nos alegra que te hayas unido! Ahora eres parte de la red de vendedores de %s. Para entrar a tu panel primero verifica tu email — es un solo clic.', 'ltms' ),
                 esc_html( $data['vendor_name'] ?? '' ),
                 esc_html( $data['site_name'] ?? get_bloginfo( 'name' ) )
             ); ?>
         </p>
 
+        <?php if ( ! empty( $data['username'] ) ) : ?>
+        <div class="access-box">
+            <p class="access-title">🔑 <?php esc_html_e( 'Tus datos de acceso', 'ltms' ); ?></p>
+            <p class="access-credential">
+                <?php esc_html_e( 'Usuario:', 'ltms' ); ?>
+                <span class="access-username"><?php echo esc_html( $data['username'] ); ?></span>
+            </p>
+            <p class="access-credential">
+                <?php esc_html_e( 'Contraseña:', 'ltms' ); ?>
+                <?php esc_html_e( 'la que registraste en el formulario.', 'ltms' ); ?>
+            </p>
+            <p class="access-steps">
+                <strong><?php esc_html_e( '1.', 'ltms' ); ?></strong>
+                <?php esc_html_e( 'Haz clic en el botón de abajo para verificar tu email.', 'ltms' ); ?><br>
+                <strong><?php esc_html_e( '2.', 'ltms' ); ?></strong>
+                <?php
+                $access_login_url = ! empty( $data['login_url'] ) ? $data['login_url'] : '';
+                printf(
+                    /* translators: %s: login URL */
+                    esc_html__( 'Inicia sesión en el panel con tu usuario o email y contraseña: %s', 'ltms' ),
+                    $access_login_url ? '<a href="' . esc_url( $access_login_url ) . '">' . esc_html( $access_login_url ) . '</a>' : esc_html__( 'página de inicio de sesión', 'ltms' )
+                );
+                ?>
+            </p>
+        </div>
+        <?php endif; ?>
+
         <div class="steps-grid">
             <div class="step-card">
-                <span class="step-icon">📋</span>
-                <div class="step-title"><?php esc_html_e( 'Verificar Identidad', 'ltms' ); ?></div>
-                <div class="step-desc"><?php esc_html_e( 'Sube tus documentos KYC para desbloquear retiros.', 'ltms' ); ?></div>
+                <span class="step-icon">✅</span>
+                <div class="step-title"><?php esc_html_e( 'Verificar tu Email', 'ltms' ); ?></div>
+                <div class="step-desc"><?php esc_html_e( 'Con el botón de abajo. Sin verificar no podrás iniciar sesión.', 'ltms' ); ?></div>
             </div>
             <div class="step-card">
                 <span class="step-icon">📦</span>
                 <div class="step-title"><?php esc_html_e( 'Publicar Productos', 'ltms' ); ?></div>
                 <div class="step-desc"><?php esc_html_e( 'Crea tu catálogo y empieza a recibir pedidos.', 'ltms' ); ?></div>
+            </div>
+            <div class="step-card">
+                <span class="step-icon">📋</span>
+                <div class="step-title"><?php esc_html_e( 'Verificar Identidad (KYC)', 'ltms' ); ?></div>
+                <div class="step-desc"><?php esc_html_e( 'Después de tu primer acceso, desde tu panel: desbloquea retiros.', 'ltms' ); ?></div>
+            </div>
+            <div class="step-card">
+                <span class="step-icon">📢</span>
+                <div class="step-title"><?php esc_html_e( 'Invitar Vendedores', 'ltms' ); ?></div>
+                <div class="step-desc"><?php esc_html_e( 'Usa tu código de referido y gana comisiones extra.', 'ltms' ); ?></div>
             </div>
             <div class="step-card">
                 <span class="step-icon">💳</span>
@@ -86,11 +133,6 @@ $country = $data['country'] ?? 'CO';
                         ? esc_html__( 'Agrega tu cuenta bancaria colombiana para retiros.', 'ltms' )
                         : esc_html__( 'Agrega tu CLABE para transferencias SPEI.', 'ltms' ); ?>
                 </div>
-            </div>
-            <div class="step-card">
-                <span class="step-icon">📢</span>
-                <div class="step-title"><?php esc_html_e( 'Invitar Vendedores', 'ltms' ); ?></div>
-                <div class="step-desc"><?php esc_html_e( 'Usa tu código de referido y gana comisiones extra.', 'ltms' ); ?></div>
             </div>
         </div>
 
@@ -110,14 +152,8 @@ $country = $data['country'] ?? 'CO';
             ✅ <?php esc_html_e( 'Verificar mi email e ir a mi Panel', 'ltms' ); ?>
         </a>
         <p style="text-align:center;font-size:12px;color:#9ca3af;margin:4px 0 24px;">
-            <?php esc_html_e( 'Al hacer clic en este botón, verificamos tu correo y te llevamos a tu panel de vendedor.', 'ltms' ); ?>
+            <?php esc_html_e( 'Al hacer clic en este botón, verificamos tu correo y te llevamos a tu panel de vendedor. El KYC y la configuración de pagos se completan dentro del panel, después de tu primer acceso.', 'ltms' ); ?>
         </p>
-
-        <?php if ( ! empty( $data['kyc_url'] ) ) : ?>
-        <a href="<?php echo esc_url( $data['kyc_url'] ); ?>" class="cta-secondary">
-            <?php esc_html_e( 'Iniciar verificación KYC →', 'ltms' ); ?>
-        </a>
-        <?php endif; ?>
 
     </div>
 

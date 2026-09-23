@@ -1433,10 +1433,20 @@ final class LTMS_Public_Auth_Handler {
 
         $data = [
             'vendor_name'   => $user->first_name . ' ' . $user->last_name,
+            // CICLO33-P1-AUTH-EMAIL-FLOW FIX (2026-09-23): el vendor no sabía cuál era
+            // su usuario (el registro lo genera automáticamente) — evidencia: vendor
+            // #246 intentó login 7 veces (LOGIN_THROTTLE) con credenciales correctas
+            // pero email sin verificar. El email ahora muestra el username y el link
+            // del login para que el flujo de acceso sea explícito.
+            'username'      => $user->user_login,
+            'login_url'     => $login_url,
             'store_name'    => (string) get_user_meta( $user_id, 'ltms_store_name', true ),
             'referral_code' => (string) get_user_meta( $user_id, 'ltms_referral_code', true ),
             'dashboard_url' => $verify_url, // CTA principal verifica + redirige al dashboard
-            'kyc_url'       => home_url( '/verificacion-identidad/' ),
+            // CICLO33-P1-AUTH-EMAIL-FLOW FIX: kyc_url eliminado del email de bienvenida —
+            // el CTA KYC prematuro llevaba a una página que exige login (el vendor no
+            // puede acceder sin verificar email) y era la fuente de confusión. El KYC
+            // se completa dentro del panel tras el primer acceso.
             'site_name'     => get_bloginfo( 'name' ),
             'country'       => LTMS_Core_Config::get_country(),
         ];
