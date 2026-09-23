@@ -37,12 +37,11 @@ define( 'LTMS_LOADED', true );
 // CONSTANTES GLOBALES DEL PLUGIN
 // CHECKOUT-CTA-VISIBLE (2026-09-14): bump a 2.9.380 para forzar cache-busting
 // de assets (CSS/JS) tras el fix del checkout y el split del monolito UX.
-// CONSOLE-CLEAN (2026-09-19): bump a 2.9.389. Silenciar logs de debug/perf en
-// produccion (ltms-ux-enhancements.js + bundles + plaza-viva): los console.warn
-// de 'Pagina lenta'/'AJAX lento' y el debug 'Inicializado' ahora se gatean con
-// CONFIG.debug=false. Los console.error de errores reales (catch) se mantienen.
-// Sin cambio de lineas en el monolito (SECTION_MAP del split intacto).
-define( 'LTMS_VERSION', '2.9.389' );
+// CICLO33-P1-CACHEBUST (2026-09-22): bump a 2.9.390. Los fixes de CSS mobile
+// (460c9c14 MOB-001 + 337d5faf envios/booking) NO bumpearon version — los
+// visitantes recurrentes con ltms-dashboard.css?ver=2.9.389 cacheado recibian
+// el CSS viejo. Bump fuerza cache-busting en todos los assets con LTMS_VERSION.
+define( 'LTMS_VERSION', '2.9.390' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
