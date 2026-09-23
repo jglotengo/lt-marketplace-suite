@@ -1368,3 +1368,44 @@ select.ltms-form-control   { cursor: pointer; }
         margin: 0 !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   CICLO33-P1-BOOKING-FILTERS + CICLO33-P1-SS-TABLES (2026-09-22)
+   Reportado por el operador en móvil: en Reservas y Fletes quedaba
+   un espacio en blanco a la derecha porque una tabla y unas
+   etiquetas/controles sobresalen del viewport.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* CICLO33-P1-BOOKING-FILTERS: la fila de filtros de Reservas (select de
+   estado + 2 date inputs + Exportar CSV) y el header del Calendario usan
+   `display:flex` INLINE sin flex-wrap — los estilos inline pisan el
+   flex-wrap del .ltms-view-header, así que 4 controles (~500px) desbordaban
+   el viewport en móvil (etiquetas sobresaliendo, espacio blanco a la
+   derecha). Con !important ganamos a los estilos inline; en desktop no
+   cambia nada (flex-wrap solo envuelve cuando no cabe). */
+@media (max-width: 768px) {
+    .ltms-view-header > div {
+        flex-wrap: wrap !important;
+    }
+}
+
+/* CICLO33-P1-SS-TABLES: las tablas .ltms-table del Estado de Cuenta de
+   Fletes (view-shipping-statement.php: Resumen 6 meses + Movimientos) y de
+   view-redi.php NO tienen wrapper scrolleable y el bloque móvil les fuerza
+   min-width:520px → tabla de 520px en ~350px disponibles → overflow de la
+   página (espacio blanco a la derecha, tabla y th sobresaliendo). Fix
+   sistémico: la tabla misma se vuelve bloque scrolleable (patrón
+   responsive-table) y se anula el min-width forzado — el contenido scrollea
+   dentro de la tabla en vez de desbordar la página. Las tablas dentro de
+   wrappers (.ltms-table-scroll / .ltms-table-wrap / .ltms-table-responsive)
+   quedan igual: doble contención es inocua. */
+@media (max-width: 768px) {
+    .ltms-table,
+    .ltms-dtable {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}

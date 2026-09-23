@@ -41,7 +41,9 @@ define( 'LTMS_LOADED', true );
 // (460c9c14 MOB-001 + 337d5faf envios/booking) NO bumpearon version — los
 // visitantes recurrentes con ltms-dashboard.css?ver=2.9.389 cacheado recibian
 // el CSS viejo. Bump fuerza cache-busting en todos los assets con LTMS_VERSION.
-define( 'LTMS_VERSION', '2.9.390' );
+// CICLO33-P1-BOOKING-FILTERS + SS-TABLES + MINICART-WIDTH (2026-09-22): bump a
+// 2.9.391 — fixes responsive del operador (reservas/fletes + minicart).
+define( 'LTMS_VERSION', '2.9.391' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

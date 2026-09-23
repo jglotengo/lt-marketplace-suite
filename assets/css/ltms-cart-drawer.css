@@ -132,6 +132,12 @@ body.ltms-minicart-locked{overflow:hidden;}
 }
 .ltms-minicart__continue:hover{border-color:#1a1f2e;}
 
-@media (max-width:480px){
-    .ltms-minicart{max-width:100%;}
+/* CICLO33-P1-MINICART-WIDTH (2026-09-22): reportado por el operador — en móvil
+   el drawer quedaba más ancho que la pantalla (había que desplazarlo lateralmente
+   para verlo completo). El corte full-width solo aplicaba en ≤480px; en pantallas
+   de 481-768px (phablets/large phones) el drawer quedaba en 420px fijo. Se sube
+   el corte a ≤768px para que el drawer sea siempre del ancho exacto del viewport
+   en todo el rango móvil. */
+@media (max-width:768px){
+    .ltms-minicart{width:100%;max-width:100%;}
 }
