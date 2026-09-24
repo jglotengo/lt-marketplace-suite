@@ -478,7 +478,8 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		$defaults = \LTMS_Vtex_Price_Calculator::get_defaults();
 		$calc     = \LTMS_Vtex_Price_Calculator::calculate( 50000, $defaults );
 
-		// Defaults: margin 30%, comisión 10%, IVA 19%, redondeo 1000.
+		// Defaults (VTEX-RULES-FIX): margin 30%, comisión 12%, IVA 19%, redondeo 1000,
+		// transporte/publicidad monto fijo 0.
 		$this->assertGreaterThan( 50000, $calc['price'], 'El precio debe superar el costo.' );
 		$this->assertSame( 0.0, fmod( $calc['price'], 1000 ), 'Debe redondear al múltiplo de 1000 por encima.' );
 		$this->assertSame( $calc['price'], \LTMS_PosGold_Price_Calculator::calculate( 50000, $defaults )['price'],

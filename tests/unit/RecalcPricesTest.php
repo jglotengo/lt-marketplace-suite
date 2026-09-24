@@ -3,9 +3,10 @@
  * RecalcPricesTest — tests del recálculo masivo de precios VTEX (PRICE-RECALC).
  *
  * El vendedor Kosmetic (UID 223) vio precios 1.73x sobre el costo VTEX porque
- * las reglas (margen 30%, comisión 10% gross-up, IVA 19%, redondeo 1.000) se
- * aplican de forma acumulativa sobre el precio RETAIL de VTEX. El costo
- * original NO se persistía → no había forma de re-preciar sin re-sincronizar.
+ * las reglas (margen 30%, comisión 12% gross-up desde VTEX-RULES-FIX, IVA 19%,
+ * redondeo 1.000) se aplican de forma acumulativa sobre el precio RETAIL de
+ * VTEX. El costo original NO se persistía → no había forma de re-preciar sin
+ * re-sincronizar.
  *
  * Este test cubre:
  *   - la sync persiste el costo original en el meta _ltms_vtex_cost.
@@ -168,11 +169,12 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 
 		// El handler construye su propio WP_Query — stubear WP_Query globalmente
 		// no es trivial; validamos el método estático de cálculo directamente con
-		// las reglas default y verificamos que 84000 -> 145000 (1.73x).
+		// las reglas default (VTEX-RULES-FIX: comisión 12%, transporte/publicidad
+		// monto fijo 0) y verificamos que 84000 -> 148000 (1.76x).
 		$rules = \LTMS_Vtex_Price_Calculator::get_vendor_rules( 223 );
 		$calc  = \LTMS_Vtex_Price_Calculator::calculate( 84000, $rules );
-		$this->assertSame( 145000.0, (float) $calc['price'],
-			'Con reglas default, 84000 de costo debe dar 145000 (multiplicador 1.73x).' );
+		$this->assertSame( 148000.0, (float) $calc['price'],
+			'Con reglas default (comisión 12%), 84000 de costo debe dar 148000 (multiplicador 1.76x).' );
 		$this->assertSame( 84000.0, (float) $calc['cost'],
 			'El breakdown debe conservar el costo original.' );
 	}
@@ -212,7 +214,8 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// Costo -> Precio: fórmula acumulativa (84,000 -> 145,000 con defaults)
+	// Costo -> Precio: fórmula acumulativa (84,000 -> 148,000 con defaults
+	// VTEX-RULES-FIX: comisión 12%)
 	// ─────────────────────────────────────────────────────────────────────────
 
 	public function test_round_up_multiple_matches_known_examples(): void {
@@ -223,7 +226,7 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( 47000.0, \LTMS_PosGold_Price_Calculator::round_up_to_multiple( 46001, 1000 ) );
 		$this->assertSame( 1000.0,  \LTMS_PosGold_Price_Calculator::round_up_to_multiple( 500, 1000 ) );
 		$this->assertSame( 145000.0, \LTMS_Vtex_Price_Calculator::round_up_to_multiple( 144386, 1000 ),
-			'84,000 con defaults (margen 30%, comisión 10%, IVA 19%) da 144,386 → redondeado 145,000.' );
+			'144,386 redondeado al múltiplo de 1000 POR ENCIMA da 145,000.' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -255,9 +258,9 @@ final class RecalcPricesTest extends LTMS_Unit_Test_Case {
 			'El JS debe recolectar los valores actuales del form de reglas.'
 		);
 		$this->assertStringContainsString(
-			"$('input[name=\"margin_pct\"]').val()",
+			"\$form.find('input[name=\"margin_pct\"]').val()",
 			$js_src,
-			'collectRules debe leer margin_pct del form.'
+			'collectRules debe leer margin_pct SCOPED al form de reglas VTEX (VTEX-RULES-FIX: la vista PosGold convive en el mismo DOM con names idénticos).'
 		);
 	}
 

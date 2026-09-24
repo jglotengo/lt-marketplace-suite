@@ -2,15 +2,19 @@
 /**
  * Motor de cálculo de precios para productos sincronizados desde VTEX.
  *
- * Reutiliza la MISMA lógica de reglas de negocio que la integración PosGold
+ * Reutiliza la lógica de reglas de negocio de la integración PosGold
  * (LTMS_PosGold_Price_Calculator): transporte, gasto publicitario, devoluciones
  * estimadas, margen de ganancia, comisión Lo Tengo, IVA, costo ReDi y redondeo
- * por encima al múltiplo. La fórmula de cálculo es idéntica — solo cambia el
- * meta prefix donde cada vendor guarda sus reglas (ltms_vtex_price_*) para que
- * las reglas de VTEX y PosGold sean independientes.
+ * por encima al múltiplo. Solo cambia el meta prefix donde cada vendor guarda
+ * sus reglas (ltms_vtex_price_*) para que las reglas de VTEX y PosGold sean
+ * independientes.
+ *
+ * VTEX-RULES-FIX (2026-09-23): los defaults VTEX difieren de PosGold —
+ * comisión Lo Tengo 12% y transporte/gasto publicitario en MONTO FIJO
+ * (transport_amount/advertising_amount, COP/MXN) en vez de % del costo base.
  *
  * @package LTMS
- * @version 2.9.323
+ * @version 2.9.392
  * @since 2.9.323
  */
 
@@ -22,12 +26,29 @@ final class LTMS_Vtex_Price_Calculator {
     const META_PREFIX = 'ltms_vtex_price_';
 
     /**
-     * Configuración default de reglas de precio (idénticas a PosGold).
+     * Configuración default de reglas de precio (base PosGold + overrides VTEX).
+     *
+     * VTEX-RULES-FIX (2026-09-23):
+     * - Comisión Lo Tengo default 12% (antes 10% heredado de PosGold).
+     * - Transporte y gasto publicitario en MONTO FIJO (COP/MXN según el país
+     *   del vendor, fallback al país de operación del sitio) — antes % del
+     *   costo base. Las keys legacy transport_pct/advertising_pct se remueven
+     *   de los defaults VTEX: los metas viejos ltms_vtex_price_transport_pct /
+     *   ltms_vtex_price_advertising_pct quedan huérfanos en DB (sin consumidor)
+     *   y el modo % solo aplica a PosGold, cuyas reglas no incluyen las keys
+     *   de monto fijo.
      *
      * @return array
      */
     public static function get_defaults(): array {
-        return LTMS_PosGold_Price_Calculator::get_defaults();
+        $defaults = LTMS_PosGold_Price_Calculator::get_defaults();
+
+        $defaults['lotengo_commission_pct'] = 12.0;
+        $defaults['transport_amount']       = 0.0;
+        $defaults['advertising_amount']     = 0.0;
+        unset( $defaults['transport_pct'], $defaults['advertising_pct'] );
+
+        return $defaults;
     }
 
     /**

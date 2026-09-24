@@ -801,6 +801,13 @@ $files = [
     // correrlos si se ejecuta la suite ahí.
     'tests/unit/VtexFunctionalE2ETest.php',
     'tests/unit/VtexSyncBackgroundTest.php',
+    // VTEX-RULES-FIX v2.9.392 — comisión Lo Tengo default 12 + transporte/publicidad
+    // monto fijo (COP/MXN) + scoping de selectores JS (contaminación cruzada
+    // PosGold/VTEX). El calculate() compartido vive en la calculadora PosGold —
+    // faltaba en la whitelist desde v2.9.31; sin ella el server recibiría los
+    // defaults VTEX nuevos (transport_amount) sin el soporte de monto fijo.
+    'includes/business/class-ltms-posgold-price-calculator.php',
+    'tests/unit/VtexRulesDefaultsTest.php',
     // POSGOLD-SYNC-BG v2.9.330 — sync PosGold en background (polling) + filtro CSV/JSON.
     'tests/unit/PosGoldSyncBackgroundTest.php',
     // VENDOR-CARD-NAME + MATRICULA-FLEX v2.9.331 — nombre real del vendedor en

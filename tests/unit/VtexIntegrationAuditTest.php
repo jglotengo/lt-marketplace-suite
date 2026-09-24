@@ -227,8 +227,10 @@ final class VtexIntegrationAuditTest extends LTMS_Unit_Test_Case {
 	public function test_vtex_view_uses_posgold_style_business_rules(): void {
 		$src = $this->src( 'includes/frontend/views/view-vtex.php' );
 
-		// Mismas reglas de negocio que PosGold.
-		foreach ( [ 'transport_pct', 'advertising_pct', 'returns_pct', 'margin_pct', 'lotengo_commission_pct', 'iva_pct', 'redi_cost_pct', 'round_multiple' ] as $rule ) {
+		// Mismas reglas de negocio que PosGold (VTEX-RULES-FIX: transporte y
+		// publicidad como MONTO FIJO — transport_amount/advertising_amount; las
+		// keys % legacy solo aplican a PosGold).
+		foreach ( [ 'transport_amount', 'advertising_amount', 'returns_pct', 'margin_pct', 'lotengo_commission_pct', 'iva_pct', 'redi_cost_pct', 'round_multiple' ] as $rule ) {
 			$this->assertStringContainsString( $rule, $src, "Regla de negocio $rule presente en la vista VTEX." );
 		}
 		$this->assertStringContainsString( 'ltms-vtex-account-name', $src, 'Campo accountName presente.' );

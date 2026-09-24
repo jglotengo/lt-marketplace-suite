@@ -1,6 +1,7 @@
 /**
  * LTMS view-posgold — extracted from inline <script>.
- * FASE2B P0 FIX (CSP): moved to external file for CSP compliance.
+ * CSP FIX (patrón FASE2B): external file for CSP compliance.
+ * VTEX-RULES-FIX (2026-09-23): scoped selectors (coexiste con la vista VTEX en el DOM SPA).
  */
 (function($){
     'use strict';
@@ -191,23 +192,28 @@
     }
 
     // Guardar reglas de precio
+    // VTEX-RULES-FIX (2026-09-23): selectores SCOPED al form (#ltms-posgold-rules-form).
+    // La vista VTEX convive en el mismo DOM SPA con inputs de idéntico name —
+    // los selectores globales $('input[name="..."]') dependen del orden del DOM;
+    // scoping a ambos forms los hace robustos en ambas direcciones.
     $('#ltms-posgold-rules-form').on('submit', function(e){
         e.preventDefault();
-        var $btn = $(this).find('button[type="submit"]');
+        var $form = $(this);
+        var $btn = $form.find('button[type="submit"]');
         $btn.prop('disabled', true).text('Guardando...');
 
         $.post(ajaxUrl, {
             action: 'ltms_save_posgold_rules',
             nonce: nonce,
             is_redi: $('#ltms-posgold-is-redi').is(':checked') ? 'yes' : 'no',
-            transport_pct: $('input[name="transport_pct"]').val(),
-            advertising_pct: $('input[name="advertising_pct"]').val(),
-            returns_pct: $('input[name="returns_pct"]').val(),
-            margin_pct: $('input[name="margin_pct"]').val(),
-            lotengo_commission_pct: $('input[name="lotengo_commission_pct"]').val(),
-            iva_pct: $('select[name="iva_pct"]').val(),
-            redi_cost_pct: $('input[name="redi_cost_pct"]').val(),
-            round_multiple: $('select[name="round_multiple"]').val()
+            transport_pct: $form.find('input[name="transport_pct"]').val(),
+            advertising_pct: $form.find('input[name="advertising_pct"]').val(),
+            returns_pct: $form.find('input[name="returns_pct"]').val(),
+            margin_pct: $form.find('input[name="margin_pct"]').val(),
+            lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
+            iva_pct: $form.find('select[name="iva_pct"]').val(),
+            redi_cost_pct: $form.find('input[name="redi_cost_pct"]').val(),
+            round_multiple: $form.find('select[name="round_multiple"]').val()
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar reglas de precio');
             if (resp.success) {
@@ -380,16 +386,19 @@
     }
 
     // Update price example
+    // VTEX-RULES-FIX (2026-09-23): selectores SCOPED al form (ver fix en el
+    // submit — la vista VTEX convive en el mismo DOM con names idénticos).
     function updatePriceExample() {
+        var $form = $('#ltms-posgold-rules-form');
         var cost = 50000;
-        var transport = parseFloat($('input[name="transport_pct"]').val()) || 0;
-        var advertising = parseFloat($('input[name="advertising_pct"]').val()) || 0;
-        var returns = parseFloat($('input[name="returns_pct"]').val()) || 0;
-        var margin = parseFloat($('input[name="margin_pct"]').val()) || 0;
-        var commission = parseFloat($('input[name="lotengo_commission_pct"]').val()) || 0;
-        var iva = parseFloat($('select[name="iva_pct"]').val()) || 0;
-        var redi = $('#ltms-posgold-is-redi').is(':checked') ? (parseFloat($('input[name="redi_cost_pct"]').val()) || 0) : 0;
-        var round = parseInt($('select[name="round_multiple"]').val()) || 1000;
+        var transport = parseFloat($form.find('input[name="transport_pct"]').val()) || 0;
+        var advertising = parseFloat($form.find('input[name="advertising_pct"]').val()) || 0;
+        var returns = parseFloat($form.find('input[name="returns_pct"]').val()) || 0;
+        var margin = parseFloat($form.find('input[name="margin_pct"]').val()) || 0;
+        var commission = parseFloat($form.find('input[name="lotengo_commission_pct"]').val()) || 0;
+        var iva = parseFloat($form.find('select[name="iva_pct"]').val()) || 0;
+        var redi = $('#ltms-posgold-is-redi').is(':checked') ? (parseFloat($form.find('input[name="redi_cost_pct"]').val()) || 0) : 0;
+        var round = parseInt($form.find('select[name="round_multiple"]').val()) || 1000;
 
         var t = cost * transport / 100;
         var a = cost * advertising / 100;

@@ -114,8 +114,12 @@ final class LTMS_PosGold_Price_Calculator {
      *
      * Fórmula:
      *   1. costo_base = precio PosGold
-     *   2. transporte = costo_base * (transport_pct / 100)
-     *   3. publicidad = costo_base * (advertising_pct / 100)
+     *   2. transporte = monto fijo (transport_amount, COP/MXN) O
+     *                  costo_base * (transport_pct / 100) si las reglas no
+     *                  incluyen transport_amount (modo legacy %, PosGold)
+     *   3. publicidad = monto fijo (advertising_amount, COP/MXN) O
+     *                  costo_base * (advertising_pct / 100) si las reglas no
+     *                  incluyen advertising_amount (modo legacy %, PosGold)
      *   4. redi_cost  = is_redi ? costo_base * (redi_cost_pct / 100) : 0
      *   5. subtotal_gastos = costo_base + transporte + publicidad + redi_cost
      *   6. margen = subtotal_gastos * (margin_pct / 100)
@@ -138,11 +142,26 @@ final class LTMS_PosGold_Price_Calculator {
         $breakdown['cost'] = $cost;
 
         // 2. Transporte
-        $transport = $cost * ( $rules['transport_pct'] / 100 );
+        // VTEX-RULES-FIX (2026-09-23): modo MONTO FIJO cuando las reglas incluyen
+        // transport_amount (COP/MXN según país del vendor). Sin esa key, cae al
+        // modo porcentual legacy (transport_pct) — backward compatible con PosGold,
+        // cuyas reglas nunca incluyen transport_amount (get_vendor_rules itera los
+        // defaults de PosGold, que no tienen esa key).
+        if ( isset( $rules['transport_amount'] ) ) {
+            $transport = (float) $rules['transport_amount'];
+        } else {
+            $transport = $cost * ( (float) ( $rules['transport_pct'] ?? 0 ) / 100 );
+        }
         $breakdown['transport'] = $transport;
 
         // 3. Publicidad
-        $advertising = $cost * ( $rules['advertising_pct'] / 100 );
+        // VTEX-RULES-FIX (2026-09-23): mismo patrón que transporte — monto fijo
+        // (advertising_amount) o % legacy (advertising_pct) según las reglas.
+        if ( isset( $rules['advertising_amount'] ) ) {
+            $advertising = (float) $rules['advertising_amount'];
+        } else {
+            $advertising = $cost * ( (float) ( $rules['advertising_pct'] ?? 0 ) / 100 );
+        }
         $breakdown['advertising'] = $advertising;
 
         // 4. Costo ReDi (solo si el producto es ReDi)
