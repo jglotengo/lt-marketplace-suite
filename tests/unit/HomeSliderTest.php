@@ -201,4 +201,58 @@ final class HomeSliderTest extends LTMS_Unit_Test_Case {
 		$this->assertTrue( $rc->hasMethod( 'render_shortcode' ), 'Debe existir render_shortcode.' );
 		$this->assertTrue( $rc->hasMethod( 'ajax_save_slides' ), 'Debe existir ajax_save_slides.' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// HOME-SLIDER-ORDER-FIX (2026-09-24): el submenu debe registrarse con
+	// prioridad 20 en admin_menu — DESPUÉS de LTMS_Admin::register_menus @10.
+	//
+	// Causa raíz verificada en server (WP 7.1.2): boot_frontend corre ANTES que
+	// boot_admin en el Kernel → el admin_menu hook de HS se registra primero y
+	// corre primero → al momento de add_submenu_page() el padre 'ltms-dashboard'
+	// AÚN no existe en $admin_page_hooks → WP calcula el hookname SIN el prefijo
+	// del padre (admin_page_ltms-home-slider), pero el acceso
+	// (user_can_access_admin_page) y el render del menú (menu-header.php) lo
+	// calculan CON prefijo (lt-marketplace_page_ltms-home-slider) porque para
+	// entonces el padre ya existe → mismatch: el menú renderiza el href CRUDO
+	// (slug → /wp-admin/ltms-home-slider → 404 del frontend al click) y el
+	// acceso directo a la URL correcta da "Lo siento, no tienes permisos".
+	// Reproducido con wp eval-file en server: access=false, registered(prefijo)=false,
+	// registered(admin_page_*)=true.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_admin_menu_hook_uses_late_priority(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			"add_action( 'admin_menu', [ \$instance, 'register_admin_menu' ], 20 )",
+			$src,
+			'El submenu debe registrarse en admin_menu con prioridad 20 (después del menú padre @10) — HOME-SLIDER-ORDER-FIX.'
+		);
+		// El registro SIN prioridad (el bug) no debe persistir.
+		$this->assertStringNotContainsString(
+			"add_action( 'admin_menu', [ \$instance, 'register_admin_menu' ] )",
+			$src,
+			'NO debe persistir el registro de admin_menu sin prioridad (causaba el mismatch de hookname y el 404 del menú).'
+		);
+	}
+
+	public function test_order_fix_documented_with_evidence(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			'HOME-SLIDER-ORDER-FIX (2026-09-24)',
+			$src,
+			'El fix debe documentarse con el ID HOME-SLIDER-ORDER-FIX y la fecha.'
+		);
+		$this->assertStringContainsString(
+			'admin_page_ltms-home-slider',
+			$src,
+			'El comentario debe documentar el hookname sin prefijo (la causa raíz del mismatch).'
+		);
+		$this->assertStringContainsString(
+			'lt-marketplace_page_ltms-home-slider',
+			$src,
+			'El comentario debe documentar el hookname con prefijo que buscan acceso/render.'
+		);
+	}
 }

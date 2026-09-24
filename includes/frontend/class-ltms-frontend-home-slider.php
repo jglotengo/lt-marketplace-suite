@@ -32,7 +32,22 @@ final class LTMS_Frontend_Home_Slider {
         $instance = new self();
 
         if ( is_admin() && ! wp_doing_ajax() ) {
-            add_action( 'admin_menu', [ $instance, 'register_admin_menu' ] );
+            // HOME-SLIDER-ORDER-FIX (2026-09-24): prioridad 20 (después de
+            // LTMS_Admin::register_menus @10). boot_frontend corre ANTES que
+            // boot_admin en el Kernel, así que este admin_menu hook se registra
+            // primero y corre primero: al momento de add_submenu_page() el menú
+            // padre 'ltms-dashboard' AÚN NO existe en $admin_page_hooks → WP 7.x
+            // calcula el hookname SIN el prefijo del padre
+            // (admin_page_ltms-home-slider), pero el acceso (user_can_access_
+            // admin_page) y el render del menú (menu-header.php) lo calculan CON
+            // prefijo (lt-marketplace_page_ltms-home-slider) porque para entonces
+            // el padre ya existe → mismatch: el menú renderiza el href CRUDO
+            // (slug → /wp-admin/ltms-home-slider → 404 del frontend al click) y
+            // el acceso directo a la URL correcta da "Lo siento, no tienes
+            // permisos" (verified: 479 KERNEL BOOT ERROR históricos no son la
+            // causa; el boot funciona). Con prioridad 20 el padre existe cuando
+            // el submenu se registra → hookname consistente en los 3 call sites.
+            add_action( 'admin_menu', [ $instance, 'register_admin_menu' ], 20 );
             add_action( 'admin_enqueue_scripts', [ $instance, 'enqueue_admin_assets' ] );
         }
 
