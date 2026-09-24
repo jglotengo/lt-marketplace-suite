@@ -3808,8 +3808,47 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      es SSH directo (`ssh -p 18765 user@ssh.lo-tengo.com.co`, `git fetch + git reset --hard origin/main`) —
      verificado funcionando con key `id_ed25519` en este ciclo.
    - Un gap de whitelist es un canario SILENCIOSO: no hay error en el deploy report (el webhook simplemente no
-     intenta descargar lo que no está listado). El hash server vs local (`md5sum`) es la única verificación
-     confiable de que TODO llegó al disco.
+      intenta descargar lo que no está listado). El hash server vs local (`md5sum`) es la única verificación
+      confiable de que TODO llegó al disco.
+
+### Lección #178: un submenu registrado bajo un menú padre que AÚN no existe produce un mismatch de hookname en WP 7.x — href crudo + "Lo siento, no tienes permisos"
+
+1. **Caso real:** el operador clickeaba el submenu Home Slider (LT Marketplace → Home Slider) y aterrizaba en
+   `lo-tengo.com.co/wp-admin/ltms-home-slider` (404 del frontend); pegando la URL correcta
+   `admin.php?page=ltms-home-slider` recibía "Lo siento, no tienes permisos para acceder a esta página" (403,
+   mensaje CORE) logueado como administrador. Causa raíz reproducida en server con `wp eval-file`:
+   `boot_frontend()` corre ANTES que `boot_admin()` en el Kernel → el hook `admin_menu` del Home Slider
+   (`LTMS_Frontend_Home_Slider::init()`) se registra y corre PRIMERO → al momento de `add_submenu_page()`
+   el padre `'ltms-dashboard'` AÚN NO existe en `$admin_page_hooks` → WP 7.x (branch elseif de
+   `get_plugin_page_hookname`, que no existía en 6.x) calcula el hookname SIN el prefijo del padre:
+   `admin_page_ltms-home-slider`. Luego `LTMS_Admin::register_menus()` registra el padre
+   (`$admin_page_hooks['ltms-dashboard'] = 'lt-marketplace'`) → el acceso (`user_can_access_admin_page`) y el
+   render del menú (`menu-header.php:265-280`) calculan el hookname CON prefijo
+   (`lt-marketplace_page_ltms-home-slider`) → MISMATCH.
+2. **Los dos síntomas, un solo mismatch:** (a) el menú renderiza el href CRUDO
+   (`echo "<a href='{$sub_item[2]}'…"` del else branch — solo dispara si `menu_hook` vacío) → el browser resuelve
+   el slug relativo como `/wp-admin/ltms-home-slider` → 404 del frontend; (b) el acceso directo a la URL correcta
+   falla porque `$_registered_pages[hookname-con-prefijo]` no existe → `user_can_access_admin_page()=false` →
+   wp_die 403.
+3. **Por qué las simulaciones CLI engañan:** reproducir el menú llamando los inits en el orden CORRECTO
+   (Admin antes que HS) da `access=true` — el bug SOLO se reproduce con el orden REAL del boot (HS primero). Una
+   simulación que no replica el orden de registro de los hooks valida un escenario que no ocurre.
+4. **Fix:** prioridad tardía en el registro del hook (`add_action('admin_menu', …, 20)`) — el padre se registra
+   en @10, el submenu en @20 → el padre existe cuando `add_submenu_page()` corre → hookname consistente en los
+   3 call sites (registro/acceso/render), INDEPENDIENTE del orden de boot.
+5. **Regla preventiva:**
+   - Todo `add_submenu_page()` con un padre SLUG CUSTOM (`ltms-dashboard`) debe registrarse con prioridad 20 en
+     `admin_menu` (o dentro del mismo callback que registra el padre) — nunca desde un init que corre antes que
+     el registro del padre.
+   - Al agregar un submenu desde una clase booteada en `boot_frontend`/`boot_business`, verificar el hookname
+     real: `wp eval-file` con el orden REAL de boot + `has_action(get_plugin_page_hookname(...))` + el render de
+     `menu-header.php` (el href REAL que produce WordPress) — las aserciones de "la página existe" no capturan
+     el mismatch.
+   - Los canarios del mismatch: ítem de menú visible con href SIN `admin.php?page=` (crudo) y acceso a la URL
+     correcta dando el mensaje CORE "Lo siento, no tienes permisos" (403) en vez del mensaje de la vista del
+     plugin — ambos juntos = hookname mismatch, no un problema de permisos.
+   - El mensaje de wp_die identifica la capa: el CORE dice "Lo siento, no tienes permisos para acceder a esta
+     página" (hook no registrado / nopriv); la vista del plugin dice su propio texto (el request SÍ llegó).
 
 
 

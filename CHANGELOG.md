@@ -6,6 +6,60 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-24
 
+### Fixed — `HOME-SLIDER-ORDER-FIX` (submenu Home Slider roto: href crudo → 404 + "Lo siento, no tienes permisos")
+
+> Reporte del operador: clickeando el submenu Home Slider en wp-admin aterrizaba en
+> `lo-tengo.com.co/wp-admin/ltms-home-slider` (404 del frontend) y pegando la URL
+> correcta `admin.php?page=ltms-home-slider` recibía "Lo siento, no tienes permisos
+> para acceder a esta página" (403, mensaje CORE — no el de la vista del plugin),
+> logueado como administrador.
+>
+> **Causa raíz verificada y reproducida en server (WP 7.1.2, `wp eval-file`):**
+> `boot_frontend()` corre ANTES que `boot_admin()` en el Kernel → el hook
+> `admin_menu` del Home Slider se registra primero y corre primero → al momento de
+> `add_submenu_page('ltms-dashboard', …)` el menú padre **aún no existe** en
+> `$admin_page_hooks` → `get_plugin_page_hookname()` (branch elseif de WP 7.x)
+> calcula el hookname **SIN el prefijo del padre**: `admin_page_ltms-home-slider`.
+> Luego `LTMS_Admin::register_menus()` registra el padre
+> (`$admin_page_hooks['ltms-dashboard'] = 'lt-marketplace'`) → el acceso
+> (`user_can_access_admin_page`) y el render del menú (`menu-header.php:265-280`)
+> calculan el hookname **CON** prefijo (`lt-marketplace_page_ltms-home-slider`)
+> porque para entonces el padre ya existe → **mismatch**:
+> - El menú renderiza el href CRUDO (`echo "<a href='{$sub_item[2]}'…")` → el
+>   browser resuelve el slug relativo como `/wp-admin/ltms-home-slider` → **404 del
+>   frontend** al click (reproducido: `has_action(prefijo)=false`).
+> - El acceso directo a la URL correcta: `$_registered_pages[hogname-buscado]` no
+>   existe → `user_can_access_admin_page()=false` → **"Lo siento, no tienes
+>   permisos"** (reproducido: `access=false`, `registered(prefijo)=false`,
+>   `registered(admin_page_*)=true`).
+>
+> Evidencia descartada durante la auditoría: 479 KERNEL BOOT ERROR históricos
+> (`LTMS_Sales_Booster::init()` sin método, último 04-sep, boot actual OK — el
+> frontend sirve los assets con ver=2.9.392), Adminimize (arrays administrator
+> vacíos), capability `ltms_manage_platform_settings` presente en administrator y
+> en los 4 usuarios admin (#2/#17/#18/#19, `access=true` en CLI), filtro
+> `LTMS_Roles::dynamic_capabilities` (inofensivo — solo `edit_post` para vendors),
+> snippets activos (ninguno toca menús), mu-plugins (2, sin menús), otros
+> submenús del plugin (los de boot_admin corren DESPUÉS del padre → consistentes;
+> los business con padre `ltms` inexistente son consistentes siempre).
+>
+> **Fix:** prioridad 20 en el registro del `admin_menu` hook del Home Slider
+> (`add_action('admin_menu', …, 20)`) — el padre se registra en @10, el submenu en
+> @20 → el padre existe cuando `add_submenu_page()` corre → hookname consistente
+> en los 3 call sites (registro/acceso/render), independiente del orden de boot.
+>
+> **Verificación post-deploy (server, `wp eval-file` con el orden real):**
+> `access=true`, `registered(lt-marketplace_page_…)=true`,
+> `has_action(prefijo)=true`, y el render del `menu-header.php` real produce
+> `HREF REAL del item Home Slider: admin.php?page=ltms-home-slider` (correcto).
+>
+> **Tests:** +2 (`HomeSliderTest`): prioridad 20 + documentación con evidencia.
+> Suite completa: **5.063 tests, 0 fallas** (local + server SiteGround).
+
+- **`includes/frontend/class-ltms-frontend-home-slider.php`:** prioridad 20 en el `admin_menu` hook + documentación de la causa raíz (hookname mismatch).
+- **`tests/unit/HomeSliderTest.php`:** +2 tests del fix.
+- **`lt-marketplace-suite.php`:** (commit previo `0b436b39`) classmap de Composer regenerado — estaba stale desde Jul 3 (48 clases faltaban; `HomeSliderTest` quedaba skipped).
+
 ### Fixed — `VTEX-RULES-FIX` v2.9.392 (recalc no respetaba cambios de reglas — cliente Kosmetic)
 
 > Auditoría a la integración VTEX: el cliente Kosmetic reportaba que el recálculo
