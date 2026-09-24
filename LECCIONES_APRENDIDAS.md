@@ -3754,6 +3754,63 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Misma clase de problema que #173/#174: siempre sospechar del "momento de ejecución" cuando el orden en el
      documento parece correcto pero el runtime falla.
 
+### Lección #176: un dashboard SPA que renderiza TODAS las vistas en el mismo DOM convierte los selectores globales de formulario en una lotería — el primer match decide
+
+1. **Caso real:** el cliente Kosmetic (integración VTEX) reportó que el recálculo de precios no respetaba los
+   cambios de reglas: "el formulario está colocando valores que ya antes se habían cambiado y guardado y tal
+   parece que no persisten". Auditoría con evidencia: `dashboard-wrapper.php` renderiza `view-posgold.php` y
+   `view-vtex.php` JUNTAS en el mismo DOM (`.ltms-view-section` ocultas con `display:none`; el SPA solo las
+   muestra/oculta — `ltms-dashboard.js` `loadView()` NO reemplaza el HTML de la sección) y ambas vistas renderizan
+   inputs con idénticos `name` (`transport_pct`, `margin_pct`, `lotengo_commission_pct`, `iva_pct`, etc.).
+   `ltms-vtex.js` leía con selectores globales `$('input[name="transport_pct"]').val()` → jQuery `.val()` retorna
+   el PRIMER match en el DOM (el form PosGold, que va primero) → al guardar reglas VTEX o pulsar "Recalcular" se
+   enviaban los valores del form PosGold, el backend los persistía en `ltms_vtex_price_*` y los cambios del vendor
+   VTEX se perdían. Tres fixes anteriores (PRICE-RECALC-SAVE/NET de sep 8-10) no lo detectaron porque corregían
+   el ORDEN de guardado y la red, no el CONTENIDO del POST.
+2. **Por qué los tests no lo atraparon antes:** los tests de recálculo verificaban el flujo backend (guardar
+   → recalcular → precio) y las aserciones JS eran estructurales (`collectRules debe leer margin_pct del form`)
+   — ninguna simulaba el DOM real del SPA con DOS forms de idéntico name conviviendo.
+3. **Fix:** scoping de todos los selectores al form propio: `$form = $('#ltms-vtex-rules-form'); $form.find('input[name="..."]')`
+   (y `#ltms-posgold-rules-form` en el JS PosGold — higiene bidireccional: PosGold solo leía sus valores por
+   accidente de orden del DOM).
+4. **Regla preventiva:**
+   - En un SPA que renderiza múltiples vistas en el mismo DOM, NUNCA leer valores de formulario con selectores
+     globales `$('input[name="..."]')` / `$('select[name="..."]')` — siempre scoping al contenedor/form propio
+     con ID único (`$('#form-id').find(...)`).
+   - Al añadir una vista nueva al dashboard, auditar choques de `name` contra TODAS las vistas existentes antes
+     de escribir el JS (grep `name="X"` en views/).
+   - QA del JS de forms: fixture de navegador con el DOM real (todas las vistas juntas) + interceptar `$.post`
+     y verificar QUÉ valores envía cada form — las aserciones estructurales de código no capturan este bug.
+   - jQuery gotcha: `.data('attr')` cachea la primera lectura; si el atributo puede cambiar post-render, leer
+     con `.attr('data-...')` (lectura fresca).
+
+### Lección #177: la whitelist del deploy webhook es un inventario vivo — cada archivo nuevo o tocado fuera de ella NO llega al server
+
+1. **Caso real:** al deployar VTEX-RULES-FIX (v2.9.392), la revisión de la whitelist del webhook
+   (`deploy/ltms-deploy-webhook.php`) reveló que `includes/business/class-ltms-posgold-price-calculator.php`
+   — la calculadora compartida que `LTMS_Vtex_Price_Calculator::calculate()` delega — NO estaba en la whitelist
+   DESDE v2.9.31 (2 meses). El webhook NO hace `git pull` genérico: solo fetchea la lista explícita de archivos
+   vía GitHub Contents API. Si se hubieran deployado los defaults VTEX nuevos (`transport_amount` en las reglas)
+   SIN el `calculate()` actualizado, el server habría corrido el modo % con undefined index
+   (`$rules['transport_pct']` → warning PHP 8 + transporte 0) — precios silenciosamente mal calculados.
+2. **Por qué sobrevivió 2 meses:** la calculadora PosGold no se había tocado desde su creación (el código
+   original funcionaba), y los deploys intermedios solo tocaron archivos que sí estaban en la whitelist. El gap
+   solo se manifiesta cuando UN archivo nuevo depende de UN archivo viejo fuera de la whitelist.
+3. **Fix:** whitelist ampliada con `class-ltms-posgold-price-calculator.php` y `VtexRulesDefaultsTest.php`
+   (test nuevo del ciclo).
+4. **Regla preventiva:**
+   - ANTES de cada deploy, verificar TODOS los archivos del `git diff --stat` contra la whitelist del webhook
+     (`grep -c '<archivo>' deploy/ltms-deploy-webhook.php` para cada uno) — mismo patrón que el hash server vs
+     local del ciclo 33.
+   - Al crear un archivo nuevo (clase, test, script), añadirlo a la whitelist en el MISMO commit que lo crea —
+     no esperar al deploy para descubrirlo.
+   - Cuando el deploy webhook devuelve 403 desde curl/browser (captcha de SiteGround), el fallback documentado
+     es SSH directo (`ssh -p 18765 user@ssh.lo-tengo.com.co`, `git fetch + git reset --hard origin/main`) —
+     verificado funcionando con key `id_ed25519` en este ciclo.
+   - Un gap de whitelist es un canario SILENCIOSO: no hay error en el deploy report (el webhook simplemente no
+     intenta descargar lo que no está listado). El hash server vs local (`md5sum`) es la única verificación
+     confiable de que TODO llegó al disco.
+
 
 
 

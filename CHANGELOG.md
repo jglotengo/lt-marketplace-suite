@@ -4,6 +4,71 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-09-24
+
+### Fixed — `VTEX-RULES-FIX` v2.9.392 (recalc no respetaba cambios de reglas — cliente Kosmetic)
+
+> Auditoría a la integración VTEX: el cliente Kosmetic reportaba que el recálculo
+> de precios no respetaba los cambios de reglas — "el formulario está colocando
+> valores que ya antes se habían cambiado y guardado y tal parece que no persisten".
+>
+> **Causa raíz (H1, P0): contaminación cruzada de selectores JS entre vistas.** El
+> dashboard SPA renderiza TODAS las vistas en el mismo DOM (`dashboard-wrapper.php`
+> incluye `view-posgold.php` y `view-vtex.php` juntas; el SPA solo las muestra/oculta)
+> y ambas vistas renderizan inputs con idénticos `name` (`transport_pct`,
+> `advertising_pct`, `returns_pct`, `margin_pct`, `lotengo_commission_pct`,
+> `iva_pct`, `redi_cost_pct`, `round_multiple`). PosGold va PRIMERO en el DOM, y
+> `ltms-vtex.js` leía con selectores globales `$('input[name="transport_pct"]')` →
+> jQuery `.val()` retorna el PRIMER match (el form PosGold) → al guardar reglas
+> VTEX o pulsar "Recalcular" se enviaban los valores del form PosGold, que el
+> backend persistía en `ltms_vtex_price_*` → los cambios del vendor VTEX se
+> perdían y el recálculo usaba valores de la otra integración.
+>
+> **Fixes:**
+> - **H1:** scoping de todos los selectores al form propio (`$form.find(...)` con
+>   `$form = $('#ltms-vtex-rules-form')` en `ltms-vtex.js`;
+>   `$('#ltms-posgold-rules-form')` en `ltms-posgold.js`).
+> - **H2 (P0):** comisión Lo Tengo default **12%** en las reglas VTEX (antes 10%
+>   heredada de PosGold) — override en `LTMS_Vtex_Price_Calculator::get_defaults()`
+>   + fallback del handler `?? 12`. PosGold queda intacto (fuera de alcance).
+> - **H3/H4 (P1):** transporte y gasto publicitario como **MONTO FIJO en COP/MXN**
+>   según la configuración (país del vendor `ltms_country`, fallback
+>   `LTMS_Core_Config::get_country()`) — antes % del costo base. Nuevas keys
+>   `transport_amount`/`advertising_amount`; el `calculate()` compartido soporta
+>   el modo fijo cuando la key está presente (backward compatible: PosGold sigue
+>   % porque sus reglas nunca incluyen las keys nuevas). Montos validados contra
+>   tope 10.000.000 (NO cap 0-100). Campos de la vista con etiqueta de moneda
+>   (`Transporte ($ COP)`) y `data-currency` en el form para el ejemplo del JS.
+> - **Deploy:** min.js regenerados con terser (server hash = local), bump
+>   `LTMS_VERSION` 2.9.391→2.9.392, whitelist del deploy webhook ampliada con
+>   `class-ltms-posgold-price-calculator.php` (**faltaba desde v2.9.31** — el
+>   server habría recibido los defaults VTEX nuevos sin el soporte de monto fijo)
+>   y `VtexRulesDefaultsTest.php`.
+>
+> **QA punta a punta:** fixture de navegador con el DOM real del SPA (ambas
+> vistas, PosGold primero) — el POST de guardado VTEX lleva los valores VTEX
+> (9000/4500/25/12/2) y NO los de PosGold (15/7/40/10); el form PosGold envía
+> sus propios valores (scoping bidireccional); sin keys % legacy; recálculo
+> encadenado; ejemplo de precio con fórmula exacta del backend (110.000) y
+> etiqueta de moneda (COP/MXN según configuración); live-update de inputs.
+>
+> **Tests:** +13 (grupo `vtex-rules`: defaults comisión 12, montos fijos, fórmula
+> completa 50000→102000, modo % legacy PosGold intacto, roundtrip de persistencia
+> save/get de las keys nuevas, scoping JS, campos de vista, defaults del handler).
+> `RecalcPricesTest` actualizado al nuevo default (84000→148000 con comisión 12%).
+> Suite completa: **5.061 tests, 0 fallas** (local + server SiteGround).
+
+- **`includes/business/class-ltms-posgold-price-calculator.php`:** `calculate()` soporta modo monto fijo (`transport_amount`/`advertising_amount`) con fallback % legacy backward-compatible.
+- **`includes/business/class-ltms-vtex-price-calculator.php`:** defaults VTEX — comisión Lo Tengo 12%, `transport_amount`/`advertising_amount` (keys % legacy removidas de los defaults VTEX).
+- **`includes/frontend/class-ltms-dashboard-logic.php`:** `ajax_save_vtex_rules()` lee las keys nuevas, comisión default 12, validación de montos (tope 10M).
+- **`includes/frontend/views/view-vtex.php`:** campos transporte/publicidad como monto fijo con moneda según país + `data-currency` en el form.
+- **`assets/js/ltms-vtex.js` + `.min.js`:** selectores SCOPED al form + transporte/publicidad monto fijo + ejemplo con moneda (`.attr('data-currency')`, lectura fresca).
+- **`assets/js/ltms-posgold.js` + `.min.js`:** selectores SCOPED al form (higiene bidireccional; PosGold mantiene %).
+- **`lt-marketplace-suite.php`:** bump `LTMS_VERSION` → 2.9.392 (cache-busting).
+- **`deploy/ltms-deploy-webhook.php`:** whitelist ampliada con `class-ltms-posgold-price-calculator.php` y `VtexRulesDefaultsTest.php`.
+- **`tests/unit/VtexRulesDefaultsTest.php` (nuevo):** 13 tests del grupo `vtex-rules`.
+- **`tests/unit/RecalcPricesTest.php` / `VtexIntegrationAuditTest.php` / `VtexFunctionalE2ETest.php`:** actualizados al enfoque nuevo (comisión 12, keys monto fijo, selectores scoped).
+
 ## [Unreleased] — 2026-09-10
 
 ### Fixed — `ELEMENTOR-MODULES-ERR-2` (persistía ReferenceError: Elementor core con defer, Pro sin defer)
