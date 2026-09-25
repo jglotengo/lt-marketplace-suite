@@ -43,7 +43,9 @@ define( 'LTMS_LOADED', true );
 // el CSS viejo. Bump fuerza cache-busting en todos los assets con LTMS_VERSION.
 // CICLO33-P1-BOOKING-FILTERS + SS-TABLES + MINICART-WIDTH (2026-09-22): bump a
 // 2.9.391 — fixes responsive del operador (reservas/fletes + minicart).
-define( 'LTMS_VERSION', '2.9.392' );
+// HOME-SLIDER-MOBILE-CSS-FIX (2026-09-24): bump a 2.9.393 — breakpoint móvil del
+// Home Slider responsivo a la imagen (aspect-ratio auto + img height:auto).
+define( 'LTMS_VERSION', '2.9.393' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

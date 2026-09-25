@@ -355,4 +355,39 @@ final class HomeSliderTest extends LTMS_Unit_Test_Case {
 			'El fix debe documentarse con el ID HOME-SLIDER-IMAGES-FIX y la fecha.'
 		);
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// HOME-SLIDER-MOBILE-CSS-FIX (2026-09-24): en móvil el contenedor del
+	// banner debe seguir el ratio REAL de la imagen. El 1:1 forzado sobre
+	// imágenes panorámicas (1600x853, los 3 banners activos) recortaba la
+	// imagen al cuadrado y dejaba un hueco del mismo ratio de la imagen
+	// debajo (fondo #f3f4f6 del contenedor visible entre el ratio natural de
+	// la img y el cuadrado del media), además de servir de placeholder blanco
+	// mientras carga el JPEG pesado. Fix: aspect-ratio auto + img height:auto
+	// en el breakpoint móvil — verificado en fixture a 390px: MEDIA=390x208
+	// (ratio natural exacto de 1600x853), GAP_BELOW_IMG=0px, imagen completa
+	// sin recorte. Si el admin sube una Imagen Mobile 1:1 el contenedor sigue
+	// su ratio igual (comportamiento original intacto).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_mobile_breakpoint_follows_image_ratio(): void {
+		$css = file_get_contents( self::CSS_PATH );
+
+		$this->assertStringContainsString(
+			'aspect-ratio: auto;',
+			$css,
+			'El breakpoint móvil debe usar aspect-ratio auto (el contenedor sigue el ratio real de la imagen) — HOME-SLIDER-MOBILE-CSS-FIX.'
+		);
+		$this->assertStringContainsString(
+			'height: auto;',
+			$css,
+			'La imagen en móvil debe renderizar a su ratio natural (height auto) sin recorte forzado.'
+		);
+		// El 1:1 forzado en el media móvil no debe persistir.
+		$this->assertStringNotContainsString(
+			'aspect-ratio: 1 / 1; /* si hay imagen mobile',
+			$css,
+			'NO debe persistir el aspect-ratio 1/1 forzado en el media móvil (recortaba la panorámica y dejaba hueco del mismo ratio debajo).'
+		);
+	}
 }

@@ -125,9 +125,25 @@
 }
 
 /* ── Responsive: mobile ─────────────────────────────────────────── */
+/* HOME-SLIDER-MOBILE-CSS-FIX (2026-09-24): el contenedor móvil ahora
+   sigue el ratio REAL de la imagen efectiva (panorámica desktop o
+   mobile 1:1). El 1:1 forzado sobre imágenes panorámicas (1600x853,
+   los 3 banners activos) recortaba la imagen al cuadrado y dejaba un
+   hueco del mismo ratio de la imagen debajo (fondo #f3f4f6 del
+   contenedor visible entre el ratio natural de la img y el cuadrado
+   del media), además de servir de placeholder blanco mientras carga
+   el JPEG pesado. Con aspect-ratio: auto + img height:auto el área
+   del banner coincide SIEMPRE con la imagen: sin recorte forzado, sin
+   espacio blanco de más; si el admin sube una Imagen Mobile 1:1 el
+   contenedor sigue su ratio igual (comportamiento original intacto). */
 @media (max-width: 767px) {
     .ltms-hs__media {
-        aspect-ratio: 1 / 1; /* si hay imagen mobile, usa su ratio; si no, 1:1 */
+        aspect-ratio: auto;
+        min-height: 120px; /* placeholder mínimo mientras carga el JPEG */
+    }
+    .ltms-hs__media img,
+    .ltms-hs__media picture img {
+        height: auto;
     }
     .ltms-hs__cta {
         left: 5%;
