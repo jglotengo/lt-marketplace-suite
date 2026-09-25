@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-24
 
+### Fixed — `HOME-SLIDER-MOBILE-CSS-FIX` (banner no responsivo a la imagen en móvil: recorte forzado a cuadrado + hueco del mismo ratio debajo)
+
+> Reporte del operador: en móvil los banners se veían con un espacio blanco en la
+> parte inferior de la misma proporción a la imagen — el área del banner no era
+> responsiva a la imagen en móvil.
+>
+> **Causa raíz:** el breakpoint móvil (`@media (max-width: 767px)`) forzaba
+> `aspect-ratio: 1/1` (cuadrado) sobre imágenes panorámicas (1600×853, los 3 banners
+> activos — mismo ratio 1.875:1): la imagen se recortaba al cuadrado con
+> `object-fit: cover` y el hueco que quedaba entre el ratio natural de la `img` y el
+> cuadrado del `.ltms-hs__media` mostraba el fondo `#f3f4f6` del contenedor — un
+> espacio con la proporción de la imagen — que además servía de placeholder blanco
+> mientras carga el JPEG pesado en conexión móvil. Verificado con fixture fiel a
+> 390px: el CSS con 1:1 produce MEDIA=390x390 (cuadrado con recorte); el CSS servido
+> en server era correcto en sí mismo (object-fit + height:100% presentes), el
+> problema era el spec del ratio, no un CSS roto.
+>
+> **Fix (commit 2d25edb1):** en móvil el contenedor sigue el ratio REAL de la imagen
+> efectiva: `aspect-ratio: auto` + `img { height: auto; }` + `min-height: 120px`
+> (placeholder mínimo mientras carga el JPEG). El banner muestra su imagen completa
+> sin recorte forzado y sin espacio de más; si el admin sube una Imagen Mobile 1:1,
+> el contenedor sigue su ratio igual (comportamiento original intacto — "si hay
+> imagen mobile, usa su ratio"). Verificado en fixture a 390px: MEDIA=390x208 (ratio
+> natural exacto de 1600×853), GAP_BELOW_IMG=0px, imagen completa.
+>
+> **Verificación end-to-end post-deploy (server `2d25edb1`, OPcache + cache flush +
+> purga SG assets, HTML servido con `?ver=2.9.393` — 16 assets cache-busted):** el
+> home real renderizado a 390px muestra HS=373x199 (ratio natural exacto),
+> `MEDIA aspectRatio=auto`, imagen completa visible sin recorte ni espacio blanco,
+> y el widget Elementor oculto sin ocupar espacio (`offsetH=0`). LTMS_VERSION
+> 2.9.392→2.9.393. Tests: +1 (HomeSliderTest 18/18, 48 assertions). Suite completa
+> 5,068 tests 0 fallas.
+
 ### Fixed — `HOME-SLIDER-IMAGES-FIX` (banners cargados en el Home Slider no se veían en el home: Elementor oculto + slider nunca renderizado)
 
 > Reporte del operador: se cargaron los banners en el Home Slider (3 activos, verificados

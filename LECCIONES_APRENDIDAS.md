@@ -3888,6 +3888,42 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      (`locate_template` + include) muestra exactamente dónde aterriza el HTML inyectado (posición + contexto
      alrededor) — no asumir el hook ni el orden de disparo.
 
+### Lección #180: un breakpoint móvil que fuerza un aspect-ratio distinto al de las imágenes reales no es "responsivo a la imagen" — y el QA de CSS responsivo debe hacerse con el HTML servido real, no con fixtures
+
+1. **Caso real:** en móvil los banners del Home Slider se veían con un espacio blanco en la parte inferior de la
+   misma proporción a la imagen. El breakpoint móvil forzaba `aspect-ratio: 1/1` (cuadrado) sobre imágenes
+   panorámicas (1600×853, los 3 banners activos — mismo ratio 1.875:1): la imagen se recortaba al cuadrado con
+   `object-fit: cover` y el hueco entre el ratio natural de la `img` y el cuadrado del media mostraba el fondo
+   `#f3f4f6` del contenedor — el "espacio blanco de la misma proporción" — que además servía de placeholder
+   mientras carga el JPEG pesado en conexión móvil.
+2. **El spec del ratio debe seguir a la IMAGEN, no al diseño:** un contenedor con `aspect-ratio` fijo solo es
+   "responsivo a la imagen" si TODAS las imágenes tienen ese ratio. Con imágenes de otro ratio: recorte (cover) o
+   hueco (contain/fondo visible). Fix: `aspect-ratio: auto` + `img { height: auto }` — el contenedor SIEMPRE sigue
+   el ratio de la imagen efectiva (desktop panorámica o mobile 1:1), sin recorte forzado ni espacio de más. Si el
+   negocio quiere banners altos en móvil, la solución es subir la Imagen Mobile 1:1 (la UI admin ya lo permite),
+   no forzar el ratio del contenedor.
+3. **Los fixtures de QA con CSS inline NO reproducen el render real:** el fixture del ciclo anterior (CSS copiado
+   inline) no mostraba el problema; el QA responsable se hace con el HTML SERVIDO real (descargado con UA de
+   navegador) + sus subrecursos remotos (imágenes/CSS/JS del sitio cargan desde file:// — solo el documento HTML
+   recibe 403 de SG Anti-Bot) + wrapper con iframe de 390px (el media query responde al viewport del iframe) +
+   script de diagnóstico inyectado (el iframe file:// es cross-origin — no se puede leer desde fuera). Eso
+   reproduce la página real sin auth y sin adivinar el CSS.
+4. **El SG Anti-Bot bloquea por User-Agent y rate-limita:** el headless browser recibe 403 universal; curl/
+   Invoke-WebRequest con UA default recibe 202 + captcha (meta refresh a /.well-known/sgcaptcha/) al repetir
+   requests; con UA de navegador real el documento estático pasa. Para páginas dinámicas o cuando hay captcha,
+   usar `wp_remote_get` desde el server vía SSH (sin Anti-Bot) y traer el HTML en base64.
+5. **Regla preventiva:**
+   - Todo breakpoint móvil de contenedores de imagen debe usar `aspect-ratio: auto` + `img { height: auto }` (el
+     contenedor sigue la imagen) O verificar que TODAS las imágenes posibles tengan el ratio forzado — nunca
+     asumir un ratio sin mirar las dimensiones reales de los uploads (`wp_get_attachment_metadata`).
+   - Verificar el CSS servido (`wp_remote_get` de la URL con `?ver=`) antes de asumir que el CSS está roto — el
+     problema puede ser el spec, no el archivo.
+   - El QA visual de responsive se hace con el HTML real descargado + wrapper iframe (viewport del iframe dispara
+     el media query) + reporte de geometría inyectado (computed aspectRatio, height, min-height, objectFit,
+     GAP_BELOW_IMG) — no con fixtures de CSS copiado.
+   - Bumpear `LTMS_VERSION` SIEMPRE con cambios de CSS (el `?ver=` en caché del dispositivo serviría el CSS
+     viejo).
+
 
 
 
