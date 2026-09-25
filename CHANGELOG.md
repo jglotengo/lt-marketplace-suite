@@ -6,6 +6,47 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-24
 
+### Fixed — `HOME-SLIDER-IMAGES-FIX` (banners cargados en el Home Slider no se veían en el home: Elementor oculto + slider nunca renderizado)
+
+> Reporte del operador: se cargaron los banners en el Home Slider (3 activos, verificados
+> en la opción `ltms_home_slides` con URLs válidas en server) pero el home no mostraba
+> ninguna imagen.
+>
+> **Causa raíz verificada de punta a punta en server (HTTP 200, home real):**
+> `inject_home_slider()` corre en `wp_footer` @20 y DENTRO de ese callback registraba
+> `add_action( 'wp_body_open', …, 30 )` — pero `wp_body_open` dispara al INICIO del
+> `<body>` (header.php), ANTES que `wp_footer`, así que el hook registrado tarde NUNCA
+> corría → `render_slider()` nunca se imprimía. Neto en el HTML servido: el estilo que
+> OCULTA el widget de Elementor SÍ se imprimía (`ltms-home-slider-hide-elementor`
+> presente, echo directo en wp_footer) pero el slider NO existía (`data-ltms-hs`
+> ausente) → Elementor oculto + slider ausente = home sin banners (el usuario perdió
+> los banners que tenía con el widget de Elementor).
+>
+> **Fix (commit 3ad0dfd1):** el render viaja en el filtro `the_content` @10 registrado
+> en `init()` con: guards (`is_front_page()` + `in_the_loop()` + guard de
+> `page_on_front` para nested loops), flag `$this->rendered` anti-duplicado, y guard de
+> shortcode (`[ltms_home_slider]` / `data-ltms-hs` ya presente en el contenido → no
+> anteponer). Fallback `wp_footer` con guard `rendered` para templates sin loop.
+> Helper `hide_elementor_style()` compartido entre ambos caminos.
+>
+> **Verificación empírica previa al deploy (server, render simulado del front page 30
+> con el template real index.php):** `the_content` dispara con `is_front_page()=true` e
+> `in_the_loop()=true` y el banner aterriza dentro de `<main id="content">` →
+> `.page-content`, justo antes del contenido Elementor (debajo del header de
+> navegación) — la posición exacta del widget Slides que reemplaza. Hooks descartados
+> durante la auditoría: `elementor/frontend/after_header` NO dispara en este site
+> aunque el header sea Elementor Pro (verificado con `wp eval-file`);
+> `wp_body_open` renderiza ENCIMA del header de navegación (antes del skip-link);
+> `wp_footer` directo renderiza al final del body.
+>
+> **Post-deploy (server `3ad0dfd1`, OPcache reset + cache flush + purga assets SG):**
+> `data-ltms-hs` presente en el HTML servido (LEN 222,619 → 223,835), posición
+> confirmada (HS_POS 70588 > HEADER_POS 42857, tras `.page-content`), 3 slides con las
+> imágenes en el orden correcto (banner3/banner2/banner1, order 1–3) y los 3 archivos
+> de imagen existentes en uploads. Whitelist del webhook con
+> `tests/unit/HomeSliderTest.php` (faltaba — lección #177). Tests: +4 (HomeSliderTest
+> 17/17, 45 assertions). Suite completa 5,067 tests 0 fallas (local + SG).
+
 ### Fixed — `HOME-SLIDER-ORDER-FIX` (submenu Home Slider roto: href crudo → 404 + "Lo siento, no tienes permisos")
 
 > Reporte del operador: clickeando el submenu Home Slider en wp-admin aterrizaba en

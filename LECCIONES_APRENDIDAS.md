@@ -3848,7 +3848,45 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
      correcta dando el mensaje CORE "Lo siento, no tienes permisos" (403) en vez del mensaje de la vista del
      plugin — ambos juntos = hookname mismatch, no un problema de permisos.
    - El mensaje de wp_die identifica la capa: el CORE dice "Lo siento, no tienes permisos para acceder a esta
-     página" (hook no registrado / nopriv); la vista del plugin dice su propio texto (el request SÍ llegó).
+      página" (hook no registrado / nopriv); la vista del plugin dice su propio texto (el request SÍ llegó).
+
+### Lección #179: un hook registrado DENTRO del callback de otro hook que ya disparó nunca corre — toda inyección de contenido en el render debe registrarse en init()
+
+1. **Caso real:** los banners del Home Slider (cargados en el admin, 3 activos verificados en `ltms_home_slides`)
+   no se veían en el home. Causa raíz verificada de punta a punta en server (HTTP 200, home real):
+   `inject_home_slider()` corre en `wp_footer` @20 y DENTRO de ese callback registraba
+   `add_action( 'wp_body_open', closure, 30 )` — pero `wp_body_open` dispara al INICIO del `<body>` (header.php),
+   ANTES que `wp_footer`, así que el hook registrado tarde NUNCA corría → `render_slider()` nunca se imprimía.
+2. **El síntoma era engañoso:** el home NO mostraba nada, pero el módulo SÍ corría — el estilo que oculta el
+   widget de Elementor se imprime con echo directo en `wp_footer` (sin diferir), así que aparecía en el HTML
+   (`ltms-home-slider-hide-elementor` presente) mientras el slider no existía (`data-ltms-hs` ausente). Un echo
+   directo en un hook funciona aunque el hook diferido del mismo callback nunca corra — verificar los DOS
+   efectos por separado.
+3. **El orden de render de WP en una página:** `wp_head` → `<body>` → `wp_body_open` → contenido (loop →
+   `the_content`) → `wp_footer`. Cualquier hook registrado DURANTE el render solo puede correr en hooks que
+   disparan DESPUÉS del punto de registro. `add_action('wp_body_open')` desde `wp_footer` es imposible
+   (wp_body_open ya disparó); misma clase de bug que #178 (hook registrado en el momento equivocado del boot).
+4. **Cómo elegir el hook de inyección de contenido (verificado empíricamente con `wp eval-file` en server,
+   render simulado con el template REAL del theme):**
+   - `elementor/frontend/after_header` NO dispara en hello-elementor aunque el header sea Elementor Pro
+     (elementor-location-header) — no confiar en él sin verificar.
+   - `wp_body_open` renderiza ENCIMA del header de navegación (antes del skip-link) — válido para announcement
+     bars, no para el banner principal del home.
+   - `the_content` @10 con guards (`is_front_page()` + `in_the_loop()` + `page_on_front` para nested loops)
+     aterriza dentro de `<main id="content">` → `.page-content`, justo antes del contenido de la página — la
+     posición exacta de un widget de contenido. Protege contra widgets (fuera de loop), feeds
+     (`the_content_feed`) y embeds (`the_excerpt_embed` — filtros distintos).
+5. **Regla preventiva:**
+   - NUNCA registrar `add_action`/`add_filter` para un hook que ya disparó dentro del callback de otro hook del
+     render — mover el registro a `init()` (o al hook más temprano desde el cual el objetivo aún no disparó).
+   - Los canarios del bug: un efecto del callback SÍ aparece (echo directo) y el otro NO (hook diferido) —
+     revisar TODO el callback, no solo el primer síntoma.
+   - Toda simulación de render debe replicar el flujo real (template-loader → template del theme → header →
+     loop → footer); una simulación que llama los hooks manualmente en otro orden valida un escenario que no
+     ocurre (misma lección que #178: las simulaciones CLI engañan).
+   - Verificar el fix de punta a punta ANTES del deploy: render simulado del front page con el template REAL
+     (`locate_template` + include) muestra exactamente dónde aterriza el HTML inyectado (posición + contexto
+     alrededor) — no asumir el hook ni el orden de disparo.
 
 
 
