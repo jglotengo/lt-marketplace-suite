@@ -255,4 +255,104 @@ final class HomeSliderTest extends LTMS_Unit_Test_Case {
 			'El comentario debe documentar el hookname con prefijo que buscan acceso/render.'
 		);
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// HOME-SLIDER-IMAGES-FIX (2026-09-24): los banners cargados en el admin no
+	// se veían en el home. Causa raíz verificada de punta a punta en server
+	// (HTTP 200, home real con 3 banners activos): inject_home_slider() corría
+	// en wp_footer @20 y DENTRO de ese callback registraba
+	// add_action( 'wp_body_open', ... ) — pero wp_body_open dispara al INICIO
+	// del <body> (header.php), ANTES que wp_footer, así que el hook registrado
+	// tarde NUNCA corría → render_slider() nunca se imprimía. Neto: el estilo
+	// que OCULTA el widget de Elementor SÍ se imprimía
+	// (ltms-home-slider-hide-elementor presente en el HTML servido) pero el
+	// slider NO existía (data-ltms-hs ausente) → Elementor oculto + slider
+	// ausente = home sin banners. Fix: el render viaja en el filtro
+	// the_content @10 registrado en init(), con guards (is_front_page,
+	// in_the_loop, page_on_front para nested loops), flag $this->rendered
+	// anti-duplicado y guard de shortcode. Fallback: wp_footer con guard
+	// rendered. Verificado empíricamente en server (render simulado del front
+	// page 30 con el template real index.php): the_content dispara con
+	// is_front_page()=true e in_the_loop()=true y el banner aterriza dentro de
+	// <main id="content"> → .page-content, justo antes del contenido Elementor
+	// (debajo del header de navegación) — la posición exacta del widget Slides.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_render_wired_via_the_content_filter_not_body_open_from_footer(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			"add_filter( 'the_content', [ \$instance, 'prepend_slider_to_content' ], 10 )",
+			$src,
+			'El render debe viajar en el filtro the_content @10 registrado en init() — HOME-SLIDER-IMAGES-FIX.'
+		);
+		// El patrón del bug (registrar wp_body_open con closure DESDE el callback
+		// de wp_footer) no debe persistir: el hook registrado en wp_footer nunca
+		// corre porque wp_body_open ya disparó al inicio del <body>.
+		$this->assertStringNotContainsString(
+			"add_action( 'wp_body_open', function",
+			$src,
+			'NO debe persistir el registro de wp_body_open con closure desde wp_footer (el hook registrado tarde nunca corre → banners invisibles).'
+		);
+		$this->assertStringContainsString(
+			'public function prepend_slider_to_content(',
+			$src,
+			'Debe existir el método prepend_slider_to_content (render vía the_content).'
+		);
+	}
+
+	public function test_content_filter_guards_front_page_loop_and_nested_loops(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			'! is_front_page() || ! in_the_loop()',
+			$src,
+			'El filtro the_content debe limitarse al loop de la página frontal (evita inyectar el banner en widgets/contenido ajeno).'
+		);
+		$this->assertStringContainsString(
+			'get_the_ID() !== $front_id',
+			$src,
+			'El filtro debe ignorar nested loops (solo inyectar cuando el loop itera page_on_front).'
+		);
+	}
+
+	public function test_content_filter_avoids_double_render(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			'if ( $this->rendered || ! is_front_page() || ! in_the_loop() )',
+			$src,
+			'El filtro debe respetar el flag rendered (evita el doble banner).'
+		);
+		$this->assertStringContainsString(
+			"strpos( \$content, '[ltms_home_slider]' )",
+			$src,
+			'El filtro debe detectar el shortcode [ltms_home_slider] en el contenido para no anteponer el slider dos veces.'
+		);
+		$this->assertStringContainsString(
+			"strpos( \$content, 'data-ltms-hs' )",
+			$src,
+			'El filtro debe detectar markup del slider ya renderizado (shortcode expandido por Elementor) para no duplicar.'
+		);
+	}
+
+	public function test_footer_fallback_guards_rendered_flag(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			'public function inject_home_slider(): void',
+			$src,
+			'Debe existir el fallback inject_home_slider (templates sin loop/the_content).'
+		);
+		$this->assertStringContainsString(
+			'if ( $this->rendered ) {' . "\n" . '            return;' . "\n" . '        }' . "\n" . '        if ( ! is_front_page() ) {',
+			$src,
+			'El fallback de wp_footer debe verificar el flag rendered ANTES de renderizar (evita el doble banner).'
+		);
+		$this->assertStringContainsString(
+			'HOME-SLIDER-IMAGES-FIX (2026-09-24)',
+			$src,
+			'El fix debe documentarse con el ID HOME-SLIDER-IMAGES-FIX y la fecha.'
+		);
+	}
 }

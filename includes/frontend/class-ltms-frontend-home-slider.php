@@ -23,6 +23,9 @@ final class LTMS_Frontend_Home_Slider {
     /** Versión de cache-busting del JS/CSS (sincronizada con LTMS_VERSION). */
     const VERSION = LTMS_VERSION;
 
+    /** HOME-SLIDER-IMAGES-FIX: true cuando el slider ya se renderizó en este request. */
+    private bool $rendered = false;
+
     /**
      * Registra los hooks.
      *
@@ -60,6 +63,25 @@ final class LTMS_Frontend_Home_Slider {
         // Shortcode + inyección automática en el home.
         add_shortcode( 'ltms_home_slider', [ $instance, 'render_shortcode' ] );
         add_action( 'wp_enqueue_scripts', [ $instance, 'enqueue_frontend_assets' ] );
+        // HOME-SLIDER-IMAGES-FIX (2026-09-24): el render del slider viaja en el
+        // filtro the_content @10, registrado AQUÍ (en init). El código anterior
+        // registraba add_action( 'wp_body_open', ... ) DESDE DENTRO del callback
+        // de inject_home_slider() (que corre en wp_footer @20): wp_body_open
+        // dispara al INICIO del <body> (header.php), ANTES que wp_footer, así
+        // que el hook registrado tarde NUNCA corría → render_slider() nunca se
+        // imprimía. Neto verificado en server (HTTP 200, home real con 3
+        // banners activos): el estilo que OCULTA el widget de Elementor sí se
+        // imprimía (ltms-home-slider-hide-elementor presente) pero el slider NO
+        // existía en el HTML (data-ltms-hs ausente) → Elementor oculto + slider
+        // ausente = home sin banners. Fix verificado empíricamente en server
+        // (render simulado del front page 30 con el template real index.php):
+        // the_content dispara con is_front_page()=true e in_the_loop()=true y el
+        // banner aterriza dentro de <main id="content"> → .page-content, justo
+        // antes del contenido Elementor (debajo del header de navegación) — la
+        // posición exacta del widget Slides que reemplaza. Fallback: si
+        // the_content nunca dispara (template exótico sin loop), wp_footer
+        // renderiza al final (visible > invisible).
+        add_filter( 'the_content', [ $instance, 'prepend_slider_to_content' ], 10 );
         add_action( 'wp_footer', [ $instance, 'inject_home_slider' ], 20 );
     }
 
@@ -175,12 +197,56 @@ final class LTMS_Frontend_Home_Slider {
     }
 
     /**
+     * HOME-SLIDER-IMAGES-FIX: antepone el slider al contenido del home vía
+     * filtro the_content @10 (debajo del header de navegación, donde estaba el
+     * widget Slides de Elementor que reemplaza). Ver el comentario del wiring
+     * en init() para la evidencia completa de la causa raíz.
+     *
+     * @param mixed $content Contenido del post (string esperado).
+     * @return string Contenido con el slider antepuesto.
+     */
+    public function prepend_slider_to_content( $content ): string {
+        $content = (string) $content;
+        if ( $this->rendered || ! is_front_page() || ! in_the_loop() ) {
+            return $content;
+        }
+        // Nested loops dentro del loop principal (widgets de posts que aplican
+        // the_content): solo inyectar cuando el loop itera la página frontal.
+        $front_id = (int) get_option( 'page_on_front' );
+        if ( $front_id && (int) get_the_ID() !== $front_id ) {
+            return $content;
+        }
+        $slides = $this->get_slides();
+        if ( empty( $slides ) ) {
+            return $content;
+        }
+        // No duplicar: si el contenido ya incluye el slider (shortcode
+        // [ltms_home_slider] por expandir en do_shortcode @11, o markup propio
+        // ya renderizado), no anteponer — pero marcar rendered para que el
+        // fallback de wp_footer tampoco duplique.
+        if ( strpos( $content, 'data-ltms-hs' ) !== false
+            || strpos( $content, '[ltms_home_slider]' ) !== false ) {
+            $this->rendered = true;
+            return $content;
+        }
+        $this->rendered = true;
+        return $this->hide_elementor_style() . $this->render_slider() . $content;
+    }
+
+    /**
      * Inyecta el slider en el home automáticamente y oculta el widget Slides
      * de Elementor (reemplazo automático).
+     *
+     * HOME-SLIDER-IMAGES-FIX (2026-09-24): queda como FALLBACK para templates
+     * sin loop/the_content — si el slider ya se renderizó en the_content, este
+     * método no hace nada (evita el doble banner).
      *
      * @return void
      */
     public function inject_home_slider(): void {
+        if ( $this->rendered ) {
+            return;
+        }
         if ( ! is_front_page() ) {
             return;
         }
@@ -188,16 +254,25 @@ final class LTMS_Frontend_Home_Slider {
         if ( empty( $slides ) ) {
             return;
         }
-        // Ocultar el widget Slides de Elementor en el home (reemplazo automático).
-        echo '<style id="ltms-home-slider-hide-elementor">
+        echo $this->hide_elementor_style(); // phpcs:ignore
+        // Renderizar nuestro slider justo después del header.
+        echo $this->render_slider(); // phpcs:ignore
+        $this->rendered = true;
+    }
+
+    /**
+     * HOME-SLIDER-IMAGES-FIX: estilo inline que oculta el widget Slides de
+     * Elementor en el home (reemplazo automático). Extraído a helper para que
+     * the_content y el fallback de wp_footer compartan el mismo markup.
+     *
+     * @return string Bloque <style>.
+     */
+    private function hide_elementor_style(): string {
+        return '<style id="ltms-home-slider-hide-elementor">
             .elementor-widget-slides, .elementor-widget-image-carousel, .elementor-widget-carousel {
                 display: none !important;
             }
         </style>';
-        // Renderizar nuestro slider justo después del header.
-        add_action( 'wp_body_open', function () {
-            echo $this->render_slider(); // phpcs:ignore
-        }, 30 );
     }
 
     /**

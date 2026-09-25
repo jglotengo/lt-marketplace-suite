@@ -720,6 +720,11 @@ $files = [
     'assets/css/ltms-home-slider.css',
     'assets/js/ltms-home-slider.js',
     'assets/js/ltms-home-slider.min.js',
+    // HOME-SLIDER-IMAGES-FIX (2026-09-24) — banners invisibles en el home
+    // (render registrado en wp_body_open desde wp_footer nunca corría). El
+    // test no estaba en la whitelist → los +4 tests no llegarían al server
+    // vía webhook (lección #177: la whitelist es inventario vivo).
+    'tests/unit/HomeSliderTest.php',
     'includes/frontend/templates/archive-product.php',
     'includes/frontend/templates/cart.php',
     'includes/frontend/templates/checkout.php',
