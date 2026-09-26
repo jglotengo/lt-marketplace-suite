@@ -49,7 +49,10 @@ define( 'LTMS_LOADED', true );
 // PosGold desde el costo persistido + cache-busting del JS del panel.
 // P2-HS-AUTOPLAY (2026-09-25): bump a 2.9.395 — autoplay editable desde la UI
 // admin del Home Slider (input + save JS + update_option) + cache-busting.
-define( 'LTMS_VERSION', '2.9.395' );
+// POSGOLD-RULES-PARITY (2026-09-26): bump a 2.9.396 — reglas PosGold idénticas
+// a VTEX (transporte/publicidad monto fijo COP/MXN, comisión Lo Tengo 12) +
+// cache-busting del JS del panel.
+define( 'LTMS_VERSION', '2.9.396' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

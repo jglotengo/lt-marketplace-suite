@@ -4,7 +4,54 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-25
+## [Unreleased] — 2026-09-26
+
+### Changed — `POSGOLD-RULES-PARITY` (reglas de precio PosGold idénticas a VTEX)
+
+> El vendor pedía paridad total de los campos de reglas: en VTEX el transporte y
+> el gasto publicitario se definen como MONTO FIJO en la moneda del vendor
+> (COP/MXN según `ltms_country`, fallback `LTMS_Core_Config::get_country`) y no
+> en porcentajes — PosGold seguía con el modo % heredado y comisión Lo Tengo
+> default 10.
+>
+> **Fix (mismo enfoque que VTEX-RULES-FIX 2026-09-23):**
+> - `LTMS_PosGold_Price_Calculator::get_defaults()`: defaults idénticos a VTEX —
+>   comisión Lo Tengo 10 → **12%**, transporte y gasto publicitario como monto
+>   fijo (`transport_amount`/`advertising_amount`, COP/MXN). Las keys legacy
+>   `transport_pct`/`advertising_pct` se remueven de los defaults (metas viejos
+>   `ltms_posgold_price_*_pct` quedan huérfanos en DB — mismo criterio aceptado
+>   en VTEX-RULES-FIX). La persistencia es automática: `get/save_vendor_rules`
+>   iteran los defaults, así la sync (`class-ltms-posgold-sync.php:292`) y el
+>   recálculo masivo leen/persisten los montos fijos sin cambios adicionales.
+> - `view-posgold.php`: vars de moneda del vendor (mismo patrón que
+>   view-vtex.php), `data-currency` en el form de reglas, campos "Transporte
+>   ($ COP/MXN)" y "Gasto publicitario ($ COP/MXN)" con `name="transport_amount"`
+>   / `name="advertising_amount"` (min 0, step 1) y help "Monto fijo en X que se
+>   suma al costo base".
+> - `LTMS_Dashboard_Logic::ajax_save_posgold_rules()`: lee los montos fijos con
+>   topes 0–10.000.000 (paridad con `ajax_save_vtex_rules`, no cap 100),
+>   comisión fallback 12 (antes 10), `wp_unslash` en `is_redi` (paridad VTEX).
+> - `ltms-posgold.js` (+ `.min.js` regenerado con terser): el save y
+>   `collectRules()` (flujo save→recalc del botón de recálculo) leen
+>   `transport_amount`/`advertising_amount` — sin este fix el recálculo habría
+>   persistido transporte 0 perdiendo el valor del vendor; `updatePriceExample()`
+>   muestra "(fijo)/(fija)" y la moneda real en el precio redondeado (paridad con
+>   el ejemplo VTEX).
+> - `calculate()` conserva el fallback % legacy para arrays de reglas sin las
+>   keys de monto fijo (llamadas antiguas / tests) — backward compat intacto.
+> - `LTMS_VERSION` 2.9.395 → 2.9.396 (cache-busting JS del panel).
+>
+> **Impacto:** vendors PosGold con % de transporte/publicidad configurado vuelven
+> a monto fijo 0 (paridad VTEX — decisión de negocio solicitada explícitamente).
+> Vendors sin reglas persistidas ahora reciben comisión 12% + montos fijos.
+>
+> **Tests:** `VtexRulesDefaultsTest`: `test_posgold_defaults_parity_with_vtex`
+> (defaults PosGold === defaults VTEX con assertSame), vista/handler PosGold con
+> montos fijos + data-currency + tope 10M; fallback % actualizado a rules sin
+> keys de monto (cubre el fallback vivo); JS scoping y min.js actualizados.
+> `PosGoldRecalcTest`: fórmula default 50.000 → 88.000 (antes 86.000 con
+> comisión 10) y ReDi → 93.000. Suite completa 5,089 tests 10,737 assertions
+> 0 fallas (3 skips preexistentes).
 
 ### Added — `P2-HS-AUTOPLAY` (autoplay del Home Slider editable desde la UI admin)
 

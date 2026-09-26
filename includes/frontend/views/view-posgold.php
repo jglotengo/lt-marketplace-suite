@@ -12,7 +12,7 @@
  * - Sincronizar productos manualmente
  *
  * @package LTMS
- * @version 2.9.31
+ * @version 2.9.396
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -20,6 +20,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $user_id = get_current_user_id();
 $creds   = LTMS_PosGold_Sync::get_vendor_credentials( $user_id );
 $rules   = LTMS_PosGold_Price_Calculator::get_vendor_rules( $user_id );
+
+// POSGOLD-RULES-PARITY (2026-09-26): transporte y gasto publicitario en MONTO
+// FIJO en la moneda del vendor — país del vendor (ltms_country, mismo patrón
+// que view-vtex.php / view-kyc.php) con fallback al país de operación del
+// sitio (LTMS_Core_Config).
+$vendor_country = strtoupper( (string) get_user_meta( $user_id, 'ltms_country', true ) );
+if ( ! in_array( $vendor_country, [ 'CO', 'MX' ], true ) ) {
+    $vendor_country = class_exists( 'LTMS_Core_Config' ) ? LTMS_Core_Config::get_country() : 'CO';
+}
+$currency_code  = ( 'MX' === $vendor_country ) ? 'MXN' : 'COP';
+$currency_label = ( 'MX' === $vendor_country )
+    ? __( 'pesos mexicanos (MXN)', 'ltms' )
+    : __( 'pesos colombianos (COP)', 'ltms' );
 
 $last_sync       = (int) get_user_meta( $user_id, 'ltms_posgold_last_sync', true );
 $last_sync_count = (int) get_user_meta( $user_id, 'ltms_posgold_last_sync_count', true );
@@ -311,7 +324,10 @@ if ( empty( $seo_template ) ) {
                     <span class="ltms-posgold-accordion-icon">▼</span>
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
-                    <form id="ltms-posgold-rules-form" method="post">
+                    <!-- POSGOLD-RULES-PARITY (2026-09-26): data-currency para que el
+                         ejemplo de cálculo del JS muestre la moneda real (COP/MXN)
+                         del vendor — paridad con view-vtex.php. -->
+                    <form id="ltms-posgold-rules-form" method="post" data-currency="<?php echo esc_attr( $currency_code ); ?>">
                         <?php /* v2.9.70 P3-4: Dead nonce removed */ ?>
 
                         <!-- Toggle ReDi -->
@@ -333,29 +349,29 @@ if ( empty( $seo_template ) ) {
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px;">
                             <div>
                                 <label style="display:block;font-weight:600;margin-bottom:4px;font-size:0.85rem;">
-                                    <?php esc_html_e( 'Transporte (%)', 'ltms' ); ?>
+                                    <?php printf( esc_html__( 'Transporte ($ %s)', 'ltms' ), esc_html( $currency_code ) ); ?>
                                 </label>
                                 <input type="number"
-                                       name="transport_pct"
-                                       value="<?php echo esc_attr( $rules['transport_pct'] ); ?>"
-                                       min="0" max="100" step="0.1"
+                                       name="transport_amount"
+                                       value="<?php echo esc_attr( $rules['transport_amount'] ); ?>"
+                                       min="0" step="1"
                                        style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;">
                                 <p style="margin:4px 0 0;font-size:0.7rem;color:#9ca3af;">
-                                    <?php esc_html_e( '% del costo base', 'ltms' ); ?>
+                                    <?php printf( esc_html__( 'Monto fijo en %s que se suma al costo base', 'ltms' ), esc_html( $currency_label ) ); ?>
                                 </p>
                             </div>
 
                             <div>
                                 <label style="display:block;font-weight:600;margin-bottom:4px;font-size:0.85rem;">
-                                    <?php esc_html_e( 'Gasto publicitario (%)', 'ltms' ); ?>
+                                    <?php printf( esc_html__( 'Gasto publicitario ($ %s)', 'ltms' ), esc_html( $currency_code ) ); ?>
                                 </label>
                                 <input type="number"
-                                       name="advertising_pct"
-                                       value="<?php echo esc_attr( $rules['advertising_pct'] ); ?>"
-                                       min="0" max="100" step="0.1"
+                                       name="advertising_amount"
+                                       value="<?php echo esc_attr( $rules['advertising_amount'] ); ?>"
+                                       min="0" step="1"
                                        style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;">
                                 <p style="margin:4px 0 0;font-size:0.7rem;color:#9ca3af;">
-                                    <?php esc_html_e( '% del costo base', 'ltms' ); ?>
+                                    <?php printf( esc_html__( 'Monto fijo en %s que se suma al costo base', 'ltms' ), esc_html( $currency_label ) ); ?>
                                 </p>
                             </div>
 

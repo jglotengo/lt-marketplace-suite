@@ -85,17 +85,27 @@ final class VtexRulesDefaultsTest extends LTMS_Unit_Test_Case {
 			'Los defaults VTEX NO deben incluir advertising_pct (la publicidad ya no es porcentual).' );
 	}
 
-	public function test_posgold_defaults_keep_pct_mode_untouched(): void {
+	public function test_posgold_defaults_parity_with_vtex(): void {
+		$this->require_class( 'LTMS_Vtex_Price_Calculator' );
 		$this->require_class( 'LTMS_PosGold_Price_Calculator' );
 
-		$defaults = \LTMS_PosGold_Price_Calculator::get_defaults();
+		$posgold = \LTMS_PosGold_Price_Calculator::get_defaults();
+		$vtex    = \LTMS_Vtex_Price_Calculator::get_defaults();
 
-		$this->assertSame( 10.0, (float) $defaults['lotengo_commission_pct'],
-			'PosGold queda fuera de alcance: su comisión default debe seguir siendo 10.' );
-		$this->assertArrayHasKey( 'transport_pct', $defaults,
-			'PosGold mantiene su modo % (transport_pct).' );
-		$this->assertArrayNotHasKey( 'transport_amount', $defaults,
-			'PosGold no debe heredar las keys de monto fijo de VTEX.' );
+		// POSGOLD-RULES-PARITY: los defaults PosGold son IDÉNTICOS a los VTEX.
+		$this->assertSame( $vtex, $posgold,
+			'Los defaults PosGold deben ser idénticos a los VTEX (paridad de reglas).' );
+
+		$this->assertSame( 12.0, (float) $posgold['lotengo_commission_pct'],
+			'La comisión Lo Tengo default en PosGold debe ser 12 (antes 10, paridad con VTEX).' );
+		$this->assertArrayHasKey( 'transport_amount', $posgold,
+			'PosGold debe usar transporte como MONTO FIJO (transport_amount, COP/MXN).' );
+		$this->assertArrayHasKey( 'advertising_amount', $posgold,
+			'PosGold debe usar publicidad como MONTO FIJO (advertising_amount, COP/MXN).' );
+		$this->assertArrayNotHasKey( 'transport_pct', $posgold,
+			'PosGold NO debe mantener transport_pct (paridad: el transporte ya no es porcentual).' );
+		$this->assertArrayNotHasKey( 'advertising_pct', $posgold,
+			'PosGold NO debe mantener advertising_pct (paridad: la publicidad ya no es porcentual).' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -121,20 +131,24 @@ final class VtexRulesDefaultsTest extends LTMS_Unit_Test_Case {
 			'Subtotal gastos = 50000 + 5000 + 3000.' );
 	}
 
-	public function test_calculate_pct_mode_still_works_for_posgold(): void {
+	public function test_calculate_pct_fallback_for_legacy_rules_array(): void {
 		$this->require_class( 'LTMS_PosGold_Price_Calculator' );
 
-		// Reglas estilo PosGold (solo %, sin keys de monto fijo): backward compat.
+		// Fallback % legacy de calculate(): un array de reglas SIN las keys de
+		// monto fijo (llamadas antiguas / tests) sigue aplicando % del costo.
+		// Desde POSGOLD-RULES-PARITY los defaults ya no incluyen las keys % —
+		// se remueven de las rules para ejercer solo el fallback.
 		$rules = \LTMS_PosGold_Price_Calculator::get_defaults();
+		unset( $rules['transport_amount'], $rules['advertising_amount'] );
 		$rules['transport_pct']   = 10.0;
 		$rules['advertising_pct'] = 5.0;
 
 		$calc = \LTMS_PosGold_Price_Calculator::calculate( 50000, $rules );
 
 		$this->assertSame( 5000.0, (float) $calc['breakdown']['transport'],
-			'PosGold: transporte 10% de 50000 = 5000 (modo % intacto).' );
+			'Fallback %: transporte 10% de 50000 = 5000 (reglas sin key de monto fijo).' );
 		$this->assertSame( 2500.0, (float) $calc['breakdown']['advertising'],
-			'PosGold: publicidad 5% de 50000 = 2500 (modo % intacto).' );
+			'Fallback %: publicidad 5% de 50000 = 2500 (reglas sin key de monto fijo).' );
 	}
 
 	public function test_calculate_fixed_amounts_full_formula_commission_12(): void {
@@ -247,8 +261,12 @@ final class VtexRulesDefaultsTest extends LTMS_Unit_Test_Case {
 
 		$this->assertStringContainsString( "$('#ltms-posgold-rules-form')", $js,
 			'El JS PosGold debe scopear la lectura de reglas al form #ltms-posgold-rules-form.' );
-		$this->assertStringContainsString( '$' . 'form.find(\'input[name="transport_pct"]\')', $js,
-			'PosGold mantiene %: el submit debe leer transport_pct SCOPED a su form.' );
+		$this->assertStringContainsString( '$' . 'form.find(\'input[name="transport_amount"]\')', $js,
+			'El submit debe leer transport_amount SCOPED al form (monto fijo, paridad VTEX).' );
+		$this->assertStringContainsString( '$' . 'form.find(\'input[name="advertising_amount"]\')', $js,
+			'El submit debe leer advertising_amount SCOPED al form (monto fijo, paridad VTEX).' );
+		$this->assertStringNotContainsString( 'transport_pct:', $js,
+			'El POST de reglas PosGold no debe enviar transport_pct (key % legacy removida).' );
 		$this->assertStringNotContainsString( '$' . '(\'input[name="transport_pct"]\')', $js,
 			'NO debe existir el selector global (depende del orden del DOM — H1).' );
 	}
@@ -267,8 +285,12 @@ final class VtexRulesDefaultsTest extends LTMS_Unit_Test_Case {
 			'El min VTEX debe leer data-currency del form con .attr (lectura fresca, moneda COP/MXN).' );
 		$this->assertStringNotContainsString( 'transport_pct', $vtex_min,
 			'El min VTEX no debe contener la key % legacy transport_pct.' );
-		$this->assertStringContainsString( 'transport_pct', $posgold_min,
-			'El min PosGold debe mantener transport_pct (modo % de PosGold).' );
+		$this->assertStringContainsString( 'transport_amount', $posgold_min,
+			'El min PosGold debe contener transport_amount (monto fijo, paridad VTEX).' );
+		$this->assertStringContainsString( 'attr("data-currency")', $posgold_min,
+			'El min PosGold debe leer data-currency del form con .attr (lectura fresca, moneda COP/MXN).' );
+		$this->assertStringNotContainsString( 'transport_pct', $posgold_min,
+			'El min PosGold no debe contener la key % legacy transport_pct (paridad VTEX).' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
@@ -313,5 +335,40 @@ final class VtexRulesDefaultsTest extends LTMS_Unit_Test_Case {
 			'El handler VTEX no debe leer advertising_pct (% legacy removida de VTEX).' );
 		$this->assertStringContainsString( 'min( 10000000, $rules[\'transport_amount\'] )', $logic,
 			'Los montos fijos NO se limitan a 0-100: tope 10.000.000.' );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// POSGOLD-RULES-PARITY: vista + handler + JS PosGold con montos fijos.
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_posgold_view_and_handler_parity_with_vtex(): void {
+		$view  = $this->src( 'includes/frontend/views/view-posgold.php' );
+		$logic = $this->src( 'includes/frontend/class-ltms-dashboard-logic.php' );
+
+		// Vista PosGold: montos fijos con moneda — paridad 1:1 con view-vtex.php.
+		$this->assertStringContainsString( 'name="transport_amount"', $view,
+			'La vista PosGold debe renderizar transport_amount (monto fijo, paridad VTEX).' );
+		$this->assertStringContainsString( 'name="advertising_amount"', $view,
+			'La vista PosGold debe renderizar advertising_amount (monto fijo, paridad VTEX).' );
+		$this->assertStringNotContainsString( 'name="transport_pct"', $view,
+			'La vista PosGold no debe renderizar transport_pct (% legacy removida).' );
+		$this->assertStringNotContainsString( 'name="advertising_pct"', $view,
+			'La vista PosGold no debe renderizar advertising_pct (% legacy removida).' );
+		$this->assertStringContainsString( 'data-currency=', $view,
+			'El form de reglas PosGold debe exponer data-currency para el ejemplo del JS.' );
+		$this->assertStringContainsString( "'ltms_country'", $view,
+			'La moneda PosGold debe resolverse con el país del vendor (ltms_country, fallback LTMS_Core_Config::get_country).' );
+		$this->assertStringContainsString( 'LTMS_Core_Config::get_country()', $view,
+			'La moneda PosGold debe caer al país de operación del sitio si el vendor no tiene país.' );
+		$this->assertStringContainsString( 'Monto fijo en', $view,
+			'El help del campo debe indicar monto fijo en la moneda del vendor.' );
+
+		// Handler PosGold: mismas keys y topes que VTEX.
+		$this->assertStringContainsString( '\'transport_amount\'       => (float) ( $_POST[\'transport_amount\'] ?? 0 )', $logic,
+			'El handler PosGold debe leer transport_amount (monto fijo).' );
+		$this->assertStringContainsString( '\'advertising_amount\'     => (float) ( $_POST[\'advertising_amount\'] ?? 0 )', $logic,
+			'El handler PosGold debe leer advertising_amount (monto fijo).' );
+		$this->assertStringContainsString( 'min( 10000000, $rules[\'transport_amount\'] )', $logic,
+			'Los montos fijos PosGold NO se limitan a 0-100: tope 10.000.000 (paridad VTEX).' );
 	}
 }

@@ -2234,21 +2234,26 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( [ 'message' => __( 'Módulo PosGold no disponible.', 'ltms' ) ], 500 );
         }
 
+        // POSGOLD-RULES-PARITY (2026-09-26): transporte y gasto publicitario como
+        // MONTO FIJO (COP/MXN) — paridad 1:1 con ajax_save_vtex_rules
+        // (VTEX-RULES-FIX). Los % legacy ya no se aceptan: los metas viejos
+        // ltms_posgold_price_*_pct quedan huérfanos en DB (mismo criterio que
+        // VTEX). Comisión Lo Tengo default 12 (antes 10 heredado de PosGold).
         $rules = [
-            'is_redi'                => sanitize_text_field( $_POST['is_redi'] ?? 'no' ) === 'yes',
-            'transport_pct'          => (float) ( $_POST['transport_pct'] ?? 0 ),
-            'advertising_pct'        => (float) ( $_POST['advertising_pct'] ?? 0 ),
+            'is_redi'                => sanitize_text_field( wp_unslash( $_POST['is_redi'] ?? 'no' ) ) === 'yes',
+            'transport_amount'       => (float) ( $_POST['transport_amount'] ?? 0 ),
+            'advertising_amount'     => (float) ( $_POST['advertising_amount'] ?? 0 ),
             'returns_pct'            => (float) ( $_POST['returns_pct'] ?? 0 ),
             'margin_pct'             => (float) ( $_POST['margin_pct'] ?? 30 ),
-            'lotengo_commission_pct' => (float) ( $_POST['lotengo_commission_pct'] ?? 10 ),
+            'lotengo_commission_pct' => (float) ( $_POST['lotengo_commission_pct'] ?? 12 ),
             'iva_pct'                => (float) ( $_POST['iva_pct'] ?? 19 ),
             'redi_cost_pct'          => (float) ( $_POST['redi_cost_pct'] ?? 0 ),
             'round_multiple'         => (int)   ( $_POST['round_multiple'] ?? 1000 ),
         ];
 
-        // Validar rangos.
-        $rules['transport_pct']          = max( 0, min( 100, $rules['transport_pct'] ) );
-        $rules['advertising_pct']        = max( 0, min( 100, $rules['advertising_pct'] ) );
+        // Validar rangos (mismos topes que VTEX: montos hasta 10M, no cap 100).
+        $rules['transport_amount']       = max( 0, min( 10000000, $rules['transport_amount'] ) );
+        $rules['advertising_amount']     = max( 0, min( 10000000, $rules['advertising_amount'] ) );
         $rules['returns_pct']            = max( 0, min( 100, $rules['returns_pct'] ) );
         $rules['margin_pct']             = max( 0, min( 500, $rules['margin_pct'] ) );
         $rules['lotengo_commission_pct'] = max( 0, min( 50, $rules['lotengo_commission_pct'] ) );

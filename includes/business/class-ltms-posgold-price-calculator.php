@@ -5,19 +5,23 @@
  * Calcula el precio de venta final aplicando reglas de negocio configurables
  * por vendor:
  *   - Costo del producto (desde PosGold)
- *   - Transporte (% o monto fijo)
- *   - Gasto publicitario (%)
+ *   - Transporte (monto fijo COP/MXN según el país del vendor)
+ *   - Gasto publicitario (monto fijo COP/MXN)
  *   - % Devoluciones estimadas
  *   - Margen de ganancia del vendor (%)
  *   - Comisión Lo Tengo (% del marketplace)
  *   - Impuestos (IVA CO/MX según tipo de producto)
  *   - Costo ReDi (si el producto es ReDi)
  *
- * El precio final se redondea al múltiplo de 1000 más cercano POR ENCIMA
- * (ej: 45200 → 46000, 46001 → 47000).
+ * POSGOLD-RULES-PARITY (2026-09-26): los defaults PosGold son IDÉNTICOS a los
+ * de VTEX — comisión Lo Tengo 12% y transporte/gasto publicitario en MONTO
+ * FIJO (transport_amount/advertising_amount, COP/MXN) en vez de % del costo
+ * base. calculate() conserva el fallback % legacy para arrays de reglas sin
+ * las keys de monto fijo (llamadas antiguas / tests), pero ninguna key % vive
+ * ya en los defaults.
  *
  * @package LTMS
- * @version 2.9.31
+ * @version 2.9.396
  * @since 2.9.31
  */
 
@@ -34,20 +38,28 @@ final class LTMS_PosGold_Price_Calculator {
      * Configuración default de reglas de precio.
      * El vendor puede override todos estos valores desde su dashboard.
      *
+     * POSGOLD-RULES-PARITY (2026-09-26): paridad 1:1 con los defaults VTEX
+     * (VTEX-RULES-FIX) — comisión Lo Tengo 12% y transporte/gasto publicitario
+     * como MONTO FIJO (COP/MXN según el país del vendor). Las keys legacy
+     * transport_pct/advertising_pct se remueven de los defaults: los metas
+     * viejos ltms_posgold_price_transport_pct /
+     * ltms_posgold_price_advertising_pct quedan huérfanos en DB (sin
+     * consumidor) — mismo criterio aceptado en VTEX-RULES-FIX.
+     *
      * @return array
      */
     public static function get_defaults(): array {
         return [
-            // % del costo base (0-100)
-            'transport_pct'         => 0.0,
-            // % del costo base (0-100)
-            'advertising_pct'       => 0.0,
+            // Monto fijo que se suma al costo base (COP/MXN según país del vendor)
+            'transport_amount'      => 0.0,
+            // Monto fijo que se suma al costo base (COP/MXN)
+            'advertising_amount'    => 0.0,
             // % estimado de devoluciones sobre precio final (0-100)
             'returns_pct'           => 0.0,
             // % margen de ganancia del vendor sobre (costo + gastos) (0-100)
             'margin_pct'            => 30.0,
             // % comisión Lo Tengo sobre precio final (0-100)
-            'lotengo_commission_pct' => 10.0,
+            'lotengo_commission_pct' => 12.0,
             // % IVA a aplicar (0, 5, 19 para CO; 0, 16 para MX)
             'iva_pct'               => 19.0,
             // % costo ReDi si el producto es ReDi (0-100)
@@ -144,9 +156,11 @@ final class LTMS_PosGold_Price_Calculator {
         // 2. Transporte
         // VTEX-RULES-FIX (2026-09-23): modo MONTO FIJO cuando las reglas incluyen
         // transport_amount (COP/MXN según país del vendor). Sin esa key, cae al
-        // modo porcentual legacy (transport_pct) — backward compatible con PosGold,
-        // cuyas reglas nunca incluyen transport_amount (get_vendor_rules itera los
-        // defaults de PosGold, que no tienen esa key).
+        // modo porcentual legacy (transport_pct) — backward compat para arrays
+        // de reglas sin las keys de monto fijo (llamadas antiguas / tests).
+        // Desde POSGOLD-RULES-PARITY los defaults PosGold incluyen
+        // transport_amount, así que el flujo normal de sync/recalc PosGold
+        // usa el modo monto fijo.
         if ( isset( $rules['transport_amount'] ) ) {
             $transport = (float) $rules['transport_amount'];
         } else {

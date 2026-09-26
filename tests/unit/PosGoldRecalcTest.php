@@ -95,8 +95,10 @@ final class PosGoldRecalcTest extends LTMS_Unit_Test_Case {
 		$rules = \LTMS_PosGold_Price_Calculator::get_vendor_rules( 999999 );
 		$calc  = \LTMS_PosGold_Price_Calculator::calculate( 50000.0, $rules );
 
-		$this->assertSame( 86000.0, (float) $calc['price'],
-			'Con defaults PosGold (margen 30%, comisión 10% gross-up, IVA 19%, redondeo 1.000), 50.000 de costo debe dar 86.000.' );
+		// POSGOLD-RULES-PARITY: comisión Lo Tengo default 12 (paridad VTEX) —
+		// 65000 gross-up 12% → 73863.64 * 1.19 (IVA) = 87897.73 → 88000.
+		$this->assertSame( 88000.0, (float) $calc['price'],
+			'Con defaults PosGold (margen 30%, comisión 12% gross-up, IVA 19%, redondeo 1.000), 50.000 de costo debe dar 88.000.' );
 		$this->assertSame( 50000.0, (float) $calc['cost'],
 			'El breakdown debe conservar el costo original (insumo del recálculo).' );
 
@@ -105,8 +107,8 @@ final class PosGoldRecalcTest extends LTMS_Unit_Test_Case {
 		$rules_redi['is_redi']     = true;
 		$rules_redi['redi_cost_pct'] = 5.0;
 		$calc_redi                 = \LTMS_PosGold_Price_Calculator::calculate( 50000.0, $rules_redi );
-		$this->assertSame( 91000.0, (float) $calc_redi['price'],
-			'Con ReDi activo (costo 5%), 50.000 de costo debe dar 91.000 (ReDi 2.500 entra al subtotal de gastos).' );
+		$this->assertSame( 93000.0, (float) $calc_redi['price'],
+			'Con ReDi activo (costo 5%), 50.000 de costo debe dar 93.000 (ReDi 2.500 entra al subtotal de gastos, comisión 12%).' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────

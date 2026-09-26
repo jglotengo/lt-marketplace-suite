@@ -199,6 +199,9 @@
     // La vista VTEX convive en el mismo DOM SPA con inputs de idéntico name —
     // los selectores globales $('input[name="..."]') dependen del orden del DOM;
     // scoping a ambos forms los hace robustos en ambas direcciones.
+    // POSGOLD-RULES-PARITY (2026-09-26): transporte y gasto publicitario como
+    // MONTO FIJO (transport_amount / advertising_amount, COP/MXN) — paridad
+    // 1:1 con ltms-vtex.js; ya no % del costo base.
     $('#ltms-posgold-rules-form').on('submit', function(e){
         e.preventDefault();
         var $form = $(this);
@@ -209,8 +212,8 @@
             action: 'ltms_save_posgold_rules',
             nonce: nonce,
             is_redi: $('#ltms-posgold-is-redi').is(':checked') ? 'yes' : 'no',
-            transport_pct: $form.find('input[name="transport_pct"]').val(),
-            advertising_pct: $form.find('input[name="advertising_pct"]').val(),
+            transport_amount: $form.find('input[name="transport_amount"]').val(),
+            advertising_amount: $form.find('input[name="advertising_amount"]').val(),
             returns_pct: $form.find('input[name="returns_pct"]').val(),
             margin_pct: $form.find('input[name="margin_pct"]').val(),
             lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
@@ -389,13 +392,20 @@
     }
 
     // Update price example
+    // Update price example (misma fórmula que el backend)
     // VTEX-RULES-FIX (2026-09-23): selectores SCOPED al form (ver fix en el
     // submit — la vista VTEX convive en el mismo DOM con names idénticos).
+    // POSGOLD-RULES-PARITY (2026-09-26): transporte y publicidad son MONTO
+    // FIJO (transport_amount / advertising_amount) en la moneda del vendor
+    // (data-currency del form) — paridad con updatePriceExample de VTEX.
     function updatePriceExample() {
         var $form = $('#ltms-posgold-rules-form');
+        // .attr (no .data): jQuery cachea la primera lectura de .data() — con .attr
+        // el valor es siempre fresco aunque el SPA reemplace el form.
+        var currency = $form.attr('data-currency') || 'COP';
         var cost = 50000;
-        var transport = parseFloat($form.find('input[name="transport_pct"]').val()) || 0;
-        var advertising = parseFloat($form.find('input[name="advertising_pct"]').val()) || 0;
+        var transport = parseFloat($form.find('input[name="transport_amount"]').val()) || 0;
+        var advertising = parseFloat($form.find('input[name="advertising_amount"]').val()) || 0;
         var returns = parseFloat($form.find('input[name="returns_pct"]').val()) || 0;
         var margin = parseFloat($form.find('input[name="margin_pct"]').val()) || 0;
         var commission = parseFloat($form.find('input[name="lotengo_commission_pct"]').val()) || 0;
@@ -403,8 +413,8 @@
         var redi = $('#ltms-posgold-is-redi').is(':checked') ? (parseFloat($form.find('input[name="redi_cost_pct"]').val()) || 0) : 0;
         var round = parseInt($form.find('select[name="round_multiple"]').val()) || 1000;
 
-        var t = cost * transport / 100;
-        var a = cost * advertising / 100;
+        var t = transport;
+        var a = advertising;
         var r = cost * redi / 100;
         var sub1 = cost + t + a + r;
         var m = sub1 * margin / 100;
@@ -418,8 +428,8 @@
         var rounded = Math.ceil(final / round) * round;
 
         var html = 'Costo: $' + cost.toLocaleString() + '<br>';
-        html += '+ Transporte (' + transport + '%): $' + Math.round(t).toLocaleString() + '<br>';
-        html += '+ Publicidad (' + advertising + '%): $' + Math.round(a).toLocaleString() + '<br>';
+        html += '+ Transporte (fijo): $' + Math.round(t).toLocaleString() + '<br>';
+        html += '+ Publicidad (fija): $' + Math.round(a).toLocaleString() + '<br>';
         if (redi > 0) { html += '+ ReDi (' + redi + '%): $' + Math.round(r).toLocaleString() + '<br>'; }
         html += '= Subtotal gastos: $' + Math.round(sub1).toLocaleString() + '<br>';
         html += '+ Margen (' + margin + '%): $' + Math.round(m).toLocaleString() + '<br>';
@@ -427,7 +437,7 @@
         html += '+ Devoluciones (' + returns + '%): $' + Math.round(ret).toLocaleString() + '<br>';
         html += '+ IVA (' + iva + '%): $' + Math.round(iv).toLocaleString() + '<br>';
         html += '<strong>= Precio final: $' + Math.round(final).toLocaleString() + '</strong><br>';
-        html += '<strong style="color:#16a34a;">→ Precio redondeado: $' + rounded.toLocaleString() + '</strong>';
+        html += '<strong style="color:#16a34a;">→ Precio redondeado (' + escapeHtml(currency) + '): $' + rounded.toLocaleString() + '</strong>';
 
         $('#ltms-posgold-price-example').html(html);
     }
@@ -463,8 +473,8 @@
         var $form = $('#ltms-posgold-rules-form');
         return {
             is_redi: $('#ltms-posgold-is-redi').is(':checked') ? 'yes' : 'no',
-            transport_pct: $form.find('input[name="transport_pct"]').val(),
-            advertising_pct: $form.find('input[name="advertising_pct"]').val(),
+            transport_amount: $form.find('input[name="transport_amount"]').val(),
+            advertising_amount: $form.find('input[name="advertising_amount"]').val(),
             returns_pct: $form.find('input[name="returns_pct"]').val(),
             margin_pct: $form.find('input[name="margin_pct"]').val(),
             lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
