@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-09-25
 
+### Added — `P2-HS-AUTOPLAY` (autoplay del Home Slider editable desde la UI admin)
+
+> Hallazgo P2 del backlog (ciclo 36): el autoplay del Home Slider no era editable
+> desde la UI admin — la vista leía `$autoplay` (html-admin-home-slider.php)
+> pero no renderizaba input; solo era editable via `wp option update
+> ltms_home_slider_autoplay`.
+>
+> **Fix:**
+> - `html-admin-home-slider.php`: caja de configuración con input
+>   `#ltms-hs-autoplay` (number, min 0, step 500) — usa la variable `$autoplay`
+>   ya leída (default 5000) y ahora deja de estar muerta. Helper text: "0 para
+>   desactivar el autoplay".
+> - `ltms-home-slider.js` (+ `.min.js` regenerado con terser): el save del
+>   slider (`ltms_home_slider_save`) incluye el param `autoplay` (parseInt del
+>   input, fallback 0).
+> - `LTMS_Frontend_Home_Slider::ajax_save_slides()`: persiste
+>   `update_option( 'ltms_home_slider_autoplay', absint( wp_unslash( ... ) ) )`
+>   — 0 = desactivado (el carrusel del frontend no autoplayea con el interval
+>   falsy). Con JS viejo (sin el param) se conserva el valor actual.
+> - `LTMS_VERSION` 2.9.394 → 2.9.395 (cache-busting JS/CSS).
+>
+> **Tests:** +3 (`HomeSliderTest` 21/21, 55 assertions: input renderizado en la
+> vista, persistencia con absint + default 5000 intacto, param autoplay en dev
+> JS y .min). Suite completa 5,088 tests 10,719 assertions 0 fallas (3 skips
+> preexistentes). Verificación visual en producción pendiente del deploy.
+
 ### Added — `POSGOLD-RECALC` (recálculo masivo de precios PosGold desde el costo persistido, sin re-sincronizar)
 
 > Paridad con `PRICE-RECALC` de VTEX: la sync PosGold pre-fix NO persistía el costo

@@ -242,10 +242,13 @@
             $btn.prop('disabled', true).text('Guardando...');
             $('#ltms-hs-save-status').text('Guardando...');
 
+            // P2-HS-AUTOPLAY (2026-09-25): el autoplay es editable desde la UI
+            // (input #ltms-hs-autoplay) y viaja en el save del slider.
             $.post(ajaxUrl, {
                 action: 'ltms_home_slider_save',
                 nonce: nonce,
-                slides: JSON.stringify(slides)
+                slides: JSON.stringify(slides),
+                autoplay: parseInt($('#ltms-hs-autoplay').val(), 10) || 0
             }).done(function (resp) {
                 $btn.prop('disabled', false).html('💾 Guardar slider');
                 if (resp.success) {

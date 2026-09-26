@@ -39,6 +39,18 @@ $autoplay = (int) get_option( 'ltms_home_slider_autoplay', 5000 );
 
     <div id="ltms-hs-notice" style="display:none;margin:12px 0;padding:12px 16px;border-radius:8px;font-weight:600;"></div>
 
+    <!-- P2-HS-AUTOPLAY (2026-09-25): autoplay editable desde la UI admin (antes la
+         vista leía $autoplay sin renderizar input; solo via wp option update) -->
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:#fff;border:1px solid #d1d5db;border-radius:8px;max-width:640px;">
+        <label for="ltms-hs-autoplay" style="font-size:12px;font-weight:600;margin:0;">
+            ⏱ <?php esc_html_e( 'Autoplay (ms)', 'ltms' ); ?>
+        </label>
+        <input type="number" id="ltms-hs-autoplay" value="<?php echo esc_attr( $autoplay ); ?>" min="0" step="500" style="width:110px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;">
+        <span style="font-size:12px;color:#6b7280;">
+            <?php esc_html_e( 'Milisegundos entre banners en el home. Usa 0 para desactivar el autoplay.', 'ltms' ); ?>
+        </span>
+    </div>
+
     <!-- Lista de slides -->
     <div id="ltms-hs-list" style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px;">
         <?php if ( empty( $slides ) ) : ?>

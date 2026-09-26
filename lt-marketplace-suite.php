@@ -47,7 +47,9 @@ define( 'LTMS_LOADED', true );
 // Home Slider responsivo a la imagen (aspect-ratio auto + img height:auto).
 // POSGOLD-RECALC (2026-09-25): bump a 2.9.394 — recálculo masivo de precios
 // PosGold desde el costo persistido + cache-busting del JS del panel.
-define( 'LTMS_VERSION', '2.9.394' );
+// P2-HS-AUTOPLAY (2026-09-25): bump a 2.9.395 — autoplay editable desde la UI
+// admin del Home Slider (input + save JS + update_option) + cache-busting.
+define( 'LTMS_VERSION', '2.9.395' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

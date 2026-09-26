@@ -390,4 +390,66 @@ final class HomeSliderTest extends LTMS_Unit_Test_Case {
 			'NO debe persistir el aspect-ratio 1/1 forzado en el media móvil (recortaba la panorámica y dejaba hueco del mismo ratio debajo).'
 		);
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// P2-HS-AUTOPLAY (2026-09-25): el autoplay del Home Slider es editable
+	// desde la UI admin. Antes la vista leía $autoplay sin renderizar input —
+	// solo editable via wp option update ltms_home_slider_autoplay. Fix: input
+	// #ltms-hs-autoplay en la vista + param autoplay en el save del JS +
+	// update_option en ajax_save_slides (absint; 0 = desactivado — el carrusel
+	// del frontend no autoplayea con el interval falsy).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_admin_view_renders_autoplay_input(): void {
+		$view = file_get_contents( self::VIEW_PATH );
+
+		$this->assertStringContainsString(
+			'id="ltms-hs-autoplay"',
+			$view,
+			'La vista admin debe renderizar el input de autoplay (P2-HS-AUTOPLAY).'
+		);
+		$this->assertStringContainsString(
+			'esc_attr( $autoplay )',
+			$view,
+			'El input debe usar la variable $autoplay ya leída en la vista (default 5000).'
+		);
+	}
+
+	public function test_save_persists_autoplay_option(): void {
+		$src = file_get_contents( self::CLASS_PATH );
+
+		$this->assertStringContainsString(
+			"update_option( 'ltms_home_slider_autoplay', absint( wp_unslash( \$_POST['autoplay'] ) ) )",
+			$src,
+			'ajax_save_slides debe persistir el autoplay con absint (0 = desactivado).'
+		);
+		// El default 5000 debe mantenerse en la lectura del frontend.
+		$this->assertStringContainsString(
+			"get_option( 'ltms_home_slider_autoplay', 5000 )",
+			$src,
+			'El frontend debe seguir leyendo el autoplay con default 5000.'
+		);
+	}
+
+	public function test_js_save_sends_autoplay_param(): void {
+		$js  = file_get_contents( self::JS_PATH );
+		$min = file_get_contents( __DIR__ . '/../../assets/js/ltms-home-slider.min.js' );
+
+		$this->assertStringContainsString(
+			'#ltms-hs-autoplay',
+			$js,
+			'El JS admin debe leer el input de autoplay al guardar (P2-HS-AUTOPLAY).'
+		);
+		$this->assertStringContainsString(
+			'autoplay:',
+			$js,
+			'El save del JS debe enviar el param autoplay.'
+		);
+		// Producción carga el .min — el autoplay debe estar minificado también.
+		$this->assertStringContainsString(
+			'autoplay:',
+			$min,
+			'El .min (el que carga producción) debe incluir el param autoplay.'
+		);
+	}
 }

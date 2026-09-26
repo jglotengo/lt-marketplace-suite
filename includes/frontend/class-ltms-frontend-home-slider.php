@@ -381,6 +381,13 @@ final class LTMS_Frontend_Home_Slider {
 
         update_option( self::OPTION_KEY, $slides );
 
+        // P2-HS-AUTOPLAY (2026-09-25): autoplay editable desde la UI admin —
+        // milisegundos entre banners (0 = desactivado). Con JS viejo (sin el
+        // param) se conserva el valor actual.
+        if ( isset( $_POST['autoplay'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- check_ajax_referer ya corrió
+            update_option( 'ltms_home_slider_autoplay', absint( wp_unslash( $_POST['autoplay'] ) ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- absint valida
+        }
+
         wp_send_json_success( [
             'message' => __( 'Slider del home actualizado correctamente.', 'ltms' ),
             'count'   => count( $slides ),
