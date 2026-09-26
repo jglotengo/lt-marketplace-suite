@@ -23,11 +23,14 @@ final class LTMS_DB_Migrations {
     /**
      * Versión actual del esquema de BD.
      *
-     * Bumped 2.8.1 → 2.8.2 (AUDIT-REDI-UX-GAPS GAP-9) para forzar la
-     * creación de las tablas lt_redi_incidents y lt_redi_incident_comments
-     * en sites ya migrados a 2.8.1.
+     * Bumped 2.9.18 → 2.9.19 (CAT-DEDUP-001) para forzar el dedup de
+     * términos product_cat heredados del bug SF-CAT-DEDUP (syncs VTEX/PosGold
+     * pre-fix con slug aleatorio — 7,480 términos para 307 nombres en
+     * dkosmetic) en sites ya migrados. Los duplicados contaminan los selects
+     * del panel vendedor (Productos → Nuevo/Editar) y la tabla Override por
+     * Categoría del admin (Envíos).
      */
-    private const CURRENT_VERSION = '2.9.18';
+    private const CURRENT_VERSION = '2.9.19';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -121,6 +124,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.18', '<' ) ) {
             self::migrate_2_9_18_drivers_schema();
+        }
+
+        if ( version_compare( $installed_version, '2.9.19', '<' ) ) {
+            self::migrate_2_9_19_category_dedup();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3604,6 +3611,185 @@ final class LTMS_DB_Migrations {
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
             LTMS_Core_Logger::info( 'DB_MIGRATION', 'v2.9.18: lt_vendor_drivers alineado con schema canónico (full_name + status + wp_user_id).' );
+        }
+    }
+
+    /**
+     * Migración v2.9.19 — Dedup de términos product_cat (CAT-DEDUP-001).
+     *
+     * La sync VTEX/PosGold pre-fix (SF-CAT-DEDUP) creaba términos product_cat
+     * con slug aleatorio ($slug.'-'.wp_rand(100,999)) → en dkosmetic quedaron
+     * 7,480 términos para 307 nombres únicos. Ese fix hizo los syncs
+     * idempotentes hacia adelante y agrupó el sidebar del storefront en
+     * lectura (get_vendor_categories), pero los duplicados heredados
+     * permanecen en la DB y siguen contaminando TODA superficie que lista
+     * product_cat con get_terms() plano:
+     *
+     *  1. Panel vendedor → Productos → modal Nuevo/Editar (view-products.php,
+     *     'number' => 100) — con miles de duplicados solo se ven las primeras
+     *     ~20 categorías, repetidas.
+     *  2. Admin → Envíos → Override por Categoría (class-ltms-admin-shipping.php,
+     *     'number' => 0) — la tabla lista cada categoría N veces y si el admin
+     *     configura el modo sobre una fila duplicada (term sin productos) el
+     *     override no aplica a los productos del término canónico →
+     *     silenciosamente roto.
+     *
+     * Estrategia (idempotente — una 2ª pasada encuentra 0 duplicados):
+     *  A. Dedup de filas term_taxonomy corruptas (mismo term_id + taxonomy,
+     *     keep MIN(tt_id)) — produce duplicados en get_terms() aunque el
+     *     nombre sea único.
+     *  B. Merge de términos duplicados (mismo nombre normalizado + mismo
+     *     parent, keep MIN(term_id) = el más viejo): reasigna
+     *     term_relationships (con manejo de conflicto PK), reasigna children,
+     *     copia term meta faltante (incluye _ltms_shipping_mode del override),
+     *     recuenta y elimina el duplicado vía wp_delete_term.
+     *
+     * @return void
+     */
+    private static function migrate_2_9_19_category_dedup(): void {
+        global $wpdb;
+
+        $merged = 0;
+        $tt_fix = 0;
+
+        // ── A. Dedup de filas term_taxonomy duplicadas (corrupción de DB) ──
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $tt_dups = $wpdb->get_results(
+            "SELECT term_id, COUNT(*) AS n, MIN(term_taxonomy_id) AS keep_tt
+              FROM {$wpdb->term_taxonomy}
+              WHERE taxonomy = 'product_cat'
+              GROUP BY term_id HAVING COUNT(*) > 1"
+        );
+
+        if ( is_array( $tt_dups ) ) {
+            foreach ( $tt_dups as $row ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query( $wpdb->prepare(
+                    "DELETE FROM {$wpdb->term_taxonomy}
+                      WHERE term_id = %d AND taxonomy = 'product_cat' AND term_taxonomy_id != %d",
+                    (int) $row->term_id,
+                    (int) $row->keep_tt
+                ) );
+                $tt_fix += ( (int) $row->n - 1 );
+                wp_update_term_count( [ (int) $row->keep_tt ], 'product_cat' );
+            }
+        }
+
+        // ── B. Merge de términos duplicados (mismo nombre + mismo parent) ──
+        // Agrupar por nombre normalizado (trim + case-insensitive — el
+        // collation utf8mb4 ya es case/acento-insensitive; TRIM cubre
+        // espacios) y parent. Canonical = MIN(term_id) (el más viejo, patrón
+        // del repo "keep the oldest").
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $groups = $wpdb->get_results(
+            "SELECT LOWER(TRIM(t.name)) AS norm_name, tt.parent AS parent,
+                    COUNT(*) AS n, MIN(t.term_id) AS canonical_id
+              FROM {$wpdb->terms} t
+              INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
+              WHERE tt.taxonomy = 'product_cat'
+              GROUP BY LOWER(TRIM(t.name)), tt.parent
+              HAVING COUNT(*) > 1"
+        );
+
+        if ( is_array( $groups ) ) {
+            foreach ( $groups as $group ) {
+                // Términos duplicados del grupo (todos menos el canónico).
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                $dups = $wpdb->get_col( $wpdb->prepare(
+                    "SELECT t.term_id
+                      FROM {$wpdb->terms} t
+                      INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
+                      WHERE tt.taxonomy = 'product_cat'
+                        AND tt.parent = %d
+                        AND LOWER(TRIM(t.name)) = %s
+                        AND t.term_id != %d",
+                    (int) $group->parent,
+                    (string) $group->norm_name,
+                    (int) $group->canonical_id
+                ) );
+
+                if ( ! is_array( $dups ) || empty( $dups ) ) {
+                    continue;
+                }
+
+                $canon_tt = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy}
+                      WHERE term_id = %d AND taxonomy = 'product_cat' LIMIT 1",
+                    (int) $group->canonical_id
+                ) );
+
+                foreach ( $dups as $dup_id ) {
+                    $dup_id = (int) $dup_id;
+
+                    $dup_tt = (int) $wpdb->get_var( $wpdb->prepare(
+                        "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy}
+                          WHERE term_id = %d AND taxonomy = 'product_cat' LIMIT 1",
+                        $dup_id
+                    ) );
+
+                    if ( $canon_tt > 0 && $dup_tt > 0 && $dup_tt !== $canon_tt ) {
+                        // 1. Conflictos PK: objetos asignados a AMBOS términos →
+                        //    borrar la fila del duplicado (el canónico permanece).
+                        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                        $wpdb->query( $wpdb->prepare(
+                            "DELETE tr FROM {$wpdb->term_relationships} tr
+                              INNER JOIN {$wpdb->term_relationships} keep_tr
+                                      ON keep_tr.object_id = tr.object_id
+                                     AND keep_tr.term_taxonomy_id = %d
+                              WHERE tr.term_taxonomy_id = %d",
+                            $canon_tt,
+                            $dup_tt
+                        ) );
+
+                        // 2. Reasignar el resto de relaciones al canónico.
+                        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                        $wpdb->query( $wpdb->prepare(
+                            "UPDATE {$wpdb->term_relationships} SET term_taxonomy_id = %d WHERE term_taxonomy_id = %d",
+                            $canon_tt,
+                            $dup_tt
+                        ) );
+
+                        // 3. Reasignar children del duplicado al canónico.
+                        // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                        $wpdb->query( $wpdb->prepare(
+                            "UPDATE {$wpdb->term_taxonomy} SET parent = %d
+                              WHERE parent = %d AND taxonomy = 'product_cat'",
+                            (int) $group->canonical_id,
+                            $dup_id
+                        ) );
+
+                        wp_update_term_count( [ $canon_tt ], 'product_cat' );
+                    }
+
+                    // 4. Copiar term meta faltante al canónico (incluye
+                    //    _ltms_shipping_mode del override y thumbnail_id).
+                    $dup_meta = get_term_meta( $dup_id );
+                    if ( is_array( $dup_meta ) ) {
+                        foreach ( $dup_meta as $meta_key => $values ) {
+                            if ( '' === get_term_meta( (int) $group->canonical_id, $meta_key, true ) ) {
+                                foreach ( (array) $values as $value ) {
+                                    add_term_meta( (int) $group->canonical_id, $meta_key, $value );
+                                }
+                            }
+                        }
+                    }
+
+                    // 5. Eliminar el duplicado (relaciones/children/meta ya migrados).
+                    wp_delete_term( $dup_id, 'product_cat' );
+                    $merged++;
+                }
+            }
+        }
+
+        if ( ( $merged > 0 || $tt_fix > 0 ) && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                sprintf(
+                    'v2.9.19 CAT-DEDUP-001: %d términos product_cat duplicados mergeados, %d filas term_taxonomy corruptas eliminadas.',
+                    $merged,
+                    $tt_fix
+                )
+            );
         }
     }
 

@@ -815,6 +815,18 @@ $files = [
     'tests/unit/VtexRulesDefaultsTest.php',
     // POSGOLD-SYNC-BG v2.9.330 — sync PosGold en background (polling) + filtro CSV/JSON.
     'tests/unit/PosGoldSyncBackgroundTest.php',
+    // POSGOLD-RECALC v2.9.394 — recálculo masivo de precios PosGold desde el
+    // costo persistido (_ltms_posgold_cost, paridad PRICE-RECALC VTEX). La sync
+    // PosGold se modificó (persistencia del costo) y NO estaba en la whitelist
+    // — sin ella el fix no llegaría al server via webhook (lección #177).
+    'includes/business/class-ltms-posgold-sync.php',
+    'tests/unit/PosGoldRecalcTest.php',
+    // CAT-DEDUP-001 v2.9.394 — migración v2.9.19 dedup de términos product_cat.
+    // Lección #177: migrations.php ya está en la whitelist y llega al server con
+    // CURRENT_VERSION 2.9.19 — sin los tests actualizados aquí la suite del
+    // server esperaría 2.9.18 (KycAudit2FixTest) y fallaría.
+    'tests/unit/CategoryDedupMigrationTest.php',
+    'tests/unit/KycAudit2FixTest.php',
     // VENDOR-CARD-NAME + MATRICULA-FLEX v2.9.331 — nombre real del vendedor en
     // cards de catálogo + matrícula vencida pasa a warning (best-effort UIAF).
     'tests/unit/ProductVendorCardNameTest.php',

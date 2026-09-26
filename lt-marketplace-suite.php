@@ -45,7 +45,9 @@ define( 'LTMS_LOADED', true );
 // 2.9.391 — fixes responsive del operador (reservas/fletes + minicart).
 // HOME-SLIDER-MOBILE-CSS-FIX (2026-09-24): bump a 2.9.393 — breakpoint móvil del
 // Home Slider responsivo a la imagen (aspect-ratio auto + img height:auto).
-define( 'LTMS_VERSION', '2.9.393' );
+// POSGOLD-RECALC (2026-09-25): bump a 2.9.394 — recálculo masivo de precios
+// PosGold desde el costo persistido + cache-busting del JS del panel.
+define( 'LTMS_VERSION', '2.9.394' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

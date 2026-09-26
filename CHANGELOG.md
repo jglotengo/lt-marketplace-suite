@@ -4,7 +4,84 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-24
+## [Unreleased] — 2026-09-25
+
+### Added — `POSGOLD-RECALC` (recálculo masivo de precios PosGold desde el costo persistido, sin re-sincronizar)
+
+> Paridad con `PRICE-RECALC` de VTEX: la sync PosGold pre-fix NO persistía el costo
+> original del producto → no había forma de re-preciar el catálogo al cambiar reglas
+> sin re-sincronizar desde la API. Además el guardado de reglas moría con
+> "Módulo PosGold no disponible" mientras la calculadora estuvo ausente del server
+> hasta 2026-09-23 (lección #177) — vendors como Jugueteria Taiwan (UID 168) no
+> tienen reglas persistidas en producción.
+>
+> **Fix:**
+> - `LTMS_PosGold_Sync`: constante `COST_META_KEY = '_ltms_posgold_cost'` — la sync
+>   persiste el costo ORIGINAL (precio de la API antes de reglas) en
+>   `$product['_ltms_cost']` ANTES de sobreescribir `regular_price`, y lo escribe en
+>   `create_product` + `update_product_fields` (paridad `_ltms_vtex_cost`).
+> - `LTMS_Dashboard_Logic::ajax_recalculate_posgold_prices()` (hook
+>   `wp_ajax_ltms_recalculate_posgold_prices`): re-aplica las reglas ACTUALES del
+>   vendor a todos sus productos con meta `ltms_posgold_synced`, leyendo el costo
+>   del meta `_ltms_posgold_cost`. En lotes de 100 (offset vía `$_POST['offset']`),
+>   el JS encadena llamadas hasta `remaining = 0`. Paridad 1:1 con
+>   `ajax_recalculate_vtex_prices` (nonce, guards, error case).
+> - `ltms-posgold.js` (+ `.min.js` regenerado con terser): botón
+>   `#ltms-posgold-recalc-btn` dentro del form de reglas (`type="button"` +
+>   `preventDefault` — no dispara submit). PRIMERO guarda las reglas del form
+>   (`ltms_save_posgold_rules`) y luego encadena el recálculo — sin este patrón un
+>   vendor que cambiaba valores y recalculaba sin guardar usaba el meta viejo.
+>   `collectRules()` con selectores SCOPED al form (lección #176). Helper
+>   `posgoldAjax()` con reintento multi-URL (WAF SiteGround → `/wp-admin/admin-ajax.php`)
+>   que SÍ propaga el resultado de la retry: un error real del backend devuelve JSON
+>   y NO se reintenta; solo reintenta en fallo de red/HTML (evita el patrón roto
+>   `tries++` de PRICE-RECALC-NET).
+> - `view-posgold.php`: caja informativa + botón + span de estado en el form de reglas.
+> - Whitelist deploy webhook: `class-ltms-posgold-sync.php` + `PosGoldRecalcTest.php`
+>   + `CategoryDedupMigrationTest.php` + `KycAudit2FixTest.php` (lección #177 —
+>   migrations.php ya estaba whitelisteada y llega al server con CURRENT_VERSION
+>   2.9.19; sin los tests actualizados la suite del server esperaría 2.9.18).
+> - `LTMS_VERSION` 2.9.393 → 2.9.394 (cache-busting del JS del panel).
+>
+> **Tests:** +7 (`PosGoldRecalcTest`: persistencia del costo en sync, fórmula con
+> defaults PosGold 50.000 → 86.000 + caso ReDi 91.000, handler + hook + botón,
+> save-before-recalculate, reintento multi-URL sin patrón roto). Suite completa
+> 5,085 tests 10,712 assertions 0 fallas (3 skips preexistentes).
+
+### Fixed — `CAT-DEDUP-001` (categorías repetidas en panel vendedor (Productos → Nuevo/Editar) y en admin (Envíos → Override por Categoría))
+
+> Reporte del operador: en el panel del vendedor, submenu Productos, las categorías
+> se repiten; sucede lo mismo desde el plugin en el administrador, en el submenu
+> Envíos, las categorías se repiten en la sección Override por Categoría.
+>
+> **Causa raíz:** términos `product_cat` duplicados heredados del bug SF-CAT-DEDUP —
+> la sync VTEX/PosGold pre-fix creaba términos con slug aleatorio
+> (`$slug.'-'.wp_rand(100,999)`); en dkosmetic quedaron 7,480 términos para 307
+> nombres únicos. El fix SF-CAT-DEDUP hizo los syncs idempotentes hacia adelante y
+> agrupó el sidebar del storefront en lectura (`get_vendor_categories`), pero NUNCA
+> limpió los duplicados de la DB — siguen contaminando toda superficie que lista
+> `product_cat` con `get_terms()` plano: los selects del vendedor
+> (view-products.php, `number => 100`; con miles de duplicados solo se ven las
+> primeras ~20 categorías, repetidas) y la tabla Override por Categoría
+> (class-ltms-admin-shipping.php, `number => 0`). Impacto extra del override: si el
+> admin configura el modo sobre una fila duplicada (term sin productos), el override
+> no aplica a los productos del término canónico → silenciosamente roto.
+>
+> **Fix:** migración `migrate_2_9_19_category_dedup()` (bump `ltms_db_version`
+> 2.9.18 → 2.9.19, corre al recargar el plugin vía activator): (A) dedup de filas
+> `term_taxonomy` corruptas (mismo term_id + taxonomy, keep MIN(tt_id)); (B) merge
+> de términos duplicados (mismo nombre normalizado trim/case-insensitive + mismo
+> parent — homónimas bajo padres distintos NO se mergean; canonical = `MIN(term_id)`,
+> patrón "keep the oldest"): reasigna `term_relationships` con manejo de conflicto
+> PK, reasigna children, copia term meta faltante (incluye `_ltms_shipping_mode` del
+> override y `thumbnail_id`), recuenta y elimina el duplicado vía `wp_delete_term`.
+> Idempotente — una 2ª pasada encuentra 0 duplicados.
+>
+> **Tests:** +10 (`CategoryDedupMigrationTest`, patrón source-inspection de
+> KycAudit2FixTest). Suite completa 5,078 tests 10,690 assertions 0 fallas
+> (3 skips preexistentes). Verificación end-to-end en producción pendiente del
+> deploy (recarga del plugin en SG ejecuta la migración; confirmar con
+> `wp eval` el conteo de términos y el log `DB_MIGRATION`).
 
 ### Fixed — `HOME-SLIDER-MOBILE-CSS-FIX` (banner no responsivo a la imagen en móvil: recorte forzado a cuadrado + hueco del mismo ratio debajo)
 

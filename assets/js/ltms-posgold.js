@@ -2,6 +2,9 @@
  * LTMS view-posgold — extracted from inline <script>.
  * CSP FIX (patrón FASE2B): external file for CSP compliance.
  * VTEX-RULES-FIX (2026-09-23): scoped selectors (coexiste con la vista VTEX en el DOM SPA).
+ * POSGOLD-RECALC (2026-09-25): recálculo masivo de precios desde el costo
+ * persistido (_ltms_posgold_cost) con guardado previo de reglas + reintento
+ * multi-URL (paridad PRICE-RECALC de ltms-vtex.js).
  */
 (function($){
     'use strict';
@@ -446,6 +449,118 @@
     // Live updates on input change
     $('#ltms-posgold-rules-form input, #ltms-posgold-rules-form select, #ltms-posgold-is-redi').on('input change', updatePriceExample);
     $('#ltms-posgold-seo-template').on('input', updateSeoPreview);
+
+    // POSGOLD-RECALC (2026-09-25): recalcular precios de productos existentes sin
+    // re-sync, usando el costo persistido (_ltms_posgold_cost) — paridad con el
+    // recálculo VTEX (PRICE-RECALC). El botón vive DENTRO del form de reglas →
+    // evitar que dispare el submit. PRICE-RECALC-SAVE (misma lección de VTEX):
+    // el recálculo PRIMERO guarda las reglas ACTUALES del form
+    // (ltms_save_posgold_rules) y luego encadena el recálculo — antes de este
+    // patrón, un vendor que cambiaba valores y recalculaba sin guardar usaba el
+    // meta viejo. collectRules con selectores SCOPED al form (lección #176: la
+    // vista VTEX convive en el mismo DOM con names idénticos).
+    function collectRules() {
+        var $form = $('#ltms-posgold-rules-form');
+        return {
+            is_redi: $('#ltms-posgold-is-redi').is(':checked') ? 'yes' : 'no',
+            transport_pct: $form.find('input[name="transport_pct"]').val(),
+            advertising_pct: $form.find('input[name="advertising_pct"]').val(),
+            returns_pct: $form.find('input[name="returns_pct"]').val(),
+            margin_pct: $form.find('input[name="margin_pct"]').val(),
+            lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
+            iva_pct: $form.find('select[name="iva_pct"]').val(),
+            redi_cost_pct: $form.find('input[name="redi_cost_pct"]').val(),
+            round_multiple: $form.find('select[name="round_multiple"]').val()
+        };
+    }
+
+    // POST con reintento multi-URL que SÍ propaga el resultado de la retry
+    // (mismo helper vtexAjax de ltms-vtex.js): el endpoint primario
+    // (?ltms_ajax=1) es bloqueado intermitentemente por el WAF de SiteGround →
+    // reintenta contra /wp-admin/admin-ajax.php. Un error real del backend
+    // devuelve JSON (xhr.responseJSON) y NO se reintenta — se resuelve con ese
+    // JSON para mostrar el mensaje real. Solo reintenta en fallo de red/HTML.
+    function posgoldAjax(urls, data) {
+        var dfd = $.Deferred();
+        var i = 0;
+        (function attempt() {
+            if (i >= urls.length) { dfd.reject(); return; }
+            $.post(urls[i++], data)
+                .done(function (resp) { dfd.resolve(resp); })
+                .fail(function (xhr) {
+                    if (xhr && xhr.responseJSON && typeof xhr.responseJSON.success !== 'undefined') {
+                        dfd.resolve(xhr.responseJSON);
+                        return;
+                    }
+                    attempt();
+                });
+        })();
+        return dfd.promise();
+    }
+
+    function buildPosgoldUrls() {
+        var urls = [ajaxUrl];
+        if (ajaxUrl.indexOf('admin-ajax.php') === -1) urls.push('/wp-admin/admin-ajax.php');
+        return urls;
+    }
+
+    function postRecalc(offsetVal) {
+        return posgoldAjax(buildPosgoldUrls(), {
+            action: 'ltms_recalculate_posgold_prices',
+            nonce: nonce,
+            offset: offsetVal
+        });
+    }
+
+    function saveRulesThenRecalc($btn, $status, updatedTotal, offset) {
+        // 1) Guardar las reglas ACTUALES del form para que el recálculo use los
+        //    valores nuevos (antes usaba el meta viejo). Con reintento multi-URL.
+        posgoldAjax(buildPosgoldUrls(), $.extend({ action: 'ltms_save_posgold_rules', nonce: nonce }, collectRules()))
+        .done(function(resp){
+            if (!resp.success) {
+                $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudieron guardar las reglas.').css('color', '#dc2626');
+                return;
+            }
+            function next() {
+                postRecalc(offset).done(function(resp){
+                    if (!resp.success) {
+                        $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                        $status.text(resp.data && resp.data.message ? resp.data.message : 'No se pudo recalcular.').css('color', '#dc2626');
+                        return;
+                    }
+                    var d = resp.data;
+                    updatedTotal += d.updated || 0;
+                    if (d.remaining > 0) {
+                        offset = d.offset;
+                        $status.text('Recalculando... (' + d.processed + '/' + d.total + ' productos)').css('color', '#6b7280');
+                        next();
+                    } else {
+                        $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                        $status.text('✅ ' + updatedTotal + ' productos actualizados.').css('color', '#16a34a');
+                        updatePriceExample();
+                    }
+                }).fail(function(){
+                    $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+                    $status.text('Error de red.').css('color', '#dc2626');
+                });
+            }
+            next();
+        }).fail(function(){
+            $btn.prop('disabled', false).html('🔄 Recalcular precios de productos existentes');
+            $status.text('Error de red.').css('color', '#dc2626');
+        });
+    }
+
+    $('#ltms-posgold-recalc-btn').on('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        var $btn = $(this);
+        var $status = $('#ltms-posgold-recalc-status');
+        $btn.prop('disabled', true);
+        $status.text('Guardando reglas y recalculando precios...');
+        saveRulesThenRecalc($btn, $status, 0, 0);
+    });
 
     // Initial render
     updatePriceExample();

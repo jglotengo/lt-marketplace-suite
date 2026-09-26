@@ -32,6 +32,14 @@ final class LTMS_PosGold_Sync {
     const CODE_META_KEY = '_ltms_posgold_code';
 
     /**
+     * POSGOLD-RECALC (2026-09-25): guarda el costo PosGold ORIGINAL del producto
+     * (precio de la API antes de reglas) para que el endpoint
+     * ltms_recalculate_posgold_prices pueda re-preciar el catálogo sin
+     * re-descargar de la API (mismo patrón PRICE-RECALC de VTEX/_ltms_vtex_cost).
+     */
+    const COST_META_KEY = '_ltms_posgold_cost';
+
+    /**
      * v2.9.72 P3-11: Cron hook para sync en background.
      */
     const CRON_HOOK = 'ltms_posgold_sync_cron';
@@ -303,7 +311,12 @@ final class LTMS_PosGold_Sync {
             }
 
             // 9b. Calcular precio final con reglas del vendor.
+            // POSGOLD-RECALC: conservar el costo ORIGINAL en $product['_ltms_cost']
+            // ANTES de sobreescribir regular_price — sync_single_product lo persiste
+            // en el meta _ltms_posgold_cost para que el recálculo masivo pueda
+            // re-preciar sin re-sincronizar (mismo patrón PRICE-RECALC de VTEX).
             $price_calc = LTMS_PosGold_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+            $product['_ltms_cost'] = $price_calc['cost'];
             $product['regular_price'] = $price_calc['price'];
 
             // 9c. Generar título SEO.
@@ -534,6 +547,11 @@ final class LTMS_PosGold_Sync {
         $wc_product->update_meta_data( self::SYNC_META_KEY, current_time( 'mysql', true ) );
         $wc_product->update_meta_data( self::CODE_META_KEY, $product['codigo'] );
 
+        // POSGOLD-RECALC: persistir el costo original para el recálculo masivo.
+        if ( isset( $product['_ltms_cost'] ) ) {
+            $wc_product->update_meta_data( self::COST_META_KEY, (float) $product['_ltms_cost'] );
+        }
+
         // Atributos (marca, modelo).
         self::set_product_attributes( $wc_product, $product );
 
@@ -600,6 +618,11 @@ final class LTMS_PosGold_Sync {
         // Marcar sync actualizado.
         $wc_product->update_meta_data( self::SYNC_META_KEY, current_time( 'mysql', true ) );
         $wc_product->update_meta_data( self::CODE_META_KEY, $product['codigo'] );
+
+        // POSGOLD-RECALC: persistir/actualizar el costo original para el recálculo masivo.
+        if ( isset( $product['_ltms_cost'] ) ) {
+            $wc_product->update_meta_data( self::COST_META_KEY, (float) $product['_ltms_cost'] );
+        }
 
         // Atributos
         self::set_product_attributes( $wc_product, $product );
