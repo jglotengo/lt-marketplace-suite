@@ -3924,6 +3924,28 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Bumpear `LTMS_VERSION` SIEMPRE con cambios de CSS (el `?ver=` en caché del dispositivo serviría el CSS
      viejo).
 
+### Lección #181: la respuesta del deploy webhook la cachea SiteGround — sin cache-buster el deploy "exitoso" re-sirve la respuesta anterior y el server se queda con el commit viejo
+
+1. **Caso real:** tras pushear `767ecff8` (POSGOLD-RULES-PARITY v2.9.396) se disparó el deploy webhook webroot
+   (`/ltms-deploy-webhook.php?token=...`) y respondió `Deploy complete.` con `HEAD is now at d64f3378` — el
+   commit ANTERIOR. Dos reintentos consecutivos devolvieron la MISMA salida (incluido el mismo
+   `+ ca34ae3f...d64f3378 main -> origin/main (forced update)`), aunque `git ls-remote origin main` desde local
+   confirmaba que GitHub servía `767ecff8`. Con cache-buster (`&nocache=<timestamp>`) el mismo URL ejecutó el
+   fetch real y el server llegó a `767ecff8`.
+2. **Causa raíz:** SG cachea la respuesta del webhook PHP (URL fija sin vary) — los reintentos sin query string
+   distinta no ejecutan el script: re-sirven la respuesta cacheada del run anterior. El deploy parece exitoso
+   (HTTP 200 + "Deploy complete") pero el server no tocó nada.
+3. **Regla preventiva:**
+   - Toda invocación del deploy webhook debe llevar un cache-buster (`&nocache=<timestamp>` o similar) — la
+     respuesta "Deploy complete" sin buster NO prueba que el deploy corrió.
+   - Verificación post-deploy obligatoria punta a punta (no confiar en el output del webhook): el contenido real
+     del archivo tocado vía HTTP (`ltms-posgold.min.js` con UA de navegador + `?nocache=`) y el `?ver=2.9.396`
+     servido en el home (evidencia de que PHP ejecuta el código nuevo).
+   - El output del webhook debe considerarse sugerencia, no verdad — la única prueba es el artefacto servido.
+   - Complemento de la lección #180 (SG Anti-Bot por UA): mismo patrón en el deploy — UA de navegador real para
+     pasar el borde de SG; curl/Invoke-WebRequest con UA default recibe 403/conexión cortada.
+
+
 
 
 
