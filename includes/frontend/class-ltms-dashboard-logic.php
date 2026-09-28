@@ -1959,7 +1959,20 @@ final class LTMS_Dashboard_Logic {
         $usuarioid = absint( $_POST['usuarioid'] ?? 1 ) ?: 1;
         $bodegaid  = absint( $_POST['bodegaid']  ?? 1 ) ?: 1;
 
-        if ( empty( $subdomain ) || empty( $token ) ) {
+        // LTMS-SAVE-CREDS-FIX (2026-09-27): la vista OCULTA el campo de token
+        // dentro de un <details> colapsado ("Actualizar token") cuando ya hay
+        // token configurado — re-guardar credenciales (para actualizar
+        // subdominio/IDs) enviaba token='' → 400 "Subdominio y Token son
+        // obligatorios." → el .fail() de jQuery ignoraba el JSON del 4xx y el
+        // vendor veía "Error de red." (verificado end-to-end en producción con
+        // sesión real del vendor: HTTP 400 JSON). persist_posgold_credentials
+        // YA conserva el valor guardado cuando un campo viene vacío — la
+        // validación solo debe rechazar cuando NO hay nada configurado Y el
+        // campo está vacío.
+        $has_saved_subdomain = (string) get_user_meta( $user_id, 'ltms_posgold_subdomain', true ) !== '';
+        $has_saved_token     = (string) get_user_meta( $user_id, 'ltms_posgold_token', true ) !== '';
+
+        if ( ( empty( $subdomain ) && ! $has_saved_subdomain ) || ( empty( $token ) && ! $has_saved_token ) ) {
             wp_send_json_error( [ 'message' => __( 'Subdominio y Token son obligatorios.', 'ltms' ) ], 400 );
         }
 

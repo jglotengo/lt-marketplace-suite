@@ -5,6 +5,9 @@
  * POSGOLD-RECALC (2026-09-25): recálculo masivo de precios desde el costo
  * persistido (_ltms_posgold_cost) con guardado previo de reglas + reintento
  * multi-URL (paridad PRICE-RECALC de ltms-vtex.js).
+ * LTMS-SAVE-CREDS-FIX (2026-09-27): todos los .fail() leen xhr.responseJSON
+ * (helper posgoldFailMsg) — los wp_send_json_error(...,4xx) llegan con JSON
+ * (validación/permisos) y antes se mostraban como "Error de red.".
  */
 (function($){
     'use strict';
@@ -21,7 +24,26 @@
         if (text === null || text === undefined) return '';
         var $div = $('<div/>');
         $div.text(String(text));
-        return $div.html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return $div.html().replace(/"/g, '"').replace(/'/g, '&#39;');
+    }
+
+    // LTMS-SAVE-CREDS-FIX (2026-09-27): los wp_send_json_error(..., 4xx) del
+    // backend llegan con JSON (validación/permisos) pero jQuery los trata como
+    // fallo — el .fail() mostraba 'Error de red.' e ignoraba xhr.responseJSON.
+    // Verificado end-to-end en producción: guardar credenciales con el token
+    // vacío (details colapsado) respondía HTTP 400 JSON "Subdominio y Token son
+    // obligatorios." y el vendor veía "Error de red.". Un 403 con body '-1'
+    // (HTML, check_ajax_referer con $die=true) es nonce/sesión vencida — el
+    // handler global 403 del dashboard (initNonceRefresh) fuerza la recarga.
+    function posgoldFailMsg(xhr, fallback) {
+        if (xhr && xhr.responseJSON && xhr.responseJSON.data) {
+            var d = xhr.responseJSON.data;
+            return (typeof d === 'string') ? d : (d.message || fallback);
+        }
+        if (xhr && xhr.status === 403) {
+            return 'Tu sesión expiró. Recargando...';
+        }
+        return fallback || 'Error de red.';
     }
 
     // Acordeón
@@ -54,9 +76,9 @@
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('💾 Guardar credenciales');
-            LTMS.UX.toastError('Error', 'Error de red.');
+            LTMS.UX.toastError('Error', posgoldFailMsg(xhr));
         });
     });
 
@@ -77,9 +99,9 @@
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('💾 Guardar categorías seleccionadas');
-            LTMS.UX.toastError('Error', 'Error de red.');
+            LTMS.UX.toastError('Error', posgoldFailMsg(xhr));
         });
     });
 
@@ -169,8 +191,10 @@
                 $('#ltms-posgold-cats-status').text('Error: ' + (resp.data.message || resp.data));
                 $('#ltms-posgold-cats-container').html('<p style="text-align:center;color:#dc2626;padding:24px 0;margin:0;">✗ ' + escapeHtml(resp.data.message || resp.data) + '<br><br>Verifica tus credenciales en la sección "Credenciales PosGold" arriba.</p>');
             }
-        }).fail(function(){
-            $('#ltms-posgold-cats-status').text('Error de red.');
+        }).fail(function(xhr){
+            var msg = posgoldFailMsg(xhr);
+            $('#ltms-posgold-cats-status').text(msg);
+            $('#ltms-posgold-cats-container').html('<p style="text-align:center;color:#dc2626;padding:24px 0;margin:0;">✗ ' + escapeHtml(msg) + '<br><br>Verifica tus credenciales en la sección "Credenciales PosGold" arriba.</p>');
         });
     }
 
@@ -228,9 +252,9 @@
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('💾 Guardar reglas de precio');
-            LTMS.UX.toastError('Error', 'Error de red.');
+            LTMS.UX.toastError('Error', posgoldFailMsg(xhr));
         });
     });
 
@@ -252,9 +276,9 @@
             } else {
                 LTMS.UX.toastError('Error', resp.data.message || resp.data);
             }
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('💾 Guardar plantilla SEO');
-            LTMS.UX.toastError('Error', 'Error de red.');
+            LTMS.UX.toastError('Error', posgoldFailMsg(xhr));
         });
     });
 
@@ -282,9 +306,10 @@
             } else {
                 $result.html('<div style="padding:12px 16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(resp.data.message || resp.data) + '</div>').show();
             }
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('🔍 Probar conexión');
-            LTMS.UX.toastError('Error', 'Error de red.');
+            var $result = $('#ltms-posgold-test-result');
+            $result.html('<div style="padding:12px 16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(posgoldFailMsg(xhr)) + '</div>').show();
         });
     });
 
@@ -313,9 +338,9 @@
             }
             var baseline = resp.data.baseline || null;
             pollSyncStatus($btn, $result, Date.now(), baseline);
-        }).fail(function(){
+        }).fail(function(xhr){
             $btn.prop('disabled', false).html('🔄 Sincronizar ahora');
-            $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ Error de red al programar la sincronización.</div>').show();
+            $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(posgoldFailMsg(xhr, 'Error de red al programar la sincronización.')) + '</div>').show();
         });
     });
 
@@ -354,8 +379,8 @@
                 }
                 $result.html(html).show();
                 setTimeout(function(){ LTMS.Dashboard.loadView('posgold', true); }, 6000);
-            }).fail(function(){
-                $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">Error de red al consultar el estado de la sincronización.</div>').show();
+            }).fail(function(xhr){
+                $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">' + escapeHtml(posgoldFailMsg(xhr, 'Error de red al consultar el estado de la sincronización.')) + '</div>').show();
             });
         }
 
@@ -378,12 +403,14 @@
                     return;
                 }
                 setTimeout(tick, 8000);
-            }).fail(function(){
+            }).fail(function(xhr){
+                var msg = posgoldFailMsg(xhr, 'Error de red al consultar el estado de la sincronización.');
                 if (Date.now() > deadline) {
                     $btn.prop('disabled', false).html('🔄 Sincronizar ahora');
-                    $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">Error de red al consultar el estado de la sincronización.</div>').show();
+                    $result.html('<div style="padding:16px;background:#fee2e2;border-radius:8px;color:#991b1b;">✗ ' + escapeHtml(msg) + '</div>').show();
                     return;
                 }
+                $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ ' + escapeHtml(msg) + ' Reintentando...</div>').show();
                 setTimeout(tick, 8000);
             });
         }

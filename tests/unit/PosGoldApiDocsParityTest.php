@@ -441,4 +441,153 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( "wp_ajax_ltms_get_products_data", $src, 'Los handlers vivos permanecen.' );
 		$this->assertStringContainsString( "wp_ajax_ltms_create_product", $src, 'Los handlers vivos permanecen.' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// LTMS-SAVE-CREDS-FIX (2026-09-27) — "Error de red" al guardar credenciales
+	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Mapa de user_meta con tracking de writes (update_user_meta).
+	 *
+	 * Devuelve un OBJETO holder (los objetos van por handle — un array
+	 * devuelto por valor sería una COPIA y el closure seguiría escribiendo en
+	 * la variable original: los asserts del test leerían una copia vacía).
+	 */
+	private function stub_vendor_meta_with_writes( int $user_id, array $meta ): object {
+		$GLOBALS['__ltms_current_uid'] = $user_id;
+		$map    = $meta;
+		$holder = new \stdClass();
+		$holder->writes = [];
+		Monkey\Functions\when( 'get_user_meta' )->alias(
+			static function ( $uid, $key = '', $single = false ) use ( $user_id, &$map ) {
+				return ( (int) $uid === $user_id && isset( $map[ $key ] ) ) ? $map[ $key ] : '';
+			}
+		);
+		Monkey\Functions\when( 'update_user_meta' )->alias(
+			static function ( $uid, $key, $value ) use ( &$map, $holder ) {
+				$holder->writes[ $key ] = $value;
+				$map[ $key ]            = $value;
+				return true;
+			}
+		);
+		Monkey\Functions\stubs( [
+			'check_ajax_referer' => true,
+			'is_user_logged_in'  => true,
+		] );
+		Monkey\Functions\when( 'get_userdata' )->alias(
+			static fn( $uid ) => (object) [ 'roles' => [ 'ltms_vendor' ] ]
+		);
+		return $holder;
+	}
+
+	private function invoke_save_credentials( callable $call ): array {
+		$payload     = null;
+		$payload_err = null;
+
+		Monkey\Functions\when( 'wp_send_json_success' )->alias(
+			static function ( $data = null ) use ( &$payload ): void {
+				$payload = $data;
+				throw new \RuntimeException( 'json_success' );
+			}
+		);
+		Monkey\Functions\when( 'wp_send_json_error' )->alias(
+			static function ( $data = null, $status = null ) use ( &$payload_err ): void {
+				$payload_err = $data;
+				throw new \RuntimeException( 'json_error' );
+			}
+		);
+
+		try {
+			$call();
+		} catch ( \RuntimeException $e ) {
+			if ( ! in_array( $e->getMessage(), [ 'json_success', 'json_error' ], true ) ) {
+				throw $e;
+			}
+		}
+
+		return [ 'success_payload' => $payload, 'error_payload' => $payload_err ];
+	}
+
+	private function post_save( string $subdomain, string $token ): void {
+		$_POST['subdomain'] = $subdomain;
+		$_POST['token']     = $token;
+		$_POST['empresaid'] = '1';
+		$_POST['usuarioid'] = '1';
+		$_POST['bodegaid']  = '1';
+		( new \LTMS_Dashboard_Logic() )->ajax_save_posgold_credentials();
+	}
+
+	public function test_save_credentials_keeps_existing_token_when_field_empty(): void {
+		$this->require_class( 'LTMS_Dashboard_Logic' );
+		$this->require_class( 'LTMS_Utils' );
+		$this->require_class( 'LTMS_Core_Security' );
+
+		// Escenario EXACTO del vendor (verificado end-to-end en producción con
+		// sesión real): token ya configurado → la vista oculta el campo dentro
+		// de <details> colapsado → re-guardar enviaba token='' → 400 → el JS
+		// mostraba "Error de red.". El fix conserva el token guardado.
+		$encrypted = \LTMS_Core_Security::encrypt( 'jwt-vendor-real' );
+		$holder = $this->stub_vendor_meta_with_writes( 168, [
+			'ltms_posgold_subdomain' => 'jugueteriataiwan',
+			'ltms_posgold_token'     => $encrypted,
+		] );
+
+		$out = $this->invoke_save_credentials( fn() => $this->post_save( 'jugueteriataiwan', '' ) );
+
+		$this->assertNotNull( $out['success_payload'], 'Con token ya configurado, guardar con el campo vacío debe tener éxito (conserva el guardado) — antes: 400 "Subdominio y Token son obligatorios." → "Error de red."' );
+		$this->assertSame( 'Credenciales guardadas correctamente.', $out['success_payload']['message'] );
+		$this->assertNull( $out['error_payload'], 'No debe haber error 400.' );
+		$this->assertArrayNotHasKey( 'ltms_posgold_token', $holder->writes, 'El token guardado NO debe sobreescribirse con el campo vacío.' );
+	}
+
+	public function test_save_credentials_still_rejects_when_nothing_saved_and_fields_empty(): void {
+		$this->require_class( 'LTMS_Dashboard_Logic' );
+		$this->require_class( 'LTMS_Utils' );
+
+		// Primera configuración con campos vacíos → el 400 con mensaje claro sigue.
+		$this->stub_vendor_meta_with_writes( 168, [] );
+
+		$out = $this->invoke_save_credentials( fn() => $this->post_save( '', '' ) );
+
+		$this->assertNotNull( $out['error_payload'], 'Sin nada configurado y campos vacíos debe seguir rechazando.' );
+		$this->assertSame( 'Subdominio y Token son obligatorios.', $out['error_payload']['message'] );
+	}
+
+	public function test_save_credentials_updates_token_when_provided(): void {
+		$this->require_class( 'LTMS_Dashboard_Logic' );
+		$this->require_class( 'LTMS_Utils' );
+		$this->require_class( 'LTMS_Core_Security' );
+
+		// El vendor abre <details> y pega un token nuevo → se cifra y se guarda.
+		$old_encrypted = \LTMS_Core_Security::encrypt( 'jwt-viejo' );
+		$holder = $this->stub_vendor_meta_with_writes( 168, [
+			'ltms_posgold_subdomain' => 'jugueteriataiwan',
+			'ltms_posgold_token'     => $old_encrypted,
+		] );
+
+		$out = $this->invoke_save_credentials( fn() => $this->post_save( 'jugueteriataiwan', 'jwt-nuevo-123' ) );
+
+		$this->assertNotNull( $out['success_payload'], 'Guardar con token nuevo debe tener éxito.' );
+		$this->assertArrayHasKey( 'ltms_posgold_token', $holder->writes, 'El token nuevo debe persistirse.' );
+		$this->assertNotSame( 'jwt-nuevo-123', $holder->writes['ltms_posgold_token'], 'El token debe ir cifrado a user_meta.' );
+		$decrypted = \LTMS_Core_Security::decrypt( $holder->writes['ltms_posgold_token'] );
+		$this->assertSame( 'jwt-nuevo-123', $decrypted, 'El token cifrado debe descifrar al valor nuevo.' );
+	}
+
+	public function test_js_fail_handlers_read_response_json(): void {
+		// LTMS-SAVE-CREDS-FIX: los .fail() de ltms-posgold.js mostraban
+		// 'Error de red.' e ignoraban xhr.responseJSON — cualquier
+		// wp_send_json_error(...,4xx) (validación/permisos) se veía como
+		// "Error de red." en vez del mensaje real.
+		$js_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-posgold.js' );
+		$this->assertIsString( $js_src, 'Debe poder leerse ltms-posgold.js.' );
+
+		$this->assertStringContainsString( 'function posgoldFailMsg(xhr, fallback)', $js_src, 'Debe existir el helper posgoldFailMsg.' );
+		$this->assertStringContainsString( 'xhr.responseJSON', $js_src, 'El helper debe leer xhr.responseJSON (el mensaje real del 4xx).' );
+		$this->assertSame( 0, substr_count( $js_src, "toastError('Error', 'Error de red.');" ), 'Ningún .fail debe mostrar "Error de red." hardcodeado sin leer la respuesta.' );
+
+		$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-posgold.min.js' );
+		$this->assertIsString( $min_src, 'Debe poder leerse ltms-posgold.min.js.' );
+		$this->assertStringContainsString( 'responseJSON', $min_src, 'El .min.js regenerado debe contener el fix.' );
+	}
 }
