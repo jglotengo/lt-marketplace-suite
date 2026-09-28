@@ -4,7 +4,96 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-26
+## [Unreleased] — 2026-09-27
+
+### Fixed — `POSGOLD-DOCS-PARITY` + `POSGOLD-CAT-DROPDOWN` (causa raíz de "no me carga categorías" en la conexión PosGold + categorías repetidas en el form de productos)
+
+> Reporte del vendor (jugueteriataiwan): en la integración para conexión de
+> datos PosGold no cargaban las categorías del filtro, y las categorías del
+> formulario de productos del panel de vendedor se repetían. Documentación
+> oficial revisada (Postman `posgold-api`: JWT Token Generar/Validar,
+> Productos_V6, Obtener Categorias y Grupos) y **verificada live contra la
+> instancia real del vendor** (HTTP directo con el JWT configurado).
+>
+> **Configuración de conexión — CORRECTA:** subdominio + Bearer JWT +
+> `empresaid=1` + `usuarioid=1` + `bodegaid=1` cargan el catálogo completo
+> (HTTP 200, 4.6 MB). Generación de token: POST
+> `/apiGold/Login_Api/LoginJWTToken?user=...&Password=...` →
+> `{"Status":true,"Token":"..."}` (verificado "Login Correcto"). Validación:
+> GET `/apiGold/Login_Api/JWTValidateToken` (Bearer) → 200.
+>
+> **Causa raíz (P0) — la respuesta real usa la clave `Datos`:**
+> `extract_products_array()`/`extract_categories_array()` buscaban
+> `data/productos/Items/items/results/lista/List` pero NO `Datos` → el
+> catálogo llegaba vacío aunque la respuesta trajera todo → el dropdown del
+> filtro PosGold mostraba "No se encontraron categorías" y la sync encontraba
+> 0 productos. Fix: `Datos` añadida a ambos extractors + manejo de HTTP 200
+> con `Status=false` como error con el motivo de `Msj` (antes: catálogo vacío
+> silencioso).
+>
+> **Fix A (P1) — endpoint de categorías equivocado:** el código usaba
+> `/apiGold/CategoriaApi/GetCategoria` → **HTTP 404 real** (verificado live).
+> La doc define `/apiGold/CategoriaAPI/GetCategoriasGrupos?empresaid=1` →
+> **HTTP 200 real** (array desnudo; vacío para esta empresa — la categorización
+> real viene de productos, que es el fallback). Fix: constante corregida y
+> query args reducidos a `empresaid` (la doc define un único param).
+>
+> **Fix B (P1) — `normalize_product()` no mapeaba los nombres reales de la API
+> V6** (verificados live): el nombre viene en `Producto` (pick list sin
+> 'Producto' → títulos vacíos), el precio en `Precio1` (pick list con 'Precio'
+> → precio 0), la categoría en `Categoriaid` (**case-sensitive**: 'CategoriaId'
+> NO matchea → `categoria_id` vacío → el filtro por categoriaid excluía TODO),
+> el IVA en `ProductoImpuestoPorcentaje`, imágenes en `Imagenes` (array) y
+> barcode en `CodigoBarras` (array). Fix: pick lists alineados + helper
+> `pick_first_scalar()` para arrays (primer elemento) + filenames desnudos de
+> `Imagenes` se descartan (las rutas `/Imagenes/` `/Images/` del subdominio
+> devuelven 404 y el catálogo requiere sesión — no hay URL base verificable;
+> solo se conservan URLs absolutas, documentado en el código). Sin esto los
+> productos se omitían por "incompletos" (sin nombre/precio) y el filtro de
+> categorías nunca matcheaba.
+>
+> **Fix C — categorías repetidas en el form de productos del panel
+> (`POSGOLD-CAT-DROPDOWN`):** `view-products.php` (modal Nuevo/Editar) listaba
+> `product_cat` con `get_terms()` plano (`number => 100`) → devolvía los
+> términos DUPLICADOS heredados de la sync pre SF-CAT-DEDUP-001 (mismo nombre
+> con slug/parent distinto — la migración v2.9.19 agrupa por nombre+parent, así
+> que duplicados con parent distinto permanecen) y truncaba la lista. Fix:
+> nuevo helper `LTMS_Utils::get_deduped_product_categories()` — SQL
+> `GROUP BY t.name` + `MIN(t.term_id)` como canónico (mismo patrón de
+> `get_vendor_categories()` del storefront y la migración CAT-DEDUP-001), sin
+> límite de filas; ambos selects reutilizan la lista computada una vez.
+> **Verificado en producción: 224 términos → 40 categorías únicas.**
+>
+> **Fix D (hallazgo de auditoría) — dead code:** handler AJAX
+> `ltms_get_categories` de `LTMS_Products_Ajax` eliminado (hook + método) —
+> ningún JS del repo lo invocaba (verificado repo-completo; el dropdown del
+> form de productos se renderiza server-side y el dropdown PosGold usa
+> `ltms_get_posgold_categories`). Patrón C5-1 FIX del repo.
+>
+> **Whitelist deploy webhook** (lección #177): `class-ltms-api-posgold.php` +
+> `class-ltms-utils.php` + `PosGoldApiDocsParityTest.php`.
+>
+> **Deploy + verificación punta a punta (2026-09-27):** commit `cb2be096` →
+> push → webhook deploy (HEAD en server = `cb2be096`, opcache reset, SG cache
+> purged) → home sirve `?ver=2.9.397` → `wp eval-file` en producción:
+> `LTMS_Api_PosGold` cargada, endpoint nuevo, dead handler eliminado,
+> **`get_categories()` con las credenciales del vendor → 23 categorías
+> cargadas** (antes: 0) con source=fallback, `normalize_product` →
+> name/precio/categoria_id/iva correctos, dedup 40 únicas. `php -l` OK en
+> server, plugin recargado (deactivate/activate), `wp cache flush`, error_log
+> sin errores nuevos tras el deploy.
+>
+> **Tests:** +16 (`tests/unit/PosGoldApiDocsParityTest.php`, grupo
+> `posgold-api-docs`): endpoint documentados (categorías + productos),
+> extracción `Datos` con la respuesta REAL capturada live, `Status=false` →
+> error con `Msj`, `normalize_product` con nombres reales (Producto/Precio1/
+> Categoriaid/ProductoImpuestoPorcentaje/Producto_ref), `Imagenes` array con
+> URL absoluta vs filename desnuo, `CodigoBarras` array, fallback de categorías
+> e2e con `Categoriaid` real, filtro por categoriaid con la API real, dedup de
+> `product_cat` (wpdb mock + GROUP BY source-level), handler dead code
+> eliminado, vista usa el helper de dedup. Suite completa 5,105 tests 10,803
+> assertions 0 fallas (3 skips preexistentes). `LTMS_VERSION` 2.9.396 →
+> 2.9.397.
 
 ### Changed — `POSGOLD-RULES-PARITY` (reglas de precio PosGold idénticas a VTEX)
 

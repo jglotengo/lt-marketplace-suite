@@ -3945,6 +3945,38 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    - Complemento de la lección #180 (SG Anti-Bot por UA): mismo patrón en el deploy — UA de navegador real para
      pasar el borde de SG; curl/Invoke-WebRequest con UA default recibe 403/conexión cortada.
 
+### Lección #182: los pick lists de normalización con nombres "parecidos" NO matchean la respuesta real de la API — el contrato se verifica con la respuesta capturada live (Postman/HTTP directo), no con nombres plausibles
+
+1. **Caso real:** POSGOLD-DOCS-PARITY (2026-09-27, commit `cb2be096`). El cliente PosGold
+   (`LTMS_Api_PosGold::normalize_product()`) tenía pick lists con nombres plausibles que NO matcheaban la
+   respuesta real de la API V6 (capturada live contra jugueteriataiwan.goldpos.com.co): el nombre viene en
+   `Producto` (pick list sin 'Producto' → títulos vacíos), el precio en `Precio1` (pick list con 'Precio' →
+   precio 0), la categoría en `Categoriaid` (**PHP array keys son CASE-SENSITIVE**: 'CategoriaId' NO matcheaba
+   → `categoria_id` vacío → el filtro por categoriaid excluía TODO el catálogo), el IVA en
+   `ProductoImpuestoPorcentaje`, imágenes en `Imagenes` (ARRAY) y barcode en `CodigoBarras` (ARRAY — el pick
+   solo manejaba escalares). Además `extract_products_array()`/`extract_categories_array()` no manejaban la
+   clave envolvente `Datos` (español) → catálogo vacío → "No se encontraron categorías" en el dropdown del
+   filtro PosGold y la sync encontraba 0 productos. Y el endpoint de categorías usado
+   (`CategoriaApi/GetCategoria`) devolvía HTTP 404 real — la doc define `CategoriaAPI/GetCategoriasGrupos`.
+2. **Causa raíz:** la normalización se escribió contra nombres "razonables" y contra la estructura que los tests
+   mockeaban — NINGÚN test ejercía `normalize_product()` ni `extract_products_array()` con la respuesta real
+   de la API (0 cobertura en el suite de 4,851 tests). Los pick lists "parecidos" pasan el code review pero
+   no el contrato real. Complemento de la regla madre: generar código ya no es el cuello de botella — verificar
+   que hace lo que dice (contra la respuesta REAL del servicio) sí lo es.
+3. **Regla preventiva:**
+   - Antes de dar por buena una normalización/mapeo de una API externa: capturar la respuesta REAL (Postman
+     público, HTTP directo con credenciales reales, o el HTML servido) y escribir el test con ESA estructura
+     exacta — no con fixtures inventados.
+   - Los pick lists por claves alternativas deben incluir TODAS las variantes case reales del servicio
+     ('Categoriaid' ≠ 'CategoriaId' ≠ 'categoriaid' — PHP keys son case-sensitive).
+   - Los campos que la API devuelve como ARRAY (Imagenes, CodigoBarras, Tags) requieren un helper dedicado
+     (primer elemento escalar) — el pick escalar no los maneja y un array pasa el guard `!== ''`.
+   - Los endpoints documentados (Postman) se verifican live: path exacto (case incluida), método HTTP real
+     (la doc de JWTValidateToken dice POST y responde GET; LoginJWTToken dice GET y exige POST) y params
+     requeridos (un param requerido faltante produce 404 genérico en ASP.NET — "No se encontró").
+   - La respuesta puede venir HTTP 200 con `Status=false` + motivo en `Msj` — tratarla como error, no como
+     catálogo vacío silencioso.
+
 
 
 
