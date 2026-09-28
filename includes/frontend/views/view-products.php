@@ -464,12 +464,19 @@ $products_total = (int) wc_get_products( [
             <select id="ltms-np-category" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                 <option value=""><?php esc_html_e( 'Sin categoría', 'ltms' ); ?></option>
                 <?php
-                $np_terms = get_terms([ 'taxonomy' => 'product_cat', 'hide_empty' => false, 'number' => 100 ]);
-                if ( ! is_wp_error( $np_terms ) ) :
-                    foreach ( $np_terms as $np_term ) :
+                // POSGOLD-CAT-DROPDOWN (2026-09-27): get_terms() plano devolvía
+                // los términos product_cat DUPLICADOS heredados de la sync
+                // (mismo nombre, slug distinto) → cada categoría aparecía N veces
+                // en el select y con límite 100 la lista quedaba truncada.
+                // El helper de dedup de LTMS_Utils agrupa por nombre con el
+                // term_id canónico (mismo patrón SF-CAT-DEDUP del storefront).
+                // La lista se computa UNA vez y se reutiliza en el select del
+                // modal Editar ($ltms_cat_terms).
+                $ltms_cat_terms = LTMS_Utils::get_deduped_product_categories();
+                foreach ( $ltms_cat_terms as $np_term ) :
                 ?>
                 <option value="<?php echo esc_attr( $np_term->term_id ); ?>"><?php echo esc_html( $np_term->name ); ?></option>
-                <?php endforeach; endif; ?>
+                <?php endforeach; ?>
             </select>
         </div>
 
@@ -692,12 +699,13 @@ wp_enqueue_script( 'ltms-products', ltms_asset_url( 'js/ltms-products' ), [ 'jqu
             <select id="ltms-ep-category" style="width:100%;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                 <option value=""><?php esc_html_e( 'Sin categoría', 'ltms' ); ?></option>
                 <?php
-                $ep_terms = get_terms([ 'taxonomy' => 'product_cat', 'hide_empty' => false, 'number' => 100 ]);
-                if ( ! is_wp_error( $ep_terms ) ) :
-                    foreach ( $ep_terms as $ep_term ) :
+                // POSGOLD-CAT-DROPDOWN (2026-09-27): mismo fix de dedup que el
+                // select del modal Nuevo — reutiliza $ltms_cat_terms (la lista
+                // ya computada arriba por el helper de dedup de LTMS_Utils).
+                foreach ( $ltms_cat_terms as $ep_term ) :
                 ?>
                 <option value="<?php echo esc_attr( $ep_term->term_id ); ?>"><?php echo esc_html( $ep_term->name ); ?></option>
-                <?php endforeach; endif; ?>
+                <?php endforeach; ?>
             </select>
         </div>
 

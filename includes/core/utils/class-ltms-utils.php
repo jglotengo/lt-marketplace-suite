@@ -7,7 +7,7 @@
  *
  * @package    LTMS
  * @subpackage LTMS/includes/core/utils
- * @version    1.5.0
+ * @version    1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -268,6 +268,50 @@ final class LTMS_Utils {
         $d2   = new \DateTime( $date2 );
         $diff = $d1->diff( $d2 );
         return (int) $diff->days;
+    }
+
+    /**
+     * Lista las categorías product_cat SIN duplicados (para dropdowns del panel).
+     *
+     * POSGOLD-CAT-DROPDOWN (2026-09-27): los términos product_cat quedaron
+     * DUPLICADOS en la DB por la sync VTEX/PosGold pre SF-CAT-DEDUP-001 (mismo
+     * nombre con slug distinto, o distinto parent — la migración v2.9.19 agrupa
+     * por nombre+parent, así que duplicados con parent distinto permanecen).
+     * get_terms() plano los devolvía todos → el select de categoría del
+     * formulario de productos del panel de vendedor (view-products.php, modal
+     * Nuevo/Editar) mostraba cada categoría N veces, y con 'number' => 100 solo
+     * se veían las primeras filas truncadas.
+     *
+     * Esta query agrupa por nombre (collation case-insensitive) y devuelve el
+     * term_id más bajo como canónico — mismo patrón que get_vendor_categories()
+     * de LTMS_Vendor_Storefront y la migración CAT-DEDUP-001. Sin límite de
+     * filas: el GROUP BY colapsa los duplicados, así que el resultado es la
+     * lista real de nombres únicos.
+     *
+     * @return array<int, object{term_id: int, name: string}>
+     */
+    public static function get_deduped_product_categories(): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT MIN(t.term_id) AS term_id, t.name
+              FROM {$wpdb->terms} t
+              INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
+              WHERE tt.taxonomy = 'product_cat'
+              GROUP BY t.name
+              ORDER BY t.name ASC"
+        );
+
+        if ( ! is_array( $rows ) ) {
+            return [];
+        }
+
+        return array_map( static function ( $row ) {
+            return (object) [
+                'term_id' => (int) $row->term_id,
+                'name'    => (string) $row->name,
+            ];
+        }, $rows );
     }
 
     /**

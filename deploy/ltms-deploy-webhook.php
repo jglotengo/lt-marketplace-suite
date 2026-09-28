@@ -836,6 +836,15 @@ $files = [
     // PROD-LIST-PAGING + PRICE-RECALC v2.9.333 — paginación del panel de
     // productos + recálculo masivo de precios desde el costo persistido.
     'tests/unit/RecalcPricesTest.php',
+    // POSGOLD-DOCS-PARITY + POSGOLD-CAT-DROPDOWN v2.9.397 — cliente PosGold
+    // alineado a la doc real (endpoint categorías GetCategoriasGrupos,
+    // extracción "Datos", normalize de nombres reales de la API V6) + dedup de
+    // product_cat en el form de productos. El cliente API y el helper Utils NO
+    // estaban en la whitelist — sin ellos el fix no llegaría al server via
+    // webhook (lección #177).
+    'includes/api/class-ltms-api-posgold.php',
+    'includes/core/utils/class-ltms-utils.php',
+    'tests/unit/PosGoldApiDocsParityTest.php',
     // REMOVE-PROMO-POPUP + CONTACT-EMAILS v2.9.334 — banner 10% + toasts
     // social proof eliminados; viewer count PDP preservado.
     'tests/unit/PromoPopupRemovalTest.php',

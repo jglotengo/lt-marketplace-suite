@@ -10,7 +10,7 @@
  * Autenticación: Bearer Token (JWT de larga duración).
  *
  * @package LTMS
- * @version 2.9.31
+ * @version 2.9.397
  * @since 2.9.31
  */
 
@@ -25,8 +25,15 @@ final class LTMS_Api_PosGold {
 
     /**
      * Endpoint de categorías (catálogo del vendor).
+     *
+     * POSGOLD-DOCS-PARITY (2026-09-27): el endpoint que se usaba
+     * (/apiGold/CategoriaApi/GetCategoria) NO existe en la API real — devuelve
+     * HTTP 404 (verificado live contra jugueteriataiwan.goldpos.com.co). La
+     * documentación de PosGold (Postman "Obtener Categorias y Grupos") define
+     * /apiGold/CategoriaAPI/GetCategoriasGrupos?empresaid=1 (verificado live:
+     * HTTP 200). Nota: el controlador es "CategoriaAPI" (API en mayúsculas).
      */
-    const ENDPOINT_CATEGORIES = '/apiGold/CategoriaApi/GetCategoria';
+    const ENDPOINT_CATEGORIES = '/apiGold/CategoriaAPI/GetCategoriasGrupos';
 
     /**
      * Timeout por defecto para requests HTTP (segundos).
@@ -205,6 +212,18 @@ final class LTMS_Api_PosGold {
             ];
         }
 
+        // POSGOLD-DOCS-PARITY (2026-09-27): la API puede devolver HTTP 200 con
+        // Status=false y el motivo en "Msj" (patrón de la doc PosGold) —
+        // tratarlo como error real en vez de catálogo vacío silencioso.
+        if ( isset( $data['Status'] ) && false === $data['Status'] ) {
+            return [
+                'success' => false,
+                'data'    => [],
+                'error'   => (string) ( $data['Msj'] ?? 'La API de PosGold rechazó la consulta.' ),
+                'status'  => $status_code,
+            ];
+        }
+
         if ( $status_code < 200 || $status_code >= 300 ) {
             $error_msg = is_array( $data ) && isset( $data['message'] )
                 ? $data['message']
@@ -254,7 +273,13 @@ final class LTMS_Api_PosGold {
         }
 
         // Caso 2: buscar en claves conocidas.
-        $keys_to_try = [ 'data', 'productos', 'Items', 'items', 'results', 'lista', 'List' ];
+        // POSGOLD-DOCS-PARITY (2026-09-27): la respuesta REAL de la API es
+        // {"Status":true,"Msj":"...","Datos":[...]} — la clave "Datos" (español)
+        // faltaba en esta lista → extract_products_array() devolvía [] aunque
+        // la respuesta trajera el catálogo completo (4.6 MB verificados live).
+        // ESA era la causa raíz de "no me carga categorías": el fallback de
+        // categorías extrae desde productos, y la sync encontraba 0 productos.
+        $keys_to_try = [ 'Datos', 'data', 'productos', 'Items', 'items', 'results', 'lista', 'List' ];
         foreach ( $keys_to_try as $key ) {
             if ( isset( $data[ $key ] ) && is_array( $data[ $key ] ) ) {
                 return $data[ $key ];
@@ -289,22 +314,59 @@ final class LTMS_Api_PosGold {
             return '';
         };
 
+        // Helper para campos que la API V6 devuelve como ARRAY (CodigoBarras,
+        // Imagenes): tomar el primer elemento si existe y es escalar.
+        $pick_first_scalar = static function ( array $keys ) use ( $raw ) {
+            foreach ( $keys as $key ) {
+                if ( isset( $raw[ $key ] ) ) {
+                    $value = $raw[ $key ];
+                    if ( is_array( $value ) ) {
+                        $value = $value[0] ?? '';
+                    }
+                    if ( $value !== '' && $value !== null && ! is_array( $value ) ) {
+                        return $value;
+                    }
+                }
+            }
+            return '';
+        };
+
+        // POSGOLD-DOCS-PARITY (2026-09-27): pick lists alineados a los nombres
+        // REALES de la API V6 (verificados live contra
+        // jugueteriataiwan.goldpos.com.co): el nombre viene en "Producto", el
+        // precio en "Precio1", la categoría en "Categoriaid" (case-sensitive:
+        // 'CategoriaId' NO matchea), el IVA en "ProductoImpuestoPorcentaje",
+        // imágenes en "Imagenes" (array) y barcode en "CodigoBarras" (array).
+        // Antes: descripcion/precio/categoria_id/iva quedaban vacíos → productos
+        // se omitían por "incompletos" (sin nombre/precio) y el filtro de
+        // categorías nunca matcheaba.
         $codigo      = $pick( [ 'codigo', 'Codigo', 'CODIGO', 'code', 'sku', 'SKU' ] );
-        $descripcion = $pick( [ 'descripcion', 'Descripcion', 'DESCRIPCION', 'name', 'nombre', 'Nombre' ] );
-        $precio      = $pick( [ 'precio', 'Precio', 'PRECIO', 'price', 'precio_venta', 'PrecioVenta' ] );
+        $descripcion = $pick( [ 'descripcion', 'Descripcion', 'DESCRIPCION', 'Producto', 'name', 'nombre', 'Nombre' ] );
+        $precio      = $pick( [ 'precio', 'Precio', 'PRECIO', 'Precio1', 'precio1', 'price', 'precio_venta', 'PrecioVenta' ] );
         $stock       = $pick( [ 'stock', 'Stock', 'STOCK', 'existencia', 'Existencia', 'cantidad', 'Cantidad', 'saldo' ] );
         $categoria   = $pick( [ 'categoria', 'Categoria', 'categoria_nombre', 'CategoriaNombre' ] );
-        $categoria_id = $pick( [ 'categoriaid', 'CategoriaId', 'categoria_id' ] );
+        $categoria_id = $pick( [ 'categoriaid', 'CategoriaId', 'Categoriaid', 'categoria_id' ] );
         $grupo       = $pick( [ 'grupo', 'Grupo', 'grupo_nombre', 'GrupoNombre' ] );
-        $grupo_id    = $pick( [ 'grupoid', 'GrupoId', 'grupo_id' ] );
+        $grupo_id    = $pick( [ 'grupoid', 'Grupoid', 'GrupoId', 'grupo_id' ] );
         $subgrupo    = $pick( [ 'subgrupo', 'SubGrupo', 'subgrupo_nombre' ] );
         $subgrupo_id = $pick( [ 'subgrupoid', 'SubGrupoId' ] );
         $marca       = $pick( [ 'marca', 'Marca', 'MARCA', 'brand' ] );
-        $modelo      = $pick( [ 'modelo', 'Modelo', 'MODELO', 'model' ] );
-        $barcode     = $pick( [ 'barcode', 'Barcode', 'codigo_barras', 'CodigoBarras', 'ean', 'EAN' ] );
-        $imagen_url  = $pick( [ 'imagen', 'Imagen', 'imagen_url', 'ImagenUrl', 'foto', 'Foto', 'image_url' ] );
+        $modelo      = $pick( [ 'modelo', 'Modelo', 'MODELO', 'model', 'Producto_ref' ] );
+        $barcode     = $pick_first_scalar( [ 'CodigoBarras', 'barcode', 'Barcode', 'codigo_barras', 'CodigoBarrasRaw', 'ean', 'EAN' ] );
+        $imagen_url  = $pick_first_scalar( [ 'Imagenes', 'imagen', 'Imagen', 'imagen_url', 'ImagenUrl', 'foto', 'Foto', 'image_url' ] );
+
+        // POSGOLD-DOCS-PARITY: la API devuelve filenames desnudos en Imagenes
+        // (ej. "04142-1.jpg") sin URL base verificable (las rutas
+        // /Imagenes/ /Images/ del subdominio devuelven 404 y las imágenes del
+        // catálogo requieren sesión). Solo se usa una URL ABSOLTA — un
+        // filename desnuo no construye una URL descargable y download_url()
+        // fallaría silenciosamente.
+        if ( $imagen_url !== '' && ! preg_match( '~^https?://~i', (string) $imagen_url ) ) {
+            $imagen_url = '';
+        }
+
         $activo      = $pick( [ 'activo', 'Activo', 'ACTIVO', 'active' ] );
-        $iva         = $pick( [ 'iva', 'Iva', 'IVA', 'tax_rate' ] );
+        $iva         = $pick( [ 'iva', 'Iva', 'IVA', 'tax_rate', 'ProductoImpuestoPorcentaje' ] );
         $unidad      = $pick( [ 'unidad', 'Unidad', 'UNIDAD', 'unit' ] );
 
         return [
@@ -384,13 +446,19 @@ final class LTMS_Api_PosGold {
      * Obtiene las categorías disponibles en PosGold del vendor.
      *
      * Intenta primero llamar al endpoint dedicado de categorías
-     * (/apiGold/CategoriaApi/GetCategoria). Si ese endpoint no existe o falla,
-     * hace fallback: descarga todos los productos y extrae las categorías únicas.
+     * (/apiGold/CategoriaAPI/GetCategoriasGrupos — POSGOLD-DOCS-PARITY: el
+     * endpoint anterior /apiGold/CategoriaApi/GetCategoria devuelve 404 en la
+     * API real). Si ese endpoint no existe o falla, hace fallback: descarga
+     * todos los productos y extrae las categorías únicas (verificado live: los
+     * productos traen Categoria/Categoriaid).
+     *
+     * La doc define un único query param: empresaid.
      *
      * @param string $subdomain Subdominio PosGold del vendor.
      * @param string $token     Bearer Token JWT.
      * @param int    $empresaid Empresa ID.
-     * @param int    $usuarioid Usuario ID.
+     * @param int    $usuarioid Usuario ID (sin uso en el endpoint de la doc —
+     *                           se mantiene por compatibilidad de firma).
      * @return array{success: bool, categories: array, error: string}
      *         Cada categoría es: ['id' => string, 'nombre' => string, 'count' => int]
      */
@@ -413,8 +481,6 @@ final class LTMS_Api_PosGold {
         $endpoint = $base_url . self::ENDPOINT_CATEGORIES;
         $url      = add_query_arg( [
             'empresaid' => $empresaid,
-            'usuarioid' => $usuarioid,
-            'activo'    => 'true',
         ], $endpoint );
 
         $response = wp_remote_get( $url, [
@@ -436,12 +502,24 @@ final class LTMS_Api_PosGold {
         if ( $status_code >= 200 && $status_code < 300 && ! is_wp_error( $response ) ) {
             $body  = wp_remote_retrieve_body( $response );
             $data  = json_decode( $body, true );
+
+            // POSGOLD-DOCS-PARITY: la API puede devolver HTTP 200 con
+            // Status=false y el motivo en "Msj" — tratarlo como error real.
+            if ( is_array( $data ) && isset( $data['Status'] ) && false === $data['Status'] ) {
+                return [
+                    'success'    => false,
+                    'categories' => [],
+                    'error'      => (string) ( $data['Msj'] ?? 'La API de PosGold rechazó la consulta.' ),
+                    'source'     => 'endpoint',
+                ];
+            }
+
             $cats  = self::extract_categories_array( $data );
 
             if ( ! empty( $cats ) ) {
                 $normalized = [];
                 foreach ( $cats as $cat ) {
-                    $id    = self::pick_field( $cat, [ 'categoriaid', 'CategoriaId', 'id', 'Id', 'ID' ] );
+                    $id    = self::pick_field( $cat, [ 'categoriaid', 'CategoriaId', 'Categoriaid', 'id', 'Id', 'ID' ] );
                     $nombre = self::pick_field( $cat, [ 'categoria', 'Categoria', 'nombre', 'Nombre', 'descripcion', 'Descripcion' ] );
                     if ( ! empty( $id ) && ! empty( $nombre ) ) {
                         $normalized[] = [
@@ -557,7 +635,7 @@ final class LTMS_Api_PosGold {
             return $data;
         }
 
-        $keys_to_try = [ 'data', 'categorias', 'Categorias', 'Items', 'items', 'results', 'lista', 'List' ];
+        $keys_to_try = [ 'Datos', 'data', 'categorias', 'Categorias', 'Items', 'items', 'results', 'lista', 'List' ];
         foreach ( $keys_to_try as $key ) {
             if ( isset( $data[ $key ] ) && is_array( $data[ $key ] ) ) {
                 return $data[ $key ];

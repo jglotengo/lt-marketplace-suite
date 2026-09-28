@@ -10,7 +10,11 @@ class LTMS_Products_Ajax {
         // C5-1 FIX: ltms_get_vendor_settings eliminado — lo maneja LTMS_Vendor_Settings_Saver
         // con respuesta más completa (bank_info, delivery_zone, store_address, etc).
         add_action( 'wp_ajax_ltms_create_product',        [ $this, 'create_product' ] );
-        add_action( 'wp_ajax_ltms_get_categories',        [ $this, 'get_categories' ] );
+        // POSGOLD-DOCS-PARITY v2.9.397: ltms_get_categories eliminado (dead code).
+        // Ningún JS del repo lo invoca (el dropdown de categorías del form de
+        // productos se renderiza server-side en view-products.php vía
+        // LTMS_Utils::get_deduped_product_categories(), y el dropdown PosGold usa
+        // ltms_get_posgold_categories). Verificado repo-completo 2026-09-27.
         add_action( 'wp_ajax_ltms_upload_product_image',  [ $this, 'upload_product_image' ] );
         add_action( 'wp_ajax_ltms_get_product',           [ $this, 'get_product' ] );
         add_action( 'wp_ajax_ltms_update_product',        [ $this, 'update_product' ] );
@@ -501,16 +505,6 @@ class LTMS_Products_Ajax {
         }
 
         wp_send_json_success( [ 'message' => 'Producto actualizado' ] );
-    }
-
-    public function get_categories() {
-        $this->check_nonce();
-        $terms = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false, 'parent' => 0 ] );
-        $cats  = [];
-        foreach ( $terms as $t ) {
-            $cats[] = [ 'id' => $t->term_id, 'name' => $t->name ];
-        }
-        wp_send_json_success( [ 'categories' => $cats ] );
     }
 
     /**
