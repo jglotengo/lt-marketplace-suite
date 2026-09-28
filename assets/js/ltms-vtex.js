@@ -172,7 +172,14 @@
     });
 
     // Cargar categorías automáticamente si ya tiene credenciales configuradas
-    if ($('#ltms-vtex-account-name').val() && $('#ltms-vtex-app-token').val()) {
+    // POSGOLD-CATS-AUTOLOAD (2026-09-27): misma fix que ltms-posgold.js — la
+    // condición vieja exigía $('#ltms-vtex-app-token').val() no-vacío, pero el
+    // campo está VACÍO cuando el AppToken está configurado (va dentro del
+    // <details> colapsado) → el auto-carga NUNCA disparaba y el vendor tenía
+    // que pulsar "Cargar categorías" manualmente en cada visita (caso real:
+    // kosmetic con 20 categorías guardadas en ltms_vtex_category_ids).
+    var vtexConfigured = $('#ltms-vtex-config-form').attr('data-creds-configured') === '1' || ($('#ltms-vtex-app-token').val() || '') !== '';
+    if ($('#ltms-vtex-account-name').val() && vtexConfigured) {
         loadCategories(false);
     }
 

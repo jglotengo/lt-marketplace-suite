@@ -150,7 +150,13 @@ if ( empty( $seo_template ) ) {
                     <span class="ltms-posgold-accordion-icon">▼</span>
                 </button>
                 <div class="ltms-posgold-accordion-body" style="display:none;padding:20px;">
-                    <form id="ltms-posgold-config-form" method="post">
+                    <!-- POSGOLD-CATS-AUTOLOAD (2026-09-27): data-creds-configured para que el
+                         auto-carga de categorías del JS dispare con credenciales YA configuradas —
+                         el campo de token queda vacío cuando está configurado (va dentro del
+                         <details> colapsado; lo visible es el div enmascarado), así que la
+                         condición vieja $('#ltms-posgold-token').val() nunca era true y el vendor
+                         tenía que pulsar "Cargar categorías" manualmente en cada visita. -->
+                    <form id="ltms-posgold-config-form" method="post" data-creds-configured="<?php echo $creds['configured'] ? '1' : '0'; ?>">
                         <?php /* v2.9.70 P3-4: Dead nonce removed — JS uses ltms_dashboard_nonce via AJAX */ ?>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">

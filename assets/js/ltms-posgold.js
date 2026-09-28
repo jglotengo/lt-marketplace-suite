@@ -214,7 +214,15 @@
     });
 
     // Cargar categorías automáticamente si ya tiene credenciales configuradas
-    if ($('#ltms-posgold-subdomain').val() && $('#ltms-posgold-token').val()) {
+    // POSGOLD-CATS-AUTOLOAD (2026-09-27): la condición vieja exigía
+    // $('#ltms-posgold-token').val() no-vacío, pero el textarea está VACÍO
+    // cuando hay token configurado (va dentro del <details> colapsado; lo
+    // visible es el div enmascarado) → el auto-carga NUNCA disparaba y el
+    // vendor tenía que pulsar "Cargar categorías" manualmente en cada visita
+    // para ver su selección guardada. Ahora usa data-creds-configured del form
+    // (renderizado por la vista) o el token tecleado.
+    var posgoldConfigured = $('#ltms-posgold-config-form').attr('data-creds-configured') === '1' || ($('#ltms-posgold-token').val() || '') !== '';
+    if ($('#ltms-posgold-subdomain').val() && posgoldConfigured) {
         loadCategories(false);
     }
 

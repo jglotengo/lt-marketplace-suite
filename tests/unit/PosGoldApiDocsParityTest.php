@@ -590,4 +590,39 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 		$this->assertIsString( $min_src, 'Debe poder leerse ltms-posgold.min.js.' );
 		$this->assertStringContainsString( 'responseJSON', $min_src, 'El .min.js regenerado debe contener el fix.' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// POSGOLD-CATS-AUTOLOAD (2026-09-27) — la selección guardada se ve al
+	// re-ingresar sin pulsar "Cargar categorías"
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_views_render_creds_configured_marker(): void {
+		// El auto-carga de categorías exige saber si hay credenciales
+		// configuradas desde el HTML — el campo de token queda VACÍO cuando
+		// está configurado (va dentro del <details> colapsado).
+		foreach ( [ 'view-posgold.php', 'view-vtex.php' ] as $view_file ) {
+			$src = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/views/' . $view_file );
+			$this->assertIsString( $src, "Debe poder leerse {$view_file}." );
+			$this->assertStringContainsString( 'data-creds-configured=', $src, "{$view_file} debe renderizar el marcador data-creds-configured en el form de credenciales." );
+			$this->assertStringContainsString( "\$creds['configured']", $src, "{$view_file} debe derivar el marcador del estado configured de las credenciales." );
+		}
+	}
+
+	public function test_js_autoload_uses_creds_configured_marker(): void {
+		// La condición vieja exigía el valor del campo de token — que está
+		// VACÍO cuando hay token configurado (details colapsado) → el
+		// auto-carga nunca disparaba y el vendor tenía que pulsar
+		// "Cargar categorías" manualmente en cada visita (caso real:
+		// jugueteriataiwan con ["52"] y kosmetic con 20 IDs guardados).
+		foreach ( [ 'ltms-posgold', 'ltms-vtex' ] as $js_base ) {
+			$js_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.js' );
+			$this->assertIsString( $js_src, "Debe poder leerse {$js_base}.js." );
+
+			$this->assertStringContainsString( "attr('data-creds-configured') === '1'", $js_src, "{$js_base}.js debe usar el marcador data-creds-configured en el auto-carga." );
+
+			$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.min.js' );
+			$this->assertIsString( $min_src, "Debe poder leerse {$js_base}.min.js." );
+			$this->assertStringContainsString( 'data-creds-configured', $min_src, "{$js_base}.min.js regenerado debe contener el fix." );
+		}
+	}
 }

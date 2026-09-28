@@ -144,7 +144,11 @@ if ( empty( $seo_template ) ) {
                     <span class="ltms-vtex-accordion-icon">▼</span>
                 </button>
                 <div class="ltms-vtex-accordion-body" style="display:none;padding:20px;">
-                    <form id="ltms-vtex-config-form" method="post">
+                    <!-- POSGOLD-CATS-AUTOLOAD (2026-09-27): mismo fix que view-posgold.php —
+                         data-creds-configured para que el auto-carga de categorías dispare con
+                         credenciales YA configuradas (el AppToken queda vacío en el campo cuando
+                         está configurado: va dentro del <details> colapsado). -->
+                    <form id="ltms-vtex-config-form" method="post" data-creds-configured="<?php echo $creds['configured'] ? '1' : '0'; ?>">
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
                             <div>
