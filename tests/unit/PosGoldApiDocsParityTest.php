@@ -575,20 +575,22 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 	}
 
 	public function test_js_fail_handlers_read_response_json(): void {
-		// LTMS-SAVE-CREDS-FIX: los .fail() de ltms-posgold.js mostraban
-		// 'Error de red.' e ignoraban xhr.responseJSON — cualquier
-		// wp_send_json_error(...,4xx) (validación/permisos) se veía como
-		// "Error de red." en vez del mensaje real.
-		$js_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-posgold.js' );
-		$this->assertIsString( $js_src, 'Debe poder leerse ltms-posgold.js.' );
+		// LTMS-SAVE-CREDS-FIX: los .fail() mostraban 'Error de red.' e ignoraban
+		// xhr.responseJSON — cualquier wp_send_json_error(...,4xx)
+		// (validación/permisos) se veía como "Error de red." en vez del mensaje
+		// real. Paridad completa en ambas vistas (PosGold + VTEX).
+		foreach ( [ 'ltms-posgold' => 'posgoldFailMsg', 'ltms-vtex' => 'vtexFailMsg' ] as $js_base => $helper ) {
+			$js_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.js' );
+			$this->assertIsString( $js_src, "Debe poder leerse {$js_base}.js." );
 
-		$this->assertStringContainsString( 'function posgoldFailMsg(xhr, fallback)', $js_src, 'Debe existir el helper posgoldFailMsg.' );
-		$this->assertStringContainsString( 'xhr.responseJSON', $js_src, 'El helper debe leer xhr.responseJSON (el mensaje real del 4xx).' );
-		$this->assertSame( 0, substr_count( $js_src, "toastError('Error', 'Error de red.');" ), 'Ningún .fail debe mostrar "Error de red." hardcodeado sin leer la respuesta.' );
+			$this->assertStringContainsString( 'function ' . $helper . '(xhr, fallback)', $js_src, "{$js_base}.js debe tener el helper {$helper}." );
+			$this->assertStringContainsString( 'xhr.responseJSON', $js_src, "{$js_base}.js debe leer xhr.responseJSON (el mensaje real del 4xx)." );
+			$this->assertSame( 0, substr_count( $js_src, "toastError('Error', 'Error de red.');" ), "{$js_base}.js: ningún .fail debe mostrar \"Error de red.\" hardcodeado sin leer la respuesta." );
 
-		$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-posgold.min.js' );
-		$this->assertIsString( $min_src, 'Debe poder leerse ltms-posgold.min.js.' );
-		$this->assertStringContainsString( 'responseJSON', $min_src, 'El .min.js regenerado debe contener el fix.' );
+			$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.min.js' );
+			$this->assertIsString( $min_src, "Debe poder leerse {$js_base}.min.js." );
+			$this->assertStringContainsString( 'responseJSON', $min_src, "{$js_base}.min.js regenerado debe contener el fix." );
+		}
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
