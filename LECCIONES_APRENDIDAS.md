@@ -3984,3 +3984,31 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
 
 
 
+
+### Lección #183: el retorno de las funciones WP que envían/alteran estado se IGNORA silenciosamente — toda llamada con retorno verificable (WP_Error) debe capturarse (2ª reincidencia del patrón)
+
+1. **Caso real:** LOSTPW-MAIL-ERR (2026-09-28, commit `e27ebf4a`) + SYNC-VIS-GATE (mismo commit).
+   `ajax_vendor_lost_password()` llamaba `retrieve_password( $identifier );` SIN capturar el retorno — si
+   `wp_mail()` falla, WP 7.x retorna `WP_Error('retrieve_password_email_failure')` y el vendor veía el
+   mensaje genérico "revisa tu email" sin que NADIE (ni logs) registrara el fallo (reporte: "no le llegó
+   nada al correo"). Diagnóstico en producción: `retrieve_password()` con la cuenta real del vendor →
+   `bool(true)` (pipeline OK, SPF/DKIM SG configurados) — el fallo original fue probablemente spam de
+   hotmail o email mal tecleado, INVISIBLE porque el handler enmascaraba cualquier WP_Error.
+
+2. **Reincidencia:** CICLO34-P1-TC-002 (2026-09, tourism-compliance-ext.php:308) corrigió el MISMO patrón
+   para wp_mail() en el envío de pólizas. Es el 2º caso del patrón "retorno de función WP ignorado".
+
+3. **Regla preventiva:** toda llamada a una función WP que retorna WP_Error/bool verificable
+   (retrieve_password, wp_mail, wp_insert_post, wp_update_post, wp_set_object_terms...) debe capturar el
+   retorno y manejar el fallo: log + respuesta clara al usuario (respetando anti-enumeración cuando
+   aplique — para retrieve_password: fallo de ENVÍO → error 500 claro; cuenta no encontrada → respuesta
+   genérica). El code de fallo de envío cambió entre WP 6.x ('mail_failed') y 7.x
+   ('retrieve_password_email_failure') — verificar el WP core REAL del server (SSH grep wp-includes/user.php),
+   no asumir la versión de la doc.
+
+4. **Complemento (SYNC-VIS-GATE):** `set_catalog_visibility('visible')` INCONDICIONAL en los syncs
+   (posgold:530, vtex:651) dejaba públicos productos sin precio/imagen. Regla de negocio de vendibilidad
+   implementada como gate central (LTMS_Business_Sync_Visibility_Gate) con hooks de producto + guard de
+   URL directa + cláusula para queries custom — NO como filtros dispersos: las superficies públicas que
+   usan WP_Query custom (vendor-store, vendor-storefront, quick-view, live-search) NO pasan por WC_Query
+   y cada una necesita su guard o cláusula.

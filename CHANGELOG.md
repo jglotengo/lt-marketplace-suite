@@ -4,7 +4,80 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-27
+## [Unreleased] — 2026-09-28
+
+### Fixed — `SYNC-VIS-GATE` + `LOSTPW-MAIL-ERR` (gate de vendibilidad pública + recuperación de contraseña sin email)
+
+> **Reporte del usuario:** (a) al sincronizar productos (VTEX y PosGold), los que
+> no tienen existencias, imágenes o precio no deben quedar en NINGUNA página
+> pública — solo deben visualizarse en el panel del vendedor; (b) un vendedor
+> diligenció el formulario de recuperación de contraseña y no le llegó nada al
+> correo electrónico. QA requerido en ambos.
+>
+> **AUDIT-A — Causa raíz (P1):** los syncs PosGold (`class-ltms-posgold-sync.php:530`)
+> y VTEX (`class-ltms-vtex-sync.php:651`) hacían `set_catalog_visibility('visible')`
+> INCONDICIONAL — un producto sin precio o sin imagen quedaba visible. Y varias
+> superficies públicas no filtraban visibilidad: `vendor-store.php` (vitrina
+> pública `/vendedor/{slug}/` — `wc_get_products` solo por author), las 3 queries
+> custom de `vendor-storefront.php`, la URL directa (`single-product.php` sin
+> guard), quick-view y live-search.
+>
+> **Fix A:** nueva clase `LTMS_Business_Sync_Visibility_Gate`
+> (`includes/business/class-ltms-business-sync-visibility-gate.php`):
+> `apply_gate()` evalúa stock (con paridad backorders — mismo patrón que la barra
+> de stock del single-product), imagen y precio; oculta vía `catalog_visibility
+> 'hidden'` (WC estándar excluye de catálogo + búsqueda) + meta
+> `_ltms_visibility_blocked` con los motivos; restaura `'visible'` SOLO si lo
+> ocultó el propio gate (nunca toca ocultamientos manuales de productos
+> vendibles); idempotente + anti-recursión (flag in_progress). Hooks
+> `woocommerce_new_product`/`woocommerce_update_product` (re-aplica en cada
+> guardado: sync, panel, órdenes que reducen stock) + guard de URL directa
+> (`guard_single_product`: 302 a la tienda para todo visitante que no sea el
+> dueño o un gestor) + `visibility_exclude_clause()` para las queries WP_Query
+> custom de la vitrina + `sweep_all()` backfill idempotente. Llamada explícita
+> en ambos syncs DESPUÉS de descargar la imagen (la imagen se adjunta POST-save
+> y no dispara hooks). El panel del vendedor NO se toca: sigue mostrando TODOS
+> los productos del vendor (publish/draft/pending) sin filtro de visibilidad.
+>
+> **QA punta a punta (producción, v2.9.401):** sweep one-time → `hidden=226,
+> restored=0, unchanged=1389` (7.4s). Producto de referencia PosGold
+> (`#21358`, sin imagen): `visibility=hidden`, meta `["image"]`. Shop `/tienda/`:
+> el producto oculto NO aparece en el HTML (HTTP 200). URL directa: HTTP 302 →
+> `Location: /tienda/` (guard funcionando). Vitrina `/vendedor/jugueteria-taiwan/`:
+> NO aparece. Panel del vendedor: los 224 siguen `publish` con meta
+> `_ltms_posgold_synced` (el panel los muestra por author+status, sin filtro de
+> visibilidad). Kosmetic vendor 223: 1 producto oculto — `#15926 ESMALTE
+> LAVANDA X13ml` agotado (motivos `["stock"]`, con imagen y precio) —
+> ocultamiento legítimo por la regla. error_log sin entradas nuevas.
+>
+> **AUDIT-B — Diagnóstico (QA producción, WP 7.1.2, SSH):** WP 7.1.2
+> `retrieve_password()` retorna `WP_Error('retrieve_password_email_failure')`
+> cuando `wp_mail()` falla (leído del `wp-includes/user.php` del server) — y el
+> handler `ajax_vendor_lost_password()` IGNORABA el retorno por completo: el
+> vendor veía el mensaje genérico "revisa tu email" sin que NADIE (ni logs)
+> registrara el fallo. Sin plugin SMTP activo (wp_mail = PHP mail()).
+> `retrieve_password()` con la cuenta real del vendor (jhonm52@hotmail.com,
+> registrado 2026-09-22) → `bool(true)`: la cuenta existe, el reset key se
+> genera y `wp_mail()` es aceptado por el MTA (SPF de SiteGround configurado +
+> DKIM presente, FROM reescrito a `notificaciones@lo-tengo.com.co`). Un email
+> de reset real fue disparado en el QA — verificar la bandeja (incluyendo spam)
+> de esa cuenta para confirmar entrega. Causa más probable del fallo original:
+> spam de hotmail o email mal tecleado (respuesta genérica por diseño —
+> anti-enumeración); el handler silencioso enmascaraba cualquier fallo de
+> wp_mail.
+>
+> **Fix B:** capturar el retorno de `retrieve_password()`: fallo de envío
+> (`retrieve_password_email_failure` WP 7.x / `mail_failed` 6.x) → log completo
+> `LOSTPW_MAIL_FAILED` + error 500 claro al vendor — el form lo muestra sin
+> tocar JS (`ltmsPostJson` resuelve con el JSON body para 4xx/5xx y lee
+> `data.data.message`). Otros codes (`invalid_email`/`invalidcombo`) → misma
+> respuesta genérica (anti-enumeración) + log `LOSTPW_NOT_SENT`.
+>
+> **Tests (+36):** `SyncVisibilityGateTest` (35 tests, grupo `sync-vis-gate`)
+> + `PublicAuthLostPasswordTest` (7 tests, grupo `auth-lostpw`) + ventana
+> source-level de `LoginErrorClarityTest` 1600→3200 bytes. Suite completa:
+> 5,146 tests, 10,938 assertions, 0 fallas (3 skips preexistentes).
+> `LTMS_VERSION` 2.9.400 → 2.9.401.
 
 ### Fixed — `POSGOLD-DOCS-PARITY` + `POSGOLD-CAT-DROPDOWN` (causa raíz de "no me carga categorías" en la conexión PosGold + categorías repetidas en el form de productos)
 
