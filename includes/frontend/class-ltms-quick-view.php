@@ -60,6 +60,14 @@ class LTMS_Quick_View {
             wp_send_json_error( [ 'message' => __( 'Producto no encontrado', 'ltms' ) ] );
         }
 
+        // SYNC-VIS-GATE: no servir productos ocultos (sin stock/imagen/precio) —
+        // defensa en profundidad: los nonces por producto solo se renderizan en
+        // cards visibles (content-product.php filtra is_visible), pero el check
+        // explícito cubre cualquier punto de entrada futuro.
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product ) ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no disponible', 'ltms' ) ] );
+        }
+
         // Construir HTML del modal.
         ob_start();
         ?>

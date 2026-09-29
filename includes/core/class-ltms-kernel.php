@@ -418,6 +418,14 @@ final class LTMS_Core_Kernel {
             LTMS_Branding_Engine::init();
         }
 
+        // SYNC-VIS-GATE (2026-09-28): gate de vendibilidad pública — productos sin
+        // stock, imagen o precio (VTEX/PosGold/panel) no aparecen en NINGUNA página
+        // pública, solo en el panel del vendedor. Hooks new/update product +
+        // guard de URL directa + cláusula para queries custom.
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) ) {
+            LTMS_Business_Sync_Visibility_Gate::init();
+        }
+
         // Encolar CSS + JS de product enhancements en frontend.
         add_action( 'wp_enqueue_scripts', function() {
             $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '2.9.2';

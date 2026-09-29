@@ -575,6 +575,13 @@ final class LTMS_PosGold_Sync {
             self::download_and_attach_image( $product['imagen_url'], $wc_product->get_id() );
         }
 
+        // SYNC-VIS-GATE: la imagen se adjunta POST-save (no dispara hooks de producto)
+        // — evaluar la vendibilidad final DESPUÉS de la descarga. Sin stock, imagen o
+        // precio el producto NO debe ser público (solo panel del vendedor).
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) ) {
+            LTMS_Business_Sync_Visibility_Gate::apply_gate( $wc_product->get_id() );
+        }
+
         return $wc_product->get_id();
     }
 
@@ -638,6 +645,13 @@ final class LTMS_PosGold_Sync {
         // Imagen: solo descargar si el producto no tiene imagen destacada.
         if ( ! empty( $product['imagen_url'] ) && ! has_post_thumbnail( $wc_product->get_id() ) ) {
             self::download_and_attach_image( $product['imagen_url'], $wc_product->get_id() );
+        }
+
+        // SYNC-VIS-GATE: evaluar vendibilidad final (stock/imagen/precio). Si falta
+        // algo el producto se oculta de las páginas públicas; si recupera todo y el
+        // gate lo había ocultado, se restaura.
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) ) {
+            LTMS_Business_Sync_Visibility_Gate::apply_gate( $wc_product->get_id() );
         }
     }
 

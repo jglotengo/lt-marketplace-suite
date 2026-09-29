@@ -168,6 +168,15 @@ $pv_products     = is_object( $pv_products_q ) && property_exists( $pv_products_
 $pv_total_prods  = is_object( $pv_products_q ) && property_exists( $pv_products_q, 'total' ) ? (int) $pv_products_q->total : 0;
 $pv_max_pages    = is_object( $pv_products_q ) && property_exists( $pv_products_q, 'max_num_pages' ) ? (int) $pv_products_q->max_num_pages : 1;
 
+// SYNC-VIS-GATE (2026-09-28): excluir productos no visibles públicamente —
+// sin stock, imagen o precio el gate de vendibilidad los oculta (visibility
+// 'hidden' o outofstock); mismo guard is_visible() que la shop en
+// archive-product.php. Sin esto la vitrina pública del vendedor mostraba
+// productos ocultos/agotados (el query de arriba NO filtra visibilidad).
+$pv_products = array_values( array_filter( (array) $pv_products, static function ( $pv_p ) {
+    return $pv_p instanceof WC_Product && $pv_p->is_visible();
+} ) );
+
 /* ---------------------------------------------------------------------------
  * 5. Reseñas del vendor (últimas 6 comentarios tipo "review" en sus productos)
  *

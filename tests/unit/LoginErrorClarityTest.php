@@ -275,7 +275,11 @@ final class LoginErrorClarityTest extends LTMS_Unit_Test_Case {
 
 		$pos = strpos( $src, 'public function ajax_vendor_lost_password(): void' );
 		$this->assertNotFalse( $pos, 'ajax_vendor_lost_password debe existir.' );
-		$block = substr( $src, $pos, 1600 );
+		// LOSTPW-MAIL-ERR FIX (2026-09-28): el handler ahora maneja el retorno de
+		// retrieve_password() (~1400b extra de comentario + manejo del fallo de
+		// envío) — la ventana creció de 1600 a 3200 bytes para cubrir todo el
+		// bloque (mismas aserciones de presencia, no de posición).
+		$block = substr( $src, $pos, 3200 );
 
 		$this->assertStringContainsString(
 			"check_ajax_referer( 'ltms_auth_nonce', 'nonce', false )",

@@ -598,6 +598,16 @@ body.ltms-storefront-page .wh-header{display:none!important}
             ];
         }
 
+        // SYNC-VIS-GATE (2026-09-28): excluir productos ocultados por el gate de
+        // vendibilidad (sin stock/imagen/precio → visibility 'hidden') — la shop
+        // los excluye vía WC_Query, esta query custom NO pasa por ahí.
+        $gate_clause = ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) )
+            ? LTMS_Business_Sync_Visibility_Gate::visibility_exclude_clause()
+            : [];
+        if ( ! empty( $gate_clause ) ) {
+            $tax_query[] = $gate_clause;
+        }
+
         $wc_order = match ( $orderby ) {
             'price'      => [ 'orderby' => 'meta_value_num', 'order' => 'ASC',  'meta_key' => '_price' ],
             'price-desc' => [ 'orderby' => 'meta_value_num', 'order' => 'DESC', 'meta_key' => '_price' ],
@@ -1203,6 +1213,10 @@ body.ltms-storefront-page .wh-header{display:none!important}
             'author'         => $vendor_id,
             's'              => $q,
             'meta_query'     => [ [ 'key' => '_price', 'value' => 0, 'compare' => '>' ] ],
+            // SYNC-VIS-GATE: excluir productos ocultos (sin stock/imagen/precio).
+            'tax_query'      => ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) )
+                ? LTMS_Business_Sync_Visibility_Gate::visibility_exclude_clause()
+                : [],
         ] );
 
         $products = [];
@@ -1239,6 +1253,15 @@ body.ltms-storefront-page .wh-header{display:none!important}
 
         $tax_query  = $cat_slug ? [ [ 'taxonomy' => 'product_cat', 'field' => 'slug', 'terms' => $cat_slug ] ] : [];
         $meta_query = $in_stock ? [ [ 'key' => '_stock_status', 'value' => 'instock' ] ] : [];
+
+        // SYNC-VIS-GATE: excluir productos ocultos (sin stock/imagen/precio).
+        $gate_clause = ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) )
+            ? LTMS_Business_Sync_Visibility_Gate::visibility_exclude_clause()
+            : [];
+        if ( ! empty( $gate_clause ) ) {
+            $tax_query[] = $gate_clause;
+        }
+
         $wc_order   = match ( $orderby ) {
             'price'      => [ 'orderby' => 'meta_value_num', 'order' => 'ASC', 'meta_key' => '_price' ],
             'price-desc' => [ 'orderby' => 'meta_value_num', 'order' => 'DESC', 'meta_key' => '_price' ],

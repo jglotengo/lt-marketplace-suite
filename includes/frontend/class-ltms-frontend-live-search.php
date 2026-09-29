@@ -83,6 +83,13 @@ class LTMS_Frontend_Live_Search {
             'limit'  => $limit,
         ] );
 
+        // SYNC-VIS-GATE (2026-09-28): excluir productos no visibles (sin stock/
+        // imagen/precio → gate de vendibilidad los oculta) — el buscador en vivo
+        // es una superficie pública y el query de arriba no filtra visibilidad.
+        $products = array_values( array_filter( (array) $products, static function ( $p ) {
+            return $p instanceof WC_Product && $p->is_visible();
+        } ) );
+
         return array_map( fn( $p ) => [
             'id'    => $p->get_id(),
             'label' => $p->get_name(),

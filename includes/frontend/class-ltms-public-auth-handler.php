@@ -347,10 +347,30 @@ final class LTMS_Public_Auth_Handler {
             wp_send_json_error( [ 'message' => __( 'Ingresa tu email o usuario.', 'ltms' ) ] );
         }
 
-        // Respuesta generica sin importar el resultado: no revelar si la cuenta
-        // existe (anti-enumeracion). retrieve_password() internamente ya envia el
-        // email solo si la cuenta existe.
-        retrieve_password( $identifier );
+        // LOSTPW-MAIL-ERR FIX (2026-09-28): el retorno de retrieve_password() NO se
+        // verificaba — si wp_mail() falla (SMTP caido, mail() deshabilitado, From
+        // rechazado), WP 7.x devuelve WP_Error('retrieve_password_email_failure') y el
+        // vendor veía el mensaje generico "revisa tu email" sin que NADIE (ni logs)
+        // registrara el fallo (causa raiz del reporte "no le llego nada al correo").
+        // Fix: capturar el retorno; fallo de envio → error claro + log completo
+        // (LOSTPW_MAIL_FAILED); otros codigos (invalid_email/invalidcombo — cuenta
+        // no encontrada) → respuesta generica (anti-enumeracion) + log de diagnostico.
+        $result = retrieve_password( $identifier );
+
+        if ( is_wp_error( $result ) ) {
+            $error_code = $result->get_error_code();
+            if ( in_array( $error_code, [ 'retrieve_password_email_failure', 'mail_failed' ], true ) ) {
+                // La cuenta existe PERO el envio fallo (WP 7.x usa
+                // retrieve_password_email_failure; 6.x mail_failed).
+                LTMS_Core_Logger::error(
+                    'LOSTPW_MAIL_FAILED',
+                    sprintf( 'retrieve_password() fallo el envio (code=%s): %s', $error_code, $result->get_error_message() )
+                );
+                wp_send_json_error( [ 'message' => __( 'No pudimos enviar el correo de recuperación en este momento. Intenta de nuevo en unos minutos o contacta a soporte.', 'ltms' ) ], 500 );
+            }
+            // Cuenta no encontrada / clave invalida — respuesta generica (anti-enumeracion).
+            LTMS_Core_Logger::info( 'LOSTPW_NOT_SENT', sprintf( 'retrieve_password no envio email (code=%s)', $error_code ) );
+        }
 
         wp_send_json_success( [ 'message' => __( 'Si la cuenta existe, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada y la carpeta de spam.', 'ltms' ) ] );
     }

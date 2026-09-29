@@ -848,6 +848,15 @@ $files = [
     // REMOVE-PROMO-POPUP + CONTACT-EMAILS v2.9.334 — banner 10% + toasts
     // social proof eliminados; viewer count PDP preservado.
     'tests/unit/PromoPopupRemovalTest.php',
+    // SYNC-VIS-GATE + LOSTPW-MAIL-ERR v2.9.401 — gate de vendibilidad pública
+    // (productos sin stock/imagen/precio ocultos de TODAS las páginas públicas,
+    // solo panel del vendedor) + manejo del retorno de retrieve_password() en el
+    // AJAX de recuperación (fallo de envío → error 500 + log, causa raíz del
+    // reporte "no le llegó nada al correo"). La clase nueva del gate NO estaba
+    // en la whitelist — sin ella el fix no llegaría al server via webhook.
+    'includes/business/class-ltms-business-sync-visibility-gate.php',
+    'tests/unit/SyncVisibilityGateTest.php',
+    'tests/unit/PublicAuthLostPasswordTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
