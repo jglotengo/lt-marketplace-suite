@@ -4,7 +4,55 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-28
+## [Unreleased] — 2026-09-28/29
+
+### Fixed — `POSGOLD-IMG-BASE` (filenames de imagen PosGold sin URL base → productos ocultados en bloque)
+
+> **Contexto:** cierre del Ciclo 5c/5d del checkpoint — la sync PosGold descartaba
+> los filenames desnudos de `Imagenes` (`imagen_url=''`) y los 224 productos del
+> vendor jugueteriataiwan quedaron OCULTOS por el gate (motivo `image`), esperando
+> el patrón real de URL (no descubrible por sondas).
+>
+> **Descubrimiento del patrón (evidencia):** ~30 patrones estáticos probados con
+> filenames REALES del API vivo (`001309-1.jpeg`, `00689-1.jpeg`, `00711.jpg` —
+> 200/200 productos con `Imagenes`) → 404: `/Images/`, `/Imagenes/`, `/Files/`,
+> `/Content/Images/`, `/Uploads/`, `/Media/`, hosts alternativos
+> (`media/cdn/images.*`). `/Producto/Imagen/{id}` (controlador) → 302 a
+> `/User/Login` (requiere sesión web; Bearer JWT NO sirve ahí). Sitio público
+> PosGold: todo detrás de login. El patrón real lo confirmó el vendor con su
+> sesión de Chrome desde la página `ProductoCrud`:
+> **`https://{subdomain}.goldpos.com.co/Files/Images/{filename}`** — ruta
+> estática PÚBLICA (verificado live 4/4 → 200 con `Content-Type image/*`; ni
+> `/Files/` ni `/Images/` sueltos bastaban, solo la combinación).
+>
+> **Causa raíz (P1):** `normalize_product()` descartaba todo filename sin
+> `https?://` porque la URL base no era verificable → `download_url()` nunca
+> recibía nada → sync sin imágenes → gate oculta por `image`.
+>
+> **Fix:** `normalize_product()` firma nueva `( array $raw, string $subdomain = '' )`
+> — con subdominio conocido construye la URL absoluta en `/Files/Images/`
+> (`rawurlencode` para espacios; SSRF guard preservado: subdominio inválido →
+> descarte); sin subdominio (calls legacy) mantiene el descarte. Call-sites
+> actualizados: `posgold-sync` (pasa `$creds['subdomain']`) +
+> `extract_categories_from_products` (pasa `$subdomain`).
+>
+> **Re-sync + QA punta a punta (producción, v2.9.402):** `do_action(
+> 'ltms_posgold_sync_cron', 168 )` (nohup via SSH) → `success=true, updated=224,
+> skipped=0, errors=[]` ("2083 fuera de categoría" = filtro del vendor
+> funcionando). **Thumbnails 224/224** (imagen descargada de PosGold → media
+> library, ej. `00772-1.png`). **hidden_gate_posgold=0** (los 224 restaurados a
+> visible por el gate; 9 hidden restantes = otro vendor, ocultamientos legítimos
+> por agotado/sin imagen). Shop `/tienda/`: "Mostrando 1–16 de **1606** resultados"
+> (= 1615 − 9 hidden) con productos PosGold en page 1. URL directa de producto
+> antes 302 → **HTTP 200**. error_log sin entradas nuevas.
+>
+> **Tests (+4):** `PosGoldApiDocsParityTest` — URL completa con filename `.jpg`/
+> `.jpeg`, URL-encode de espacios en filename, SSRF guard descarta, legacy sin
+> subdominio descarta. Suite completa: 5,150 tests, 10,942 assertions, 0 fallas
+> (3 skips preexistentes). `LTMS_VERSION` 2.9.401 → 2.9.402. Deploy: webhook falló
+> 2× (conexión cortada en request largo) → **SSH `git merge --ff-only origin/main`**
+> (el plugin dir del server ES el git repo; fetch OK con remote PAT embebido,
+> HEAD `e27ebf4a` → `65012a27`) + OPcache reset + `php -l` OK.
 
 ### Fixed — `SYNC-VIS-GATE` + `LOSTPW-MAIL-ERR` (gate de vendibilidad pública + recuperación de contraseña sin email)
 

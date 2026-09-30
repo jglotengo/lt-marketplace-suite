@@ -4012,3 +4012,37 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    URL directa + cláusula para queries custom — NO como filtros dispersos: las superficies públicas que
    usan WP_Query custom (vendor-store, vendor-storefront, quick-view, live-search) NO pasan por WC_Query
    y cada una necesita su guard o cláusula.
+
+
+### Lección #184: el patrón de URL de un recurso externo solo es descubrible con evidencia REAL del vendor - las sondas estáticas con patrones parciales no bastan y el API puede 404 por params faltantes (no por endpoint muerto)
+
+1. **Caso real:** POSGOLD-IMG-BASE (2026-09-29, commit `65012a27`). La sync PosGold descartaba los
+   filenames desnudos de `Imagenes` (ej. "001309-1.jpeg") porque la URL base no era descubrible:
+   ~30 patrones estáticos probados con filenames REALES daban 404 (/Images/, /Imagenes/, /Files/
+   sueltos, /Content/Images/, hosts alternativos) y /Producto/Imagen/{id} requiere sesión web (302,
+   Bearer JWT no sirve). El patrón REAL era https://{subdomain}.goldpos.com.co/Files/Images/{filename}
+   - la combinación /Files/Images/ nunca se probó porque los patrones "obvios" fallaban primero.
+   Confirmado por el vendor con su sesión de Chrome (clic derecho -> copiar dirección de imagen) desde
+   la página ProductoCrud (detrás de login, sin catálogo público).
+
+2. **Reincidencia parcial:** POSGOLD-DOCS-PARITY (2026-09-27) ya había documentado el patrón
+   "endpoint equivocado vs endpoint muerto" para categorías (/apiGold/CategoriaApi/GetCategoria 404
+   real). Esta lección lo extiende: GetProduct_V6 con params MÍNIMOS también daba 404 (respuesta
+   rápida) y con el set COMPLETO de params (los defaults de get_products, incluyendo vacíos:
+   codigo=, descripcion=, ult_mov=...) respondía 200 lento (el timeout era señal de que el endpoint
+   EXISTÍA y estaba procesando). Un 404 rápido con params mínimos NO prueba endpoint muerto.
+
+3. **Regla preventiva:** (a) antes de asumir "no descubrible", probar el set COMPLETO de params del
+   cliente real (los defaults con TODOS los keys, incluso vacíos); (b) cuando las sondas estáticas
+   agoten los patrones obvios, pedir al vendor UNA URL real de su sesión (clic derecho -> copiar
+   dirección de imagen) - es más barato que adivinar; (c) al construir URLs desde filenames,
+   rawurlencode() los espacios/caracteres especiales; (d) verificar que la ruta descubierta sea
+   PÚBLICA (HEAD sin cookies 200) antes de asumir que download_url() (GET plano) funcionará - las
+   rutas de controlador pueden requerir sesión aunque el mismo host sirva estáticos públicos
+   (/Images/Posgold-logo.png 200 sin sesión vs /Producto/Imagen/{id} 302).
+
+4. **Ops descubierta:** el deploy webhook falla 2x con "conexión terminada" en requests largos
+   (baja ~40 archivos del API de GitHub) - el deploy alternativo es SSH git merge --ff-only
+   origin/main (el plugin dir del server ES el git repo, fetch OK con remote PAT embebido) +
+   find ~/.opcache -type f -delete. El sync pesado (~224 productos con imágenes) correrlo con
+   nohup wp eval-file ... & y sondear el log (SSH muere con SIGHUP en requests largos).
