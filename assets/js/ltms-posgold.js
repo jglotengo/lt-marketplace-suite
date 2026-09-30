@@ -404,7 +404,14 @@
                     return;
                 }
                 var secs = Math.floor((Date.now() - elapsedStart) / 1000);
-                $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ Sincronizando en segundo plano... (' + secs + 's). No cierres esta página.</div>').show();
+                // SYNC-UX-MESSAGE FIX (2026-09-29): "No cierres esta página" era
+                // texto del flujo inline-AJAX pre-POSGOLD-SYNC-BG (v2.9.330) y
+                // CONTRADICE el texto del panel ("puedes cerrar esta página",
+                // view-posgold.php). La sync corre 100% en background vía WP-Cron
+                // (proceso server-side independiente del navegador): cerrar NO la
+                // mata; el resultado queda en _ltms_posgold_sync_last_result +
+                // notificación del panel y se muestra al volver.
+                $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ Sincronizando en segundo plano... (' + secs + 's). Puedes cerrar esta página; recibirás una notificación cuando termine.</div>').show();
                 if (Date.now() > deadline) {
                     $btn.prop('disabled', false).html('🔄 Sincronizar ahora');
                     $result.html('<div style="padding:16px;background:#fef3c7;border-radius:8px;color:#92400e;">La sincronización sigue en proceso después de 60 minutos. Recibirás una notificación cuando termine.</div>').show();

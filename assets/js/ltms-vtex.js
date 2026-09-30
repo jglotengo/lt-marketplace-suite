@@ -384,7 +384,13 @@
                     return;
                 }
                 var secs = Math.floor((Date.now() - elapsedStart) / 1000);
-                $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ Sincronizando en segundo plano... (' + secs + 's). No cierres esta página.</div>').show();
+                // SYNC-UX-MESSAGE FIX (2026-09-29): paridad 1:1 con ltms-posgold.js
+                // (mismo patrón corregido ahí) — "No cierres esta página" era texto
+                // del flujo inline-AJAX pre-VTEX-SYNC-BG y CONTRADICE el texto del
+                // panel (view-vtex.php). La sync corre 100% en background vía
+                // WP-Cron: cerrar NO la mata; el resultado queda en
+                // _ltms_vtex_sync_last_result + notificación del panel.
+                $result.html('<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;">⏳ Sincronizando en segundo plano... (' + secs + 's). Puedes cerrar esta página; recibirás una notificación cuando termine.</div>').show();
                 if (Date.now() > deadline) {
                     $btn.prop('disabled', false).html('🔄 Sincronizar ahora');
                     $result.html('<div style="padding:16px;background:#fef3c7;border-radius:8px;color:#92400e;">La sincronización sigue en proceso después de 60 minutos. Recibirás una notificación cuando termine.</div>').show();
