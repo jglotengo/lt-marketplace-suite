@@ -55,12 +55,29 @@ foreach ( array( 'product_cat', 'min_price', 'max_price', 'instock' ) as $pv_k )
         $pv_filter[ $pv_k ] = sanitize_text_field( wp_unslash( $_GET[ $pv_k ] ) );
     }
 }
+// CAT-NORM-002 + SHOP-CATS-MULTI (2026-09-29): multi-select de categorías vía
+// CSV propio (?ltms_cats=slug1,slug2) — product_cat[]=a&product_cat[]=b fatala
+// con HTTP 500 (verificado live) y product_cat=slug es single-select. El CSV lo
+// aplica un filtro pre_get_posts (filter_shop_cats de LTMS_Vendor_Storefront).
+$pv_cat_slugs = array();
+if ( isset( $_GET['ltms_cats'] ) && '' !== $_GET['ltms_cats'] ) {
+    $pv_cat_slugs = array_values( array_filter( array_map( 'sanitize_title', explode( ',', (string) wp_unslash( $_GET['ltms_cats'] ) ) ) ) );
+    if ( ! empty( $pv_cat_slugs ) ) {
+        $pv_filter['ltms_cats'] = implode( ',', $pv_cat_slugs );
+    }
+}
 $pv_cat_slug = isset( $pv_filter['product_cat'] ) ? (string) $pv_filter['product_cat'] : '';
 $pv_min      = isset( $pv_filter['min_price'] ) ? (string) $pv_filter['min_price'] : '';
 $pv_max      = isset( $pv_filter['max_price'] ) ? (string) $pv_filter['max_price'] : '';
 $pv_instock  = isset( $pv_filter['instock'] );
 $pv_view     = ( isset( $_GET['view'] ) && 'list' === $_GET['view'] ) ? 'list' : 'grid';
-$pv_cats     = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => true, 'number' => 15, 'orderby' => 'count', 'order' => 'DESC' ) );
+// CAT-NORM-002 (2026-09-29): lista NORMALIZADA (fingerprint dedup
+// case/acento/singular-plural + nombre en MAYÚSCULAS + solo con productos) —
+// get_terms() plano listaba "JUEGO DE MESA" y "JUEGOS DE MESA" por separado y
+// case-variantes ("Coloración"/"Coloracion") como entradas distintas. Top 15
+// por productos (mismo comportamiento que el orderby count DESC anterior).
+$pv_cats_raw = LTMS_Utils::get_normalized_product_categories( true );
+$pv_cats     = array_slice( is_array( $pv_cats_raw ) ? $pv_cats_raw : [], 0, 15 );
 ?>
 
 <div class="pv-scope pv-shop<?php echo 'list' === $pv_view ? ' pv-shop--list' : ''; ?>">
@@ -102,6 +119,7 @@ $pv_cats     = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => tr
                 <form method="get" action="<?php echo esc_url( $pv_shop_base ); ?>" class="pv-shop__filter-price">
                     <?php if ( $pv_instock ) : ?><input type="hidden" name="instock" value="1"><?php endif; ?>
                     <?php if ( $pv_cat_slug ) : ?><input type="hidden" name="product_cat" value="<?php echo esc_attr( $pv_cat_slug ); ?>"><?php endif; ?>
+                    <?php if ( ! empty( $pv_cat_slugs ) ) : ?><input type="hidden" name="ltms_cats" value="<?php echo esc_attr( implode( ',', $pv_cat_slugs ) ); ?>"><?php endif; ?>
                     <div class="pv-shop__price-field">
                         <input type="number" name="min_price" min="0" step="1" placeholder="<?php esc_attr_e( 'Min', 'ltms' ); ?>" value="<?php echo esc_attr( $pv_min ); ?>">
                         <span>&ndash;</span>
@@ -114,17 +132,27 @@ $pv_cats     = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => tr
             <div class="pv-shop__filter">
                 <h4 class="pv-shop__filter-title"><?php esc_html_e( 'Categoría', 'ltms' ); ?></h4>
                 <?php
+                /**
+                 * CAT-NORM-002 + SHOP-CATS-MULTI (2026-09-29): links
+                 * single-select → checkboxes multi-select (el JS
+                 * .pv-shop__cat-check construye la URL con el CSV de las
+                 * marcadas, ?ltms_cats=slug1,slug2). Nombres en MAYÚSCULAS
+                 * (helper normalizado).
+                 */
                 $pv_qs_all = $pv_filter;
-                unset( $pv_qs_all['product_cat'] );
+                unset( $pv_qs_all['product_cat'], $pv_qs_all['ltms_cats'] );
                 ?>
-                <a class="pv-shop__filter-link<?php echo '' === $pv_cat_slug ? ' is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( $pv_qs_all, $pv_shop_base ) ); ?>"><?php esc_html_e( 'Todas', 'ltms' ); ?></a>
-                <?php if ( ! is_wp_error( $pv_cats ) ) : foreach ( $pv_cats as $pv_cat ) :
-                    $pv_url_cat = add_query_arg( array_merge( $pv_filter, array( 'product_cat' => $pv_cat->slug ) ), $pv_shop_base );
+                <a class="pv-shop__filter-link<?php echo ( '' === $pv_cat_slug && empty( $pv_cat_slugs ) ) ? ' is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( $pv_qs_all, $pv_shop_base ) ); ?>"><?php esc_html_e( 'Todas', 'ltms' ); ?></a>
+                <div class="pv-shop__filter-cats">
+                <?php foreach ( $pv_cats as $pv_cat ) :
+                    $pv_cat_checked = in_array( $pv_cat->slug, $pv_cat_slugs, true );
                 ?>
-                    <a class="pv-shop__filter-link<?php echo $pv_cat_slug === $pv_cat->slug ? ' is-active' : ''; ?>" href="<?php echo esc_url( $pv_url_cat ); ?>">
+                    <label class="pv-shop__filter-check">
+                        <input type="checkbox" class="pv-shop__cat-check" value="<?php echo esc_attr( $pv_cat->slug ); ?>" <?php checked( $pv_cat_checked ); ?>>
                         <?php echo esc_html( $pv_cat->name ); ?> <span class="pv-shop__filter-count">(<?php echo esc_html( $pv_cat->count ); ?>)</span>
-                    </a>
-                <?php endforeach; endif; ?>
+                    </label>
+                <?php endforeach; ?>
+                </div>
             </div>
 
             <div class="pv-shop__filter">
@@ -163,14 +191,25 @@ $pv_cats     = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => tr
                 </div>
             </div>
 
-            <?php if ( $pv_cat_slug || $pv_instock || '' !== $pv_min || '' !== $pv_max ) : ?>
+            <?php if ( $pv_cat_slug || ! empty( $pv_cat_slugs ) || $pv_instock || '' !== $pv_min || '' !== $pv_max ) : ?>
                 <div class="pv-shop__chips" aria-label="<?php esc_attr_e( 'Filtros activos', 'ltms' ); ?>">
                     <?php if ( $pv_cat_slug ) :
                         $pv_cat_obj = get_term_by( 'slug', $pv_cat_slug, 'product_cat' );
                         $pv_qs_rm_cat = $pv_filter; unset( $pv_qs_rm_cat['product_cat'] );
                     ?>
-                        <a class="pv-shop__active-filter" href="<?php echo esc_url( add_query_arg( $pv_qs_rm_cat, $pv_shop_base ) ); ?>"><?php echo esc_html( $pv_cat_obj ? $pv_cat_obj->name : $pv_cat_slug ); ?> &times;</a>
+                        <a class="pv-shop__active-filter" href="<?php echo esc_url( add_query_arg( $pv_qs_rm_cat, $pv_shop_base ) ); ?>"><?php echo esc_html( $pv_cat_obj ? mb_strtoupper( $pv_cat_obj->name, 'UTF-8' ) : $pv_cat_slug ); ?> &times;</a>
                     <?php endif; ?>
+                    <?php foreach ( $pv_cat_slugs as $pv_sel_slug ) :
+                        $pv_sel_obj = get_term_by( 'slug', $pv_sel_slug, 'product_cat' );
+                        $pv_qs_rm_sel = $pv_filter;
+                        // Quitar UNA categoría del CSV (multi-select: cada chip
+                        // remueve solo la suya, las demás permanecen).
+                        $pv_remaining = array_values( array_diff( $pv_cat_slugs, [ $pv_sel_slug ] ) );
+                        if ( ! empty( $pv_remaining ) ) { $pv_qs_rm_sel['ltms_cats'] = implode( ',', $pv_remaining ); }
+                        else { unset( $pv_qs_rm_sel['ltms_cats'] ); }
+                    ?>
+                        <a class="pv-shop__active-filter" href="<?php echo esc_url( add_query_arg( $pv_qs_rm_sel, $pv_shop_base ) ); ?>"><?php echo esc_html( $pv_sel_obj ? mb_strtoupper( $pv_sel_obj->name, 'UTF-8' ) : $pv_sel_slug ); ?> &times;</a>
+                    <?php endforeach; ?>
                     <?php if ( '' !== $pv_min || '' !== $pv_max ) :
                         $pv_qs_rm_price = $pv_filter; unset( $pv_qs_rm_price['min_price'], $pv_qs_rm_price['max_price'] );
                         $pv_price_label = ( $pv_min !== '' && $pv_max !== '' ) ? $pv_min . ' – ' . $pv_max : ( $pv_min !== '' ? '≥ ' . $pv_min : '≤ ' . $pv_max );

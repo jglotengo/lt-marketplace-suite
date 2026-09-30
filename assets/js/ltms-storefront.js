@@ -80,6 +80,24 @@ $(document).on('click', '#ltms-sf-sidebar-overlay', function () {
                 if (url) { window.location.href = url; }
         });
 
+        /* ── CAT-NORM-002 + STORE-CATS-MULTI (2026-09-29): multi-select de
+           categorías (checkboxes) — los radios single-select no permitían
+           combinar categorías. El JS construye la URL con el CSV de las
+           marcadas preservando el resto de params (order/instock/s/view/age). ── */
+        $(document).on('change', '.ltms-sf-cat-check', function () {
+                var base = window.location.href.split('?')[0];
+                var params = new URLSearchParams(window.location.search);
+                var checked = [];
+                $('.ltms-sf-cat-check:checked').each(function () {
+                        var v = $(this).val();
+                        if (v) { checked.push(v); }
+                });
+                if (checked.length) { params.set('cat', checked.join(',')); }
+                else { params.delete('cat'); }
+                params.delete('pg'); // nueva selección → volver a la página 1
+                window.location.href = base + '?' + params.toString();
+        });
+
         // ════════════════════════════════════════════════════════════
         // UX AUDIT IMPROVEMENTS v2.9.270
         // ════════════════════════════════════════════════════════════

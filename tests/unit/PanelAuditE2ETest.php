@@ -205,8 +205,8 @@ final class PanelAuditE2ETest extends LTMS_Unit_Test_Case {
 
 		$this->assertStringContainsString( 'PANEL-E2E-009 (P0) FIX', $src,
 			'El fix PANEL-E2E-009 debe estar documentado en las migraciones.' );
-		$this->assertStringContainsString( "private const CURRENT_VERSION = '2.9.19';", $src,
-			'La versión de migración debe bumpear a 2.9.19 (sigue a la última migración; drivers 2.9.18 ya dispatcheada).' );
+		$this->assertStringContainsString( "private const CURRENT_VERSION = '2.9.20';", $src,
+			'La versión de migración debe bumpear a 2.9.20 (CAT-NORM-002 sigue a la última migración; drivers 2.9.18 ya dispatcheada).' );
 		$this->assertStringContainsString( "migrate_2_9_18_drivers_schema", $src,
 			'Debe existir el delta migrate_2_9_18_drivers_schema.' );
 

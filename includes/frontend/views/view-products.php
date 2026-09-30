@@ -229,7 +229,7 @@ $products_total = (int) wc_get_products( [
      ═══════════════════════════════════════════════════════════════ -->
 <div class="ltms-modal" id="ltms-modal-new-product" role="dialog" aria-modal="true" aria-labelledby="ltms-np-title">
     <div class="ltms-modal-backdrop"></div>
-    <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+    <div class="ltms-modal-inner" style="max-width:560px;box-sizing:border-box;width:100%;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
             <h3 id="ltms-np-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Nuevo Producto', 'ltms' ); ?></h3>
@@ -472,7 +472,15 @@ $products_total = (int) wc_get_products( [
                 // term_id canónico (mismo patrón SF-CAT-DEDUP del storefront).
                 // La lista se computa UNA vez y se reutiliza en el select del
                 // modal Editar ($ltms_cat_terms).
-                $ltms_cat_terms = LTMS_Utils::get_deduped_product_categories();
+                // CAT-NORM-002 (2026-09-29): lista normalizada (fingerprint
+                // dedup case/acento/singular-plural + canónico con más
+                // productos + nombre en MAYÚSCULAS). La lista se computa UNA
+                // vez y se reutiliza en el select del modal Editar
+                // ($ltms_cat_terms). Reemplaza al helper anterior de dedup por
+                // nombre (eliminado — el GROUP BY t.name no mergeaba
+                // singular/plural y devolvía MIN(term_id), que puede ser un
+                // término muerto de syncs viejas).
+                $ltms_cat_terms = LTMS_Utils::get_normalized_product_categories( false );
                 foreach ( $ltms_cat_terms as $np_term ) :
                 ?>
                 <option value="<?php echo esc_attr( $np_term->term_id ); ?>"><?php echo esc_html( $np_term->name ); ?></option>
@@ -559,7 +567,7 @@ wp_enqueue_script( 'ltms-products', ltms_asset_url( 'js/ltms-products' ), [ 'jqu
      ═══════════════════════════════════════════════════════════════ -->
 <div class="ltms-modal" id="ltms-modal-edit-product" role="dialog" aria-modal="true" aria-labelledby="ltms-ep-title">
     <div class="ltms-modal-backdrop"></div>
-    <div class="ltms-modal-inner" style="max-width:560px;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+    <div class="ltms-modal-inner" style="max-width:560px;box-sizing:border-box;width:100%;background:#fff;border-radius:12px;padding:28px;margin:auto;position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
             <h3 id="ltms-ep-title" style="margin:0;font-size:1.1rem;"><?php esc_html_e( 'Editar Producto', 'ltms' ); ?></h3>
@@ -581,6 +589,23 @@ wp_enqueue_script( 'ltms-products', ltms_asset_url( 'js/ltms-products' ), [ 'jqu
                 📁 <?php esc_html_e( 'Cambiar imagen', 'ltms' ); ?>
             </button>
             <span id="ltms-ep-img-status" style="font-size:0.8rem;color:#6b7280;margin-left:8px;"></span>
+        </div>
+
+        <!-- CAT-NORM-002 / PROD-GALLERY-EDIT (2026-09-29): galería multi-imagen
+             en el modal Editar (paridad 1:1 con el modal Nuevo, v2.9.88 P1) —
+             antes el Editar solo permitía la imagen destacada y NO había forma
+             de añadir más ángulos del producto desde el panel. El backend
+             update_product ya maneja gallery_ids. -->
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:6px;"><?php esc_html_e( 'Galería de imágenes (otros ángulos)', 'ltms' ); ?></label>
+            <div id="ltms-ep-gallery-preview" style="display:flex;gap:8px;flex-wrap:wrap;min-height:60px;padding:8px;border:2px dashed #e5e7eb;border-radius:8px;background:#f9fafb;align-items:center;max-width:100%;box-sizing:border-box;">
+                <span style="color:#d1d5db;font-size:0.8rem;">Click para añadir imágenes</span>
+            </div>
+            <input type="file" id="ltms-ep-gallery-input" accept="image/*" multiple style="display:none;">
+            <input type="hidden" id="ltms-ep-gallery-ids" value="">
+            <button type="button" style="padding:6px 14px;border:1.5px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:0.85rem;margin-top:6px;" id="ltms-ep-gallery-btn">
+                📁 <?php esc_html_e( 'Añadir imágenes a la galería', 'ltms' ); ?>
+            </button>
         </div>
 
         <!-- Nombre -->

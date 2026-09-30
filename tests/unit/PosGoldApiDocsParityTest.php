@@ -406,61 +406,74 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 	// POSGOLD-CAT-DROPDOWN — dedup de product_cat en el form de productos
 	// ─────────────────────────────────────────────────────────────────────────
 
-	public function test_get_deduped_product_categories_collapses_duplicates_by_name(): void {
+	public function test_get_normalized_product_categories_merges_variants_and_uppercases(): void {
 		$this->require_class( 'LTMS_Utils' );
 
-		// La query SQL hace el GROUP BY (el dedup real ocurre en MySQL); el mock
-		// devuelve las filas YA agrupadas (3 nombres únicos con el term_id
-		// canónico MIN) para verificar la normalización a objetos — mismo patrón
-		// que StorefrontCategoryDedupTest::mock_wpdb_with_categories().
+		// CAT-NORM-002: el dedup ocurre en PHP por fingerprint (case/acento/
+		// singular-plural). El mock devuelve filas SIN agrupar con variantes
+		// reales del diagnóstico live 2026-09-29 ("JUEGO DE MESA" 224 +
+		// "JUEGOS DE MESA" 6; "Coloración"/"Coloracion") para verificar merge
+		// + MAYÚSCULAS + canónico con más productos.
 		global $wpdb;
 		$wpdb = new class() {
-			public string $terms          = 'wp_terms';
-			public string $term_taxonomy  = 'wp_term_taxonomy';
+			public string $terms         = 'wp_terms';
+			public string $term_taxonomy = 'wp_term_taxonomy';
 			public function get_results( $query ): array {
 				return [
-					(object) [ 'term_id' => '12', 'name' => 'Juego de Mesa' ],
-					(object) [ 'term_id' => '4',  'name' => 'Bebes' ],
-					(object) [ 'term_id' => '7',  'name' => 'Muñecas' ],
+					(object) [ 'term_id' => '8401', 'name' => 'JUEGO DE MESA', 'slug' => 'juego-de-mesa', 'count' => '224' ],
+					(object) [ 'term_id' => '1205', 'name' => 'JUEGOS DE MESA', 'slug' => 'juegos-de-mesa', 'count' => '6' ],
+					(object) [ 'term_id' => '8390', 'name' => 'Coloración', 'slug' => 'coloracion-1', 'count' => '178' ],
+					(object) [ 'term_id' => '8399', 'name' => 'Coloracion', 'slug' => 'coloracion-2', 'count' => '41' ],
 				];
 			}
 		};
 
-		$cats = \LTMS_Utils::get_deduped_product_categories();
+		$cats = \LTMS_Utils::get_normalized_product_categories( false );
 
 		$this->assertIsArray( $cats );
-		$this->assertCount( 3, $cats, 'Debe devolver las 3 categorías únicas (lo que get_terms() plano mostraba repetido N veces en el select del panel).' );
+		$this->assertCount( 2, $cats, 'Las variantes ("JUEGO/JUEGOS DE MESA", "Coloración/Coloracion") deben colapsar a 2 conceptos únicos — hoy se listaban por separado.' );
 
 		$by_name = [];
 		foreach ( $cats as $cat ) {
 			$this->assertIsObject( $cat );
-			$this->assertGreaterThan( 0, $cat->term_id, 'Cada categoría debe exponer su term_id canónico.' );
-			$this->assertNotSame( '', $cat->name );
-			$by_name[ $cat->name ] = $cat->term_id;
+			$this->assertGreaterThan( 0, $cat->term_id, 'Cada categoría debe exponer el term_id canónico.' );
+			$by_name[ $cat->name ] = $cat;
 		}
 
-		$this->assertSame( 12, $by_name['Juego de Mesa'] );
-		$this->assertSame( 4, $by_name['Bebes'] );
-		$this->assertSame( 7, $by_name['Muñecas'] );
+		$this->assertArrayHasKey( 'JUEGO DE MESA', $by_name, 'El name devuelto debe ir en MAYÚSCULAS.' );
+		$this->assertSame( 8401, $by_name['JUEGO DE MESA']->term_id, 'El canónico debe ser el término con MÁS productos (count=224), no el más viejo.' );
+		$this->assertSame( 230, $by_name['JUEGO DE MESA']->count, 'El count debe sumar las variantes del grupo (224 + 6).' );
+		$this->assertArrayHasKey( 'COLORACIÓN', $by_name, 'Coloración debe normalizarse a MAYÚSCULAS.' );
+		$this->assertSame( 8390, $by_name['COLORACIÓN']->term_id, 'El canónico de Coloración debe ser el de más productos (178 vs 41).' );
+		$this->assertSame( 219, $by_name['COLORACIÓN']->count, 'El count debe sumar las variantes (178 + 41).' );
 	}
 
-	public function test_deduped_query_groups_by_name_with_canonical_term_id(): void {
-		// El dedup real ocurre en la query SQL (GROUP BY t.name + MIN(term_id)) —
-		// misma estrategia que la migración CAT-DEDUP-001 y
-		// get_vendor_categories() del storefront.
-		$src = file_get_contents( dirname( __DIR__, 2 ) . '/includes/core/utils/class-ltms-utils.php' );
-		$this->assertIsString( $src, 'Debe poder leerse class-ltms-utils.php.' );
+	public function test_get_normalized_product_categories_hide_empty_filters_empty(): void {
+		$this->require_class( 'LTMS_Utils' );
 
-		$pos  = strpos( $src, 'function get_deduped_product_categories' );
-		$body = substr( $src, $pos, 1800 );
+		// hide_empty=true (filtros del storefront) excluye conceptos sin
+		// productos; hide_empty=false (form del panel) los incluye.
+		global $wpdb;
+		$wpdb = new class() {
+			public string $terms         = 'wp_terms';
+			public string $term_taxonomy = 'wp_term_taxonomy';
+			public function get_results( $query ): array {
+				return [
+					(object) [ 'term_id' => '8401', 'name' => 'JUEGO DE MESA', 'slug' => 'juego-de-mesa', 'count' => '224' ],
+					(object) [ 'term_id' => '356', 'name' => 'ACCESORIOS', 'slug' => 'accesorios', 'count' => '0' ],
+				];
+			}
+		};
 
-		$this->assertStringContainsString( 'GROUP BY t.name', $body, 'La query debe agrupar por nombre (colapsa duplicados con distinto slug/parent).' );
-		$this->assertStringContainsString( 'MIN(t.term_id) AS term_id', $body, 'Debe devolver el term_id más bajo como canónico.' );
-		$this->assertStringContainsString( "tt.taxonomy = 'product_cat'", $body, 'Debe filtrar la taxonomía product_cat.' );
-		$this->assertStringNotContainsString( 'number', $body, 'Sin límite de filas — el GROUP BY ya colapsa los duplicados.' );
+		$all    = \LTMS_Utils::get_normalized_product_categories( false );
+		$filled = \LTMS_Utils::get_normalized_product_categories( true );
+
+		$this->assertCount( 2, $all, 'hide_empty=false debe devolver todos los conceptos (para el form del panel).' );
+		$this->assertCount( 1, $filled, 'hide_empty=true debe excluir los conceptos sin productos (filtros del storefront).' );
+		$this->assertSame( 'JUEGO DE MESA', $filled[0]->name );
 	}
 
-	public function test_get_deduped_product_categories_handles_wpdb_error(): void {
+	public function test_get_normalized_product_categories_handles_wpdb_error(): void {
 		$this->require_class( 'LTMS_Utils' );
 
 		global $wpdb;
@@ -472,20 +485,21 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 			}
 		};
 
-		$this->assertSame( [], \LTMS_Utils::get_deduped_product_categories(), 'Un fallo de DB debe devolver [] sin crashear.' );
+		$this->assertSame( [], \LTMS_Utils::get_normalized_product_categories(), 'Un fallo de DB debe devolver [] sin crashear.' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// Source-level — el form de productos usa el helper de dedup
+	// Source-level — el form de productos usa el helper normalizado
 	// ─────────────────────────────────────────────────────────────────────────
 
-	public function test_view_products_uses_deduped_helper_for_both_selects(): void {
+	public function test_view_products_uses_normalized_helper_for_both_selects(): void {
 		$src = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/views/view-products.php' );
 		$this->assertIsString( $src, 'Debe poder leerse view-products.php.' );
 
-		$this->assertStringContainsString( 'LTMS_Utils::get_deduped_product_categories()', $src, 'El form de productos debe usar el helper de dedup.' );
+		$this->assertStringContainsString( 'LTMS_Utils::get_normalized_product_categories( false )', $src, 'El form de productos debe usar el helper normalizado (CAT-NORM-002: fingerprint + MAYÚSCULAS + canónico con más productos).' );
+		$this->assertStringNotContainsString( 'get_deduped_product_categories', $src, 'El helper de dedup anterior quedó sin consumidores (reemplazado por la normalizada) — no debe quedar en el form.' );
 		$this->assertStringNotContainsString( "get_terms([ 'taxonomy' => 'product_cat'", $src, 'El get_terms plano de product_cat mostraba duplicados heredados en el select — no debe quedar.' );
-		$this->assertSame( 1, substr_count( $src, 'LTMS_Utils::get_deduped_product_categories()' ), 'La lista se computa UNA vez y se reutiliza en ambos selects (Nuevo + Editar).' );
+		$this->assertSame( 1, substr_count( $src, 'LTMS_Utils::get_normalized_product_categories( false )' ), 'La lista se computa UNA vez y se reutiliza en ambos selects (Nuevo + Editar).' );
 	}
 
 	public function test_dead_get_categories_handler_is_removed(): void {
@@ -686,6 +700,33 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 			$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.min.js' );
 			$this->assertIsString( $min_src, "Debe poder leerse {$js_base}.min.js." );
 			$this->assertStringContainsString( 'data-creds-configured', $min_src, "{$js_base}.min.js regenerado debe contener el fix." );
+		}
+	}
+
+	public function test_js_sync_polling_message_matches_background_truth(): void {
+		// SYNC-UX-MESSAGE FIX (2026-09-29): el mensaje del polling decía
+		// "No cierres esta página" (texto del flujo inline-AJAX pre-SYNC-BG) y
+		// CONTRADICE el texto del panel ("puedes cerrar esta página",
+		// view-posgold.php:113 / view-vtex.php:108) — la sync corre 100% en
+		// background vía WP-Cron (proceso server-side independiente del
+		// navegador): cerrar NO la mata; el resultado queda en last_result +
+		// notificación del panel y se muestra al volver.
+		foreach ( [ 'ltms-posgold', 'ltms-vtex' ] as $js_base ) {
+			$js_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.js' );
+			$this->assertIsString( $js_src, "Debe poder leerse {$js_base}.js." );
+
+			$this->assertStringContainsString(
+				'Puedes cerrar esta página; recibirás una notificación cuando termine.',
+				$js_src,
+				"{$js_base}.js: el mensaje del polling debe alinearse con el texto del panel (la sync corre en background)."
+			);
+
+			// El texto viejo solo puede sobrevivir en comentarios del .js — el
+			// min (que carga producción) no debe contenerlo.
+			$min_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/' . $js_base . '.min.js' );
+			$this->assertIsString( $min_src, "Debe poder leerse {$js_base}.min.js." );
+			$this->assertStringContainsString( 'Puedes cerrar esta página', $min_src, "{$js_base}.min.js regenerado debe contener el fix." );
+			$this->assertStringNotContainsString( 'No cierres esta página', $min_src, "{$js_base}.min.js: el texto contradictorio no debe sobrevivir en el min que carga producción." );
 		}
 	}
 }

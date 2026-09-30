@@ -153,8 +153,10 @@ final class CategoryDedupMigrationTest extends LTMS_Unit_Test_Case {
 	public function test_09_current_version_bumped_to_2_9_19(): void {
 		$src = $this->migrations_src();
 
-		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.19'", $src,
-			'CURRENT_VERSION debe bumparse a 2.9.19 para que la migración v2.9.19 corra en sites ya activados.' );
+		// CAT-NORM-002: bumped a 2.9.20 (sigue a la última migración); el
+		// literal se actualiza con cada migración nueva.
+		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.20'", $src,
+			'CURRENT_VERSION debe bumparse a 2.9.20 (CAT-NORM-002) para que la migración corra en sites ya activados.' );
 	}
 
 	public function test_10_migration_dispatched_in_run(): void {

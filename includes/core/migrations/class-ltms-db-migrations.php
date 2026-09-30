@@ -30,7 +30,7 @@ final class LTMS_DB_Migrations {
      * del panel vendedor (Productos → Nuevo/Editar) y la tabla Override por
      * Categoría del admin (Envíos).
      */
-    private const CURRENT_VERSION = '2.9.19';
+    private const CURRENT_VERSION = '2.9.20';
 
     /**
      * Ejecuta las migraciones pendientes.
@@ -128,6 +128,10 @@ final class LTMS_DB_Migrations {
 
         if ( version_compare( $installed_version, '2.9.19', '<' ) ) {
             self::migrate_2_9_19_category_dedup();
+        }
+
+        if ( version_compare( $installed_version, '2.9.20', '<' ) ) {
+            self::migrate_2_9_20_category_normalize();
         }
 
         update_option( 'ltms_db_version', self::CURRENT_VERSION );
@@ -3788,6 +3792,185 @@ final class LTMS_DB_Migrations {
                     'v2.9.19 CAT-DEDUP-001: %d términos product_cat duplicados mergeados, %d filas term_taxonomy corruptas eliminadas.',
                     $merged,
                     $tt_fix
+                )
+            );
+        }
+    }
+
+    /**
+     * Migración v2.9.20 — Normalización de categorías product_cat (CAT-NORM-002).
+     *
+     * CAT-DEDUP-001 (v2.9.19) mergeaba solo EXACTOS (LOWER(TRIM(name)) + mismo
+     * parent) — el diagnóstico live del 2026-09-29 (227 términos, 18 grupos con
+     * variantes) dejó expuesto lo que quedó pendiente:
+     *
+     *  (a) singular/plural: "JUEGO DE MESA" (id 8401, count=224) vs
+     *      "JUEGOS DE MESA" (id 1205, count=6) — mismo parent, se listaban por
+     *      separado en el shop y la vitrina.
+     *  (b) case/acento-variantes con distinto parent: "Coloración" (178,
+     *      parent 1219) vs "Coloracion" (41, parent 2930) — la exigencia de
+     *      mismo parent de la migración anterior impedía el merge.
+     *  (c) dupes muertas count=0 de syncs: "Shampoo y acondicionador" x50
+     *      (parents 1219/0/1357) — contaminan el dropdown del form (que no
+     *      filtra hide_empty) y cualquier get_terms() plano.
+     *
+     * Estrategia (idempotente — una 2ª pasada encuentra 0 grupos): merge por
+     * FINGERPRINT (LTMS_Utils::category_fingerprint: lowercase + sin acentos +
+     * singular/plural colapsado) SIN importar el parent. Canonical = el término
+     * con MÁS productos asignados; empate → el nombre ya en MAYÚSCULAS; luego
+     * id más bajo. El canónico se RENOMBRA a MAYÚSCULAS (consistencia en toda
+     * superficie; el slug NO cambia para no romper URLs). Reasigna
+     * relationships (con manejo de conflicto PK), children, term meta faltante
+     * (incluye _ltms_shipping_mode del override), recuenta y elimina el
+     * duplicado vía wp_delete_term — mismo patrón 1-5 de
+     * migrate_2_9_19_category_dedup().
+     *
+     * @return void
+     */
+    private static function migrate_2_9_20_category_normalize(): void {
+        global $wpdb;
+
+        if ( ! class_exists( 'LTMS_Utils' ) || ! method_exists( 'LTMS_Utils', 'category_fingerprint' ) ) {
+            return;
+        }
+
+        $merged = 0;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $terms = $wpdb->get_results(
+            "SELECT t.term_id, t.name, tt.count
+              FROM {$wpdb->terms} t
+              INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
+              WHERE tt.taxonomy = 'product_cat'"
+        );
+
+        if ( ! is_array( $terms ) || count( $terms ) < 2 ) {
+            return;
+        }
+
+        // Agrupar por fingerprint (case/acento/singular-plural insensitive).
+        $groups = [];
+        foreach ( $terms as $t ) {
+            $fp = LTMS_Utils::category_fingerprint( (string) $t->name );
+            if ( ! isset( $groups[ $fp ] ) ) {
+                $groups[ $fp ] = [];
+            }
+            $groups[ $fp ][] = $t;
+        }
+
+        foreach ( $groups as $group_terms ) {
+            if ( count( $group_terms ) < 2 ) {
+                continue;
+            }
+
+            // Canonical: más productos; empate → MAYÚSCULAS; luego id más bajo.
+            usort( $group_terms, static function ( $a, $b ) {
+                if ( (int) $b->count !== (int) $a->count ) {
+                    return ( (int) $b->count < (int) $a->count ) ? -1 : 1;
+                }
+                $a_upper = ( mb_strtoupper( (string) $a->name, 'UTF-8' ) === (string) $a->name ) ? 1 : 0;
+                $b_upper = ( mb_strtoupper( (string) $b->name, 'UTF-8' ) === (string) $b->name ) ? 1 : 0;
+                if ( $a_upper !== $b_upper ) {
+                    return ( $a_upper > $b_upper ) ? -1 : 1;
+                }
+                return ( (int) $a->term_id < (int) $b->term_id ) ? -1 : 1;
+            } );
+            $canonical_id   = (int) $group_terms[0]->term_id;
+            $canonical_name = mb_strtoupper( (string) $group_terms[0]->name, 'UTF-8' );
+
+            // Renombrar el canónico a MAYÚSCULAS (consistencia). El slug se
+            // pasa EXPLÍCITO para que wp_update_term no lo regenere desde el
+            // nombre nuevo (las URLs ?cat=slug y /categoria-producto/slug/ no
+            // deben cambiar).
+            $current_name = get_term_field( 'name', $canonical_id, 'product_cat' );
+            $current_slug = get_term_field( 'slug', $canonical_id, 'product_cat' );
+            if ( ! is_wp_error( $current_name ) && ! is_wp_error( $current_slug )
+                && (string) $current_name !== $canonical_name ) {
+                wp_update_term( $canonical_id, 'product_cat', [
+                    'name' => $canonical_name,
+                    'slug' => (string) $current_slug,
+                ] );
+            }
+
+            // Términos duplicados/variantes del grupo (todos menos el canónico).
+            foreach ( array_slice( $group_terms, 1 ) as $dup ) {
+                $dup_id = (int) $dup->term_id;
+
+                if ( $dup_id === $canonical_id ) {
+                    continue;
+                }
+
+                $canon_tt = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy}
+                      WHERE term_id = %d AND taxonomy = 'product_cat' LIMIT 1",
+                    $canonical_id
+                ) );
+
+                $dup_tt = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy}
+                      WHERE term_id = %d AND taxonomy = 'product_cat' LIMIT 1",
+                    $dup_id
+                ) );
+
+                if ( $canon_tt > 0 && $dup_tt > 0 && $dup_tt !== $canon_tt ) {
+                    // 1. Conflictos PK: objetos asignados a AMBOS términos →
+                    //    borrar la fila del duplicado (el canónico permanece).
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                    $wpdb->query( $wpdb->prepare(
+                        "DELETE tr FROM {$wpdb->term_relationships} tr
+                          INNER JOIN {$wpdb->term_relationships} keep_tr
+                                  ON keep_tr.object_id = tr.object_id
+                                 AND keep_tr.term_taxonomy_id = %d
+                          WHERE tr.term_taxonomy_id = %d",
+                        $canon_tt,
+                        $dup_tt
+                    ) );
+
+                    // 2. Reasignar el resto de relaciones al canónico.
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                    $wpdb->query( $wpdb->prepare(
+                        "UPDATE {$wpdb->term_relationships} SET term_taxonomy_id = %d WHERE term_taxonomy_id = %d",
+                        $canon_tt,
+                        $dup_tt
+                    ) );
+
+                    // 3. Reasignar children del duplicado al canónico.
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+                    $wpdb->query( $wpdb->prepare(
+                        "UPDATE {$wpdb->term_taxonomy} SET parent = %d
+                          WHERE parent = %d AND taxonomy = 'product_cat'",
+                        $canonical_id,
+                        $dup_id
+                    ) );
+
+                    wp_update_term_count( [ $canon_tt ], 'product_cat' );
+                }
+
+                // 4. Copiar term meta faltante al canónico (incluye
+                //    _ltms_shipping_mode del override y thumbnail_id).
+                $dup_meta = get_term_meta( $dup_id );
+                if ( is_array( $dup_meta ) ) {
+                    foreach ( $dup_meta as $meta_key => $values ) {
+                        if ( '' === get_term_meta( $canonical_id, $meta_key, true ) ) {
+                            foreach ( (array) $values as $value ) {
+                                add_term_meta( $canonical_id, $meta_key, $value );
+                            }
+                        }
+                    }
+                }
+
+                // 5. Eliminar el duplicado (relaciones/children/meta ya migrados).
+                wp_delete_term( $dup_id, 'product_cat' );
+                $merged++;
+            }
+        }
+
+        if ( $merged > 0 && class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'DB_MIGRATION',
+                sprintf(
+                    'v2.9.20 CAT-NORM-002: %d términos product_cat duplicados/variantes mergeados y normalizados a MAYÚSCULAS.',
+                    $merged
                 )
             );
         }

@@ -51,6 +51,11 @@ class LTMS_Vendor_Storefront {
         add_action( 'template_redirect', [ __CLASS__, 'maybe_render' ] );
         add_filter( 'document_title_parts', [ __CLASS__, 'filter_title' ] );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+        // CAT-NORM-002 + SHOP-CATS-MULTI (2026-09-29): multi-select de
+        // categorías en /tienda/ vía el CSV propio ltms_cats (product_cat[]=
+        // fatala con HTTP 500 — verificado live). El filtro añade el tax_query
+        // IN a la main query del shop.
+        add_action( 'pre_get_posts', [ __CLASS__, 'filter_shop_cats' ] );
 
         // SiteGround Optimizer combina todos los CSS del tema en un archivo externo
         // que se carga ANTES del nuestro, rompiendo la cascada. Se registran en
@@ -245,6 +250,40 @@ class LTMS_Vendor_Storefront {
             $parts['title'] = esc_html( $vendor->name ) . ' — Lo Tengo';
         }
         return $parts;
+    }
+
+    /**
+     * CAT-NORM-002 + SHOP-CATS-MULTI (2026-09-29): aplica el multi-select de
+     * categorías del shop (/tienda/) — el CSV propio ltms_cats
+     * (?ltms_cats=slug1,slug2) se convierte en tax_query IN sobre la main
+     * query. product_cat[]=a&product_cat[]=b fatala con HTTP 500 (verificado
+     * live), y product_cat=slug (single, WP nativo) sigue funcionando para
+     * URLs viejas.
+     *
+     * @param \WP_Query $query Query principal.
+     * @return void
+     */
+    public static function filter_shop_cats( \WP_Query $query ): void {
+        if ( is_admin() || ! $query->is_main_query() ) {
+            return;
+        }
+        $cats_raw = isset( $_GET['ltms_cats'] ) ? (string) wp_unslash( $_GET['ltms_cats'] ) : '';
+        if ( '' === $cats_raw ) {
+            return;
+        }
+        $slugs = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $cats_raw ) ) ) );
+        if ( empty( $slugs ) ) {
+            return;
+        }
+        $tax_query = $query->get( 'tax_query' );
+        $tax_query = is_array( $tax_query ) ? $tax_query : [];
+        $tax_query[] = [
+            'taxonomy' => 'product_cat',
+            'field'    => 'slug',
+            'terms'    => $slugs,
+            'operator' => 'IN',
+        ];
+        $query->set( 'tax_query', $tax_query );
     }
 
     public static function enqueue_assets(): void {
@@ -578,7 +617,14 @@ body.ltms-storefront-page .wh-header{display:none!important}
         // Kosmetic necesitaba ~229 clics de "Cargar más"). 24 mantiene el
         // balance entre carga y UX (4 columnas × 6 filas).
         $per_page   = 24;
-        $cat_slug   = sanitize_title( $_GET['cat'] ?? '' );
+        // CAT-NORM-002 + STORE-CATS-MULTI (2026-09-29): multi-select de
+        // categorías vía CSV (?cat=slug1,slug2) — los radios single-select no
+        // permitían combinar categorías. sanitize_title() se aplica POR ITEM
+        // (sobre el CSV crudo quita las comas y produce un slug basura). El
+        // formato lo parsea la query inicial Y el AJAX load_more.
+        $cat_raw    = isset( $_GET['cat'] ) ? (string) wp_unslash( $_GET['cat'] ) : '';
+        $cat_slugs  = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $cat_raw ) ) ) );
+        $cat_slug   = $cat_slugs[0] ?? '';
         $orderby    = in_array( $_GET['order'] ?? '', [ 'price', 'price-desc', 'date' ], true )
                       ? sanitize_text_field( $_GET['order'] ) : 'date';
         $search_q   = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
@@ -590,11 +636,12 @@ body.ltms-storefront-page .wh-header{display:none!important}
                     ? array_map( 'sanitize_text_field', $_GET['age'] ) : [];
 
         $tax_query = [];
-        if ( $cat_slug ) {
+        if ( $cat_slugs ) {
             $tax_query[] = [
                 'taxonomy' => 'product_cat',
                 'field'    => 'slug',
-                'terms'    => $cat_slug,
+                'terms'    => $cat_slugs,
+                'operator' => 'IN',
             ];
         }
 
@@ -640,7 +687,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
         $base_url  = home_url( '/vendedor/' . $vendor->slug . '/' );
 
         // Filtros activos para la pastilla de "Limpiar todo"
-        $active_filters = array_filter( [ $cat_slug, $in_stock, $ages_raw, $search_q ] );
+        $active_filters = array_filter( [ $cat_slugs ? implode( ',', $cat_slugs ) : '', $in_stock, $ages_raw, $search_q ] );
 
         self::print_head( $vendor );
         ?>
@@ -753,20 +800,25 @@ body.ltms-storefront-page .wh-header{display:none!important}
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
                         </button>
                         <div class="ltms-sf-filter-body" id="ltms-filter-cat">
-                            <label class="ltms-sf-filter-option">
-                                <input type="radio" name="ltms_cat" value=""
-                                    <?php checked( ! $cat_slug ); ?>
-                                    data-ltms-nav-url="<?php echo esc_attr( $base_url ); ?>">
-                                Todos
+                            <?php
+                            /**
+                             * CAT-NORM-002 + STORE-CATS-MULTI (2026-09-29):
+                             * radios single-select → checkboxes multi-select
+                             * (el JS .ltms-sf-cat-check construye la URL con el
+                             * CSV de las marcadas). Nombres en MAYÚSCULAS
+                             * (consistencia con el helper normalizado).
+                             */
+                            ?>
+                            <a class="ltms-sf-filter-option<?php echo empty( $cat_slugs ) ? ' is-active' : ''; ?>" href="<?php echo esc_url( $base_url ); ?>">
+                                Todas
                                 <span class="ltms-sf-filter-count"><?php echo esc_html( $total ); ?></span>
-                            </label>
+                            </a>
                             <?php foreach ( $vendor_cats as $cat ) :
-                                $cat_url = add_query_arg( 'cat', $cat->slug, $base_url ); ?>
+                                $cat_checked = in_array( $cat->slug, $cat_slugs, true ); ?>
                                 <label class="ltms-sf-filter-option">
-                                    <input type="radio" name="ltms_cat" value="<?php echo esc_attr( $cat->slug ); ?>"
-                                        <?php checked( $cat_slug, $cat->slug ); ?>
-                                        data-ltms-nav-url="<?php echo esc_attr( $cat_url ); ?>">
-                                    <?php echo esc_html( $cat->name ); ?>
+                                    <input type="checkbox" class="ltms-sf-cat-check" value="<?php echo esc_attr( $cat->slug ); ?>"
+                                        <?php checked( $cat_checked ); ?>>
+                                    <?php echo esc_html( mb_strtoupper( (string) $cat->name, 'UTF-8' ) ); ?>
                                     <span class="ltms-sf-filter-count"><?php echo esc_html( $cat->count ?? '' ); ?></span>
                                 </label>
                             <?php endforeach; ?>
@@ -782,7 +834,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
                         <div class="ltms-sf-filter-body" id="ltms-filter-stock">
                             <?php
                             $stock_url = add_query_arg( array_merge(
-                                [ 'cat' => $cat_slug ?: null, 'order' => $orderby !== 'date' ? $orderby : null ],
+                                [ 'cat' => $cat_raw ?: null, 'order' => $orderby !== 'date' ? $orderby : null ],
                                 $in_stock ? [] : [ 'instock' => '1' ]
                             ), $base_url );
                             ?>
@@ -877,7 +929,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                     'price-desc' => 'Precio: mayor a menor',
                                 ];
                                 foreach ( $order_opts as $val => $label ) :
-                                    $url = add_query_arg( [ 'order' => $val, 'cat' => $cat_slug ?: null ], $base_url );
+                                    $url = add_query_arg( [ 'order' => $val, 'cat' => $cat_raw ?: null ], $base_url );
                                 ?>
                                     <option value="<?php echo esc_url( $url ); ?>" <?php selected( $orderby, $val ); ?>>
                                         <?php echo esc_html( $label ); ?>
@@ -1024,7 +1076,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                  data-vendor-id="<?php echo esc_attr( $vendor->id ); ?>"
                                  data-paged="<?php echo esc_attr( $paged ); ?>"
                                  data-pages="<?php echo esc_attr( $pages ); ?>"
-                                 data-cat="<?php echo esc_attr( $cat_slug ); ?>"
+                                 data-cat="<?php echo esc_attr( $cat_raw ); ?>"
                                  data-order="<?php echo esc_attr( $orderby ); ?>"
                                  data-s="<?php echo esc_attr( $search_q ); ?>"
                                  data-instock="<?php echo $in_stock ? '1' : ''; ?>"
@@ -1045,7 +1097,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
                                         continue;
                                     }
                                 ?>
-                                    <a href="<?php echo esc_url( add_query_arg( [ 'pg' => $p, 'cat' => $cat_slug ?: null, 'order' => $orderby !== 'date' ? $orderby : null ], $base_url ) ); ?>"
+                                    <a href="<?php echo esc_url( add_query_arg( [ 'pg' => $p, 'cat' => $cat_raw ?: null, 'order' => $orderby !== 'date' ? $orderby : null ], $base_url ) ); ?>"
                                        class="ltms-sf-page-btn <?php echo $p === $paged ? 'active' : ''; ?>"
                                        aria-label="Página <?php echo esc_attr( $p ); ?>"
                                        <?php echo $p === $paged ? 'aria-current="page"' : ''; ?>>
@@ -1243,7 +1295,12 @@ body.ltms-storefront-page .wh-header{display:none!important}
         check_ajax_referer( 'ltms_sf_nonce', 'nonce' );
         $vendor_id = (int) ( $_POST['vendor_id'] ?? 0 );
         $paged     = (int) ( $_POST['paged'] ?? 2 );
-        $cat_slug  = sanitize_title( $_POST['cat'] ?? '' );
+        // CAT-NORM-002 + STORE-CATS-MULTI (2026-09-29): parse CSV del cat
+        // (paridad con la query inicial — ?cat=slug1,slug2). sanitize_title()
+        // sobre el CSV crudo quita las comas → aplicar POR ITEM.
+        $cat_raw   = isset( $_POST['cat'] ) ? (string) wp_unslash( $_POST['cat'] ) : '';
+        $cat_slugs = array_values( array_filter( array_map( 'sanitize_title', explode( ',', $cat_raw ) ) ) );
+        $cat_slug  = $cat_slugs[0] ?? '';
         $orderby   = sanitize_text_field( $_POST['order'] ?? 'date' );
         $search_q  = sanitize_text_field( wp_unslash( $_POST['s'] ?? '' ) );
         $in_stock  = ! empty( $_POST['instock'] );
@@ -1251,7 +1308,7 @@ body.ltms-storefront-page .wh-header{display:none!important}
 
         if ( ! $vendor_id ) wp_send_json_error( 'Invalid vendor' );
 
-        $tax_query  = $cat_slug ? [ [ 'taxonomy' => 'product_cat', 'field' => 'slug', 'terms' => $cat_slug ] ] : [];
+        $tax_query  = $cat_slugs ? [ [ 'taxonomy' => 'product_cat', 'field' => 'slug', 'terms' => $cat_slugs, 'operator' => 'IN' ] ] : [];
         $meta_query = $in_stock ? [ [ 'key' => '_stock_status', 'value' => 'instock' ] ] : [];
 
         // SYNC-VIS-GATE: excluir productos ocultos (sin stock/imagen/precio).

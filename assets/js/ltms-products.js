@@ -96,8 +96,11 @@
             success: function(res){
                 if (res.success){
                     $('#ltms-np-image-id').val(res.data.attachment_id);
+                    // PROD-IMG-FIT (2026-09-29): object-fit:cover RECORTABA la
+                    // imagen del preview (entrecorte reportado por el vendor) —
+                    // contain muestra la imagen completa en el contenedor.
                     $('#ltms-np-img-preview').html(
-                        '<img src="' + res.data.url + '" style="width:100%;height:100%;object-fit:cover;">'
+                        '<img src="' + res.data.url + '" style="width:100%;height:100%;object-fit:contain;background:#fff;">'
                     );
                     $status.text('✓');
                 } else {
@@ -258,6 +261,10 @@
     $('#ltms-np-tipo-'+_initTipo+'-lbl').css({'border-color':'#1a5276','background':'#eff6ff'});
 
     // ── CS-07: Editar producto inline ────────────────────────────
+    // PROD-GALLERY-EDIT (2026-09-29): galería multi-imagen en el modal Editar
+    // (paridad con el modal Nuevo) — antes no había forma de añadir más
+    // ángulos del producto desde el panel.
+    var epGalleryIds = [];
     $(document).on('click', '.ltms-edit-product-btn', function(){
         var pid = $(this).data('product-id');
         $('#ltms-ep-notice').hide().text('');
@@ -265,6 +272,10 @@
         $('#ltms-ep-name,#ltms-ep-desc,#ltms-ep-price,#ltms-ep-stock,#ltms-ep-sale-price,#ltms-ep-short-desc,#ltms-ep-sku,#ltms-ep-tags').val('');
         $('#ltms-ep-img-preview').html('<span style="color:#9ca3af;font-size:2rem;">📷</span>');
         $('#ltms-ep-image-id').val('');
+        // Reset de la galería (cada carga del modal parte de los datos del producto).
+        epGalleryIds = [];
+        $('#ltms-ep-gallery-ids').val('');
+        $('#ltms-ep-gallery-preview').html('<span style="color:#d1d5db;font-size:0.8rem;">Click para añadir imágenes</span>');
         $.ajax({
             url: ltmsDashboard.ajax_url,
             method: 'POST',
@@ -297,7 +308,24 @@
                 $('#ltms-ep-category').val(d.category_id);
                 $('#ltms-ep-status').val(d.status);
                 $('#ltms-ep-image-id').val(d.image_id);
-                if(d.image_url){ $('#ltms-ep-img-preview').html('<img src="'+d.image_url+'" style="width:100%;height:100%;object-fit:cover;">'); }
+                if(d.image_url){ $('#ltms-ep-img-preview').html('<img src="'+d.image_url+'" style="width:100%;height:100%;object-fit:contain;background:#fff;">'); }
+                // PROD-GALLERY-EDIT: poblar la galería existente del producto
+                // (get_product() devuelve gallery_ids/gallery_urls).
+                if (d.gallery_urls && d.gallery_urls.length) {
+                    var $gprev = $('#ltms-ep-gallery-preview');
+                    $gprev.find('span').remove();
+                    d.gallery_urls.forEach(function(gurl, gi) {
+                        var gid = (d.gallery_ids && d.gallery_ids[gi]) || 0;
+                        if (gid) { epGalleryIds.push(gid); }
+                        $gprev.append(
+                            '<div style="position:relative;width:50px;height:50px;border-radius:6px;overflow:hidden;flex-shrink:0;">' +
+                            '<img src="' + gurl + '" style="width:100%;height:100%;object-fit:cover;">' +
+                            '<button type="button" data-ep-gallery-remove="' + gid + '" style="position:absolute;top:0;right:0;background:rgba(239,68,68,0.9);color:#fff;border:none;font-size:0.6rem;cursor:pointer;width:16px;height:16px;line-height:1;">✕</button>' +
+                            '</div>'
+                        );
+                    });
+                    $('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
+                }
                 // Tipo
                 var tipo = d.product_type || 'physical';
                 $('input[name="ltms_ep_tipo"][value="'+tipo+'"]').prop('checked',true).trigger('change');
@@ -339,9 +367,65 @@
         fd.append('nonce', ltmsDashboard.nonce);
         fd.append('image', file);
         $.ajax({ url:ltmsDashboard.ajax_url, method:'POST', data:fd, processData:false, contentType:false,
-            success:function(r){ if(r.success){ $('#ltms-ep-image-id').val(r.data.attachment_id); $('#ltms-ep-img-preview').html('<img src="'+r.data.url+'" style="width:100%;height:100%;object-fit:cover;">'); $s.text('✓'); } else { $s.text('Error'); } },
+            success:function(r){ if(r.success){ $('#ltms-ep-image-id').val(r.data.attachment_id); $('#ltms-ep-img-preview').html('<img src="'+r.data.url+'" style="width:100%;height:100%;object-fit:contain;background:#fff;">'); $s.text('V'); } else { $s.text('Error'); } },
             error:function(){ $s.text('Error'); }
         });
+    });
+
+    // PROD-GALLERY-EDIT (2026-09-29): galería multi-imagen en el modal Editar
+    // (paridad 1:1 con los handlers np-gallery del modal Nuevo).
+    $('#ltms-ep-gallery-btn, #ltms-ep-gallery-preview').on('click', function(){
+        if (epGalleryIds.length >= 5) {
+            LTMS.UX.toastError('Límite', 'Máximo 5 imágenes en la galería.');
+            return;
+        }
+        $('#ltms-ep-gallery-input').trigger('click');
+    });
+    $('#ltms-ep-gallery-input').on('change', function(){
+        var files = this.files;
+        if (!files || !files.length) return;
+        var remaining = 5 - epGalleryIds.length;
+        var toUpload = Math.min(files.length, remaining);
+        if (files.length > remaining) {
+            LTMS.UX.toastWarning('Límite', 'Solo se subirán ' + remaining + ' imágenes más (máx 5).');
+        }
+        for (var i = 0; i < toUpload; i++) {
+            (function(file) {
+                var fd = new FormData();
+                fd.append('action', 'ltms_upload_product_image');
+                fd.append('nonce', ltmsDashboard.nonce);
+                fd.append('file', file);
+                $.ajax({
+                    url: ltmsDashboard.ajax_url, method: 'POST', data: fd,
+                    processData: false, contentType: false,
+                    success: function(res) {
+                        if (res.success && res.data.attachment_id) {
+                            epGalleryIds.push(res.data.attachment_id);
+                            $('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
+                            var $preview = $('#ltms-ep-gallery-preview');
+                            $preview.find('span').remove();
+                            $preview.append(
+                                '<div style="position:relative;width:50px;height:50px;border-radius:6px;overflow:hidden;flex-shrink:0;">' +
+                                '<img src="' + res.data.url + '" style="width:100%;height:100%;object-fit:cover;">' +
+                                '<button type="button" data-ep-gallery-remove="' + res.data.attachment_id + '" style="position:absolute;top:0;right:0;background:rgba(239,68,68,0.9);color:#fff;border:none;font-size:0.6rem;cursor:pointer;width:16px;height:16px;line-height:1;">✕</button>' +
+                                '</div>'
+                            );
+                        }
+                    }
+                });
+            })(files[i]);
+        }
+        $(this).val('');
+    });
+    $(document).on('click', '[data-ep-gallery-remove]', function(e) {
+        e.preventDefault();
+        var id = parseInt($(this).data('ep-gallery-remove'));
+        epGalleryIds = epGalleryIds.filter(function(v) { return v !== id; });
+        $('#ltms-ep-gallery-ids').val(epGalleryIds.join(','));
+        $(this).parent().remove();
+        if (epGalleryIds.length === 0) {
+            $('#ltms-ep-gallery-preview').html('<span style="color:#d1d5db;font-size:0.8rem;">Click para añadir imágenes</span>');
+        }
     });
 
     // Highlight tipo en modal edición
@@ -395,6 +479,9 @@
                 category_id:$('#ltms-ep-category').val(),
                 status:$('#ltms-ep-status').val(),
                 image_id:$('#ltms-ep-image-id').val(),
+                // PROD-GALLERY-EDIT: enviar galería al backend (paridad con
+                // create_product) — update_product ya maneja gallery_ids.
+                gallery_ids:$('#ltms-ep-gallery-ids').val() || '',
                 product_type:$('input[name="ltms_ep_tipo"]:checked').val()||'physical',
                 redi_enabled:$('#ltms-ep-redi-enabled').is(':checked') ? 'yes' : 'no',
                 redi_rate:parseFloat($('#ltms-ep-redi-rate').val())||0,

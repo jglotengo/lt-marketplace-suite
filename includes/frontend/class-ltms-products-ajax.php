@@ -13,8 +13,9 @@ class LTMS_Products_Ajax {
         // POSGOLD-DOCS-PARITY v2.9.397: ltms_get_categories eliminado (dead code).
         // Ningún JS del repo lo invoca (el dropdown de categorías del form de
         // productos se renderiza server-side en view-products.php vía
-        // LTMS_Utils::get_deduped_product_categories(), y el dropdown PosGold usa
-        // ltms_get_posgold_categories). Verificado repo-completo 2026-09-27.
+        // LTMS_Utils::get_normalized_product_categories() — CAT-NORM-002
+        // reemplazó a get_deduped_product_categories —, y el dropdown PosGold
+        // usa ltms_get_posgold_categories). Verificado repo-completo 2026-09-27.
         add_action( 'wp_ajax_ltms_upload_product_image',  [ $this, 'upload_product_image' ] );
         add_action( 'wp_ajax_ltms_get_product',           [ $this, 'get_product' ] );
         add_action( 'wp_ajax_ltms_update_product',        [ $this, 'update_product' ] );

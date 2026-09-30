@@ -271,47 +271,128 @@ final class LTMS_Utils {
     }
 
     /**
-     * Lista las categorías product_cat SIN duplicados (para dropdowns del panel).
+     * Lista las categorías product_cat NORMALIZADAS (para dropdowns del panel
+     * y filtros del storefront).
      *
-     * POSGOLD-CAT-DROPDOWN (2026-09-27): los términos product_cat quedaron
-     * DUPLICADOS en la DB por la sync VTEX/PosGold pre SF-CAT-DEDUP-001 (mismo
-     * nombre con slug distinto, o distinto parent — la migración v2.9.19 agrupa
-     * por nombre+parent, así que duplicados con parent distinto permanecen).
-     * get_terms() plano los devolvía todos → el select de categoría del
-     * formulario de productos del panel de vendedor (view-products.php, modal
-     * Nuevo/Editar) mostraba cada categoría N veces, y con 'number' => 100 solo
-     * se veían las primeras filas truncadas.
+     * CAT-NORM-002 (2026-09-29): reemplaza a get_deduped_product_categories()
+     * (GROUP BY t.name que colapsaba case-variantes pero NO singular/plural
+     * — "JUEGO DE MESA" y "JUEGOS DE MESA" se listaban por separado — y
+     * devolvía MIN(term_id), que puede ser un término MUERTO count=0 creado
+     * por syncs viejas). Normalización en dos capas:
      *
-     * Esta query agrupa por nombre (collation case-insensitive) y devuelve el
-     * term_id más bajo como canónico — mismo patrón que get_vendor_categories()
-     * de LTMS_Vendor_Storefront y la migración CAT-DEDUP-001. Sin límite de
-     * filas: el GROUP BY colapsa los duplicados, así que el resultado es la
-     * lista real de nombres únicos.
+     *  1. Fingerprint (category_fingerprint): lowercase + sin acentos +
+     *     singular/plural colapsado (trailing 's' de palabras >3 chars) +
+     *     espacios colapsados. "JUEGO DE MESA" y "juegos de mesa" →
+     *     "juego de mesa" (mismo grupo).
+     *  2. Canónico del grupo: el término con MÁS productos asignados; empate
+     *     → el que ya está en MAYÚSCULAS; luego el id más bajo. El name
+     *     devuelto SIEMPRE va en MAYÚSCULAS (consistencia en toda superficie).
      *
-     * @return array<int, object{term_id: int, name: string}>
+     * @param bool $hide_empty true → solo conceptos con productos asignados
+     *                         (filtros del storefront); false → todos
+     *                         (dropdowns del panel de productos).
+     * @return array<int, object{term_id: int, slug: string, name: string, count: int}>
      */
-    public static function get_deduped_product_categories(): array {
+    public static function get_normalized_product_categories( bool $hide_empty = true ): array {
         global $wpdb;
 
         $rows = $wpdb->get_results(
-            "SELECT MIN(t.term_id) AS term_id, t.name
+            "SELECT t.term_id, t.name, t.slug, tt.count
               FROM {$wpdb->terms} t
               INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id
-              WHERE tt.taxonomy = 'product_cat'
-              GROUP BY t.name
-              ORDER BY t.name ASC"
+              WHERE tt.taxonomy = 'product_cat'"
         );
 
         if ( ! is_array( $rows ) ) {
             return [];
         }
 
-        return array_map( static function ( $row ) {
-            return (object) [
-                'term_id' => (int) $row->term_id,
-                'name'    => (string) $row->name,
+        // Agrupar por fingerprint (case/acento/singular-plural insensitive).
+        $groups = [];
+        foreach ( $rows as $row ) {
+            $fp = self::category_fingerprint( (string) $row->name );
+            if ( ! isset( $groups[ $fp ] ) ) {
+                $groups[ $fp ] = [];
+            }
+            $groups[ $fp ][] = $row;
+        }
+
+        $normalized = [];
+        foreach ( $groups as $terms ) {
+            // Canonical: más productos; empate → MAYÚSCULAS; luego id más bajo.
+            usort( $terms, static function ( $a, $b ) {
+                if ( (int) $b->count !== (int) $a->count ) {
+                    return ( (int) $b->count < (int) $a->count ) ? -1 : 1;
+                }
+                $a_upper = ( mb_strtoupper( (string) $a->name, 'UTF-8' ) === (string) $a->name ) ? 1 : 0;
+                $b_upper = ( mb_strtoupper( (string) $b->name, 'UTF-8' ) === (string) $b->name ) ? 1 : 0;
+                if ( $a_upper !== $b_upper ) {
+                    return ( $a_upper > $b_upper ) ? -1 : 1;
+                }
+                return ( (int) $a->term_id < (int) $b->term_id ) ? -1 : 1;
+            } );
+            $canon = $terms[0];
+
+            $total = 0;
+            foreach ( $terms as $t ) {
+                $total += (int) $t->count;
+            }
+            if ( $hide_empty && 0 === $total ) {
+                continue;
+            }
+
+            $normalized[] = (object) [
+                'term_id' => (int) $canon->term_id,
+                'slug'    => (string) $canon->slug,
+                'name'    => mb_strtoupper( (string) $canon->name, 'UTF-8' ),
+                'count'   => $total,
             ];
-        }, $rows );
+        }
+
+        // Filtros: ordenar por productos (los más usados primero).
+        usort( $normalized, static function ( $a, $b ) {
+            return ( (int) $b->count < (int) $a->count ) ? -1 : 1;
+        } );
+
+        return $normalized;
+    }
+
+    /**
+     * Fingerprint de un nombre de categoría para dedup: lowercase + sin
+     * acentos (á/é/í/ó/ú/ü/ñ) + singular/plural colapsado (trailing 's' de
+     * palabras de más de 3 chars — "JUEGOS"→"juego", "MESAS"→"mesa"; "DE" y
+     * "TRES" cortas quedan intactas) + espacios colapsados.
+     *
+     * CAT-NORM-002 (2026-09-29): el fingerprint SOLO se usa para agrupar
+     * variantes del mismo concepto — el nombre de display es el del término
+     * canónico, no el fingerprint.
+     *
+     * @param string $name Nombre crudo del término.
+     * @return string Fingerprint normalizado.
+     */
+    public static function category_fingerprint( string $name ): string {
+        $n = mb_strtolower( trim( $name ), 'UTF-8' );
+        $n = strtr( $n, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'ü' => 'u', 'ñ' => 'n',
+            'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u',
+            'Ü' => 'u', 'Ñ' => 'n',
+        ] );
+        $words = preg_split( '/\s+/u', $n, -1, PREG_SPLIT_NO_EMPTY );
+        if ( ! is_array( $words ) ) {
+            return $n;
+        }
+        $out = [];
+        foreach ( $words as $w ) {
+            if ( '' === $w ) {
+                continue;
+            }
+            if ( mb_strlen( $w, 'UTF-8' ) > 3 && 's' === mb_substr( $w, -1, null, 'UTF-8' ) ) {
+                $w = mb_substr( $w, 0, -1, 'UTF-8' );
+            }
+            $out[] = $w;
+        }
+        return implode( ' ', $out );
     }
 
     /**

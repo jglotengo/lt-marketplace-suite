@@ -255,6 +255,26 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') close();
         });
+
+        /* ── CAT-NORM-002 + SHOP-CATS-MULTI (2026-09-29): multi-select de
+           categorías en /tienda/ (checkboxes .pv-shop__cat-check) — los links
+           single-select no permitían combinar categorías. El JS construye la
+           URL con el CSV propio ltms_cats (product_cat[]= fatala con HTTP 500)
+           preservando el resto de params (min_price/max_price/instock/view). ── */
+        document.addEventListener('change', function (e) {
+            var t = e.target;
+            if (!t || typeof t.closest !== 'function') return;
+            if (!t.classList.contains('pv-shop__cat-check')) return;
+            var checked = [];
+            document.querySelectorAll('.pv-shop__cat-check:checked').forEach(function (c) {
+                if (c.value) { checked.push(c.value); }
+            });
+            var base = window.location.href.split('?')[0];
+            var params = new URLSearchParams(window.location.search);
+            if (checked.length) { params.set('ltms_cats', checked.join(',')); }
+            else { params.delete('ltms_cats'); }
+            window.location.href = base + '?' + params.toString();
+        });
     }
 
     /* ══════════════════════════════════════════════════════════════

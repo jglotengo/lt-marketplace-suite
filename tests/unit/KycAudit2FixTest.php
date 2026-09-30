@@ -140,7 +140,8 @@ class KycAudit2FixTest extends LTMS_Unit_Test_Case {
 		// the latest migration added.
 		// v2.9.322 PANEL-E2E-009: bumped to 2.9.18 for migrate_2_9_18_drivers_schema.
 		// CAT-DEDUP-001: bumped to 2.9.19 for migrate_2_9_19_category_dedup.
-		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.19'", $src,
+		// CAT-NORM-002: bumped to 2.9.20 for migrate_2_9_20_category_normalize.
+		$this->assertStringContainsString( "CURRENT_VERSION = '2.9.20'", $src,
 			'CURRENT_VERSION debe bumparse a 2.9.19 para que la migracion v2.9.19 (category dedup) corra en sites ya activados.' );
 	}
 
