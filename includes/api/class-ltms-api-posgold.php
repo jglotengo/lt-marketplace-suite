@@ -300,10 +300,13 @@ final class LTMS_Api_PosGold {
      * Maneja diferentes nombres de campos que PosGold puede usar (camelCase,
      * snake_case, PascalCase, etc.) y los normaliza a un formato canónico.
      *
-     * @param array $raw Producto crudo desde la API de PosGold.
+     * @param array  $raw       Producto crudo desde la API de PosGold.
+     * @param string $subdomain Subdominio PosGold del vendor (ej. 'jugueteriataiwan').
+     *                           Conocido → los filenames desnudos de Imagenes se
+     *                           convierten en URLs absolutas descargables.
      * @return array Producto normalizado con claves estándar.
      */
-    public static function normalize_product( array $raw ): array {
+    public static function normalize_product( array $raw, string $subdomain = '' ): array {
         // Helper: buscar un valor en múltiples claves posibles.
         $pick = static function ( array $keys ) use ( $raw ) {
             foreach ( $keys as $key ) {
@@ -355,14 +358,20 @@ final class LTMS_Api_PosGold {
         $barcode     = $pick_first_scalar( [ 'CodigoBarras', 'barcode', 'Barcode', 'codigo_barras', 'CodigoBarrasRaw', 'ean', 'EAN' ] );
         $imagen_url  = $pick_first_scalar( [ 'Imagenes', 'imagen', 'Imagen', 'imagen_url', 'ImagenUrl', 'foto', 'Foto', 'image_url' ] );
 
-        // POSGOLD-DOCS-PARITY: la API devuelve filenames desnudos en Imagenes
-        // (ej. "04142-1.jpg") sin URL base verificable (las rutas
-        // /Imagenes/ /Images/ del subdominio devuelven 404 y las imágenes del
-        // catálogo requieren sesión). Solo se usa una URL ABSOLTA — un
-        // filename desnuo no construye una URL descargable y download_url()
-        // fallaría silenciosamente.
+        // POSGOLD-IMG-BASE FIX (2026-09-29): la API V6 devuelve filenames
+        // desnudos en Imagenes (ej. "001309-1.jpeg") que viven en la ruta
+        // estática https://{subdomain}.goldpos.com.co/Files/Images/{filename}
+        // (verificado live 4/4 → 200 con Content-Type image/*, PÚBLICA sin
+        // sesión — /Producto/Imagen/{id} SÍ requiere sesión, la ruta estática
+        // NO). Con subdomain conocido se construye la URL absoluta
+        // descargable (download_url() hace GET plano y funciona). Sin
+        // subdomain (llamadas legacy sin el 2º parámetro) se mantiene el
+        // descarte: un filename sin URL verificable no es descargable.
         if ( $imagen_url !== '' && ! preg_match( '~^https?://~i', (string) $imagen_url ) ) {
-            $imagen_url = '';
+            $base_url = ( '' !== $subdomain ) ? self::build_base_url( $subdomain ) : '';
+            $imagen_url = ( '' !== $base_url )
+                ? $base_url . '/Files/Images/' . rawurlencode( (string) $imagen_url )
+                : '';
         }
 
         $activo      = $pick( [ 'activo', 'Activo', 'ACTIVO', 'active' ] );
@@ -588,7 +597,7 @@ final class LTMS_Api_PosGold {
 
         $categories_map = [];
         foreach ( $result['data'] as $raw_product ) {
-            $product = self::normalize_product( $raw_product );
+            $product = self::normalize_product( $raw_product, $subdomain );
 
             $cat_id    = (string) $product['categoria_id'];
             $cat_nombre = (string) $product['categoria'];

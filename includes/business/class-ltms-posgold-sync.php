@@ -264,7 +264,11 @@ final class LTMS_PosGold_Sync {
         // 4. Normalizar todos los productos.
         $normalized = [];
         foreach ( $products as $raw_product ) {
-            $normalized[] = LTMS_Api_PosGold::normalize_product( $raw_product );
+            // POSGOLD-IMG-BASE FIX (2026-09-29): pasar el subdominio para que
+            // los filenames desnudos de Imagenes se conviertan en URLs
+            // absolutas (https://{subdomain}/Files/Images/{filename}) y el
+            // sync pueda descargar/adjuntar la imagen destacada.
+            $normalized[] = LTMS_Api_PosGold::normalize_product( $raw_product, $creds['subdomain'] );
         }
 
         // 5. Filtrar por categoriaid si el vendor configuró categorías.

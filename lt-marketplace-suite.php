@@ -52,7 +52,7 @@ define( 'LTMS_LOADED', true );
 // POSGOLD-RULES-PARITY (2026-09-26): bump a 2.9.396 — reglas PosGold idénticas
 // a VTEX (transporte/publicidad monto fijo COP/MXN, comisión Lo Tengo 12) +
 // cache-busting del JS del panel.
-define( 'LTMS_VERSION', '2.9.401' );
+define( 'LTMS_VERSION', '2.9.402' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

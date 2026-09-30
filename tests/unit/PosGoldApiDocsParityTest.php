@@ -263,12 +263,13 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 	public function test_normalize_product_bare_image_filename_is_discarded(): void {
 		$this->require_class( 'LTMS_Api_PosGold' );
 
-		// La API devuelve filenames desnudos ("04142-1.jpg") — las rutas del
-		// subdominio devuelven 404 y el catálogo requiere sesión: no hay URL base
-		// verificable para construir una URL descargable.
+		// Legacy (sin 2º parámetro de subdominio): un filename desnuo sin URL
+		// base verificable no debe usarse como URL de imagen (download_url
+		// fallaría silenciosamente). Con subdominio se construye la URL real
+		// (ver test_normalize_product_builds_files_images_url_from_bare_filename).
 		$normalized = \LTMS_Api_PosGold::normalize_product( $this->real_api_response()['Datos'][0] );
 
-		$this->assertSame( '', $normalized['imagen_url'], 'Un filename desnuo no debe usarse como URL de imagen (download_url fallaría silenciosamente).' );
+		$this->assertSame( '', $normalized['imagen_url'], 'Sin subdominio, un filename desnuo no debe usarse como URL de imagen.' );
 	}
 
 	public function test_normalize_product_keeps_absolute_image_url(): void {
@@ -291,6 +292,66 @@ final class PosGoldApiDocsParityTest extends LTMS_Unit_Test_Case {
 		$normalized = \LTMS_Api_PosGold::normalize_product( $raw );
 
 		$this->assertSame( '7701234567890', $normalized['barcode'], 'CodigoBarras viene como array — debe tomarse el primer elemento.' );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// POSGOLD-IMG-BASE FIX (2026-09-29): filenames desnudos → URL real
+	// https://{subdomain}.goldpos.com.co/Files/Images/{filename} (verificado
+	// live 4/4 → 200 con Content-Type image/*). El patrón fue descubierto vía
+	// sesión real del vendor (la página ProductoCrud está detrás de login;
+	// las sondas estáticas con /Images/ /Imagenes/ /Files/ sueltos daban 404).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_normalize_product_builds_files_images_url_from_bare_filename(): void {
+		$this->require_class( 'LTMS_Api_PosGold' );
+
+		$raw       = $this->real_api_response()['Datos'][0];
+		$normalized = \LTMS_Api_PosGold::normalize_product( $raw, 'jugueteriataiwan' );
+
+		$this->assertSame(
+			'https://jugueteriataiwan.goldpos.com.co/Files/Images/04142-1.jpg',
+			$normalized['imagen_url'],
+			'Con subdominio, un filename desnuo debe convertirse en URL absoluta en /Files/Images/ (ruta estática pública verificada live).'
+		);
+	}
+
+	public function test_normalize_product_builds_url_with_second_real_filename_pattern(): void {
+		$this->require_class( 'LTMS_Api_PosGold' );
+
+		$raw       = $this->real_api_response()['Datos'][1];
+		$normalized = \LTMS_Api_PosGold::normalize_product( $raw, 'jugueteriataiwan' );
+
+		$this->assertSame(
+			'https://jugueteriataiwan.goldpos.com.co/Files/Images/001309-1.jpeg',
+			$normalized['imagen_url'],
+			'Filenames .jpeg y .jpg ambos deben construir URL en /Files/Images/.'
+		);
+	}
+
+	public function test_normalize_product_url_encodes_special_chars_in_filename(): void {
+		$this->require_class( 'LTMS_Api_PosGold' );
+
+		$raw           = $this->real_api_response()['Datos'][0];
+		$raw['Imagenes'] = [ '04142 1 copia.jpg' ];
+
+		$normalized = \LTMS_Api_PosGold::normalize_product( $raw, 'jugueteriataiwan' );
+
+		$this->assertSame(
+			'https://jugueteriataiwan.goldpos.com.co/Files/Images/04142%201%20copia.jpg',
+			$normalized['imagen_url'],
+			'Espacios/caracteres especiales del filename deben URL-encodearse para que download_url() no falle.'
+		);
+	}
+
+	public function test_normalize_product_bare_filename_with_invalid_subdomain_is_discarded(): void {
+		$this->require_class( 'LTMS_Api_PosGold' );
+
+		// SSRF guard: build_base_url('evil.com') devuelve '' → el filename debe
+		// descartarse (imagen_url ''), nunca construir una URL hacia otro host.
+		$raw       = $this->real_api_response()['Datos'][0];
+		$normalized = \LTMS_Api_PosGold::normalize_product( $raw, 'evil.com' );
+
+		$this->assertSame( '', $normalized['imagen_url'], 'Un subdominio inválido (SSRF guard) debe descartar el filename, no construir URL externa.' );
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────
