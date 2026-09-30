@@ -4046,3 +4046,44 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    origin/main (el plugin dir del server ES el git repo, fetch OK con remote PAT embebido) +
    find ~/.opcache -type f -delete. El sync pesado (~224 productos con imágenes) correrlo con
    nohup wp eval-file ... & y sondear el log (SSH muere con SIGHUP en requests largos).
+
+
+### Lección #185: una exigencia de agrupación demasiado estricta (mismo parent) deja los duplicados vivos - y PS 5.1 Get-Content -Raw + Set-Content -Encoding UTF8 DOBLE-ENCODEA el archivo entero (usar la tool edit SIEMPRE)
+
+1. **Caso real (dedup incompleto):** CAT-NORM-002 (2026-09-29, commit `76c07f90`). La migración
+   CAT-DEDUP-001 (v2.9.19) mergeaba solo términos con EXACTAMENTE el mismo nombre normalizado Y
+   mismo parent - el diagnóstico live (227 términos, 18 grupos con variantes) dejó expuesto que
+   quedaron: singular/plural ("JUEGO DE MESA" 224 vs "JUEGOS DE MESA" 6), case/acento-variantes
+   con distinto parent ("Coloración" 178 parent 1219 vs "Coloracion" 41 parent 2930) y ~50 dupes
+   muertas count=0 de syncs. La exigencia de mismo parent era PROTECTIVA pero impedía el merge
+   real: los dupes con distinto parent eran sync-created (parent 0 o jerarquía vieja), no
+   jerarquías legítimas. Fix: merge por FINGERPRINT (lowercase + sin acentos + singular/plural
+   colapsado) SIN importar parent + canónico = el de MÁS productos + renombrar a MAYÚSCULAS con
+   slug EXPLÍCITO (wp_update_term sin slug explícito puede regenerarlo desde el nombre y romper
+   las URLs). Resultado: 227 -> 42 términos.
+
+2. **Caso real (encoding, 2a reincidencia del patrón PS):** el `Get-Content -Raw` de PS 5.1 usa
+   el encoding DEFAULT (ANSI/CP1252 en Windows), NO UTF-8 - leer un archivo UTF-8 con él misread
+   los multi-byte sequences como latin1 (á -> Ã¡), y `Set-Content -Encoding UTF8` re-encodeó el
+   DOBLE (Ã¡ persiste) + escribió BOM (EF BB BF, rompe headers/redirects de WP) + convirtió LF a
+   CRLF. El intento de reversión con latin1 encode fue LOSSY para los chars del rango
+   CP1252-específico (0x80-0x9F: comillas tipográficas " = U+201C no caben en latin1 -> '?' +
+   emojis dañados irreversiblemente) - obligó a git checkout + re-aplicar los cambios con la
+   tool edit. La lección #184 ya documentaba Add-Content; ESTA la extiende: Get-Content -Raw
+   (sin -Encoding UTF8) + Set-Content son ILEGALES para editar archivos con UTF-8.
+
+3. **Regla preventiva:** (a) al diseñar una migración de dedup, diagnosticar los datos REALES
+   primero (fingerprint grouping en un probe wp eval-file) - la exigencia de agrupación debe
+   cubrir los patrones reales, no los teóricos; (b) wp_update_term renombrando: pasar el slug
+   EXPLÍCITO; (c) para editar archivos del repo NUNCA usar Get-Content/Set-Content de PS 5.1 -
+   usar la tool edit del entorno (UTF-8 safe) o [System.IO.File]::ReadAllText(path,
+   [System.Text.Encoding]::UTF8) + WriteAllText con UTF8Encoding($false); (d) tras cualquier
+   operación de encoding masiva, verificar BOM + CRLF + doble-encode + git diff --stat (un diff
+   de 330 líneas para un cambio de 60 = re-encode churn); (e) node --check es el linter real
+   para los .js (php -l sobre un .js no valida nada) y el conteo de braces vs HEAD detecta
+   braces desbalanceados que php -l no ve.
+
+4. **Ops:** product_cat[]=a&product_cat[]=b (array nativo WP) fatala con HTTP 500 en producción
+   (verificado live, error_log sin rastro) - el multi-select de categorías usa CSV propio
+   (?ltms_cats=slug1,slug2 en /tienda/ con filtro pre_get_posts; ?cat=CSV en /vendedor/{slug}/)
+   con sanitize_title() POR ITEM (sobre el CSV crudo quita las comas y produce slug basura).

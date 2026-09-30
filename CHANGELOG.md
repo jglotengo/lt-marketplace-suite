@@ -4,7 +4,81 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-09-28/29
+## [Unreleased] — 2026-09-28/29/30
+
+### Fixed — `CAT-NORM-002` + `SHOP-CATS-MULTI` + `PROD-GALLERY-EDIT` + `PROD-IMG-FIT` (categorías duplicadas/variantes, multi-select en storefronts, galería en modal Editar, previews sin recorte)
+
+> **Reporte del vendor (4 issues):** (1) el form de productos del panel solo
+> permite una imagen (la destacada) — no hay galería de otros ángulos; (2) la
+> imagen del form se entrecorta/desborda (optimizar móvil y escritorio); (3)
+> "JUEGO DE MESA" y "JUEGOS DE MESA" son duplicados, hay categorías en
+> minúsculas y mayúsculas — normalizar; (4) el storefront no permite
+> multi-select de categorías y deben mostrarse en MAYÚSCULAS.
+>
+> **Diagnóstico (QA live, 2026-09-29):** 227 términos product_cat, **18 grupos
+> con variantes** — "JUEGO DE MESA" (id 8401, count=224) vs "JUEGOS DE MESA"
+> (id 1205, count=6, mismo parent); "Coloración" (178, parent 1219) vs
+> "Coloracion" (41, parent 2930) — CAT-DEDUP-001 exigía mismo parent y no las
+> mergeaba; ~50 dupes muertas count=0 de syncs ("Shampoo y acondicionador"
+> ×50, parents 1219/0/1357). Y: `product_cat[]=a&product_cat[]=b` fatala con
+> **HTTP 500** (verificado live; error_log sin rastro) — el multi-select no
+> puede usar el array nativo.
+>
+> **Fix (1+3 — CAT-NORM-002):** helper `LTMS_Utils::get_normalized_product_categories(
+> hide_empty )` — dedup por **fingerprint** (`category_fingerprint`: lowercase +
+> sin acentos + singular/plural colapsado vía trailing-'s' de palabras >3 chars
+> + espacios) + canónico = el término con MÁS productos (empate → MAYÚSCULAS,
+> luego id bajo) + name SIEMPRE en MAYÚSCULAS. Reemplaza a
+> `get_deduped_product_categories` (eliminada, sin consumidores: GROUP BY
+> t.name no mergeaba singular/plural y devolvía MIN(term_id) que puede ser un
+> término muerto). **Migración v2.9.20** (ltms_db_version 2.9.19 → 2.9.20):
+> merge por fingerprint SIN importar parent + canónico renombrado a MAYÚSCULAS
+> (slug explícito preservado — las URLs ?cat=slug y /categoria-producto/slug/
+> no cambian) + reasignación relationships/children/meta + wp_delete_term
+> (mismo patrón 1-5 de CAT-DEDUP-001). Consumidores actualizados: form del
+> panel (view-products.php, hide_empty=false) + filtro del shop
+> (archive-product.php, hide_empty=true, top 15).
+>
+> **Fix (2 — SHOP-CATS-MULTI):** shop `/tienda/`: links single-select →
+> **checkboxes** (`?ltms_cats=slug1,slug2`, CSV propio) + filtro
+> `pre_get_posts` `filter_shop_cats` (tax_query IN) + chips por categoría (cada
+> chip remueve solo la suya). Vendor store `/vendedor/{slug}/`: radios →
+> **checkboxes** + `cat` CSV parseado en la query inicial Y `ajax_load_more`
+> (paridad) + URLs stock/order/paginación/data-cat preservan el CSV crudo. JS
+> multi-select en ambos (`.pv-shop__cat-check` / `.ltms-sf-cat-check`
+> construyen la URL con el CSV preservando el resto de params).
+>
+> **Fix (galería — PROD-GALLERY-EDIT):** el modal Editar solo permitía la
+> imagen destacada (la galería existía SOLO en el modal Nuevo desde v2.9.88) —
+> añadida la sección ep-gallery (HTML + JS: subida máx 5, remoción, población
+> desde `d.gallery_urls` del producto existente) + `gallery_ids` en el submit
+> (el backend `update_product` ya lo maneja).
+>
+> **Fix (CSS — PROD-IMG-FIT):** `object-fit:cover` RECORTABA la imagen del
+> preview del form (entrecorte reportado) → `contain` + fondo blanco (np
+> upload + ep modal load + ep upload); modals `box-sizing:border-box` +
+> `width:100%` (el padding de 28px sumaba 560+56=616px y desbordaba); galería
+> `max-width:100%`. Móvil: el CSS existente (95vw) se mantiene.
+>
+> **QA punta a punta (producción, v2.9.404):** migración corrida →
+> ltms_db_version 2.9.20, **227 → 42 términos** (185 dupes mergeados),
+> **"JUEGO DE MESA" count=230** (224+6), "JUEGOS DE MESA" eliminado, helper:
+> 21 conceptos con productos **todos en MAYÚSCULAS** (BELLEZA Y SALUD 1383,
+> CUIDADO CAPILAR 792, COLORACIÓN 219...). Shop: checkboxes renderizando con
+> nombres MAYÚSCULAS; **multi `?ltms_cats=juego-de-mesa,no-aplica` → HTTP 200**
+> (antes 500) con 223 resultados; `?product_cat=slug` (back-compat) → 200.
+> Vitrina: checkboxes (radios: 0), "JUEGO DE MESA" en MAYÚSCULAS, multi
+> `?cat=juego-de-mesa` → 200. error_log sin entradas nuevas.
+>
+> **Tests (+22 nuevos, 7 huérfanos actualizados):** `CategoryNormMultiSelectTest`
+> (22 tests: fingerprint funcional singular/plural/case/acento/no-word-order/
+> palabras cortas + helper normalizado + migración + multi-select en ambos
+> storefronts + galería + CSS) + huérfanos actualizados en el MISMO commit
+> (PosGoldApiDocsParityTest ×4: merge variantes + hide_empty + wpdb error + el
+> form usa el helper normalizado; CategoryDedupMigrationTest/KycAudit2FixTest/
+> PanelAuditE2ETest: CURRENT_VERSION 2.9.20). Suite completa: 5,173 tests,
+> 11,008 assertions, 0 fallas (3 skips preexistentes). `LTMS_VERSION` 2.9.403
+> → 2.9.404. Deploy: SSH ff-merge + OPcache reset.
 
 ### Fixed — `POSGOLD-IMG-BASE` (filenames de imagen PosGold sin URL base → productos ocultados en bloque)
 
