@@ -134,9 +134,20 @@ final class LTMS_Frontend_Home_Slider {
     /**
      * Encola el CSS/JS del frontend solo en la página frontal (home).
      *
+     * HOME-REDESIGN-004 (2026-10-01): en la home NATIVA (home.php servida por
+     * LTMS_Native_Templates) el hero renderiza los banners directamente desde
+     * los slides (sin carrusel, sin autoplay) — el CSS/JS del slider no se
+     * usa ahí: no encolar (peso muerto). La misma condición de la rama del
+     * home en maybe_override(). Con Elementor (o la opción en 'no') el
+     * comportamiento original queda intacto.
+     *
      * @return void
      */
     public function enqueue_frontend_assets(): void {
+        if ( get_option( 'ltms_home_template_enabled', 'yes' ) === 'yes'
+            && is_front_page() && is_page() ) {
+            return;
+        }
         if ( ! is_front_page() && ! has_shortcode( get_post_field( 'post_content', get_the_ID() ), 'ltms_home_slider' ) ) {
             return;
         }
@@ -254,10 +265,23 @@ final class LTMS_Frontend_Home_Slider {
      * sin loop/the_content — si el slider ya se renderizó en the_content, este
      * método no hace nada (evita el doble banner).
      *
+     * HOME-REDESIGN-004 (2026-10-01): en la home NATIVA (home.php) el hero
+     * renderiza los banners del admin directamente en su posición correcta
+     * (sin carrusel). Este fallback corre en wp_footer (al final de la
+     * página) — si corrier ahí pondría el banner DEBAJO del footer. El hook
+     * ltms_before_home_plazaviva dispara desde home.php ANTES del hero, así
+     * que did_action() aquí es true cuando el template nativo sirvió la
+     * página: skip — la home nativa gestiona sus propios banners. Con
+     * Elementor (o la opción en 'no') did_action nunca dispara y el fallback
+     * sigue funcionando como antes.
+     *
      * @return void
      */
     public function inject_home_slider(): void {
         if ( $this->rendered ) {
+            return;
+        }
+        if ( did_action( 'ltms_before_home_plazaviva' ) ) {
             return;
         }
         if ( ! is_front_page() ) {

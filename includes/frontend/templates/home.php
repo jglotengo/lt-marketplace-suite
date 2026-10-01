@@ -195,7 +195,21 @@ $pv_star_vendors = get_users( array(
 ) );
 
 /* ---------------------------------------------------------------------------
- * 5. Helpers de render
+ * 5. Hero — banners del Home Slider (HOME-REDESIGN-004)
+ *    Banner principal = slide 1; tarjetas secundarias = slides 2 y 3 (título
+ *    corto + un único botón cada uno). Sin autoplay y sin carrusel en el hero
+ *    (brief). El contenido lo gestiona el admin (LT Marketplace → Home
+ *    Slider). Si no hay banners activos, fallback: hero gradiente con CTA.
+ * ------------------------------------------------------------------------- */
+$pv_hero_slides = array();
+if ( class_exists( 'LTMS_Frontend_Home_Slider' ) && method_exists( 'LTMS_Frontend_Home_Slider', 'get_slides' ) ) {
+    $pv_hero_slides = ( new LTMS_Frontend_Home_Slider() )->get_slides( true );
+}
+$pv_hero_banner = array_shift( $pv_hero_slides ); // slide 1 → banner principal
+$pv_hero_cards  = array_slice( $pv_hero_slides, 0, 2 ); // slides 2-3 → tarjetas
+
+/* ---------------------------------------------------------------------------
+ * 6. Helpers de render
  *
  * AUDIT-FE-PV-DS-003 FIX (P1-1, DRY): el helper ltms_pv_render_trending_card()
  * fue eliminado — reimplementaba .pv-product-card duplicando
@@ -409,11 +423,83 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * HERO BANNER — gradiente azul #2563EB
+     * HERO (HOME-REDESIGN-004, patrón Amazon): 1 banner principal (slide 1
+     * del Home Slider del admin) + 2 tarjetas secundarias (slides 2-3), cada
+     * una con título corto y un único botón. Sin autoplay, sin carrusel.
+     * Desktop: banner a la izquierda (≈66%) + tarjetas apiladas a la derecha
+     * (≈33%), una sola altura. Móvil/tablet: banner a ancho completo + las
+     * tarjetas en una fila de 2 columnas debajo. El texto va en HTML (nunca
+     * dentro de la imagen). La imagen del banner con prioridad de carga.
      * =====================================================================
      */
+    if ( ! empty( $pv_hero_banner ) && ! empty( $pv_hero_banner['image_desktop'] ) ) :
     ?>
     <section class="pv-section pv-home__hero-wrap" aria-labelledby="pv-home-hero-title">
+        <div class="pv-home-hero__head">
+            <span class="pv-hero__eyebrow">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <?php esc_html_e( 'Marketplace protegido con Escrow', 'ltms' ); ?>
+            </span>
+            <h1 id="pv-home-hero-title" class="pv-hero__title">
+                <?php esc_html_e( 'Compra con confianza, vende con libertad', 'ltms' ); ?>
+            </h1>
+            <p class="pv-hero__sub">
+                <?php esc_html_e( 'Miles de productos de vendedores verificados. Pago seguro y envío a todo el país.', 'ltms' ); ?>
+            </p>
+        </div>
+        <div class="pv-home-hero__grid">
+            <a class="pv-home-hero__banner"
+               href="<?php echo esc_url( (string) ( $pv_hero_banner['cta_url'] ?? '' ) !== '' ? (string) $pv_hero_banner['cta_url'] : $pv_shop_url ); ?>">
+                <?php /* HOME-REDESIGN-004: <picture> con recorte distinto para
+                     móvil (imagen 1:1 del admin) y escritorio (panorámica). */ ?>
+                <picture>
+                    <?php if ( ! empty( $pv_hero_banner['image_mobile'] ) ) : ?>
+                        <source media="(max-width: 767px)" srcset="<?php echo esc_url( (string) $pv_hero_banner['image_mobile'] ); ?>" />
+                    <?php endif; ?>
+                    <img src="<?php echo esc_url( (string) $pv_hero_banner['image_desktop'] ); ?>"
+                         alt="<?php echo esc_attr( (string) ( $pv_hero_banner['title'] ?? '' ) ); ?>"
+                         fetchpriority="high" loading="eager" decoding="async" />
+                </picture>
+                <span class="pv-home-hero__overlay">
+                    <?php if ( ! empty( $pv_hero_banner['title'] ) ) : ?>
+                        <span class="pv-home-hero__banner-title"><?php echo esc_html( (string) $pv_hero_banner['title'] ); ?></span>
+                    <?php endif; ?>
+                    <?php if ( ! empty( $pv_hero_banner['cta_text'] ) ) : ?>
+                        <span class="pv-home-hero__banner-cta"><?php echo esc_html( (string) $pv_hero_banner['cta_text'] ); ?></span>
+                    <?php endif; ?>
+                </span>
+            </a>
+            <?php if ( ! empty( $pv_hero_cards ) ) : ?>
+                <div class="pv-home-hero__side">
+                    <?php foreach ( $pv_hero_cards as $pv_hero_card ) :
+                        $pv_card_img = (string) ( $pv_hero_card['image_mobile'] ?? '' ) !== '' ? (string) $pv_hero_card['image_mobile'] : (string) ( $pv_hero_card['image_desktop'] ?? '' );
+                        if ( '' === $pv_card_img ) {
+                            continue;
+                        }
+                        $pv_card_url = (string) ( $pv_hero_card['cta_url'] ?? '' ) !== '' ? (string) $pv_hero_card['cta_url'] : $pv_shop_url;
+                    ?>
+                        <a class="pv-home-hero__card" href="<?php echo esc_url( $pv_card_url ); ?>">
+                            <img src="<?php echo esc_url( $pv_card_img ); ?>"
+                                 alt="<?php echo esc_attr( (string) ( $pv_hero_card['title'] ?? '' ) ); ?>"
+                                 loading="lazy" decoding="async" />
+                            <span class="pv-home-hero__overlay pv-home-hero__overlay--card">
+                                <?php if ( ! empty( $pv_hero_card['title'] ) ) : ?>
+                                    <span class="pv-home-hero__card-title"><?php echo esc_html( (string) $pv_hero_card['title'] ); ?></span>
+                                <?php endif; ?>
+                                <?php if ( ! empty( $pv_hero_card['cta_text'] ) ) : ?>
+                                    <span class="pv-home-hero__card-cta"><?php echo esc_html( (string) $pv_hero_card['cta_text'] ); ?></span>
+                                <?php endif; ?>
+                            </span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </section>
+    <?php else : ?>
+        <!-- Fallback: sin banners en el Home Slider — hero gradiente con CTA
+             (HOME-REDESIGN-004: una sola acción principal). -->
+        <section class="pv-section pv-home__hero-wrap" aria-labelledby="pv-home-hero-title">
         <div class="pv-hero pv-home-hero">
             <span class="pv-hero__eyebrow">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
@@ -430,12 +516,10 @@ do_action( 'ltms_before_home_plazaviva' );
                     <?php esc_html_e( 'Explorar productos', 'ltms' ); ?>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </a>
-                <a class="pv-btn pv-btn--ghost pv-btn--lg" href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>">
-                    <?php esc_html_e( 'Vender en Lo Tengo', 'ltms' ); ?>
-                </a>
             </div>
         </div>
     </section>
+    <?php endif; ?>
 
     <?php
     /* =====================================================================
@@ -945,9 +1029,86 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home-header__action{flex-direction:row;gap:6px;}
 }
 
-/* ── HERO ────────────────────────────────────────────────────────────────── */
+/* ── HERO (HOME-REDESIGN-004, patrón Amazon) ──────────────────────────────
+   Mobile-first: banner a ancho completo + 2 tarjetas en fila 2 columnas
+   debajo. ≥768 (tablet): banner con aspect-ratio panorámico. ≥1024
+   (escritorio): banner a la izquierda (≈66%) + tarjetas apiladas a la
+   derecha (≈33%), una sola altura (grid stretch). El texto del banner va
+   en HTML (overlay con scrim — nunca dentro de la imagen). La imagen del
+   banner con fetchpriority=high (sin carga diferida). */
 .pv-scope.pv-home .pv-home__hero-wrap{padding-top:28px;padding-bottom:8px;}
+.pv-scope.pv-home .pv-home-hero__head{
+    display:flex;flex-direction:column;gap:6px;
+    padding-bottom:16px;
+}
+.pv-scope.pv-home .pv-home-hero__grid{
+    display:grid;grid-template-columns:1fr;gap:12px;
+}
+.pv-scope.pv-home .pv-home-hero__side{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
+}
+.pv-scope.pv-home .pv-home-hero__banner{
+    position:relative;display:block;overflow:hidden;
+    border-radius:var(--r-md);text-decoration:none;
+    background:#1A1A4E;
+    min-height:120px;
+}
+.pv-scope.pv-home .pv-home-hero__banner img{display:block;width:100%;height:auto;}
+.pv-scope.pv-home .pv-home-hero__card{
+    position:relative;display:block;overflow:hidden;
+    border-radius:var(--r-md);text-decoration:none;
+    background:#1A1A4E;
+    min-height:120px;
+}
+.pv-scope.pv-home .pv-home-hero__card img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+}
+.pv-scope.pv-home .pv-home-hero__overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;
+    gap:6px;padding:16px 18px;
+    background:linear-gradient(to top, rgba(13,13,31,.72) 0%, rgba(13,13,31,.14) 55%, rgba(13,13,31,0) 100%);
+}
+.pv-scope.pv-home .pv-home-hero__banner-title{
+    font-family:var(--display);font-weight:800;
+    font-size:clamp(18px,2.4vw,28px);
+    color:#fff;line-height:1.15;
+    text-shadow:0 1px 8px rgba(0,0,0,.35);
+}
+.pv-scope.pv-home .pv-home-hero__banner-cta,
+.pv-scope.pv-home .pv-home-hero__card-cta{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:40px;padding:0 16px;
+    background:#fff;color:#1E40AF;
+    font-size:13px;font-weight:700;
+    border-radius:var(--r-pill);text-decoration:none;
+    white-space:nowrap;
+}
+.pv-scope.pv-home .pv-home-hero__card-title{
+    font-family:var(--display);font-weight:700;
+    font-size:clamp(14px,1.6vw,18px);
+    color:#fff;line-height:1.2;
+    text-shadow:0 1px 8px rgba(0,0,0,.35);
+}
+/* Fallback sin banners: el hero gradiente del design system. */
 .pv-scope.pv-home .pv-home-hero{padding:52px 48px;min-height:360px;}
+@media (min-width:768px){
+    .pv-scope.pv-home .pv-home-hero__banner{aspect-ratio:16/6;min-height:0;}
+    .pv-scope.pv-home .pv-home-hero__banner picture{
+        position:absolute;inset:0;
+    }
+    .pv-scope.pv-home .pv-home-hero__banner img{
+        position:absolute;inset:0;height:100%;object-fit:cover;
+    }
+}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home-hero__grid{grid-template-columns:2fr 1fr;gap:16px;}
+    .pv-scope.pv-home .pv-home-hero__side{
+        grid-template-columns:1fr;
+        grid-template-rows:repeat(2,1fr);
+    }
+    .pv-scope.pv-home .pv-home-hero__card{min-height:0;}
+}
 
 /* ── TRUST ───────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__trust{padding-top:24px;padding-bottom:8px;}

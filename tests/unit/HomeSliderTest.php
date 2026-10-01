@@ -345,9 +345,9 @@ final class HomeSliderTest extends LTMS_Unit_Test_Case {
 			'Debe existir el fallback inject_home_slider (templates sin loop/the_content).'
 		);
 		$this->assertStringContainsString(
-			'if ( $this->rendered ) {' . "\n" . '            return;' . "\n" . '        }' . "\n" . '        if ( ! is_front_page() ) {',
+			'if ( $this->rendered ) {' . "\n" . '            return;' . "\n" . '        }' . "\n" . '        if ( did_action( \'ltms_before_home_plazaviva\' ) ) {',
 			$src,
-			'El fallback de wp_footer debe verificar el flag rendered ANTES de renderizar (evita el doble banner).'
+			'El fallback de wp_footer debe verificar el flag rendered ANTES de renderizar (evita el doble banner), y saltarse en la home nativa (HOME-REDESIGN-004: home.php gestiona sus propios banners en el hero — el fallback pondría el banner debajo del footer).'
 		);
 		$this->assertStringContainsString(
 			'HOME-SLIDER-IMAGES-FIX (2026-09-24)',
