@@ -753,13 +753,20 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * FOOTER — enlaces legales · métodos de pago · redes sociales
+     * FOOTER (HOME-REDESIGN-006, patrón Amazon): 4 columnas Conócenos,
+     * Vende con nosotros, Ayuda y Legal. Móvil = acordeones colapsables por
+     * columna (<details> nativo, cero JS — CSP-compliant); tablet = 2
+     * columnas; escritorio = 4 columnas. Selector de moneda solo si ya
+     * existe soporte multi-moneda (LTMS_Currency_Manager — bail defensivo
+     * interno si no hay monedas habilitadas). Selector de país descartado:
+     * no existe soporte (brief: solo si ya existe).
      * =====================================================================
      */
     ?>
     <footer class="pv-home-footer" role="contentinfo">
         <div class="pv-section pv-home-footer__inner">
 
+            <?php /* --- Col 1: Conócenos (marca + tagline + redes) --- */ ?>
             <div class="pv-home-footer__col pv-home-footer__col--brand">
                 <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
                     <span class="pv-home-footer__logo-mark" aria-hidden="true">
@@ -770,45 +777,7 @@ do_action( 'ltms_before_home_plazaviva' );
                 <p class="pv-home-footer__tagline">
                     <?php esc_html_e( 'El marketplace donde compras con confianza y vendes con libertad. Protegido con Escrow, vendedores verificados y envío a todo el país.', 'ltms' ); ?>
                 </p>
-            </div>
-
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Enlaces legales', 'ltms' ); ?>">
-                <h4 class="pv-home-footer__col-title"><?php esc_html_e( 'Legal', 'ltms' ); ?></h4>
-                <ul class="pv-home-footer__links">
-                    <?php
-                    $pv_legal_links = apply_filters( 'ltms_home_footer_legal_links', array(
-                        array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => home_url( '/terminos' ) ),
-                        array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => home_url( '/privacidad' ) ),
-                        array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => home_url( '/cookies' ) ),
-                        array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => home_url( '/habeas-data' ) ),
-                    ) );
-                    foreach ( $pv_legal_links as $pv_link ) :
-                    ?>
-                        <li><a href="<?php echo esc_url( $pv_link['url'] ); ?>"><?php echo esc_html( $pv_link['label'] ); ?></a></li>
-                    <?php endforeach; ?>
-                </ul>
-            </nav>
-
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Métodos de pago', 'ltms' ); ?>">
-                <h4 class="pv-home-footer__col-title"><?php esc_html_e( 'Pagos', 'ltms' ); ?></h4>
-                <ul class="pv-home-footer__payments">
-                    <?php
-                    $pv_payments = apply_filters( 'ltms_home_footer_payments', array(
-                        'PSE', 'Nequi', 'Daviplata', 'Visa', 'Mastercard', 'Amex',
-                    ) );
-                    foreach ( $pv_payments as $pv_pay ) :
-                    ?>
-                        <li class="pv-home-footer__pay-badge"><?php echo esc_html( $pv_pay ); ?></li>
-                    <?php endforeach; ?>
-                </ul>
-                <p class="pv-home-footer__pay-note">
-                    <?php esc_html_e( 'Pago seguro con Escrow · Billetera Lo Tengo', 'ltms' ); ?>
-                </p>
-            </nav>
-
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Redes sociales', 'ltms' ); ?>">
-                <h4 class="pv-home-footer__col-title"><?php esc_html_e( 'Síguenos', 'ltms' ); ?></h4>
-                <ul class="pv-home-footer__social">
+                <ul class="pv-home-footer__social" aria-label="<?php esc_attr_e( 'Redes sociales', 'ltms' ); ?>">
                     <?php
                     $pv_socials = apply_filters( 'ltms_home_footer_socials', array(
                         array( 'label' => 'Instagram', 'url' => 'https://instagram.com', 'icon' => 'instagram' ),
@@ -826,9 +795,79 @@ do_action( 'ltms_before_home_plazaviva' );
                         </li>
                     <?php endforeach; ?>
                 </ul>
+            </div>
+
+            <?php /* --- Col 2: Vende con nosotros --- */ ?>
+            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Vende con nosotros', 'ltms' ); ?>">
+                <details class="pv-home-footer__acc" open>
+                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></summary>
+                    <ul class="pv-home-footer__links">
+                        <li><a href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>"><?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?></a></li>
+                        <li><a href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>"><?php esc_html_e( 'Ver vendedores', 'ltms' ); ?></a></li>
+                    </ul>
+                </details>
+            </nav>
+
+            <?php /* --- Col 3: Ayuda --- */ ?>
+            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Ayuda', 'ltms' ); ?>">
+                <details class="pv-home-footer__acc" open>
+                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Ayuda', 'ltms' ); ?></summary>
+                    <ul class="pv-home-footer__links">
+                        <li><a href="<?php echo esc_url( home_url( '/ayuda' ) ); ?>"><?php esc_html_e( 'Centro de ayuda', 'ltms' ); ?></a></li>
+                        <li><a href="<?php echo esc_url( home_url( '/seguimiento' ) ); ?>"><?php esc_html_e( 'Rastrear pedido', 'ltms' ); ?></a></li>
+                        <li><a href="<?php echo esc_url( $pv_account_url ); ?>"><?php esc_html_e( 'Mi cuenta', 'ltms' ); ?></a></li>
+                    </ul>
+                </details>
+            </nav>
+
+            <?php /* --- Col 4: Legal --- */ ?>
+            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Enlaces legales', 'ltms' ); ?>">
+                <details class="pv-home-footer__acc" open>
+                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Legal', 'ltms' ); ?></summary>
+                    <ul class="pv-home-footer__links">
+                        <?php
+                        $pv_legal_links = apply_filters( 'ltms_home_footer_legal_links', array(
+                            array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => home_url( '/terminos' ) ),
+                            array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => home_url( '/privacidad' ) ),
+                            array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => home_url( '/cookies' ) ),
+                            array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => home_url( '/habeas-data' ) ),
+                        ) );
+                        foreach ( $pv_legal_links as $pv_link ) :
+                        ?>
+                            <li><a href="<?php echo esc_url( $pv_link['url'] ); ?>"><?php echo esc_html( $pv_link['label'] ); ?></a></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </details>
             </nav>
 
         </div>
+
+        <?php /* --- Pagos + selector de moneda (solo si multi-moneda activa) --- */ ?>
+        <div class="pv-section pv-home-footer__payrow">
+            <ul class="pv-home-footer__payments" aria-label="<?php esc_attr_e( 'Métodos de pago', 'ltms' ); ?>">
+                <?php
+                $pv_payments = apply_filters( 'ltms_home_footer_payments', array(
+                    'PSE', 'Nequi', 'Daviplata', 'Visa', 'Mastercard', 'Amex',
+                ) );
+                foreach ( $pv_payments as $pv_pay ) :
+                ?>
+                    <li class="pv-home-footer__pay-badge"><?php echo esc_html( $pv_pay ); ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <p class="pv-home-footer__pay-note">
+                <?php esc_html_e( 'Pago seguro con Escrow · Billetera Lo Tengo', 'ltms' ); ?>
+            </p>
+            <?php
+            /* HOME-REDESIGN-006: selector de moneda solo si ya existe soporte
+               multi-moneda (brief). El widget canónico del checkout reutilizado
+               — hace bail defensivo si el motor cross-border no está cargado o
+               no hay monedas habilitadas (renderiza nada). */
+            if ( class_exists( 'LTMS_Currency_Manager' ) && method_exists( 'LTMS_Currency_Manager', 'render_currency_selector' ) ) {
+                LTMS_Currency_Manager::render_currency_selector();
+            }
+            ?>
+        </div>
+
         <div class="pv-home-footer__bottom">
             <div class="pv-section pv-home-footer__bottom-inner">
                 <span>&copy; <?php echo esc_html( date_i18n( 'Y' ) ); ?> <?php echo esc_html( get_bloginfo( 'name' ) ); ?>. <?php esc_html_e( 'Todos los derechos reservados.', 'ltms' ); ?></span>
@@ -1358,7 +1397,13 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-footer__links{display:flex;flex-direction:column;gap:9px;}
 .pv-scope.pv-home .pv-home-footer__links a{font-size:13.5px;color:var(--text-2);text-decoration:none;transition:color var(--t);}
 .pv-scope.pv-home .pv-home-footer__links a:hover{color:var(--primary);}
-.pv-scope.pv-home .pv-home-footer__payments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.pv-scope.pv-home .pv-home-footer__payments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0;}
+/* HOME-REDESIGN-006: fila de pagos + selector de moneda (bajo las columnas). */
+.pv-scope.pv-home .pv-home-footer__payrow{
+    display:flex;flex-direction:column;gap:10px;
+    padding-top:24px;padding-bottom:32px;
+    border-top:1px solid var(--border);
+}
 .pv-scope.pv-home .pv-home-footer__pay-badge{
     padding:5px 10px;border-radius:var(--r-sm);
     background:var(--bg);border:1px solid var(--border);
@@ -1376,6 +1421,29 @@ body.pv-home-native .ltms-header-access{display:none!important}
     background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-2px);
 }
 .pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid var(--border);}
+/* HOME-REDESIGN-006: acordeones colapsables por columna en móvil
+   (<details> nativo, cero JS — CSP-compliant). Desktop ≥1024: headers
+   estáticos siempre abiertos (pointer-events:none — sin JS). */
+.pv-scope.pv-home .pv-home-footer__acc summary{
+    list-style:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:14px 0;margin-bottom:0;
+}
+.pv-scope.pv-home .pv-home-footer__acc summary::-webkit-details-marker{display:none;}
+.pv-scope.pv-home .pv-home-footer__acc summary::after{
+    content:"";width:9px;height:9px;flex-shrink:0;
+    border-right:2px solid var(--text-3);border-bottom:2px solid var(--text-3);
+    transform:rotate(45deg);transition:transform var(--t);
+}
+.pv-scope.pv-home .pv-home-footer__acc[open] summary::after{transform:rotate(-135deg);}
+.pv-scope.pv-home .pv-home-footer__acc .pv-home-footer__links{padding-top:4px;}
+@media (min-width:768px){
+    .pv-scope.pv-home .pv-home-footer__acc summary{padding-top:0;}
+}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home-footer__acc summary{cursor:default;pointer-events:none;}
+    .pv-scope.pv-home .pv-home-footer__acc summary::after{display:none;}
+}
 .pv-scope.pv-home .pv-home-footer__bottom-inner{
     display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
     padding-top:18px;padding-bottom:18px;font-size:12.5px;color:var(--text-3);
